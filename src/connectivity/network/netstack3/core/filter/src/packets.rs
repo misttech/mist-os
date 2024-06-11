@@ -2010,11 +2010,11 @@ mod tests {
         }
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn update_pseudo_header_address_updates_checksum<I: Ip + TestIpExt, P: Protocol>(_proto: P) {
+    fn update_pseudo_header_address_updates_checksum<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut buf = P::make_packet::<I>(I::SRC_IP, I::DST_IP);
         let view = SliceBufViewMut::new(&mut buf);
 
@@ -2036,12 +2036,12 @@ mod tests {
         assert_eq!(equivalent, buf);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp, true, true)]
     #[test_case(Tcp, true, true)]
     #[test_case(IcmpEchoRequest, true, false)]
     #[test_case(IcmpEchoReply, false, true)]
-    fn parsed_packet_update_src_dst_port_updates_checksum<I: Ip + TestIpExt, P: Protocol>(
+    fn parsed_packet_update_src_dst_port_updates_checksum<I: TestIpExt, P: Protocol>(
         _proto: P,
         update_src_port: bool,
         update_dst_port: bool,
@@ -2080,10 +2080,10 @@ mod tests {
         assert_eq!(equivalent, buf);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
-    fn serializer_update_src_dst_port_updates_checksum<I: Ip + TestIpExt, P: Protocol>(_proto: P) {
+    fn serializer_update_src_dst_port_updates_checksum<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut serializer =
             P::make_serializer_with_ports::<I>(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT);
         let mut packet =
@@ -2098,8 +2098,8 @@ mod tests {
         assert_eq!(equivalent, serializer);
     }
 
-    #[ip_test]
-    fn icmp_echo_request_update_id_port_updates_checksum<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn icmp_echo_request_update_id_port_updates_checksum<I: TestIpExt>() {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
@@ -2121,8 +2121,8 @@ mod tests {
         assert_eq!(equivalent, serializer);
     }
 
-    #[ip_test]
-    fn icmp_echo_reply_update_id_port_updates_checksum<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn icmp_echo_reply_update_id_port_updates_checksum<I: TestIpExt>() {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
@@ -2167,9 +2167,9 @@ mod tests {
         packet.set_src_port(SRC_PORT_2);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[should_panic]
-    fn icmp_echo_request_set_dst_port_panics<I: Ip + TestIpExt>() {
+    fn icmp_echo_request_set_dst_port_panics<I: TestIpExt>() {
         let mut serializer = IcmpEchoRequest::make_serializer::<I>(I::SRC_IP, I::DST_IP);
         let Some(packet) = serializer.transport_packet_mut() else {
             // We expect this method to always return Some, and this test is expected to
@@ -2180,9 +2180,9 @@ mod tests {
         packet.set_dst_port(SRC_PORT_2);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[should_panic]
-    fn icmp_echo_reply_set_src_port_panics<I: Ip + TestIpExt>() {
+    fn icmp_echo_reply_set_src_port_panics<I: TestIpExt>() {
         let mut serializer = IcmpEchoReply::make_serializer::<I>(I::SRC_IP, I::DST_IP);
         let Some(packet) = serializer.transport_packet_mut() else {
             // We expect this method to always return Some, and this test is expected to
@@ -2201,11 +2201,11 @@ mod tests {
             .unwrap_b()
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn ip_packet_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(_proto: P)
+    fn ip_packet_set_src_dst_addr_updates_checksums<I: TestIpExt, P: Protocol>(_proto: P)
     where
         for<'a> I::Packet<&'a mut [u8]>: IpPacket<I>,
     {
@@ -2222,13 +2222,11 @@ mod tests {
         assert_eq!(equivalent, buf);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn forwarded_packet_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(
-        _proto: P,
-    ) {
+    fn forwarded_packet_set_src_dst_addr_updates_checksums<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut buffer = ip_packet::<I, P>(I::SRC_IP, I::DST_IP);
         let meta = buffer.parse::<I::Packet<_>>().expect("parse IP packet").parse_metadata();
         let mut packet =
@@ -2244,11 +2242,11 @@ mod tests {
         assert_eq!(equivalent, packet);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn tx_packet_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(_proto: P) {
+    fn tx_packet_set_src_dst_addr_updates_checksums<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut body = P::make_serializer::<I>(I::SRC_IP, I::DST_IP);
         let mut packet = TxPacket::<I, _>::new(I::SRC_IP, I::DST_IP, P::proto::<I>(), &mut body);
         packet.set_src_addr(I::SRC_IP_2);
@@ -2261,13 +2259,11 @@ mod tests {
         assert_eq!(equivalent, packet);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn nested_serializer_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(
-        _proto: P,
-    ) {
+    fn nested_serializer_set_src_dst_addr_updates_checksums<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut packet = P::make_serializer::<I>(I::SRC_IP, I::DST_IP).encapsulate(
             I::PacketBuilder::new(I::SRC_IP, I::DST_IP, /* ttl */ u8::MAX, P::proto::<I>()),
         );

@@ -7,7 +7,7 @@ use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 
 use net_types::ethernet::Mac;
-use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu};
+use net_types::ip::{AddrSubnet, Ipv4, Ipv6, Mtu};
 use net_types::SpecifiedAddr;
 use netstack3_base::testutil::{TestAddrs, TestIpExt};
 use netstack3_core::error::NotFoundError;
@@ -42,8 +42,8 @@ fn loopback_mtu() {
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-#[ip_test]
-fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_loopback_add_remove_addrs<I: TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();
     let device = ctx
         .core_api()
@@ -82,8 +82,8 @@ fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpExt>() {
     assert_matches!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, addr), Err(NotFoundError));
 }
 
-#[ip_test]
-fn loopback_sends_ethernet<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn loopback_sends_ethernet<I: TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();
     let device = ctx.core_api().device::<LoopbackDevice>().add_device_with_default_state(
         LoopbackCreationProperties { mtu: MTU },

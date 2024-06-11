@@ -1851,7 +1851,7 @@ impl NudIcmpIpExt for Ipv6 {
 
 /// The execution context which allows sending ICMP destination unreachable
 /// errors, which needs to happen when address resolution fails.
-pub trait NudIcmpContext<I: Ip + NudIcmpIpExt, D: LinkDevice, BC>: DeviceIdContext<D> {
+pub trait NudIcmpContext<I: NudIcmpIpExt, D: LinkDevice, BC>: DeviceIdContext<D> {
     /// Send an ICMP destination unreachable error to `original_src_ip` as
     /// a result of `frame` being unable to be sent/forwarded due to link
     /// layer address resolution failure.
@@ -2074,7 +2074,7 @@ enum TransmitProbe<A> {
 }
 
 impl<
-        I: Ip + NudIcmpIpExt,
+        I: NudIcmpIpExt,
         D: LinkDevice,
         BC: NudBindingsContext<I, D, CC::DeviceId>,
         CC: NudContext<I, D, BC> + NudIcmpContext<I, D, BC> + CounterContext<NudCounters<I>>,
@@ -2097,7 +2097,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
     bindings_ctx: &mut BC,
     device_id: CC::DeviceId,
 ) where
-    I: Ip + NudIcmpIpExt,
+    I: NudIcmpIpExt,
     D: LinkDevice,
     BC: NudBindingsContext<I, D, CC::DeviceId>,
     CC: NudContext<I, D, BC> + NudIcmpContext<I, D, BC> + CounterContext<NudCounters<I>>,
@@ -2881,7 +2881,7 @@ mod tests {
         }
     }
 
-    impl<I: Ip + NudIcmpIpExt> NudIcmpContext<I, FakeLinkDevice, FakeBindingsCtxImpl<I>>
+    impl<I: NudIcmpIpExt> NudIcmpContext<I, FakeLinkDevice, FakeBindingsCtxImpl<I>>
         for FakeCoreCtxImpl<I>
     {
         fn send_icmp_dest_unreachable(
@@ -3069,7 +3069,7 @@ mod tests {
         }
     }
 
-    fn queue_ip_packet_to_unresolved_neighbor<I: Ip + TestIpExt>(
+    fn queue_ip_packet_to_unresolved_neighbor<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
@@ -3112,7 +3112,7 @@ mod tests {
         );
     }
 
-    fn init_incomplete_neighbor_with_ip<I: Ip + TestIpExt>(
+    fn init_incomplete_neighbor_with_ip<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
@@ -3133,7 +3133,7 @@ mod tests {
         pending_frames
     }
 
-    fn init_incomplete_neighbor<I: Ip + TestIpExt>(
+    fn init_incomplete_neighbor<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         take_probe: bool,
@@ -3141,7 +3141,7 @@ mod tests {
         init_incomplete_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, take_probe)
     }
 
-    fn init_stale_neighbor_with_ip<I: Ip + TestIpExt>(
+    fn init_stale_neighbor_with_ip<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
@@ -3164,7 +3164,7 @@ mod tests {
         );
     }
 
-    fn init_stale_neighbor<I: Ip + TestIpExt>(
+    fn init_stale_neighbor<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
@@ -3172,7 +3172,7 @@ mod tests {
         init_stale_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
-    fn init_reachable_neighbor_with_ip<I: Ip + TestIpExt>(
+    fn init_reachable_neighbor_with_ip<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
@@ -3204,7 +3204,7 @@ mod tests {
         assert_pending_frame_sent(core_ctx, queued_frame, link_address);
     }
 
-    fn init_reachable_neighbor<I: Ip + TestIpExt>(
+    fn init_reachable_neighbor<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
@@ -3212,7 +3212,7 @@ mod tests {
         init_reachable_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
-    fn init_delay_neighbor_with_ip<I: Ip + TestIpExt>(
+    fn init_delay_neighbor_with_ip<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
@@ -3242,7 +3242,7 @@ mod tests {
         );
     }
 
-    fn init_delay_neighbor<I: Ip + TestIpExt>(
+    fn init_delay_neighbor<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
@@ -3250,7 +3250,7 @@ mod tests {
         init_delay_neighbor_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1, link_address);
     }
 
-    fn init_probe_neighbor_with_ip<I: Ip + TestIpExt>(
+    fn init_probe_neighbor_with_ip<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
@@ -3279,7 +3279,7 @@ mod tests {
         }
     }
 
-    fn init_probe_neighbor<I: Ip + TestIpExt>(
+    fn init_probe_neighbor<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
@@ -3294,7 +3294,7 @@ mod tests {
         );
     }
 
-    fn init_unreachable_neighbor_with_ip<I: Ip + TestIpExt>(
+    fn init_unreachable_neighbor_with_ip<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
@@ -3322,7 +3322,7 @@ mod tests {
         );
     }
 
-    fn init_unreachable_neighbor<I: Ip + TestIpExt>(
+    fn init_unreachable_neighbor<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
@@ -3340,7 +3340,7 @@ mod tests {
         Unreachable,
     }
 
-    fn init_neighbor_in_state<I: Ip + TestIpExt>(
+    fn init_neighbor_in_state<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         state: InitialState,
@@ -3372,7 +3372,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn init_static_neighbor_with_ip<I: Ip + TestIpExt>(
+    fn init_static_neighbor_with_ip<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
@@ -3398,7 +3398,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn init_static_neighbor<I: Ip + TestIpExt>(
+    fn init_static_neighbor<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         link_address: FakeLinkAddress,
@@ -3414,7 +3414,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn delete_neighbor<I: Ip + TestIpExt>(
+    fn delete_neighbor<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
     ) {
@@ -3429,7 +3429,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_neighbor_state<I: Ip + TestIpExt>(
+    fn assert_neighbor_state<I: TestIpExt>(
         core_ctx: &FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         state: DynamicNeighborState<FakeLinkDevice, FakeBindingsCtxImpl<I>>,
@@ -3445,7 +3445,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_neighbor_state_with_ip<I: Ip + TestIpExt>(
+    fn assert_neighbor_state_with_ip<I: TestIpExt>(
         core_ctx: &FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
@@ -3475,7 +3475,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_pending_frame_sent<I: Ip + TestIpExt>(
+    fn assert_pending_frame_sent<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         pending_frames: VecDeque<Buf<Vec<u8>>>,
         link_address: FakeLinkAddress,
@@ -3493,7 +3493,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_neighbor_probe_sent_for_ip<I: Ip + TestIpExt>(
+    fn assert_neighbor_probe_sent_for_ip<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         ip_address: SpecifiedAddr<I::Addr>,
         link_address: Option<FakeLinkAddress>,
@@ -3511,7 +3511,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_neighbor_probe_sent<I: Ip + TestIpExt>(
+    fn assert_neighbor_probe_sent<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         link_address: Option<FakeLinkAddress>,
     ) {
@@ -3519,7 +3519,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_neighbor_removed_with_ip<I: Ip + TestIpExt>(
+    fn assert_neighbor_removed_with_ip<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
         neighbor: SpecifiedAddr<I::Addr>,
@@ -3531,8 +3531,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn incomplete_to_stale_on_probe<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn incomplete_to_stale_on_probe<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in INCOMPLETE.
@@ -3558,12 +3558,12 @@ mod tests {
         assert_pending_frame_sent(&mut core_ctx, queued_frame, LINK_ADDR1);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(true, true; "solicited override")]
     #[test_case(true, false; "solicited non-override")]
     #[test_case(false, true; "unsolicited override")]
     #[test_case(false, false; "unsolicited non-override")]
-    fn incomplete_on_confirmation<I: Ip + TestIpExt>(solicited_flag: bool, override_flag: bool) {
+    fn incomplete_on_confirmation<I: TestIpExt>(solicited_flag: bool, override_flag: bool) {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in INCOMPLETE.
@@ -3599,8 +3599,8 @@ mod tests {
         assert_pending_frame_sent(&mut core_ctx, queued_frame, LINK_ADDR1);
     }
 
-    #[ip_test]
-    fn reachable_to_stale_on_timeout<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn reachable_to_stale_on_timeout<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in REACHABLE.
@@ -3620,7 +3620,7 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(InitialState::Reachable, true; "reachable with different address")]
     #[test_case(InitialState::Reachable, false; "reachable with same address")]
     #[test_case(InitialState::Stale, true; "stale with different address")]
@@ -3631,7 +3631,7 @@ mod tests {
     #[test_case(InitialState::Probe, false; "probe with same address")]
     #[test_case(InitialState::Unreachable, true; "unreachable with different address")]
     #[test_case(InitialState::Unreachable, false; "unreachable with same address")]
-    fn transition_to_stale_on_probe_with_different_address<I: Ip + TestIpExt>(
+    fn transition_to_stale_on_probe_with_different_address<I: TestIpExt>(
         initial_state: InitialState,
         update_link_address: bool,
     ) {
@@ -3668,7 +3668,7 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(InitialState::Reachable, true; "reachable with override flag set")]
     #[test_case(InitialState::Reachable, false; "reachable with override flag not set")]
     #[test_case(InitialState::Stale, true; "stale with override flag set")]
@@ -3679,7 +3679,7 @@ mod tests {
     #[test_case(InitialState::Probe, false; "probe with override flag not set")]
     #[test_case(InitialState::Unreachable, true; "unreachable with override flag set")]
     #[test_case(InitialState::Unreachable, false; "unreachable with override flag not set")]
-    fn transition_to_reachable_on_solicited_confirmation_same_address<I: Ip + TestIpExt>(
+    fn transition_to_reachable_on_solicited_confirmation_same_address<I: TestIpExt>(
         initial_state: InitialState,
         override_flag: bool,
     ) {
@@ -3714,14 +3714,14 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(InitialState::Reachable; "reachable")]
     #[test_case(InitialState::Stale; "stale")]
     #[test_case(InitialState::Delay; "delay")]
     #[test_case(InitialState::Probe; "probe")]
     #[test_case(InitialState::Unreachable; "unreachable")]
     fn transition_to_stale_on_unsolicited_override_confirmation_with_different_address<
-        I: Ip + TestIpExt,
+        I: TestIpExt,
     >(
         initial_state: InitialState,
     ) {
@@ -3752,7 +3752,7 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(InitialState::Reachable, true; "reachable with override flag set")]
     #[test_case(InitialState::Reachable, false; "reachable with override flag not set")]
     #[test_case(InitialState::Stale, true; "stale with override flag set")]
@@ -3763,7 +3763,7 @@ mod tests {
     #[test_case(InitialState::Probe, false; "probe with override flag not set")]
     #[test_case(InitialState::Unreachable, true; "unreachable with override flag set")]
     #[test_case(InitialState::Unreachable, false; "unreachable with override flag not set")]
-    fn noop_on_unsolicited_confirmation_with_same_address<I: Ip + TestIpExt>(
+    fn noop_on_unsolicited_confirmation_with_same_address<I: TestIpExt>(
         initial_state: InitialState,
         override_flag: bool,
     ) {
@@ -3790,14 +3790,14 @@ mod tests {
         assert_neighbor_state(&core_ctx, &mut bindings_ctx, expected_state, None);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(InitialState::Reachable; "reachable")]
     #[test_case(InitialState::Stale; "stale")]
     #[test_case(InitialState::Delay; "delay")]
     #[test_case(InitialState::Probe; "probe")]
     #[test_case(InitialState::Unreachable; "unreachable")]
     fn transition_to_reachable_on_solicited_override_confirmation_with_different_address<
-        I: Ip + TestIpExt,
+        I: TestIpExt,
     >(
         initial_state: InitialState,
     ) {
@@ -3832,8 +3832,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn reachable_to_reachable_on_probe_with_same_address<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn reachable_to_reachable_on_probe_with_same_address<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in REACHABLE.
@@ -3862,10 +3862,10 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(true; "solicited")]
     #[test_case(false; "unsolicited")]
-    fn reachable_to_stale_on_non_override_confirmation_with_different_address<I: Ip + TestIpExt>(
+    fn reachable_to_stale_on_non_override_confirmation_with_different_address<I: TestIpExt>(
         solicited_flag: bool,
     ) {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
@@ -3896,7 +3896,7 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(InitialState::Stale, true; "stale solicited")]
     #[test_case(InitialState::Stale, false; "stale unsolicited")]
     #[test_case(InitialState::Delay, true; "delay solicited")]
@@ -3905,7 +3905,7 @@ mod tests {
     #[test_case(InitialState::Probe, false; "probe unsolicited")]
     #[test_case(InitialState::Unreachable, true; "unreachable solicited")]
     #[test_case(InitialState::Unreachable, false; "unreachable unsolicited")]
-    fn noop_on_non_override_confirmation_with_different_address<I: Ip + TestIpExt>(
+    fn noop_on_non_override_confirmation_with_different_address<I: TestIpExt>(
         initial_state: InitialState,
         solicited_flag: bool,
     ) {
@@ -3932,8 +3932,8 @@ mod tests {
         assert_neighbor_state(&core_ctx, &mut bindings_ctx, initial_state, None);
     }
 
-    #[ip_test]
-    fn stale_to_delay_on_packet_sent<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn stale_to_delay_on_packet_sent<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Initialize a neighbor in STALE.
@@ -3970,14 +3970,14 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(InitialState::Delay,
                 NudEvent::DelayFirstProbe;
                 "delay to probe")]
     #[test_case(InitialState::Probe,
                 NudEvent::RetransmitUnicastProbe;
                 "probe retransmit unicast probe")]
-    fn delay_or_probe_to_probe_on_timeout<I: Ip + TestIpExt>(
+    fn delay_or_probe_to_probe_on_timeout<I: TestIpExt>(
         initial_state: InitialState,
         expected_initial_event: NudEvent,
     ) {
@@ -4027,8 +4027,8 @@ mod tests {
         assert_neighbor_probe_sent(&mut core_ctx, Some(LINK_ADDR1));
     }
 
-    #[ip_test]
-    fn unreachable_probes_with_exponential_backoff_while_packets_sent<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn unreachable_probes_with_exponential_backoff_while_packets_sent<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         init_unreachable_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -4152,10 +4152,10 @@ mod tests {
         )]);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(true; "solicited confirmation")]
     #[test_case(false; "unsolicited confirmation")]
-    fn confirmation_should_not_create_entry<I: Ip + TestIpExt>(solicited_flag: bool) {
+    fn confirmation_should_not_create_entry<I: TestIpExt>(solicited_flag: bool) {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         let link_addr = FakeLinkAddress([1]);
@@ -4173,10 +4173,10 @@ mod tests {
         assert_eq!(core_ctx.nud.state.neighbors, HashMap::new());
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(true; "set_with_dynamic")]
     #[test_case(false; "set_with_static")]
-    fn pending_frames<I: Ip + TestIpExt>(dynamic: bool) {
+    fn pending_frames<I: TestIpExt>(dynamic: bool) {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         assert_eq!(core_ctx.inner.take_frames(), []);
 
@@ -4290,8 +4290,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn static_neighbor<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn static_neighbor<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         init_static_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1, ExpectedEvent::Added);
@@ -4316,8 +4316,8 @@ mod tests {
         assert!(neighbors.is_empty(), "neighbor table should be empty: {neighbors:?}");
     }
 
-    #[ip_test]
-    fn dynamic_neighbor<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn dynamic_neighbor<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         init_stale_neighbor(&mut core_ctx, &mut bindings_ctx, LINK_ADDR1);
@@ -4355,8 +4355,8 @@ mod tests {
         assert_eq!(core_ctx.inner.take_frames(), []);
     }
 
-    #[ip_test]
-    fn send_solicitation_on_lookup<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn send_solicitation_on_lookup<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
@@ -4419,8 +4419,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn solicitation_failure_in_incomplete<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn solicitation_failure_in_incomplete<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
@@ -4466,8 +4466,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn solicitation_failure_in_probe<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn solicitation_failure_in_probe<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
@@ -4509,8 +4509,8 @@ mod tests {
         assert_eq!(core_ctx.inner.take_frames(), []);
     }
 
-    #[ip_test]
-    fn flush_entries<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn flush_entries<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
@@ -4565,8 +4565,8 @@ mod tests {
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
-    #[ip_test]
-    fn delete_dynamic_entry<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn delete_dynamic_entry<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(core_ctx.inner.take_frames(), []);
@@ -4582,13 +4582,13 @@ mod tests {
         bindings_ctx.timers.assert_no_timers_installed();
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(InitialState::Reachable; "reachable neighbor")]
     #[test_case(InitialState::Stale; "stale neighbor")]
     #[test_case(InitialState::Delay; "delay neighbor")]
     #[test_case(InitialState::Probe; "probe neighbor")]
     #[test_case(InitialState::Unreachable; "unreachable neighbor")]
-    fn resolve_cached_linked_addr<I: Ip + TestIpExt>(initial_state: InitialState) {
+    fn resolve_cached_linked_addr<I: TestIpExt>(initial_state: InitialState) {
         let mut ctx = new_context::<I>();
         ctx.bindings_ctx.timers.assert_no_timers_installed();
         assert_eq!(ctx.core_ctx.inner.take_frames(), []);
@@ -4621,10 +4621,10 @@ mod tests {
         StaticEntryAdded,
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(ResolutionSuccess::Confirmation; "incomplete entry timed out")]
     #[test_case(ResolutionSuccess::StaticEntryAdded; "incomplete entry removed from table")]
-    fn dynamic_neighbor_resolution_success<I: Ip + TestIpExt>(reason: ResolutionSuccess) {
+    fn dynamic_neighbor_resolution_success<I: TestIpExt>(reason: ResolutionSuccess) {
         let mut ctx = new_context::<I>();
 
         let observers = (0..10)
@@ -4704,10 +4704,10 @@ mod tests {
         Removed,
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(ResolutionFailure::Timeout; "incomplete entry timed out")]
     #[test_case(ResolutionFailure::Removed; "incomplete entry removed from table")]
-    fn dynamic_neighbor_resolution_failure<I: Ip + TestIpExt>(reason: ResolutionFailure) {
+    fn dynamic_neighbor_resolution_failure<I: TestIpExt>(reason: ResolutionFailure) {
         let mut ctx = new_context::<I>();
 
         let observers = (0..10)
@@ -4768,14 +4768,14 @@ mod tests {
         }
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(InitialState::Incomplete, false; "incomplete neighbor")]
     #[test_case(InitialState::Reachable, true; "reachable neighbor")]
     #[test_case(InitialState::Stale, true; "stale neighbor")]
     #[test_case(InitialState::Delay, true; "delay neighbor")]
     #[test_case(InitialState::Probe, true; "probe neighbor")]
     #[test_case(InitialState::Unreachable, true; "unreachable neighbor")]
-    fn upper_layer_confirmation<I: Ip + TestIpExt>(
+    fn upper_layer_confirmation<I: TestIpExt>(
         initial_state: InitialState,
         should_transition_to_reachable: bool,
     ) {
@@ -4880,8 +4880,8 @@ mod tests {
         )
     }
 
-    #[ip_test]
-    fn garbage_collection_retains_static_entries<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn garbage_collection_retains_static_entries<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Add `MAX_ENTRIES` STALE dynamic neighbors and `MAX_ENTRIES` static
@@ -4927,8 +4927,8 @@ mod tests {
         }
     }
 
-    #[ip_test]
-    fn garbage_collection_retains_in_use_entries<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn garbage_collection_retains_in_use_entries<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Add enough static entries that the NUD table is near maximum capacity.
@@ -4968,8 +4968,8 @@ mod tests {
         assert_neighbor_removed_with_ip(&mut core_ctx, &mut bindings_ctx, stale_entry);
     }
 
-    #[ip_test]
-    fn garbage_collection_triggered_on_new_stale_entry<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn garbage_collection_triggered_on_new_stale_entry<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         // Pretend we just ran GC so the next pass will be scheduled after a delay.
         core_ctx.nud.state.last_gc = Some(bindings_ctx.now());
@@ -5013,8 +5013,8 @@ mod tests {
             .assert_some_timers_installed([(NudTimerId::garbage_collection(), expected_gc_time)]);
     }
 
-    #[ip_test]
-    fn garbage_collection_triggered_on_transition_to_unreachable<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn garbage_collection_triggered_on_transition_to_unreachable<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         // Pretend we just ran GC so the next pass will be scheduled after a delay.
         core_ctx.nud.state.last_gc = Some(bindings_ctx.now());
@@ -5058,8 +5058,8 @@ mod tests {
             .assert_some_timers_installed([(NudTimerId::garbage_collection(), expected_gc_time)]);
     }
 
-    #[ip_test]
-    fn garbage_collection_not_triggered_on_new_incomplete_entry<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn garbage_collection_not_triggered_on_new_incomplete_entry<I: TestIpExt>() {
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
         // Fill the neighbor table to maximum capacity with static entries.

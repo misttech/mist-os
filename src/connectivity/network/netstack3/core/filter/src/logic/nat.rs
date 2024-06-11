@@ -489,7 +489,7 @@ mod tests {
 
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, Ipv4, Ipv6};
+    use net_types::ip::Ipv4;
     use net_types::NonMappedAddr;
     use netstack3_base::IntoCoreTimerCtx;
     use test_case::test_case;
@@ -787,12 +787,12 @@ mod tests {
 
     const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(55555));
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(PhantomData::<IngressHook>, None; "redirect INGRESS")]
     #[test_case(PhantomData::<IngressHook>, Some(LOCAL_PORT); "redirect INGRESS to local port")]
     #[test_case(PhantomData::<LocalEgressHook>, None; "redirect LOCAL_EGRESS")]
     #[test_case(PhantomData::<LocalEgressHook>, Some(LOCAL_PORT); "redirect LOCAL_EGRESS to local port")]
-    fn redirect<I: Ip + TestIpExt, N: NatHookExt<I>>(
+    fn redirect<I: TestIpExt, N: NatHookExt<I>>(
         _hook: PhantomData<N>,
         dst_port: Option<NonZeroU16>,
     ) {

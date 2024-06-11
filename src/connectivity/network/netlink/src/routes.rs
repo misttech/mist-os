@@ -1501,6 +1501,7 @@ mod tests {
     use super::*;
 
     use fidl::endpoints::{ControlHandle, RequestStream};
+    use ip_test_macro::ip_test;
     use {
         fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     };
@@ -1637,29 +1638,17 @@ mod tests {
         nlas
     }
 
-    // TODO(https://g-issues.fuchsia.dev/issues/42084902): Update to use
-    // `ip_test` when async is supported.
+    #[ip_test(I)]
     #[test_case(RouteTableKey::Unmanaged)]
     #[test_case(MANAGED_ROUTE_TABLE)]
     #[fuchsia::test]
-    async fn test_handle_route_watcher_event_v4(table: RouteTableKey) {
-        handle_route_watcher_event_helper::<Ipv4>(V4_SUB1, V4_NEXTHOP1, table).await;
-    }
-
-    #[test_case(RouteTableKey::Unmanaged)]
-    #[test_case(MANAGED_ROUTE_TABLE)]
-    #[fuchsia::test]
-    async fn test_handle_route_watcher_event_v6(table: RouteTableKey) {
-        handle_route_watcher_event_helper::<Ipv6>(V6_SUB1, V6_NEXTHOP1, table).await;
-    }
-
-    async fn handle_route_watcher_event_helper<
-        I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    async fn handles_route_watcher_event<
+        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     >(
-        subnet: Subnet<I::Addr>,
-        next_hop: I::Addr,
         table: RouteTableKey,
     ) {
+        let (subnet, next_hop) =
+            I::map_ip((), |()| (V4_SUB1, V4_NEXTHOP1), |()| (V6_SUB1, V6_NEXTHOP1));
         let installed_route1: fnet_routes_ext::InstalledRoute<I> =
             create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1);
         let installed_route2: fnet_routes_ext::InstalledRoute<I> =
@@ -1850,24 +1839,13 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
     }
 
-    // TODO(https://g-issues.fuchsia.dev/issues/42084902): Update to use
-    // `ip_test` when async is supported.
+    #[ip_test(I, test = false)]
     #[fuchsia::test]
-    async fn test_handle_route_watcher_event_two_routesets_v4() {
-        handle_route_watcher_event_two_routesets_helper::<Ipv4>(V4_SUB1, V4_NEXTHOP1).await;
-    }
-
-    #[fuchsia::test]
-    async fn test_handle_route_watcher_event_two_routesets_v6() {
-        handle_route_watcher_event_two_routesets_helper::<Ipv6>(V6_SUB1, V6_NEXTHOP1).await;
-    }
-
-    async fn handle_route_watcher_event_two_routesets_helper<
+    async fn handle_route_watcher_event_two_routesets<
         I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-    >(
-        subnet: Subnet<I::Addr>,
-        next_hop: I::Addr,
-    ) {
+    >() {
+        let (subnet, next_hop) =
+            I::map_ip((), |()| (V4_SUB1, V4_NEXTHOP1), |()| (V6_SUB1, V6_NEXTHOP1));
         let installed_route1: fnet_routes_ext::InstalledRoute<I> =
             create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1);
         let installed_route2: fnet_routes_ext::InstalledRoute<I> =

@@ -420,20 +420,19 @@ mod tests {
     use assert_matches::assert_matches;
     use fuchsia_zircon_status as zx_status;
     use futures::FutureExt;
-    use netstack_testing_macros::netstack_test;
+    use ip_test_macro::ip_test;
     use test_case::test_case;
 
     // Tests the `fake_watcher_impl` with various "shapes". The test parameter
     // is a vec of ranges, where each range corresponds to the batch of events
     // that will be sent in response to a single call to `Watch().
-    #[netstack_test]
+    #[ip_test(I)]
     #[test_case(Vec::new(); "no events")]
     #[test_case(vec![0..1]; "single_batch_single_event")]
     #[test_case(vec![0..10]; "single_batch_many_events")]
     #[test_case(vec![0..10, 10..20, 20..30]; "many_batches_many_events")]
-    async fn fake_watcher_impl_against_shape<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn fake_watcher_impl_against_shape<I: FidlRouteIpExt>(
         test_shape: Vec<std::ops::Range<u32>>,
     ) {
         // Build the event stream based on the `test_shape`. Use a channel
@@ -489,12 +488,10 @@ mod tests {
 
     // `serve_one_route_set` should panic if the caller makes a call
     // to `new_route_set` more than once.
-    #[netstack_test]
+    #[ip_test(I)]
+    #[fuchsia_async::run_singlethreaded]
     #[should_panic(expected = "received multiple RouteTable requests")]
-    async fn test_serve_one_route_set_panic<I: net_types::ip::Ip + FidlRouteAdminIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
-    ) {
+    async fn test_serve_one_route_set_panic<I: FidlRouteAdminIpExt>() {
         let (routes_set_provider_proxy, routes_set_provider_server_end) =
             fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
         let mut provider = admin::serve_one_route_set::<I>(routes_set_provider_server_end);

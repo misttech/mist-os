@@ -1137,7 +1137,6 @@ where
 mod test {
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, Ipv4, Ipv6};
     use netstack3_base::testutil::TestIpExt;
     use packet::ParseBuffer as _;
     use test_case::test_case;
@@ -1168,13 +1167,13 @@ mod test {
         }
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }).into(), &[]; "syn")]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(const_unwrap_option(NonZeroU16::new(1440 as u16)))), window_scale: None }).into(), &[]; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)).into(), &[]; "ack")]
     #[test_case(Segment::with_fake_data(false), Segment::FAKE_DATA; "contiguous data")]
     #[test_case(Segment::with_fake_data(true), Segment::FAKE_DATA; "split data")]
-    fn tcp_serialize_segment<I: Ip + TestIpExt>(
+    fn tcp_serialize_segment<I: TestIpExt>(
         segment: Segment<SendPayload<'_>>,
         expected_body: &[u8],
     ) {

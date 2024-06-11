@@ -4,7 +4,7 @@
 
 use ip_test_macro::ip_test;
 use net_declare::{net_subnet_v4, net_subnet_v6};
-use net_types::ip::{Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{IpAddress as _, Ipv4Addr, Ipv6Addr};
 use net_types::SpecifiedAddr;
 use test_case::test_case;
 
@@ -19,10 +19,10 @@ use netstack3_ip::{
     AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric,
 };
 
-#[ip_test]
+#[ip_test(I)]
 #[test_case(true; "when there is an on-link route to the gateway")]
 #[test_case(false; "when there is no on-link route to the gateway")]
-fn select_device_for_gateway<I: Ip + TestIpExt>(on_link_route: bool) {
+fn select_device_for_gateway<I: TestIpExt>(on_link_route: bool) {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
     let device_id: DeviceId<_> = ctx
@@ -96,7 +96,7 @@ struct AddGatewayRouteTestCase {
     expected_second_result: Result<(), AddRouteError>,
 }
 
-#[ip_test]
+#[ip_test(I)]
 #[test_case(AddGatewayRouteTestCase {
     enable_before_final_route_add: false,
     expected_first_result: Ok(()),
@@ -107,7 +107,7 @@ struct AddGatewayRouteTestCase {
     expected_first_result: Ok(()),
     expected_second_result: Ok(()),
 }; "with_specified_device_enabled")]
-fn add_gateway_route<I: Ip + TestIpExt>(test_case: AddGatewayRouteTestCase) {
+fn add_gateway_route<I: TestIpExt>(test_case: AddGatewayRouteTestCase) {
     let AddGatewayRouteTestCase {
         enable_before_final_route_add,
         expected_first_result,
@@ -173,8 +173,8 @@ fn add_gateway_route<I: Ip + TestIpExt>(test_case: AddGatewayRouteTestCase) {
     );
 }
 
-#[ip_test]
-fn test_route_tracks_interface_metric<I: Ip + TestIpExt>() {
+#[ip_test(I)]
+fn test_route_tracks_interface_metric<I: TestIpExt>() {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
     ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
 

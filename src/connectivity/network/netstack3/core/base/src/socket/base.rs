@@ -60,8 +60,8 @@ mod socket_ip_ext_test {
     use super::*;
     use ip_test_macro::ip_test;
 
-    #[ip_test]
-    fn loopback_addr_is_valid_socket_addr<I: Ip + SocketIpExt>() {
+    #[ip_test(I)]
+    fn loopback_addr_is_valid_socket_addr<I: SocketIpExt>() {
         // `LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR is defined with the "unchecked"
         // constructor (which supports const construction). Verify here that the
         // addr actually satisfies all the requirements (protecting against far

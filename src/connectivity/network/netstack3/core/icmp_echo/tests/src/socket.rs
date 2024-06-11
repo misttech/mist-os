@@ -7,7 +7,6 @@ use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
-use net_types::ip::{Ip, Ipv4, Ipv6};
 use net_types::ZonedAddr;
 use packet::{Buf, Serializer};
 use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode};
@@ -34,15 +33,15 @@ enum IcmpSendType {
 // TODO(https://fxbug.dev/42084713): Add test cases with local delivery and a
 // bound device once delivery of looped-back packets is corrected in the
 // socket map.
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, true)]
 #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, true)]
 #[test_case(IcmpConnectionType::Local, IcmpSendType::Send, false)]
 #[test_case(IcmpConnectionType::Local, IcmpSendType::SendTo, false)]
 #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, false)]
 #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, false)]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_icmp_connection<I: Ip + TestIpExt + IpExt>(
+fn test_icmp_connection<I: TestIpExt + IpExt>(
     conn_type: IcmpConnectionType,
     send_type: IcmpSendType,
     bind_to_device: bool,

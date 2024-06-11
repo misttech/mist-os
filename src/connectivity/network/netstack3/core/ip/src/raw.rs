@@ -904,17 +904,17 @@ mod test {
             .unwrap()
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(IpProto::Udp; "UDP")]
     #[test_case(IpProto::Reserved; "IPPROTO_RAW")]
-    fn create_and_close<I: Ip + IpExt + DualStackIpExt + TestIpExt>(proto: IpProto) {
+    fn create_and_close<I: IpExt + DualStackIpExt + TestIpExt>(proto: IpProto) {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(proto.into()), Default::default());
         let FakeExternalSocketState { received_packets: _ } = api.close(sock).into_removed();
     }
 
-    #[ip_test]
-    fn set_device<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn set_device<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
 
@@ -930,8 +930,8 @@ mod test {
         assert_eq!(api.get_device(&sock), None);
     }
 
-    #[ip_test]
-    fn set_icmp_filter<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn set_icmp_filter<I: IpExt + DualStackIpExt + TestIpExt>() {
         let filter1 = RawIpSocketIcmpFilter::<I>::new([123; 32]);
         let filter2 = RawIpSocketIcmpFilter::<I>::new([234; 32]);
         let mut api = new_raw_ip_socket_api::<I>();
@@ -954,8 +954,8 @@ mod test {
         assert_eq!(api.get_icmp_filter(&sock), Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp));
     }
 
-    #[ip_test]
-    fn set_unicast_hop_limits<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn set_unicast_hop_limits<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
 
@@ -971,8 +971,8 @@ mod test {
         assert_eq!(api.get_unicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.unicast);
     }
 
-    #[ip_test]
-    fn set_multicast_hop_limit<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn set_multicast_hop_limit<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
 
@@ -988,8 +988,8 @@ mod test {
         assert_eq!(api.get_multicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.multicast);
     }
 
-    #[ip_test]
-    fn receive_ip_packet<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn receive_ip_packet<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
 
         // Create two sockets with the right protocol, and one socket with the
@@ -1030,8 +1030,8 @@ mod test {
 
     // Verify that sockets created with `RawIpSocketProtocol::Raw` cannot
     // receive packets
-    #[ip_test]
-    fn cannot_receive_ip_packet_with_proto_raw<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn cannot_receive_ip_packet_with_proto_raw<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::Raw, Default::default());
 
@@ -1055,11 +1055,11 @@ mod test {
         assert_matches!(&received_packets.lock()[..], []);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(MultipleDevicesId::A, None, true; "no_bound_device")]
     #[test_case(MultipleDevicesId::A, Some(MultipleDevicesId::A), true; "bound_same_device")]
     #[test_case(MultipleDevicesId::A, Some(MultipleDevicesId::B), false; "bound_diff_device")]
-    fn receive_ip_packet_with_bound_device<I: Ip + IpExt + DualStackIpExt + TestIpExt>(
+    fn receive_ip_packet_with_bound_device<I: IpExt + DualStackIpExt + TestIpExt>(
         send_dev: MultipleDevicesId,
         bound_dev: Option<MultipleDevicesId>,
         should_deliver: bool,
@@ -1092,13 +1092,13 @@ mod test {
         }
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     // NB: Don't bother testing for individual ICMP codes. The `filter` sub
     // module already covers that extensively.
     #[test_case(None, true; "no_filter")]
     #[test_case(Some(RawIpSocketIcmpFilter::<I>::ALLOW_ALL), true; "allow_all")]
     #[test_case(Some(RawIpSocketIcmpFilter::<I>::DENY_ALL), false; "deny_all")]
-    fn receive_ip_packet_with_icmp_filter<I: Ip + IpExt + DualStackIpExt + TestIpExt>(
+    fn receive_ip_packet_with_icmp_filter<I: IpExt + DualStackIpExt + TestIpExt>(
         filter: Option<RawIpSocketIcmpFilter<I>>,
         should_deliver: bool,
     ) {
@@ -1166,11 +1166,11 @@ mod test {
         assert_matches!(&received_packets.lock()[..], []);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(None, None; "default_send")]
     #[test_case(Some(MultipleDevicesId::A), None; "with_bound_dev")]
     #[test_case(None, Some(123); "with_hop_limit")]
-    fn send_to<I: Ip + IpExt + DualStackIpExt + TestIpExt>(
+    fn send_to<I: IpExt + DualStackIpExt + TestIpExt>(
         bound_dev: Option<MultipleDevicesId>,
         hop_limit: Option<u8>,
     ) {
@@ -1200,8 +1200,8 @@ mod test {
         assert_eq!(*ttl, hop_limit);
     }
 
-    #[ip_test]
-    fn send_to_disallows_raw_protocol<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn send_to_disallows_raw_protocol<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::Raw, Default::default());
         assert_matches!(

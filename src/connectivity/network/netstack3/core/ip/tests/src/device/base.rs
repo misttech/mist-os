@@ -612,9 +612,9 @@ fn notify_on_dad_failure_ipv6() {
     let _ = ctx.bindings_ctx.take_events();
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn update_ip_device_configuration_err<I: Ip + IpExt>() {
+#[ip_test(I)]
+fn update_ip_device_configuration_err<I: IpExt>() {
     let mut ctx = FakeCtx::default();
 
     let loopback_device_id = ctx

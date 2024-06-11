@@ -14,7 +14,7 @@ use ip_test_macro::ip_test;
 use loom::sync::Arc;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
 use net_types::ethernet::Mac;
-use net_types::ip::{Ip, Ipv4, Ipv6, Subnet};
+use net_types::ip::{Ipv4, Ipv6, Subnet};
 use net_types::{SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr};
 use netstack3_core::device::{EthernetLinkDevice, RecvEthernetFrameMeta};
 use netstack3_core::device_socket::{Protocol, TargetDevice};
@@ -252,9 +252,9 @@ impl TestIpExt for Ipv6 {
     }
 }
 
-#[ip_test]
 #[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
-fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
+#[ip_test(I)]
+fn neighbor_resolution_and_send_queued_packets_atomic<I: TestIpExt>() {
     // Per the loom docs [1], it can take a significant amount of time to
     // exhaustively check complex models. Rather than running a completely
     // exhaustive check, you can configure loom to skip executions that it deems
@@ -390,9 +390,9 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
     })
 }
 
-#[ip_test]
 #[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
-fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
+#[ip_test(I)]
+fn new_incomplete_neighbor_schedule_timer_atomic<I: TestIpExt>() {
     loom_model(Default::default(), move || {
         let mut builder = FakeCtxBuilder::default();
         let dev_index = builder.add_device_with_ip(

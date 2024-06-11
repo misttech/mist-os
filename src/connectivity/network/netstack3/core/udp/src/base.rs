@@ -201,7 +201,7 @@ pub struct Udp<BT>(PhantomData<BT>, Never);
 
 /// Produces an iterator over eligible receiving socket addresses.
 #[cfg(test)]
-fn iter_receiving_addrs<I: Ip + IpExt, D: WeakDeviceIdentifier>(
+fn iter_receiving_addrs<I: IpExt, D: WeakDeviceIdentifier>(
     addr: ConnIpAddr<I::Addr, NonZeroU16, UdpRemotePort>,
     device: D,
 ) -> impl Iterator<Item = AddrVec<I, D, UdpAddrSpec>> {
@@ -857,7 +857,7 @@ impl<T> AddrState<T> {
 /// Uses the provided addresses and receiving device to look up sockets that
 /// should receive a matching incoming packet. The returned iterator may
 /// yield 0, 1, or multiple sockets.
-fn lookup<'s, I: Ip + IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
+fn lookup<'s, I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
     bound: &'s DatagramBoundSockets<I, D, UdpAddrSpec, UdpSocketMapStateSpec<I, D, BT>>,
     (src_ip, src_port): (Option<SocketIpAddr<I::Addr>>, Option<NonZeroU16>),
     (dst_ip, dst_port): (SocketIpAddr<I::Addr>, NonZeroU16),
@@ -2967,7 +2967,7 @@ mod tests {
         fn dual_stack_context(
             &mut self,
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
-            struct Wrap<'a, I: Ip + TestIpExt, D: FakeStrongDeviceId + 'static>(
+            struct Wrap<'a, I: TestIpExt, D: FakeStrongDeviceId + 'static>(
                 MaybeDualStack<
                     &'a mut I::UdpDualStackBoundStateContext<D>,
                     &'a mut I::UdpNonDualStackBoundStateContext<D>,
@@ -3230,7 +3230,7 @@ mod tests {
         device: Option<FakeWeakDeviceId<FakeDeviceId>>,
     ) -> AddrVec<I, FakeWeakDeviceId<FakeDeviceId>, UdpAddrSpec>
     where
-        I: Ip + TestIpExt,
+        I: TestIpExt,
     {
         let local_ip = SocketIpAddr::try_from(local_ip::<I>()).unwrap();
         let remote_ip = SocketIpAddr::try_from(remote_ip::<I>()).unwrap();
@@ -3248,7 +3248,7 @@ mod tests {
         device: Option<FakeWeakDeviceId<FakeDeviceId>>,
     ) -> AddrVec<I, FakeWeakDeviceId<FakeDeviceId>, UdpAddrSpec>
     where
-        I: Ip + TestIpExt,
+        I: TestIpExt,
     {
         let local_ip = SocketIpAddr::try_from(local_ip::<I>()).unwrap();
         ListenerAddr { ip: ListenerIpAddr { identifier: LOCAL_PORT, addr: Some(local_ip) }, device }
@@ -3259,12 +3259,12 @@ mod tests {
         device: Option<FakeWeakDeviceId<FakeDeviceId>>,
     ) -> AddrVec<I, FakeWeakDeviceId<FakeDeviceId>, UdpAddrSpec>
     where
-        I: Ip + TestIpExt,
+        I: TestIpExt,
     {
         ListenerAddr { ip: ListenerIpAddr { identifier: LOCAL_PORT, addr: None }, device }.into()
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(conn_addr(Some(FakeWeakDeviceId(FakeDeviceId))), [
             conn_addr(None), local_listener(Some(FakeWeakDeviceId(FakeDeviceId))), local_listener(None),
             wildcard_listener(Some(FakeWeakDeviceId(FakeDeviceId))), wildcard_listener(None)
@@ -3277,19 +3277,15 @@ mod tests {
     #[test_case(conn_addr(None), [local_listener(None), wildcard_listener(None)]; "conn no device")]
     #[test_case(local_listener(None), [wildcard_listener(None)]; "local listener no device")]
     #[test_case(wildcard_listener(None), []; "wildcard listener no device")]
-    fn test_udp_addr_vec_iter_shadows_conn<
-        I: Ip + IpExt,
-        D: WeakDeviceIdentifier,
-        const N: usize,
-    >(
+    fn test_udp_addr_vec_iter_shadows_conn<I: IpExt, D: WeakDeviceIdentifier, const N: usize>(
         addr: AddrVec<I, D, UdpAddrSpec>,
         expected_shadows: [AddrVec<I, D, UdpAddrSpec>; N],
     ) {
         assert_eq!(addr.iter_shadows().collect::<HashSet<_>>(), HashSet::from(expected_shadows));
     }
 
-    #[ip_test]
-    fn test_iter_receiving_addrs<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_iter_receiving_addrs<I: TestIpExt>() {
         let addr = ConnIpAddr {
             local: (SocketIpAddr::try_from(local_ip::<I>()).unwrap(), LOCAL_PORT),
             remote: (SocketIpAddr::try_from(remote_ip::<I>()).unwrap(), REMOTE_PORT.into()),
@@ -3316,8 +3312,8 @@ mod tests {
     /// Tests that a listener can be created, that the context receives packet
     /// notifications for that listener, and that we can send data using that
     /// listener.
-    #[ip_test]
-    fn test_listen_udp<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_listen_udp<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -3409,8 +3405,8 @@ mod tests {
     ///
     /// Tests that receiving a UDP packet on a port over which there isn't a
     /// listener causes the packet to be dropped correctly.
-    #[ip_test]
-    fn test_udp_drop<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_udp_drop<I: TestIpExt>() {
         set_logger_for_test();
         let UdpFakeDeviceCtx { mut core_ctx, mut bindings_ctx } =
             UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
@@ -3435,8 +3431,8 @@ mod tests {
     /// over it.
     ///
     /// Only tests with specified local port and address bounds.
-    #[ip_test]
-    fn test_udp_conn_basic<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_udp_conn_basic<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -3490,8 +3486,8 @@ mod tests {
 
     /// Tests that UDP connections fail with an appropriate error for
     /// non-routable remote addresses.
-    #[ip_test]
-    fn test_udp_conn_unroutable<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_udp_conn_unroutable<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -3508,8 +3504,8 @@ mod tests {
 
     /// Tests that UDP listener creation fails with an appropriate error when
     /// local address is non-local.
-    #[ip_test]
-    fn test_udp_conn_cannot_bind<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_udp_conn_cannot_bind<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -3564,12 +3560,12 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(
         true,
         Err(IpSockCreationError::Route(ResolveRouteError::Unreachable).into()); "remove device")]
     #[test_case(false, Ok(()); "dont remove device")]
-    fn test_udp_conn_device_removed<I: Ip + TestIpExt>(
+    fn test_udp_conn_device_removed<I: TestIpExt>(
         remove_device: bool,
         expected: Result<(), ConnectError>,
     ) {
@@ -3595,8 +3591,8 @@ mod tests {
 
     /// Tests that UDP connections fail with an appropriate error when local
     /// ports are exhausted.
-    #[ip_test]
-    fn test_udp_conn_exhausted<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_udp_conn_exhausted<I: TestIpExt>() {
         // NB: We don't enable logging for this test because it's very spammy.
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -3618,8 +3614,8 @@ mod tests {
         assert_eq!(conn_err, ConnectError::CouldNotAllocateLocalPort);
     }
 
-    #[ip_test]
-    fn test_connect_success<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_connect_success<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -3666,8 +3662,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_connect_fails<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_connect_fails<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -3715,8 +3711,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_reconnect_udp_conn_success<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_reconnect_udp_conn_success<I: TestIpExt>() {
         set_logger_for_test();
 
         let local_ip = local_ip::<I>();
@@ -3750,8 +3746,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_reconnect_udp_conn_fails<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_reconnect_udp_conn_fails<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -3784,8 +3780,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_send_to<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_send_to<I: TestIpExt>() {
         set_logger_for_test();
 
         let local_ip = local_ip::<I>();
@@ -3843,8 +3839,8 @@ mod tests {
     /// Tests that UDP send failures are propagated as errors.
     ///
     /// Only tests with specified local port and address bounds.
-    #[ip_test]
-    fn test_send_udp_conn_failure<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_send_udp_conn_failure<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -3866,8 +3862,8 @@ mod tests {
         assert_eq!(send_err, Either::Left(SendError::IpSock(IpSockSendError::Mtu)));
     }
 
-    #[ip_test]
-    fn test_send_udp_conn_device_removed<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_send_udp_conn_device_removed<I: TestIpExt>() {
         set_logger_for_test();
         let device = FakeReferencyDeviceId::default();
         let mut ctx =
@@ -3896,12 +3892,12 @@ mod tests {
         }
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(false, ShutdownType::Send; "shutdown send then send")]
     #[test_case(false, ShutdownType::SendAndReceive; "shutdown both then send")]
     #[test_case(true, ShutdownType::Send; "shutdown send then sendto")]
     #[test_case(true, ShutdownType::SendAndReceive; "shutdown both then sendto")]
-    fn test_send_udp_after_shutdown<I: Ip + TestIpExt>(send_to: bool, shutdown: ShutdownType) {
+    fn test_send_udp_after_shutdown<I: TestIpExt>(send_to: bool, shutdown: ShutdownType) {
         set_logger_for_test();
 
         #[derive(Debug)]
@@ -3941,10 +3937,10 @@ mod tests {
         assert_matches!(send(send_to_ip, &mut api, &socket), Err(NotWriteableError));
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(ShutdownType::Receive; "receive")]
     #[test_case(ShutdownType::SendAndReceive; "both")]
-    fn test_marked_for_receive_shutdown<I: Ip + TestIpExt>(which: ShutdownType) {
+    fn test_marked_for_receive_shutdown<I: TestIpExt>(which: ShutdownType) {
         set_logger_for_test();
 
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
@@ -4014,8 +4010,8 @@ mod tests {
 
     /// Tests that if we have multiple listeners and connections, demuxing the
     /// flows is performed correctly.
-    #[ip_test]
-    fn test_udp_demux<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_udp_demux<I: TestIpExt>() {
         set_logger_for_test();
         let local_ip = local_ip::<I>();
         let remote_ip_a = I::get_other_ip_address(70);
@@ -4164,8 +4160,8 @@ mod tests {
     }
 
     /// Tests UDP wildcard listeners for different IP versions.
-    #[ip_test]
-    fn test_wildcard_listeners<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_wildcard_listeners<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -4229,8 +4225,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_receive_source_port_zero_on_listener<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_receive_source_port_zero_on_listener<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -4267,8 +4263,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_receive_source_addr_unspecified_on_listener<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_receive_source_addr_unspecified_on_listener<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -4294,11 +4290,11 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(const_unwrap_option(NonZeroU16::new(u16::MAX)), Ok(const_unwrap_option(NonZeroU16::new(u16::MAX))); "ephemeral available")]
     #[test_case(const_unwrap_option(NonZeroU16::new(100)), Err(LocalAddressError::FailedToAllocateLocalPort);
         "no ephemeral available")]
-    fn test_bind_picked_port_all_others_taken<I: Ip + TestIpExt>(
+    fn test_bind_picked_port_all_others_taken<I: TestIpExt>(
         available_port: NonZeroU16,
         expected_result: Result<NonZeroU16, LocalAddressError>,
     ) {
@@ -4328,8 +4324,8 @@ mod tests {
         assert_eq!(result, expected_result);
     }
 
-    #[ip_test]
-    fn test_receive_multicast_packet<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_receive_multicast_packet<I: TestIpExt>() {
         set_logger_for_test();
         let local_ip = local_ip::<I>();
         let remote_ip = I::get_other_ip_address(70);
@@ -4422,8 +4418,8 @@ mod tests {
 
     /// Tests that if sockets are bound to devices, they will only receive
     /// packets that are received on those devices.
-    #[ip_test]
-    fn test_bound_to_device_receive<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_bound_to_device_receive<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
@@ -4487,8 +4483,8 @@ mod tests {
 
     /// Tests that if sockets are bound to devices, they will send packets out
     /// of those devices.
-    #[ip_test]
-    fn test_bound_to_device_send<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_bound_to_device_send<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
@@ -4538,7 +4534,7 @@ mod tests {
         assert_eq!(received_devices, &MultipleDevicesId::all());
     }
 
-    fn receive_packet_on<I: Ip + TestIpExt>(
+    fn receive_packet_on<I: TestIpExt>(
         core_ctx: &mut UdpMultipleDevicesCoreCtx,
         bindings_ctx: &mut UdpMultipleDevicesBindingsCtx,
         device: MultipleDevicesId,
@@ -4557,8 +4553,8 @@ mod tests {
     }
 
     /// Check that sockets can be bound to and unbound from devices.
-    #[ip_test]
-    fn test_bind_unbind_device<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_bind_unbind_device<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
@@ -4588,8 +4584,8 @@ mod tests {
     }
 
     /// Check that bind fails as expected when it would cause illegal shadowing.
-    #[ip_test]
-    fn test_unbind_device_fails<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_unbind_device_fails<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
@@ -4615,8 +4611,8 @@ mod tests {
 
     /// Check that binding a device fails if it would make a connected socket
     /// unroutable.
-    #[ip_test]
-    fn test_bind_conn_socket_device_fails<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_bind_conn_socket_device_fails<I: TestIpExt>() {
         set_logger_for_test();
         let device_configs = HashMap::from(
             [(MultipleDevicesId::A, 1), (MultipleDevicesId::B, 2)].map(|(device, i)| {
@@ -4656,8 +4652,8 @@ mod tests {
         api.set_device(&socket, Some(&MultipleDevicesId::A)).expect("routing picked A already");
     }
 
-    #[ip_test]
-    fn test_bound_device_receive_multicast_packet<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_bound_device_receive_multicast_packet<I: TestIpExt>() {
         set_logger_for_test();
         let remote_ip = I::get_other_ip_address(1);
         let multicast_addr = I::get_multicast_addr(0);
@@ -4722,8 +4718,8 @@ mod tests {
     }
 
     /// Tests establishing a UDP connection without providing a local IP
-    #[ip_test]
-    fn test_conn_unspecified_local_ip<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_conn_unspecified_local_ip<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -4743,8 +4739,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_multicast_sendto<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_multicast_sendto<I: TestIpExt>() {
         set_logger_for_test();
 
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
@@ -4789,8 +4785,8 @@ mod tests {
         }
     }
 
-    #[ip_test]
-    fn test_multicast_send<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_multicast_send<I: TestIpExt>() {
         set_logger_for_test();
 
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
@@ -4837,8 +4833,8 @@ mod tests {
     ///
     /// Tests that calling [`connect`] causes a valid local port to be
     /// allocated.
-    #[ip_test]
-    fn test_udp_local_port_alloc<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_udp_local_port_alloc<I: TestIpExt>() {
         let local_ip = local_ip::<I>();
         let ip_a = I::get_other_ip_address(100);
         let ip_b = I::get_other_ip_address(200);
@@ -4886,8 +4882,8 @@ mod tests {
     }
 
     /// Tests that if `listen_udp` fails, it can be retried later.
-    #[ip_test]
-    fn test_udp_retry_listen_after_removing_conflict<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_udp_retry_listen_after_removing_conflict<I: TestIpExt>() {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
@@ -4919,8 +4915,8 @@ mod tests {
     ///
     /// Tests that calling [`listen_udp`] causes a valid local port to be
     /// allocated when no local port is passed.
-    #[ip_test]
-    fn test_udp_listen_port_alloc<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_udp_listen_port_alloc<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let local_ip = local_ip::<I>();
@@ -4943,8 +4939,8 @@ mod tests {
         assert_ne!(wildcard_port, specified_port);
     }
 
-    #[ip_test]
-    fn test_bind_multiple_reuse_port<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_bind_multiple_reuse_port<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let listeners = [(), ()].map(|()| {
@@ -4965,8 +4961,8 @@ mod tests {
         }
     }
 
-    #[ip_test]
-    fn test_set_unset_reuse_port_unbound<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_set_unset_reuse_port_unbound<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let unbound = api.create();
@@ -4985,10 +4981,10 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(bind_as_listener)]
     #[test_case(bind_as_connected)]
-    fn test_set_unset_reuse_port_bound<I: Ip + TestIpExt>(
+    fn test_set_unset_reuse_port_bound<I: TestIpExt>(
         set_up_socket: impl FnOnce(
             &mut UdpMultipleDevicesCtx,
             &UdpSocketId<
@@ -5013,8 +5009,8 @@ mod tests {
     }
 
     /// Tests [`remove_udp`]
-    #[ip_test]
-    fn test_remove_udp_conn<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_remove_udp_conn<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
@@ -5027,8 +5023,8 @@ mod tests {
     }
 
     /// Tests [`remove_udp`]
-    #[ip_test]
-    fn test_remove_udp_listener<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_remove_udp_listener<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
@@ -5044,7 +5040,7 @@ mod tests {
         api.close(wildcard).into_removed();
     }
 
-    fn try_join_leave_multicast<I: Ip + TestIpExt>(
+    fn try_join_leave_multicast<I: TestIpExt>(
         mcast_addr: MulticastAddr<I::Addr>,
         interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
         set_up_ctx: impl FnOnce(&mut UdpMultipleDevicesCtx),
@@ -5135,7 +5131,7 @@ mod tests {
         MulticastInterfaceSelector::LocalAddress(addr).into()
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(iface_id(MultipleDevicesId::A), leave_unbound::<I>; "device_no_addr_unbound")]
     #[test_case(iface_addr(local_ip::<I>()), leave_unbound::<I>; "addr_no_device_unbound")]
     #[test_case(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute, leave_unbound::<I>;
@@ -5148,7 +5144,7 @@ mod tests {
     #[test_case(iface_addr(local_ip::<I>()), bind_as_connected::<I>; "addr_no_device_connected")]
     #[test_case(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute, bind_as_connected::<I>;
         "any_interface_connected")]
-    fn test_join_leave_multicast_succeeds<I: Ip + TestIpExt>(
+    fn test_join_leave_multicast_succeeds<I: TestIpExt>(
         interface: MulticastMembershipInterfaceSelector<I::Addr, MultipleDevicesId>,
         set_up_socket: impl FnOnce(
             &mut UdpMultipleDevicesCtx,
@@ -5188,11 +5184,11 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(leave_unbound::<I>; "unbound")]
     #[test_case(bind_as_listener::<I>; "listener")]
     #[test_case(bind_as_connected::<I>; "connected")]
-    fn test_join_multicast_fails_without_route<I: Ip + TestIpExt>(
+    fn test_join_multicast_fails_without_route<I: TestIpExt>(
         set_up_socket: impl FnOnce(
             &mut UdpMultipleDevicesCtx,
             &UdpSocketId<
@@ -5214,7 +5210,7 @@ mod tests {
         assert_eq!(ip_options, HashMap::new());
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(MultipleDevicesId::A, Some(local_ip::<I>()), leave_unbound, Ok(());
         "with_ip_unbound")]
     #[test_case(MultipleDevicesId::A, None, leave_unbound, Ok(());
@@ -5223,7 +5219,7 @@ mod tests {
         "with_ip_listener")]
     #[test_case(MultipleDevicesId::A, Some(local_ip::<I>()), bind_as_connected, Ok(());
         "with_ip_connected")]
-    fn test_join_leave_multicast_interface_inferred_from_bound_device<I: Ip + TestIpExt>(
+    fn test_join_leave_multicast_interface_inferred_from_bound_device<I: TestIpExt>(
         bound_device: MultipleDevicesId,
         interface_addr: Option<SpecifiedAddr<I::Addr>>,
         set_up_socket: impl FnOnce(
@@ -5261,8 +5257,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_multicast_membership_with_removed_device<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_multicast_membership_with_removed_device<I: TestIpExt>() {
         let device = FakeReferencyDeviceId::default();
         let mut ctx =
             FakeUdpCtx::with_core_ctx(FakeUdpCoreCtx::new_with_device::<I>(device.clone()));
@@ -5296,8 +5292,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_remove_udp_unbound_leaves_multicast_groups<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_remove_udp_unbound_leaves_multicast_groups<I: TestIpExt>() {
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
         );
@@ -5328,8 +5324,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_remove_udp_listener_leaves_multicast_groups<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_remove_udp_listener_leaves_multicast_groups<I: TestIpExt>() {
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
         );
@@ -5372,8 +5368,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_remove_udp_connected_leaves_multicast_groups<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_remove_udp_connected_leaves_multicast_groups<I: TestIpExt>() {
         let mut ctx = UdpMultipleDevicesCtx::with_core_ctx(
             UdpMultipleDevicesCoreCtx::new_multiple_devices::<I>(),
         );
@@ -5421,9 +5417,9 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[should_panic(expected = "listen again failed")]
-    fn test_listen_udp_removes_unbound<I: Ip + TestIpExt>() {
+    fn test_listen_udp_removes_unbound<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let local_ip = local_ip::<I>();
@@ -5438,8 +5434,8 @@ mod tests {
             .expect("listen again failed");
     }
 
-    #[ip_test]
-    fn test_get_conn_info<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_get_conn_info<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
@@ -5456,8 +5452,8 @@ mod tests {
         assert_eq!(info.remote_identifier, u16::from(REMOTE_PORT));
     }
 
-    #[ip_test]
-    fn test_get_listener_info<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_get_listener_info<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
@@ -5479,8 +5475,8 @@ mod tests {
         assert_eq!(info.local_identifier, OTHER_LOCAL_PORT);
     }
 
-    #[ip_test]
-    fn test_get_reuse_port<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_get_reuse_port<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let first = api.create();
@@ -5502,8 +5498,8 @@ mod tests {
         assert_eq!(api.get_posix_reuse_port(&second), true);
     }
 
-    #[ip_test]
-    fn test_get_bound_device_unbound<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_get_bound_device_unbound<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let unbound = api.create();
@@ -5514,8 +5510,8 @@ mod tests {
         assert_eq!(api.get_bound_device(&unbound), Some(FakeWeakDeviceId(FakeDeviceId)));
     }
 
-    #[ip_test]
-    fn test_get_bound_device_listener<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_get_bound_device_listener<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let socket = api.create();
@@ -5529,8 +5525,8 @@ mod tests {
         assert_eq!(api.get_bound_device(&socket), None);
     }
 
-    #[ip_test]
-    fn test_get_bound_device_connected<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_get_bound_device_connected<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let socket = api.create();
@@ -5542,8 +5538,8 @@ mod tests {
         assert_eq!(api.get_bound_device(&socket), None);
     }
 
-    #[ip_test]
-    fn test_listen_udp_forwards_errors<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_listen_udp_forwards_errors<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let remote_ip = remote_ip::<I>();
@@ -5840,8 +5836,8 @@ mod tests {
         assert_eq!(result, expected);
     }
 
-    #[ip_test]
-    fn test_listen_udp_loopback_no_zone_is_required<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_listen_udp_loopback_no_zone_is_required<I: TestIpExt>() {
         let loopback_addr = I::LOOPBACK_ADDRESS;
         let remote_ips = vec![remote_ip::<I>()];
 
@@ -6092,16 +6088,16 @@ mod tests {
         assert_eq!(api.get_bound_device(&socket), Some(FakeWeakDeviceId(FakeDeviceId)));
     }
 
-    #[ip_test]
-    fn test_remove_udp_unbound<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_remove_udp_unbound<I: TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let unbound = api.create();
         api.close(unbound).into_removed();
     }
 
-    #[ip_test]
-    fn test_hop_limits_used_for_sending_packets<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_hop_limits_used_for_sending_packets<I: TestIpExt>() {
         let some_multicast_addr: MulticastAddr<I::Addr> = I::map_ip(
             (),
             |()| Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS,
@@ -6764,7 +6760,7 @@ mod tests {
     type FakePortAlloc<'a, I> =
         UdpPortAlloc<'a, I, FakeWeakDeviceId<FakeDeviceId>, FakeUdpBindingsCtx<FakeDeviceId>>;
 
-    fn listen<I: Ip + IpExt>(
+    fn listen<I: IpExt>(
         ip: I::Addr,
         port: u16,
     ) -> AddrVec<I, FakeWeakDeviceId<FakeDeviceId>, UdpAddrSpec> {
@@ -6776,7 +6772,7 @@ mod tests {
         })
     }
 
-    fn listen_device<I: Ip + IpExt>(
+    fn listen_device<I: IpExt>(
         ip: I::Addr,
         port: u16,
         device: FakeWeakDeviceId<FakeDeviceId>,
@@ -6789,7 +6785,7 @@ mod tests {
         })
     }
 
-    fn conn<I: Ip + IpExt>(
+    fn conn<I: IpExt>(
         local_ip: I::Addr,
         local_port: u16,
         remote_ip: I::Addr,

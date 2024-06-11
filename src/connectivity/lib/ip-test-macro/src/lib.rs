@@ -20,8 +20,7 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit_mut::{self, VisitMut};
 use syn::{
-    Attribute, Error, Expr, ExprPath, FnArg, GenericParam, Ident, Pat, PatType, Path,
-    TypeParamBound, TypePath,
+    Attribute, Error, Expr, ExprPath, FnArg, GenericParam, Ident, Pat, PatType, Path, TypePath,
 };
 
 /// Defines tests which call the annotated function with [`net_types::ip::Ipv4`]
@@ -29,16 +28,35 @@ use syn::{
 /// parameter.
 ///
 /// Modulo interactions with other attribute macros, a function marked with
-/// `#[ip_test]` must *always*:
-/// * Receive zero arguments
-/// * Have *exactly one* type parameter that has an [`net_types::ip::Ip`] trait bound.
+/// `#[ip_test]` must *always* receive zero arguments.
+///
+/// Note that due to how expansion works, the order in which attributes are
+/// anchored to a function matters. `#[ip_test]` has smarts for handling
+/// `test_case` attributes due to closely related functionality, but in general
+/// any macro that will also emit code that is generic over IP should be placed
+/// *before* `ip_test`.
+///
+/// ## Arguments
+///
+/// `ip_test` requires the identifier that represents the IP version to be given
+/// as its first argument.
+///
+/// Optional arguments are in the form `arg = value` and are:
+///
+/// * `net_types`: controls the path where the `net_types` crate is available.
+///   Example: `net_types = "crate::net_types_alias"`. If omitted defaults to
+///   `net_types`.
+/// * `test`: controls whether `#[test]` is emitted as part of the macro.
+///   Defaults to automatic behavior based on detection of an existing
+///   `test_case` attribute.  Can be set as `test = false` in argument list.
+///   Note
 ///
 /// ## Example
 ///
 /// The following code:
 ///
 /// ```rust
-/// #[ip_test]
+/// #[ip_test(I)]
 /// fn test_foo<I: Ip>() {
 ///    assert!(do_ip_specific_thing::<I>());
 ///    /* ... */
@@ -65,63 +83,27 @@ use syn::{
 /// ```
 #[proc_macro_attribute]
 pub fn ip_test(attr: TokenStream, input: TokenStream) -> TokenStream {
-    ip_test_inner(attr, input, "ip_test", "Ip", "Ipv4", "Ipv6")
-}
-
-fn ip_test_inner(
-    attr: TokenStream,
-    input: TokenStream,
-    attr_name: &'static str,
-    trait_name: &'static str,
-    ipv4_type_name: &'static str,
-    ipv6_type_name: &'static str,
-) -> TokenStream {
-    assert!(attr.is_empty(), "#[ip_test]: unexpected attribute argument");
+    let IpTestArgs { ip_ident, net_types, emit_test } = parse_macro_input!(attr as IpTestArgs);
 
     let item = parse_macro_input!(input as syn::ItemFn);
-    let syn::ItemFn { attrs, vis, sig, block } = item;
-    let (type_ident, trait_path) = {
-        if let Some(variadic) = &sig.variadic {
-            return Error::new(
-                variadic.dots.spans[0],
-                format!("{} entry may not be variadic", attr_name),
-            )
+    let syn::ItemFn { mut attrs, vis, sig, block } = item;
+    if let Some(variadic) = &sig.variadic {
+        return Error::new(variadic.dots.spans[0], format!("ip_test entry may not be variadic"))
             .to_compile_error()
             .into();
-        }
+    }
 
-        let trait_info = sig.generics.params.iter().find_map(|gen| match gen {
-            GenericParam::Type(tp) => tp
-                .bounds
-                .iter()
-                .find_map(|b| match b {
-                    TypeParamBound::Trait(t) => t.path.is_ident(trait_name).then(|| t.path.clone()),
-                    _ => None,
-                })
-                .map(|trait_path| (&tp.ident, trait_path)),
-            _ => None,
-        });
+    if !sig.generics.params.iter().any(|gen| match gen {
+        GenericParam::Type(tp) => tp.ident == ip_ident,
+        _ => false,
+    }) {
+        return Error::new(sig.generics.span(), format!("can't find generic parameter {ip_ident}"))
+            .to_compile_error()
+            .into();
+    }
 
-        match trait_info {
-            Some((type_ident, trait_path)) => (type_ident, trait_path),
-            None => {
-                return Error::new(
-                    sig.generics.span(),
-                    format!("some generic parameter must have a {} type bound", trait_name),
-                )
-                .to_compile_error()
-                .into()
-            }
-        }
-    };
-
-    // we need to check the attributes given to the function, test attributes
-    // like `should_panic` need to go to the concrete test definitions instead.
-    let (mut test_attrs, attrs) = attrs.into_iter().partition::<Vec<_>, _>(|attr| {
-        attr.path.is_ident("should_panic") || attr.path.is_ident("test_case")
-    });
-    if !test_attrs.iter().any(|a| a.path.is_ident("test_case")) {
-        test_attrs.push(Attribute {
+    if emit_test.unwrap_or_else(|| !attrs.iter().any(|a| a.path.is_ident("test_case"))) {
+        attrs.push(Attribute {
             path: syn::parse_quote!(test),
             bracket_token: Default::default(),
             pound_token: Default::default(),
@@ -130,7 +112,7 @@ fn ip_test_inner(
         });
     }
     // borrow here because `test_attrs` is used twice in `quote_spanned!` below.
-    let test_attrs = &test_attrs;
+    let attrs = &attrs;
 
     let span = sig.ident.span();
     let output = &sig.output;
@@ -148,18 +130,25 @@ fn ip_test_inner(
     let v4_test = Ident::new(&format!("{}_v4", ident), Span::call_site());
     let v6_test = Ident::new(&format!("{}_v6", ident), Span::call_site());
 
-    let ipv4_type_ident = Ident::new(ipv4_type_name, Span::call_site());
-    let ipv6_type_ident = Ident::new(ipv6_type_name, Span::call_site());
+    let net_types_path = |ty| {
+        let mut p = net_types.clone();
+        let rest: Path = syn::parse_str(ty).unwrap();
+        p.segments.extend(rest.segments.into_iter());
+        p
+    };
+    let ip_trait_path = net_types_path("ip::Ip");
+    let ipv4_type_path = net_types_path("ip::Ipv4");
+    let ipv6_type_path = net_types_path("ip::Ipv6");
 
     struct IpSpecializations {
         test_attrs: Vec<Attribute>,
         inputs: Vec<FnArg>,
         fn_generics: Vec<GenericParam>,
-        generic_params: Vec<Ident>,
+        generic_params: Vec<Path>,
     }
 
-    let specialize = |ip_type_ident: Ident| {
-        let test_attrs = test_attrs
+    let specialize = |ip_type_path: Path| {
+        let test_attrs = attrs
             .iter()
             .cloned()
             .map(|mut attr| {
@@ -167,9 +156,9 @@ fn ip_test_inner(
                     parse_prefix_suffix(Punctuated::<Expr, Token![,]>::parse_separated_nonempty);
                 if let Ok((mut punctuated, tail)) = attr.parse_args_with(parser) {
                     let mut visit = TraitToConcreteVisit {
-                        concrete: ip_type_ident.clone().into(),
-                        trait_path: trait_path.clone(),
-                        type_ident: type_ident.clone(),
+                        concrete: ip_type_path.clone().into(),
+                        trait_path: ip_trait_path.clone(),
+                        type_ident: ip_ident.clone(),
                     };
 
                     for expr in punctuated.iter_mut() {
@@ -182,9 +171,9 @@ fn ip_test_inner(
             .collect();
 
         let mut input_visitor = TraitToConcreteVisit {
-            concrete: ip_type_ident.clone().into(),
-            trait_path: trait_path.clone(),
-            type_ident: type_ident.clone(),
+            concrete: ip_type_path.clone().into(),
+            trait_path: ip_trait_path.clone(),
+            type_ident: ip_ident.clone(),
         };
         let inputs = sig
             .inputs
@@ -201,7 +190,7 @@ fn ip_test_inner(
             .params
             .iter()
             .filter(|gen| match gen {
-                GenericParam::Type(tp) => &tp.ident != type_ident,
+                GenericParam::Type(tp) => tp.ident != ip_ident,
                 _ => true,
             })
             .cloned()
@@ -216,13 +205,14 @@ fn ip_test_inner(
             .params
             .iter()
             .filter_map(|a| match a {
-                GenericParam::Type(tp) => {
-                    Some(if &tp.ident == type_ident { &ip_type_ident } else { &tp.ident })
-                }
+                GenericParam::Type(tp) => Some(if tp.ident == ip_ident {
+                    ip_type_path.clone()
+                } else {
+                    tp.ident.clone().into()
+                }),
                 GenericParam::Lifetime(_) => None,
-                GenericParam::Const(c) => Some(&c.ident),
+                GenericParam::Const(c) => Some(c.ident.clone().into()),
             })
-            .cloned()
             .collect();
 
         IpSpecializations { test_attrs, inputs, generic_params, fn_generics }
@@ -233,31 +223,36 @@ fn ip_test_inner(
         inputs: ipv4_inputs,
         fn_generics: ipv4_fn_generics,
         generic_params: ipv4_generic_params,
-    } = specialize(ipv4_type_ident);
+    } = specialize(ipv4_type_path);
 
     let IpSpecializations {
         test_attrs: ipv6_test_attrs,
         inputs: ipv6_inputs,
         fn_generics: ipv6_fn_generics,
         generic_params: ipv6_generic_params,
-    } = specialize(ipv6_type_ident);
+    } = specialize(ipv6_type_path);
+
+    let (maybe_async, do_await) = if sig.asyncness.is_some() {
+        (quote! {async}, quote! {.await})
+    } else {
+        (quote! {}, quote! {})
+    };
 
     let output = quote_spanned! { span =>
-        #(#attrs)*
         // Note: `ItemFn::block` includes the function body braces. Do not add
         // additional braces (will break source code coverage analysis).
-        // TODO(https://fxbug.dev/42157203): Try to improve the Rust compiler to ease
-        // this restriction.
+        // TODO(https://fxbug.dev/42157203): Try to improve the Rust compiler to
+        // ease this restriction.
         #vis #sig #block
 
         #(#ipv4_test_attrs)*
-        fn #v4_test<#(#ipv4_fn_generics),*> (#(#ipv4_inputs),*) #output {
-           #ident::<#(#ipv4_generic_params),*>(#(#arg_idents),*)
+        #maybe_async fn #v4_test<#(#ipv4_fn_generics),*> (#(#ipv4_inputs),*) #output {
+           #ident::<#(#ipv4_generic_params),*>(#(#arg_idents),*) #do_await
         }
 
         #(#ipv6_test_attrs)*
-        fn #v6_test<#(#ipv6_fn_generics),*> (#(#ipv6_inputs),*) #output {
-           #ident::<#(#ipv6_generic_params),*>(#(#arg_idents),*)
+        #maybe_async fn #v6_test<#(#ipv6_fn_generics),*> (#(#ipv6_inputs),*) #output {
+           #ident::<#(#ipv6_generic_params),*>(#(#arg_idents),*) #do_await
         }
     };
     output.into()
@@ -290,6 +285,53 @@ fn make_arg_idents<'a>(
             },
         })
         .collect()
+}
+
+struct IpTestArgs {
+    ip_ident: Ident,
+    net_types: Path,
+    emit_test: Option<bool>,
+}
+
+impl syn::parse::Parse for IpTestArgs {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        let ip_ident = Ident::parse(input)?;
+
+        let mut net_types = None;
+        let mut emit_test = None;
+        if !input.is_empty() {
+            let _ = <syn::Token![,]>::parse(input)?;
+        }
+        if !input.is_empty() {
+            let args = Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(input)?;
+            for syn::MetaNameValue { path, lit, .. } in args {
+                let ident = path
+                    .get_ident()
+                    .ok_or_else(|| Error::new(path.span(), "expecting identifier"))?;
+                if ident == "test" {
+                    let notest = match lit {
+                        syn::Lit::Bool(b) => b,
+                        _ => return Err(Error::new(lit.span(), "expected boolean")),
+                    };
+                    emit_test = Some(notest.value);
+                } else if ident == "net_types" {
+                    let v = match lit {
+                        syn::Lit::Str(s) => s,
+                        _ => return Err(Error::new(lit.span(), "extected string")),
+                    };
+                    net_types = Some(syn::parse_str(&v.value()).map_err(|mut e| {
+                        e.combine(Error::new(v.span(), "can't parse path"));
+                        e
+                    })?);
+                } else {
+                    return Err(Error::new(path.span(), format!("unrecognized option {ident}")));
+                }
+            }
+        }
+
+        let net_types = net_types.unwrap_or_else(|| syn::parse_quote! { net_types });
+        Ok(Self { ip_ident, emit_test, net_types })
+    }
 }
 
 /// A VisitMut that replaces accesses of an associated type or constant with

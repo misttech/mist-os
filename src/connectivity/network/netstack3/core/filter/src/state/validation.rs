@@ -426,7 +426,7 @@ mod tests {
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ipv4, Ipv6};
+    use net_types::ip::Ipv4;
     use test_case::test_case;
 
     use super::*;
@@ -452,7 +452,7 @@ mod tests {
         Hook { routines: vec![Routine { rules }] }
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(
         hook_with_rules(vec![rule(
             PacketMatcher {
@@ -557,7 +557,7 @@ mod tests {
         Err(ValidationError::RuleWithInvalidMatcher(RuleId::Invalid));
         "match on output interface in target routine when unavailable"
     )]
-    fn validate_interface_matcher_available<I: Ip + IpExt>(
+    fn validate_interface_matcher_available<I: IpExt>(
         hook: Hook<I, FakeDeviceClass, RuleId>,
         unavailable_matcher: UnavailableMatcher,
     ) -> Result<(), ValidationError<RuleId>> {
@@ -603,7 +603,7 @@ mod tests {
 
     const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(
         Routines {
             ip: IpRoutines {
@@ -739,13 +739,13 @@ mod tests {
         Err(ValidationError::RuleWithInvalidAction(RuleId::Invalid));
         "redirect unavailable in IP routines"
     )]
-    fn validate_action_available<I: Ip + IpExt>(
+    fn validate_action_available<I: IpExt>(
         routines: Routines<I, FakeDeviceClass, RuleId>,
     ) -> Result<(), ValidationError<RuleId>> {
         ValidRoutines::new(routines).map(|_| ())
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(
         Routine {
             rules: vec![Rule {
@@ -790,13 +790,13 @@ mod tests {
         Err(ValidationError::TransparentProxyWithInvalidMatcher(RuleId::Invalid));
         "transparent proxy invalid with no transport protocol matcher"
     )]
-    fn validate_transparent_proxy_matcher<I: Ip + IpExt>(
+    fn validate_transparent_proxy_matcher<I: IpExt>(
         routine: Routine<I, FakeDeviceClass, RuleId>,
     ) -> Result<(), ValidationError<RuleId>> {
         validate_routine(&routine, &[], &[])
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(
         Routine {
             rules: vec![Rule {
@@ -852,7 +852,7 @@ mod tests {
         Err(ValidationError::RedirectWithInvalidMatcher(RuleId::Invalid));
         "redirect invalid with no transport protocol matcher when dst port specified"
     )]
-    fn validate_redirect_matcher<I: Ip + IpExt>(
+    fn validate_redirect_matcher<I: IpExt>(
         routine: Routine<I, FakeDeviceClass, RuleId>,
     ) -> Result<(), ValidationError<RuleId>> {
         validate_routine(&routine, &[], &[])

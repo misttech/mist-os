@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
-use net_types::ip::{AddrSubnet, Ip, IpAddress as _, IpVersion, Ipv4, Ipv6, Mtu};
+use net_types::ip::{AddrSubnet, IpAddress as _, IpVersion, Mtu};
 use net_types::{Witness, ZonedAddr};
 use netstack3_base::testutil::TestIpExt;
 use netstack3_core::sync::RemoveResourceResult;
@@ -28,7 +28,7 @@ use test_case::test_case;
 const MTU: Mtu = Mtu::new(1234);
 const TTL: u8 = 64;
 
-fn default_ip_packet<I: Ip + TestIpExt>() -> Buf<Vec<u8>> {
+fn default_ip_packet<I: TestIpExt>() -> Buf<Vec<u8>> {
     Buf::new(Vec::new(), ..)
         .encapsulate(I::PacketBuilder::new(
             I::TEST_ADDRS.remote_ip.get(),
@@ -69,8 +69,8 @@ fn update_tx_queue_config() {
     tx_queue_api.set_configuration(&device, TransmitQueueConfiguration::Fifo);
 }
 
-#[ip_test]
-fn receive_frame<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn receive_frame<I: TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();
     let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
         PureIpDeviceCreationProperties { mtu: MTU },
@@ -100,10 +100,10 @@ fn receive_frame<I: Ip + TestIpExt + IpExt>() {
     check_frame_counters::<I>(&ctx.core_ctx, 1);
 }
 
-#[ip_test]
+#[ip_test(I)]
 #[test_case(TransmitQueueConfiguration::None; "no queue")]
 #[test_case(TransmitQueueConfiguration::Fifo; "fifo queue")]
-fn send_frame<I: Ip + TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfiguration) {
+fn send_frame<I: TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfiguration) {
     let mut ctx = FakeCtx::default();
     let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
         PureIpDeviceCreationProperties { mtu: MTU },
@@ -174,10 +174,10 @@ fn send_frame<I: Ip + TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfigura
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-#[ip_test]
+#[ip_test(I)]
 // Verify that a socket can listen on an IP address that is assigned to a
 // pure IP device.
-fn available_to_socket_layer<I: Ip + TestIpExt + IpExt>() {
+fn available_to_socket_layer<I: TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();
     let device = ctx
         .core_api()

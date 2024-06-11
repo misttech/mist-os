@@ -1048,11 +1048,11 @@ mod tests {
     use crate::testutil::internal as internal_testutil;
     use assert_matches::assert_matches;
     use futures::FutureExt;
+    use ip_test_macro::ip_test;
     use net_declare::{
         fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, net_ip_v4,
         net_ip_v6, net_subnet_v4, net_subnet_v6,
     };
-    use netstack_testing_macros::netstack_test;
     use test_case::test_case;
     use {fidl_fuchsia_net as _, fuchsia_zircon_status as zx_status};
 
@@ -1660,14 +1660,13 @@ mod tests {
     // Tests the `event_stream_from_state` with various "shapes". The test
     // parameter is a vec of ranges, where each range corresponds to the batch
     // of events that will be sent in response to a single call to `Watch().
-    #[netstack_test]
+    #[ip_test(I)]
     #[test_case(Vec::new(); "no events")]
     #[test_case(vec![0..1]; "single_batch_single_event")]
     #[test_case(vec![0..10]; "single_batch_many_events")]
     #[test_case(vec![0..10, 10..20, 20..30]; "many_batches_many_events")]
-    async fn event_stream_from_state_against_shape<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn event_stream_from_state_against_shape<I: FidlRouteIpExt>(
         test_shape: Vec<std::ops::Range<u32>>,
     ) {
         // Build the event stream based on the `test_shape`. Use a channel
@@ -1735,11 +1734,9 @@ mod tests {
 
     // Verify that calling `event_stream_from_state` multiple times with the
     // same `State` proxy, results in independent `Watcher` clients.
-    #[netstack_test]
-    async fn event_stream_from_state_multiple_watchers<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
-    ) {
+    #[ip_test(I)]
+    #[fuchsia_async::run_singlethreaded]
+    async fn event_stream_from_state_multiple_watchers<I: FidlRouteIpExt>() {
         // Events for 3 watchers. Each receives one batch containing 10 events.
         let test_data = vec![
             vec![internal_testutil::generate_events_in_range::<I>(0..10)],
@@ -1794,14 +1791,13 @@ mod tests {
     // a good event is sent after the bad event, either as part of the same
     // batch or in a subsequent batch. The test expects this data to be
     // truncated from the resulting event_stream.
-    #[netstack_test]
+    #[ip_test(I)]
     #[test_case(false, false; "no_trailing")]
     #[test_case(true, false; "trailing_event")]
     #[test_case(false, true; "trailing_batch")]
     #[test_case(true, true; "trailing_event_and_batch")]
-    async fn event_stream_from_state_conversion_error<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn event_stream_from_state_conversion_error<I: FidlRouteIpExt>(
         trailing_event: bool,
         trailing_batch: bool,
     ) {
@@ -1869,14 +1865,11 @@ mod tests {
     // the event stream. When `trailing_batch` is true, an additional "good"
     // batch will be sent after the empty batch; the test expects this data to
     // be truncated from the resulting event_stream.
-    #[netstack_test]
+    #[ip_test(I)]
     #[test_case(false; "no_trailing_batch")]
     #[test_case(true; "trailing_batch")]
-    async fn event_stream_from_state_empty_batch_error<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
-        trailing_batch: bool,
-    ) {
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn event_stream_from_state_empty_batch_error<I: FidlRouteIpExt>(trailing_batch: bool) {
         let batches = std::iter::once(Vec::new())
             // Optionally append a known good batch to the sequence of batches.
             .chain(trailing_batch.then(|| vec![internal_testutil::generate_event::<I>(0)]))
@@ -1932,13 +1925,12 @@ mod tests {
         StreamEnded,
     }
 
-    #[netstack_test]
+    #[ip_test(I)]
     #[test_case(CollectRoutesUntilIdleErrorTestCase::ErrorInStream; "error_in_stream")]
     #[test_case(CollectRoutesUntilIdleErrorTestCase::UnexpectedEvent; "unexpected_event")]
     #[test_case(CollectRoutesUntilIdleErrorTestCase::StreamEnded; "stream_ended")]
-    async fn collect_routes_until_idle_error<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn collect_routes_until_idle_error<I: FidlRouteIpExt>(
         test_case: CollectRoutesUntilIdleErrorTestCase,
     ) {
         // Build up the test data and the expected outcome base on `test_case`.
@@ -1974,11 +1966,9 @@ mod tests {
 
     // Verifies that `collect_routes_until_idle` collects all existing events,
     // drops the idle event, and leaves all trailing events intact.
-    #[netstack_test]
-    async fn collect_routes_until_idle_success<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
-    ) {
+    #[ip_test(I)]
+    #[fuchsia_async::run_singlethreaded]
+    async fn collect_routes_until_idle_success<I: FidlRouteIpExt>() {
         let route = arbitrary_test_route();
         let event_stream = futures::stream::iter([
             Ok(Event::Existing(route)),
@@ -1999,11 +1989,9 @@ mod tests {
         );
     }
 
-    #[netstack_test]
-    async fn wait_for_routes_errors<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
-    ) {
+    #[ip_test(I)]
+    #[fuchsia_async::run_singlethreaded]
+    async fn wait_for_routes_errors<I: FidlRouteIpExt>() {
         let mut state = HashSet::new();
         let event_stream =
             futures::stream::once(futures::future::ready(Err(WatchError::EmptyEventBatch)));
@@ -2028,11 +2016,9 @@ mod tests {
         assert!(state.is_empty());
     }
 
-    #[netstack_test]
-    async fn wait_for_routes_add_remove<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
-        _test_name: &str,
-    ) {
+    #[ip_test(I)]
+    #[fuchsia_async::run_singlethreaded]
+    async fn wait_for_routes_add_remove<I: FidlRouteIpExt>() {
         let into_stream = |t| futures::stream::once(futures::future::ready(t));
 
         let route = arbitrary_test_route::<I>();

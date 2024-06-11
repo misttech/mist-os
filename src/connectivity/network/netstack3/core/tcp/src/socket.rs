@@ -4958,8 +4958,8 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
     segment: Segment<SendPayload<'a>>,
 ) where
-    WireI: Ip + IpExt,
-    SockI: Ip + IpExt + DualStackIpExt,
+    WireI: IpExt,
+    SockI: IpExt + DualStackIpExt,
     CC: CounterContext<TcpCounters<SockI>>
         + IpSocketHandler<WireI, BC, DeviceId = D::Strong, WeakDeviceId = D>,
     BC: TcpBindingsTypes,
@@ -5922,7 +5922,7 @@ mod tests {
     ///   - the client socket from local.
     ///   - the send end of the client socket.
     ///   - the accepted socket from remote.
-    fn bind_listen_connect_accept_inner<I: Ip + TcpTestIpExt>(
+    fn bind_listen_connect_accept_inner<I: TcpTestIpExt>(
         listen_addr: I::Addr,
         BindConfig { client_port, server_port, client_reuse_addr }: BindConfig,
         seed: u128,
@@ -6143,7 +6143,7 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false }, I::UNSPECIFIED_ADDRESS)]
     #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false }, I::UNSPECIFIED_ADDRESS)]
     #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true }, I::UNSPECIFIED_ADDRESS)]
@@ -6152,10 +6152,8 @@ mod tests {
     #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
     #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
     #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
-    fn bind_listen_connect_accept<I: Ip + TcpTestIpExt>(
-        bind_config: BindConfig,
-        listen_addr: I::Addr,
-    ) where
+    fn bind_listen_connect_accept<I: TcpTestIpExt>(bind_config: BindConfig, listen_addr: I::Addr)
+    where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
             TcpBindingsCtx<FakeDeviceId>,
@@ -6215,10 +6213,10 @@ mod tests {
         assert_counters(REMOTE, ExpectedCounters { tx: 3, rx: 4, passive_open: 1, active_open: 0 });
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(*<I as TestIpExt>::TEST_ADDRS.local_ip; "same addr")]
     #[test_case(I::UNSPECIFIED_ADDRESS; "any addr")]
-    fn bind_conflict<I: Ip + TcpTestIpExt>(conflict_addr: I::Addr)
+    fn bind_conflict<I: TcpTestIpExt>(conflict_addr: I::Addr)
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -6243,11 +6241,11 @@ mod tests {
             .expect("able to rebind to a free address");
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(const_unwrap_option(NonZeroU16::new(u16::MAX)), Ok(const_unwrap_option(NonZeroU16::new(u16::MAX))); "ephemeral available")]
     #[test_case(const_unwrap_option(NonZeroU16::new(100)), Err(LocalAddressError::FailedToAllocateLocalPort);
                 "no ephemeral available")]
-    fn bind_picked_port_all_others_taken<I: Ip + TcpTestIpExt>(
+    fn bind_picked_port_all_others_taken<I: TcpTestIpExt>(
         available_port: NonZeroU16,
         expected_result: Result<NonZeroU16, LocalAddressError>,
     ) where
@@ -6292,8 +6290,8 @@ mod tests {
         assert_eq!(result, Err(ConnectError::NoPort));
     }
 
-    #[ip_test]
-    fn bind_to_non_existent_address<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn bind_to_non_existent_address<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -6518,8 +6516,8 @@ mod tests {
 
     // The test verifies that if client tries to connect to a closed port on
     // server, the connection is aborted and RST is received.
-    #[ip_test]
-    fn connect_reset<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn connect_reset<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -6605,8 +6603,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn retransmission<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn retransmission<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -6628,8 +6626,8 @@ mod tests {
 
     const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1845));
 
-    #[ip_test]
-    fn listener_with_bound_device_conflict<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn listener_with_bound_device_conflict<I: TcpTestIpExt>()
     where
         TcpCoreCtx<MultipleDevicesId, TcpBindingsCtx<MultipleDevicesId>>:
             TcpContext<I, TcpBindingsCtx<MultipleDevicesId>>,
@@ -6714,12 +6712,12 @@ mod tests {
         assert_matches!(api.set_device(&socket, set_device), Err(SetDeviceError::ZoneChange));
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(*<I as TestIpExt>::TEST_ADDRS.local_ip, true; "specified bound")]
     #[test_case(I::UNSPECIFIED_ADDRESS, true; "unspecified bound")]
     #[test_case(*<I as TestIpExt>::TEST_ADDRS.local_ip, false; "specified listener")]
     #[test_case(I::UNSPECIFIED_ADDRESS, false; "unspecified listener")]
-    fn bound_socket_info<I: Ip + TcpTestIpExt>(ip_addr: I::Addr, listen: bool)
+    fn bound_socket_info<I: TcpTestIpExt>(ip_addr: I::Addr, listen: bool)
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -6749,8 +6747,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn connection_info<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn connection_info<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -6909,7 +6907,7 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     // Assuming instant delivery of segments:
     // - If peer calls close, then the timeout we need to wait is in
     // TIME_WAIT, which is 2MSL.
@@ -6917,7 +6915,7 @@ mod tests {
     // - If not, we will be in the FIN_WAIT2 state and waiting for its
     // timeout.
     #[test_case(false, DEFAULT_FIN_WAIT2_TIMEOUT; "peer doesn't call close")]
-    fn connection_close_peer_calls_close<I: Ip + TcpTestIpExt>(
+    fn connection_close_peer_calls_close<I: TcpTestIpExt>(
         peer_calls_close: bool,
         expected_time_to_close: Duration,
     ) where
@@ -6983,8 +6981,8 @@ mod tests {
         }
     }
 
-    #[ip_test]
-    fn connection_shutdown_then_close_peer_doesnt_call_close<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn connection_shutdown_then_close_peer_doesnt_call_close<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -7032,8 +7030,8 @@ mod tests {
         assert_eq!(weak_local.upgrade(), None);
     }
 
-    #[ip_test]
-    fn connection_shutdown_then_close<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn connection_shutdown_then_close<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -7097,8 +7095,8 @@ mod tests {
         }
     }
 
-    #[ip_test]
-    fn remove_unbound<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn remove_unbound<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7115,8 +7113,8 @@ mod tests {
         assert_eq!(weak_unbound.upgrade(), None);
     }
 
-    #[ip_test]
-    fn remove_bound<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn remove_bound<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7135,8 +7133,8 @@ mod tests {
         assert_eq!(weak_socket.upgrade(), None);
     }
 
-    #[ip_test]
-    fn shutdown_listener<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn shutdown_listener<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -7285,8 +7283,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn set_buffer_size<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn set_buffer_size<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7384,8 +7382,8 @@ mod tests {
         step_and_increment_buffer_sizes_until_idle(&mut net, &local_connection, &remote_connection);
     }
 
-    #[ip_test]
-    fn set_reuseaddr_unbound<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn set_reuseaddr_unbound<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7413,12 +7411,12 @@ mod tests {
         api.listen(&first_bound, const_unwrap_option(NonZeroUsize::new(10))).expect("can listen");
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case([true, true], Ok(()); "allowed with set")]
     #[test_case([false, true], Err(LocalAddressError::AddressInUse); "first unset")]
     #[test_case([true, false], Err(LocalAddressError::AddressInUse); "second unset")]
     #[test_case([false, false], Err(LocalAddressError::AddressInUse); "both unset")]
-    fn reuseaddr_multiple_bound<I: Ip + TcpTestIpExt>(
+    fn reuseaddr_multiple_bound<I: TcpTestIpExt>(
         set_reuseaddr: [bool; 2],
         expected: Result<(), LocalAddressError>,
     ) where
@@ -7443,8 +7441,8 @@ mod tests {
         assert_eq!(second_bind_result, expected.map_err(From::from));
     }
 
-    #[ip_test]
-    fn toggle_reuseaddr_bound_different_addrs<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn toggle_reuseaddr_bound_different_addrs<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7470,8 +7468,8 @@ mod tests {
         api.set_reuseaddr(&first, false).expect("can un-set");
     }
 
-    #[ip_test]
-    fn unset_reuseaddr_bound_unspecified_specified<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn unset_reuseaddr_bound_unspecified_specified<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7496,8 +7494,8 @@ mod tests {
         assert_matches!(api.set_reuseaddr(&second, false), Err(SetReuseAddrError::AddrInUse));
     }
 
-    #[ip_test]
-    fn reuseaddr_allows_binding_under_connection<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn reuseaddr_allows_binding_under_connection<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7558,12 +7556,12 @@ mod tests {
         });
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case([true, true]; "specified specified")]
     #[test_case([false, true]; "any specified")]
     #[test_case([true, false]; "specified any")]
     #[test_case([false, false]; "any any")]
-    fn set_reuseaddr_bound_allows_other_bound<I: Ip + TcpTestIpExt>(bind_specified: [bool; 2])
+    fn set_reuseaddr_bound_allows_other_bound<I: TcpTestIpExt>(bind_specified: [bool; 2])
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7604,8 +7602,8 @@ mod tests {
         api.bind(&second, second_addr, Some(PORT_1)).expect("can bind");
     }
 
-    #[ip_test]
-    fn clear_reuseaddr_listener<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn clear_reuseaddr_listener<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7844,8 +7842,8 @@ mod tests {
         })
     }
 
-    #[ip_test]
-    fn icmp_destination_unreachable_listener<I: Ip + TcpTestIpExt + IcmpIpExt>()
+    #[ip_test(I)]
+    fn icmp_destination_unreachable_listener<I: TcpTestIpExt + IcmpIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<I, TcpBindingsCtx<FakeDeviceId>>
             + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>
@@ -7923,8 +7921,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn time_wait_reuse<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn time_wait_reuse<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -8098,8 +8096,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn conn_addr_not_available<I: Ip + TcpTestIpExt + IcmpIpExt>()
+    #[ip_test(I)]
+    fn conn_addr_not_available<I: TcpTestIpExt + IcmpIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -8262,8 +8260,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn closed_not_in_demux<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn closed_not_in_demux<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -8304,8 +8302,8 @@ mod tests {
         }
     }
 
-    #[ip_test]
-    fn tcp_accept_queue_clean_up_closed<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn tcp_accept_queue_clean_up_closed<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,

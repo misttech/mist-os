@@ -11,6 +11,7 @@ use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use futures::channel::mpsc;
 use futures::{StreamExt as _, TryFutureExt as _};
+use ip_test_macro::ip_test;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
 use net_types::ethernet::Mac;
 use net_types::ip::{AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6};
@@ -1044,22 +1045,11 @@ impl IpExt for Ipv6 {
     const FIDL_IP_VERSION: fidl_net::IpVersion = fidl_net::IpVersion::V6;
 }
 
-// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn add_remove_neighbor_entry_v4() {
-    add_remove_neighbor_entry::<Ipv4>().await
-}
-
-// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn add_remove_neighbor_entry_v6() {
-    add_remove_neighbor_entry::<Ipv6>().await
-}
-
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
+#[fixture::teardown(TestSetup::shutdown)]
+#[ip_test(I)]
+#[fasync::run_singlethreaded]
+async fn add_remove_neighbor_entry<I: IpExt>() {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
         .add_endpoint()
@@ -1111,22 +1101,11 @@ async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     t
 }
 
-// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn remove_dynamic_neighbor_entry_v4() {
-    remove_dynamic_neighbor_entry::<Ipv4>().await
-}
-
-// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn remove_dynamic_neighbor_entry_v6() {
-    remove_dynamic_neighbor_entry::<Ipv6>().await
-}
-
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-async fn remove_dynamic_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
+#[fixture::teardown(TestSetup::shutdown)]
+#[ip_test(I)]
+#[fasync::run_singlethreaded]
+async fn remove_dynamic_neighbor_entry<I: IpExt>() {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
         .add_endpoint()
@@ -1168,21 +1147,12 @@ async fn remove_dynamic_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     t
 }
 
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn clear_entries_v4() {
-    clear_entries::<Ipv4>().await
-}
-
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn clear_entries_v6() {
-    clear_entries::<Ipv6>().await
-}
-
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 #[netstack3_core::context_ip_bounds(I::OtherIp, BindingsCtx)]
-async fn clear_entries<I: Ip + IpExt>() -> TestSetup {
+#[fixture::teardown(TestSetup::shutdown)]
+#[ip_test(I)]
+#[fasync::run_singlethreaded]
+async fn clear_entries<I: IpExt>() {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
         .add_endpoint()

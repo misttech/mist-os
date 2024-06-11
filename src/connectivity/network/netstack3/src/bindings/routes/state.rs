@@ -616,7 +616,7 @@ mod tests {
 
     // Tests that `RouteUpdateDispatcher` returns an error when it receives a
     // `RouteRemoved` update for a non-existent route.
-    #[ip_test]
+    #[ip_test(I)]
     fn dispatcher_fails_to_remove_non_existent<I: Ip>() {
         let route = arbitrary_route_on_interface::<I>(1);
         assert_eq!(
@@ -628,7 +628,7 @@ mod tests {
 
     // Tests that `RouteUpdateDispatcher` returns an error when it receives an
     // `AddRoute` update for an already existing route.
-    #[ip_test]
+    #[ip_test(I)]
     fn dispatcher_fails_to_add_existing<I: Ip>() {
         let mut dispatcher = RouteUpdateDispatcherInner::default();
         let route = arbitrary_route_on_interface::<I>(1);
@@ -641,7 +641,7 @@ mod tests {
 
     // Tests the basic functionality of the `RouteUpdateDispatcher`,
     // `RouteWatcherSink`, and `RouteWatcher`.
-    #[ip_test]
+    #[ip_test(I)]
     fn notify_dispatch_watch<I: Ip>() {
         let mut dispatcher = RouteUpdateDispatcherInner::default();
 
@@ -687,7 +687,7 @@ mod tests {
 
     // Tests that a `RouteWatcher` is canceled if it exceeds
     // `MAX_PENDING_EVENTS` in its queue.
-    #[ip_test]
+    #[ip_test(I)]
     fn cancel_watcher_with_too_many_pending_events<I: Ip>() {
         // Helper function to drain the watcher of a specific number of events,
         // which may be spread across multiple batches of size
@@ -739,7 +739,7 @@ mod tests {
         assert_eq!(watcher2.canceled.wait().now_or_never(), Some(()));
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     fn watcher_respects_interest<I: Ip>() {
         let mut dispatcher = RouteUpdateDispatcherInner::default();
         let main_table_id = routes::main_table_id::<I>();

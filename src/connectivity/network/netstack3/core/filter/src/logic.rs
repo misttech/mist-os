@@ -665,7 +665,7 @@ mod tests {
     use alloc::vec::Vec;
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ipv4, Ipv6};
+    use net_types::ip::Ipv4;
     use test_case::test_case;
 
     use super::*;
@@ -984,8 +984,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn filter_handler_implements_ip_hooks_correctly<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn filter_handler_implements_ip_hooks_correctly<I: TestIpExt>() {
         fn drop_all_traffic<I: TestIpExt>(
             matcher: PacketMatcher<I, FakeDeviceClass>,
         ) -> Hook<I, FakeDeviceClass, ()> {
@@ -1108,14 +1108,14 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(22 => Verdict::Accept; "port 22 allowed for SSH")]
     #[test_case(80 => Verdict::Accept; "port 80 allowed for HTTP")]
     #[test_case(1024 => Verdict::Accept; "ephemeral port 1024 allowed")]
     #[test_case(65535 => Verdict::Accept; "ephemeral port 65535 allowed")]
     #[test_case(1023 => Verdict::Drop; "privileged port 1023 blocked")]
     #[test_case(53 => Verdict::Drop; "privileged port 53 blocked")]
-    fn block_privileged_ports_except_ssh_http<I: Ip + TestIpExt>(port: u16) -> Verdict {
+    fn block_privileged_ports_except_ssh_http<I: TestIpExt>(port: u16) -> Verdict {
         fn tcp_port_rule<I: IpExt>(
             src_port: Option<PortMatcher>,
             dst_port: Option<PortMatcher>,
@@ -1186,13 +1186,13 @@ mod tests {
         )
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(
         ethernet_interface() => Verdict::Accept;
         "allow incoming traffic on ethernet interface"
     )]
     #[test_case(wlan_interface() => Verdict::Drop; "drop incoming traffic on wlan interface")]
-    fn filter_on_wlan_only<I: Ip + TestIpExt>(interface: FakeDeviceId) -> Verdict {
+    fn filter_on_wlan_only<I: TestIpExt>(interface: FakeDeviceId) -> Verdict {
         fn drop_wlan_traffic<I: IpExt>() -> Routine<I, FakeDeviceClass, ()> {
             Routine {
                 rules: vec![Rule::new(

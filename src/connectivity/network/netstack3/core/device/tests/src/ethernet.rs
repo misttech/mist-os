@@ -60,10 +60,10 @@ fn contains_addr<A: IpAddress>(
     }
 }
 
-#[ip_test]
+#[ip_test(I)]
 #[test_case(true; "enabled")]
 #[test_case(false; "disabled")]
-fn test_receive_ip_frame<I: Ip + TestIpExt + IpExt>(enable: bool) {
+fn test_receive_ip_frame<I: TestIpExt + IpExt>(enable: bool) {
     // Should only receive a frame if the device is enabled.
 
     let config = I::TEST_ADDRS;
@@ -117,10 +117,10 @@ fn initialize_once() {
     ctx.test_api().enable_device(&device);
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 #[netstack3_macros::context_ip_bounds(I::OtherVersion, FakeBindingsCtx)]
-fn test_set_ip_routing<I: Ip + TestIpExt + IpExt>()
+#[ip_test(I)]
+fn test_set_ip_routing<I: TestIpExt + IpExt>()
 where
     I::OtherVersion: IpExt,
 {
@@ -233,13 +233,10 @@ where
     assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 }
 
-#[ip_test]
+#[ip_test(I)]
 #[test_case(UnicastAddr::new(net_mac!("12:13:14:15:16:17")).unwrap(), true; "unicast")]
 #[test_case(MulticastAddr::new(net_mac!("13:14:15:16:17:18")).unwrap(), false; "multicast")]
-fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>(
-    other_mac: impl Witness<Mac>,
-    is_other_host: bool,
-) {
+fn test_promiscuous_mode<I: TestIpExt + IpExt>(other_mac: impl Witness<Mac>, is_other_host: bool) {
     // Test that frames not destined for a device will still be accepted
     // when the device is put into promiscuous mode. In all cases, frames
     // that are destined for a device must always be accepted.
@@ -335,8 +332,8 @@ fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>(
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-#[ip_test]
-fn test_add_remove_ip_addresses<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_add_remove_ip_addresses<I: TestIpExt + IpExt>() {
     let config = I::TEST_ADDRS;
     let mut ctx = FakeCtx::default();
 
@@ -449,8 +446,8 @@ fn receive_simple_ip_packet_test<A: IpAddress>(
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-#[ip_test]
-fn test_multiple_ip_addresses<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_multiple_ip_addresses<I: TestIpExt + IpExt>() {
     let config = I::TEST_ADDRS;
     let mut ctx = FakeCtx::default();
     let device = ctx
@@ -515,9 +512,9 @@ fn test_multiple_ip_addresses<I: Ip + TestIpExt + IpExt>() {
 /// Test that we can join and leave a multicast group, but we only truly
 /// leave it after calling `leave_ip_multicast` the same number of times as
 /// `join_ip_multicast`.
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_ip_join_leave_multicast_addr_ref_count<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_ip_join_leave_multicast_addr_ref_count<I: TestIpExt + IpExt>() {
     let config = I::TEST_ADDRS;
     let mut ctx = FakeCtx::default();
 
@@ -570,10 +567,10 @@ fn test_ip_join_leave_multicast_addr_ref_count<I: Ip + TestIpExt + IpExt>() {
 ///
 /// This method should always panic as leaving an unjoined multicast group
 /// is a panic condition.
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[should_panic(expected = "attempted to leave IP multicast group we were not a member of:")]
-fn test_ip_leave_unjoined_multicast<I: Ip + TestIpExt + IpExt>() {
+fn test_ip_leave_unjoined_multicast<I: TestIpExt + IpExt>() {
     let config = I::TEST_ADDRS;
     let mut ctx = FakeCtx::default();
     let device = ctx

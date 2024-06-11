@@ -1140,7 +1140,7 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
-    use net_types::ip::{Ipv4, Ipv6};
+    use net_types::ip::Ipv6;
     use net_types::Witness;
     use netstack3_base::socket::StrictlyZonedAddr;
     use netstack3_base::testutil::{
@@ -1370,8 +1370,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn send_invalid_icmp_echo<I: Ip + TestIpExt + IpExt>() {
+    #[ip_test(I)]
+    fn send_invalid_icmp_echo<I: TestIpExt + IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         let conn = api.create();
@@ -1395,8 +1395,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn get_info<I: Ip + TestIpExt + IpExt>() {
+    #[ip_test(I)]
+    fn get_info<I: TestIpExt + IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
 
@@ -1424,8 +1424,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn send<I: Ip + TestIpExt + IpExt>() {
+    #[ip_test(I)]
+    fn send<I: TestIpExt + IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         let sock = api.create();
@@ -1457,8 +1457,8 @@ mod tests {
         assert_eq!(echo_req.message().seq(), SEQ_NUM);
     }
 
-    #[ip_test]
-    fn receive<I: Ip + TestIpExt + IpExt>() {
+    #[ip_test(I)]
+    fn receive<I: TestIpExt + IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         let sock = api.create();
@@ -1505,8 +1505,8 @@ mod tests {
         assert_eq!(&got_data[..], reply.as_ref());
     }
 
-    #[ip_test]
-    fn receive_no_socket<I: Ip + TestIpExt + IpExt>() {
+    #[ip_test(I)]
+    fn receive_no_socket<I: TestIpExt + IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         let sock = api.create();

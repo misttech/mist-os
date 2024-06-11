@@ -455,8 +455,8 @@ fn test_ipv6_unrecognized_ext_hdr_option() {
     assert_eq!(ctx.core_ctx.ipv6().inner.counters().dispatch_receive_ip_packet.get(), 1);
 }
 
-#[ip_test]
-fn test_ip_packet_reassembly_not_needed<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_ip_packet_reassembly_not_needed<I: TestIpExt + IpExt>() {
     let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
     let device: DeviceId<_> = device_ids[0].clone().into();
     let fragment_id = 5;
@@ -471,8 +471,8 @@ fn test_ip_packet_reassembly_not_needed<I: Ip + TestIpExt + IpExt>() {
     assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 1);
 }
 
-#[ip_test]
-fn test_ip_packet_reassembly<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_ip_packet_reassembly<I: TestIpExt + IpExt>() {
     let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
     let device: DeviceId<_> = device_ids[0].clone().into();
     let fragment_id = 5;
@@ -497,8 +497,8 @@ fn test_ip_packet_reassembly<I: Ip + TestIpExt + IpExt>() {
     assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 1);
 }
 
-#[ip_test]
-fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: TestIpExt + IpExt>() {
     let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();
     let device: DeviceId<_> = device_ids[0].clone().into();
     let fragment_id_0 = 5;
@@ -547,8 +547,8 @@ fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: Ip + TestIpEx
     assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 3);
 }
 
-#[ip_test]
-fn test_ip_packet_reassembly_timer<I: Ip + TestIpExt + IpExt>()
+#[ip_test(I)]
+fn test_ip_packet_reassembly_timer<I: TestIpExt + IpExt>()
 where
     IpLayerTimerId: From<FragmentTimerId<I>>,
 {
@@ -589,9 +589,9 @@ where
     assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 0);
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_ip_reassembly_only_at_destination_host<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_ip_reassembly_only_at_destination_host<I: TestIpExt + IpExt>() {
     // Create a new network with two parties (alice & bob) and enable IP
     // packet routing for alice.
     let a = "alice";
@@ -807,8 +807,8 @@ impl GetPmtuIpExt for Ipv6 {
     }
 }
 
-#[ip_test]
-fn test_ip_update_pmtu<I: Ip + GetPmtuIpExt>() {
+#[ip_test(I)]
+fn test_ip_update_pmtu<I: GetPmtuIpExt>() {
     // Test receiving a Packet Too Big (IPv6) or Dest Unreachable
     // Fragmentation Required (IPv4) which should update the PMTU if it is
     // less than the current value.
@@ -895,8 +895,8 @@ fn test_ip_update_pmtu<I: Ip + GetPmtuIpExt>() {
     );
 }
 
-#[ip_test]
-fn test_ip_update_pmtu_too_low<I: Ip + GetPmtuIpExt>() {
+#[ip_test(I)]
+fn test_ip_update_pmtu_too_low<I: GetPmtuIpExt>() {
     // Test receiving a Packet Too Big (IPv6) or Dest Unreachable
     // Fragmentation Required (IPv4) which should not update the PMTU if it
     // is less than the min MTU.
@@ -1140,9 +1140,9 @@ fn test_invalid_icmpv6_in_ipv4() {
     assert_eq!(code, Icmpv4DestUnreachableCode::DestProtocolUnreachable);
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_joining_leaving_ip_multicast_group<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_joining_leaving_ip_multicast_group<I: TestIpExt + IpExt>() {
     // Test receiving a packet destined to a multicast IP (and corresponding
     // multicast MAC).
 
@@ -1680,8 +1680,7 @@ fn remote_ip<I: TestIpExt>() -> SpecifiedAddr<I::Addr> {
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn make_test_ctx<I: Ip + TestIpExt + IpExt>(
-) -> (Ctx<FakeBindingsCtx>, Vec<DeviceId<FakeBindingsCtx>>) {
+fn make_test_ctx<I: TestIpExt + IpExt>() -> (Ctx<FakeBindingsCtx>, Vec<DeviceId<FakeBindingsCtx>>) {
     let mut builder = FakeCtxBuilder::default();
     for device in [Device::First, Device::Second] {
         let ip: SpecifiedAddr<I::Addr> = device.ip_address().into();
@@ -1739,7 +1738,8 @@ fn do_route_lookup<I: IpExt>(
     })
 }
 
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(None,
                 None,
                 Device::First.ip_address(),
@@ -1812,8 +1812,7 @@ fn do_route_lookup<I: IpExt>(
                     local_delivery_device: Some(Device::Second),
                     next_hop: NextHop::RemoteAsNeighbor });
                 "local delivery cross device")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn lookup_route<I: Ip + TestIpExt + IpExt>(
+fn lookup_route<I: TestIpExt + IpExt>(
     local_ip: Option<IpDeviceAddr<I::Addr>>,
     egress_device: Option<Device>,
     dest_ip: RoutableIpAddr<I::Addr>,
@@ -1836,7 +1835,8 @@ fn lookup_route<I: Ip + TestIpExt + IpExt>(
     assert_eq!(result, expected_result);
 }
 
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(None,
                 None,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::First,
@@ -1860,8 +1860,7 @@ fn lookup_route<I: Ip + TestIpExt + IpExt>(
                 Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Second,
                     local_delivery_device: None, next_hop: NextHop::RemoteAsNeighbor });
                 "constrain to second device")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn lookup_route_multiple_devices_with_route<I: Ip + TestIpExt + IpExt>(
+fn lookup_route_multiple_devices_with_route<I: TestIpExt + IpExt>(
     local_ip: Option<IpDeviceAddr<I::Addr>>,
     egress_device: Option<Device>,
     expected_result: Result<ResolvedRoute<I, Device>, ResolveRouteError>,

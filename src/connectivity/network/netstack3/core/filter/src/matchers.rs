@@ -337,7 +337,7 @@ mod base_testutil {
 #[cfg(test)]
 mod tests {
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
     use packet_formats::ip::{IpProto, Ipv4Proto};
     use test_case::test_case;
 
@@ -418,12 +418,12 @@ mod tests {
         Range,
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(AddressMatcherTestCase::Subnet, /* invert */ false)]
     #[test_case(AddressMatcherTestCase::Subnet, /* invert */ true)]
     #[test_case(AddressMatcherTestCase::Range, /* invert */ false)]
     #[test_case(AddressMatcherTestCase::Range, /* invert */ true)]
-    fn match_on_subnet_or_address_range<I: Ip + TestIpExt>(
+    fn match_on_subnet_or_address_range<I: TestIpExt>(
         test_case: AddressMatcherTestCase,
         invert: bool,
     ) {
@@ -608,8 +608,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn packet_must_match_all_provided_matchers<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn packet_must_match_all_provided_matchers<I: TestIpExt>() {
         let matcher = PacketMatcher::<I, FakeDeviceClass> {
             src_address: Some(AddressMatcher {
                 matcher: AddressMatcherType::Subnet(I::SUBNET),

@@ -4994,7 +4994,7 @@ mod test {
     use crate::internal::spec_context;
 
     trait DatagramIpExt<D: FakeStrongDeviceId>:
-        Ip + IpExt + IpDeviceStateIpExt + TestIpExt + DualStackIpExt + DualStackContextsIpExt<D>
+        IpExt + IpDeviceStateIpExt + TestIpExt + DualStackIpExt + DualStackContextsIpExt<D>
     {
     }
     impl<
@@ -5557,7 +5557,7 @@ mod test {
         }
     }
 
-    impl<D: FakeStrongDeviceId, I: Ip + DualStackContextsIpExt<D>>
+    impl<D: FakeStrongDeviceId, I: DualStackContextsIpExt<D>>
         spec_context::DatagramSpecBoundStateContext<I, FakeDualStackCoreCtx<D>, FakeBindingsCtx>
         for FakeStateSpec
     {
@@ -5707,8 +5707,8 @@ mod test {
         }
     }
 
-    #[ip_test]
-    fn set_get_hop_limits<I: Ip + DatagramIpExt<FakeDeviceId>>() {
+    #[ip_test(I)]
+    fn set_get_hop_limits<I: DatagramIpExt<FakeDeviceId>>() {
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, FakeDeviceId>::new());
         let mut api = ctx.datagram_api::<I>();
 
@@ -5729,8 +5729,8 @@ mod test {
         assert_eq!(api.get_ip_hop_limits(&unbound), EXPECTED_HOP_LIMITS);
     }
 
-    #[ip_test]
-    fn set_get_device_hop_limits<I: Ip + DatagramIpExt<FakeReferencyDeviceId>>() {
+    #[ip_test(I)]
+    fn set_get_device_hop_limits<I: DatagramIpExt<FakeReferencyDeviceId>>() {
         let device = FakeReferencyDeviceId::default();
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(
             FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
@@ -5759,8 +5759,8 @@ mod test {
         assert_eq!(api.get_ip_hop_limits(&unbound), DEFAULT_HOP_LIMITS);
     }
 
-    #[ip_test]
-    fn default_hop_limits<I: Ip + DatagramIpExt<FakeDeviceId>>() {
+    #[ip_test(I)]
+    fn default_hop_limits<I: DatagramIpExt<FakeDeviceId>>() {
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, FakeDeviceId>::new());
         let mut api = ctx.datagram_api::<I>();
         let unbound = api.create(());
@@ -5784,8 +5784,8 @@ mod test {
         assert_eq!(api.get_ip_hop_limits(&unbound), DEFAULT_HOP_LIMITS);
     }
 
-    #[ip_test]
-    fn bind_device_unbound<I: Ip + DatagramIpExt<FakeDeviceId>>() {
+    #[ip_test(I)]
+    fn bind_device_unbound<I: DatagramIpExt<FakeDeviceId>>() {
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, FakeDeviceId>::new());
         let mut api = ctx.datagram_api::<I>();
         let unbound = api.create(());
@@ -5797,8 +5797,8 @@ mod test {
         assert_eq!(api.get_bound_device(&unbound), None);
     }
 
-    #[ip_test]
-    fn send_to_binds_unbound<I: Ip + DatagramIpExt<FakeDeviceId>>() {
+    #[ip_test(I)]
+    fn send_to_binds_unbound<I: DatagramIpExt<FakeDeviceId>>() {
         let mut ctx =
             FakeCtx::with_core_ctx(FakeCoreCtx::<I, FakeDeviceId>::new_with_ip_socket_ctx(
                 FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
@@ -5816,8 +5816,8 @@ mod test {
         assert_matches!(api.get_info(&socket), SocketInfo::Listener(_));
     }
 
-    #[ip_test]
-    fn send_to_no_route_still_binds<I: Ip + DatagramIpExt<FakeDeviceId>>() {
+    #[ip_test(I)]
+    fn send_to_no_route_still_binds<I: DatagramIpExt<FakeDeviceId>>() {
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(
             FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
                 device: FakeDeviceId,
@@ -5836,10 +5836,10 @@ mod test {
         assert_matches!(api.get_info(&socket), SocketInfo::Listener(_));
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(true; "remove device b")]
     #[test_case(false; "dont remove device b")]
-    fn multicast_membership_changes<I: Ip + DatagramIpExt<FakeReferencyDeviceId> + TestIpExt>(
+    fn multicast_membership_changes<I: DatagramIpExt<FakeReferencyDeviceId> + TestIpExt>(
         remove_device_b: bool,
     ) {
         let device_a = FakeReferencyDeviceId::default();
@@ -5916,8 +5916,8 @@ mod test {
         }
     }
 
-    #[ip_test]
-    fn set_get_transparent<I: Ip + DatagramIpExt<FakeDeviceId>>() {
+    #[ip_test(I)]
+    fn set_get_transparent<I: DatagramIpExt<FakeDeviceId>>() {
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(
             FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
                 device: FakeDeviceId,
@@ -5946,11 +5946,11 @@ mod test {
         Connected,
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(OriginalSocketState::Unbound; "reinsert_unbound")]
     #[test_case(OriginalSocketState::Listener; "reinsert_listener")]
     #[test_case(OriginalSocketState::Connected; "reinsert_connected")]
-    fn connect_reinserts_on_failure_single_stack<I: Ip + DatagramIpExt<FakeDeviceId>>(
+    fn connect_reinserts_on_failure_single_stack<I: DatagramIpExt<FakeDeviceId>>(
         original: OriginalSocketState,
     ) {
         connect_reinserts_on_failure_inner::<I>(
@@ -5975,7 +5975,7 @@ mod test {
         connect_reinserts_on_failure_inner::<Ipv6>(original, local_ip, remote_ip);
     }
 
-    fn connect_reinserts_on_failure_inner<I: Ip + DatagramIpExt<FakeDeviceId>>(
+    fn connect_reinserts_on_failure_inner<I: DatagramIpExt<FakeDeviceId>>(
         original: OriginalSocketState,
         local_ip: I::Addr,
         remote_ip: SpecifiedAddr<I::Addr>,
@@ -6108,11 +6108,11 @@ mod test {
         assert_eq!(api.get_shutdown_connected(&socket), Some(shutdown));
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(OriginalSocketState::Unbound; "unbound")]
     #[test_case(OriginalSocketState::Listener; "listener")]
     #[test_case(OriginalSocketState::Connected; "connected")]
-    fn set_get_device_single_stack<I: Ip + DatagramIpExt<MultipleDevicesId>>(
+    fn set_get_device_single_stack<I: DatagramIpExt<MultipleDevicesId>>(
         original: OriginalSocketState,
     ) {
         set_get_device_inner::<I>(original, I::TEST_ADDRS.local_ip.get(), I::TEST_ADDRS.remote_ip);
@@ -6133,7 +6133,7 @@ mod test {
         set_get_device_inner::<Ipv6>(original, local_ip, remote_ip);
     }
 
-    fn set_get_device_inner<I: Ip + DatagramIpExt<MultipleDevicesId>>(
+    fn set_get_device_inner<I: DatagramIpExt<MultipleDevicesId>>(
         original: OriginalSocketState,
         local_ip: I::Addr,
         remote_ip: SpecifiedAddr<I::Addr>,

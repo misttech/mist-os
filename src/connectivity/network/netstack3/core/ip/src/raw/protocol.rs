@@ -85,17 +85,17 @@ mod test {
     use net_types::ip::{Ipv4, Ipv6};
     use test_case::test_case;
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(IpProto::Udp, Some(Protocol(IpProto::Udp.into())); "valid")]
     #[test_case(IpProto::Reserved, None; "reserved")]
-    fn new_protocol<I: Ip + IpExt>(p: IpProto, expected: Option<Protocol<I>>) {
+    fn new_protocol<I: IpExt>(p: IpProto, expected: Option<Protocol<I>>) {
         assert_eq!(Protocol::new(p.into()), expected);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(IpProto::Udp, RawIpSocketProtocol::Proto(Protocol(IpProto::Udp.into())); "valid")]
     #[test_case(IpProto::Reserved, RawIpSocketProtocol::Raw; "reserved")]
-    fn new_raw_ip_socket_protocol<I: Ip + IpExt>(p: IpProto, expected: RawIpSocketProtocol<I>) {
+    fn new_raw_ip_socket_protocol<I: IpExt>(p: IpProto, expected: RawIpSocketProtocol<I>) {
         assert_eq!(RawIpSocketProtocol::new(p.into()), expected);
     }
 

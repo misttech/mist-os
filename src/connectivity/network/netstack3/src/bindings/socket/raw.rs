@@ -934,7 +934,7 @@ mod tests {
     use packet_formats::ip::IpProto;
     use test_case::test_case;
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(
         fpraw::ProtocolAssociation::Unassociated(fpraw::Empty),
         Ok(RawIpSocketProtocol::Raw);
@@ -945,20 +945,17 @@ mod tests {
         Err(fposix::Errno::Einval);
         "associated_with_iana_reserved_protocol"
     )]
-    fn raw_protocol_from_fidl<I: Ip + IpExt>(
+    fn raw_protocol_from_fidl<I: IpExt>(
         fidl: fpraw::ProtocolAssociation,
         expected_result: Result<RawIpSocketProtocol<I>, fposix::Errno>,
     ) {
         assert_eq!(RawIpSocketProtocol::<I>::try_from_fidl(fidl), expected_result);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(fpraw::ProtocolAssociation::Associated(6), IpProto::Tcp)]
     #[test_case(fpraw::ProtocolAssociation::Associated(17), IpProto::Udp)]
-    fn protocol_from_fidl<I: Ip + IpExt>(
-        fidl: fpraw::ProtocolAssociation,
-        expected_proto: IpProto,
-    ) {
+    fn protocol_from_fidl<I: IpExt>(fidl: fpraw::ProtocolAssociation, expected_proto: IpProto) {
         assert_eq!(
             RawIpSocketProtocol::<I>::try_from_fidl(fidl)
                 .expect("conversion should succeed")

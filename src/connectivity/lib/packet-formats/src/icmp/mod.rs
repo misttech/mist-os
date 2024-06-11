@@ -842,10 +842,10 @@ mod tests {
         assert!(buf.parse::<IcmpPacketRaw<Ipv4, _, IcmpEchoRequest>>().is_ok());
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case([0,0]; "zeroed_checksum")]
     #[test_case([123, 234]; "garbage_checksum")]
-    fn test_try_write_checksum<I: Ip + IcmpIpExt>(corrupt_checksum: [u8; 2]) {
+    fn test_try_write_checksum<I: IcmpIpExt>(corrupt_checksum: [u8; 2]) {
         // NB: The process of serializing an `IcmpPacketBuilder` will compute a
         // valid checksum.
         let icmp_message_with_checksum = []

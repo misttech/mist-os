@@ -60,7 +60,7 @@ struct NewSocketTestCase {
     expected_result: Result<(), IpSockCreationError>,
 }
 
-trait IpSocketIpExt: Ip + TestIpExt + IcmpIpExt + IpExt + ip::IpExt {
+trait IpSocketIpExt: TestIpExt + IcmpIpExt + IpExt + ip::IpExt {
     fn multicast_addr(host: u8) -> SpecifiedAddr<Self::Addr>;
 }
 
@@ -130,7 +130,8 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
     }
 }
 
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::Unroutable,
         remote_ip_type: AddressType::Remote,
@@ -197,8 +198,7 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
         device_type: DeviceType::Unspecified,
         expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
     }; "new remote to local")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_new<I: Ip + IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
+fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
     let cfg = I::TEST_ADDRS;
     let proto = I::ICMP_IP_PROTO;
 
@@ -262,13 +262,13 @@ fn test_new<I: Ip + IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
     assert_eq!(res.map(|s| s.definition().clone()), get_expected_result(template));
 }
 
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(AddressType::LocallyOwned, AddressType::LocallyOwned; "local to local")]
 #[test_case(AddressType::Unspecified { can_select: true },
         AddressType::LocallyOwned; "unspecified to local")]
 #[test_case(AddressType::LocallyOwned, AddressType::Remote; "local to remote")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_send_local<I: Ip + IpSocketIpExt + IpExt>(
+fn test_send_local<I: IpSocketIpExt + IpExt>(
     from_addr_type: AddressType,
     to_addr_type: AddressType,
 ) {
@@ -360,9 +360,9 @@ fn test_send_local<I: Ip + IpSocketIpExt + IpExt>(
     assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 1);
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_send<I: IpSocketIpExt + IpExt>() {
     // Test various edge cases of the
     // IpSocketContext::send_ip_packet` method.
 
@@ -498,9 +498,9 @@ fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
     assert_eq!(res, Err(IpSockSendError::Unroutable(ResolveRouteError::Unreachable)));
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
     set_logger_for_test();
 
     #[derive(Copy, Clone, Debug)]
@@ -597,11 +597,11 @@ fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpExt>() {
     }
 }
 
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(true; "remove device")]
 #[test_case(false; "dont remove device")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpExt>(remove_device: bool) {
+fn get_mms_device_removed<I: IpSocketIpExt + IpExt>(remove_device: bool) {
     set_logger_for_test();
 
     let TestAddrs::<I::Addr> { local_ip, remote_ip: _, local_mac, subnet: _, remote_mac: _ } =

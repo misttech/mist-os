@@ -430,7 +430,7 @@ fn ipv6_integration() {
 
 type FakeNudNetwork<L> = FakeNetwork<FakeCtxNetworkSpec, &'static str, L>;
 
-fn new_test_net<I: Ip + TestIpExt>() -> (
+fn new_test_net<I: TestIpExt>() -> (
     FakeNudNetwork<
         impl FakeNetworkLinks<DispatchedFrame, EthernetDeviceId<FakeBindingsCtx>, &'static str>,
     >,
@@ -495,9 +495,9 @@ fn bind_and_connect_sockets<
     })
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn upper_layer_confirmation_tcp_handshake<I: Ip + TestIpExt + IpExt>()
+#[ip_test(I)]
+fn upper_layer_confirmation_tcp_handshake<I: TestIpExt + IpExt>()
 where
     for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<FakeBindingsCtx>>
         + NudContext<I, EthernetLinkDevice, FakeBindingsCtx>,
@@ -562,9 +562,9 @@ where
     }
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn upper_layer_confirmation_tcp_ack<I: Ip + TestIpExt + IpExt>()
+#[ip_test(I)]
+fn upper_layer_confirmation_tcp_ack<I: TestIpExt + IpExt>()
 where
     for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<FakeBindingsCtx>>
         + NudContext<I, EthernetLinkDevice, FakeBindingsCtx>,
@@ -625,9 +625,9 @@ where
     }
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn icmp_error_on_address_resolution_failure_tcp_local<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn icmp_error_on_address_resolution_failure_tcp_local<I: TestIpExt + IpExt>() {
     let mut builder = FakeCtxBuilder::default();
     let _device_id = builder.add_device_with_ip(
         I::TEST_ADDRS.local_mac,
@@ -655,9 +655,9 @@ fn icmp_error_on_address_resolution_failure_tcp_local<I: Ip + TestIpExt + IpExt>
     assert_eq!(tcp_api.get_socket_error(&socket), Some(tcp::ConnectionError::HostUnreachable),);
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: TestIpExt + IpExt>() {
     let (mut net, local_device, remote_device) = new_test_net::<I>();
 
     let TestAddrs { remote_ip, .. } = I::TEST_ADDRS;

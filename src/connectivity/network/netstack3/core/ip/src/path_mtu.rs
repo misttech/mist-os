@@ -411,7 +411,6 @@ mod tests {
     use super::*;
 
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ipv4, Ipv6};
     use net_types::{SpecifiedAddr, Witness};
     use netstack3_base::testutil::{
         assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt, TestIpExt,
@@ -492,8 +491,8 @@ mod tests {
         core_ctx.state.cache.get_last_updated(src_ip, dst_ip)
     }
 
-    #[ip_test]
-    fn test_ip_path_mtu_cache_ctx<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_ip_path_mtu_cache_ctx<I: TestIpExt>() {
         let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
@@ -665,8 +664,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_ip_pmtu_task<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_ip_pmtu_task<I: TestIpExt>() {
         let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 

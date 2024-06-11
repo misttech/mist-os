@@ -96,8 +96,8 @@ mod tests {
         assert_eq!(build_precise_filter::<Ipv6>(message_type, allow).into_bytes(), expected);
     }
 
-    #[ip_test]
-    fn icmp_filter_allows_type<I: Ip + IcmpIpExt>() {
+    #[ip_test(I)]
+    fn icmp_filter_allows_type<I: IcmpIpExt>() {
         for i in 0..u8::MAX {
             match I::IcmpMessageType::try_from(i) {
                 // This isn't a valid message type; skip testing it.
