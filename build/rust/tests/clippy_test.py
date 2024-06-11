@@ -6,8 +6,9 @@ import json
 import unittest
 import subprocess
 import sys
-from subprocess import CalledProcessError
 from pathlib import Path
+from subprocess import CalledProcessError
+from typing import Any
 
 # the host_cpu specific dir is passed as an arg
 HOST = Path(sys.argv.pop())
@@ -16,11 +17,11 @@ FAKE_OUT = FAKE_ROOT / "out/default"
 TEST_DIR = Path("gen/build/rust/tests")
 
 
-def run_clippy(*args):
+def run_clippy(*args: Any) -> str:
     return subprocess.check_output(
         [
             sys.executable,
-            FAKE_ROOT / "tools/devshell/contrib/lib/rust/clippy.py",
+            str(FAKE_ROOT / "tools/devshell/contrib/lib/rust/clippy.py"),
             "--no-build",
             f"--out-dir={FAKE_OUT}",
             f"--fuchsia-dir={FAKE_ROOT}",
@@ -30,28 +31,28 @@ def run_clippy(*args):
     )
 
 
-def read_lints(raw):
+def read_lints(raw: str) -> list[dict[str, Any]]:
     return [json.loads(line) for line in raw.splitlines()]
 
 
-def extract_codes(lints):
+def extract_codes(lints: list[dict[str, Any]]) -> list[str]:
     return sorted([l["code"]["code"] for l in lints])
 
 
 class TestClippy(unittest.TestCase):
-    def test_expected(self):
+    def test_expected(self) -> None:
         lints = read_lints(run_clippy("//build/rust/tests:a", "--raw"))
         codes = extract_codes(lints)
         self.assertEqual(codes, ["clippy::needless_return"])
 
-    def test_unit_test(self):
+    def test_unit_test(self) -> None:
         lints = read_lints(run_clippy("//build/rust/tests:a_test", "--raw"))
         codes = extract_codes(lints)
         self.assertEqual(
             codes, ["clippy::approx_constant", "clippy::needless_return"]
         )
 
-    def test_file_filtering(self):
+    def test_file_filtering(self) -> None:
         lints = read_lints(
             run_clippy("-f", FAKE_ROOT / "build/rust/tests/a/main.rs", "--raw")
         )
@@ -64,7 +65,7 @@ class TestClippy(unittest.TestCase):
         codes = extract_codes(lints)
         self.assertEqual(codes, ["clippy::needless_return"])
 
-    def test_dedup_lints(self):
+    def test_dedup_lints(self) -> None:
         lints = read_lints(
             run_clippy(
                 "-f",
@@ -78,7 +79,7 @@ class TestClippy(unittest.TestCase):
             codes, ["clippy::approx_constant", "clippy::needless_return"]
         )
 
-    def test_depfiles(self):
+    def test_depfiles(self) -> None:
         with open(FAKE_OUT / TEST_DIR / "a.clippy.deps") as f:
             self.assertEqual(
                 f.read().splitlines(),
@@ -95,7 +96,7 @@ class TestClippy(unittest.TestCase):
                 f.read().splitlines(),
             )
 
-    def test_file_mapping(self):
+    def test_file_mapping(self) -> None:
         output = run_clippy(
             "--get-outputs", "-f", FAKE_ROOT / "build/rust/tests/b/lib.rs"
         )
@@ -110,7 +111,7 @@ class TestClippy(unittest.TestCase):
         }:
             self.assertIn(label, set(output.splitlines()))
 
-    def test_dedup_files(self):
+    def test_dedup_files(self) -> None:
         outputs = run_clippy(
             "--get-outputs",
             "-f",
@@ -127,14 +128,14 @@ class TestClippy(unittest.TestCase):
             ],
         )
 
-    def test_not_found(self):
+    def test_not_found(self) -> None:
         with self.assertRaises(CalledProcessError):
             run_clippy("-f", "NOT_A_RUST_FILE")
 
         with self.assertRaises(CalledProcessError):
             run_clippy("NOT_A_RUST_TARGET")
 
-    def test_host_toolchain(self):
+    def test_host_toolchain(self) -> None:
         lints = read_lints(
             run_clippy(
                 f"//build/rust/tests:d(//build/toolchain:{HOST})", "--raw"
