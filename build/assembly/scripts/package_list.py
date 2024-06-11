@@ -12,7 +12,7 @@ import os
 import sys
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Parse assembly create-system output manifest to get package info."
     )

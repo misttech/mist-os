@@ -34,7 +34,7 @@ import json
 import sys
 import collections
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 
 class InvalidInputError(Exception):
@@ -42,14 +42,14 @@ class InvalidInputError(Exception):
 
 
 def convert_budget_format_by_pkg_names(
-    component: Dict[str, Any], all_manifests: Dict[str, str]
-):
+    component: dict[str, Any], all_manifests: dict[str, str]
+) -> dict[str, Any]:
     """Converts a component budget to the new budget format.
 
     Args:
       component: dictionary, size checker configuration entry that specifies
       packages by name.
-      all_manifests: Dict[string, Path)], list of tuples of package name and manifest
+      all_manifests: dict[string, Path)], list of tuples of package name and manifest
       path.
     Returns:
       dictionary, new configuration with a name, a maximum size and the list of
@@ -72,7 +72,9 @@ def convert_budget_format_by_pkg_names(
     return result
 
 
-def count_packages(budgets, all_manifests):
+def count_packages(
+    budgets: list[dict[str, Any]], all_manifests: list[str]
+) -> tuple[list[str], list[str]]:
     """Returns packages that are missing, or present in multiple budgets."""
     package_count = collections.Counter(
         package for budget in budgets for package in budget["packages"]
@@ -84,10 +86,12 @@ def count_packages(budgets, all_manifests):
     return more_than_once, zero
 
 
-def make_package_set_budgets(size_limits, product_config):
+def make_package_set_budgets(
+    size_limits: dict[str, Any], product_config: dict[str, Any]
+) -> list[dict[str, Any]]:
     # Convert each budget to the new format and packages from base and cache.
     # Package from system belongs the system budget.
-    all_manifests: List[str] = product_config.get(
+    all_manifests: list[str] = product_config.get(
         "base", []
     ) + product_config.get("cache", [])
 
@@ -97,7 +101,7 @@ def make_package_set_budgets(size_limits, product_config):
     #   some/path/to/<package_name>/package_manifest.json
     #
     # So a map of <package_name> to path can be readily computed.
-    manifests_by_name: Dict[str, str] = {}
+    manifests_by_name: dict[str, str] = {}
     for manifest_path in all_manifests:
         segments = manifest_path.split("/")
         if (
@@ -160,7 +164,9 @@ def make_package_set_budgets(size_limits, product_config):
     return sorted(packages_budgets, key=lambda budget: budget["name"])
 
 
-def make_resources_budgets(size_limits):
+def make_resources_budgets(
+    size_limits: dict[str, str | list[str]]
+) -> list[dict[str, Any]]:
     budgets = []
     if "distributed_shlibs" in size_limits:
         budgets.append(
@@ -177,7 +183,7 @@ def make_resources_budgets(size_limits):
         budgets.append(
             dict(
                 name="ICU Data",
-                paths=sorted(size_limits["icu_data"]),
+                paths=sorted(list(size_limits["icu_data"])),
                 budget_bytes=size_limits["icu_data_limit"],
                 creep_budget_bytes=size_limits["icu_data_creep_limit"],
             )
@@ -185,7 +191,7 @@ def make_resources_budgets(size_limits):
     return budgets
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Converts the former size_checker.go budget file to the new format as part of RFC-0144"
     )

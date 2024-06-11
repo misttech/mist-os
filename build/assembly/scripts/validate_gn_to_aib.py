@@ -22,7 +22,6 @@ import json
 import sys
 from types import SimpleNamespace
 from pprint import pformat, pprint
-from typing import List
 import logging
 from contextlib import contextmanager
 import textwrap
@@ -241,7 +240,7 @@ def _uncommitted_changes() -> bool:
     return False
 
 
-def _diff_dicts(old, new, path: List):
+def _diff_dicts(old, new, path: list):
     """Recursively checks the two JSON files for the expected discrepancies and logs them to stdout.
 
     NOTE: This function is not a full JSON differ and should not be used as

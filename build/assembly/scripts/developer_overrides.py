@@ -7,7 +7,7 @@ import argparse
 from dataclasses import dataclass
 import json
 import sys
-from typing import Any, Dict, List
+from typing import Any
 import logging
 from serialization import (
     instance_from_dict,
@@ -17,7 +17,7 @@ from serialization import (
 @dataclass
 class ShellCommandEntryFromGN:
     package: str
-    components: List[str]
+    components: list[str]
 
 
 def main():
@@ -37,7 +37,7 @@ def main():
     )
     args = parser.parse_args()
 
-    overrides_json: Dict[str, Any] = json.load(args.input)
+    overrides_json: dict[str, Any] = json.load(args.input)
 
     # Translate the shell commands from a list to a dict
     if "shell_commands" in overrides_json:

@@ -11,9 +11,11 @@ import json
 import os
 import tempfile
 import unittest
+from typing import Any, Generator
 from unittest import mock
 
 from assembly import (
+    AIBCreator,
     FileEntry,
     ImageAssemblyConfig,
     PackageManifest,
@@ -41,7 +43,9 @@ def make_merkle(blob_name: str) -> str:
     return m.hexdigest()
 
 
-def _make_package_contents(package_name, blobs, source_dir) -> PackageManifest:
+def _make_package_contents(
+    package_name: str, blobs: list[str], source_dir: str
+) -> PackageManifest:
     manifest = PackageManifest(
         PackageMetaData(package_name), [], repository="fuchsia.com"
     )
@@ -58,7 +62,9 @@ def _make_package_contents(package_name, blobs, source_dir) -> PackageManifest:
     return manifest
 
 
-def make_package_manifest(package_name, blobs, source_dir):
+def make_package_manifest(
+    package_name: str, blobs: list[str], source_dir: str
+) -> str:
     manifest = _make_package_contents(package_name, blobs, source_dir)
 
     # Write the manifest out to the temp dir
@@ -69,11 +75,11 @@ def make_package_manifest(package_name, blobs, source_dir):
     return manifest_path
 
 
-def make_image_assembly_path(package_name):
+def make_image_assembly_path(package_name: str) -> str:
     return "source/" + package_name + ".json"
 
 
-def make_package_path(package_name):
+def make_package_path(package_name: str) -> str:
     return "packages/" + package_name
 
 
@@ -86,16 +92,18 @@ OUTDIR = "outdir"
 
 
 @contextmanager
-def setup_temp_dir(*args, **kwargs):
+def setup_temp_dir(
+    *args: str, **kwargs: Any
+) -> Generator[TestSetupArgs, None, None]:
     temp_dir = tempfile.TemporaryDirectory()
     try:
         os.chdir(temp_dir.name)
         os.mkdir(SOURCE_DIR)
 
         # Write out package manifests which are part of the package.
-        base = set()
-        cache = set()
-        system = set()
+        base: set[str] = set()
+        cache: set[str] = set()
+        system: set[str] = set()
         for package_set in ["base", "cache"]:
             for suffix in ["a", "b"]:
                 package_name = f"{package_set}_{suffix}"
@@ -184,7 +192,7 @@ def setup_temp_dir(*args, **kwargs):
 
 
 class MakeLegacyConfig(unittest.TestCase):
-    def test_make_legacy_config(self):
+    def test_make_legacy_config(self) -> None:
         self.maxDiff = None
 
         # Patch in a mock for the fast_copy() fn
@@ -493,7 +501,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 ],
             )
 
-    def test_package_found_in_base_and_cache(self):
+    def test_package_found_in_base_and_cache(self) -> None:
         """
         Asserts that the copy_to_assembly_input_bundle function has the side effect of
         assigning packages found in both base and cache in the image assembly config to
@@ -538,7 +546,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 ),
             )
 
-    def test_driver_package_removed_from_base(self):
+    def test_driver_package_removed_from_base(self) -> None:
         """
         Asserts that the copy_to_assembly_input_bundle function has the side effect of
         removing packages from base if they are listed as driver packages, and adds them to the
@@ -555,7 +563,7 @@ class MakeLegacyConfig(unittest.TestCase):
             # Replace the AIBCreator._get_driver_details function within the
             # context manager with a mock.
             with mock.patch.object(
-                make_legacy_config.AIBCreator, "_get_driver_details"
+                AIBCreator, "_get_driver_details"
             ) as patched_method:
                 # This fixed return value should add the contents of the set in the first index
                 # of the tuple to the aib.base_drivers, and remove it from the aib.base package set
@@ -586,7 +594,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 make_package_path(duplicate_package), aib.base_drivers
             )
 
-    def test_different_manifest_same_pkg_name(self):
+    def test_different_manifest_same_pkg_name(self) -> None:
         """
         Asserts that when a package is found in a package set that has a different package
         manifest path, but the same package name, assembly will raise a DuplicatePackageException.

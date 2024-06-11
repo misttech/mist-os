@@ -12,7 +12,7 @@ import shutil
 import time
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Create a platform artifacts directory"
     )
@@ -43,6 +43,8 @@ def main():
         f.write(str(time.time()))
 
     depfile.DepFile.from_deps(stamp, deps).write_to(args.depfile)
+
+    return 0
 
 
 if __name__ == "__main__":

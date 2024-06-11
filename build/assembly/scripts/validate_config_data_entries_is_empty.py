@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -11,7 +11,7 @@ import os
 import sys
 import serialization
 from serialization import instance_from_dict
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
@@ -25,7 +25,7 @@ class RawConfigDataEntry:
         return parts[2]
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Parse config_data package entries file and validate it's empty"
     )
@@ -52,13 +52,13 @@ def main():
     )
     args = parser.parse_args()
 
-    allowlist: List[str] = []
+    allowlist: list[str] = []
     if args.package_allowlist:
         allowlist = json.load(args.package_allowlist)
 
-    raw_entries: List[Dict[str, Any]] = json.load(args.metadata_walk_results)
+    raw_entries: list[dict[str, Any]] = json.load(args.metadata_walk_results)
 
-    parsed_entries = {}
+    parsed_entries: dict[str, list[RawConfigDataEntry]] = {}
     for entry in raw_entries:
         parsed: RawConfigDataEntry = instance_from_dict(
             RawConfigDataEntry, entry
@@ -77,9 +77,9 @@ def main():
 
     def print_entries(
         banner: str,
-        pkg_entries: Dict[str, List[RawConfigDataEntry]],
-        list_entry_details=True,
-    ):
+        pkg_entries: dict[str, list[RawConfigDataEntry]],
+        list_entry_details: bool = True,
+    ) -> None:
         print(banner)
         sorted_keys = sorted(pkg_entries.keys())
         for pkg in sorted_keys:

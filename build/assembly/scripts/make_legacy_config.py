@@ -15,10 +15,10 @@ import json
 import os
 import sys
 import logging
-from typing import Dict, List, Set, Tuple, Optional
 
 from assembly import (
     AssemblyInputBundle,
+    AssemblyInputBundleCreationException,
     AIBCreator,
     FileEntry,
     FilePath,
@@ -39,12 +39,12 @@ from serialization import instance_from_dict, json_load
 logger = logging.getLogger()
 
 # Some type annotations for clarity
-PackageManifestList = List[FilePath]
+PackageManifestlist = list[FilePath]
 Merkle = str
-BlobList = List[Tuple[Merkle, FilePath]]
-FileEntryList = List[FileEntry]
-FileEntrySet = Set[FileEntry]
-DepSet = Set[FilePath]
+Bloblist = list[tuple[Merkle, FilePath]]
+FileEntrylist = list[FileEntry]
+FileEntrySet = set[FileEntry]
+DepSet = set[FilePath]
 
 
 @dataclass
@@ -61,21 +61,21 @@ class ConfigDataEntryFromGN:
 
 
 def copy_to_assembly_input_bundle(
-    base: List[FilePath],
-    cache: List[FilePath],
-    bootfs_packages: List[FilePath],
+    base: list[FilePath],
+    cache: list[FilePath],
+    bootfs_packages: list[FilePath],
     kernel: KernelInfo,
-    boot_args: List[str],
-    config_data_entries: FileEntryList,
+    boot_args: list[str],
+    config_data_entries: FileEntrylist,
     outdir: FilePath,
-    base_driver_packages_list: List[str],
-    base_driver_components_files_list: List[dict],
-    boot_driver_packages_list: List[str],
-    boot_driver_components_files_list: List[dict],
-    shell_commands: Dict[str, List],
-    core_realm_shards: List[FilePath],
-    bootfs_files_package: Optional[FilePath],
-) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
+    base_driver_packages_list: list[str],
+    base_driver_components_files_list: list[dict[str, str]],
+    boot_driver_packages_list: list[str],
+    boot_driver_components_files_list: list[dict[str, str]],
+    shell_commands: dict[str, list[str]],
+    core_realm_shards: list[FilePath],
+    bootfs_files_package: FilePath | None,
+) -> tuple[AssemblyInputBundle, FilePath, DepSet]:
     """
     Copy all the artifacts into an AssemblyInputBundle that is in outdir,
     tracking all copy operations in a DepFile that is returned with the
@@ -106,10 +106,10 @@ def copy_to_assembly_input_bundle(
 
     # Remove base_drivers from base
     base_drivers = set(base_driver_packages_list)
-    base = set(base).difference(base_drivers)
+    base = list(set(base).difference(base_drivers))
 
     # Remove base_drivers and base from cache
-    cache = set(cache).difference(base).difference(base_drivers)
+    cache = list(set(cache).difference(base).difference(base_drivers))
 
     # Now we can update the aib_creator
     aib_creator.base_drivers = base_drivers
@@ -147,7 +147,7 @@ def copy_to_assembly_input_bundle(
     return aib_creator.build()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Create an image assembly configuration"
     )
@@ -192,21 +192,21 @@ def main():
     else:
         config_data_entries = []
 
-    base_driver_packages_list = None
+    base_driver_packages_list = []
     if args.base_driver_packages_list:
         base_driver_packages_list = json.load(args.base_driver_packages_list)
         base_driver_components_files_list = json.load(
             args.base_driver_components_files_list
         )
 
-    boot_driver_packages_list = None
+    boot_driver_packages_list = []
     if args.boot_driver_packages_list:
         boot_driver_packages_list = json.load(args.boot_driver_packages_list)
         boot_driver_components_files_list = json.load(
             args.boot_driver_components_files_list
         )
 
-    shell_commands = dict()
+    shell_commands: dict[str, set[str]] = dict()
     shell_deps = set()
     if args.shell_commands_packages_list:
         shell_commands = defaultdict(set)
@@ -226,7 +226,7 @@ def main():
                     }
                 )
 
-    core_realm_shards: List[FilePath] = []
+    core_realm_shards: list[FilePath] = []
     if args.core_realm_shards_list:
         for shard in json.load(args.core_realm_shards_list):
             core_realm_shards.append(shard)
