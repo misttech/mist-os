@@ -3,15 +3,22 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""Generate an IDK meta/manifest.json file for all atoms described by an internal SDK manifest file."""
+
 import argparse
 import json
 import sys
+import typing as T
 
 from sdk_common import Atom
 
+# The type of a list of IDK parts, as it appears in the "parts"
+# field of the output manifest.
+IdkPart: T.TypeAlias = T.Dict[str, str]
 
-def sort_atoms(atoms):
-    def key(ad):
+
+def get_sorted_parts(atoms: T.List[Atom]) -> T.Sequence[IdkPart]:
+    def key(ad: IdkPart) -> T.Tuple[str, str]:
         return (ad["meta"], ad["type"])
 
     return sorted(
@@ -26,14 +33,14 @@ def sort_atoms(atoms):
     )
 
 
-def main():
-    parser = argparse.ArgumentParser()
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--manifest", help="Path to the SDK's manifest file", required=True
+        "--manifest",
+        help="Path to input SDK manifest describing all IDK atoms.",
+        required=True,
     )
-    parser.add_argument(
-        "--meta", help="Path to output metadata file", required=True
-    )
+    parser.add_argument("--meta", help="Path to output file.", required=True)
     parser.add_argument(
         "--target-arch",
         help="Architecture of precompiled target atoms",
@@ -65,7 +72,7 @@ def main():
             ],
         },
         "id": args.id,
-        "parts": sort_atoms(atoms),
+        "parts": get_sorted_parts(atoms),
         "root": manifest["root"],
         "schema_version": args.schema_version,
     }
@@ -74,6 +81,8 @@ def main():
         json.dump(
             meta, meta_file, indent=2, sort_keys=True, separators=(",", ": ")
         )
+
+    return 0
 
 
 if __name__ == "__main__":

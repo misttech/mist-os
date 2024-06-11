@@ -84,10 +84,11 @@ template("sdk_collection") {
     local_archive = "${target_name}_local_archive"
     local_manifest = "${target_name}_molecule"
     main = target_name
-    sdk_meta = "${target_name}_sdk_meta"
+    idk_meta_manifest_json = "${target_name}_idk_meta_manifest_json"
     tarmaker_manifest = "${target_name}_tarmaker_manifest"
     verify_manifest = "${target_name}_verify_manifest"
-    verify_sdk_meta = "${target_name}_verify_sdk_meta"
+    verify_idk_meta_manifest_json =
+        "${target_name}_verify_idk_meta_manifest_json"
   }
 
   files = {
@@ -95,7 +96,8 @@ template("sdk_collection") {
     final_manifest = "$root_out_dir/sdk/manifest/$sdk_name"
     local_archive = "$target_gen_dir/$target_name.tar.gz"
     local_manifest = "$target_gen_dir/${targets.main}.sdk"
-    sdk_meta = "$target_gen_dir/$sdk_name.sdk_meta.json"
+    idk_meta_manifest_json =
+        "$target_gen_dir/$sdk_name.idk_meta_manifest_json.json"
     tarmaker_manifest = "$target_gen_dir/${sdk_name}.tarmaker_manifest"
   }
 
@@ -152,22 +154,22 @@ template("sdk_collection") {
     deps = [ ":${targets.final_manifest}" ]
   }
 
-  # Generates a metadata file (meta/manifest.json) describing the various
-  # parts of the SDK collection.
-  python_action(targets.sdk_meta) {
+  # Generates the IDK top-level metadata file (meta/manifest.json) describing the
+  # various parts of the SDK collection.
+  python_action(targets.idk_meta_manifest_json) {
     forward_variables_from(invoker, [ "testonly" ])
 
-    binary_label = "//build/sdk:generate_meta"
+    binary_label = "//build/sdk:generate_idk_meta_manifest_json"
 
     inputs = [ files.local_manifest ]
 
-    outputs = [ files.sdk_meta ]
+    outputs = [ files.idk_meta_manifest_json ]
 
     args = [
       "--manifest",
       rebase_path(files.local_manifest, root_build_dir),
       "--meta",
-      rebase_path(files.sdk_meta, root_build_dir),
+      rebase_path(files.idk_meta_manifest_json, root_build_dir),
       "--target-arch",
       target_triple,
       "--host-arch",
@@ -186,11 +188,11 @@ template("sdk_collection") {
     public_deps = [ ":${targets.local_manifest}" ]
   }
 
-  # Verifies that the metadata manifest is valid.
-  validate_json(targets.verify_sdk_meta) {
+  # Verifies that the IDK meta/manifest.json file is valid.
+  validate_json(targets.verify_idk_meta_manifest_json) {
     forward_variables_from(invoker, [ "testonly" ])
 
-    data = files.sdk_meta
+    data = files.idk_meta_manifest_json
 
     schema = "//build/sdk/meta/manifest.json"
     sources = [
@@ -198,14 +200,14 @@ template("sdk_collection") {
       "//build/sdk/meta/common.json",
     ]
 
-    public_deps = [ ":${targets.sdk_meta}" ]
+    public_deps = [ ":${targets.idk_meta_manifest_json}" ]
   }
 
   additional_archive_files = [
     {
-      source = files.sdk_meta
+      source = files.idk_meta_manifest_json
       dest = "meta/manifest.json"
-      deps = [ ":${targets.sdk_meta}" ]
+      deps = [ ":${targets.idk_meta_manifest_json}" ]
     },
   ]
 
@@ -214,7 +216,7 @@ template("sdk_collection") {
   python_action(targets.tarmaker_manifest) {
     forward_variables_from(invoker, [ "testonly" ])
 
-    binary_label = "//build/sdk:generate_archive_manifest"
+    binary_label = "//build/sdk:generate_archive_manifest_from_sdk_manifest"
 
     inputs = [ files.final_manifest ]
 
@@ -326,8 +328,8 @@ template("sdk_collection") {
                            ])
 
     deps = [
+      ":${targets.verify_idk_meta_manifest_json}",
       ":${targets.verify_manifest}",
-      ":${targets.verify_sdk_meta}",
     ]
 
     public_deps = [

@@ -7,7 +7,6 @@ import difflib
 import functools
 import json
 import pathlib
-import yaml
 
 from typing import Sequence, Optional, List, Any, Iterator
 
@@ -154,6 +153,8 @@ class Validator:
     def from_areas_file_path(cls, areas_file: pathlib.Path) -> "Validator":
         """Build a Validator given a path to
         docs/contribute/governance/areas/_areas.yaml."""
+        import yaml
+
         with areas_file.open() as f:
             parsed_areas = yaml.safe_load(f)
             return Validator(area_names_from_file(parsed_areas))

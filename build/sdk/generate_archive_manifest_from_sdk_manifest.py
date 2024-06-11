@@ -3,6 +3,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+"""Generate a tarmaker manifest from an input SDK manifest describing a set of atoms."""
+
 import argparse
 import json
 import os
@@ -38,15 +40,15 @@ class MappingAction(argparse.Action):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--manifest", help="Path to the SDK's manifest file", required=True
+        "--manifest", help="Path to the input SDK manifest file.", required=True
     )
     parser.add_argument(
         "--mapping",
-        help="Extra files to add to the archive",
+        help="Extra files to add to the archive. Format is '--mapping <dest> <source>'.",
         action=MappingAction,
     )
     parser.add_argument(
-        "--output", help="Path to the output file manifest", required=True
+        "--output", help="Path to the output tarmaker manifest.", required=True
     )
     args = parser.parse_args()
 

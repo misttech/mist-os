@@ -3,12 +3,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Generate a manifest for an exported IDK directory.
+"""Generate a tarmaker input manifest from an input directory containing symlinks.
 
 Really all this does is walk a directory, resolve all symlinks, and output the
 contents in the format expected by tarmaker.
 
-NOTE: This assumes that everything in the IDK directory is intended to go in the
+NOTE: This assumes that everything in the input directory is intended to go in the
 archive! When generating the IDK directory, it's important to ensure no stale
 files are carried over between builds.
 """
@@ -43,11 +43,11 @@ def get_mappings(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(__doc__)
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--exported-idk-dir",
+        "--input-dir",
         type=pathlib.Path,
-        help="Path to the exported IDK directory",
+        help="Path to the input directory.",
         required=True,
     )
     parser.add_argument(
@@ -58,7 +58,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    mappings = get_mappings(args.exported_idk_dir, pathlib.Path.cwd())
+    mappings = get_mappings(args.input_dir, pathlib.Path.cwd())
 
     with args.output.open("w") as manifest:
         for dest, src in sorted(mappings.items()):
