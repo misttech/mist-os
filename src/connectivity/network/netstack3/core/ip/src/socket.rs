@@ -28,7 +28,7 @@ use crate::{
     internal::{
         base::{
             FilterHandlerProvider, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt,
-            IpLayerPacketMetadata, ResolveRouteError, SendIpPacketMeta,
+            IpLayerPacketMetadata, IpPacketDestination, ResolveRouteError, SendIpPacketMeta,
         },
         device::{state::IpDeviceStateIpExt, IpDeviceAddr},
         types::{ResolvedRoute, RoutableIpAddr},
@@ -370,6 +370,9 @@ where
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
+
+    /// Returns `DeviceId` for the loopback device.
+    fn get_loopback_device(&mut self) -> Option<Self::DeviceId>;
 }
 
 /// Enables a blanket implementation of [`IpSocketHandler`].
@@ -649,17 +652,9 @@ where
         device: D,
         proto: I::Proto,
     ) -> Result<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, IpSockSendError> {
-        let (next_hop, broadcast) = next_hop.into_next_hop_and_broadcast_marker(dst_ip);
-        Ok(SendIpPacketMeta {
-            device,
-            src_ip,
-            dst_ip,
-            broadcast,
-            next_hop,
-            ttl: options.hop_limit(&dst_ip),
-            proto,
-            mtu,
-        })
+        let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
+        let ttl = options.hop_limit(&dst_ip);
+        Ok(SendIpPacketMeta { device, src_ip, dst_ip, destination, ttl, proto, mtu })
     }
 
     let meta = resolve_metadata(
@@ -1538,13 +1533,13 @@ pub(crate) mod testutil {
                 self.lookup_route(device.as_ref(), Some(*local_ip), *remote_ip)?;
 
             let remote_ip: &SpecifiedAddr<_> = remote_ip.as_ref();
-            let (next_hop, broadcast) = next_hop.into_next_hop_and_broadcast_marker(*remote_ip);
+
+            let destination = IpPacketDestination::from_next_hop(next_hop, *remote_ip);
             Ok(SendIpPacketMeta {
                 device,
                 src_ip: src_addr.into(),
                 dst_ip: *remote_ip,
-                broadcast,
-                next_hop,
+                destination,
                 proto: *proto,
                 ttl: options.hop_limit(remote_ip),
                 mtu,

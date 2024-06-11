@@ -74,7 +74,7 @@ use netstack3_ip::{
         MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL,
     },
     icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-    SendIpPacketMeta,
+    IpPacketDestination, SendIpPacketMeta,
 };
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -251,8 +251,7 @@ fn test_address_resolution() {
                 device: &local_device_id,
                 src_ip: Some(local_ip().into_specified()),
                 dst_ip: remote_ip().into_specified(),
-                broadcast: None,
-                next_hop: remote_ip().into_specified(),
+                destination: IpPacketDestination::from_addr(remote_ip().into()),
                 proto: Ipv6Proto::Icmpv6,
                 ttl: None,
                 mtu: None,
@@ -1004,8 +1003,7 @@ fn test_sending_ipv6_packet_after_hop_limit_change() {
                 device: device_id,
                 src_ip: Some(config.local_ip),
                 dst_ip: config.remote_ip,
-                broadcast: None,
-                next_hop: config.remote_ip,
+                destination: IpPacketDestination::from_addr(config.remote_ip),
                 proto: IpProto::Tcp.into(),
                 ttl: None,
                 mtu: None,

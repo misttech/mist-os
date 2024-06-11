@@ -37,7 +37,7 @@ use thiserror::Error;
 use zerocopy::ByteSlice;
 
 use crate::internal::{
-    base::IpLayerHandler,
+    base::{IpLayerHandler, IpPacketDestination},
     device::IpDeviceSendContext,
     gmp::{
         gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
@@ -411,15 +411,9 @@ fn send_mld_packet<
             .unwrap(),
         );
 
-    IpLayerHandler::send_ip_frame(
-        core_ctx,
-        bindings_ctx,
-        &device,
-        dst_ip.into_specified(),
-        body,
-        None,
-    )
-    .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
+    let destination = IpPacketDestination::Multicast(dst_ip);
+    IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
+        .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
 }
 
 #[cfg(test)]
@@ -445,12 +439,11 @@ mod tests {
 
     use super::*;
     use crate::internal::{
-        base::{self, IpLayerPacketMetadata, SendIpPacketMeta},
+        base::{self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta},
         gmp::{
             GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
             QueryReceivedActions, QueryReceivedGenericAction,
         },
-        types::IpTypesIpExt,
     };
 
     /// Metadata for sending an MLD packet in an IP packet.
@@ -559,9 +552,8 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtxImpl,
             device: &Self::DeviceId,
-            next_hop: SpecifiedAddr<<Ipv6 as Ip>::Addr>,
+            destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             body: S,
-            broadcast: Option<<Ipv6 as IpTypesIpExt>::BroadcastMarker>,
         ) -> Result<(), S>
         where
             S: Serializer + netstack3_filter::IpPacket<Ipv6>,
@@ -571,9 +563,8 @@ mod tests {
                 self,
                 bindings_ctx,
                 device,
-                next_hop,
+                destination,
                 body,
-                broadcast,
                 IpLayerPacketMetadata::default(),
             )
         }
@@ -584,23 +575,19 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtxImpl,
             device_id: &Self::DeviceId,
-            local_addr: SpecifiedAddr<Ipv6Addr>,
+            destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             body: S,
-            _broadcast: Option<Never>,
             ProofOfEgressCheck { .. }: ProofOfEgressCheck,
         ) -> Result<(), S>
         where
             S: Serializer,
             S::Buffer: BufferMut,
         {
-            self.send_frame(
-                bindings_ctx,
-                MldFrameMetadata::new(
-                    device_id.clone(),
-                    MulticastAddr::new(local_addr.get()).expect("addr should be multicast"),
-                ),
-                body,
-            )
+            let addr = match destination {
+                IpPacketDestination::Multicast(addr) => addr,
+                _ => panic!("destination is not multicast: {:?}", destination),
+            };
+            self.send_frame(bindings_ctx, MldFrameMetadata::new(device_id.clone(), addr), body)
         }
     }
 

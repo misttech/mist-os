@@ -52,7 +52,7 @@ use netstack3_ip::{
     nud::{
         ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
     },
-    IpForwardingDeviceContext, IpTypesIpExt, RawMetric,
+    IpForwardingDeviceContext, IpPacketDestination, IpTypesIpExt, RawMetric,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
@@ -192,16 +192,15 @@ impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::F
         &mut self,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
-        local_addr: SpecifiedAddr<<I as Ip>::Addr>,
+        destination: IpPacketDestination<I, &DeviceId<BC>>,
         body: S,
-        broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), S>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
     {
-        send_ip_frame(self, bindings_ctx, device, local_addr, body, broadcast)
+        send_ip_frame(self, bindings_ctx, device, destination, body)
     }
 }
 
@@ -217,9 +216,8 @@ impl<
         &mut self,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
-        local_addr: SpecifiedAddr<<I as Ip>::Addr>,
+        destination: IpPacketDestination<I, &DeviceId<BC>>,
         body: S,
-        broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), S>
     where
@@ -227,7 +225,7 @@ impl<
         S::Buffer: BufferMut,
     {
         let Self { config: _, core_ctx } = self;
-        send_ip_frame(core_ctx, bindings_ctx, device, local_addr, body, broadcast)
+        send_ip_frame(core_ctx, bindings_ctx, device, destination, body)
     }
 }
 
@@ -910,41 +908,34 @@ fn leave_link_multicast_group<
     }
 }
 
-fn send_ip_frame<BC, S, A, L>(
+fn send_ip_frame<BC, S, I, L>(
     core_ctx: &mut CoreCtx<'_, BC, L>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
-    local_addr: SpecifiedAddr<A>,
+    destination: IpPacketDestination<I, &DeviceId<BC>>,
     body: S,
-    broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
     BC: BindingsContext,
     S: Serializer,
     S::Buffer: BufferMut,
-    A: IpAddress,
-    L: LockBefore<crate::lock_ordering::IpState<A::Version>>
+    I: EthernetIpExt + IpTypesIpExt,
+    L: LockBefore<crate::lock_ordering::IpState<I>>
         + LockBefore<crate::lock_ordering::LoopbackTxQueue>
         + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
-    A::Version: EthernetIpExt + IpTypesIpExt,
     for<'a> CoreCtx<'a, BC, L>: EthernetIpLinkDeviceDynamicStateContext<BC, DeviceId = EthernetDeviceId<BC>>
-        + NudHandler<A::Version, EthernetLinkDevice, BC>
+        + NudHandler<I, EthernetLinkDevice, BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>,
 {
     match device {
-        DeviceId::Ethernet(id) => ethernet::send_ip_frame::<_, _, A, _>(
-            core_ctx,
-            bindings_ctx,
-            &id,
-            local_addr,
-            body,
-            broadcast,
-        ),
+        DeviceId::Ethernet(id) => {
+            ethernet::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
+        }
         DeviceId::Loopback(id) => {
-            loopback::send_ip_frame::<_, _, A, _>(core_ctx, bindings_ctx, id, local_addr, body)
+            loopback::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
         }
         DeviceId::PureIp(id) => {
-            pure_ip::send_ip_frame::<_, _, A::Version, _>(core_ctx, bindings_ctx, id, body)
+            pure_ip::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
         }
     }
 }

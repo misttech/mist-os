@@ -1057,6 +1057,10 @@ impl<
     {
         send_ip_packet_from_device(self, bindings_ctx, meta.into(), body, packet_metadata)
     }
+
+    fn get_loopback_device(&mut self) -> Option<Self::DeviceId> {
+        device::IpDeviceConfigurationContext::<I, _>::loopback_id(self)
+    }
 }
 
 /// The IP context providing dispatch to the available transport protocols.
@@ -1775,9 +1779,8 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    next_hop: SpecifiedAddr<I::Addr>,
+    destination: IpPacketDestination<I, &CC::DeviceId>,
     mut body: S,
-    broadcast: Option<I::BroadcastMarker>,
     mut packet_metadata: IpLayerPacketMetadata<I, BC>,
 ) -> Result<(), S>
 where
@@ -1802,7 +1805,7 @@ where
     }
 
     packet_metadata.acknowledge_drop();
-    core_ctx.send_ip_frame(bindings_ctx, device, next_hop, body, broadcast, proof)
+    core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof)
 }
 
 /// Drop a packet and undo the effects of parsing it.
@@ -2144,11 +2147,7 @@ pub fn receive_ipv4_packet<
             );
         }
         ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
-            let (next_hop, broadcast) = match next_hop {
-                NextHop::RemoteAsNeighbor => (dst_ip, None),
-                NextHop::Gateway(gateway) => (gateway, None),
-                NextHop::Broadcast(marker) => (dst_ip, Some(marker)),
-            };
+            let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
             let ttl = packet.ttl();
             if ttl > 1 {
                 trace!("receive_ipv4_packet: forwarding");
@@ -2174,9 +2173,8 @@ pub fn receive_ipv4_packet<
                     core_ctx,
                     bindings_ctx,
                     &dst_device,
-                    next_hop,
+                    destination,
                     packet,
-                    broadcast,
                     packet_metadata,
                 ) {
                     Ok(()) => (),
@@ -2531,11 +2529,7 @@ pub fn receive_ipv6_packet<
                     filter::Verdict::Accept => {}
                 }
 
-                let next_hop = match next_hop {
-                    NextHop::RemoteAsNeighbor => dst_ip,
-                    NextHop::Gateway(gateway) => gateway,
-                    NextHop::Broadcast(never) => match never {},
-                };
+                let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
                 packet.set_ttl(ttl - 1);
                 let (src, dst, proto, meta) = packet.into_metadata();
                 let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
@@ -2544,9 +2538,8 @@ pub fn receive_ipv6_packet<
                     core_ctx,
                     bindings_ctx,
                     &dst_device,
-                    next_hop,
+                    destination,
                     packet,
-                    None,
                     packet_metadata,
                 ) {
                     // TODO(https://fxbug.dev/42167236): Encode the MTU error more
@@ -2878,6 +2871,44 @@ fn lookup_route_table<
     core_ctx.with_ip_routing_table(|core_ctx, table| table.lookup(core_ctx, device, dst_ip))
 }
 
+/// Packed destination passed to [`IpDeviceSendContext::send_ip_frame`].
+#[derive(Debug, Derivative)]
+#[derivative(Eq(bound = "D: Eq"), PartialEq(bound = "D: PartialEq"))]
+pub enum IpPacketDestination<I: IpTypesIpExt, D> {
+    /// Broadcast packet.
+    Broadcast(I::BroadcastMarker),
+
+    /// Multicast packet to the specified IP.
+    Multicast(MulticastAddr<I::Addr>),
+
+    /// Send packet to the neighbor with the specified IP (the receiving
+    /// node is either a router or the final recipient of the packet).
+    Neighbor(SpecifiedAddr<I::Addr>),
+
+    /// Loopback the packet to the specified device. Can be used only when
+    /// sending to the loopback device.
+    Loopback(D),
+}
+
+impl<I: IpTypesIpExt, D> IpPacketDestination<I, D> {
+    /// Creates `IpPacketDestination` for IP address.
+    pub fn from_addr(addr: SpecifiedAddr<I::Addr>) -> Self {
+        match MulticastAddr::new(addr.into_addr()) {
+            Some(mc_addr) => Self::Multicast(mc_addr),
+            None => Self::Neighbor(addr),
+        }
+    }
+
+    /// Create `IpPacketDestination` from `NextHop`.
+    pub fn from_next_hop(next_hop: NextHop<I::Addr>, dst_ip: SpecifiedAddr<I::Addr>) -> Self {
+        match next_hop {
+            NextHop::RemoteAsNeighbor => Self::from_addr(dst_ip),
+            NextHop::Gateway(gateway) => Self::Neighbor(gateway),
+            NextHop::Broadcast(marker) => Self::Broadcast(marker),
+        }
+    }
+}
+
 /// The metadata associated with an outgoing IP packet.
 #[derive(Debug)]
 pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt + IpTypesIpExt, D, Src> {
@@ -2890,11 +2921,8 @@ pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt + IpTypesIpExt, D, Src>
     /// The destination address of the packet.
     pub dst_ip: SpecifiedAddr<I::Addr>,
 
-    /// The next-hop node that the packet should be sent to.
-    pub next_hop: SpecifiedAddr<I::Addr>,
-
-    /// Whether the destination is a broadcast address.
-    pub broadcast: Option<I::BroadcastMarker>,
+    /// The destination for the send operation.
+    pub destination: IpPacketDestination<I, D>,
 
     /// The upper-layer protocol held in the packet's payload.
     pub proto: I::Proto,
@@ -2915,22 +2943,13 @@ impl<I: packet_formats::ip::IpExt + IpTypesIpExt, D>
     for SendIpPacketMeta<I, D, Option<SpecifiedAddr<I::Addr>>>
 {
     fn from(
-        SendIpPacketMeta { device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<
+        SendIpPacketMeta { device, src_ip, dst_ip, destination, proto, ttl, mtu }: SendIpPacketMeta<
             I,
             D,
             SpecifiedAddr<I::Addr>,
         >,
     ) -> SendIpPacketMeta<I, D, Option<SpecifiedAddr<I::Addr>>> {
-        SendIpPacketMeta {
-            device,
-            src_ip: Some(src_ip),
-            dst_ip,
-            broadcast,
-            next_hop,
-            proto,
-            ttl,
-            mtu,
-        }
+        SendIpPacketMeta { device, src_ip: Some(src_ip), dst_ip, destination, proto, ttl, mtu }
     }
 }
 
@@ -2962,9 +2981,8 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        next_hop: SpecifiedAddr<I::Addr>,
+        destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-        broadcast: Option<I::BroadcastMarker>,
     ) -> Result<(), S>
     where
         S: Serializer + IpPacket<I>,
@@ -2994,9 +3012,8 @@ impl<
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        next_hop: SpecifiedAddr<I::Addr>,
+        destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-        broadcast: Option<I::BroadcastMarker>,
     ) -> Result<(), S>
     where
         S: Serializer + IpPacket<I>,
@@ -3006,9 +3023,8 @@ impl<
             self,
             bindings_ctx,
             device,
-            next_hop,
+            destination,
             body,
-            broadcast,
             IpLayerPacketMetadata::default(),
         )
     }
@@ -3038,7 +3054,7 @@ where
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
 {
-    let SendIpPacketMeta { device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu } = meta;
+    let SendIpPacketMeta { device, src_ip, dst_ip, destination, proto, ttl, mtu } = meta;
     let next_packet_id = gen_ip_packet_id(core_ctx);
     let ttl = ttl.unwrap_or_else(|| core_ctx.get_hop_limit(device)).get();
     let src_ip = src_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.get());
@@ -3069,10 +3085,10 @@ where
 
     if let Some(mtu) = mtu {
         let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu as usize));
-        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast, packet_metadata)
+        send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
             .map_err(|ser| ser.into_inner().into_inner())
     } else {
-        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast, packet_metadata)
+        send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
             .map_err(|ser| ser.into_inner())
     }
 }

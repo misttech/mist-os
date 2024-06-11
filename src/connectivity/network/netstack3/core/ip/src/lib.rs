@@ -200,12 +200,12 @@ pub use internal::base::{
     receive_ipv6_packet_action, resolve_route_to_destination, AddressStatus,
     BaseTransportIpContext, DropReason, FilterHandlerProvider, HopLimits, IpCounters,
     IpDeviceContext, IpDeviceStateContext, IpExt, IpLayerBindingsContext, IpLayerContext,
-    IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpStateContext, IpStateInner,
-    IpTransportContext, IpTransportDispatchContext, Ipv4PresentAddressStatus, Ipv4State,
-    Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State, Ipv6StateBuilder,
-    MulticastMembershipHandler, ReceivePacketAction, ResolveRouteError, SendIpPacketMeta,
-    TransparentLocalDelivery, TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS,
-    DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
+    IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination,
+    IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
+    Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State,
+    Ipv6StateBuilder, MulticastMembershipHandler, ReceivePacketAction, ResolveRouteError,
+    SendIpPacketMeta, TransparentLocalDelivery, TransportIpContext, TransportReceiveError,
+    DEFAULT_HOP_LIMITS, DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
 };
 pub use internal::forwarding::{
     request_context_add_route, request_context_del_routes, AddRouteError, ForwardingTable,

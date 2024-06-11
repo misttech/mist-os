@@ -18,7 +18,7 @@ use netstack3_core::{
     IpExt,
 };
 use netstack3_device::{
-    loopback::{self, LoopbackCreationProperties, LoopbackDevice, LoopbackRxQueueMeta},
+    loopback::{self, LoopbackCreationProperties, LoopbackDevice},
     queue::ReceiveQueueContext,
 };
 use netstack3_ip::{self as ip, device::IpAddressId as _};
@@ -95,11 +95,11 @@ fn loopback_sends_ethernet<I: Ip + TestIpExt + IpExt>() {
     ctx.test_api().enable_device(&device.clone().into());
     let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
-    let local_addr = I::TEST_ADDRS.local_ip;
+    let destination = ip::IpPacketDestination::<I, _>::from_addr(I::TEST_ADDRS.local_ip);
     const BODY: &[u8] = b"IP body".as_slice();
 
     let body = Buf::new(Vec::from(BODY), ..);
-    loopback::send_ip_frame(&mut core_ctx.context(), bindings_ctx, &device, local_addr, body)
+    loopback::send_ip_frame(&mut core_ctx.context(), bindings_ctx, &device, destination, body)
         .expect("can send");
 
     // There is no transmit queue so the frames will immediately go into the
@@ -107,9 +107,7 @@ fn loopback_sends_ethernet<I: Ip + TestIpExt + IpExt>() {
     let mut frames = ReceiveQueueContext::<LoopbackDevice, _>::with_receive_queue_mut(
         &mut core_ctx.context(),
         &device,
-        |queue_state| {
-            queue_state.take_frames().map(|(LoopbackRxQueueMeta, frame)| frame).collect::<Vec<_>>()
-        },
+        |queue_state| queue_state.take_frames().map(|(_meta, frame)| frame).collect::<Vec<_>>(),
     );
 
     let frame = assert_matches!(frames.as_mut_slice(), [frame] => frame);

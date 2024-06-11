@@ -12,7 +12,7 @@ use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::{
     ethernet::Mac,
-    ip::{Ip, IpVersion, Ipv4, Ipv6},
+    ip::{Ip, IpInvariant, IpVersion, Ipv4, Ipv6},
 };
 use netstack3_base::{
     sync::RwLock, Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector,
@@ -243,6 +243,18 @@ pub struct DeviceCounters {
     pub send_ipv6_frame: Counter,
     /// Count of frames that failed to send because there was no Tx queue.
     pub send_dropped_no_queue: Counter,
+}
+
+impl DeviceCounters {
+    /// Either `send_ipv4_frame` or `send_ipv6_frame` depending on `I`.
+    pub fn send_frame<I: Ip>(&self) -> &Counter {
+        I::map_ip::<_, IpInvariant<&Counter>>(
+            (),
+            |()| IpInvariant(&self.send_ipv4_frame),
+            |()| IpInvariant(&self.send_ipv6_frame),
+        )
+        .into_inner()
+    }
 }
 
 impl Inspectable for DeviceCounters {

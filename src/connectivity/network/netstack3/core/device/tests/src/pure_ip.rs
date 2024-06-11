@@ -27,6 +27,7 @@ use netstack3_device::{
     queue::TransmitQueueConfiguration,
     DeviceId,
 };
+use netstack3_ip::IpPacketDestination;
 use packet::{Buf, Serializer as _};
 use packet_formats::ip::{IpPacketBuilder, IpProto};
 use test_case::test_case;
@@ -140,10 +141,11 @@ fn send_frame<I: Ip + TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfigura
 
     {
         let (mut core_ctx, bindings_ctx) = ctx.contexts();
-        pure_ip::send_ip_frame::<_, _, I, _>(
+        pure_ip::send_ip_frame(
             &mut core_ctx,
             bindings_ctx,
             &device,
+            IpPacketDestination::<I, _>::from_addr(I::TEST_ADDRS.local_ip),
             default_ip_packet::<I>(),
         )
         .expect("send should succeed");

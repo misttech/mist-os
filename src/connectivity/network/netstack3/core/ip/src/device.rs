@@ -45,6 +45,7 @@ use packet_formats::{
 use zerocopy::ByteSlice;
 
 use crate::internal::{
+    base::IpPacketDestination,
     device::{
         config::{
             IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
@@ -1149,9 +1150,8 @@ pub trait IpDeviceSendContext<I: IpTypesIpExt, BC>: DeviceIdContext<AnyDevice> {
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        local_addr: SpecifiedAddr<I::Addr>,
+        destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-        broadcast: Option<I::BroadcastMarker>,
         egress_proof: ProofOfEgressCheck,
     ) -> Result<(), S>
     where

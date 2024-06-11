@@ -12,8 +12,8 @@ use const_unwrap::const_unwrap_option;
 use log::{error, trace};
 use net_types::{
     ethernet::Mac,
-    ip::{GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv6, Mtu},
-    BroadcastAddress, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
+    ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6, Mtu},
+    BroadcastAddress, MulticastAddr, UnicastAddr, Witness,
 };
 use netstack3_base::{
     ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
@@ -27,7 +27,7 @@ use netstack3_ip::{
     nud::{
         LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
     },
-    IpTypesIpExt, WrapBroadcastMarker,
+    IpPacketDestination, IpTypesIpExt, WrapBroadcastMarker,
 };
 use packet::{Buf, BufferMut, Nested, Serializer};
 use packet_formats::{
@@ -41,6 +41,7 @@ use packet_formats::{
 use crate::internal::{
     arp::{ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId},
     base::{DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters},
+    id::DeviceId,
     id::EthernetDeviceId,
     queue::{
         tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
@@ -404,47 +405,32 @@ where
 /// serializer. It computes the routing information, serializes
 /// the serializer, and sends the resulting buffer in a new Ethernet
 /// frame.
-pub fn send_ip_frame<BC, CC, A, S>(
+pub fn send_ip_frame<BC, CC, I, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
-    local_addr: SpecifiedAddr<A>,
+    destination: IpPacketDestination<I, &DeviceId<BC>>,
     body: S,
-    broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
     BC: EthernetIpLinkDeviceBindingsContext + LinkResolutionContext<EthernetLinkDevice>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-        + NudHandler<A::Version, EthernetLinkDevice, BC>
+        + NudHandler<I, EthernetLinkDevice, BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
-    A: IpAddress,
+    I: EthernetIpExt + IpTypesIpExt,
     S: Serializer,
     S::Buffer: BufferMut,
-    A::Version: EthernetIpExt + IpTypesIpExt,
 {
-    fn increment_counter<I: Ip>(counters: &DeviceCounters) {
-        let () = I::map_ip(
-            (),
-            |()| counters.send_ipv4_frame.increment(),
-            |()| counters.send_ipv6_frame.increment(),
-        );
-    }
-    core_ctx.with_per_resource_counters(device_id, increment_counter::<A::Version>);
-    core_ctx.with_counters(increment_counter::<A::Version>);
+    core_ctx.increment(device_id, DeviceCounters::send_frame::<I>);
 
-    trace!(
-        "ethernet::send_ip_frame: local_addr = {:?}; device = {:?}; broadcast = {:?}",
-        local_addr,
-        device_id,
-        broadcast
-    );
+    trace!("ethernet::send_ip_frame: destination = {:?}; device = {:?}", destination, device_id);
 
     let body = body.with_size_limit(get_mtu(core_ctx, device_id).get() as usize);
 
-    match broadcast {
-        Some(marker) => {
-            <A::Version as Ip>::map_ip::<_, ()>(
+    match destination {
+        IpPacketDestination::Broadcast(marker) => {
+            I::map_ip::<_, ()>(
                 WrapBroadcastMarker(marker),
                 |WrapBroadcastMarker(())| (),
                 |WrapBroadcastMarker(never)| match never {},
@@ -455,28 +441,26 @@ where
                 device_id,
                 Mac::BROADCAST,
                 body,
-                A::Version::ETHER_TYPE,
+                I::ETHER_TYPE,
             )
         }
-        None => {
-            if let Some(multicast) = MulticastAddr::new(local_addr.get()) {
-                send_as_ethernet_frame_to_dst(
-                    core_ctx,
-                    bindings_ctx,
-                    device_id,
-                    Mac::from(&multicast),
-                    body,
-                    A::Version::ETHER_TYPE,
-                )
-            } else {
-                NudHandler::<A::Version, _, _>::send_ip_packet_to_neighbor(
-                    core_ctx,
-                    bindings_ctx,
-                    device_id,
-                    local_addr,
-                    body,
-                )
-            }
+        IpPacketDestination::Multicast(multicast_ip) => send_as_ethernet_frame_to_dst(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            Mac::from(&multicast_ip),
+            body,
+            I::ETHER_TYPE,
+        ),
+        IpPacketDestination::Neighbor(ip) => NudHandler::<I, _, _>::send_ip_packet_to_neighbor(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            ip,
+            body,
+        ),
+        IpPacketDestination::Loopback(_) => {
+            unreachable!("Loopback packets must be delivered through the loopback device")
         }
     }
     .map_err(Nested::into_inner)
@@ -896,7 +880,10 @@ pub(crate) mod testutil {
 mod tests {
     use alloc::vec;
 
-    use net_types::ip::{Ipv4Addr, Ipv6Addr};
+    use net_types::{
+        ip::{Ipv4Addr, Ipv6Addr},
+        SpecifiedAddr,
+    };
     use netstack3_base::{
         testutil::{FakeDeviceId, FakeInstant, FakeWeakDeviceId, TEST_ADDRS_V4},
         CounterContext, CtxPair, IntoCoreTimerCtx,
@@ -1358,9 +1345,8 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
-                TEST_ADDRS_V4.remote_ip,
+                IpPacketDestination::<Ipv4, _>::Neighbor(TEST_ADDRS_V4.remote_ip),
                 Buf::new(&mut vec![0; size], ..),
-                None,
             )
             .map_err(|_serializer| ());
             let sent_frames = core_ctx.inner.frames().len();
@@ -1385,9 +1371,8 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &FakeDeviceId,
-            TEST_ADDRS_V4.remote_ip,
+            IpPacketDestination::<Ipv4, _>::Broadcast(()),
             Buf::new(&mut vec![0; 100], ..),
-            /* broadcast */ Some(()),
         )
         .map_err(|_serializer| ())
         .expect("send_ip_frame should succeed");

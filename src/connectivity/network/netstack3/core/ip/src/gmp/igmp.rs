@@ -35,7 +35,7 @@ use thiserror::Error;
 use zerocopy::ByteSlice;
 
 use crate::internal::{
-    base::IpLayerHandler,
+    base::{IpLayerHandler, IpPacketDestination},
     device::IpDeviceSendContext,
     gmp::{
         gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
@@ -399,6 +399,7 @@ where
     // some details regarding considerations for IGMP/MLD snooping switches.
     let src_ip =
         core_ctx.get_ip_addr_subnet(device).map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.addr().get());
+    let destination = IpPacketDestination::from_addr(dst_ip.into_specified());
 
     let body =
         IgmpPacketBuilder::<EmptyBuf, M>::new_with_resp_time(group_addr.get(), max_resp_time);
@@ -411,15 +412,8 @@ where
     };
     let body = body.into_serializer().encapsulate(builder);
 
-    IpLayerHandler::send_ip_frame(
-        core_ctx,
-        bindings_ctx,
-        &device,
-        dst_ip.into_specified(),
-        body,
-        None,
-    )
-    .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
+    IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
+        .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -575,12 +569,11 @@ mod tests {
 
     use super::*;
     use crate::internal::{
-        base::{self, IpLayerPacketMetadata, SendIpPacketMeta},
+        base::{self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta},
         gmp::{
             GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
             QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
         },
-        types::IpTypesIpExt,
     };
 
     /// Metadata for sending an IGMP packet.
@@ -678,9 +671,8 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtx,
             device: &Self::DeviceId,
-            next_hop: SpecifiedAddr<<Ipv4 as Ip>::Addr>,
+            destination: IpPacketDestination<Ipv4, &Self::DeviceId>,
             body: S,
-            broadcast: Option<<Ipv4 as IpTypesIpExt>::BroadcastMarker>,
         ) -> Result<(), S>
         where
             S: Serializer + netstack3_filter::IpPacket<Ipv4>,
@@ -690,9 +682,8 @@ mod tests {
                 self,
                 bindings_ctx,
                 device,
-                next_hop,
+                destination,
                 body,
-                broadcast,
                 IpLayerPacketMetadata::default(),
             )
         }
@@ -703,23 +694,19 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtx,
             device_id: &Self::DeviceId,
-            local_addr: SpecifiedAddr<Ipv4Addr>,
+            destination: IpPacketDestination<Ipv4, &Self::DeviceId>,
             body: S,
-            _broadcast: Option<()>,
             ProofOfEgressCheck { .. }: ProofOfEgressCheck,
         ) -> Result<(), S>
         where
             S: Serializer,
             S::Buffer: BufferMut,
         {
-            self.send_frame(
-                bindings_ctx,
-                IgmpPacketMetadata::new(
-                    device_id.clone(),
-                    MulticastAddr::new(local_addr.get()).expect("addr should be multicast"),
-                ),
-                body,
-            )
+            let addr = match destination {
+                IpPacketDestination::Multicast(addr) => addr,
+                _ => panic!("destination is not multicast: {:?}", destination),
+            };
+            self.send_frame(bindings_ctx, IgmpPacketMetadata::new(device_id.clone(), addr), body)
         }
     }
 

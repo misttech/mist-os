@@ -15,6 +15,7 @@ use netstack3_base::{
     CoreTimerContext, Device, DeviceIdContext, ReceivableFrameMeta, RecvFrameContext,
     RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
 };
+use netstack3_ip::{IpPacketDestination, IpTypesIpExt};
 use packet::{Buf, BufferMut, Serializer};
 
 use crate::internal::{
@@ -22,7 +23,7 @@ use crate::internal::{
         DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError,
         PureIpDeviceCounters,
     },
-    id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
+    id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, DeviceId},
     queue::{
         tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
         DequeueState, TransmitQueueFrameError,
@@ -220,13 +221,43 @@ where
         net_types::for_any_ip_version!(
             ip_version,
             I,
-            send_ip_frame::<_, _, I, _>(core_ctx, bindings_ctx, &device_id, body)
+            queue_ip_frame::<_, _, I, _>(core_ctx, bindings_ctx, &device_id, body)
         )
     }
 }
 
 /// Enqueues the given IP packet on the TX queue for the given [`PureIpDevice`].
-pub fn send_ip_frame<CC, BC, I, S>(
+pub fn send_ip_frame<BC, CC, I, S>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
+    destination: IpPacketDestination<I, &DeviceId<BC>>,
+    packet: S,
+) -> Result<(), S>
+where
+    BC: DeviceLayerTypes,
+    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
+        + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
+    I: Ip + IpTypesIpExt,
+    S: Serializer,
+    S::Buffer: BufferMut,
+{
+    core_ctx.increment(device_id, |counters| &counters.send_total_frames);
+    core_ctx.increment(device_id, DeviceCounters::send_frame::<I>);
+
+    match destination {
+        IpPacketDestination::Broadcast(_)
+        | IpPacketDestination::Multicast(_)
+        | IpPacketDestination::Neighbor(_) => (),
+        IpPacketDestination::Loopback(_) => {
+            unreachable!("Loopback packets must be delivered through the loopback device");
+        }
+    };
+
+    queue_ip_frame::<_, _, I, _>(core_ctx, bindings_ctx, device_id, packet)
+}
+
+fn queue_ip_frame<BC, CC, I, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
@@ -239,12 +270,6 @@ where
     S: Serializer,
     S::Buffer: BufferMut,
 {
-    core_ctx.increment(device_id, |counters| &counters.send_total_frames);
-    match I::VERSION {
-        IpVersion::V4 => core_ctx.increment(device_id, |counters| &counters.send_ipv4_frame),
-        IpVersion::V6 => core_ctx.increment(device_id, |counters| &counters.send_ipv6_frame),
-    }
-
     let result = TransmitQueueHandler::<PureIpDevice, _>::queue_tx_frame(
         core_ctx,
         bindings_ctx,

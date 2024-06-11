@@ -47,8 +47,8 @@ use zerocopy::ByteSlice;
 
 use crate::internal::{
     base::{
-        self, AddressStatus, IpDeviceStateContext, IpExt, IpLayerHandler, IpTransportContext,
-        Ipv6PresentAddressStatus, SendIpPacketMeta, TransparentLocalDelivery,
+        self, AddressStatus, IpDeviceStateContext, IpExt, IpLayerHandler, IpPacketDestination,
+        IpTransportContext, Ipv6PresentAddressStatus, SendIpPacketMeta, TransparentLocalDelivery,
         TransportReceiveError, IPV6_DEFAULT_SUBNET,
     },
     device::{
@@ -1102,8 +1102,7 @@ where
             device: device_id,
             src_ip,
             dst_ip,
-            broadcast: None,
-            next_hop: dst_ip,
+            destination: IpPacketDestination::from_addr(dst_ip),
             ttl: NonZeroU8::new(REQUIRED_NDP_IP_PACKET_HOP_LIMIT),
             proto: Ipv6Proto::Icmpv6,
             mtu: None,
@@ -2903,12 +2902,9 @@ mod tests {
     use packet_formats::{icmp::mld::MldPacket, ip::IpProto, utils::NonZeroDuration};
 
     use super::*;
-    use crate::internal::{
-        socket::{
-            testutil::{FakeDeviceConfig, FakeIpSocketCtx},
-            IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions,
-        },
-        types::IpTypesIpExt,
+    use crate::internal::socket::{
+        testutil::{FakeDeviceConfig, FakeIpSocketCtx},
+        IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions,
     };
 
     /// The FakeCoreCtx held as the inner state of [`FakeIcmpCoreCtx`].
@@ -3454,9 +3450,8 @@ mod tests {
             &mut self,
             _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device: &Self::DeviceId,
-            _next_hop: SpecifiedAddr<<Ipv6 as Ip>::Addr>,
+            _destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             _body: S,
-            _broadcast: Option<<Ipv6 as IpTypesIpExt>::BroadcastMarker>,
         ) -> Result<(), S>
         where
             S: Serializer,
