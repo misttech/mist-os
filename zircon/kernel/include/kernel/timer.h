@@ -136,7 +136,7 @@ class TimerQueue {
 
   // This is called periodically by timer_tick(), which itself is invoked
   // periodically by some hardware timer.
-  void Tick(zx_time_t now, cpu_num_t cpu);
+  void Tick(cpu_num_t cpu);
 
  private:
   // Timers can directly call Insert and Cancel.

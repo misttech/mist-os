@@ -256,7 +256,7 @@ static zx_ticks_t read_ct() {
 
 static void platform_tick(void* arg) {
   write_ctl(0);
-  timer_tick(current_time());
+  timer_tick();
 }
 
 template <GetTicksSyncFlag Flags>

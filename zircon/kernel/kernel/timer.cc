@@ -368,19 +368,19 @@ bool Timer::Cancel() {
 }
 
 // called at interrupt time to process any pending timers
-void timer_tick(zx_time_t now) {
+void timer_tick() {
   DEBUG_ASSERT(arch_ints_disabled());
 
   CPU_STATS_INC(timer_ints);
 
   cpu_num_t cpu = arch_curr_cpu_num();
-
-  LTRACEF("cpu %u now %" PRIi64 ", sp %p\n", cpu, now, __GET_FRAME());
-
-  percpu::Get(cpu).timer_queue.Tick(now, cpu);
+  percpu::Get(cpu).timer_queue.Tick(cpu);
 }
 
-void TimerQueue::Tick(zx_time_t now, cpu_num_t cpu) {
+void TimerQueue::Tick(cpu_num_t cpu) {
+  zx_time_t now = current_time();
+  LTRACEF("cpu %u now %" PRIi64 ", sp %p\n", cpu, now, __GET_FRAME());
+
   // The platform timer has fired, so no deadline is set.
   next_timer_deadline_ = ZX_TIME_INFINITE;
 

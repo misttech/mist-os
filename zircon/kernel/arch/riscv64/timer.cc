@@ -39,7 +39,7 @@ inline affine::Ratio riscv_generic_timer_compute_conversion_factors(uint32_t cnt
 
 void riscv64_timer_exception() {
   riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
-  timer_tick(current_time());
+  timer_tick();
 }
 
 zx_ticks_t riscv_sbi_current_ticks() { return riscv64_csr_read(RISCV64_CSR_TIME); }

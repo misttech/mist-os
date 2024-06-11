@@ -310,7 +310,7 @@ static zx_time_t discrete_time_roundup(zx_time_t t) {
 static void pit_timer_tick(void* arg) { pit_ticks = pit_ticks + 1; }
 
 // The APIC timers will call this when they fire
-void platform_handle_apic_timer_tick(void) { timer_tick(current_time()); }
+void platform_handle_apic_timer_tick(void) { timer_tick(); }
 
 static void set_pit_frequency(uint32_t frequency) {
   uint32_t count, remainder;
