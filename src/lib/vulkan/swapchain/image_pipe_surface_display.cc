@@ -46,33 +46,6 @@ constexpr inline fuchsia::hardware::display::ImageId ToFidlImageId(uint32_t imag
 ImagePipeSurfaceDisplay::ImagePipeSurfaceDisplay()
     : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
-// Attempt to connect to /svc/fuchsia.hardware.display.Provider (not the device
-// node) in case that was injected for testing.
-static fuchsia::hardware::display::CoordinatorPtr ConnectToCoordinatorFromService(
-    async_dispatcher_t* dispatcher) {
-  fuchsia::hardware::display::ProviderSyncPtr provider;
-  zx_status_t status = fdio_service_connect("/svc/fuchsia.hardware.display.Provider",
-                                            provider.NewRequest().TakeChannel().release());
-
-  if (status != ZX_OK) {
-    return {};
-  }
-
-  zx_status_t status2 = ZX_OK;
-  fuchsia::hardware::display::CoordinatorPtr coordinator;
-  status = provider->OpenCoordinatorForPrimary(coordinator.NewRequest(dispatcher), &status2);
-  if (status != ZX_OK) {
-    // If the path isn't injected the failure will happen at this point.
-    return {};
-  }
-
-  if (status2 != ZX_OK) {
-    fprintf(stderr, "Couldn't connect to display controller: %s\n", zx_status_get_string(status2));
-    return {};
-  }
-  return coordinator;
-}
-
 bool ImagePipeSurfaceDisplay::Init() {
   zx_status_t status = fdio_service_connect("/svc/fuchsia.sysmem2.Allocator",
                                             sysmem_allocator_.NewRequest().TakeChannel().release());
@@ -87,43 +60,38 @@ bool ImagePipeSurfaceDisplay::Init() {
   debug_client_request.set_id(fsl::GetCurrentProcessKoid());
   sysmem_allocator_->SetDebugClientInfo(std::move(debug_client_request));
 
-  display_coordinator_ = ConnectToCoordinatorFromService(loop_.dispatcher());
-  if (!display_coordinator_) {
-    // Probe /dev/class/display-coordinator/ for a display coordinator name.
-    // When the display driver restarts it comes up with a new one (e.g. '001'
-    // instead of '000'). For now, simply take the first file found in the
-    // directory.
-    const char kDir[] = "/dev/class/display-coordinator";
-    std::string filename;
+  // Probe /dev/class/display-coordinator/ for a display coordinator name.
+  // When the display driver restarts it comes up with a new one (e.g. '001'
+  // instead of '000'). For now, simply take the first file found in the
+  // directory.
+  const char kDir[] = "/dev/class/display-coordinator";
+  std::string filename;
 
-    {
-      DIR* dir = opendir(kDir);
-      if (!dir) {
-        fprintf(stderr, "%s: Can't open directory: %s: %s\n", kTag, kDir, strerror(errno));
-        return false;
-      }
+  {
+    DIR* dir = opendir(kDir);
+    if (!dir) {
+      fprintf(stderr, "%s: Can't open directory: %s: %s\n", kTag, kDir, strerror(errno));
+      return false;
+    }
 
-      errno = 0;
-      for (;;) {
-        dirent* entry = readdir(dir);
-        if (!entry) {
-          if (errno != 0) {
-            // An error occurred while reading the directory.
-            fprintf(stderr, "%s: Warning: error while reading %s: %s\n", kTag, kDir,
-                    strerror(errno));
-          }
-          break;
+    errno = 0;
+    for (;;) {
+      dirent* entry = readdir(dir);
+      if (!entry) {
+        if (errno != 0) {
+          // An error occurred while reading the directory.
+          fprintf(stderr, "%s: Warning: error while reading %s: %s\n", kTag, kDir, strerror(errno));
         }
-        // Skip over '.' and '..' if present.
-        if (entry->d_name[0] == '.' &&
-            (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")))
-          continue;
-
-        filename = std::string(kDir) + "/" + entry->d_name;
         break;
       }
-      closedir(dir);
+      // Skip over '.' and '..' if present.
+      if (entry->d_name[0] == '.' && (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")))
+        continue;
+
+      filename = std::string(kDir) + "/" + entry->d_name;
+      break;
     }
+    closedir(dir);
 
     if (filename.empty()) {
       fprintf(stderr, "%s: No display controller.\n", kTag);
