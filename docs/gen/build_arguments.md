@@ -1515,14 +1515,6 @@ From //out/not-default/args.gn:29
 
 From //BUILD.gn:115
 
-### devicetree_board_driver
-
-Set to true if a devicetree based board driver is being used.
-
-**Current value (from the default):** `false`
-
-From //build/devicetree/args.gni:7
-
 ### dir_docker
 
 **Current value (from the default):** `"//third_party/pigweed/src/docker"`
