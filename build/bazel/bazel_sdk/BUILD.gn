@@ -112,5 +112,11 @@ group("bazel_sdk_tests_idk") {
 
 group("tests") {
   testonly = true
-  deps = [ ":bazel_sdk_tests" ]
+  deps = [
+    ":bazel_sdk_tests",
+
+    # TODO(digit): Remove this when sdk-bazel-xxxx builder configurations
+    # target this dependency directly, instead of //build/bazel/bazel_sdk:tests
+    "//sdk:final_fuchsia_sdk_tests",
+  ]
 }
