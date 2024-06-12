@@ -251,12 +251,27 @@ impl VolumesDirectory {
         Ok(me)
     }
 
+    /// Delete a profile for a given volume. Fails if that volume isn't mounted or if there is
+    /// active profile recording or replay.
     pub async fn delete_profile(
         self: &Arc<Self>,
         volume: &str,
         profile: &str,
     ) -> Result<(), zx::Status> {
-        for (_, (vol_name, volume_and_root)) in &*(self.mounted_volumes.lock().await) {
+        // Volumes lock is taken first to provide consistent lock ordering with mounting a volume.
+        let volumes = self.mounted_volumes.lock().await;
+        let state = self.profiling_state.lock().await;
+
+        // Only allow deletion when no operations are in flight. This removes confusion around
+        // deleting a profile while one is recording with the same name, as the profile will not be
+        // available for deletion until the recording completes. This would also mean that deleting
+        // during a recording may succeed for deleting an older version but will be confusingly
+        // replaced moments later.
+        if state.is_some() {
+            warn!("Failing profile deletion while profile operations are in flight.");
+            return Err(zx::Status::UNAVAILABLE);
+        }
+        for (_, (vol_name, volume_and_root)) in &*volumes {
             if vol_name == volume {
                 let dir = Arc::new(FxDirectory::new(
                     None,
@@ -282,6 +297,8 @@ impl VolumesDirectory {
         *state = None;
     }
 
+    /// Record a named profile for a number of seconds, fails if there is an in flight recording or
+    /// replay.
     pub async fn record_or_replay_profile(
         self: Arc<Self>,
         name: String,
@@ -1879,6 +1896,14 @@ mod tests {
             .await
             .expect("Recording");
 
+        // Deletion fails during in-flight recording.
+        assert_eq!(
+            volumes_directory.delete_profile("foo", "foo").await.expect_err("File shouldn't exist"),
+            Status::UNAVAILABLE
+        );
+
+        volumes_directory.finish_profiling().await;
+
         // Missing volume name.
         assert_eq!(
             volumes_directory.delete_profile("bar", "foo").await.expect_err("File shouldn't exist"),
@@ -1890,14 +1915,6 @@ mod tests {
             volumes_directory.delete_profile("foo", "bar").await.expect_err("File shouldn't exist"),
             Status::NOT_FOUND
         );
-
-        // Deletion fails as the file is not visible until after the recording completes.
-        assert_eq!(
-            volumes_directory.delete_profile("foo", "foo").await.expect_err("File shouldn't exist"),
-            Status::NOT_FOUND
-        );
-
-        volumes_directory.finish_profiling().await;
 
         // Deletion should now succeed as the profile will be placed as part of `finish_profiling()`
         volumes_directory.delete_profile("foo", "foo").await.expect("Deleting");

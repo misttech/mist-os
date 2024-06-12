@@ -19,7 +19,8 @@ pub struct CompactSubCommand {}
     subcommand,
     name = "delete_profile",
     example = "ffx storage fxfs delete_profile",
-    description = "Deletes a profile from a named unlocked volume."
+    description = "Deletes a profile from a named unlocked volume. Fails during active profile \
+        record or replay."
 )]
 pub struct DeleteProfileSubCommand {
     #[argh(positional)]
