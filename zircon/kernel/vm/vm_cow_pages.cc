@@ -199,24 +199,17 @@ zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* allo
     p_clone = list_remove_head_type(alloc_list, vm_page, queue_node);
   }
 
-  paddr_t pa_clone;
   if (p_clone) {
-    pa_clone = p_clone->paddr();
+    InitializeVmPage(p_clone);
   } else {
-    zx_status_t status = CacheAllocPage(pmm_alloc_flags_, &p_clone, &pa_clone);
+    zx_status_t status = AllocPage(&p_clone, request);
     if (status != ZX_OK) {
-      DEBUG_ASSERT(!p_clone);
-      if (status == ZX_ERR_SHOULD_WAIT) {
-        status = AnonymousPageRequester::Get().FillRequest(request->get());
-      }
       return status;
     }
     DEBUG_ASSERT(p_clone);
   }
 
-  InitializeVmPage(p_clone);
-
-  void* dst = paddr_to_physmap(pa_clone);
+  void* dst = paddr_to_physmap(p_clone->paddr());
   DEBUG_ASSERT(dst);
 
   if (parent_paddr != vm_get_zero_page_paddr()) {
@@ -232,6 +225,37 @@ zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* allo
   *clone = p_clone;
 
   return ZX_OK;
+}
+
+zx_status_t VmCowPages::AllocUninitializedPage(vm_page_t** page, LazyPageRequest* request) {
+  paddr_t paddr = 0;
+  DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
+  zx_status_t status = CacheAllocPage(pmm_alloc_flags_, page, &paddr);
+  if (status == ZX_ERR_SHOULD_WAIT) {
+    status = AnonymousPageRequester::Get().FillRequest(request->get());
+  }
+  return status;
+}
+
+zx_status_t VmCowPages::AllocPage(vm_page_t** page, LazyPageRequest* request) {
+  zx_status_t status = AllocUninitializedPage(page, request);
+  if (status == ZX_OK) {
+    InitializeVmPage(*page);
+  }
+  return status;
+}
+
+zx_status_t VmCowPages::AllocLoanedPage(vm_page_t** page) {
+  uint32_t pmm_alloc_flags = pmm_alloc_flags_;
+  // Loaned page allocations will always precisely succeed or fail and the CAN_WAIT flag cannot be
+  // combined and so we remove it if it exists.
+  pmm_alloc_flags &= ~PMM_ALLOC_FLAG_CAN_WAIT;
+  pmm_alloc_flags |= PMM_ALLOC_FLAG_LOANED;
+  zx_status_t status = pmm_alloc_page(pmm_alloc_flags, page);
+  if (status == ZX_OK) {
+    InitializeVmPage(*page);
+  }
+  return status;
 }
 
 zx_status_t VmCowPages::CacheAllocPage(uint alloc_flags, vm_page_t** p, paddr_t* pa) {
@@ -278,14 +302,10 @@ zx_status_t VmCowPages::MakePageFromReference(VmPageOrMarkerRef page_or_mark,
   VmCompression* compression = pmm_page_compression();
   DEBUG_ASSERT(compression);
   vm_page_t* p;
-  zx_status_t status = pmm_alloc_page(pmm_alloc_flags_, &p);
+  zx_status_t status = AllocPage(&p, page_request);
   if (status != ZX_OK) {
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      status = AnonymousPageRequester::Get().FillRequest(page_request->get());
-    }
     return status;
   }
-  InitializeVmPage(p);
   const auto ref = page_or_mark.SwapReferenceForPage(p);
   compression->Decompress(ref, paddr_to_physmap(p->paddr()));
   return ZX_OK;
@@ -5130,18 +5150,13 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
       DEBUG_ASSERT(options != SupplyOptions::PhysicalPageProvider);
       // Try to replace src_page with a loaned page.  We allocate the loaned page one page at a time
       // to avoid failing the allocation due to asking for more loaned pages than there are free
-      // loaned pages. Loaned page allocations will always precisely succeed or fail and the
-      // CAN_WAIT flag cannot be combined and so we remove it if it exists.
-      uint32_t pmm_alloc_flags = pmm_alloc_flags_;
-      pmm_alloc_flags &= ~PMM_ALLOC_FLAG_CAN_WAIT;
-      pmm_alloc_flags |= PMM_ALLOC_FLAG_LOANED;
-      vm_page_t* new_page;
-      zx_status_t alloc_status = pmm_alloc_page(pmm_alloc_flags, &new_page);
+      // loaned pages.
+      vm_page_t* new_page = nullptr;
+      zx_status_t alloc_status = AllocLoanedPage(&new_page);
       // If we got a loaned page, replace the page in src_page, else just continue with src_page
       // unmodified since pmm has no more loaned free pages or
       // !is_borrowing_in_supplypages_enabled().
       if (alloc_status == ZX_OK) {
-        InitializeVmPage(new_page);
         CopyPageForReplacementLocked(new_page, src_page.Page());
         vm_page_t* old_page = src_page.ReleasePage();
         list_add_tail(&freed_list, &old_page->queue_node);
@@ -5436,18 +5451,11 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
       // ensures we are making forward progress across successive calls.
       while (zero_pages_count > 0) {
         vm_page_t* new_page;
-        status = pmm_alloc_page(pmm_alloc_flags_, &new_page);
+        // We will initialize this page later when passing it to AddNewPageLocked
+        status = AllocUninitializedPage(&new_page, page_request);
         // If single page allocation fails, bubble up the failure.
         if (status != ZX_OK) {
-          // If asked to wait, fill in the page request for the caller to wait on.
-          if (status == ZX_ERR_SHOULD_WAIT) {
-            DEBUG_ASSERT(page_request);
-            status = AnonymousPageRequester::Get().FillRequest(page_request->get());
-            DEBUG_ASSERT(status == ZX_ERR_SHOULD_WAIT);
-            return status;
-          }
-          // Map all allocation failures except ZX_ERR_SHOULD_WAIT to ZX_ERR_NO_MEMORY.
-          return ZX_ERR_NO_MEMORY;
+          return status;
         }
         list_add_tail(alloc_list, &new_page->queue_node);
         zero_pages_count--;
@@ -6349,14 +6357,10 @@ uint64_t VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintA
 
 void VmCowPages::SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page) {
   DEBUG_ASSERT(!old_page->object.pin_count);
-  DEBUG_ASSERT(new_page->state() == vm_page_state::ALLOC);
+  DEBUG_ASSERT(new_page->state() == vm_page_state::OBJECT);
 
   // unmap before removing old page
   RangeChangeUpdateLocked(offset, PAGE_SIZE, RangeChangeOp::Unmap);
-
-  // Some of the fields initialized by this call get overwritten by CopyPageForReplacementLocked(),
-  // and some don't (such as state()).
-  InitializeVmPage(new_page);
 
   const VmPageOrMarker* p = page_list_.Lookup(offset);
   DEBUG_ASSERT(p);
@@ -6482,7 +6486,13 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     DEBUG_ASSERT(!old_page->is_loaned());
     return ZX_ERR_BAD_STATE;
   }
-  uint32_t pmm_alloc_flags = pmm_alloc_flags_;
+
+  // We stack-own a loaned page from pmm_alloc_page() to SwapPageLocked() OR from SwapPageLocked()
+  // until FreePageLocked().
+  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
+
+  vm_page_t* new_page = nullptr;
+  zx_status_t status = ZX_OK;
   if (with_loaned) {
     if (!can_borrow_locked()) {
       return ZX_ERR_NOT_SUPPORTED;
@@ -6490,27 +6500,14 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     if (is_page_dirty_tracked(old_page) && !is_page_clean(old_page)) {
       return ZX_ERR_BAD_STATE;
     }
-    // Loaned page allocations will always precisely succeed or fail and the CAN_WAIT flag cannot be
-    // combined and so we remove it if it exists.
-    pmm_alloc_flags &= ~PMM_ALLOC_FLAG_CAN_WAIT;
-    pmm_alloc_flags |= PMM_ALLOC_FLAG_LOANED;
+    status = AllocLoanedPage(&new_page);
   } else {
-    pmm_alloc_flags &= ~PMM_ALLOC_FLAG_LOANED;
+    status = AllocPage(&new_page, page_request);
   }
-
-  // We stack-own a loaned page from pmm_alloc_page() to SwapPageLocked() OR from SwapPageLocked()
-  // until FreePageLocked().
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
-  vm_page_t* new_page;
-  zx_status_t status = pmm_alloc_page(pmm_alloc_flags, &new_page);
   if (status != ZX_OK) {
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      DEBUG_ASSERT(page_request);
-      return AnonymousPageRequester::Get().FillRequest(page_request->get());
-    }
     return status;
   }
+
   SwapPageLocked(offset, old_page, new_page);
   pmm_page_queues()->Remove(old_page);
   FreePageLocked(old_page, /*freeing_owned_page=*/true);

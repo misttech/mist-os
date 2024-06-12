@@ -1920,6 +1920,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
   // page_request.
   __UNINITIALIZED LazyPageRequest page_request;
 
+  Guard<CriticalMutex> guard{lock()};
   // Initialize a list of allocated pages that DirtyPagesLocked will allocate any new pages into
   // before inserting them in the VMO. Allocated pages can therefore be shared across multiple calls
   // to DirtyPagesLocked. Instead of having to allocate and free pages in case DirtyPagesLocked
@@ -1928,13 +1929,12 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
   // each successive call to DirtyPagesLocked.
   list_node alloc_list;
   list_initialize(&alloc_list);
-  auto alloc_list_cleanup = fit::defer([&alloc_list]() -> void {
+  auto alloc_list_cleanup = fit::defer([&alloc_list, this]() -> void {
     if (!list_is_empty(&alloc_list)) {
-      pmm_free(&alloc_list);
+      AssertHeld(lock_ref());
+      cow_pages_locked()->FreePagesLocked(&alloc_list, true);
     }
   });
-
-  Guard<CriticalMutex> guard{lock()};
   do {
     status = cow_pages_locked()->DirtyPagesLocked(offset, len, &alloc_list, &page_request);
     if (status == ZX_ERR_SHOULD_WAIT) {
