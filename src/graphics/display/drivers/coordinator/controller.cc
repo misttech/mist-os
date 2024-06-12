@@ -872,9 +872,6 @@ zx::result<std::unique_ptr<Controller>> Controller::Create(
 }
 
 zx::result<> Controller::Initialize() {
-  supports_capture_ = engine_driver_client_->IsCaptureSupported();
-  zxlogf(INFO, "Display capture is%s supported", supports_capture_ ? "" : " not");
-
   zx::result<> vsync_monitor_init_result = vsync_monitor_.Initialize();
   if (vsync_monitor_init_result.is_error()) {
     // VsyncMonitor::Init() logged the error.
@@ -885,6 +882,9 @@ zx::result<> Controller::Initialize() {
       .ops = &display_controller_interface_protocol_ops_,
       .ctx = this,
   });
+
+  supports_capture_ = engine_driver_client_->IsCaptureSupported();
+  zxlogf(INFO, "Display capture is%s supported", supports_capture_ ? "" : " not");
 
   return zx::ok();
 }
