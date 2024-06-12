@@ -638,7 +638,11 @@ async fn dispatch_control_request(
         }
         fnet_interfaces_admin::ControlRequest::GetId { responder } => responder.send(id.get()),
         fnet_interfaces_admin::ControlRequest::SetConfiguration { config, responder } => {
-            responder.send(set_configuration(ctx, id, config).as_ref().map_err(|e| *e))
+            let result = set_configuration(ctx, id, config);
+            if let Err(e) = &result {
+                warn!("failed to set interface {id} configuration: {e:?}");
+            }
+            responder.send(result.as_ref().map_err(|e| *e))
         }
         fnet_interfaces_admin::ControlRequest::GetConfiguration { responder } => {
             responder.send(Ok(&get_configuration(ctx, id)))
@@ -835,6 +839,10 @@ fn set_configuration(
                 "TODO(https://fxbug.dev/323052525): setting multicast_forwarding not yet supported"
             )
             }
+            if let Some(forwarding) = forwarding {
+                info!("updating IPv6 forwarding on {core_id:?} to enabled={forwarding}");
+            }
+
             (
                 Some(Ipv4DeviceConfigurationUpdate {
                     ip_config: IpDeviceConfigurationUpdate {
@@ -871,6 +879,9 @@ fn set_configuration(
                 warn!(
                     "TODO(https://fxbug.dev/323052525): setting multicast_forwarding not yet supported"
                 )
+            }
+            if let Some(forwarding) = forwarding {
+                info!("updating IPv6 forwarding on {core_id:?} to enabled={forwarding}");
             }
 
             let fnet_interfaces_admin::NdpConfiguration { nud, dad, __source_breaking } =
