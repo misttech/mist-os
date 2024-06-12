@@ -105,8 +105,6 @@ impl FakePowerBroker {
                     )
                     .detach();
                 }
-                ElementControlRequest::AddDependency { .. } => todo!(),
-                ElementControlRequest::RemoveDependency { .. } => todo!(),
                 ElementControlRequest::RegisterDependencyToken { .. } => todo!(),
                 ElementControlRequest::UnregisterDependencyToken { .. } => todo!(),
                 ElementControlRequest::_UnknownMethod { .. } => todo!(),

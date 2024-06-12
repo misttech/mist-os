@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Error, Result};
+use assert_matches::assert_matches;
 use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
 use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, DependencyType, ElementSchema, LeaseStatus, LevelDependency,
@@ -230,21 +231,18 @@ mod tests {
         executor.run_singlethreaded(async {
             drop(parent_element_control);
             let status_after_remove = parent_status.watch_power_level().await;
-            assert!(matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. })));
-            assert!(matches!(
+            assert_matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. }));
+            assert_matches!(
                 parent_required_fut.await,
                 Err(fidl::Error::ClientChannelClosed { .. })
-            ));
+            );
         });
         // Remove C's element. Status channel should be closed.
         executor.run_singlethreaded(async {
             drop(child_element_control);
             let status_after_remove = child_status.watch_power_level().await;
-            assert!(matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. })));
-            assert!(matches!(
-                child_required_fut.await,
-                Err(fidl::Error::ClientChannelClosed { .. })
-            ));
+            assert_matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. }));
+            assert_matches!(child_required_fut.await, Err(fidl::Error::ClientChannelClosed { .. }));
         });
 
         Ok(())
@@ -1320,11 +1318,11 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_topology() -> Result<(), Error> {
+    async fn test_add_element_errors() -> Result<(), Error> {
         let realm = build_power_broker_realm().await?;
-
-        // Create a four element topology.
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+
+        // Create a root element
         let earth_token = zx::Event::create();
         let earth_element_control = topology
             .add_element(ElementSchema {
@@ -1338,11 +1336,60 @@ mod tests {
             })
             .await?
             .expect("add_element failed");
-        let earth_element_control = earth_element_control.into_proxy()?;
+        let _earth_element_control = earth_element_control.into_proxy()?;
+
         let water_token = zx::Event::create();
-        let water_element_control = topology
+
+        // Using an unauthorized dependency token yields AddElementError::NotAuthorized.
+        assert_matches!(
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("Water".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: zx::Event::create(),
+                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                    }]),
+                    active_dependency_tokens_to_register: Some(vec![
+                        water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
+                    ]),
+                    ..Default::default()
+                })
+                .await,
+            Ok(Err(fpb::AddElementError::NotAuthorized))
+        );
+
+        // Using an invalid level in a dependency yields AddElementError::Invalid.
+        assert_matches!(
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("Air".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Active,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: earth_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level: 2,
+                    }]),
+                    active_dependency_tokens_to_register: Some(vec![
+                        water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
+                    ]),
+                    ..Default::default()
+                })
+                .await,
+            Ok(Err(fpb::AddElementError::Invalid))
+        );
+
+        // Using the correct dependency token succeeds.
+        let _ = topology
             .add_element(ElementSchema {
-                element_name: Some("Water".into()),
+                element_name: Some("Fire".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                 valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                 dependencies: Some(vec![LevelDependency {
@@ -1360,87 +1407,35 @@ mod tests {
             })
             .await?
             .expect("add_element failed");
-        let water_element_control = water_element_control.into_proxy()?;
-        let fire_token = zx::Event::create();
-        let fire_element_control = topology
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_closing_element_control_closes_status() -> Result<(), Error> {
+        let realm = build_power_broker_realm().await?;
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+
+        let element_control = topology
             .add_element(ElementSchema {
                 element_name: Some("Fire".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                 valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                active_dependency_tokens_to_register: Some(vec![
-                    fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
-                ]),
                 ..Default::default()
             })
             .await?
             .expect("add_element failed");
-        let fire_element_control = fire_element_control.into_proxy()?;
-        let air_token = zx::Event::create();
-        let air_element_control = topology
-            .add_element(ElementSchema {
-                element_name: Some("Air".into()),
-                initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
-                valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                active_dependency_tokens_to_register: Some(vec![
-                    air_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
-                ]),
-                ..Default::default()
-            })
-            .await?
-            .expect("add_element failed");
-        let air_element_control = air_element_control.into_proxy()?;
-
-        let extra_add_dep_res = water_element_control
-            .add_dependency(
-                DependencyType::Active,
-                BinaryPowerLevel::On.into_primitive(),
-                earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                BinaryPowerLevel::On.into_primitive(),
-            )
-            .await?;
-        assert!(matches!(extra_add_dep_res, Err(fpb::ModifyDependencyError::AlreadyExists { .. })));
-
-        water_element_control
-            .remove_dependency(
-                DependencyType::Active,
-                BinaryPowerLevel::On.into_primitive(),
-                earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                BinaryPowerLevel::On.into_primitive(),
-            )
-            .await?
-            .expect("remove_dependency failed");
-
-        let extra_remove_dep_res = water_element_control
-            .remove_dependency(
-                DependencyType::Active,
-                BinaryPowerLevel::On.into_primitive(),
-                earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                BinaryPowerLevel::On.into_primitive(),
-            )
-            .await?;
-        assert!(matches!(extra_remove_dep_res, Err(fpb::ModifyDependencyError::NotFound { .. })));
-
-        drop(air_element_control);
+        let element_control = element_control.into_proxy()?;
 
         // Confirm the element has been removed and Status channels have been
         // closed.
-        let fire_status = {
+        let status_proxy = {
             let (client, server) = create_proxy::<StatusMarker>()?;
-            fire_element_control.open_status_channel(server)?;
+            element_control.open_status_channel(server)?;
             client
         };
-        drop(fire_element_control);
-        fire_status.as_channel().on_closed().await?;
-
-        let add_dep_req_invalid = earth_element_control
-            .add_dependency(
-                DependencyType::Active,
-                BinaryPowerLevel::On.into_primitive(),
-                fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                BinaryPowerLevel::On.into_primitive(),
-            )
-            .await?;
-        assert!(matches!(add_dep_req_invalid, Err(fpb::ModifyDependencyError::NotAuthorized),));
+        drop(element_control);
+        status_proxy.as_channel().on_closed().await?;
 
         Ok(())
     }

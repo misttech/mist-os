@@ -137,14 +137,6 @@ open protocol ElementControl {
         status_channel server_end:Status;
     });
 
-    /// Adds an active or passive dependency of this element upon another
-    /// element.
-    flexible AddDependency(LevelDependency) -> () error ModifyDependencyError;
-
-    /// Removes an active or passive dependency of this element upon another
-    /// element.
-    flexible RemoveDependency(LevelDependency) -> () error ModifyDependencyError;
-
     /// Register a token which will permit the bearer to add either an
     /// active or passive dependency upon this element, depending on the
     /// dependency_type specified.

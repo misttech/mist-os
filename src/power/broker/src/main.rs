@@ -199,58 +199,6 @@ impl BrokerSvc {
                 let svc = self.clone();
                 svc.create_status_channel_handler(element_id.clone(), status_channel).await
             }
-            ElementControlRequest::AddDependency {
-                dependency_type,
-                dependent_level,
-                requires_token,
-                requires_level,
-                responder,
-            } => {
-                tracing::debug!(
-                    "AddDependency({:?},{:?},{:?},{:?},{:?})",
-                    element_id,
-                    dependency_type,
-                    &dependent_level,
-                    &requires_token,
-                    &requires_level
-                );
-                let mut broker = self.broker.borrow_mut();
-                let res = broker.add_dependency(
-                    element_id,
-                    dependency_type,
-                    dependent_level,
-                    requires_token.into(),
-                    requires_level,
-                );
-                tracing::debug!("AddDependency add_dependency = ({:?})", &res);
-                responder.send(res.map_err(Into::into)).context("send failed")
-            }
-            ElementControlRequest::RemoveDependency {
-                dependency_type,
-                dependent_level,
-                requires_token,
-                requires_level,
-                responder,
-            } => {
-                tracing::debug!(
-                    "RemoveDependency({:?},{:?},{:?},{:?},{:?})",
-                    element_id,
-                    dependency_type,
-                    &dependent_level,
-                    &requires_token,
-                    &requires_level
-                );
-                let mut broker = self.broker.borrow_mut();
-                let res = broker.remove_dependency(
-                    element_id,
-                    dependency_type,
-                    dependent_level,
-                    requires_token.into(),
-                    requires_level,
-                );
-                tracing::debug!("RemoveDependency remove_dependency = ({:?})", &res);
-                responder.send(res.map_err(Into::into)).context("send failed")
-            }
             ElementControlRequest::RegisterDependencyToken {
                 token,
                 dependency_type,
