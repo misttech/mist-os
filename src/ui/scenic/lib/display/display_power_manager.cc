@@ -16,10 +16,16 @@ namespace {
 
 using SetDisplayPowerResult = fuchsia::ui::display::internal::DisplayPower_SetDisplayPower_Result;
 
+constexpr char kDisplayPower[] = "DisplayPower";
+constexpr char kDisplayPowerStatus[] = "display_power_is_on";
+
 }  // namespace
 
-DisplayPowerManager::DisplayPowerManager(DisplayManager& display_manager)
-    : display_manager_(display_manager) {}
+DisplayPowerManager::DisplayPowerManager(DisplayManager& display_manager,
+                                         inspect::Node& parent_node)
+    : display_manager_(display_manager),
+      inspect_node_(parent_node.CreateChild(kDisplayPower)),
+      inspect_display_power_status_(inspect_node_.CreateBool(kDisplayPowerStatus, true)) {}
 
 void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback callback) {
   // No display
@@ -50,6 +56,7 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
     return;
   }
 
+  inspect_display_power_status_.Set(power_on);
   callback(SetDisplayPowerResult::WithResponse({}));
 }
 

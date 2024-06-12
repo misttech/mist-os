@@ -33,6 +33,7 @@ source_set("display") {
     "//third_party/glm",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
   deps = [
