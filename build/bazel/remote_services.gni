@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/toolchain/rbe_modes.gni")
+
 declare_args() {
   # Configure bazel to build remotely with RBE where supported.
   # This can speed up builds via remote caching.
@@ -11,7 +13,7 @@ declare_args() {
   # The Remote Execution API can be found at:
   # https://github.com/bazelbuild/remote-apis
   # For an overview of remote execution for Bazel, see https://bazel.build/remote/rbe
-  enable_bazel_remote_rbe = false
+  enable_bazel_remote_rbe = rbe_settings.bazel_enable
 
   # Configure bazel to stream build events and results to a service.
   # This is useful for sharing build results and invocation details

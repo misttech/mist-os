@@ -58,41 +58,73 @@ _all_modes_defaults = {
   rust_download_rlibs = true
   rust_download_unstripped_binaries = true
 
-  # TODO(fangism@) - Add Bazel options
+  # bazel defaults (currently none applicable)
 }
 
 _default_rbe_settings = {
+  # Build entirely locally/offline.
   off = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = false
     link_enable = false
     rust_enable = false
+    bazel_enable = false
   }
 
+  # For legacy reasons, this reflects the settings that developers
+  # were accustomed to seeing, which was C++ automatically remote-enabled
+  # via Goma (deprecated), has since been replaced by re-client.
+  # It is advised to choose one of the other options that
+  # best matches your development environment.
   default = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
     link_enable = false
     rust_enable = false
+    bazel_enable = false
   }
 
+  # The "Cloudtop" development environment has very high
+  # network bandwidth, which makes for faster remote cache
+  # hits and downloading of cached artifacts.
+  # It is expected for CI to warm remote caches.
+  # Cache hit rates are subject to differences in build
+  # configuration, commands, and local source modifications.
   cloudtop = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
     link_enable = true
     rust_enable = true
     rust_exec_strategy = "remote"
+
+    # Goal is to enable bazel+RBE, but perhaps only after
+    # a subset of actions are tagged no-remote.
+    bazel_enable = false
   }
 
+  # The build infrastructure environment is also expected
+  # to have high-bandwidth connections.
+  # Note: infra configurations exist elsewhere and are not
+  # actually controlled here.
+  # This merely expresses intent and recommendations.
   infra = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
     link_enable = true
     rust_enable = true
     rust_exec_strategy = "remote"
+
+    # TODO(b/42067312): enable after un-blocking
+    bazel_enable = false
   }
 
   # This mode itself is experimental.
+  #
+  # Relative to "Cloudtop" this enables the same set of
+  # remote builds, but skips downloading many intermediate
+  # build artifacts, in an effort to reduce bandwidth.
+  # Every not-downloaded artifact leaves a download-stub
+  # in its place, which can be downloaded later as-needed.
   low_bandwidth_remote = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
@@ -107,6 +139,11 @@ _default_rbe_settings = {
     rust_exec_strategy = "remote"
     rust_download_rlibs = false
     rust_download_unstripped_binaries = false
+
+    # Currently, bazel sub-builds are late-stage in the overall
+    # build, which often have lower cache hit rates, and include larger
+    # artifacts that can be slow to download.
+    bazel_enable = false
   }
 }
 
@@ -148,6 +185,7 @@ rbe_settings = {
               "rust_download_rlibs",
               "rust_download_unstripped_binaries",
               "rust_exec_strategy",
+              "bazel_enable",
             ]) {
       if (defined(rbe_settings_overrides[_setting_name]) &&
           rbe_settings_overrides[_setting_name] ==
@@ -197,5 +235,10 @@ rbe_settings = {
   }
   if (defined(rbe_settings_overrides["rust_exec_strategy"])) {
     rust_exec_strategy = rbe_settings_overrides["rust_exec_strategy"]
+  }
+
+  # bazel overrides
+  if (defined(rbe_settings_overrides["bazel_enable"])) {
+    bazel_enable = rbe_settings_overrides["bazel_enable"]
   }
 }
