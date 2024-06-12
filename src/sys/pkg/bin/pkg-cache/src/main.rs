@@ -136,6 +136,7 @@ async fn main_inner() -> Result<(), Error> {
         let system_image = system_image::SystemImage::new(blobfs.clone(), &boot_args)
             .await
             .context("Accessing contents of system_image package")?;
+        info!("system_image package: {}", system_image.hash().to_string());
         inspector.root().record_string("system_image", system_image.hash().to_string());
 
         let (base_packages_res, cache_packages_res) =
