@@ -13,7 +13,7 @@
 #
 # To run this tool, use:
 #
-#   fx set core.x64 --with //scripts/versioning:bump_api_level --args=bump_api_level=true
+#   fx set bringup.x64 --with-host //scripts/versioning:bump_api_level --args=bump_api_level=true
 #   fx build.
 #
 
