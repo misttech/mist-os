@@ -7,6 +7,7 @@ use crate::client::types;
 use crate::config_management::{Credential, HistoricalListsByBssid};
 use crate::util::pseudo_energy::EwmaSignalData;
 use ieee80211::{Bssid, MacAddrBytes, Ssid};
+use rand::distributions::{Alphanumeric, DistString};
 use rand::{Rng as _, RngCore};
 use wlan_common::channel::{Cbw, Channel};
 use wlan_common::random_fidl_bss_description;
@@ -24,6 +25,11 @@ pub fn generate_ssid(ssid: &str) -> types::Ssid {
 
 pub fn generate_security_type_detailed() -> types::SecurityTypeDetailed {
     types::SecurityTypeDetailed::from_primitive(rand::thread_rng().gen_range(0..11)).unwrap()
+}
+
+/// Generate a random string of length 16
+pub fn generate_string() -> String {
+    Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
 }
 
 pub fn generate_random_channel() -> Channel {

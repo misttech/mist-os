@@ -1467,17 +1467,13 @@ mod tests {
     use fuchsia_async::{DurationExt, TestExecutor};
     use futures::stream::StreamFuture;
     use futures::task::Poll;
-    use futures::TryStreamExt;
     use ieee80211::MacAddr;
     use lazy_static::lazy_static;
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::channel::Cbw;
     use wlan_common::{assert_variant, random_fidl_bss_description, RadioConfig};
-    use {
-        fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_common as fidl_common,
-        fuchsia_inspect as inspect,
-    };
+    use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_inspect as inspect};
 
     // Responses that FakePhyManager will provide
     pub const TEST_CLIENT_IFACE_ID: u16 = 0;
@@ -1891,41 +1887,6 @@ mod tests {
         iface_manager
     }
 
-    /// Move stash requests forward so that a save request can progress.
-    fn process_stash_write(
-        exec: &mut fuchsia_async::TestExecutor,
-        stash_server: &mut fidl_stash::StoreAccessorRequestStream,
-    ) {
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::SetValue { .. })))
-        );
-        process_stash_flush(exec, stash_server);
-    }
-
-    fn process_stash_delete(
-        exec: &mut fuchsia_async::TestExecutor,
-        stash_server: &mut fidl_stash::StoreAccessorRequestStream,
-    ) {
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::DeletePrefix { .. })))
-        );
-        process_stash_flush(exec, stash_server);
-    }
-
-    fn process_stash_flush(
-        exec: &mut fuchsia_async::TestExecutor,
-        stash_server: &mut fidl_stash::StoreAccessorRequestStream,
-    ) {
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::Flush{responder}))) => {
-                responder.send(Ok(())).expect("failed to send stash response");
-            }
-        );
-    }
-
     #[track_caller]
     fn run_state_machine_futures(
         exec: &mut fuchsia_async::TestExecutor,
@@ -1982,12 +1943,9 @@ mod tests {
     fn test_connect_with_unconfigured_iface() {
         let mut exec = fuchsia_async::TestExecutor::new();
 
-        let mut test_values = test_setup(&mut exec);
+        let test_values = test_setup(&mut exec);
         let (mut iface_manager, mut _sme_stream) =
             create_iface_manager_with_client(&test_values, false);
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
 
         // Add credentials for the test network to the saved networks.
         let connect_selection = generate_connect_selection();
@@ -1996,9 +1954,7 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-        process_stash_write(&mut exec, &mut stash_server);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         {
             let connect_fut = iface_manager.connect(connect_selection.clone());
@@ -2069,10 +2025,6 @@ mod tests {
         let mut exec = fuchsia_async::TestExecutor::new();
 
         let mut test_values = test_setup(&mut exec);
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
-
         let (mut iface_manager, mut _sme_stream) =
             create_iface_manager_with_client(&test_values, false);
 
@@ -2093,9 +2045,6 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-        process_stash_write(&mut exec, &mut stash_server);
         assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Initiate automatic connection selection
@@ -2242,7 +2191,7 @@ mod tests {
     ) {
         let mut exec = fuchsia_async::TestExecutor::new();
 
-        let mut test_values = test_setup(&mut exec);
+        let test_values = test_setup(&mut exec);
         // The default FakePhyManager will not have a WPA3 iface which is intentional because if
         // an unconfigured iface is available with WPA3, it should be used without asking
         // PhyManager for an iface.
@@ -2253,10 +2202,6 @@ mod tests {
         security_support.sae.driver_handler_supported = sae_driver_handler_supported;
         security_support.sae.sme_handler_supported = sae_sme_handler_supported;
         iface_manager.clients[0].security_support = security_support;
-
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
 
         let network_id = NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa3);
         let connect_selection = client_types::ConnectSelection {
@@ -2273,14 +2218,12 @@ mod tests {
             reason: client_types::ConnectReason::FidlConnectRequest,
         };
 
-        let save_network_fut = test_values.saved_networks.store(
+        let mut save_network_fut = test_values.saved_networks.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-        process_stash_write(&mut exec, &mut stash_server);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         {
             let connect_fut = iface_manager.connect(connect_selection.clone());
@@ -4940,20 +4883,14 @@ mod tests {
             expected_connect_selection: None,
         }));
 
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
-
         // Update the saved networks with knowledge of the test SSID and credentials.
         let connect_selection = generate_connect_selection();
-        let save_network_fut = test_values.saved_networks.store(
+        let mut save_network_fut = test_values.saved_networks.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-        process_stash_write(&mut exec, &mut stash_server);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Ask the IfaceManager to reconnect.
         let mut sme_stream = {
@@ -5075,7 +5012,7 @@ mod tests {
         let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
-        let mut test_values = test_setup(&mut exec);
+        let test_values = test_setup(&mut exec);
         let (mut iface_manager, _sme_stream) = create_iface_manager_with_client(&test_values, true);
 
         // Make the client state machine report that it is alive.
@@ -5085,20 +5022,14 @@ mod tests {
             expected_connect_selection: None,
         }));
 
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
-
         // Update the saved networks with knowledge of the test SSID and credentials.
         let connect_selection = generate_connect_selection();
-        let save_network_fut = test_values.saved_networks.store(
+        let mut save_network_fut = test_values.saved_networks.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-        process_stash_write(&mut exec, &mut stash_server);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Ask the IfaceManager to reconnect.
         {
@@ -5134,21 +5065,10 @@ mod tests {
         // Insert a saved network.
         let network_id = NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa);
         let credential = Credential::Password(TEST_PASSWORD.as_bytes().to_vec());
-        let mut stash_server = {
-            let (saved_networks, mut stash_server) =
-                exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-            test_values.saved_networks = Arc::new(saved_networks);
-
-            // Update the saved networks with knowledge of the test SSID and credentials.
-            let save_network_fut =
-                test_values.saved_networks.store(network_id.clone(), credential.clone());
-            let mut save_network_fut = pin!(save_network_fut);
-            assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-            process_stash_write(&mut exec, &mut stash_server);
-
-            stash_server
-        };
+        let mut save_network_fut =
+            test_values.saved_networks.store(network_id.clone(), credential.clone());
+        let mut save_network_fut = pin!(save_network_fut);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Make the client state machine report that it is not alive.
         let (mut iface_manager, _sme_stream) = create_iface_manager_with_client(&test_values, true);
@@ -5176,10 +5096,10 @@ mod tests {
             }
             NetworkSelectionMissingAttribute::SavedNetwork => {
                 // Remove the saved network so that there are no known networks to connect to.
-                let mut remove_network_fut =
-                    pin!(test_values.saved_networks.remove(network_id.clone(), credential.clone()));
-                assert_variant!(exec.run_until_stalled(&mut remove_network_fut), Poll::Pending);
-                process_stash_delete(&mut exec, &mut stash_server);
+                let remove_network_fut =
+                    test_values.saved_networks.remove(network_id.clone(), credential);
+                let mut remove_network_fut = pin!(remove_network_fut);
+                assert_variant!(exec.run_until_stalled(&mut remove_network_fut), Poll::Ready(_));
             }
             NetworkSelectionMissingAttribute::NetworkSelectionInProgress => {
                 // Insert a future so that it looks like a scan is in progress.
@@ -5436,23 +5356,18 @@ mod tests {
     #[fuchsia::test]
     fn test_terminated_client() {
         let mut exec = fuchsia_async::TestExecutor::new();
-        let mut test_values = test_setup(&mut exec);
+        let test_values = test_setup(&mut exec);
 
         // Create a fake network entry so that a reconnect will be attempted.
         let network_id = NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa);
         let credential = Credential::Password(TEST_PASSWORD.as_bytes().to_vec());
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
 
         // Update the saved networks with knowledge of the test SSID and credentials.
         {
             let save_network_fut =
                 test_values.saved_networks.store(network_id.clone(), credential.clone());
             let mut save_network_fut = pin!(save_network_fut);
-            assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-            process_stash_write(&mut exec, &mut stash_server);
+            assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
         }
 
         // Create an interface manager with an unconfigured client interface.

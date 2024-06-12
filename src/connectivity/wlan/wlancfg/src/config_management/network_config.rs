@@ -636,6 +636,7 @@ fn check_config_errors(
 
 /// Error codes representing problems in trying to save a network config, such as errors saving
 /// or removing a network config, or for invalid values when trying to create a network config.
+#[derive(Hash, PartialEq, Eq)]
 pub enum NetworkConfigError {
     OpenNetworkPassword,
     Wpa3Psk,
@@ -646,7 +647,7 @@ pub enum NetworkConfigError {
     ConfigMissingId,
     ConfigMissingCredential,
     CredentialTypeInvalid,
-    StashWriteError,
+    FileWriteError,
     LegacyWriteError,
 }
 
@@ -676,8 +677,8 @@ impl Debug for NetworkConfigError {
             NetworkConfigError::CredentialTypeInvalid => {
                 write!(f, "cannot convert fidl Credential, unknown variant")
             }
-            NetworkConfigError::StashWriteError => {
-                write!(f, "error writing network config to stash")
+            NetworkConfigError::FileWriteError => {
+                write!(f, "error writing network config to file")
             }
             NetworkConfigError::LegacyWriteError => {
                 write!(f, "error writing network config to legacy storage")
@@ -704,7 +705,7 @@ impl From<NetworkConfigError> for fidl_policy::NetworkConfigChangeError {
             NetworkConfigError::CredentialTypeInvalid => {
                 fidl_policy::NetworkConfigChangeError::UnsupportedCredentialError
             }
-            NetworkConfigError::StashWriteError | NetworkConfigError::LegacyWriteError => {
+            NetworkConfigError::FileWriteError | NetworkConfigError::LegacyWriteError => {
                 fidl_policy::NetworkConfigChangeError::NetworkConfigWriteError
             }
         }

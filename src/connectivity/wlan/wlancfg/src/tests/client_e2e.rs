@@ -28,12 +28,12 @@ use std::convert::Infallible;
 use std::pin::{pin, Pin};
 use std::sync::Arc;
 use test_case::test_case;
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 use wlan_common::scan::write_vmo;
 use wlan_common::test_utils::ExpectWithin;
 use wlan_common::{assert_variant, random_fidl_bss_description};
 use {
-    fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_common_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx, hex,
@@ -145,7 +145,6 @@ struct InternalObjects {
 struct ExternalInterfaces {
     monitor_service_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     monitor_service_stream: fidl_fuchsia_wlan_device_service::DeviceMonitorRequestStream,
-    stash_server: fidl_stash::StoreAccessorRequestStream,
     client_controller: fidl_policy::ClientControllerProxy,
     listener_updates_stream: fidl_policy::ClientStateUpdatesRequestStream,
     _telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
@@ -169,8 +168,7 @@ fn test_setup(
     let monitor_service_stream =
         monitor_service_requests.into_stream().expect("failed to create stream");
 
-    let (saved_networks, stash_server) =
-        exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
+    let saved_networks = exec.run_singlethreaded(SavedNetworksManager::new_for_test());
     let saved_networks = Arc::new(saved_networks);
     let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
     let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
@@ -324,7 +322,6 @@ fn test_setup(
     let external_interfaces = ExternalInterfaces {
         monitor_service_proxy,
         monitor_service_stream,
-        stash_server,
         client_controller,
         listener_updates_stream,
         _telemetry_receiver: telemetry_receiver,
@@ -579,28 +576,6 @@ fn request_controller(
 }
 
 #[track_caller]
-fn process_stash_write<BackgroundFut>(
-    exec: &mut fasync::TestExecutor,
-    background_tasks: &mut BackgroundFut,
-    stash_server: &mut fidl_stash::StoreAccessorRequestStream,
-) where
-    BackgroundFut: Future + Unpin,
-{
-    let stash_set_req = run_while(exec, background_tasks, stash_server.next());
-    assert_variant!(stash_set_req, Some(Ok(fidl_stash::StoreAccessorRequest::SetValue { key, val, .. })) => {
-        trace!("Stash set {}: {:?}", key, val);
-    });
-    let stash_flush_req = run_while(exec, background_tasks, stash_server.next());
-    assert_variant!(
-        stash_flush_req,
-        Some(Ok(fidl_stash::StoreAccessorRequest::Flush{responder})) => {
-            responder.send(Ok(())).expect("failed to send stash response");
-        }
-    );
-    info!("finished stash writing")
-}
-
-#[track_caller]
 fn get_client_state_update<BackgroundFut>(
     exec: &mut TestExecutor,
     background_tasks: &mut BackgroundFut,
@@ -702,13 +677,6 @@ fn save_and_connect(
     // Save the network
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     let save_fut = pin!(save_fut);
-
-    // Begin processing the save request and the stash write from the save
-    process_stash_write(
-        exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
 
     // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
     let save_resp = run_while(exec, &mut test_values.internal_objects.internal_futures, save_fut);
@@ -822,13 +790,6 @@ fn save_and_connect(
             is_reconnect: false,
         })
         .expect("failed to send connection completion");
-
-    // Process stash write for the recording of connect results
-    process_stash_write(
-        exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
 
     // Check for a listener update saying we're connected
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -1001,13 +962,6 @@ fn test_save_and_fail_to_connect(
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     let mut save_fut = pin!(save_fut);
 
-    // Begin processing the save request and the stash write from the save
-    process_stash_write(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
-
     // Continue processing the save request. Auto-connection process starts, and we get an update
     // saying we are connecting.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -1156,13 +1110,6 @@ fn test_connect_to_new_network() {
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     let save_fut = pin!(save_fut);
 
-    // Process the stash write from the save.
-    process_stash_write(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
-
     // Save request returns.
     let save_fut_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
@@ -1309,13 +1256,6 @@ fn test_connect_to_new_network() {
     // to prevent the channel from closing.
     existing_connection.connect_txn_handle = connect_txn_handle;
 
-    // Process stash write for the recording of connect results.
-    process_stash_write(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
-
     // Listener update should now show only the second network with connected state.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
         &mut exec,
@@ -1363,13 +1303,6 @@ fn test_autoconnect_to_saved_network() {
     // Save the network.
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     let save_fut = pin!(save_fut);
-
-    // Process the stash write from the save.
-    process_stash_write(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
 
     // Save request returns.
     let save_fut_resp =
@@ -1555,13 +1488,6 @@ fn test_autoconnect_to_saved_network() {
         })
         .expect("failed to send connection completion");
 
-    // Process stash write for the recording of connect results
-    process_stash_write(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
-
     // Check for a listener update saying we're Connected.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
         &mut exec,
@@ -1611,13 +1537,6 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
     // Save the network.
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     let save_fut = pin!(save_fut);
-
-    // Process the stash write from the save.
-    process_stash_write(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
 
     // Save request returns.
     let save_fut_resp =
@@ -1796,17 +1715,6 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
                 is_reconnect: false,
             })
             .expect("failed to send connection completion");
-
-        // Process stash write for the recording of connect results.
-        // This only happens on the first loop, since we only write "has_ever_connected: true" the
-        // first time.
-        if connect_disconnect_loop_counter == 1 {
-            process_stash_write(
-                &mut exec,
-                &mut test_values.internal_objects.internal_futures,
-                &mut test_values.external_interfaces.stash_server,
-            );
-        }
 
         // Check for a listener update saying we're Connected.
         let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -2293,13 +2201,6 @@ fn test_connect_failure_recovery() {
     // Save the network
     let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
     let save_fut = pin!(save_fut);
-
-    // Begin processing the save request and the stash write from the save
-    process_stash_write(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.stash_server,
-    );
 
     // Continue processing the save request. Connect process starts, and save request returns once
     // the scan has been queued.

@@ -210,7 +210,7 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
         credential: Credential,
     ) -> Result<Option<NetworkConfig>, NetworkConfigError> {
         if self.fail_all_stores {
-            return Err(NetworkConfigError::StashWriteError);
+            return Err(NetworkConfigError::FileWriteError);
         }
         let config = NetworkConfig::new(network_id.clone(), credential, false)?;
         return Ok(self

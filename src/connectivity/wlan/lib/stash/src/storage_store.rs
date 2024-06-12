@@ -28,8 +28,9 @@ impl StorageStore {
         Self { path: path.as_ref().into() }
     }
 
-    #[allow(unused)]
-    pub fn delete_store(&mut self) -> Result<(), Error> {
+    /// Clears the backing file if it exists or creates a new one
+    /// {"version:" 1, saved_networks: [] }
+    pub fn empty_store(&self) -> Result<(), Error> {
         self.write(Vec::new())
     }
 
@@ -109,7 +110,7 @@ mod tests {
     use wlan_stash_constants::{Credential, SecurityType};
 
     #[fuchsia::test]
-    fn test_write() {
+    fn test_write_and_load() {
         let path = format!("/data/config.{}", rand_string());
         let store = StorageStore::new(&path);
         let network_configs = vec![PersistentStorageData {
@@ -209,15 +210,19 @@ mod tests {
     #[fuchsia::test]
     fn test_delete_store() {
         let path = format!("/data/config.{}", rand_string());
-        let mut store = StorageStore::new(&path);
+        let store = StorageStore::new(&path);
         let network_config = vec![PersistentStorageData {
             ssid: "foo".into(),
             security_type: SecurityType::Wpa2,
             credential: Credential::Password(b"password".to_vec()),
             has_ever_connected: false,
         }];
-        store.write(network_config).expect("write failed");
-        store.delete_store().expect("delete_store failed");
+        store.write(network_config.clone()).expect("write failed");
+        assert_eq!(store.load().expect("load failed"), network_config);
+
+        // Empty the store and check that nothing is loaded.
+        store.empty_store().expect("empty_store failed");
+        let store = StorageStore::new(&path);
         assert_eq!(store.load().expect("load failed"), Vec::new());
     }
 }

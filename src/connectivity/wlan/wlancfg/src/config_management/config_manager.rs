@@ -16,7 +16,7 @@ use rand::Rng;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use tracing::{error, info};
-use wlan_stash::policy::{PolicyStorage as Stash, POLICY_STORAGE_ID};
+use wlan_stash::policy::{PolicyStorage, POLICY_STORAGE_ID};
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async as fasync,
@@ -27,13 +27,13 @@ const MAX_CONFIGS_PER_SSID: usize = 1;
 /// The Saved Network Manager keeps track of saved networks and provides thread-safe access to
 /// saved networks. Networks are saved by NetworkConfig and accessed by their NetworkIdentifier
 /// (SSID and security protocol). Network configs are saved in-memory, and part of each network
-/// data is saved persistently. Futures aware locks are used in order to wait for the stash flush
+/// data is saved persistently. Futures aware locks are used in order to wait for the storage flush
 /// operations to complete when data changes.
 pub struct SavedNetworksManager {
     saved_networks: Mutex<NetworkConfigMap>,
-    /// It is possible for stash creation to return an error, but we don't want to crash WLAN for
-    /// not having persistent storage access.
-    stash: Option<Mutex<Stash>>,
+    // Persistent storage for networks, which should be updated when there is a change to the data
+    // that is saved between reboots.
+    store: Mutex<PolicyStorage>,
     telemetry_sender: TelemetrySender,
 }
 
@@ -123,120 +123,82 @@ pub trait SavedNetworksManagerApi: Send + Sync {
 }
 
 impl SavedNetworksManager {
-    /// Initializes a new Saved Network Manager by reading saved networks from a secure storage
-    /// (stash). It initializes in-memory storage and persistent storage with stash.
+    /// Initializes a new Saved Network Manager by reading saved networks from local storage using
+    /// a WLAN helper library. It will attempt to migrate any data from legacy storage.
     pub async fn new(telemetry_sender: TelemetrySender) -> Self {
-        let stash = Stash::new_with_id(POLICY_STORAGE_ID)
-            .await
-            .map_err(|e| {
-                error!(
-                    "An error occurred initializing persistent storage. WLAN will continue without
-                it; {}",
-                    e
-                );
-                e
-            })
-            .ok();
-
-        Self::new_with_stash(stash, telemetry_sender).await
+        let storage = PolicyStorage::new_with_id(POLICY_STORAGE_ID);
+        Self::new_with_storage(storage, telemetry_sender).await
     }
 
-    /// Load from persistent data from stash.
-    pub async fn new_with_stash(stash: Option<Stash>, telemetry_sender: TelemetrySender) -> Self {
-        let saved_networks: HashMap<NetworkIdentifier, Vec<NetworkConfig>> = if let Some(stash) =
-            &stash
-        {
-            let stashed_networks = stash.load().await.unwrap_or_else(|e| {
-                // If there is an error loading saved networks, load none of them. Clear the stash
-                // since it is likely corrupted. However if stash crashing caused this error,
-                // networks will not be persisted and the error will happen again next reboot.
-                error!("No saved networks loaded; error loading saved networks from stash: {}", e);
-                HashMap::new()
-            });
-            stashed_networks
-                .iter()
-                .map(|(network_id, persistent_data)| {
-                    (
-                        NetworkIdentifier::from(network_id.clone()),
-                        persistent_data
-                            .iter()
-                            .filter_map(|data| {
-                                NetworkConfig::new(
-                                    NetworkIdentifier::from(network_id.clone()),
-                                    data.credential.clone().into(),
-                                    data.has_ever_connected,
-                                )
-                                .ok()
-                            })
-                            .collect(),
-                    )
-                })
-                .collect()
-        } else {
-            HashMap::new()
-        };
+    /// Load data from persistent storage. The legacy stash data is deleted if it exists.
+    pub async fn new_with_storage(
+        mut store: PolicyStorage,
+        telemetry_sender: TelemetrySender,
+    ) -> Self {
+        let mut saved_networks: HashMap<NetworkIdentifier, Vec<NetworkConfig>> = HashMap::new();
+        // Load saved networks from persistent storage. An error loading would mean that there was
+        // nothing saved in the current version of persistent store and there was an error loading
+        // legacy stash data.
+        let stored_networks = store.load().await.unwrap_or_else(|e| {
+            // If there is an error loading saved networks, we will run with no saved networks.
+            error!("No saved networks loaded; error loading saved networks from storage: {}", e);
+            Vec::new()
+        });
+        let mut errors_building_configs = HashSet::new();
+
+        // Collect the list of persisted networks into the map that will be used internally.
+        for persisted_data in stored_networks.into_iter() {
+            let id = NetworkIdentifier::new(
+                types::Ssid::from_bytes_unchecked(persisted_data.ssid),
+                persisted_data.security_type.into(),
+            );
+            let config = NetworkConfig::new(
+                id.clone(),
+                persisted_data.credential.clone().into(),
+                persisted_data.has_ever_connected,
+            );
+            match config {
+                Ok(config) => saved_networks.entry(id).or_default().push(config),
+                Err(e) => {
+                    _ = errors_building_configs.insert(e);
+                }
+            }
+        }
+
+        // If there errors creating network configs from persisted data, log unique types.
+        if !errors_building_configs.is_empty() {
+            error!(
+                "At least one error occurred building network config from persisted data: {:?}",
+                errors_building_configs
+            )
+        }
 
         Self {
             saved_networks: Mutex::new(saved_networks),
-            stash: stash.map(|s| Mutex::new(s)),
+            store: Mutex::new(store),
             telemetry_sender,
         }
     }
 
-    /// Creates a new config with a random stash ID, ensuring a clean environment for an individual
-    /// test
+    /// Creates a new config with a random storage path, ensuring a clean environment for an
+    /// individual test
     #[cfg(test)]
     pub async fn new_for_test() -> Self {
+        use crate::util::testing::generate_string;
         use futures::channel::mpsc;
-        use rand::distributions::{Alphanumeric, DistString as _};
-        use rand::thread_rng;
 
-        let stash_id = Alphanumeric.sample_string(&mut thread_rng(), 20);
+        let store_id = generate_string();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let stash = Some(Stash::new_with_id(&stash_id).await.expect("failed to create stash"));
-        Self::new_with_stash(stash, telemetry_sender).await
+        let store = PolicyStorage::new_with_id(&store_id);
+        Self::new_with_storage(store, telemetry_sender).await
     }
 
-    /// Creates a new SavedNetworksManager and hands back the other end of the stash proxy used.
-    /// This should be used when a test does something that will interact with stash and uses the
-    /// executor to step through futures.
-    #[cfg(test)]
-    pub async fn new_and_stash_server() -> (Self, fidl_fuchsia_stash::StoreAccessorRequestStream) {
-        use futures::channel::mpsc;
-        use rand::distributions::{Alphanumeric, DistString as _};
-        use rand::thread_rng;
-
-        let id = Alphanumeric.sample_string(&mut thread_rng(), 20);
-        use fidl::endpoints::create_proxy;
-        let (store_client, _stash_server) = create_proxy::<fidl_fuchsia_stash::StoreMarker>()
-            .expect("failed to create stash proxy");
-        store_client.identify(id.as_ref()).expect("failed to identify client to store");
-        let (store, accessor_server) = create_proxy::<fidl_fuchsia_stash::StoreAccessorMarker>()
-            .expect("failed to create accessor proxy");
-        let stash = Stash::new_with_stash(store);
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let telemetry_sender = TelemetrySender::new(telemetry_sender);
-
-        (
-            Self {
-                saved_networks: Mutex::new(NetworkConfigMap::new()),
-                stash: Some(Mutex::new(stash)),
-                telemetry_sender,
-            },
-            accessor_server.into_stream().expect("failed to create stash request stream"),
-        )
-    }
-
-    /// Clear the in memory storage and the persistent storage. Also clear the legacy storage.
+    /// Clear the in memory storage and the persistent storage.
     #[cfg(test)]
     pub async fn clear(&self) -> Result<(), anyhow::Error> {
         self.saved_networks.lock().await.clear();
-        if let Some(s) = &self.stash {
-            s.lock().await.clear().await
-        } else {
-            Ok(())
-        }
+        self.store.lock().await.clear()
     }
 }
 
@@ -254,29 +216,21 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
             // Keep the configs that don't match provided NetworkIdentifier and Credential.
             network_configs.retain(|cfg| cfg.credential != credential);
             if original_len != network_configs.len() {
-                if let Some(s) = &self.stash {
-                    s.lock()
-                        .await
-                        .write(
-                            &network_id.clone().into(),
-                            &network_config_vec_to_persistent_data(network_configs),
-                        )
-                        .await
-                        .map_err(|e| {
-                            error!("error removing network from stash: {}", e);
-                            NetworkConfigError::StashWriteError
-                        })?;
-                } else {
-                    error!(
-                        "Error removing network from stash; stash was not successfully initialized"
-                    );
-                    return Err(NetworkConfigError::StashWriteError);
-                }
-
                 // If there was only one config with this ID before removing it, remove the ID.
                 if network_configs.is_empty() {
                     _ = saved_networks.remove(&network_id);
                 }
+
+                // Update persistent storage
+                self.store
+                    .lock()
+                    .await
+                    .write(persistent_data_from_config_map(&saved_networks))
+                    .map_err(|e| {
+                        error!("error writing network to persistent storage: {}", e);
+                        NetworkConfigError::FileWriteError
+                    })?;
+
                 return Ok(true);
             } else {
                 // Log whether there were any matching credential types without logging specific
@@ -365,23 +319,12 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
         let evicted_config = evict_if_needed(network_configs);
         network_configs.push(network_config);
 
-        if let Some(s) = &self.stash {
-            s.lock()
-                .await
-                .write(
-                    &network_id.clone().into(),
-                    &network_config_vec_to_persistent_data(network_configs),
-                )
-                .await
-                .map_err(|e| {
-                    error!("error storing network to stash: {}", e);
-                    NetworkConfigError::StashWriteError
-                })?;
-        } else {
-            // If stash is none, there was a failure creating it when creating SavedNetworksManager.
-            error!("Error storing network to stash; stash was not successfully initialized");
-            return Err(NetworkConfigError::StashWriteError);
-        }
+        self.store.lock().await.write(persistent_data_from_config_map(&saved_networks)).map_err(
+            |e| {
+                error!("error writing network to persistent storage: {}", e);
+                NetworkConfigError::FileWriteError
+            },
+        )?;
 
         Ok(evicted_config)
     }
@@ -424,11 +367,9 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
 
                         if has_change {
                             // Update persistent storage since a config has changed.
-                            let data = network_config_vec_to_persistent_data(networks);
-                            if let Some(stash) = &self.stash {
-                                if let Err(e) = stash.lock().await.write(&id.into(), &data).await {
-                                    info!("Failed to record successful connect in stash: {}", e);
-                                }
+                            let data = persistent_data_from_config_map(&saved_networks);
+                            if let Err(e) = self.store.lock().await.write(data) {
+                                info!("Failed to record successful connect in store: {}", e);
                             }
                         }
                     }
@@ -526,7 +467,6 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
                     for config in compatible_configs {
                         config.update_hidden_prob(HiddenProbEvent::SeenPassive)
                     }
-                    // TODO(60619): Update the stash with new probability if it has changed
                 }
             }
         }
@@ -548,9 +488,9 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
                 }) {
                     config.update_hidden_prob(HiddenProbEvent::NotSeenActive);
                 }
-                // TODO(60619): Update the stash with new probability if it has changed
             }
         }
+        // TODO(60619): Update persistent storage with new probability if it has changed
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {
@@ -679,21 +619,17 @@ mod tests {
         HistoricalListsByBssid, PROB_HIDDEN_DEFAULT, PROB_HIDDEN_IF_CONNECT_ACTIVE,
         PROB_HIDDEN_IF_CONNECT_PASSIVE, PROB_HIDDEN_IF_SEEN_PASSIVE,
     };
-    use crate::util::testing::{generate_random_bss, random_connection_data};
-    use fidl_fuchsia_stash as fidl_stash;
+    use crate::util::testing::{generate_random_bss, generate_string, random_connection_data};
     use futures::channel::mpsc;
     use futures::task::Poll;
-    use futures::TryStreamExt;
-    use rand::distributions::{Alphanumeric, DistString as _};
-    use rand::thread_rng;
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::assert_variant;
 
     #[fuchsia::test]
     async fn store_and_lookup() {
-        let stash_id = "store_and_lookup";
-        let saved_networks = create_saved_networks(stash_id).await;
+        let store_id = generate_string();
+        let saved_networks = create_saved_networks(&store_id).await;
         let network_id_foo = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();
 
         assert!(saved_networks.lookup(&network_id_foo).await.is_empty());
@@ -742,10 +678,10 @@ mod tests {
 
         // Saved networks should persist when we create a saved networks manager with the same ID.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id).await.expect("failed to create stash"));
+        let store = PolicyStorage::new_with_id(&store_id);
 
         let saved_networks =
-            SavedNetworksManager::new_with_stash(stash, TelemetrySender::new(telemetry_sender))
+            SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
         assert_eq!(
             vec![network_config("foo", "12345678")],
@@ -802,8 +738,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn store_and_remove() {
-        let stash_id = "store_and_remove";
-        let saved_networks = create_saved_networks(stash_id).await;
+        let store_id = generate_string();
+        let saved_networks = create_saved_networks(&store_id).await;
 
         let network_id = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();
         let credential = Credential::Password(b"qwertyuio".to_vec());
@@ -856,9 +792,9 @@ mod tests {
 
         // Check that removal persists.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id).await.expect("failed to create stash"));
+        let store = PolicyStorage::new_with_id(&store_id);
         let saved_networks =
-            SavedNetworksManager::new_with_stash(stash, TelemetrySender::new(telemetry_sender))
+            SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
         assert_eq!(0, saved_networks.known_network_count().await);
         assert!(saved_networks.lookup(&network_id).await.is_empty());
@@ -975,9 +911,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn connect_network() {
-        let stash_id = "connect_network";
+        let store_id = generate_string();
 
-        let saved_networks = create_saved_networks(stash_id).await;
+        let saved_networks = create_saved_networks(&store_id).await;
 
         let network_id = NetworkIdentifier::try_from("bar", SecurityType::Wpa2).unwrap();
         let credential = Credential::Password(b"password".to_vec());
@@ -1056,9 +992,9 @@ mod tests {
 
         // Success connects should be saved as persistent data.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id).await.expect("failed to create stash"));
+        let store = PolicyStorage::new_with_id(&store_id);
         let saved_networks =
-            SavedNetworksManager::new_with_stash(stash, TelemetrySender::new(telemetry_sender))
+            SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
         assert_variant!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
             assert_eq!(config.has_ever_connected, true);
@@ -1612,9 +1548,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn clear() {
-        let stash_id = "clear";
+        let store_id = "clear";
         let network_id = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();
-        let saved_networks = create_saved_networks(stash_id).await;
+        let saved_networks = create_saved_networks(store_id).await;
 
         assert!(saved_networks
             .store(network_id.clone(), Credential::Password(b"qwertyuio".to_vec()))
@@ -1627,96 +1563,94 @@ mod tests {
         );
         assert_eq!(1, saved_networks.known_network_count().await);
 
-        saved_networks.clear().await.expect("clearing store failed");
+        saved_networks.clear().await.expect("failed to clear saved networks");
         assert_eq!(0, saved_networks.saved_networks.lock().await.len());
         assert_eq!(0, saved_networks.known_network_count().await);
 
-        // Load store from stash to verify it is also gone from persistent storage
+        // Load store from storage to verify it is also gone from persistent storage
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id).await.expect("failed to create stash"));
+        let store = PolicyStorage::new_with_id(store_id);
         let saved_networks =
-            SavedNetworksManager::new_with_stash(stash, TelemetrySender::new(telemetry_sender))
+            SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
 
         assert_eq!(0, saved_networks.known_network_count().await);
-    }
-
-    #[fuchsia::test]
-    fn test_store_waits_for_stash() {
-        let mut exec = fasync::TestExecutor::new();
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-
-        let network_id = NetworkIdentifier::try_from("foo", SecurityType::None).unwrap();
-        let save_fut = saved_networks.store(network_id, Credential::None);
-        let mut save_fut = pin!(save_fut);
-
-        // Verify that storing the network does not complete until stash responds.
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::SetValue { .. })))
-        );
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::Flush{responder}))) => {
-                responder.send(Ok(())).expect("failed to send stash response");
-            }
-        );
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
     }
 
     impl std::fmt::Debug for SavedNetworksManager {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("SavedNetworksManager")
                 .field("saved_networks", &self.saved_networks)
-                .field("has_stash", &self.stash.is_some())
                 .finish()
         }
     }
 
     #[fuchsia::test]
-    fn test_stash_errors_cause_write_errors() {
+    fn test_store_errors_cause_write_errors() {
+        use fidl::endpoints::create_request_stream;
+        use fidl_fuchsia_stash as fidl_stash;
+        use futures::StreamExt;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        // Use a path for the persistent store that will cause write errors.
+        let store_path_str = "/////";
         let mut exec = fasync::TestExecutor::new();
+
+        // Initialize stash proxies such that SavedNetworksManager initialize doesn't wait on
+        // and doesn't load anything from the legacy stash.
+        let (stash_client, mut request_stream) =
+            create_request_stream::<fidl_stash::SecureStoreMarker>()
+                .expect("create_request_stream failed");
+
+        let read_from_stash = Arc::new(AtomicBool::new(false));
+
+        let _task = {
+            let read_from_stash = read_from_stash.clone();
+            fasync::Task::spawn(async move {
+                while let Some(request) = request_stream.next().await {
+                    match request.unwrap() {
+                        fidl_stash::SecureStoreRequest::Identify { .. } => {}
+                        fidl_stash::SecureStoreRequest::CreateAccessor {
+                            accessor_request, ..
+                        } => {
+                            let read_from_stash = read_from_stash.clone();
+                            fuchsia_async::EHandle::local().spawn_detached(async move {
+                                let mut request_stream = accessor_request.into_stream().unwrap();
+                                while let Some(request) = request_stream.next().await {
+                                    match request.unwrap() {
+                                        fidl_stash::StoreAccessorRequest::ListPrefix { .. } => {
+                                            read_from_stash.store(true, Ordering::Relaxed);
+                                            // If we just drop the iterator, it should trigger a
+                                            // read error.
+                                        }
+                                        _ => unreachable!(),
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            })
+        };
+
+        // Use a persistent store with the invalid file name and legacy stash which returns errors.
+        let store = PolicyStorage::new_with_stash_proxy_and_id(
+            stash_client.into_proxy().unwrap(),
+            store_path_str,
+        );
+
+        // Initialize the saved networks manager with the file that should cause write errors, the
+        // legacy stash that will load nothing, and empty legacy known ess store file.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-
-        // Create stash
-        use fidl::endpoints::create_proxy;
-        let (store_client, _stash_server) = create_proxy::<fidl_fuchsia_stash::StoreMarker>()
-            .expect("failed to create stash proxy");
-        let id = Alphanumeric.sample_string(&mut thread_rng(), 20);
-        store_client.identify(id.as_ref()).expect("failed to identify client to store");
-        let (store, accessor_server) = create_proxy::<fidl_fuchsia_stash::StoreAccessorMarker>()
-            .expect("failed to create accessor proxy");
-        let stash = Stash::new_with_stash(store);
-        let mut stash_req_stream =
-            accessor_server.into_stream().expect("failed to create stash request stream");
-
-        // Create WLAN stash with a mocked out channel to the stash API.
-        let init_fut = SavedNetworksManager::new_with_stash(Some(stash), telemetry_sender);
+        let init_fut = SavedNetworksManager::new_with_storage(store, telemetry_sender);
         let mut init_fut = pin!(init_fut);
-        assert_variant!(exec.run_until_stalled(&mut init_fut), Poll::Pending);
-
-        // Send back an error through the channel that would cause loading stash to fail
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_req_stream.try_next()),
-            Poll::Ready(Ok(Some(fidl_fuchsia_stash::StoreAccessorRequest::ListPrefix { it, .. }))) => {
-                let mut iter = it.into_stream().expect("failed to make iterator into stream");
-                assert_variant!(exec.run_until_stalled(
-                    &mut iter.try_next()),
-                    Poll::Ready(Ok(Some(fidl_stash::ListIteratorRequest::GetNext { responder }))) => {
-                        drop(responder);
-                        // In manual test runs, the accessor store also goes away.
-                        drop(stash_req_stream);
-                })
-        });
-
         let saved_networks = assert_variant!(exec.run_until_stalled(&mut init_fut), Poll::Ready(snm) => {
             snm
         });
 
-        // Save and remove networks and check that we get stash write errors
+        // Save and remove networks and check that we get storage write errors
         let ssid = "foo";
         let credential = Credential::None;
         let network_id = NetworkIdentifier::try_from(ssid, SecurityType::None).unwrap();
@@ -1725,9 +1659,10 @@ mod tests {
 
         assert_variant!(
             exec.run_until_stalled(&mut save_fut),
-            Poll::Ready(Err(NetworkConfigError::StashWriteError))
+            Poll::Ready(Err(NetworkConfigError::FileWriteError))
         );
 
+        // The network should have been saved temporarily even if saving the network gives an error.
         assert_variant!(exec.run_until_stalled(&mut saved_networks.lookup(&network_id)), Poll::Ready(configs) => {
             assert_eq!(configs, vec![network_config(ssid, "")]);
         });
@@ -1736,87 +1671,15 @@ mod tests {
         });
     }
 
-    #[fuchsia::test]
-    fn test_stash_crash_errors_cause_write_errors() {
-        let mut exec = fasync::TestExecutor::new();
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let telemetry_sender = TelemetrySender::new(telemetry_sender);
-
-        // Create stash
-        use fidl::endpoints::create_proxy;
-        let (store_client, stash_server) = create_proxy::<fidl_fuchsia_stash::StoreMarker>()
-            .expect("failed to create stash proxy");
-        let id = Alphanumeric.sample_string(&mut thread_rng(), 20);
-        store_client.identify(id.as_ref()).expect("failed to identify client to store");
-        let (store, accessor_server) = create_proxy::<fidl_fuchsia_stash::StoreAccessorMarker>()
-            .expect("failed to create accessor proxy");
-        let stash = Stash::new_with_stash(store);
-
-        // Drop the server end of stash as if stash crashed.
-        drop(stash_server);
-        drop(accessor_server);
-
-        // Create WLAN stash with a mocked out channel to the stash API.
-        let init_fut = SavedNetworksManager::new_with_stash(Some(stash), telemetry_sender);
-        let mut init_fut = pin!(init_fut);
-
-        // Create saved networks manager. This should complete without any stash interaction since
-        // the channel is closed.
-        let saved_networks = assert_variant!(exec.run_until_stalled(&mut init_fut), Poll::Ready(snm) => {
-            snm
-        });
-
-        // Save and remove networks and check that we get stash write errors
-        let ssid = "foo";
-        let credential = Credential::None;
-        let network_id = NetworkIdentifier::try_from(ssid, SecurityType::None).unwrap();
-        let save_fut = saved_networks.store(network_id.clone(), credential);
-        let mut save_fut = pin!(save_fut);
-
-        assert_variant!(
-            exec.run_until_stalled(&mut save_fut),
-            Poll::Ready(Err(NetworkConfigError::StashWriteError))
-        );
-
-        assert_variant!(
-            exec.run_until_stalled(&mut saved_networks.lookup(&network_id)),
-            Poll::Ready(configs) => {
-                assert_eq!(configs, vec![network_config(ssid, "")]);
-        });
-        assert_variant!(
-            exec.run_until_stalled(&mut saved_networks.known_network_count()),
-            Poll::Ready(count) => {
-                assert_eq!(count, 1);
-        });
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_no_stash_causes_write_errors() {
-        let mut saved_networks = SavedNetworksManager::new_for_test().await;
-        // Make the saved networks manager have no stash, as if the stash creation itself gave
-        // an error.
-        saved_networks.stash = None;
-
-        let net_id = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();
-        let credential = Credential::Password(b"some-password".to_vec());
-
-        // Check that saving the network gives an error.
-        assert_variant!(
-            saved_networks.store(net_id, credential).await,
-            Err(NetworkConfigError::StashWriteError)
-        );
-    }
-
-    /// Create a saved networks manager and clear the contents. Stash ID should be different for
+    /// Create a saved networks manager and clear the contents. Storage ID should be different for
     /// each test so that they don't interfere.
-    async fn create_saved_networks(stash_id: impl AsRef<str>) -> SavedNetworksManager {
+    async fn create_saved_networks(store_id: &str) -> SavedNetworksManager {
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash =
-            Some(Stash::new_with_id(stash_id.as_ref()).await.expect("failed to create stash"));
+        let store = PolicyStorage::new_with_id(store_id);
         let saved_networks =
-            SavedNetworksManager::new_with_stash(stash, TelemetrySender::new(telemetry_sender))
+            SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
-        saved_networks.clear().await.expect("Failed to clear new SavedNetworksManager");
+        saved_networks.clear().await.expect("failed to clear saved networks");
         saved_networks
     }
 
@@ -1830,18 +1693,14 @@ mod tests {
         NetworkConfig::new(id, credential, has_ever_connected).unwrap()
     }
 
-    fn rand_string() -> String {
-        Alphanumeric.sample_string(&mut thread_rng(), 20)
-    }
-
     #[fuchsia::test]
     async fn record_metrics_when_called_on_class() {
-        let stash_id = rand_string();
+        let store_id = generate_string();
         let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let stash = Some(Stash::new_with_id(&stash_id).await.expect("failed to create stash"));
+        let store = PolicyStorage::new_with_id(&store_id);
 
-        let saved_networks = SavedNetworksManager::new_with_stash(stash, telemetry_sender).await;
+        let saved_networks = SavedNetworksManager::new_with_storage(store, telemetry_sender).await;
         let network_id_foo = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();
         let network_id_baz = NetworkIdentifier::try_from("baz", SecurityType::Wpa2).unwrap();
 

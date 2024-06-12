@@ -803,8 +803,8 @@ pub fn convert_manual_connect_to_disconnect_reason(
 mod tests {
 
     use super::*;
-    use crate::config_management::network_config::{self, Credential, FailureReason};
-    use crate::config_management::{PastConnectionList, SavedNetworksManager};
+    use crate::config_management::network_config::{self, Credential};
+    use crate::config_management::PastConnectionList;
     use crate::util::listener;
     use crate::util::testing::{
         generate_connect_selection, generate_disconnect_info, poll_sme_req, random_connection_data,
@@ -812,6 +812,7 @@ mod tests {
     };
     use fidl::endpoints::create_proxy_and_stream;
     use fidl::prelude::*;
+    use fidl_fuchsia_wlan_policy as fidl_policy;
     use fuchsia_zircon::prelude::*;
     use futures::task::Poll;
     use futures::Future;
@@ -819,7 +820,6 @@ mod tests {
     use std::pin::pin;
     use wlan_common::assert_variant;
     use wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason;
-    use {fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_policy as fidl_policy};
 
     lazy_static! {
         pub static ref TEST_PASSWORD: Credential = Credential::Password(b"password".to_vec());
@@ -882,23 +882,6 @@ mod tests {
         }
     }
 
-    /// Move stash requests forward so that a save request can progress.
-    fn process_stash_write(
-        exec: &mut fasync::TestExecutor,
-        stash_server: &mut fidl_stash::StoreAccessorRequestStream,
-    ) {
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::SetValue { .. })))
-        );
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::Flush{responder}))) => {
-                responder.send(Ok(())).expect("failed to send stash response");
-            }
-        );
-    }
-
     #[fuchsia::test]
     fn wait_for_connect_result_ignores_other_events() {
         let mut exec = fasync::TestExecutor::new();
@@ -950,29 +933,22 @@ mod tests {
     fn connecting_state_successfully_connects() {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
-        // Do SavedNetworksManager set up manually to get functionality and stash server
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        let saved_networks_manager = Arc::new(saved_networks);
-        test_values.common_options.saved_networks_manager = saved_networks_manager.clone();
 
         let connect_selection = generate_connect_selection();
         let bss_description =
             Sequestered::release(connect_selection.target.bss.bss_description.clone());
 
         // Store the network in the saved_networks_manager, so we can record connection success
-        let save_fut = saved_networks_manager.store(
+        let save_fut = test_values.saved_networks_manager.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
         let mut save_fut = pin!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
-        process_stash_write(&mut exec, &mut stash_server);
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         // Check that the saved networks manager has the expected initial data
         let saved_networks = exec.run_singlethreaded(
-            saved_networks_manager.lookup(&connect_selection.target.network.clone()),
+            test_values.saved_networks_manager.lookup(&connect_selection.target.network.clone()),
         );
         assert_eq!(false, saved_networks[0].has_ever_connected);
         assert!(saved_networks[0].hidden_probability > 0.0);
@@ -1023,8 +999,6 @@ mod tests {
 
         // Progress the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        process_stash_write(&mut exec, &mut stash_server);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Check for a connect update
         let client_state_update = ClientStateUpdate {
@@ -1041,11 +1015,17 @@ mod tests {
             assert_eq!(updates, client_state_update);
         });
 
-        // Check that the saved networks manager has the connection recorded
-        let saved_networks = exec.run_singlethreaded(
-            saved_networks_manager.lookup(&connect_selection.target.network.clone()),
-        );
-        assert_eq!(true, saved_networks[0].has_ever_connected);
+        // Check that the connection was recorded to SavedNetworksManager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+            let expected_connect_result = ConnectResultRecord {
+                 id: connect_selection.target.network.clone(),
+                 credential: connect_selection.target.credential.clone(),
+                 bssid: types::Bssid::from(bss_description.bssid),
+                 connect_result: fake_successful_connect_result(),
+                 scan_type: connect_selection.target.bss.observation,
+            };
+            assert_eq!(data, &expected_connect_result);
+        });
 
         // Progress the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1061,24 +1041,17 @@ mod tests {
     fn connecting_state_times_out() {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
-        // Do SavedNetworksManager set up manually to get functionality and stash server
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        let saved_networks_manager = Arc::new(saved_networks);
-        test_values.common_options.saved_networks_manager = saved_networks_manager.clone();
 
         let connect_selection = generate_connect_selection();
         let bss_description =
             Sequestered::release(connect_selection.target.bss.bss_description.clone());
 
         // Store the network in the saved_networks_manager
-        let save_fut = saved_networks_manager.store(
+        let save_fut = test_values.saved_networks_manager.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
         let mut save_fut = pin!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
-        process_stash_write(&mut exec, &mut stash_server);
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
         // Prepare state machine
@@ -1441,29 +1414,7 @@ mod tests {
     #[fuchsia::test]
     fn connecting_state_fails_to_connect_at_max_retries() {
         let mut exec = fasync::TestExecutor::new();
-        // Don't use test_values() because of issue with KnownEssStore
-        let (update_sender, mut update_receiver) = mpsc::unbounded();
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
-        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
-        let saved_networks_manager =
-            Arc::new(exec.run_singlethreaded(SavedNetworksManager::new_for_test()));
-        let (_client_req_sender, client_req_stream) = mpsc::channel(1);
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
-        let roam_manager = Arc::new(Mutex::new(FakeLocalRoamManager::new()));
-
-        let common_options = CommonStateOptions {
-            proxy: sme_proxy,
-            req_stream: client_req_stream.fuse(),
-            update_sender,
-            saved_networks_manager: saved_networks_manager.clone(),
-            telemetry_sender,
-            iface_id: 1,
-            defect_sender,
-            roam_manager,
-        };
+        let mut test_values = test_setup();
 
         let connect_selection = generate_connect_selection();
         let bss_description =
@@ -1471,22 +1422,21 @@ mod tests {
 
         // save network to check that failed connect is recorded
         assert!(exec
-            .run_singlethreaded(saved_networks_manager.store(
+            .run_singlethreaded(test_values.saved_networks_manager.store(
                 connect_selection.target.network.clone(),
                 connect_selection.target.credential.clone()
             ),)
             .expect("Failed to save network")
             .is_none());
-        let before_recording = fasync::Time::now();
 
         let connecting_options = ConnectingOptions {
             connect_selection: connect_selection.clone(),
             attempt_counter: MAX_CONNECTION_ATTEMPTS - 1,
         };
-        let initial_state = connecting_state(common_options, connecting_options);
+        let initial_state = connecting_state(test_values.common_options, connecting_options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
-        let sme_fut = sme_req_stream.into_future();
+        let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
@@ -1527,24 +1477,31 @@ mod tests {
             }],
         };
         assert_variant!(
-            update_receiver.try_next(),
+            test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
         // Check that failure was recorded in SavedNetworksManager
-        let mut configs = exec.run_singlethreaded(
-            saved_networks_manager.lookup(&connect_selection.target.network.clone()),
-        );
-        let network_config = configs.pop().expect("Failed to get saved network");
-        let mut failures =
-            network_config.perf_stats.connect_failures.get_recent_for_network(before_recording);
-        let connect_failure = failures.pop().expect("Saved network is missing failure reason");
-        assert_eq!(connect_failure.reason, FailureReason::GeneralFailure);
+        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+            let connect_result = fidl_sme::ConnectResult {
+                code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                is_credential_rejected: false,
+                is_reconnect: false,
+            };
+            let expected_connect_result = ConnectResultRecord {
+                 id: connect_selection.target.network.clone(),
+                 credential: connect_selection.target.credential.clone(),
+                 bssid: types::Bssid::from(bss_description.bssid),
+                 connect_result: connect_result,
+                 scan_type: connect_selection.target.bss.observation,
+            };
+            assert_eq!(data, &expected_connect_result);
+        });
 
         // A defect should be logged.
         assert_variant!(
-            defect_receiver.try_next(),
+            test_values.defect_receiver.try_next(),
             Ok(Some(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 1 })))
         );
     }
@@ -1552,53 +1509,28 @@ mod tests {
     #[fuchsia::test]
     fn connecting_state_fails_to_connect_with_bad_credentials() {
         let mut exec = fasync::TestExecutor::new();
-        // Don't use test_values() because of issue with KnownEssStore
-        let (update_sender, mut update_receiver) = mpsc::unbounded();
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
-        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
-        let saved_networks_manager =
-            Arc::new(exec.run_singlethreaded(SavedNetworksManager::new_for_test()));
-        let (_client_req_sender, client_req_stream) = mpsc::channel(1);
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
-        let roam_manager = Arc::new(Mutex::new(FakeLocalRoamManager::new()));
-
-        let common_options = CommonStateOptions {
-            proxy: sme_proxy,
-            req_stream: client_req_stream.fuse(),
-            update_sender,
-            saved_networks_manager: saved_networks_manager.clone(),
-            telemetry_sender,
-            iface_id: 1,
-            defect_sender,
-            roam_manager,
-        };
+        let mut test_values = test_setup();
 
         let connect_selection = generate_connect_selection();
         let bss_description =
             Sequestered::release(connect_selection.target.bss.bss_description.clone());
 
-        // save network to check that failed connect is recorded
-        let saved_networks_manager = common_options.saved_networks_manager.clone();
         assert!(exec
-            .run_singlethreaded(saved_networks_manager.store(
+            .run_singlethreaded(test_values.saved_networks_manager.store(
                 connect_selection.target.network.clone(),
                 connect_selection.target.credential.clone()
             ),)
             .expect("Failed to save network")
             .is_none());
-        let before_recording = fasync::Time::now();
 
         let connecting_options = ConnectingOptions {
             connect_selection: connect_selection.clone(),
             attempt_counter: MAX_CONNECTION_ATTEMPTS - 1,
         };
-        let initial_state = connecting_state(common_options, connecting_options);
+        let initial_state = connecting_state(test_values.common_options, connecting_options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
-        let sme_fut = sme_req_stream.into_future();
+        let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
         // Run the state machine
@@ -1640,23 +1572,30 @@ mod tests {
             }],
         };
         assert_variant!(
-            update_receiver.try_next(),
+            test_values.update_receiver.try_next(),
             Ok(Some(listener::Message::NotifyListeners(updates))) => {
             assert_eq!(updates, client_state_update);
         });
 
-        // Check that failure was recorded in SavedNetworksManager
-        let mut configs = exec.run_singlethreaded(
-            saved_networks_manager.lookup(&connect_selection.target.network.clone()),
-        );
-        let network_config = configs.pop().expect("Failed to get saved network");
-        let mut failures =
-            network_config.perf_stats.connect_failures.get_recent_for_network(before_recording);
-        let connect_failure = failures.pop().expect("Saved network is missing failure reason");
-        assert_eq!(connect_failure.reason, FailureReason::CredentialRejected);
+        // Check that failure was recorded to SavedNetworksManager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+            let connect_result = fidl_sme::ConnectResult {
+                code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                is_credential_rejected: true,
+                is_reconnect: false,
+            };
+            let expected_connect_result = ConnectResultRecord {
+                 id: connect_selection.target.network.clone(),
+                 credential: connect_selection.target.credential.clone(),
+                 bssid: types::Bssid::from(bss_description.bssid),
+                 connect_result: connect_result,
+                 scan_type: connect_selection.target.bss.observation,
+            };
+            assert_eq!(data, &expected_connect_result);
+        });
 
         // No defect should have been observed.
-        assert_variant!(defect_receiver.try_next(), Ok(None));
+        assert_variant!(test_values.defect_receiver.try_next(), Ok(None));
     }
 
     #[fuchsia::test]

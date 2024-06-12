@@ -991,7 +991,7 @@ mod tests {
 
         // validate the function works
         let results = merge_saved_networks_and_scan_data(
-            &test_values.real_saved_network_manager,
+            &Arc::new(test_values.real_saved_network_manager),
             mock_scan_results,
         )
         .await;
