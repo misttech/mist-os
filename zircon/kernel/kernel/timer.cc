@@ -406,11 +406,11 @@ TimestampType TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
 
   for (;;) {
     // See if there's an event to process.
-    if (timer_list_.is_empty()) {
+    if (timer_list.is_empty()) {
       break;
     }
 
-    Timer& timer = timer_list_.front();
+    Timer& timer = timer_list.front();
 
     LTRACEF("next item on timer queue %p at %" PRIi64 " now %" PRIi64 " (%p, arg %p)\n", &timer,
             timer.scheduled_time_, now, timer.callback_, timer.arg_);
@@ -423,7 +423,7 @@ TimestampType TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
     DEBUG_ASSERT_MSG(timer.magic_ == Timer::kMagic,
                      "ASSERT: timer failed magic check: timer %p, magic 0x%x\n", &timer,
                      (uint)timer.magic_);
-    timer_list_.erase(timer);
+    timer_list.erase(timer);
 
     // Mark the timer busy.
     timer.active_cpu_.store(cpu, ktl::memory_order_relaxed);
@@ -451,8 +451,8 @@ TimestampType TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
 
   // Get the deadline of the event at the head of the queue (if any).
   zx_time_t deadline = ZX_TIME_INFINITE;
-  if (!timer_list_.is_empty()) {
-    deadline = timer_list_.front().scheduled_time_;
+  if (!timer_list.is_empty()) {
+    deadline = timer_list.front().scheduled_time_;
     // This has to be the case or it would have fired already.
     DEBUG_ASSERT(deadline > now);
   }

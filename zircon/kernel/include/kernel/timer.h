@@ -154,8 +154,8 @@ class TimerQueue {
   // This is called by Tick(), and processes all timers with scheduled times less than now.
   // Once it's done, the scheduled time of the timer at the front of the queue is returned.
   template <typename TimestampType>
-  TimestampType TickInternal(TimestampType now, cpu_num_t cpu,
-                             fbl::DoublyLinkedList<Timer*>& timer_list);
+  static TimestampType TickInternal(TimestampType now, cpu_num_t cpu,
+                                    fbl::DoublyLinkedList<Timer*>& timer_list);
 
   // Timers on this queue.
   fbl::DoublyLinkedList<Timer*> timer_list_;
