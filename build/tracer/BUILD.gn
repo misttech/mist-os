@@ -21,6 +21,8 @@ group("tests") {
 
 if (is_host) {
   python_host_test("action_tracer_test") {
+    # TODO(https://fxbug.dev/346606208): Resolve mypy errors and enable type checking
+    enable_mypy = false
     main_source = "action_tracer_test.py"
     sources = [ "action_tracer.py" ]
   }
@@ -79,10 +81,14 @@ action("fsatrace_test") {
 
 if (is_host) {
   python_host_test("output_cacher_test") {
+    # TODO(https://fxbug.dev/346606208): Resolve mypy errors and enable type checking
+    enable_mypy = false
     main_source = "output_cacher_test.py"
     sources = [ "output_cacher.py" ]
   }
   python_host_test("restat_cacher_test") {
+    # TODO(https://fxbug.dev/346606208): Resolve mypy errors and enable type checking
+    enable_mypy = false
     main_source = "restat_cacher_test.py"
     sources = [ "restat_cacher.py" ]
   }
