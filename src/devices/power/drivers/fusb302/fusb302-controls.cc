@@ -353,42 +353,7 @@ zx::result<> Fusb302Controls::PushStateToPdProtocolConfig() {
     return result;
   }
 
-  if (bmc_phy_enabled) {
-    result = WaitForTransmitQueueFlush();
-    if (result.is_error()) {
-      return result;
-    }
-    result = WaitForReceiveQueueFlush();
-    if (result.is_error()) {
-      return result;
-    }
-  }
-
   return zx::ok();
-}
-
-zx::result<> Fusb302Controls::WaitForTransmitQueueFlush() {
-  for (int retry_count = 0; retry_count < 10; ++retry_count) {
-    if (!Control0Reg::ReadFrom(i2c_).tx_flush()) {
-      return zx::ok();
-    }
-    zx::nanosleep(zx::deadline_after(zx::usec(10)));
-  }
-
-  FDF_LOG(ERROR, "Timed out waiting for the transmit queue to flush");
-  return zx::error(ZX_ERR_TIMED_OUT);
-}
-
-zx::result<> Fusb302Controls::WaitForReceiveQueueFlush() {
-  for (int retry_count = 0; retry_count < 10; ++retry_count) {
-    if (!Control1Reg::ReadFrom(i2c_).rx_flush()) {
-      return zx::ok();
-    }
-    zx::nanosleep(zx::deadline_after(zx::usec(10)));
-  }
-
-  FDF_LOG(ERROR, "Timed out waiting for the receive queue to flush");
-  return zx::error(ZX_ERR_TIMED_OUT);
 }
 
 }  // namespace fusb302
