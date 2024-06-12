@@ -87,14 +87,32 @@ template("sdk_fuchsia_package") {
   assert(defined(invoker.api_level_added),
          "Must specify the API level at which the package was added")
 
-  package_in_target_api_level =
-      override_target_api_level != "PLATFORM" &&
-      invoker.api_level_added <= override_target_api_level
+  if (override_target_api_level == "PLATFORM") {
+    # While we do not ship packages targeting "PLATFORM" in the SDK, they can be
+    # built. See //sdk:sdk for an example.
 
-  if (defined(invoker.api_level_removed)) {
+    # Ignore the range of supported API levels and
+    package_in_target_api_level = true
+    not_needed(invoker,
+               [
+                 "api_level_added",
+                 "api_level_removed",
+               ])
+
+    # For historical reasons, -1 is used for platform builds.
+    # TODO(https://fxbug.dev/310006516): Consider changing this once fixed.
+    _api_level_arg_for_manifest_script = -1
+  } else {
+    # Build the package for supported API levels.
     package_in_target_api_level =
-        package_in_target_api_level &&
-        override_target_api_level < invoker.api_level_removed
+        invoker.api_level_added <= override_target_api_level
+
+    if (package_in_target_api_level && defined(invoker.api_level_removed)) {
+      package_in_target_api_level =
+          override_target_api_level < invoker.api_level_removed
+    }
+
+    _api_level_arg_for_manifest_script = override_target_api_level
   }
 
   if (package_in_target_api_level && current_toolchain == target_toolchain) {
@@ -241,13 +259,21 @@ template("sdk_fuchsia_package") {
       deps = [ _full_package_label ]
       depfile = _sdk_package_depfile
 
+      # Ensure the manifest is rebuilt in the odd case that  the package is
+      # newly `package_in_target_api_level` at this target level but the Fuchsia
+      # package (`_full_package_label`) is not dirty. Without this dependency,
+      # manifest verification can fail in such cases because the manifest does
+      # already exists and does not get regenerated because
+      # `_full_package_label` is not dirty.
+      deps += [ ":${_content_checklist_target}" ]
+
       args = [
         "--manifest",
         rebase_path(package_manifest_file, root_build_dir),
         "--output",
         rebase_path(_sdk_package_dir, root_build_dir),
         "--api-level",
-        "${override_target_api_level}",
+        "${_api_level_arg_for_manifest_script}",
         "--target-cpu",
         "${target_cpu}",
         "--depfile",
@@ -302,6 +328,7 @@ template("sdk_fuchsia_package") {
 
     # Suppress unused variable warnings.
     not_needed(invoker, "*")
+    not_needed([ "_api_level_arg_for_manifest_script" ])
   } else {
     # Fuchsia SDK packages should only be built with target_toolchain. However, it
     # is possible for package targets to be expanded in other toolchains (host,
@@ -316,5 +343,6 @@ template("sdk_fuchsia_package") {
 
     # Suppress unused variable warnings.
     not_needed(invoker, "*")
+    not_needed([ "_api_level_arg_for_manifest_script" ])
   }
 }
