@@ -12,9 +12,11 @@
 
 #include <optional>
 
+#include "src/developer/forensics/testing/stubs/fidl_server.h"
+
 namespace forensics::stubs {
 
-class PowerBrokerLeaseControl : public fidl::testing::TestBase<fuchsia_power_broker::LeaseControl> {
+class PowerBrokerLeaseControl : public FidlServer<fuchsia_power_broker::LeaseControl> {
  public:
   PowerBrokerLeaseControl(uint8_t level,
                           fidl::ServerEnd<fuchsia_power_broker::LeaseControl> server_end,
@@ -34,16 +36,6 @@ class PowerBrokerLeaseControl : public fidl::testing::TestBase<fuchsia_power_bro
   void OnFidlClosed(const fidl::UnbindInfo error) {
     FX_LOGS(ERROR) << error;
     on_closure_(this);
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
   }
 
   uint8_t Level() const { return level_; }

@@ -149,6 +149,17 @@ source_set("diagnostics") {
   ]
 }
 
+source_set("fidl_server") {
+  testonly = true
+
+  sources = [ "fidl_server.h" ]
+
+  public_deps = [
+    "//sdk/lib/fidl/cpp/wire",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
 source_set("fidl_server_hlcpp") {
   testonly = true
 
@@ -266,6 +277,7 @@ source_set("power_broker") {
   ]
 
   public_deps = [
+    ":fidl_server",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/lib/fidl/cpp:cpp",
     "//sdk/lib/fit",
@@ -321,6 +333,7 @@ source_set("system_activity_governor") {
   ]
 
   public_deps = [
+    ":fidl_server",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/syslog/cpp:cpp",
   ]

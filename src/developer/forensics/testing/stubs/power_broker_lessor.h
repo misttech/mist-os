@@ -10,14 +10,14 @@
 #include <lib/async/dispatcher.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <string>
 #include <vector>
 
+#include "src/developer/forensics/testing/stubs/fidl_server.h"
 #include "src/developer/forensics/testing/stubs/power_broker_lease_control.h"
 
 namespace forensics::stubs {
 
-class PowerBrokerLessorBase : public fidl::testing::TestBase<fuchsia_power_broker::Lessor> {
+class PowerBrokerLessorBase : public FidlServer<fuchsia_power_broker::Lessor> {
  public:
   PowerBrokerLessorBase(fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
                         async_dispatcher_t* dispatcher)
@@ -30,15 +30,6 @@ class PowerBrokerLessorBase : public fidl::testing::TestBase<fuchsia_power_broke
   void SetLeaseStatus(fuchsia_power_broker::LeaseStatus status);
 
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
-  }
 
  protected:
   std::vector<std::unique_ptr<PowerBrokerLeaseControl>>& LeaseControls() { return lease_controls_; }
@@ -81,15 +72,6 @@ class PowerBrokerLessorClosesConnection : public PowerBrokerLessorBase {
   }
 
   bool IsActive() const override { return false; }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
-  }
 };
 
 }  // namespace forensics::stubs

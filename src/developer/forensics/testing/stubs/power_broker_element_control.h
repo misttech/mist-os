@@ -11,13 +11,13 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <functional>
-#include <string>
 #include <utility>
+
+#include "src/developer/forensics/testing/stubs/fidl_server.h"
 
 namespace forensics::stubs {
 
-class PowerBrokerElementControl
-    : public fidl::testing::TestBase<fuchsia_power_broker::ElementControl> {
+class PowerBrokerElementControl : public FidlServer<fuchsia_power_broker::ElementControl> {
  public:
   PowerBrokerElementControl(fidl::ServerEnd<fuchsia_power_broker::ElementControl> server_end,
                             async_dispatcher_t* dispatcher, std::function<void()> on_closure)
@@ -28,16 +28,6 @@ class PowerBrokerElementControl
   void OnFidlClosed(const fidl::UnbindInfo error) {
     FX_LOGS(ERROR) << error;
     on_closure_();
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementControl> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
   }
 
  private:
