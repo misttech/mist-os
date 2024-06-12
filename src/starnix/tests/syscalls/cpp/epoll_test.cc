@@ -4,10 +4,13 @@
 
 #include <signal.h>
 #include <sys/epoll.h>
+#include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
+#include <sys/timerfd.h>
 #include <unistd.h>
 
+#include <ctime>
 #include <thread>
 
 #include <gtest/gtest.h>
@@ -205,4 +208,37 @@ TEST(EpollTest, WaitInvalidParams) {
   errno = 0;
   EXPECT_EQ(-1, epoll_wait(epfd.get(), nullptr, 0, 0));
   EXPECT_EQ(EINVAL, errno);
+}
+
+TEST(EpollTest, EPOLLWAKEUPEvent) {
+  int fd = timerfd_create(CLOCK_REALTIME, 0);
+  ASSERT_NE(-1, fd) << errno;
+
+  int epoll_fd = epoll_create(1);
+  EXPECT_LE(0, epoll_fd);
+
+  struct epoll_event ev = epoll_event();
+  ev.events = EPOLLIN | EPOLLWAKEUP;
+  EXPECT_EQ(0, epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev));
+
+  timespec begin = {};
+  ASSERT_EQ(0, clock_gettime(CLOCK_REALTIME, &begin));
+  // Timer 1 second in the future.
+  struct itimerspec its = {};
+  its.it_value = begin;
+  its.it_value.tv_sec += 1;
+  EXPECT_EQ(0, timerfd_settime(fd, TFD_TIMER_ABSTIME, &its, nullptr));
+
+  pollfd pfd = {.fd = fd, .events = POLLIN};
+  EXPECT_EQ(1, poll(&pfd, 1, -1));
+
+  int ret = 0;
+  struct epoll_event out_ev;
+  ret = epoll_wait(epoll_fd, &out_ev, 1, -1);
+  EXPECT_EQ(1, ret);
+
+  EXPECT_EQ(0, epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, &ev));
+  close(fd);
+  ret = epoll_wait(epoll_fd, &out_ev, 1, 0);
+  EXPECT_EQ(0, ret);
 }

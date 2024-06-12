@@ -11,9 +11,9 @@ use crate::vfs::fsverity::{
     FsVerityState, {self},
 };
 use crate::vfs::{
-    DirentSink, FallocMode, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard,
-    FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand,
-    RecordLockOwner,
+    DirentSink, EpollFileObject, FallocMode, FdNumber, FdTableId, FileReleaser, FileSystemHandle,
+    FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, NamespaceNode,
+    RecordLockCommand, RecordLockOwner,
 };
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
@@ -38,6 +38,7 @@ use starnix_uapi::{
     FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END,
     SEEK_HOLE, SEEK_SET, TCGETS,
 };
+use std::collections::HashSet;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
@@ -1102,6 +1103,10 @@ pub struct FileObject {
 
     async_owner: Mutex<FileAsyncOwner>,
 
+    /// A set of epoll file descriptor numbers that tracks which `EpollFileObject`s add this
+    /// `FileObject` as the control file.
+    epoll_files: Mutex<HashSet<FdNumber>>,
+
     _file_write_guard: Option<FileWriteGuard>,
 }
 
@@ -1153,6 +1158,7 @@ impl FileObject {
                 offset: Mutex::new(0),
                 flags: Mutex::new(flags - OpenFlags::CREAT),
                 async_owner: Default::default(),
+                epoll_files: Default::default(),
                 _file_write_guard: file_write_guard,
             }
             .into()
@@ -1654,12 +1660,33 @@ impl FileObject {
         checked_add_offset_and_length(offset, length)?;
         self.ops().readahead(self, current_task, offset, length)
     }
+
+    /// Register the fd number of an `EpollFileObject` that listens to events from this
+    /// `FileObject`.
+    pub fn register_epfd(&self, fd: FdNumber) {
+        self.epoll_files.lock().insert(fd);
+    }
+
+    pub fn unregister_epfd(&self, fd: FdNumber) {
+        self.epoll_files.lock().remove(&fd);
+    }
 }
 
 impl Releasable for FileObject {
     type Context<'a> = &'a CurrentTask;
 
     fn release(self, current_task: Self::Context<'_>) {
+        // Release all wake leases associated with this file in the corresponding `WaitObject`
+        // of each registered epfd.
+        for epfd in self.epoll_files.lock().drain() {
+            if let Ok(file) = current_task.files.get(epfd) {
+                if let Some(epoll_object) = file.downcast_file::<EpollFileObject>() {
+                    if let Some(file_handle) = self.weak_handle.upgrade() {
+                        epoll_object.drop_lease(&file_handle);
+                    }
+                }
+            }
+        }
         self.ops().close(&self, current_task);
         self.name.entry.node.on_file_closed(&self);
         let event =

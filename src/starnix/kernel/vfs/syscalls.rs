@@ -26,7 +26,8 @@ use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::{
-    CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS,
+    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM,
+    PTRACE_MODE_ATTACH_REALCREDS,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT};
@@ -2177,17 +2178,34 @@ pub fn sys_epoll_ctl(
     let file = current_task.files.get(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
 
+    let epoll_event = match current_task.read_object(event) {
+        Ok(mut epoll_event) => {
+            // If EPOLLWAKEUP is specified in flags, but the caller does not have the CAP_BLOCK_SUSPEND
+            // capability, then the EPOLLWAKEUP flag is silently ignored.
+            // See https://man7.org/linux/man-pages/man2/epoll_ctl.2.html
+            if epoll_event.events().contains(FdEvents::EPOLLWAKEUP) {
+                if !current_task.creds().has_capability(CAP_BLOCK_SUSPEND) {
+                    epoll_event.ignore(FdEvents::EPOLLWAKEUP);
+                }
+            }
+            Ok(epoll_event)
+        }
+        result => result,
+    };
+
     let ctl_file = current_task.files.get(fd)?;
     match op {
         EPOLL_CTL_ADD => {
-            let epoll_event = current_task.read_object(event)?;
-            epoll_file.add(current_task, &ctl_file, &file, epoll_event)?;
+            epoll_file.add(current_task, &ctl_file, &file, epoll_event?)?;
+            ctl_file.register_epfd(epfd);
         }
         EPOLL_CTL_MOD => {
-            let epoll_event = current_task.read_object(event)?;
-            epoll_file.modify(current_task, &ctl_file, epoll_event)?;
+            epoll_file.modify(current_task, &ctl_file, epoll_event?)?;
         }
-        EPOLL_CTL_DEL => epoll_file.delete(&ctl_file)?,
+        EPOLL_CTL_DEL => {
+            epoll_file.delete(&ctl_file)?;
+            ctl_file.unregister_epfd(epfd);
+        }
         _ => return error!(EINVAL),
     }
     Ok(())

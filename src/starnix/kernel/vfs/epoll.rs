@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::power::{WakeLease, WakeLeaseInterlockOps};
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
     WaitQueue, Waiter,
@@ -34,6 +35,9 @@ struct WaitObject {
     events: FdEvents,
     data: u64,
     wait_canceler: Option<WaitCanceler>,
+    // TODO(https://fxbug.dev/325469447): Revisit after the decision of handling wakelocks is made.
+    /// The wake lease to prevent system suspending wile processing the event.
+    wake_lease: WakeLease,
 }
 
 impl WaitObject {
@@ -207,6 +211,7 @@ impl EpollFileObject {
                     events: epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR,
                     data: epoll_event.data(),
                     wait_canceler: None,
+                    wake_lease: Default::default(),
                 });
                 self.wait_on_file(current_task, key, wait_object)
             }
@@ -230,6 +235,14 @@ impl EpollFileObject {
                     wait_canceler.cancel();
                 }
                 wait_object.events = epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR;
+                // If the new epoll event doesn't include EPOLLWAKEUP, we need to take down the
+                // wake lease. This ensures that the system doesn't stay awake unnecessarily when
+                // the event no longer requires it to be awake.
+                if wait_object.events.contains(FdEvents::EPOLLWAKEUP)
+                    && !epoll_event.events().contains(FdEvents::EPOLLWAKEUP)
+                {
+                    wait_object.wake_lease.take_lease();
+                }
                 self.wait_on_file(current_task, key, wait_object)
             }
             Entry::Vacant(_) => error!(ENOENT),
@@ -376,6 +389,8 @@ impl EpollFileObject {
             for to_wait in rearm_list.iter() {
                 // TODO handle interrupts here
                 let w = state.wait_objects.get_mut(&to_wait.key).unwrap();
+                // Drop the wake lease
+                w.wake_lease.take_lease();
                 self.wait_on_file(current_task, to_wait.key, w)?;
             }
         }
@@ -406,9 +421,15 @@ impl EpollFileObject {
                         Err(err) => log_warn!("Unexpected wait result {:#?}", err),
                         _ => {}
                     }
-                } else {
-                    state.rearm_list.push(pending_event.clone());
+                    continue;
                 }
+                // When this is the first time epoll_wait on this epoll fd, create and
+                // hold a wake lease until the next epoll_wait.
+                if wait.events.contains(FdEvents::EPOLLWAKEUP) {
+                    wait.wake_lease.activate()?;
+                }
+
+                state.rearm_list.push(pending_event.clone());
             }
         }
 
@@ -418,6 +439,15 @@ impl EpollFileObject {
         }
 
         Ok(result)
+    }
+
+    /// Drop the wake lease associated with the `file`.
+    pub fn drop_lease(&self, file: &FileHandle) {
+        let mut guard = self.state.lock();
+        let key = as_epoll_key(file).into();
+        if let Entry::Occupied(entry) = guard.wait_objects.entry(key) {
+            entry.get().wake_lease.take_lease();
+        }
     }
 }
 

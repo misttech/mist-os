@@ -102,6 +102,10 @@ impl FakeSystemActivityGovernor {
                                 active_dependency_token: Some(Event::create()),
                                 ..Default::default()
                             }),
+                            wake_handling: Some(fsystem::WakeHandling {
+                                active_dependency_token: Some(Event::create()),
+                                ..Default::default()
+                            }),
                             ..Default::default()
                         })
                         .expect("");
