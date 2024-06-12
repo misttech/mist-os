@@ -5394,7 +5394,7 @@ To override the set of API levels, see
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:57
+From //build/sdk/config.gni:65
 
 ### override_target_api_level
 
@@ -7579,6 +7579,19 @@ Can be true for any API level, including the default level.
 
 From //build/sdk/config.gni:12
 
+### sdk_legacy_unstable_abi_revisions
+
+When true, uses the "legacy" way of assigning an ABI revision to unstable
+API levels (e.g., `HEAD`, `PLATFORM`). When false, uses the "new way", which
+derives an ABI revision from the latest integration.git hash.
+
+TODO(https://fxbug.dev/324892812): Delete this option after a transition
+period.
+
+**Current value (from the default):** `true`
+
+From //build/sdk/config.gni:20
+
 ### sdk_max_simultaneous_sub_builds
 
 An upper bound on the maximum number of subbuilds that may be running at the
@@ -7599,7 +7612,7 @@ But also these bad things:
 
 **Current value (from the default):** `5`
 
-From //build/sdk/config.gni:29
+From //build/sdk/config.gni:37
 
 ### sdk_sub_build_max_load_average
 
@@ -7609,7 +7622,7 @@ blank, the subbuild script will make a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:41
+From //build/sdk/config.gni:49
 
 ### sdk_sub_build_parallelism
 
@@ -7621,7 +7634,7 @@ a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:36
+From //build/sdk/config.gni:44
 
 ### sdk_sub_build_verbose
 
@@ -7629,7 +7642,7 @@ Set to `true` to enable verbose logging during IDK subbuilds.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:44
+From //build/sdk/config.gni:52
 
 ### select_variant
 
