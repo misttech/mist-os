@@ -390,6 +390,18 @@ void TimerQueue::Tick(cpu_num_t cpu) {
     Scheduler::TimerTick(SchedTime{now});
   }
 
+  zx_time_t deadline = TickInternal(now, cpu, timer_list_);
+
+  // Set the platform timer to the *soonest* of queue event and preemption timer.
+  if (preempt_timer_deadline_ < deadline) {
+    deadline = preempt_timer_deadline_;
+  }
+  UpdatePlatformTimer(deadline);
+}
+
+template <typename TimestampType>
+TimestampType TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
+                                       fbl::DoublyLinkedList<Timer*>& timer_list) {
   Guard<MonitoredSpinLock, NoIrqSave> guard{TimerLock::Get(), SOURCE_TAG};
 
   for (;;) {
@@ -444,15 +456,7 @@ void TimerQueue::Tick(cpu_num_t cpu) {
     // This has to be the case or it would have fired already.
     DEBUG_ASSERT(deadline > now);
   }
-
-  // We're done manipulating the timer queue.
-  guard.Release();
-
-  // Set the platform timer to the *soonest* of queue event and preemption timer.
-  if (preempt_timer_deadline_ < deadline) {
-    deadline = preempt_timer_deadline_;
-  }
-  UpdatePlatformTimer(deadline);
+  return deadline;
 }
 
 zx_status_t Timer::TrylockOrCancel(MonitoredSpinLock* lock) {
