@@ -26,9 +26,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   for (auto it = edid::timing_iterator(&edid); it.is_valid(); ++it) {
     count++;
   }
-  for (auto it = edid::audio_data_block_iterator(&edid); it.is_valid(); ++it) {
-    count--;
-  }
   edid.Print([](const char* str) {});
 
   return 0;

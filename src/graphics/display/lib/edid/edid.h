@@ -315,7 +315,6 @@ using ReadEdidResult = fit::result<const char*, fbl::Vector<uint8_t>>;
 ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact);
 
 class timing_iterator;
-class audio_data_block_iterator;
 
 class Edid {
  public:
@@ -361,7 +360,6 @@ class Edid {
   friend class internal::data_block_iterator;
   friend class internal::descriptor_iterator;
   friend class timing_iterator;
-  friend class audio_data_block_iterator;
 
   template <typename T>
   const T* GetBlock(uint8_t block_num) const;
@@ -420,28 +418,6 @@ class timing_iterator {
   uint16_t state_index_;
   internal::descriptor_iterator descriptors_;
   internal::data_block_iterator dbs_;
-};
-
-class audio_data_block_iterator {
- public:
-  explicit audio_data_block_iterator(const Edid* edid)
-      : edid_(edid), sad_idx_(UINT8_MAX), dbs_(edid) {
-    ++(*this);
-  }
-
-  audio_data_block_iterator& operator++();
-
-  const ShortAudioDescriptor& operator*() const { return descriptor_; }
-  const ShortAudioDescriptor* operator->() const { return &descriptor_; }
-
-  bool is_valid() const { return edid_ != nullptr; }
-
- private:
-  const Edid* edid_;
-  uint8_t sad_idx_;
-  internal::data_block_iterator dbs_;
-
-  ShortAudioDescriptor descriptor_;
 };
 
 }  // namespace edid

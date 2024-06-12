@@ -453,22 +453,6 @@ void timing_iterator::Advance() {
   }
 }
 
-audio_data_block_iterator& audio_data_block_iterator::operator++() {
-  while (dbs_.is_valid()) {
-    uint32_t num_sads = static_cast<uint32_t>(dbs_->length() / sizeof(ShortAudioDescriptor));
-    if (dbs_->type() != ShortAudioDescriptor::kType || ++sad_idx_ > num_sads) {
-      ++dbs_;
-      sad_idx_ = UINT8_MAX;
-      continue;
-    }
-    descriptor_ = dbs_->payload.audio[sad_idx_];
-    return *this;
-  }
-
-  edid_ = nullptr;
-  return *this;
-}
-
 void Edid::Print(void (*print_fn)(const char* str)) const {
   char str_buf[128];
   print_fn("Raw edid:\n");
