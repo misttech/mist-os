@@ -48,14 +48,14 @@ impl StorageStore {
 
             // Write to the file, using a temporary file to ensure the original data isn't lost if
             // there is an error.
-            let mut file = std::fs::File::create(&tmp_path)?;
+            dbg!(tmp_path.clone());
+            let mut file = std::fs::File::create(tmp_path.clone())?;
             file.write_all(&serialized_data)?;
             // This fsync is required because the storage stack doesn't guarantee data is flushed
             // before the rename.
             fuchsia_nix::unistd::fsync(file.as_raw_fd())?;
         }
         std::fs::rename(&tmp_path, &self.path)?;
-        tracing::info!("Successfully saved data to {:?}", self.path);
         Ok(())
     }
 

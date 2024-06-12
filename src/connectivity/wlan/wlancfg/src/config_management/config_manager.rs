@@ -126,7 +126,7 @@ impl SavedNetworksManager {
     /// Initializes a new Saved Network Manager by reading saved networks from local storage using
     /// a WLAN helper library. It will attempt to migrate any data from legacy storage.
     pub async fn new(telemetry_sender: TelemetrySender) -> Self {
-        let storage = PolicyStorage::new_with_id(POLICY_STORAGE_ID);
+        let storage = PolicyStorage::new_with_id(POLICY_STORAGE_ID).await;
         Self::new_with_storage(storage, telemetry_sender).await
     }
 
@@ -190,7 +190,7 @@ impl SavedNetworksManager {
         let store_id = generate_string();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let store = PolicyStorage::new_with_id(&store_id);
+        let store = PolicyStorage::new_with_id(&store_id).await;
         Self::new_with_storage(store, telemetry_sender).await
     }
 
@@ -678,7 +678,7 @@ mod tests {
 
         // Saved networks should persist when we create a saved networks manager with the same ID.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let store = PolicyStorage::new_with_id(&store_id);
+        let store = PolicyStorage::new_with_id(&store_id).await;
 
         let saved_networks =
             SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
@@ -792,7 +792,7 @@ mod tests {
 
         // Check that removal persists.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let store = PolicyStorage::new_with_id(&store_id);
+        let store = PolicyStorage::new_with_id(&store_id).await;
         let saved_networks =
             SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
@@ -992,7 +992,7 @@ mod tests {
 
         // Success connects should be saved as persistent data.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let store = PolicyStorage::new_with_id(&store_id);
+        let store = PolicyStorage::new_with_id(&store_id).await;
         let saved_networks =
             SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
@@ -1569,7 +1569,7 @@ mod tests {
 
         // Load store from storage to verify it is also gone from persistent storage
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let store = PolicyStorage::new_with_id(store_id);
+        let store = PolicyStorage::new_with_id(store_id).await;
         let saved_networks =
             SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
@@ -1675,7 +1675,7 @@ mod tests {
     /// each test so that they don't interfere.
     async fn create_saved_networks(store_id: &str) -> SavedNetworksManager {
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let store = PolicyStorage::new_with_id(store_id);
+        let store = PolicyStorage::new_with_id(store_id).await;
         let saved_networks =
             SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
@@ -1698,7 +1698,7 @@ mod tests {
         let store_id = generate_string();
         let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let store = PolicyStorage::new_with_id(&store_id);
+        let store = PolicyStorage::new_with_id(&store_id).await;
 
         let saved_networks = SavedNetworksManager::new_with_storage(store, telemetry_sender).await;
         let network_id_foo = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();

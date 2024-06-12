@@ -7,6 +7,7 @@ use crate::storage_store::StorageStore;
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_stash as fidl_stash;
 use fuchsia_component::client::connect_to_protocol;
+use wlan_metrics_registry::StashMigrationResultsMetricDimensionMigrationResult as MigrationResult;
 
 pub use wlan_stash_constants::{
     self, Credential, NetworkIdentifier, PersistentData, PersistentStorageData, SecurityType,
@@ -25,12 +26,13 @@ pub struct PolicyStorage {
     /// the first time. The result is carried here because we only care about any errors if we end
     /// up migrating the data.
     legacy_stash: Result<StashStore, Error>,
+    cobalt_proxy: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
 }
 
 impl PolicyStorage {
     /// Initialize new store with the ID provided by the Saved Networks Manager. The ID will
     /// identify stored values as being part of the same persistent storage.
-    pub fn new_with_id(id: &str) -> Self {
+    pub async fn new_with_id(id: &str) -> Self {
         let path = format!("{FILE_PATH_FORMAT}{id}");
         let root = StorageStore::new(&path);
 
@@ -38,7 +40,17 @@ impl PolicyStorage {
         let legacy_stash =
             proxy.and_then(|p| StashStore::from_secure_store_proxy(id, p)).map_err(|e| e);
 
-        Self { root, legacy_stash }
+        let cobalt_proxy = init_telemetry_channel()
+            .await
+            .inspect_err(|e| {
+                tracing::info!(
+                    "Error accessing telemetry. Stash migration metric will not be logged: {}",
+                    e
+                );
+            })
+            .ok();
+
+        Self { root, legacy_stash, cobalt_proxy }
     }
 
     /// Initializer for tests outside of this module
@@ -46,9 +58,10 @@ impl PolicyStorage {
         stash_proxy: fidl_stash::SecureStoreProxy,
         id: &str,
     ) -> Self {
-        let root = StorageStore::new(&id);
-        let stash = StashStore::from_secure_store_proxy(id, stash_proxy);
-        Self { root, legacy_stash: stash }
+        let root = StorageStore::new(id);
+        let legacy_stash = StashStore::from_secure_store_proxy(id, stash_proxy);
+        let cobalt_proxy = None;
+        Self { root, legacy_stash, cobalt_proxy }
     }
 
     /// Initialize the storage wrapper and load all saved network configs from persistent storage.
@@ -58,10 +71,12 @@ impl PolicyStorage {
         // If there is an error loading from the new version of storage, it means it hasn't been
         // create and should be loaded from stash.
         let load_err = match self.root.load() {
-            Ok(networks) => return Ok(networks),
+            Ok(networks) => {
+                self.log_load_metric(MigrationResult::AlreadyMigrated).await;
+                return Ok(networks);
+            }
             Err(e) => e,
         };
-
         let stash_store: &mut StashStore = if let Ok(stash) = self.legacy_stash.as_mut() {
             stash
         } else {
@@ -79,18 +94,29 @@ impl PolicyStorage {
             }
 
             // Write the data to the new storage.
-            let write_succeeded = self
-                .root
-                .write(networks_list.clone())
-                .inspect_err(|e| tracing::info!(?e, "Failed to write migrated saved networks"))
-                .is_ok();
-            if write_succeeded {
-                // Delete from stash if writing was successful.
-                stash_store
-                    .delete_store()
-                    .await
-                    .context("Failed to delete stash store after migration")?;
-                tracing::info!("Migrated saved networks from stash");
+            match self.root.write(networks_list.clone()) {
+                Ok(_) => {
+                    tracing::info!("Migrated saved networks from stash");
+                    // Delete from stash if writing was successful.
+                    let delete_result = stash_store.delete_store().await;
+                    match delete_result {
+                        Ok(()) => {
+                            self.log_load_metric(MigrationResult::Success).await;
+                        }
+                        Err(e) => {
+                            tracing::info!(
+                                "Failed to delete legacy stash data after migration: {:?}",
+                                e
+                            );
+                            self.log_load_metric(MigrationResult::MigratedButFailedToDeleteLegacy)
+                                .await;
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::info!(?e, "Failed to write migrated saved networks");
+                    self.log_load_metric(MigrationResult::FailedToWriteNewStore).await;
+                }
             }
             Ok(networks_list)
         } else {
@@ -98,6 +124,7 @@ impl PolicyStorage {
             // don't want to intentionally create a file if migrating stash fails since
             // then we will never try to read from stash again.
             tracing::info!(?load_err, "Failed to read saved networks from file and legacy stash, new file will be created when a network is saved",);
+            self.log_load_metric(MigrationResult::FailedToLoadLegacyData).await;
             Ok(Vec::new())
         }
     }
@@ -113,6 +140,71 @@ impl PolicyStorage {
     pub fn clear(&mut self) -> Result<(), Error> {
         self.root.empty_store()
     }
+
+    async fn log_load_metric(&self, result_event_code: MigrationResult) {
+        // No need to log an error if the cobalt proxy is none, errors would have been logged on
+        // failed initialization of the channel.
+        let cobalt_proxy = match &self.cobalt_proxy {
+            Some(proxy) => proxy,
+            None => return,
+        };
+
+        let events = &[fidl_fuchsia_metrics::MetricEvent {
+            metric_id: wlan_metrics_registry::STASH_MIGRATION_RESULTS_METRIC_ID,
+            event_codes: vec![result_event_code as u32],
+            payload: fidl_fuchsia_metrics::MetricEventPayload::Count(1),
+        }];
+
+        // The error type of this inner result is a fidl_fuchsia_metrics defined error.
+        match cobalt_proxy.log_metric_events(events).await {
+            Err(e) => {
+                tracing::info!(
+                    "Error logging metric {:?} for migration result: {:?}",
+                    result_event_code,
+                    e
+                );
+            }
+            Ok(Err(e)) => {
+                tracing::info!(
+                    "Error sending metric {:?} for migration result: {:?}",
+                    result_event_code,
+                    e
+                );
+            }
+            Ok(_) => (),
+        }
+    }
+}
+
+async fn init_telemetry_channel() -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error> {
+    // Get channel for logging cobalt 1.1 metrics.
+    let factory_proxy = fuchsia_component::client::connect_to_protocol::<
+        fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
+    >()?;
+
+    let (cobalt_proxy, cobalt_1dot1_server) =
+        fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
+            .context("failed to create MetricEventLoggerMarker endponts")?;
+
+    let project_spec = fidl_fuchsia_metrics::ProjectSpec {
+        customer_id: None, // defaults to fuchsia
+        project_id: Some(wlan_metrics_registry::PROJECT_ID),
+        ..Default::default()
+    };
+
+    let experiment_ids = [];
+
+    factory_proxy
+        .create_metric_event_logger_with_experiments(
+            &project_spec,
+            &experiment_ids,
+            cobalt_1dot1_server,
+        )
+        .await
+        .context("failed to create metrics event logger")?
+        .map_err(|e| format_err!("failed to create metrics event logger: {:?}", e))?;
+
+    Ok(cobalt_proxy)
 }
 
 #[cfg(test)]
@@ -122,16 +214,18 @@ mod tests {
 
     use super::*;
     use crate::tests::{network_id, rand_string};
-    use fidl::endpoints::{create_proxy, create_request_stream};
+    use fidl::endpoints::create_request_stream;
     use fidl_fuchsia_stash::{SecureStoreRequest, StoreAccessorRequest};
     use fuchsia_async as fasync;
-    use futures::StreamExt;
+    use futures::task::Poll;
+    use futures::{StreamExt, TryStreamExt};
     use ieee80211::Ssid;
     use rand::distributions::{Alphanumeric, DistString as _};
     use rand::thread_rng;
     use std::convert::TryFrom;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use wlan_common::assert_variant;
     use wlan_stash_constants::PersistentData;
 
     /// The PSK provided must be the bytes form of the 64 hexadecimal character hash. This is a
@@ -294,7 +388,7 @@ mod tests {
         store.write(vec![cfg.clone()]).expect("Failed writing to storage");
 
         // Create the storage again with same id
-        let mut store = PolicyStorage::new_with_id(&path);
+        let mut store = PolicyStorage::new_with_id(&path).await;
 
         // Expect to read the same value back with the same key, should exist in new stash
         let cfgs_from_store = store.load().await.expect("Failed reading from storage");
@@ -350,7 +444,7 @@ mod tests {
         // the legacy stash.
         let store_id = &rand_string();
         let backing_file_path = format!("{}{}", FILE_PATH_FORMAT, store_id).to_string();
-        let mut store = PolicyStorage::new_with_id(store_id);
+        let mut store = PolicyStorage::new_with_id(store_id).await;
 
         // The file should not exist yet, so reading it would give an error.
         std::fs::read(&backing_file_path).expect_err("The file for the store should not exist yet");
@@ -429,7 +523,7 @@ mod tests {
         assert_eq!(0, configs_from_storage.len());
 
         // recreate storage and verify that clearing the storage persists
-        let mut storage = PolicyStorage::new_with_id(storage_id);
+        let mut storage = PolicyStorage::new_with_id(storage_id).await;
         let configs_from_storage = storage.load().await.expect("Failed to read");
         assert_eq!(0, configs_from_storage.len());
     }
@@ -461,7 +555,7 @@ mod tests {
         stash.write(&network_id, &vec![previous_data]).await.expect("write failed");
 
         // Initialize storage, and give it the stash with the saved network data.
-        let mut storage = PolicyStorage::new_with_id(&storage_id);
+        let mut storage = PolicyStorage::new_with_id(&storage_id).await;
         storage.legacy_stash = Ok(stash);
         assert_eq!(storage.load().await.expect("load failed"), network_config);
 
@@ -474,7 +568,7 @@ mod tests {
         assert!(stash.load().await.expect("load failed").is_empty());
 
         // And once more, but this time there should be no migration.
-        let mut storage = PolicyStorage::new_with_id(&storage_id);
+        let mut storage = PolicyStorage::new_with_id(&storage_id).await;
         assert_eq!(storage.load().await.expect("load failed"), network_config);
     }
 
@@ -485,8 +579,13 @@ mod tests {
         let (client, mut request_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>()
             .expect("create_request_stream failed");
 
+        // This will be set to true if stash is accessed, so that the test can check whether stash
+        // was read by the migration code.
         let read_from_stash = Arc::new(AtomicBool::new(false));
 
+        // This responds in the background to any stash requests for initializing the connection to
+        // stash (identify or create accessor), and responds to requests for reading data with an
+        // an error by dropping the responder.
         let _task = {
             let read_from_stash = read_from_stash.clone();
             fasync::Task::spawn(async move {
@@ -516,7 +615,7 @@ mod tests {
         };
 
         // Initialize the store but switch out with the stash we made to act corrupted.
-        let mut store = PolicyStorage::new_with_id(&store_id);
+        let mut store = PolicyStorage::new_with_id(&store_id).await;
         let proxy_fn = client.into_proxy().unwrap();
         store.legacy_stash = StashStore::from_secure_store_proxy(&store_id, proxy_fn);
 
@@ -530,8 +629,298 @@ mod tests {
     /// Creates a new persistent storage with a file bath based on the given ID and clears any
     /// values saved in the store.
     pub async fn new_storage(id: &str) -> PolicyStorage {
-        let mut store = PolicyStorage::new_with_id(id);
+        let mut store = PolicyStorage::new_with_id(id).await;
         store.clear().expect("failed to clear stash");
         store
+    }
+
+    /// Metrics tests need to be able to control stash behavior and check what is sent to cobalt.
+    struct MetricsTestValues {
+        store: PolicyStorage,
+        cobalt_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
+        stash_stream: fidl_stash::SecureStoreRequestStream,
+    }
+
+    /// This initializes PolicyStorage with a cobalt channel and stash channel that is
+    /// controlled by the test. It is for tests that want to control stash responses and read
+    /// messages send to cobalt.
+    fn migration_metrics_test_values() -> MetricsTestValues {
+        let (cobalt_proxy, cobalt_stream) = fidl::endpoints::create_proxy_and_stream::<
+            fidl_fuchsia_metrics::MetricEventLoggerMarker,
+        >()
+        .expect("failed to create MetricsEventLogger proxy");
+
+        let (legacy_stash, stash_stream) = stash_for_test();
+        let root = StorageStore::new(format!("{FILE_PATH_FORMAT}{}", rand_string()));
+        let store = PolicyStorage { root, legacy_stash, cobalt_proxy: Some(cobalt_proxy) };
+
+        MetricsTestValues { store, cobalt_stream, stash_stream }
+    }
+
+    fn stash_for_test() -> (Result<StashStore, Error>, fidl_stash::SecureStoreRequestStream) {
+        let (client, stash_stream) = create_request_stream::<fidl_stash::SecureStoreMarker>()
+            .expect("create_request_stream failed");
+        let proxy_fn = client.into_proxy().unwrap();
+        let id = rand_string();
+        let legacy_stash = StashStore::from_secure_store_proxy(&id, proxy_fn);
+
+        (legacy_stash, stash_stream)
+    }
+
+    // Checks that the metric event is correct and acks the metric event so that the load fut
+    // can continue.
+    fn check_load_metric(
+        logged_metric: fidl_fuchsia_metrics::MetricEventLoggerRequest,
+        expected_event: MigrationResult,
+    ) {
+        assert_variant!(logged_metric, fidl_fuchsia_metrics::MetricEventLoggerRequest::LogMetricEvents {
+            mut events, responder, ..
+        } => {
+            assert_eq!(events.len(), 1);
+            let event = events.pop().unwrap();
+            assert_variant!(event, fidl_fuchsia_metrics::MetricEvent { metric_id, event_codes, payload } => {
+                assert_eq!(metric_id, wlan_metrics_registry::STASH_MIGRATION_RESULTS_METRIC_ID);
+                assert_eq!(event_codes, [expected_event as u32]);
+            });
+
+            assert!(responder.send(Ok(())).is_ok());
+        });
+    }
+
+    fn process_init_stash(
+        exec: &mut fasync::TestExecutor,
+        mut stash_stream: fidl_stash::SecureStoreRequestStream,
+    ) -> fidl_stash::StoreAccessorRequestStream {
+        assert_variant!(
+            exec.run_until_stalled(&mut stash_stream.next()),
+            Poll::Ready(Some(Ok(SecureStoreRequest::Identify { .. })))
+        );
+
+        let accessor_req_stream = assert_variant!(
+            exec.run_until_stalled(&mut stash_stream.next()),
+            Poll::Ready(Some(Ok(SecureStoreRequest::CreateAccessor { accessor_request, .. }))) =>
+        {
+            accessor_request.into_stream().unwrap()
+        });
+
+        accessor_req_stream
+    }
+
+    /// Respond to the ListPrefix request with empty data, which matches the scenario where nothing
+    /// is saved in stash.
+    fn respond_to_stash_list_prefix(
+        exec: &mut fasync::TestExecutor,
+        stash_server: &mut fidl_stash::StoreAccessorRequestStream,
+    ) {
+        let request = assert_variant!(exec.run_until_stalled(&mut stash_server.next()), Poll::Ready(req) => {
+            req.expect("ListPrefix stash request not recieved.")
+        });
+        match request.unwrap() {
+            StoreAccessorRequest::ListPrefix { it, .. } => {
+                let mut iter = it.into_stream().expect("failed to make iterator into stream");
+                assert_variant!(
+                    exec.run_until_stalled(&mut iter.try_next()),
+                    Poll::Ready(Ok(Some(fidl_stash::ListIteratorRequest::GetNext { responder }))) => {
+                        responder.send(&[]).expect("error sending stash response");
+                });
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn process_stash_delete(
+        exec: &mut fasync::TestExecutor,
+        stash_server: &mut fidl_stash::StoreAccessorRequestStream,
+    ) {
+        // Respond to stash delete.
+        let request = assert_variant!(exec.run_until_stalled(&mut stash_server.next()), Poll::Ready(req) => {
+            req.expect("DeletePrefix stash request not recieved.")
+        });
+        match request.unwrap() {
+            StoreAccessorRequest::DeletePrefix { .. } => {}
+            _ => unreachable!(),
+        }
+
+        // Respond to stash flush.
+        assert_variant!(
+            exec.run_until_stalled(&mut stash_server.try_next()),
+            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::Flush{responder}))) => {
+                responder.send(Ok(())).expect("failed to send stash response");
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    pub fn test_load_logs_result_success_metric() {
+        let mut exec = fasync::TestExecutor::new();
+        // Use a PolicyStorage with the default stash proxy for this test, but switch out the
+        // cobalt proxy to intercept metric events.
+        let mut test_values = migration_metrics_test_values();
+
+        // Load for the first time successfully.
+        {
+            let load_fut = test_values.store.load();
+            futures::pin_mut!(load_fut);
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+            // Respond to stash initialization requests.
+            let mut accessor_req_stream = process_init_stash(&mut exec, test_values.stash_stream);
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+            // Respond to stash read requests with empty data.
+            respond_to_stash_list_prefix(&mut exec, &mut accessor_req_stream);
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+            // Process stash delete and flush.
+            process_stash_delete(&mut exec, &mut accessor_req_stream);
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+            let mut metric_fut = test_values.cobalt_stream.next();
+            assert_variant!(exec.run_until_stalled(&mut metric_fut), Poll::Ready(Some(Ok(logged_metric))) => {
+                check_load_metric(logged_metric, MigrationResult::Success);
+            });
+            assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(_)));
+        }
+
+        // Load again, an AlreadyMigrated metric event code should be logged. Stash do not need
+        // handling because the stash wrapper internally stores the data.
+        let load_fut = test_values.store.load();
+        futures::pin_mut!(load_fut);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        let mut metric_fut = test_values.cobalt_stream.next();
+        assert_variant!(exec.run_until_stalled(&mut metric_fut), Poll::Ready(Some(Ok(logged_metric))) => {
+            check_load_metric(logged_metric, MigrationResult::AlreadyMigrated);
+        });
+
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(_)));
+
+        // Check that nothing else was logged
+        assert_variant!(exec.run_until_stalled(&mut metric_fut), Poll::Pending);
+    }
+
+    #[fuchsia::test]
+    pub fn test_load_failure_logs_result_metric() {
+        let mut exec = fuchsia_async::TestExecutor::new();
+        let mut test_values = migration_metrics_test_values();
+        let load_fut = test_values.store.load();
+        futures::pin_mut!(load_fut);
+
+        // Start running the future to load and trigger migration. It should halt waiting on a
+        // stash request.
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        // Respond to stash initialization requests.
+        let mut accessor_req_stream = process_init_stash(&mut exec, test_values.stash_stream);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        // Drop the request to read stash so that loading stash fails.
+        let request = assert_variant!(exec.run_until_stalled(&mut accessor_req_stream.next()), Poll::Ready(req) => {
+            req.expect("ListPrefix stash request not recieved.")
+        });
+        match request.unwrap() {
+            StoreAccessorRequest::ListPrefix { it: _, .. } => {
+                // If we just drop the iterator without responding, it should trigger a read error.
+            }
+            _ => unreachable!(),
+        }
+
+        // Continue the load fut, it should wait on a response to sending a metric.
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        // Check for the correct metric and ack.
+        assert_variant!(exec.run_until_stalled(&mut test_values.cobalt_stream.next()), Poll::Ready(Some(Ok(metric))) => {
+            check_load_metric(metric, MigrationResult::FailedToLoadLegacyData);
+        });
+
+        // The load should finish this time.
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(data)) => {
+            assert!(data.is_empty());
+        });
+
+        // Verify that nothing else was send through the cobalt channel.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.cobalt_stream.next()),
+            Poll::Pending
+        );
+    }
+
+    #[fuchsia::test]
+    pub fn test_load_delete_stash_failure_logs_result_metric() {
+        let mut exec = fuchsia_async::TestExecutor::new();
+        let mut test_values = migration_metrics_test_values();
+        let load_fut = test_values.store.load();
+        futures::pin_mut!(load_fut);
+
+        // Start running the future to load and trigger migration. It should halt waiting on a
+        // stash request.
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        // Respond to stash initialization requests.
+        let mut accessor_req_stream = process_init_stash(&mut exec, test_values.stash_stream);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        // Respond to stash requests as if loading empty stash data.
+        respond_to_stash_list_prefix(&mut exec, &mut accessor_req_stream);
+
+        // Drop the accessor request stream to trigger an error when deleting stash.
+        drop(accessor_req_stream);
+
+        // Continue the load fut, it should wait on a response to sending a metric.
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        // Check for the correct metric and ack.
+        assert_variant!(exec.run_until_stalled(&mut test_values.cobalt_stream.next()), Poll::Ready(Some(Ok(metric))) => {
+            check_load_metric(metric, MigrationResult::MigratedButFailedToDeleteLegacy);
+        });
+
+        // The load should finish this time.
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(data)) => {
+            assert!(data.is_empty());
+        });
+
+        // Verify that nothing else was sent through the cobalt channel.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.cobalt_stream.next()),
+            Poll::Pending
+        );
+    }
+
+    #[fuchsia::test]
+    pub fn test_load_logs_result_failed_to_write_metric() {
+        let mut exec = fasync::TestExecutor::new();
+        // Use a path that is invalid so that writing to it fails.
+        let store_id = "//";
+        let mut test_values = migration_metrics_test_values();
+
+        // Switch out StorageStore to one using the invalid path.
+        test_values.store.root = StorageStore::new(std::path::Path::new(store_id));
+
+        // Start loading to migrate stash data.
+        let load_fut = test_values.store.load();
+        futures::pin_mut!(load_fut);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        // Respond to stash initialization requests.
+        let mut accessor_req_stream = process_init_stash(&mut exec, test_values.stash_stream);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        // Respond to stash requests as if loading empty stash data.
+        respond_to_stash_list_prefix(&mut exec, &mut accessor_req_stream);
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Pending);
+
+        // Check that the metric is logged for the failure to write.
+        let mut metric_fut = test_values.cobalt_stream.next();
+        assert_variant!(exec.run_until_stalled(&mut metric_fut), Poll::Ready(Some(Ok(logged_metric))) => {
+            check_load_metric(logged_metric, MigrationResult::FailedToWriteNewStore);
+        });
+
+        assert_variant!(exec.run_until_stalled(&mut load_fut), Poll::Ready(Ok(_)));
+
+        // Verify that nothing else was sent through the cobalt channel.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.cobalt_stream.next()),
+            Poll::Pending
+        );
     }
 }
