@@ -66,23 +66,6 @@ group_with_no_dir_target_deps("core_x64_unstable_tests") {
   public_deps = []
 }
 
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of core.x64
-# core.emulator
-group_with_no_dir_target_deps("core_emulator_stable_tests") {
-  testonly = true
-  public_deps = [
-    "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_x64_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
-  ]
-}
-
-group_with_no_dir_target_deps("core_emulator_unstable_tests") {
-  testonly = true
-  public_deps = []
-}
-
 # workbench.x64
 group_with_no_dir_target_deps("workbench_x64_stable_tests") {
   testonly = true
@@ -100,26 +83,6 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
 }
 
 group_with_no_dir_target_deps("workbench_x64_unstable_tests") {
-  testonly = true
-  public_deps = []
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of workbench.x64
-# workbench.emulator
-group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
-  testonly = true
-  public_deps = [
-    "affordance_tests/test_session:session_test_fc($host_toolchain)",
-    "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
-    "affordance_tests/test_ui:user_input_test_fc($host_toolchain)",
-    "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_x64_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
-  ]
-}
-
-group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
   testonly = true
   public_deps = []
 }
@@ -166,45 +129,6 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   ]
 }
 
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of core.x64
-# core.nuc
-group_with_no_dir_target_deps("core_nuc_stable_tests") {
-  testonly = true
-  public_deps = [
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
-    "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
-  ]
-}
-
-group_with_no_dir_target_deps("core_nuc_unstable_tests") {
-  testonly = true
-  public_deps = [
-    "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_x64_fc($host_toolchain)",
-  ]
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of workbench.x64
-# workbench.nuc
-group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
-  testonly = true
-  public_deps = [
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
-    "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
-  ]
-}
-
-group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
-  testonly = true
-  public_deps = [
-    "affordance_tests/test_session:session_test_fc($host_toolchain)",
-    "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
-    "affordance_tests/test_ui:user_input_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_x64_fc($host_toolchain)",
-  ]
-}
-
 # starnix.vim3
 # Note: This will be run on internal builder, hence using `starnix` here instead of internal `<PRODUCT>` name.
 group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
@@ -239,18 +163,6 @@ group_with_no_dir_target_deps("core_x64_unstable_packages") {
   public_deps = []
 }
 
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of core.x64
-# core.emulator
-group_with_no_dir_target_deps("core_emulator_stable_packages") {
-  testonly = true
-  public_deps = [ "transport_tests/test_ffx:packages" ]
-}
-
-group_with_no_dir_target_deps("core_emulator_unstable_packages") {
-  testonly = true
-  public_deps = []
-}
-
 # workbench.x64
 group_with_no_dir_target_deps("workbench_x64_stable_packages") {
   testonly = true
@@ -261,21 +173,6 @@ group_with_no_dir_target_deps("workbench_x64_stable_packages") {
 }
 
 group_with_no_dir_target_deps("workbench_x64_unstable_packages") {
-  testonly = true
-  public_deps = []
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of workbench.x64
-# workbench.emulator
-group_with_no_dir_target_deps("workbench_emulator_stable_packages") {
-  testonly = true
-  public_deps = [
-    "affordance_tests/test_session:packages",
-    "transport_tests/test_ffx:packages",
-  ]
-}
-
-group_with_no_dir_target_deps("workbench_emulator_unstable_packages") {
   testonly = true
   public_deps = []
 }
@@ -298,30 +195,6 @@ group_with_no_dir_target_deps("workbench_vim3_stable_packages") {
 }
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_packages") {
-  testonly = true
-  public_deps = [ "affordance_tests/test_session:packages" ]
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of core.x64
-# core.nuc
-group_with_no_dir_target_deps("core_nuc_stable_packages") {
-  testonly = true
-  public_deps = [ "transport_tests/test_ffx:packages" ]
-}
-
-group_with_no_dir_target_deps("core_nuc_unstable_packages") {
-  testonly = true
-  public_deps = []
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of workbench.x64
-# workbench.nuc
-group_with_no_dir_target_deps("workbench_nuc_stable_packages") {
-  testonly = true
-  public_deps = [ "transport_tests/test_ffx:packages" ]
-}
-
-group_with_no_dir_target_deps("workbench_nuc_unstable_packages") {
   testonly = true
   public_deps = [ "affordance_tests/test_session:packages" ]
 }

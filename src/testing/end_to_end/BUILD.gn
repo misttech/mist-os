@@ -99,52 +99,6 @@ group("core_x64_staging_tests") {
   ]
 }
 
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of core.x64
-# core.emulator
-group_with_no_dir_target_deps("core_emulator_stable_sl4f_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_soft_reboot:soft_reboot_test_fc_preferred($host_toolchain)",
-  ]
-}
-
-group_with_no_dir_target_deps("core_emulator_stable_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:core_emulator_stable_tests",
-  ]
-}
-
-group_with_no_dir_target_deps("core_emulator_unstable_sl4f_tests") {
-  testonly = true
-  public_deps = []
-}
-
-group_with_no_dir_target_deps("core_emulator_unstable_tests") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:core_emulator_unstable_tests" ]
-}
-
-group("core_emulator_staging_sl4f_tests") {
-  testonly = true
-  public_deps = [
-    ":core_emulator_stable_sl4f_tests",
-    ":core_emulator_unstable_sl4f_tests",
-  ]
-}
-
-group("core_emulator_staging_tests") {
-  testonly = true
-  public_deps = [
-    ":core_emulator_stable_tests",
-    ":core_emulator_unstable_tests",
-  ]
-}
-
 # workbench.x64
 group_with_no_dir_target_deps("workbench_x64_stable_tests") {
   testonly = true
@@ -169,32 +123,6 @@ group("workbench_x64_staging_tests") {
   public_deps = [
     ":workbench_x64_stable_tests",
     ":workbench_x64_unstable_tests",
-  ]
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of workbench.x64
-# workbench.emulator
-group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:workbench_emulator_stable_tests",
-  ]
-}
-
-group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_emulator_unstable_tests" ]
-}
-
-group("workbench_emulator_staging_tests") {
-  testonly = true
-  public_deps = [
-    ":workbench_emulator_stable_tests",
-    ":workbench_emulator_unstable_tests",
   ]
 }
 
@@ -251,62 +179,6 @@ group("workbench_vim3_staging_tests") {
   public_deps = [
     ":workbench_vim3_stable_tests",
     ":workbench_vim3_unstable_tests",
-  ]
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of core.x64
-# core.nuc
-group_with_no_dir_target_deps("core_nuc_stable_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:core_nuc_stable_tests",
-  ]
-}
-
-group_with_no_dir_target_deps("core_nuc_unstable_tests") {
-  testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_nuc_unstable_tests" ]
-}
-
-group("core_nuc_staging_tests") {
-  testonly = true
-  public_deps = [
-    ":core_nuc_stable_tests",
-    ":core_nuc_unstable_tests",
-  ]
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of workbench.x64
-# workbench.nuc
-group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:workbench_nuc_stable_tests",
-  ]
-}
-
-group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:workbench_nuc_unstable_tests",
-  ]
-}
-
-group("workbench_nuc_staging_tests") {
-  testonly = true
-  public_deps = [
-    ":workbench_nuc_stable_tests",
-    ":workbench_nuc_unstable_tests",
   ]
 }
 
@@ -379,46 +251,6 @@ group("core_x64_staging_packages") {
   ]
 }
 
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of core.x64
-# core.emulator
-group_with_no_dir_target_deps("core_emulator_stable_sl4f_packages") {
-  testonly = true
-  public_deps = []
-}
-
-group_with_no_dir_target_deps("core_emulator_stable_packages") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:core_emulator_stable_packages" ]
-}
-
-group_with_no_dir_target_deps("core_emulator_unstable_sl4f_packages") {
-  testonly = true
-  public_deps = [ "honeydew:sl4f_packages" ]
-}
-
-group_with_no_dir_target_deps("core_emulator_unstable_packages") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:core_emulator_unstable_packages" ]
-}
-
-group("core_emulator_staging_sl4f_packages") {
-  testonly = true
-  public_deps = [
-    ":core_emulator_stable_sl4f_packages",
-    ":core_emulator_unstable_sl4f_packages",
-  ]
-}
-
-group("core_emulator_staging_packages") {
-  testonly = true
-  public_deps = [
-    ":core_emulator_stable_packages",
-    ":core_emulator_unstable_packages",
-  ]
-}
-
 # workbench.x64
 group_with_no_dir_target_deps("workbench_x64_stable_packages") {
   testonly = true
@@ -437,28 +269,6 @@ group("workbench_x64_staging_packages") {
   public_deps = [
     ":workbench_x64_stable_packages",
     ":workbench_x64_unstable_packages",
-  ]
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of workbench.x64
-# workbench.emulator
-group_with_no_dir_target_deps("workbench_emulator_stable_packages") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_emulator_stable_packages" ]
-}
-
-group_with_no_dir_target_deps("workbench_emulator_unstable_packages") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_emulator_unstable_packages" ]
-}
-
-group("workbench_emulator_staging_packages") {
-  testonly = true
-  public_deps = [
-    ":workbench_emulator_stable_packages",
-    ":workbench_emulator_unstable_packages",
   ]
 }
 
@@ -500,48 +310,6 @@ group("workbench_vim3_staging_packages") {
   public_deps = [
     ":workbench_vim3_stable_packages",
     ":workbench_vim3_unstable_packages",
-  ]
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of core.x64
-# core.nuc
-group_with_no_dir_target_deps("core_nuc_stable_packages") {
-  testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_nuc_stable_packages" ]
-}
-
-group_with_no_dir_target_deps("core_nuc_unstable_packages") {
-  testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_nuc_unstable_packages" ]
-}
-
-group("core_nuc_staging_packages") {
-  testonly = true
-  public_deps = [
-    ":core_nuc_stable_packages",
-    ":core_nuc_unstable_packages",
-  ]
-}
-
-# TODO(https://fxbug.dev/346402095): This section will be deleted as it is now part of workbench.x64
-# workbench.nuc
-group_with_no_dir_target_deps("workbench_nuc_stable_packages") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_nuc_stable_packages" ]
-}
-
-group_with_no_dir_target_deps("workbench_nuc_unstable_packages") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_nuc_unstable_packages" ]
-}
-
-group("workbench_nuc_staging_packages") {
-  testonly = true
-  public_deps = [
-    ":workbench_nuc_stable_packages",
-    ":workbench_nuc_unstable_packages",
   ]
 }
 
