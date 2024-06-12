@@ -4,6 +4,7 @@
 
 # Definitions to build each of the Fuchsia SDKs.
 
+import("//build/bazel/bazel_fuchsia_sdk.gni")
 import("//build/config/build_api_module.gni")
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/config/fuchsia/target_api_level.gni")
@@ -176,10 +177,71 @@ group("final_fuchsia_idk.validation") {
 
       # Run the Bazel SDK test suite against the final exported directory,
       # TODO(https://fxbug.dev/42075205): Make the Bazel SDK test suite runnable on MacOS!
-      "//build/bazel/bazel_sdk:bazel_sdk_tests_idk",
+      ":final_fuchsia_idk_bazel_sdk_tests",
     ]
   }
   testonly = true
+}
+
+foreach(cpu, idk_target_cpus) {
+  # This target runs the test suite against a locally-generated IDK
+  # (which includes support for all target architectures), but only
+  # for target_cpu. E.g. `bazel_sdk_tests_arm64` will run the
+  # test suite with a build configuration that generates Fuchsia/arm64
+  # binaries.
+  run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests_${cpu}") {
+    target_cpu = cpu
+    idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
+    idk_exported_target = "//sdk:final_fuchsia_idk.exported"
+
+    # Use shared output_base and output_user_root between CPU-specific test runs.
+    output_base = "$target_out_dir/output_base"
+    output_user_root = "$target_out_dir/output_user_root"
+  }
+}
+
+# This target runs the test suite against each target architecture
+# supported by the IDK. Currently, this runs multiple instances of
+# the test suite, one per target cpu. This is a dependency of
+# //sdk:final_fuchsia_idk.validation.
+group("final_fuchsia_idk_bazel_sdk_tests") {
+  testonly = true
+  deps = []
+  foreach(cpu, idk_target_cpus) {
+    deps += [ ":final_fuchsia_idk_bazel_sdk_tests_${cpu}" ]
+  }
+}
+
+# This target generate a Fuchsia Bazel SDK directory directly
+# from the content of the Core IDK. This requires a working Bazel
+# workspace, but its output does not depend on the content of the
+# @fuchsia_sdk repository used by the platform build.
+#
+generate_fuchsia_bazel_sdk("final_fuchsia_sdk") {
+  idk_export_target = "//sdk:final_fuchsia_idk.exported"
+  idk_export_dir = "$root_build_dir/sdk/exported/fuchsia_idk"
+}
+
+foreach(cpu, idk_target_cpus) {
+  run_fuchsia_bazel_sdk_tests("final_fuchsia_sdk_tests_$cpu") {
+    fuchsia_sdk_target = ":final_fuchsia_sdk"
+  }
+}
+
+# Verify the content of the final_fuchsia_sdk target by running
+# the Bazel SDK test suite with it for all supported target cpus.
+group("final_fuchsia_sdk_tests") {
+  testonly = true
+  deps = []
+  foreach(cpu, idk_target_cpus) {
+    deps += [ ":final_fuchsia_sdk_tests_$cpu" ]
+  }
+
+  # NOTE: For now, nothing should depend on the :final_fuchsia_sdk_test
+  # target, except //:root_targets. This ensures the target is always
+  # defined in the GN graph, but can only be built explicitly.
+  visibility = []
+  visibility = [ "*" ]
 }
 
 sdk_final_manifest_golden("final_fuchsia_idk_manifest_golden") {

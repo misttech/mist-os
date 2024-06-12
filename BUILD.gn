@@ -1982,6 +1982,9 @@ group("root_targets") {
     "//build/sdk:sdk_versioned_shared_libraries",
     "//build/sdk:sdk_versioned_source_sets",
 
+    # The Fuchsia Bazel SDK generated from the Core IDK, and the associated tests.
+    "//sdk:final_fuchsia_sdk_tests",
+
     # This target is listed explicitly by multiple CI bot build configurations.
     # See https://fxbug.dev/42162374 for context.
     "//build/images:record_filesystem_sizes",

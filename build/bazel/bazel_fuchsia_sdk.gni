@@ -2,10 +2,285 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_inputs.gni")
+import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
+
 declare_args() {
   # Set to true to populate the @fuchsia_sdk external repository with prebuilt
   # binaries for all supported target CPU architectures. By default, only those
   # for the current build configuration's `target_cpu` value will be generated
   # to save about 3 minutes of build time when they are not needed.
   bazel_fuchsia_sdk_all_cpus = false
+}
+
+# Generate a Fuchsia Bazel SDK directory at build time from the
+# content of a given IDK export directory. This does not require
+# the Bazel workspace to be setup.
+#
+# Arguments:
+#
+#  idk_export_target (required)
+#      GN Label of target generating the IDK export directory.
+#
+#  idk_export_dir (required)
+#      Input IDK export directory (GN path string).
+#
+#  output_name (optional)
+#      Name of the Ninja output directory where the results will be copied to.
+#      Default is simply target_name.
+#
+template("generate_fuchsia_bazel_sdk") {
+  _output_name = target_name
+  if (defined(invoker.output_name)) {
+    _output_name = invoker.output_name
+  }
+
+  _output_dir = "${target_out_dir}/${_output_name}"
+  _buildifier_tool =
+      "//prebuilt/third_party/buildifier/${host_os}-${host_cpu}/buildifier"
+  _bazel_rules_fuchsia_dir = "//build/bazel_sdk/bazel_rules_fuchsia"
+  action(target_name) {
+    script = "${_bazel_rules_fuchsia_dir}/fuchsia/workspace/sdk_export/idk_to_bazel_sdk.py"
+    outputs = [
+      "${_output_dir}/WORKSPACE.bazel",
+      "${_output_dir}/BUILD.bazel",
+    ]
+    inputs = [
+      _buildifier_tool,
+      "${_bazel_rules_fuchsia_dir}/fuchsia/workspace/sdk_templates/generate_sdk_build_rules.bzl",
+    ]
+    depfile = "$target_out_dir/$target_name.d"
+    args = [
+      "--input-idk",
+      rebase_path(invoker.idk_export_dir, root_build_dir),
+      "--output-sdk",
+      rebase_path(_output_dir, root_build_dir),
+      "--buildifier",
+      rebase_path(_buildifier_tool, root_build_dir),
+      "--bazel_rules_fuchsia",
+      rebase_path(_bazel_rules_fuchsia_dir, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+    ]
+    deps = [ invoker.idk_export_target ]
+    hermetic_deps = false
+
+    metadata = {
+      # Used by //:bazel_sdk_info build API module
+      bazel_sdk_info = [
+        {
+          location = rebase_path(_output_dir, root_build_dir)
+        },
+      ]
+    }
+  }
+}
+
+# Run the test suite for the Fuchsia Bazel SDK rules, using
+# an input IDK export directory, an input Fuchsia Bazel SDK, or
+# simply the current @fuchsia_sdk content.
+#
+# This ensures that the Fuchsia checkout's prebuilt Clang and
+# Python toolchains and Bazel third-party modules are used, and
+# disallows network downloads.
+#
+# Note that this does not use bazel_action() because:
+#
+#  1) The test suite is run in its own Bazel workspace,
+#     completely separate from the one used by the platform
+#     build.
+#
+#  2) bazel_action() may change the target build configuration
+#     in ways that are not supported by the test suite, for
+#     example, changing `is_debug` or `optimize` in args.gn may
+#     change Bazel output paths, which will fail tests that rely
+#     on golden file that embeds hard-coded versions of them.
+#
+#  3) There is no way to list all inputs / outputs properly.
+#
+# Arguments:
+#    target_cpu: (optional)
+#       Target cpu name. Default to current_cpu otherwise.
+#
+#    idk_exported_path: (optional)
+#       GN path to an IDK `exported` directory to use to run the
+#       test suite. Requires `idk_exported_target` to be set as well.
+#
+#    idk_exported_target: (optional)
+#       GN label of target used to generate the directory pointed to by
+#       `idk_exported_dir`, if provided.
+#
+#    fuchsia_sdk_path: (optional)
+#       GN path to a Fuchsia Bazel SDK to use to run the test suite with.
+#       Ignored if idk_exported_dir is used. Default is to use the content of
+#       the internal @fuchsia_sdk external repository. If provided, requires
+#       `fuchsia_sdk_target` to be set as well.
+#
+#    fuchsia_sdk_target: (optional)
+#       GN label of target used to generate the directory pointed to by
+#       `fuchsia_sdk_dir`, if provided.
+#
+#    output_base: (optional)
+#       GN path to a Bazel output_base directory to use to run the
+#       test suite. This is useful to run the test suite repeatedly through
+#       multiple targets that each have a different target_cpu value.
+#
+#       See technical note below for proper usage.
+#
+#    output_user_root: (optional)
+#       GN path to a Bazel output_user_root directory to use to run
+#       the test suite. This is useful to run the test suite multiple times
+#       with different target_cpu values or even IDK export directories.
+#
+#    remote_build: (optional)
+#       Override the global `enable_bazel_remote_rbe` setting for building.
+#       Set to false to prevent use of remote services for building.
+#
+template("run_fuchsia_bazel_sdk_tests") {
+  _use_idk_exported = defined(invoker.idk_exported_path)
+  if (_use_idk_exported) {
+    assert(defined(invoker.idk_exported_target),
+           "idk_exported_path requires idk_exported_target to be defined!")
+    _idk_exported_path = invoker.idk_exported_path
+    _idk_exported_target = invoker.idk_exported_target
+  }
+
+  _use_fuchsia_sdk = defined(invoker.fuchsia_sdk_target)
+  if (_use_fuchsia_sdk) {
+    _fuchsia_sdk_target = invoker.fuchsia_sdk_target
+    if (defined(invoker.fuchsia_sdk_path)) {
+      _fuchsia_sdk_path = invoker.fuchsia_sdk_path
+    } else {
+      _fuchsia_sdk_path =
+          get_label_info(_fuchsia_sdk_target, "target_out_dir") + "/" +
+          get_label_info(_fuchsia_sdk_target, "name")
+    }
+    assert(defined(invoker.fuchsia_sdk_target),
+           "fuchsia_sdk_path requires fuchsia_sdk_target to be defined!")
+  }
+
+  _target_cpu = target_cpu
+  if (defined(invoker.target_cpu)) {
+    _target_cpu = invoker.target_cpu
+  }
+
+  if (defined(invoker.output_base)) {
+    _output_base = invoker.output_base
+  } else {
+    _output_base = "${target_gen_dir}/${target_name}/output_base"
+  }
+  if (defined(invoker.output_user_root)) {
+    _output_user_root = invoker.output_user_root
+  } else {
+    _output_user_root = "${target_gen_dir}/${target_name}/output_user_root"
+  }
+
+  action(target_name) {
+    testonly = true
+    script = "//build/bazel_sdk/tests/scripts/bazel_test.py"
+    inputs = [ "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel" ]
+    outputs = [
+      "$target_gen_dir/$target_name.stamp",
+      "$target_out_dir/$target_name.bazel_events_logs.json",
+    ]
+    _exec_log = "$target_out_dir/$target_name.bazel_exec_log.pb.zstd"
+    depfile = "$target_gen_dir/$target_name.d"
+
+    args = [
+      "--verbose",
+      "--fuchsia_source_dir=" + rebase_path("//", root_build_dir),
+      "--output_base=" + rebase_path(_output_base, root_build_dir),
+      "--output_user_root=" + rebase_path(_output_user_root, root_build_dir),
+      "--target_cpu=${_target_cpu}",
+      "--bazel=" + rebase_path(inputs[0], root_build_dir),
+      "--stamp-file=" + rebase_path(outputs[0], root_build_dir),
+      "--depfile=" + rebase_path(depfile, root_build_dir),
+      "--quiet",
+    ]
+
+    deps = []
+
+    _remote_build = enable_bazel_remote_rbe
+    if (defined(invoker.remote_build)) {
+      _remote_build = invoker.remote_build
+    }
+    if (_remote_build || bazel_upload_build_events != "") {
+      _remote_services_bazelrc_target = "//build/bazel:remote_services_bazelrc"
+      _remote_services_bazelrc_path =
+          get_label_info(_remote_services_bazelrc_target, "target_out_dir") +
+          "/remote_services.bazelrc"
+      args += [
+        "--bazelrc",
+        rebase_path(_remote_services_bazelrc_path, root_build_dir),
+      ]
+      deps += [ _remote_services_bazelrc_target ]
+    }
+    if (_remote_build) {
+      args += [ "--bazel-config=remote" ]
+    }
+    if (bazel_upload_build_events != "") {
+      args += [ "--bazel-config=" + bazel_upload_build_events ]
+    }
+
+    if (_use_idk_exported) {
+      args += [
+        "--fuchsia_idk_directory",
+        rebase_path(_idk_exported_path, root_build_dir),
+      ]
+      deps += [ _idk_exported_target ]
+    } else if (_use_fuchsia_sdk) {
+      args += [
+        "--fuchsia_build_dir",
+        rebase_path(root_build_dir, root_build_dir),
+        "--fuchsia_sdk_dir",
+        rebase_path(_fuchsia_sdk_path, root_build_dir),
+      ]
+      deps += [ _fuchsia_sdk_target ]
+    } else {
+      args += [
+        "--fuchsia_build_dir",
+        rebase_path(root_build_dir, root_build_dir),
+      ]
+      deps += [ "//build/bazel:generate_fuchsia_sdk_repository" ]
+    }
+    args += [
+      "--prebuilt-python-version-file",
+      rebase_path(prebuilt_content_hash_files.python, root_build_dir),
+      "--prebuilt-clang-version-file",
+      rebase_path(prebuilt_content_hash_files.clang, root_build_dir),
+    ]
+
+    if (bazel_execution_logs) {
+      args += [
+        "--bazel-exec-log-compact",
+        rebase_path(_exec_log, root_build_dir),
+      ]
+    }
+    args += [
+      "--bazel-build-events-log-json",
+      rebase_path(outputs[1], root_build_dir),
+    ]
+
+    metadata = {
+      # Used by //:bazel_build_events_logs Build API module
+      bazel_build_events_log = [
+        {
+          gn_label = get_label_info(":$target_name", "label_no_toolchain")
+          build_events_log = rebase_path(outputs[1], root_build_dir)
+          format = "json"
+        },
+      ]
+    }
+
+    deps += [
+      prebuilt_content_hash_labels.clang,
+      prebuilt_content_hash_labels.python,
+    ]
+    pool = "//:console"
+    hermetic_deps = false
+
+    # The build events log contains absolute paths written by Bazel!
+    no_output_dir_leaks = false
+  }
 }
