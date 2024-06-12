@@ -87,7 +87,6 @@ def main():
                 [
                     f"-Clink-arg=--sysroot={fuchsia_sysroot}",
                     f"-Lnative={shared_libs_root}",
-                    f"@{ROOT_PATH / build_dir}/rust_api_level_cfg_flags.txt",
                 ]
             )
         if "LINUX" in target:
