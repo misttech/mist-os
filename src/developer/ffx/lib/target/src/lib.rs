@@ -531,32 +531,37 @@ pub enum WaitFor {
     DeviceOffline,
 }
 
-const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(1000);
 const DOWN_REPOLL_DELAY_MS: u64 = 500;
 
 pub async fn wait_for_device(
     wait_timeout: Option<Duration>,
+    env: &EnvironmentContext,
     target_spec: Option<String>,
-    target_collection: &TargetCollectionProxy,
+    behavior: WaitFor,
+) -> Result<(), ffx_command::Error> {
+    wait_for_device_inner(RcsKnockerImpl, wait_timeout, env, target_spec, behavior).await
+}
+
+async fn wait_for_device_inner(
+    knocker: impl RcsKnocker,
+    wait_timeout: Option<Duration>,
+    env: &EnvironmentContext,
+    target_spec: Option<String>,
     behavior: WaitFor,
 ) -> Result<(), ffx_command::Error> {
     let target_spec_clone = target_spec.clone();
+    let env = env.clone();
     let knock_fut = async {
         loop {
-            break match knock_target_by_name(
-                &target_spec_clone,
-                target_collection,
-                OPEN_TARGET_TIMEOUT,
-                DEFAULT_RCS_KNOCK_TIMEOUT,
-            )
-            .await
-            {
+            futures_lite::future::yield_now().await;
+            break match knocker.knock_rcs(target_spec_clone.clone(), &env).await {
                 Err(KnockError::CriticalError(e)) => Err(ffx_command::Error::Unexpected(e)),
                 Err(KnockError::NonCriticalError(e)) => {
                     if let WaitFor::DeviceOffline = behavior {
                         Ok(())
                     } else {
                         tracing::debug!("unable to knock target: {e:?}");
+                        async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
                         continue;
                     }
                 }
@@ -583,6 +588,45 @@ pub async fn wait_for_device(
         ))
     })
     .await
+}
+
+#[cfg_attr(test, mockall::automock)]
+trait RcsKnocker {
+    fn knock_rcs(
+        &self,
+        target_spec: Option<String>,
+        env: &EnvironmentContext,
+    ) -> impl Future<Output = Result<(), KnockError>>;
+}
+
+struct RcsKnockerImpl;
+
+impl<T: RcsKnocker + ?Sized> RcsKnocker for Box<T> {
+    fn knock_rcs(
+        &self,
+        target_spec: Option<String>,
+        env: &EnvironmentContext,
+    ) -> impl Future<Output = Result<(), KnockError>> {
+        (**self).knock_rcs(target_spec, env)
+    }
+}
+
+impl RcsKnocker for RcsKnockerImpl {
+    async fn knock_rcs(
+        &self,
+        target_spec: Option<String>,
+        env: &EnvironmentContext,
+    ) -> Result<(), KnockError> {
+        knock_target_daemonless(target_spec, env, Some(DEFAULT_RCS_KNOCK_TIMEOUT)).await.map(
+            |compat| {
+                let msg = match compat {
+                    Some(c) => format!("Received compat info: {c:?}"),
+                    None => format!("No compat info received"),
+                };
+                tracing::debug!("Knocked target. {msg}");
+            },
+        )
+    }
 }
 
 /// Attempts to "knock" a target to determine if it is up and connectable via RCS, within
@@ -746,8 +790,10 @@ pub async fn add_manual_target(
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_command::bug;
     use ffx_config::macro_deps::serde_json::Value;
     use ffx_config::{test_init, ConfigLevel};
+    use futures_lite::future::{pending, ready};
 
     #[fuchsia::test]
     async fn test_target_wait_too_short_timeout() {
@@ -842,5 +888,177 @@ mod test {
         )
         .await
         .is_err());
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_device_knock_works() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| Box::pin(async { Ok(()) }));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(10000)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_device_hangs_indefinitely() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| Box::pin(pending()));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_device_critical_error_causes_failure() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().times(1).returning(|_, _| {
+            Box::pin(async { Err(KnockError::CriticalError(bug!("Oh no!").into())) })
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_device_critical_error_causes_failure_even_waiting_for_down() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().times(1).returning(|_, _| {
+            Box::pin(async { Err(KnockError::CriticalError(bug!("Oh no!").into())) })
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn non_critical_error_causes_eventual_timeout() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| {
+            Box::pin(async { Err(KnockError::NonCriticalError(bug!("Oh no!").into())) })
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(3)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn non_critical_error_returns_ok_for_down_target() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| {
+            Box::pin(async { Err(KnockError::NonCriticalError(bug!("Oh no!").into())) })
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn knock_error_reattempt_successful() {
+        let mut mock = MockRcsKnocker::new();
+        let mut seq = mockall::Sequence::new();
+        mock.expect_knock_rcs().times(1).in_sequence(&mut seq).returning(|_, _| {
+            Box::pin(ready(Err(KnockError::NonCriticalError(bug!("timeout").into()))))
+        });
+        mock.expect_knock_rcs()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Box::pin(ready(Ok(()))));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(10)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_offline_after_online() {
+        let mut mock = MockRcsKnocker::new();
+        let mut seq = mockall::Sequence::new();
+        mock.expect_knock_rcs()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Box::pin(ready(Ok(()))));
+        mock.expect_knock_rcs()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Box::pin(ready(Ok(()))));
+        mock.expect_knock_rcs().times(1).in_sequence(&mut seq).returning(|_, _| {
+            Box::pin(ready(Err(KnockError::NonCriticalError(
+                bug!("Oh no it's not connected").into(),
+            ))))
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(10)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_down_when_able_to_connect_to_device() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| Box::pin(ready(Ok(()))));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
     }
 }

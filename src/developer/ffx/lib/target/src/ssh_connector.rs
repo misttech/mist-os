@@ -6,6 +6,7 @@ use crate::overnet_connector::{
     OvernetConnection, OvernetConnectionError, OvernetConnector, BUFFER_SIZE,
 };
 use anyhow::Result;
+use ffx_command::FfxContext;
 use ffx_config::EnvironmentContext;
 use ffx_ssh::ssh::{build_ssh_command_with_env, SshError};
 use fuchsia_async::Task;
@@ -73,7 +74,7 @@ async fn start_ssh_command(target: SocketAddr, env_context: &EnvironmentContext)
     );
     tracing::debug!("SshConnector: invoking {ssh:?}");
     let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
-    Ok(ssh_cmd.spawn()?)
+    Ok(ssh_cmd.spawn().bug_context("spawning ssh command")?)
 }
 
 async fn try_ssh_cmd_cleanup(mut cmd: Child) -> Result<()> {
