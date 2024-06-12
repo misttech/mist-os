@@ -18,7 +18,7 @@
 #include <string>
 
 #include "src/developer/forensics/feedback_data/data_provider.h"
-#include "src/developer/forensics/testing/stubs/fidl_server.h"
+#include "src/developer/forensics/testing/stubs/fidl_server_hlcpp.h"
 
 namespace forensics {
 namespace stubs {

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_FORENSICS_TESTING_STUBS_FIDL_SERVER_H_
-#define SRC_DEVELOPER_FORENSICS_TESTING_STUBS_FIDL_SERVER_H_
+#ifndef SRC_DEVELOPER_FORENSICS_TESTING_STUBS_FIDL_SERVER_HLCPP_H_
+#define SRC_DEVELOPER_FORENSICS_TESTING_STUBS_FIDL_SERVER_HLCPP_H_
 
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -103,4 +103,4 @@ class MultiBindingFidlServer : public TestBase {
 #define STUB_METHOD_CLOSES_ALL_CONNECTIONS(METHOD, PARAM_TYPES...) \
   void METHOD(PARAM_TYPES) override { CloseAllConnections(); }
 
-#endif  // SRC_DEVELOPER_FORENSICS_TESTING_STUBS_FIDL_SERVER_H_
+#endif  // SRC_DEVELOPER_FORENSICS_TESTING_STUBS_FIDL_SERVER_HLCPP_H_
