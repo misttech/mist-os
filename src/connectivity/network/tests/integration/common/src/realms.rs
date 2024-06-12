@@ -67,6 +67,8 @@ impl NetstackVersion {
                 fnet_debug::InterfacesMarker::PROTOCOL_NAME,
                 fnet_interfaces_admin::InstallerMarker::PROTOCOL_NAME,
                 fnet_interfaces::StateMarker::PROTOCOL_NAME,
+                fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME,
+                fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_name::DnsServerWatcherMarker::PROTOCOL_NAME,
                 fnet_neighbor::ControllerMarker::PROTOCOL_NAME,
                 fnet_neighbor::ViewMarker::PROTOCOL_NAME,
@@ -95,8 +97,6 @@ impl NetstackVersion {
             NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
             | NetstackVersion::ProdNetstack2 => &common_services_and!(
                 fnet_filter_deprecated::FilterMarker::PROTOCOL_NAME,
-                fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME,
-                fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_stack::LogMarker::PROTOCOL_NAME,
             ),
             NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => &common_services_and!(

@@ -69,6 +69,8 @@ pub fn main() {
         .add_fidl_service(Service::RootRoutesV6)
         .add_fidl_service(Service::Interfaces)
         .add_fidl_service(Service::InterfacesAdmin)
+        .add_fidl_service(Service::MulticastAdminV4)
+        .add_fidl_service(Service::MulticastAdminV6)
         .add_fidl_service(Service::FilterState)
         .add_fidl_service(Service::FilterControl)
         .add_fidl_service(Service::Neighbor)

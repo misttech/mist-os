@@ -17,6 +17,7 @@ mod filter;
 mod inspect;
 mod interfaces_admin;
 mod interfaces_watcher;
+mod multicast_admin;
 mod name_worker;
 mod neighbor_worker;
 mod netdevice_worker;
@@ -54,6 +55,7 @@ use util::{ConversionContext, IntoFidl as _};
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
     fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_async as fasync,
     fuchsia_zircon as zx,
 };
@@ -1099,6 +1101,8 @@ pub(crate) enum Service {
     FilterState(fidl_fuchsia_net_filter::StateRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
+    MulticastAdminV4(fidl_fuchsia_net_multicast_admin::Ipv4RoutingTableControllerRequestStream),
+    MulticastAdminV6(fidl_fuchsia_net_multicast_admin::Ipv6RoutingTableControllerRequestStream),
     NeighborController(fidl_fuchsia_net_neighbor::ControllerRequestStream),
     Neighbor(fidl_fuchsia_net_neighbor::ViewRequestStream),
     PacketSocket(fidl_fuchsia_posix_socket_packet::ProviderRequestStream),
@@ -1480,6 +1484,20 @@ impl NetstackSeed {
                                 fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME
                             );
                             interfaces_admin::serve(netstack.clone(), installer).await;
+                        }
+                        Service::MulticastAdminV4(controller) => {
+                            debug!(
+                                "serving {}",
+                                fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME
+                            );
+                            multicast_admin::serve_table_controller::<Ipv4>(controller).await;
+                        }
+                        Service::MulticastAdminV6(controller) => {
+                            debug!(
+                                "serving {}",
+                                fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME
+                            );
+                            multicast_admin::serve_table_controller::<Ipv6>(controller).await;
                         }
                         Service::DebugInterfaces(debug_interfaces) => {
                             debug_interfaces
