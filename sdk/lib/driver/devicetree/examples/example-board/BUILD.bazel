@@ -22,7 +22,7 @@ fuchsia_driver_bind_bytecode(
     deps = [
         "@fuchsia_sdk//bind/fuchsia.devicetree",
         "@fuchsia_sdk//bind/fuchsia.test.platform",
-        "@internal_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     ],
 )
 
@@ -37,12 +37,12 @@ fuchsia_cc_driver(
     deps = [
         "@fuchsia_sdk//bind/fuchsia.platform:fuchsia.platform_cc",
         "@fuchsia_sdk//fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
         "@fuchsia_sdk//fidl/fuchsia.io:fuchsia.io_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_runtime",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@internal_sdk//fidl/fuchsia.boot:fuchsia.boot_cpp",
-        "@internal_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
         "@internal_sdk//pkg/devicetree-default",
         "@internal_sdk//pkg/devicetree-load-visitors",
         "@internal_sdk//pkg/devicetree-manager",

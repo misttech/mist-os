@@ -23,7 +23,7 @@ fuchsia_driver_bind_bytecode(
     deps = [
         "@fuchsia_sdk//bind/fuchsia.devicetree",
         "@fuchsia_sdk//bind/fuchsia.khadas.platform",
-        "@internal_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     ],
 )
 
@@ -80,15 +80,15 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//bind/fuchsia.adc:fuchsia.adc_cc",
         "@fuchsia_sdk//bind/fuchsia.broadcom.platform.sdio:fuchsia.broadcom.platform.sdio_cc",
         "@fuchsia_sdk//bind/fuchsia.sdio:fuchsia.sdio_cc",
+        "@fuchsia_sdk//fidl/fuchsia.buttons:fuchsia.buttons_cpp",
         "@fuchsia_sdk//fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cc",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_runtime",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
-        "@internal_sdk//fidl/fuchsia.buttons:fuchsia.buttons_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_cpp",
-        "@internal_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-        "@internal_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
         "@internal_sdk//fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib_cc",
         "@internal_sdk//pkg/devicetree-driver-visitors",
         "@internal_sdk//pkg/devicetree-load-visitors",
