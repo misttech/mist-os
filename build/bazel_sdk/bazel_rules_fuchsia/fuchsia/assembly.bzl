@@ -51,15 +51,12 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_partitions_configuration.bzl",
     _fuchsia_partitions_configuration = "fuchsia_partitions_configuration",
+    _fuchsia_prebuilt_partitions_configuration = "fuchsia_prebuilt_partitions_configuration",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_platform_artifacts.bzl",
     _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
     _fuchsia_platform_artifacts = "fuchsia_platform_artifacts",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_prebuilt_partitions_configuration.bzl",
-    _fuchsia_prebuilt_partitions_configuration = "fuchsia_prebuilt_partitions_configuration",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product.bzl",
