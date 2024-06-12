@@ -247,6 +247,7 @@ fidl_library://fidl/fuchsia.hardware.i2cimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.light
 fidl_library://fidl/fuchsia.hardware.network
 fidl_library://fidl/fuchsia.hardware.pci
+fidl_library://fidl/fuchsia.hardware.platform.bus (unstable)
 fidl_library://fidl/fuchsia.hardware.platform.device
 fidl_library://fidl/fuchsia.hardware.power (unstable)
 fidl_library://fidl/fuchsia.hardware.power.sensor
