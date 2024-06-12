@@ -570,7 +570,7 @@ zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOp
   DEBUG_ASSERT(!(options & VmCowPagesOptions::kInternalOnlyMask));
   fbl::AllocChecker ac;
   auto cow = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      ktl::move(root_lock), options, PMM_ALLOC_FLAG_ANY, size, ktl::move(src), nullptr));
+      ktl::move(root_lock), options, PMM_ALLOC_FLAG_CAN_WAIT, size, ktl::move(src), nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
