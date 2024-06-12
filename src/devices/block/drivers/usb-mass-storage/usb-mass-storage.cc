@@ -315,7 +315,7 @@ zx_status_t UsbMassStorageDevice::Reset() {
     return status;
   }
   // Step 2: Clear Feature HALT to the Bulk-In endpoint
-  constexpr uint8_t request_type = USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_ENDPOINT;
+  constexpr uint8_t request_type = USB_DIR_OUT | USB_RECIP_ENDPOINT;
   status = usb_.ClearFeature(request_type, USB_ENDPOINT_HALT, bulk_in_addr_, ZX_TIME_INFINITE);
   if (status != ZX_OK) {
     zxlogf(DEBUG, "UMS: clear endpoint halt failed: %s", zx_status_get_string(status));
@@ -362,7 +362,7 @@ zx_status_t UsbMassStorageDevice::SendCbw(uint8_t lun, uint32_t transfer_length,
   return req->response.status;
 }
 
-zx_status_t UsbMassStorageDevice::ReadCsw(uint32_t* out_residue) {
+zx_status_t UsbMassStorageDevice::ReadCsw(uint32_t* out_residue, bool retry) {
   sync_completion_t completion;
   usb_request_complete_callback_t complete = {
       .callback = ReqComplete,
@@ -372,6 +372,28 @@ zx_status_t UsbMassStorageDevice::ReadCsw(uint32_t* out_residue) {
   usb_request_t* csw_request = csw_req_;
   RequestQueue(csw_request, &complete);
   waiter_->Wait(&completion, ZX_TIME_INFINITE);
+  if (csw_request->response.status != ZX_OK) {
+    if (csw_request->response.status == ZX_ERR_IO_REFUSED) {
+      if (retry) {
+        Reset();
+        return csw_request->response.status;
+      }
+      // Stalled. Clear Bulk In endpoint and try to receive CSW again.
+      auto status = usb_.ResetEndpoint(bulk_in_addr_);
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "ResetEndpoint failed %d", status);
+        return status;
+      }
+      constexpr uint8_t request_type = USB_DIR_OUT | USB_RECIP_ENDPOINT;
+      status = usb_.ClearFeature(request_type, USB_ENDPOINT_HALT, bulk_in_addr_, ZX_TIME_INFINITE);
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "UMS: clear endpoint halt failed: %s", zx_status_get_string(status));
+        return status;
+      }
+      return ReadCsw(out_residue, true);
+    }
+    return csw_request->response.status;
+  }
   csw_status_t csw_error = VerifyCsw(csw_request, out_residue);
 
   if (csw_error == CSW_SUCCESS) {

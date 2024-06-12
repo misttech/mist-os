@@ -107,7 +107,7 @@ class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceTy
   // Reads a Command Status Wrapper from a USB mass storage device
   // and validates that the command index in the response matches the index
   // in the previous request.
-  zx_status_t ReadCsw(uint32_t* out_residue);
+  zx_status_t ReadCsw(uint32_t* out_residue, bool retry = false);
 
   // Validates the command index and signature of a command status wrapper.
   csw_status_t VerifyCsw(usb_request_t* csw_request, uint32_t* out_residue);
