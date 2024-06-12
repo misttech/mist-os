@@ -210,8 +210,19 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
 
   if (!request.config() || !request.config()->target()) {
     FX_LOGS(ERROR) << "No Target Specified and System Wide profiling isn't yet implemented!";
-    completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+    completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kMissingTargetConfigs));
     return;
+  }
+
+  if (!request.config()->configs()) {
+    FX_LOGS(ERROR) << "No sampling configs specified!";
+    completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kMissingSampleConfigs));
+    return;
+  }
+
+  sample_specs_.clear();
+  for (auto&& sampling_config : request.config()->configs().value()) {
+    sample_specs_.push_back(std::move(sampling_config));
   }
 
   // We're given pids/tids/jobids for each of our targets. We'll need handles to each of these
@@ -332,13 +343,16 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
     return;
   }
   if constexpr (kSamplerKernelSupport) {
-    sampler_ = std::make_unique<KernelSampler>(dispatcher_, std::move(targets_));
+    sampler_ =
+        std::make_unique<KernelSampler>(dispatcher_, std::move(targets_), std::move(sample_specs_));
   } else {
     FX_LOGS(WARNING)
         << "Kernel assisted sampling is not enabled. Falling back to zx_process_read_memory based sampling.\n"
         << "Set the build arg \"experimental_thread_sampler_enabled = true\" to enable kernel assisted sampling";
-    sampler_ = std::make_unique<Sampler>(dispatcher_, std::move(targets_));
+    sampler_ =
+        std::make_unique<Sampler>(dispatcher_, std::move(targets_), std::move(sample_specs_));
   }
+  sample_specs_.clear();
   targets_.Clear();
   if (component_target_) {
     ComponentWatcher::ComponentEventHandler on_start_handler = [this](std::string moniker,
@@ -381,6 +395,7 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
   size_t buffer_size_mb = request.buffer_size_mb().value_or(8);
   zx::result<> start_res = sampler_->Start(buffer_size_mb);
   if (start_res.is_error()) {
+    FX_PLOGS(ERROR, start_res.status_value()) << "Failed to start sampler";
     Reset();
     completer.Close(start_res.status_value());
     return;
@@ -481,4 +496,5 @@ void profiler::ProfilerControllerImpl::Reset() {
   targets_.Clear();
   state_ = ProfilingState::Unconfigured;
   component_target_.reset();
+  sample_specs_.clear();
 }

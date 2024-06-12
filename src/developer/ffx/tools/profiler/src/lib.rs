@@ -124,8 +124,22 @@ pub async fn profiler(
     match cmd.sub_cmd {
         ProfilerSubCommand::Start(opts) => {
             let target = gather_targets(&opts)?;
+            let config = profiler::SamplingConfig {
+                period: Some(opts.sample_period_us * 1000),
+                timebase: Some(profiler::Counter::PlatformIndependent(
+                    profiler::CounterId::Nanoseconds,
+                )),
+                sample: Some(profiler::Sample {
+                    callgraph: Some(profiler::CallgraphConfig {
+                        strategy: Some(profiler::CallgraphStrategy::FramePointer),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
             let profiler_config = profiler::Config {
-                configs: Some(vec![]),
+                configs: Some(vec![config]),
                 target: Some(target),
                 ..Default::default()
             };

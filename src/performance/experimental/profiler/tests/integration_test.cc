@@ -100,7 +100,7 @@ TEST(ProfilerIntegrationTest, EndToEnd) {
   ASSERT_EQ(ZX_OK, res);
 
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 1000000,
+      .period = 10'000'000,
       .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
           fuchsia_cpu_profiler::CounterId::kNanoseconds),
       .sample = fuchsia_cpu_profiler::Sample{{
@@ -157,7 +157,7 @@ TEST(ProfilerIntegrationTest, NewThreads) {
   ASSERT_EQ(ZX_OK, info_result);
 
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 1000000,
+      .period = 10'000'000,
       .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
           fuchsia_cpu_profiler::CounterId::kNanoseconds),
       .sample = fuchsia_cpu_profiler::Sample{{
@@ -229,7 +229,7 @@ TEST(ProfilerIntegrationTest, OwnJobId) {
   ASSERT_EQ(ZX_OK, info_result);
 
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 1000000,
+      .period = 10'000'000,
       .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
           fuchsia_cpu_profiler::CounterId::kNanoseconds),
       .sample = fuchsia_cpu_profiler::Sample{{
@@ -305,7 +305,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcess) {
   ASSERT_EQ(ZX_OK, info_result);
 
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 1000000,
+      .period = 10'000'000,
       .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
           fuchsia_cpu_profiler::CounterId::kNanoseconds),
       .sample = fuchsia_cpu_profiler::Sample{{
@@ -405,7 +405,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcessThreadSpawner) {
   ASSERT_EQ(ZX_OK, info_result);
 
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 1000000,
+      .period = 10'000'000,
       .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
           fuchsia_cpu_profiler::CounterId::kNanoseconds),
       .sample = fuchsia_cpu_profiler::Sample{{
@@ -469,7 +469,7 @@ TEST(ProfilerIntegrationTest, ComponentByMoniker) {
 
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 1000000,
+      .period = 10'000'000,
       .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
           fuchsia_cpu_profiler::CounterId::kNanoseconds),
       .sample = fuchsia_cpu_profiler::Sample{{
@@ -546,7 +546,7 @@ TEST(ProfilerIntegrationTest, LaunchedComponent) {
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
 
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 1000000,
+      .period = 10'000'000,
       .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
           fuchsia_cpu_profiler::CounterId::kNanoseconds),
       .sample = fuchsia_cpu_profiler::Sample{{
@@ -597,7 +597,7 @@ TEST(ProfilerIntegrationTest, ChildComponents) {
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
 
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 1000000,
+      .period = 10'000'000,
       .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
           fuchsia_cpu_profiler::CounterId::kNanoseconds),
       .sample = fuchsia_cpu_profiler::Sample{{
@@ -695,7 +695,7 @@ TEST(ProfilerIntegrationTest, ChildComponentsByMoniker) {
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
 
   fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 1000000,
+      .period = 10'000'000,
       .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
           fuchsia_cpu_profiler::CounterId::kNanoseconds),
       .sample = fuchsia_cpu_profiler::Sample{{

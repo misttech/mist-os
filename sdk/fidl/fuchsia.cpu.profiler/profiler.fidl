@@ -32,7 +32,7 @@ type Counter = flexible union {
     2: platform_dependent uint32;
 };
 
-/// Various approaches to obtaining
+/// Various approaches to obtaining a backtrace
 type CallgraphStrategy = flexible enum : uint8 {
     /// Don't try to get a callgraph
     NONE = 0;
@@ -141,6 +141,8 @@ closed protocol Session {
         BAD_SOCKET = 1;
         BAD_STATE = 2;
         INVALID_CONFIGURATION = 3;
+        MISSING_SAMPLE_CONFIGS = 4;
+        MISSING_TARGET_CONFIGS = 5;
     };
 
     /// Begin profiling and optionally begin writing data to the configured

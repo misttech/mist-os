@@ -64,4 +64,8 @@ pub struct Start {
     /// pprof format. Ignored if --symbolize is false.
     #[argh(option, default = "true")]
     pub pprof_conversion: bool,
+
+    /// how frequently to take a sample
+    #[argh(option, default = "10000")]
+    pub sample_period_us: u64,
 }
