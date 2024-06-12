@@ -473,13 +473,47 @@ class Scheduler {
   // Returns the Scheduler instance for the given CPU.
   static Scheduler* Get(cpu_num_t cpu);
 
-  // Returns a CPU to run the given thread on.  The thread's lock must be held
-  // exclusively during this operation.  This is almost always called when
-  // threads are transitioning from a wait queue to a scheduler, therefore the
-  // thread's state is only protected by the thread's lock; not by any scheduler
-  // or wait queue lock.
+  // Find an appropriate CPU for a thread to run on, then lock that scheduler,
+  // confirm that it is still active, and invoke the user-supplied callback with
+  // the scheduler's queue_lock held.
+  //
+  // This method may need to search for a target CPU for the thread more than
+  // once if the initially chosen scheduler becomes deactivated after it was
+  // selected, but before it was locked.
+  template <typename Callable>
+  static cpu_num_t FindActiveSchedulerForThread(Thread* thread, FindTargetCpuReason reason,
+                                                Callable action) TA_REQ_SHARED(thread->get_lock()) {
+    while (true) {
+      const cpu_num_t target_cpu = FindTargetCpu(thread, reason);
+      Scheduler* const target = Get(target_cpu);
+      Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+
+      if (target->IsCpuActive()) {
+        action(thread, target);
+        return target_cpu;
+      }
+
+      IncFindTargetCpuRetriesKcounter();
+    }
+  }
+
+  // A helper function used by FindActiveSchedulerForThread.  Returns a CPU to
+  // run the given thread on, but does not lock that scheduler, meaning that the
+  // selected scheduler can become de-activated before the caller can lock it.
+  //
+  // Typically, users will want to use FindActiveSchedulerForThread instead,
+  // which will supply a locked scheduler which is guaranteed to be active.
+  //
   static cpu_num_t FindTargetCpu(Thread* thread, FindTargetCpuReason reason)
       TA_REQ_SHARED(thread->get_lock());
+
+  // Increment the kcounter which tracks the number of times that an extra
+  // attempt to find an active scheduler was needed during
+  // FindActiveSchedulerForThread.  Sadly, the method cannot increment the
+  // counter directly because of the way that kcounters need to be declared, in
+  // a translation unit in an anonymous namespace, with no ability to fwd
+  // declare the counter.
+  static void IncFindTargetCpuRetriesKcounter();
 
   // Change this scheduler's CPU's active state in the global mp_active_mask.
   // We require that the scheduler's queue_lock be held during the operation.
@@ -871,11 +905,18 @@ class Scheduler {
   // the scheduler that the thread is currently a member of (see
   // AssertInScheduler, above).
   //
+  // MarkInFindActiveSchedulerForThreadCbk tells the static analyzer that we are
+  // in the callback for an FindActiveSchedulerForThread operation, meaning that
+  // we must hold both the thread's lock and the queue_lock for the thread and
+  // scheduler involved in the operation.
+  //
   // See StealWork for a practical example of where these methods are useful.
   //
   static inline void MarkHasSchedulerAccess(const Scheduler& s) TA_ASSERT(s.queue_lock_) {}
   static inline void MarkHasOwnedThreadAccess(const Thread& t)
       TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT_SHARED(t.get_lock()) {}
+  static inline void MarkInFindActiveSchedulerForThreadCbk(const Thread& t, const Scheduler& s)
+      TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT(t.get_lock()) TA_ASSERT(s.queue_lock_) {}
 
   // The run queue of fair scheduled threads ready to run, but not currently running.
   TA_GUARDED(queue_lock_)
@@ -965,18 +1006,18 @@ class Scheduler {
   // Performance scale of this CPU relative to the highest performance CPU. This
   // value is initially determined from the system topology, when available, and
   // by userspace performance/thermal management at runtime.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale performance_scale_{1};
+  TA_GUARDED(queue_lock_) SchedPerformanceScale performance_scale_ {1};
   TA_GUARDED(queue_lock_)
   RelaxedAtomic<SchedPerformanceScale> performance_scale_reciprocal_{SchedPerformanceScale{1}};
 
   // Performance scale requested by userspace. The operational performance scale
   // is updated to this value (possibly adjusted for the minimum allowed value)
   // on the next reschedule, after the current thread's accounting is updated.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale pending_user_performance_scale_{1};
+  TA_GUARDED(queue_lock_) SchedPerformanceScale pending_user_performance_scale_ {1};
 
   // Default performance scale, determined from the system topology, when
   // available.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale default_performance_scale_{1};
+  TA_GUARDED(queue_lock_) SchedPerformanceScale default_performance_scale_ {1};
 
   // The CPU this scheduler instance is associated with.
   // NOTE: This member is not initialized to prevent clobbering the value set
