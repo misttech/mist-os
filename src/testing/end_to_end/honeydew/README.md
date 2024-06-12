@@ -48,7 +48,7 @@ environment variables can be specified:
 
 Here are some of the best practices that should be followed while contributing
 to Honeydew:
-* Ensure code is compliant with
+* Right before merging the CL, ensure code is compliant with
   [Honeydew code guidelines][Honeydew code guidelines] by running
   `conformance.sh`.
 * Ensure there is [unit tests][unit tests] and
@@ -100,71 +100,29 @@ INFO: Honeydew code has passed all of the conformance steps
 
 ### Code Review Expectations
 
-If you are making non-superficial changes to Honeydew, refer to Honeydew's
-[Best Practices][Best Practices] for general guidances.
-
-Additionally, please follow Honeydew's CL review process as detailed below:
-
-#### Author
-
-* On the initial patchset where reviewers will be added, do the following before
-  starting the review:
-  1. Ensure [conformance.sh][Honeydew code conformance scripts] passes
-  2. Include the following information at the end of the commit message:
-    ```
-    Verified the following on Patchset: <initial patchset number>
-    * Honeydew code guidelines
-    * Successfully ran the impacted functional tests using [LocalRun|InfraRun]
-    ```
-* On final patchset that will be used for merging, do the following before
-  merging the CL:
-  1. Ensure [conformance.sh][Honeydew code conformance scripts] passes
-  2. Ensure CL does not introduce any regressions by successfully running
-    **all** of the Honeydew staging builders using try-jobs
-    * Look for `lacewing-self-staging` in the try-job name reg-ex filter field
-      (exclude `-subbuild` builders).
-    * For reference, see
-      [screenshot][example Lacewing self tests staging builders using try-jobs]
-  3. Update the commit message with the final patchset number:
-    ```
-    Verified the following on Patchset: <final patchset number>
-    * Honeydew code guidelines
-    * Successfully ran the impacted functional tests using [LocalRun|InfraRun]
-    * Successfully ran Honeydew builders using try-jobs
-    ```
-
-#### Reviewer
-
-* Remind the CL author to follow [Best Practices][Best Practices] section by
-  opening a comment and asking author to resolve this comment only after they
-  verify on absolute final patchset that will be merged
-* Verify the author has included all the information in commit message as
-  mentioned in [Author][Author] section
+* If you are making non-superficial changes to Honeydew, refer to Honeydew's
+  [Best Practices][Best Practices] for general guidances.
+* Else, ensure [conformance.sh][conformance.sh] passes right before merging the
+  CL.
 
 ## Interactive usage
 
 If you like to use Honeydew in an interactive Python terminal refer to
 [interactive usage](markdowns/interactive_usage.md).
 
-[Honeydew OWNERS]: ../OWNERS
-
 [Affordance OWNER]: honeydew/interfaces/OWNERS
-
-[Author]: #Author
 
 [Best Practices]: #Best-Practices
 
-[Honeydew code guidelines]: #honeydew-code-guidelines
+[conformance.sh]: #honeydew-code-guidelines
 
-[Honeydew code conformance scripts]: #honeydew-code-guidelines
+[Honeydew code guidelines]: #honeydew-code-guidelines
 
 [interfaces]: honeydew/interfaces/
 
 [unit tests]: tests/unit_tests/
 
 [unit tests README]: tests/unit_tests/README.md
-
-[unit tests BUILD.gn]: tests/unit_tests/BUILD.gn#10
 
 [top level Honeydew unit tests BUILD]: tests/unit_tests/BUILD.gn
 
@@ -175,8 +133,6 @@ If you like to use Honeydew in an interactive Python terminal refer to
 [how to add a new test to run in infra]: tests/functional_tests/README.md#How-to-add-a-new-test-to-run-in-infra
 
 [top level Honeydew functional tests BUILD]: tests/functional_tests/BUILD.gn
-
-[example Lacewing self tests staging builders using try-jobs]: images/lacewing_self_staging_builders.png
 
 [instructions on how to submit contributions to the Fuchsia project]: https://fuchsia.dev/fuchsia-src/development/source_code/contribute_changes
 
