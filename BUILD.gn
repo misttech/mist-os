@@ -234,6 +234,7 @@ build_api_module("api") {
     ":triage_sources",
     ":vnames_config",
     "//build/images/archive",
+    "//build/rbe:rbe_settings.json",
     "//sdk:sdk_source_set_list",
     "//sdk/ctf:ctf_artifacts",
   ]
@@ -1359,6 +1360,8 @@ build_api_module("all_package_manifest_paths") {
 # in file: "$root_build_dir/rbe_config.json"
 #
 # Paths are relative to $root_build_dir.
+#
+# This file is read by infra recipes.
 #
 # Type: list(scope)
 #

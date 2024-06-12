@@ -2,6 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/remote_services.gni")
+import("//build/toolchain/rbe.gni")
+import("//build/toolchain/rbe_modes.gni")
+
 import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 
@@ -260,5 +264,40 @@ if (is_host) {
     enable_mypy = false
     main_source = "textpb_test.py"
     sources = _textpb_sources
+  }
+}
+
+if (current_toolchain == default_toolchain) {
+  # List all of the RBE related settings after modes have been applied
+  # and resolved.
+  # TODO(b/346845227): the final override and source-of-truth still lies
+  # with the global variables, but this will eventually migrate to using
+  # the corresponding variables in the `rbe_settings` scope.
+  generated_file("rbe_settings.json") {
+    contents = {
+      settings = rbe_settings
+      final = {
+        # after considering top-level overrides
+        bazel_enable = enable_bazel_remote_rbe
+        cxx_download_objects = cxx_rbe_download_obj_files
+        cxx_enable = cxx_rbe_enable
+        cxx_exec_strategy = cxx_rbe_exec_strategy
+        link_download_unstripped_outputs = link_rbe_download_unstripped_outputs
+        link_enable = link_rbe_enable
+        link_exec_strategy = link_rbe_exec_strategy
+        rust_download_rlibs = rust_rbe_download_rlibs
+        rust_download_unstripped_binaries =
+            rust_rbe_download_unstripped_binaries
+        rust_enable = rust_rbe_enable
+        rust_exec_strategy = rust_rbe_exec_strategy
+
+        # derived values:
+
+        # The following is used by lib/vars.sh to auto-startup reproxy.
+        needs_reproxy = cxx_enable || link_enable || rust_enable
+      }
+    }
+    output_conversion = "json"
+    outputs = [ "$root_build_dir/rbe_settings.json" ]
   }
 }
