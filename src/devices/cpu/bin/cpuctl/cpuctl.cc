@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <ctype.h>
 #include <dirent.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/fit/defer.h>
@@ -16,7 +15,6 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <tuple>
@@ -29,7 +27,6 @@ using ListCb = std::function<void(const char*)>;
 
 constexpr char kCpuDevicePath[] = "/dev/class/cpu-ctrl";
 constexpr char kCpuDeviceFormat[] = "/dev/class/cpu-ctrl/%s";
-constexpr size_t kMaxPathLen = 24;  // strlen("/dev/class/cpu-ctrl/000\0")
 
 // TODO(gkalsi): Maybe parameterize these?
 constexpr uint64_t kDefaultStressTestIterations = 1000;
@@ -111,26 +108,24 @@ zx_status_t list(const ListCb& cb) {
 
   struct dirent* de = nullptr;
   while ((de = readdir(dir)) != nullptr) {
-    cb(de->d_name);
+    // we expect performance domains to be in one of the following formats, so
+    // skip anything too short to be any of them (it is probably '.'):
+    // - NNN (eg. 000, 001)
+    // - hhhhhhhh (eg. aaf1d3e9)
+    // - hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh (eg. 820f47b1ec93d2087394bc0ceec97fc9)
+    if (strnlen(de->d_name, 3) > 2) {
+      cb(de->d_name);
+    }
   }
   return ZX_OK;
 }
 
 // Print each performance domain to stdout.
-void print_performance_domain(const char* path) {
-  // Paths take the form /dev/class/cpu/NNN so we expect the
-  // path to be exactly 3 characters long.
-  if (strnlen(path, 4) == 3) {
-    printf("Domain %s\n", path);
-  } else {
-    // Why isn't the path 3 characters?
-    printf("Domain ???\n");
-  }
-}
+void print_performance_domain(const char* path) { printf("Domain %s\n", path); }
 
 void describe(const char* domain_name) {
-  char path[kMaxPathLen];
-  snprintf(path, kMaxPathLen, kCpuDeviceFormat, domain_name);
+  char path[PATH_MAX];
+  snprintf(path, PATH_MAX, kCpuDeviceFormat, domain_name);
 
   zx::result domain = CpuPerformanceDomain::CreateFromPath(path);
   if (domain.is_error()) {
@@ -177,8 +172,8 @@ void describe(const char* domain_name) {
 }
 
 void set_current_operating_point(const char* domain_name, const char* opp) {
-  char path[kMaxPathLen];
-  snprintf(path, kMaxPathLen, kCpuDeviceFormat, domain_name);
+  char path[PATH_MAX];
+  snprintf(path, PATH_MAX, kCpuDeviceFormat, domain_name);
 
   zx::result domain = CpuPerformanceDomain::CreateFromPath(path);
   if (domain.is_error()) {
@@ -229,8 +224,8 @@ void set_current_operating_point(const char* domain_name, const char* opp) {
 }
 
 void get_current_operating_point(const char* domain_name) {
-  char path[kMaxPathLen];
-  snprintf(path, kMaxPathLen, kCpuDeviceFormat, domain_name);
+  char path[PATH_MAX];
+  snprintf(path, PATH_MAX, kCpuDeviceFormat, domain_name);
 
   zx::result domain = CpuPerformanceDomain::CreateFromPath(path);
   if (domain.is_error()) {
