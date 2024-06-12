@@ -31,13 +31,13 @@ class Sl4fClient:
         target: str = os.environ["FUCHSIA_DEVICE_ADDR"],
         port: int = 80,
         ssh_key: str = os.environ["FUCHSIA_SSH_KEY"],
-    ):
+    ) -> None:
         """Inits Sl4fClient with default parameters."""
         self._ssh_key = ssh_key
         self._target = target
         self._url = f"http://{target}:{port}"
 
-    def is_running(self):
+    def is_running(self) -> bool:
         """Sends an empty http request to the server to verify if it's listening."""
         try:
             with request.urlopen(self._url) as r:
@@ -45,7 +45,7 @@ class Sl4fClient:
         except IOError as e:
             return False
 
-    def ssh(self, remote_cmd):
+    def ssh(self, remote_cmd: str) -> subprocess.CompletedProcess[str]:
         """Executes an ssh command on the server."""
         cmd = [
             "ssh",
@@ -68,7 +68,7 @@ class Sl4fClient:
             cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
 
-    def start_server(self, tries=3, is_running_retries=3):
+    def start_server(self, tries: int = 3, is_running_retries: int = 3) -> bool:
         """Starts the SL4F server on the target using ssh."""
         if self.is_running():
             return True
@@ -80,7 +80,9 @@ class Sl4fClient:
                     return True
         return False
 
-    def request(self, method, params=None):
+    def request(
+        self, method: str, params: dict[str, str] | None = None
+    ) -> bool:
         """Sends a JSON-RPC request to SL4F."""
         body = {
             "id": "",
@@ -90,7 +92,7 @@ class Sl4fClient:
         req = request.Request(self._url)
         data = json.dumps(body).encode("utf-8")
         req.add_header("Content-Type", "application/json; charset=utf-8")
-        req.add_header("Content-Length", len(data))
+        req.add_header("Content-Length", str(len(data)))
 
         with request.urlopen(req, data) as resp:
             json_response = json.load(resp)
@@ -99,11 +101,11 @@ class Sl4fClient:
             raise Sl4fError(f"Sl4f server responded with error: {err}")
         return json_response["result"]
 
-    def is_time_syncronized(self):
+    def is_time_syncronized(self) -> bool:
         """Returns whether or not system time on the DUT is synchronized to an external source."""
         return self.request("time_facade.IsSynchronized")
 
-    def system_time(self):
+    def system_time(self) -> datetime:
         """Returns the system time on the DUT in UTC as reported by the standard libraries used
         by sl4f.
         """
@@ -111,7 +113,7 @@ class Sl4fClient:
             self.request("time_facade.SystemTimeMillis") / 1000.0
         )
 
-    def userspace_time(self):
+    def userspace_time(self) -> datetime:
         """Returns the system time on the DUT in UTC, as reported by the clock passed to sl4f's
         runtime.
         """
@@ -127,22 +129,24 @@ class Sl4fError(Exception):
 
 
 class TimeSyncE2eTests(unittest.TestCase):
+    _sl4f: Sl4fClient
+
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         sl4f = Sl4fClient()
         cls._sl4f = sl4f
         assert sl4f.start_server()
         while not sl4f.is_time_syncronized():
             time.sleep(2)
 
-    def testSystemTimeSyncronized(self):
+    def testSystemTimeSyncronized(self) -> None:
         host_now_utc = datetime.utcnow()
         remote_system_time = self._sl4f.system_time()
         # The UTC clock on the DUT measured directly should roughly align with the host time.
         assert remote_system_time > host_now_utc - MAX_HOST_DIFF
         assert remote_system_time < host_now_utc + MAX_HOST_DIFF
 
-    def testUserspaceTimeSyncronized(self):
+    def testUserspaceTimeSyncronized(self) -> None:
         host_now_utc = datetime.utcnow()
         remote_userspace_time = self._sl4f.userspace_time()
         # The UTC clock on the DUT measured through the runtime should roughly align with the
@@ -150,7 +154,7 @@ class TimeSyncE2eTests(unittest.TestCase):
         assert remote_userspace_time > host_now_utc - MAX_HOST_DIFF
         assert remote_userspace_time < host_now_utc + MAX_HOST_DIFF
 
-    def testUtcClocksAgree(self):
+    def testUtcClocksAgree(self) -> None:
         host_now_utc = datetime.utcnow()
         remote_system_time = self._sl4f.system_time()
         remote_system_time_offset = datetime.utcnow() - remote_system_time
