@@ -185,9 +185,22 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
       return status;
     }
 
+    auto directory_client = cpu_device->AddService();
+    if (directory_client.is_error()) {
+      zxlogf(ERROR, "aml-cpu: Failed to add cpu control service to outgoing directory (%d): %s",
+             directory_client.status_value(), directory_client.status_string());
+      return directory_client.status_value();
+    }
+
+    std::array offers = {
+        fuchsia_cpuctrl::Service::Name,
+    };
+
     status = cpu_device->DdkAdd(ddk::DeviceAddArgs(name)
                                     .set_flags(DEVICE_ADD_NON_BINDABLE)
                                     .set_proto_id(ZX_PROTOCOL_CPU_CTRL)
+                                    .set_fidl_service_offers(offers)
+                                    .set_outgoing_dir(directory_client->TakeChannel())
                                     .set_inspect_vmo(cpu_device->inspector_.DuplicateVmo()));
 
     if (status != ZX_OK) {
@@ -203,6 +216,30 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
 }
 
 void AmlCpu::DdkRelease() { delete this; }
+
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> AmlCpu::AddService() {
+  auto result =
+      outgoing_.AddService<fuchsia_cpuctrl::Service>(fuchsia_cpuctrl::Service::InstanceHandler({
+          .device =
+              [this](fidl::ServerEnd<fuchsia_cpuctrl::Device> server_end) {
+                bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                     std::move(server_end), this, fidl::kIgnoreBindingClosure);
+              },
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add CpuCtrl protocol: %s", result.status_string());
+    return zx::error_result(result.take_error());
+  }
+
+  auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  result = outgoing_.Serve(std::move(directory_server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to service the outgoing directory");
+    return zx::error_result(result.take_error());
+  }
+
+  return zx::ok(std::move(directory_client));
+}
 
 zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uint32_t* out_opp) {
   zx_status_t status;
