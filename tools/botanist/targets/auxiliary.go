@@ -16,7 +16,7 @@ type Auxiliary struct {
 }
 
 // TestConfig returns fields describing the target to be provided to tests.
-func (t *Auxiliary) TestConfig(netboot bool) (any, error) {
+func (t *Auxiliary) TestConfig(expectsSSH bool) (any, error) {
 	return t.config, nil
 }
 

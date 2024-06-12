@@ -475,6 +475,6 @@ func (g *GCE) SSHClient() (*sshutil.Client, error) {
 	return g.sshClient(&net.IPAddr{IP: addr}, "gce")
 }
 
-func (g *GCE) TestConfig(netboot bool) (any, error) {
-	return TargetInfo(g, netboot, nil)
+func (g *GCE) TestConfig(expectsSSH bool) (any, error) {
+	return TargetInfo(g, expectsSSH, nil)
 }

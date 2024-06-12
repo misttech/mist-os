@@ -551,7 +551,7 @@ func (r *RunCommand) runPreflights(ctx context.Context) error {
 func (r *RunCommand) createTestbedConfig(baseTargets []targets.Base) (string, error) {
 	var testbedConfig []any
 	for _, t := range baseTargets {
-		c, err := t.TestConfig(r.netboot)
+		c, err := t.TestConfig(r.expectsSSH)
 		if err != nil {
 			return "", err
 		}
