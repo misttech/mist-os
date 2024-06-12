@@ -9,12 +9,10 @@ use errors::ffx_bail;
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
-use ffx_target::{get_target_specifier, knock_target_by_name};
-use fho::{daemon_protocol, AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_target::{knock_target, TargetProxy};
+use fho::{AvailabilityFlag, Connector, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
-    RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetCollectionProxy,
-    TargetCollectionReaderMarker, TargetCollectionReaderRequest, TargetInfo,
-    TargetQuery as FfxTargetQuery,
+    RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetInfo,
 };
 use fidl_fuchsia_developer_ffx_ext::{
     RepositoryRegistrationAliasConflictMode as FfxRepositoryRegistrationAliasConflictMode,
@@ -29,7 +27,7 @@ use fuchsia_repo::repo_client::RepoClient;
 use fuchsia_repo::repository::{PmRepository, RepoProvider};
 use fuchsia_repo::server::RepositoryServer;
 use futures::executor::block_on;
-use futures::{SinkExt, StreamExt, TryStreamExt as _};
+use futures::{SinkExt, StreamExt};
 use pkg::repo::register_target_with_fidl_proxies;
 use signal_hook::consts::signal::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
@@ -41,7 +39,7 @@ use timeout::timeout;
 use tuf::metadata::RawSignedMetadata;
 
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
-const SERVE_KNOCK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+const NUM_RECONNECT_RETRIES: u8 = 10;
 const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
 const REPO_FOREGROUND_FEATURE_FLAG: &str = "repository.foreground.enabled";
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
@@ -55,35 +53,11 @@ pub struct ServeTool {
     #[command]
     cmd: ServeCommand,
     context: EnvironmentContext,
-    #[with(daemon_protocol())]
-    target_collection_proxy: TargetCollectionProxy,
+    target_proxy_connector: Connector<TargetProxy>,
+    rcs_proxy_connector: Connector<RemoteControlProxy>,
 }
 
 fho::embedded_plugin!(ServeTool);
-
-async fn get_target_infos(
-    target_collection_proxy: &TargetCollectionProxy,
-    query: &FfxTargetQuery,
-) -> Result<Vec<TargetInfo>, anyhow::Error> {
-    let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
-    target_collection_proxy.list_targets(query, reader)?;
-
-    let mut targets = Vec::new();
-    let mut stream = server.into_stream()?;
-
-    while let Some(TargetCollectionReaderRequest::Next { entry, responder }) =
-        stream.try_next().await?
-    {
-        responder.send()?;
-        if entry.len() > 0 {
-            targets.extend(entry);
-        } else {
-            break;
-        }
-    }
-
-    Ok(targets)
-}
 
 #[tracing::instrument(skip(conn_quit_tx, server_quit_tx))]
 fn start_signal_monitoring(
@@ -107,61 +81,28 @@ fn start_signal_monitoring(
     });
 }
 
-async fn connect_to_rcs(
-    target_collection_proxy: &TargetCollectionProxy,
-    query: &FfxTargetQuery,
-) -> Result<RemoteControlProxy, anyhow::Error> {
-    let (target_proxy, target_server_end) = fidl::endpoints::create_proxy()?;
-    let (rcs_proxy, rcs_server_end) = fidl::endpoints::create_proxy()?;
-
-    target_collection_proxy
-        .open_target(query, target_server_end)
-        .await?
-        .map_err(|e| anyhow!("Failed to open target: {:?}", e))?;
-    target_proxy
-        .open_remote_control(rcs_server_end)
-        .await?
-        .map_err(|e| anyhow!("Failed to open remote control: {:?}", e))?;
-    Ok(rcs_proxy)
-}
-
 async fn connect_to_target(
     target_spec: Option<String>,
+    target_info: TargetInfo,
     aliases: Option<Vec<String>>,
     storage_type: Option<RepositoryStorageType>,
     repo_server_listen_addr: std::net::SocketAddr,
     repo_manager: Arc<RepositoryManager>,
-    target_collection_proxy: &TargetCollectionProxy,
+    rcs_proxy: &RemoteControlProxy,
     alias_conflict_mode: FfxRepositoryRegistrationAliasConflictMode,
-) -> Result<Option<String>, anyhow::Error> {
-    let target_query = FfxTargetQuery { string_matcher: target_spec.clone(), ..Default::default() };
-
-    let rcs_proxy = connect_to_rcs(target_collection_proxy, &target_query).await?;
-
-    let tv = get_target_infos(target_collection_proxy, &target_query).await?;
-
-    let target = if tv.len() != 1 {
-        return Err(anyhow!(
-            "Exactly one target is expected in the target collection, found {}, nodenames: {}",
-            tv.len(),
-            tv.into_iter().filter_map(|e| e.nodename.clone()).collect::<Vec<_>>().join(",")
-        ));
-    } else {
-        &tv[0]
-    };
-
+) -> Result<(), anyhow::Error> {
     let repo_proxy = rcs::connect_to_protocol::<RepositoryManagerMarker>(
         TIMEOUT,
         REPOSITORY_MANAGER_MONIKER,
         &rcs_proxy,
     )
     .await
-    .with_context(|| format!("connecting to repository manager on {:?}", target_query))?;
+    .with_context(|| format!("connecting to repository manager on {:?}", target_spec))?;
 
     let engine_proxy =
         rcs::connect_to_protocol::<EngineMarker>(TIMEOUT, ENGINE_MONIKER, &rcs_proxy)
             .await
-            .with_context(|| format!("binding engine to stream on {:?}", target_query))?;
+            .with_context(|| format!("binding engine to stream on {:?}", target_spec))?;
 
     for (repo_name, repo) in repo_manager.repositories() {
         let repo_target = FfxCliRepositoryTarget {
@@ -180,7 +121,7 @@ async fn connect_to_target(
             repo_proxy.clone(),
             engine_proxy.clone(),
             &repo_target_info,
-            &target,
+            &target_info,
             repo_server_listen_addr,
             &repo,
             alias_conflict_mode.clone(),
@@ -188,7 +129,7 @@ async fn connect_to_target(
         .await
         .map_err(|e| anyhow!("Failed to register repository: {:?}", e))?;
     }
-    Ok(target.nodename.clone())
+    Ok(())
 }
 
 // Constructs a repo client with an explicitly passed trusted
@@ -222,13 +163,21 @@ async fn repo_client_from_optional_trusted_root(
 impl FfxMain for ServeTool {
     type Writer = SimpleWriter;
     async fn main(self, writer: Self::Writer) -> Result<()> {
-        serve_impl(self.target_collection_proxy, self.cmd, self.context, writer).await?;
+        serve_impl(
+            self.target_proxy_connector,
+            self.rcs_proxy_connector,
+            self.cmd,
+            self.context,
+            writer,
+        )
+        .await?;
         Ok(())
     }
 }
 
 async fn serve_impl<W: Write + 'static>(
-    target_collection_proxy: TargetCollectionProxy,
+    target_proxy: Connector<TargetProxy>,
+    rcs_proxy: Connector<RemoteControlProxy>,
     cmd: ServeCommand,
     context: EnvironmentContext,
     mut writer: W,
@@ -322,93 +271,164 @@ $ ffx doctor --restart-daemon"#,
     let (server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
     let (loop_stop_tx, mut loop_stop_rx) = futures::channel::mpsc::channel::<()>(1);
 
-    // Register signal handler.
+    // Register signal handler and monitor for server requests.
+    let _server_stop_task = fasync::Task::local(async move {
+        if let Some(_) = server_stop_rx.next().await {
+            server.stop();
+        }
+    });
     start_signal_monitoring(loop_stop_tx.clone(), server_stop_tx.clone());
 
     if !cmd.no_device {
-        // Resolving the default target is typically fast
-        // or does not succeed, in which case we return
-        tracing::info!("Getting target specifier");
-        let target_spec = timeout(Duration::from_secs(1), get_target_specifier(&context))
-            .await
-            .context("getting target specifier")??;
+        // We try to reconnect unless NUM_RECONNECT RETRIES reconnect
+        // attempts in immediate succession fail.
+        let mut retries = 0;
 
-        let mut server_stop_tx = server_stop_tx.clone();
-        let _conn_loop_task = fasync::Task::local(async move {
-               'conn: loop {
-                    // This blocks until the default target becomes available
-                    // if a connection is possible.
-                    match target_spec {
-                        Some(ref s) => tracing::info!("Attempting connection to target: {s}"),
-                        None => tracing::info!("Attempting connection to first target if unambiguously detectable"),
-                    }
-                    let connection = connect_to_target(
-                        target_spec.clone(),
-                        Some(cmd.alias.clone()),
-                        cmd.storage_type,
-                        server_addr,
-                        Arc::clone(&repo_manager),
-                        &target_collection_proxy,
-                        cmd.alias_conflict_mode.into(),
-                    )
-                    .await;
-
-                    match connection {
-                        Ok(target) => {
-                            let s = match target {
-                                Some(t) => format!(
-                                    "Serving repository '{repo_path}' to target '{t}' over address '{}'.",
-                                    server_addr),
-                                None => format!(
-                                    "Serving repository '{repo_path}' over address '{}'.",
-                                    server_addr),
-                            };
-                            if let Err(e) = writeln!(writer, "{}", s) {
-                                tracing::error!("Failed to write to output: {:?}", e);
-                            }
-                            tracing::info!("{}", s);
-                            loop {
-                                fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
-                                // If serving is supposed to shut down and this task has not been
-                                // cancelled already, exit voluntarily.
-                                if let Ok(Some(_)) = loop_stop_rx.try_next() {
-                                    break 'conn;
-                                }
-                                if let Err(e) = knock_target_by_name(
-                                    &target_spec.clone(),
-                                    &target_collection_proxy,
-                                    SERVE_KNOCK_TIMEOUT,
-                                    SERVE_KNOCK_TIMEOUT,
-                                )
-                                .await
-                                {
-                                    tracing::warn!("Connection to target lost, retrying. Error: {}", e);
-                                    break;
-                                };
-                            }
+        // Outer connection loop, retries when disconnected.
+        'conn: loop {
+            // Check for an exit request before (re-)connecting.
+            if let Ok(Some(_)) = loop_stop_rx.try_next() {
+                break;
+            }
+            let mut target_spec_from_rcs_proxy: Option<String> = None;
+            let rcs_proxy = timeout(
+                TIMEOUT,
+                rcs_proxy.try_connect(|target| {
+                    tracing::info!(
+                        "Waiting for target '{}' to return",
+                        match target {
+                            Some(s) => s,
+                            _ => "None",
                         }
-                        Err(e) => {
-                            // If we end up here, it is unlikely a reconnect will be successful without
-                            // ffx being restarted.
-                            tracing::error!("Cannot serve repository to target, exiting. Error: {}", e);
-                            let _: Result<(), _> = server_stop_tx.send(()).await;
-                            break;
-                        }
-                    };
+                    );
+                    target_spec_from_rcs_proxy = target.clone();
+                    Ok(())
+                }),
+            )
+            .await;
+            let rcs_proxy = match rcs_proxy {
+                Ok(Ok(r)) => r,
+                Ok(Err(e)) => {
+                    return Err(e);
                 }
-            }).detach();
+                Err(e) => {
+                    retries += 1;
+                    tracing::warn!(
+                        "Attempt #{retries}: failed to connect to rcs, trying again: {e}"
+                    );
+                    continue;
+                }
+            };
+            let mut target_spec_from_target_proxy: Option<String> = None;
+            let target_proxy = target_proxy
+                .try_connect(|target| {
+                    tracing::info!(
+                        "Waiting for target '{}' to return",
+                        match target {
+                            Some(s) => s,
+                            _ => "None",
+                        }
+                    );
+                    target_spec_from_target_proxy = target.clone();
+                    Ok(())
+                })
+                .await?;
+
+            // This catches an edge case where the environment is not populated
+            // consistently.
+            if target_spec_from_rcs_proxy != target_spec_from_target_proxy {
+                tracing::warn!(
+                    "Obtained different targets from RCS and target proxies: '{:#?}', '{:#?}'",
+                    target_spec_from_rcs_proxy,
+                    target_spec_from_target_proxy
+                );
+                if retries >= NUM_RECONNECT_RETRIES {
+                    tracing::error!(
+                        "Stopping reconnecting after {retries} subsequent failed attempts"
+                    );
+                    break;
+                } else {
+                    tracing::warn!("Retrying to reconnect ...");
+                    retries += 1;
+                    continue;
+                }
+            }
+
+            let target_info: TargetInfo = timeout(Duration::from_secs(2), target_proxy.identity())
+                .await
+                .context("Timed out getting target identity")?
+                .context("Failed to get target identity")?;
+
+            let connection = connect_to_target(
+                target_spec_from_rcs_proxy.clone(),
+                target_info,
+                Some(cmd.alias.clone()),
+                cmd.storage_type,
+                server_addr,
+                Arc::clone(&repo_manager),
+                &rcs_proxy,
+                cmd.alias_conflict_mode.into(),
+            )
+            .await;
+            match connection {
+                Ok(()) => {
+                    retries = 0;
+                    let s = match target_spec_from_rcs_proxy {
+                        Some(t) => format!(
+                            "Serving repository '{repo_path}' to target '{t}' over address '{}'.",
+                            server_addr
+                        ),
+                        None => format!(
+                            "Serving repository '{repo_path}' over address '{}'.",
+                            server_addr
+                        ),
+                    };
+                    if let Err(e) = writeln!(writer, "{}", s) {
+                        tracing::error!("Failed to write to output: {:?}", e);
+                    }
+                    tracing::info!("{}", s);
+                    loop {
+                        fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
+                        // Check for an exit request before knocking the target
+                        if let Ok(Some(_)) = loop_stop_rx.try_next() {
+                            break 'conn;
+                        }
+                        match knock_target(&target_proxy).await {
+                            Ok(()) => {
+                                // Nothing to do, continue checking connection
+                            }
+                            Err(e) => {
+                                let s =
+                                    format!("Connection to target lost, retrying. Error: {}", e);
+                                if let Err(e) = writeln!(writer, "{}", s) {
+                                    tracing::error!("Failed to write to output: {:?}", e);
+                                }
+                                tracing::warn!(s);
+                                break;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error connecting to target: {}", e);
+                    if retries >= NUM_RECONNECT_RETRIES {
+                        tracing::error!(
+                            "Stopping reconnecting after {retries} subsequent failed attempts"
+                        );
+                        break;
+                    } else {
+                        tracing::warn!("Retrying to connect ...");
+                        retries += 1;
+                        continue;
+                    }
+                }
+            };
+        }
     } else {
         let s = format!("Serving repository '{repo_path}' over address '{}'.", server_addr);
         writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
         tracing::info!("{}", s);
     }
-
-    let _ = fasync::Task::local(async move {
-        if let Some(_) = server_stop_rx.next().await {
-            server.stop();
-        }
-    })
-    .detach();
 
     // Wait for the server to shut down.
     server_task.await;
@@ -424,10 +444,12 @@ mod test {
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::{ConfigLevel, TestEnv};
     use fho::macro_deps::ffx_writer::TestBuffer;
+    use fho::testing::ToolEnv;
+    use fho::TryFromEnv;
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
         RemoteControlState, RepositoryRegistrationAliasConflictMode, SshHostAddrInfo,
-        TargetAddrInfo, TargetCollectionRequest, TargetIpPort, TargetRequest, TargetState,
+        TargetAddrInfo, TargetIpPort, TargetRequest, TargetState,
     };
     use fidl_fuchsia_developer_remotecontrol as frcs;
     use fidl_fuchsia_net::{IpAddress, Ipv4Address};
@@ -443,7 +465,8 @@ mod test {
     use fuchsia_repo::repo_keys::RepoKeys;
     use fuchsia_repo::repository::HttpRepository;
     use fuchsia_repo::test_utils;
-    use futures::channel::mpsc::{self, Receiver};
+    use futures::channel::mpsc;
+    use futures::TryStreamExt;
     use std::collections::BTreeSet;
     use std::sync::Mutex;
     use std::time;
@@ -488,193 +511,141 @@ mod test {
         }
     }
 
-    #[derive(Clone, Copy, PartialEq)]
-    enum FakeTargetResponse {
-        Ignore,
-        Respond,
-    }
-    struct FakeTargetCollection;
+    struct FakeRcs;
 
-    impl FakeTargetCollection {
-        fn new(
-            repo_manager: FakeRepositoryManager,
-            engine: FakeEngine,
-            // Optional: Let the fake RCS connection
-            // know which target requests should be answered.
-            // The vector is pop()ed at each incoming request.
-            mut target_responses: Option<Vec<FakeTargetResponse>>,
-        ) -> (Self, TargetCollectionProxy, Receiver<String>) {
-            let (sender, rx) = futures::channel::mpsc::channel::<String>(8);
-            let fake_rcs = FakeRcs::new();
-            // We pop vector elements below, so reverse the vec to
-            // maintain the expected temporal order.
-            if let Some(v) = &mut target_responses {
-                v.reverse();
-            }
-            let fake_target_collection_proxy: TargetCollectionProxy =
+    impl FakeRcs {
+        fn new(repo_manager: FakeRepositoryManager, engine: FakeEngine) -> RemoteControlProxy {
+            let fake_rcs_proxy: RemoteControlProxy =
                 fho::testing::fake_proxy(move |req| match req {
-                    TargetCollectionRequest::ListTargets { query, reader, control_handle: _ } => {
-                        let reader = reader.into_proxy().unwrap();
-                        let target_info_values: Vec<TargetInfo> = match query.string_matcher {
-                            Some(s) => vec![to_target_info(s)],
-                            None => vec![to_target_info(TARGET_NODENAME.to_string())],
-                        };
-                        fuchsia_async::Task::local(async move {
-                            let mut iter = target_info_values.chunks(10);
-                            loop {
-                                let chunk = iter.next().unwrap_or(&[]);
-                                reader.next(&chunk).await.unwrap();
-                                if chunk.is_empty() {
-                                    break;
-                                }
+                    frcs::RemoteControlRequest::OpenCapability {
+                        moniker: _,
+                        capability_set: _,
+                        capability_name,
+                        server_channel,
+                        flags: _,
+                        responder,
+                    } => {
+                        match capability_name.as_str() {
+                            RepositoryManagerMarker::PROTOCOL_NAME => repo_manager.spawn(
+                                fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
+                                    server_channel,
+                                )
+                                .into_stream()
+                                .unwrap(),
+                            ),
+                            EngineMarker::PROTOCOL_NAME => engine.spawn(
+                                fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
+                                    .into_stream()
+                                    .unwrap(),
+                            ),
+                            _ => {
+                                unreachable!();
                             }
-                        })
-                        .detach();
-                    }
-                    TargetCollectionRequest::OpenTarget { query: _, target_handle, responder } => {
-                        let mut target_stream = target_handle.into_stream().unwrap();
-                        let repo_manager = repo_manager.clone();
-                        let engine = engine.clone();
-                        let fake_rcs = fake_rcs.clone();
-                        let sender = sender.clone();
-                        // The default is to respond successfully to a request,
-                        // unless there is a value in the vector saying otherwise.
-                        let target_response = if let Some(v) = &mut target_responses {
-                            if let Some(r) = v.pop() {
-                                r
-                            } else {
-                                FakeTargetResponse::Respond
-                            }
-                        } else {
-                            FakeTargetResponse::Respond
-                        };
-                        fuchsia_async::Task::local(async move {
-                            while let Ok(Some(req)) = target_stream.try_next().await {
-                                match req {
-                                    // Fake RCS
-                                    TargetRequest::OpenRemoteControl {
-                                        remote_control,
-                                        responder,
-                                    } => {
-                                        let repo_manager = repo_manager.clone();
-                                        let engine = engine.clone();
-                                        let sender = sender.clone();
-                                        fake_rcs.spawn(
-                                            remote_control.into_stream().unwrap(),
-                                            repo_manager,
-                                            engine,
-                                            sender,
-                                            target_response,
-                                        );
-                                        responder.send(Ok(())).unwrap();
-                                    }
-                                    _ => panic!("unexpected request: {:?}", req),
-                                }
-                            }
-                        })
-                        .detach();
+                        }
                         responder.send(Ok(())).unwrap();
                     }
                     _ => panic!("unexpected request: {:?}", req),
                 });
-            (Self {}, fake_target_collection_proxy, rx)
+
+            fake_rcs_proxy
         }
     }
 
-    #[derive(Clone)]
-    struct FakeRcs;
+    #[derive(Debug, PartialEq)]
+    enum TargetEvent {
+        Identity,
+        OpenRemoteControl,
+    }
+    struct FakeTarget;
 
-    impl FakeRcs {
-        fn new() -> Self {
-            Self {}
-        }
+    impl FakeTarget {
+        fn new(knock_skip: Option<Vec<u32>>) -> (Self, TargetProxy, mpsc::Receiver<()>) {
+            let (sender, target_rx) = mpsc::channel::<()>(1);
+            let events = Arc::new(Mutex::new(Vec::new()));
+            let events_closure = Arc::clone(&events);
 
-        fn spawn(
-            &self,
-            mut rcs_server: fidl_fuchsia_developer_remotecontrol::RemoteControlRequestStream,
-            repo_manager: FakeRepositoryManager,
-            engine: FakeEngine,
-            mut sender: mpsc::Sender<String>,
-            response: FakeTargetResponse,
-        ) {
-            fuchsia_async::Task::local(async move {
-                while let Ok(Some(req)) = rcs_server.try_next().await {
-                    match req {
-                        frcs::RemoteControlRequest::OpenCapability {
-                            moniker: _,
-                            capability_set: _,
-                            capability_name,
-                            server_channel,
-                            flags: _,
-                            responder,
-                        } => {
-                            match capability_name.as_str() {
-                                RepositoryManagerMarker::PROTOCOL_NAME => {
-                                    if response == FakeTargetResponse::Respond {
-                                        repo_manager.spawn(
-                                            fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
-                                                server_channel,
-                                            )
-                                            .into_stream()
-                                            .unwrap(),
-                                        );
-                                    }
-                                    let _send = sender
-                                        .send(RepositoryManagerMarker::PROTOCOL_NAME.to_owned())
-                                        .await;
-                                }
-                                EngineMarker::PROTOCOL_NAME => {
-                                    if response == FakeTargetResponse::Respond {
-                                        engine.spawn(
-                                            fidl::endpoints::ServerEnd::<EngineMarker>::new(
-                                                server_channel,
-                                            )
-                                            .into_stream()
-                                            .unwrap(),
-                                        );
-                                    }
-                                    let _send = sender
-                                        .send(EngineMarker::PROTOCOL_NAME.to_owned())
-                                        .await;
-                                }
-                                RemoteControlMarker::PROTOCOL_NAME => {
-                                    // Serve the periodic knock whether the fake target is alive
-                                    // By knock_rcs_impl() in
-                                    // src/developer/ffx/lib/rcs/src/lib.rs
-                                    // a knock is considered unsuccessful if there is no
-                                    // channel connection available within the timeout.
-                                    // Hence we will provide a viable channel (or not), depending
-                                    // on the input args for this test.
-                                    if response == FakeTargetResponse::Respond {
-                                        let mut stream =
-                                            fidl::endpoints::ServerEnd::<RemoteControlMarker>::new(
-                                                server_channel,
-                                            )
-                                            .into_stream()
-                                            .unwrap();
-                                        fasync::Task::local(async move {
-                                            while let Some(Ok(req)) = stream.next().await {
-                                                // Do nada, just take the request
-                                                let _ = req;
+            let mut knock_counter = 0;
+            let knock_skip = if let Some(k) = knock_skip { k } else { vec![] };
+
+            let target_proxy: TargetProxy = fho::testing::fake_proxy(move |req| match req {
+                TargetRequest::Identity { responder, .. } => {
+                    let mut sender = sender.clone();
+                    let events_closure = events_closure.clone();
+
+                    fasync::Task::local(async move {
+                        events_closure.lock().unwrap().push(TargetEvent::Identity);
+                        responder.send(&to_target_info(TARGET_NODENAME.to_string())).unwrap();
+                        let _send = sender.send(()).await.unwrap();
+                    })
+                    .detach();
+                }
+                TargetRequest::OpenRemoteControl { remote_control, responder } => {
+                    let mut s = remote_control.into_stream().unwrap();
+                    let knock_skip = knock_skip.clone();
+                    fasync::Task::local(async move {
+                        if let Ok(Some(req)) = s.try_next().await {
+                            match req {
+                                frcs::RemoteControlRequest::OpenCapability {
+                                    moniker: _,
+                                    capability_set: _,
+                                    capability_name,
+                                    server_channel,
+                                    flags: _,
+                                    responder,
+                                } => {
+                                    match capability_name.as_str() {
+                                        RemoteControlMarker::PROTOCOL_NAME => {
+                                            // Serve the periodic knock whether the fake target is alive
+                                            // By knock_rcs_impl() in
+                                            // src/developer/ffx/lib/rcs/src/lib.rs
+                                            // a knock is considered unsuccessful if there is no
+                                            // channel connection available within the timeout.
+                                            knock_counter += 1;
+                                            if knock_skip.contains(&knock_counter) { // Do not respond
+                                            } else {
+                                                let mut stream = fidl::endpoints::ServerEnd::<
+                                                    RemoteControlMarker,
+                                                >::new(
+                                                    server_channel
+                                                )
+                                                .into_stream()
+                                                .unwrap();
+                                                fasync::Task::local(async move {
+                                                    while let Some(Ok(_)) = stream.next().await {
+                                                        // Do nada, just await the request, this is required for target knocking
+                                                    }
+                                                })
+                                                .detach();
+                                                let _ = responder.send(Ok(())).unwrap();
                                             }
-                                        })
-                                        .detach();
-                                    }
-                                    let _send = sender
-                                        .send(RemoteControlMarker::PROTOCOL_NAME.to_owned())
-                                        .await;
+                                        }
+                                        e => {
+                                            panic!("Requested capability not implemented: {}", e);
+                                        }
+                                    };
                                 }
-                                e => {
-                                    panic!("Requested capability not implemented: {}", e);
-                                }
-                            }
-                            responder.send(Ok(())).unwrap();
+                                _ => panic!("unexpected request: {:?}", req),
+                            };
                         }
-                        _ => panic!("unexpected request: {:?}", req),
+                    })
+                    .detach();
+
+                    knock_counter += 1;
+                    if knock_counter != 200 {
+                        let mut sender = sender.clone();
+                        let events_closure = events_closure.clone();
+
+                        fasync::Task::local(async move {
+                            events_closure.lock().unwrap().push(TargetEvent::OpenRemoteControl);
+                            responder.send(Ok(())).unwrap();
+                            let _send = sender.send(()).await.unwrap();
+                        })
+                        .detach();
                     }
                 }
-            })
-            .detach();
+                _ => panic!("unexpected request: {:?}", req),
+            });
+            (Self, target_proxy, target_rx)
         }
     }
 
@@ -866,24 +837,25 @@ mod test {
 
         let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
-        let (_, target_collection_proxy, mut target_collection_proxy_rx) =
-            FakeTargetCollection::new(fake_repo.clone(), fake_engine.clone(), None);
+        let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(None);
+
+        let frc = fake_repo.clone();
+        let fec = fake_engine.clone();
+
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || {
+                let fake_repo = frc.clone();
+                let fake_engine = fec.clone();
+                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = fake_target_proxy.clone();
+                async { Ok(fake_target_proxy) }
+            });
+
+        let env = tool_env.make_environment(test_env.context.clone());
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
-
-        // Future resolves once fake target exists
-        let _timeout = timeout(time::Duration::from_secs(10), async {
-            let fake_targets = get_target_infos(
-                &target_collection_proxy,
-                &FfxTargetQuery { string_matcher: None, ..Default::default() },
-            )
-            .await
-            .unwrap();
-
-            assert_eq!(fake_targets[0], to_target_info(TARGET_NODENAME.to_string()));
-        })
-        .await
-        .unwrap();
 
         let serve_tool = ServeTool {
             cmd: ServeCommand {
@@ -898,8 +870,13 @@ mod test {
                 port_path: Some(tmp_port_file.path().to_owned()),
                 no_device: false,
             },
-            context: test_env.context.clone(),
-            target_collection_proxy: target_collection_proxy,
+            context: env.context.clone(),
+            target_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make target proxy test connector"),
+            rcs_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make RCS test connector"),
         };
 
         let test_stdout = TestBuffer::default();
@@ -910,10 +887,9 @@ mod test {
 
         // Future resolves once repo server communicates with them.
         let _timeout = timeout(time::Duration::from_secs(10), async {
+            let _ = fake_target_rx.next().await.unwrap();
             let _ = fake_repo_rx.next().await.unwrap();
             let _ = fake_engine_rx.next().await.unwrap();
-            let _fake_repo_response = target_collection_proxy_rx.next().await.unwrap();
-            let _fake_engine_response = target_collection_proxy_rx.next().await.unwrap();
         })
         .await
         .unwrap();
@@ -985,37 +961,30 @@ mod test {
             .await
             .unwrap();
 
-        // For this test, we specify which requests the Fake RCS should respond to:
-        let open_target_responses = vec![
-            FakeTargetResponse::Respond, // First OpenTarget request (fake repo + fake engine)
-            FakeTargetResponse::Respond, // First knock request
-            FakeTargetResponse::Ignore, // Second knock request, this is expected to lead to a reconnect
-        ];
         let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
-        let (_, target_collection_proxy, mut target_collection_proxy_rx) =
-            FakeTargetCollection::new(
-                fake_repo.clone(),
-                fake_engine.clone(),
-                Some(open_target_responses),
-            );
+        // Create a target where the second and third knock requests are not answered, triggering the reconnect
+        // loops in both the repository serve plugin and the Connect<TargetProxy>.
+        let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(Some(vec![2, 3]));
+
+        let frc = fake_repo.clone();
+        let fec = fake_engine.clone();
+
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || {
+                let fake_repo = frc.clone();
+                let fake_engine = fec.clone();
+                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = fake_target_proxy.clone();
+                async { Ok(fake_target_proxy) }
+            });
+
+        let env = tool_env.make_environment(test_env.context.clone());
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
         let tmp_port_file_path = tmp_port_file.path().to_owned();
-
-        // Future resolves once fake target exists
-        let _timeout = timeout(time::Duration::from_secs(10), async {
-            let fake_targets = get_target_infos(
-                &target_collection_proxy,
-                &FfxTargetQuery { string_matcher: None, ..Default::default() },
-            )
-            .await
-            .unwrap();
-
-            assert_eq!(fake_targets[0], to_target_info(TARGET_NODENAME.to_string()));
-        })
-        .await
-        .unwrap();
 
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
@@ -1023,7 +992,10 @@ mod test {
         // Run main in background
         let _task = fasync::Task::local(async move {
             serve_impl(
-                target_collection_proxy,
+                Connector::try_from_env(&env)
+                    .await
+                    .expect("Could not make target proxy test connector"),
+                Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
                 ServeCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
@@ -1036,7 +1008,7 @@ mod test {
                     port_path: Some(tmp_port_file_path),
                     no_device: false,
                 },
-                test_env.context.clone(),
+                env.context.clone(),
                 writer,
             )
             .await
@@ -1045,12 +1017,9 @@ mod test {
 
         // Future resolves once repo server communicates with them.
         let _timeout = timeout(time::Duration::from_secs(10), async {
+            let _ = fake_target_rx.next().await.unwrap();
             let _ = fake_repo_rx.next().await.unwrap();
             let _ = fake_engine_rx.next().await.unwrap();
-            let fake_repo_response = target_collection_proxy_rx.next().await.unwrap();
-            let fake_engine_response = target_collection_proxy_rx.next().await.unwrap();
-            assert_eq!(fake_repo_response, RepositoryManagerMarker::PROTOCOL_NAME);
-            assert_eq!(fake_engine_response, EngineMarker::PROTOCOL_NAME);
         })
         .await
         .unwrap();
@@ -1109,32 +1078,24 @@ mod test {
 
         assert_matches!(repo_client.update().await, Ok(true));
 
-        // Wait for the two target knock with nothing else in between
-        let mut reqs = Vec::new();
-        for _ in 0..2 {
-            reqs.push(target_collection_proxy_rx.next().await.unwrap());
+        // Wait for the sequence of outputs on stdout to indicate
+        // serving a repo, then reconnecting, then serving again.
+        let expected_outputs =
+            vec!["Serving repository", "Connection to target lost", "Serving repository"];
+        for expected in expected_outputs {
+            let mut output_found = "";
+            'attempts: for _ in 0..30 {
+                let out = test_stdout.clone().into_string();
+                for line in out.split("\n") {
+                    if line.starts_with(expected) {
+                        output_found = expected;
+                        break 'attempts;
+                    }
+                }
+                fasync::Timer::new(time::Duration::from_secs(1)).await;
+            }
+            assert_eq!(output_found, expected);
         }
-
-        assert_eq!(
-            reqs,
-            vec![RemoteControlMarker::PROTOCOL_NAME, RemoteControlMarker::PROTOCOL_NAME,]
-        );
-
-        // The second target knock is not answered, see the open_target_responses vector above.
-        // Hence we expect reconnect instead of another RemoteControlMarker::PROTOCOL_NAME
-        // We check the next three requests to verify the reconnect has happened.
-        reqs.clear();
-        for _ in 0..3 {
-            reqs.push(target_collection_proxy_rx.next().await.unwrap());
-        }
-        assert_eq!(
-            reqs,
-            vec![
-                RepositoryManagerMarker::PROTOCOL_NAME,
-                EngineMarker::PROTOCOL_NAME,
-                RemoteControlMarker::PROTOCOL_NAME,
-            ]
-        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1146,9 +1107,23 @@ mod test {
 
         let (fake_repo, _fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, _fake_engine_rx) = FakeEngine::new();
+        let (_, fake_target_proxy, _) = FakeTarget::new(None);
 
-        let (_, target_collection_proxy, _) =
-            FakeTargetCollection::new(fake_repo.clone(), fake_engine.clone(), None);
+        let frc = fake_repo.clone();
+        let fec = fake_engine.clone();
+
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || {
+                let fake_repo = frc.clone();
+                let fake_engine = fec.clone();
+                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = fake_target_proxy.clone();
+                async { Ok(fake_target_proxy) }
+            });
+
+        let env = tool_env.make_environment(test_env.context.clone());
 
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
@@ -1156,7 +1131,10 @@ mod test {
         // Run main in background
         let _task = fasync::Task::local(async move {
             serve_impl(
-                target_collection_proxy,
+                Connector::try_from_env(&env)
+                    .await
+                    .expect("Could not make target proxy test connector"),
+                Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
                 ServeCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
@@ -1169,7 +1147,7 @@ mod test {
                     port_path: Some(tmp_port_file_path),
                     no_device: false,
                 },
-                test_env.context.clone(),
+                env.context.clone(),
                 writer,
             )
             .await
@@ -1201,50 +1179,6 @@ mod test {
         let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
 
         assert_matches!(repo_client.update().await, Ok(true));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_get_target_infos_from_fake_target_collection() {
-        let _test_env = get_test_env().await;
-
-        let (fake_repo, _fake_repo_rx) = FakeRepositoryManager::new();
-        let (fake_engine, _fake_engine_rx) = FakeEngine::new();
-        let (_, target_collection_proxy, _) =
-            FakeTargetCollection::new(fake_repo.clone(), fake_engine.clone(), None);
-        let target_query = FfxTargetQuery { string_matcher: None, ..Default::default() };
-
-        let targets = get_target_infos(&target_collection_proxy, &target_query).await.unwrap();
-
-        assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0], to_target_info(TARGET_NODENAME.to_string()));
-
-        let targets = get_target_infos(&target_collection_proxy, &target_query).await.unwrap();
-
-        assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0], to_target_info(TARGET_NODENAME.to_string()));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_rcs_from_fake_target_collection() {
-        let _test_env = get_test_env().await;
-
-        let (fake_repo, _fake_repo_rx) = FakeRepositoryManager::new();
-        let (fake_engine, _fake_engine_rx) = FakeEngine::new();
-        let (_, target_collection_proxy, _) =
-            FakeTargetCollection::new(fake_repo.clone(), fake_engine.clone(), None);
-        let (target_proxy, target_marker) = fidl::endpoints::create_proxy().unwrap();
-        let (_, rcs_marker) = fidl::endpoints::create_proxy().unwrap();
-        let c = target_collection_proxy
-            .open_target(
-                &FfxTargetQuery { string_matcher: None, ..Default::default() },
-                target_marker,
-            )
-            .await;
-
-        assert!(c.is_ok());
-
-        let c = target_proxy.open_remote_control(rcs_marker).await;
-        assert!(c.is_ok());
     }
 
     async fn write_product_bundle(pb_dir: &Utf8Path) {
@@ -1303,19 +1237,29 @@ mod test {
 
         let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, _fake_engine_rx) = FakeEngine::new();
-        let (_, target_collection_proxy, _) =
-            FakeTargetCollection::new(fake_repo.clone(), fake_engine.clone(), None);
+        let (_, fake_target_proxy, _) = FakeTarget::new(None);
+
+        let frc = fake_repo.clone();
+        let fec = fake_engine.clone();
+        let ftpc = fake_target_proxy.clone();
+
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || {
+                let fake_repo = frc.clone();
+                let fake_engine = fec.clone();
+                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = ftpc.clone();
+                async { Ok(fake_target_proxy) }
+            });
+
+        let env = tool_env.make_environment(test_env.context.clone());
 
         // Future resolves once fake target exists
         let _timeout = timeout(time::Duration::from_secs(10), async {
-            let fake_targets = get_target_infos(
-                &target_collection_proxy,
-                &FfxTargetQuery { string_matcher: None, ..Default::default() },
-            )
-            .await
-            .unwrap();
-
-            assert_eq!(fake_targets[0], to_target_info(TARGET_NODENAME.to_string()));
+            let target = fake_target_proxy.identity().await.unwrap();
+            assert_eq!(target, to_target_info(TARGET_NODENAME.to_string()));
         })
         .await
         .unwrap();
@@ -1326,7 +1270,10 @@ mod test {
         // Run main in background
         let _task = fasync::Task::local(async move {
             serve_impl(
-                target_collection_proxy,
+                Connector::try_from_env(&env)
+                    .await
+                    .expect("Could not make target proxy test connector"),
+                Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
                 ServeCommand {
                     repository: None,
                     trusted_root: None,
@@ -1452,9 +1399,21 @@ mod test {
 
         let (fake_repo, _fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, _fake_engine_rx) = FakeEngine::new();
+        let (_, fake_target_proxy, _) = FakeTarget::new(None);
+        let frc = fake_repo.clone();
+        let fec = fake_engine.clone();
 
-        let (_, target_collection_proxy, _) =
-            FakeTargetCollection::new(fake_repo.clone(), fake_engine.clone(), None);
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || {
+                let fake_repo = frc.clone();
+                let fake_engine = fec.clone();
+                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = fake_target_proxy.clone();
+                async { Ok(fake_target_proxy) }
+            });
+        let env = tool_env.make_environment(test_env.context.clone());
 
         // Prepare serving the repo without passing the trusted root, and
         // passing of the trusted root 2.root.json explicitly
@@ -1477,7 +1436,10 @@ mod test {
         // and can't initialize root of trust 1.root.json.
         assert_eq!(
             serve_impl(
-                target_collection_proxy.clone(),
+                Connector::try_from_env(&env)
+                    .await
+                    .expect("Could not make target proxy test connector"),
+                Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
                 serve_cmd_without_root,
                 test_env.context.clone(),
                 SimpleWriter::new()
@@ -1493,7 +1455,10 @@ mod test {
         // Run main in background
         let _task = fasync::Task::local(async move {
             serve_impl(
-                target_collection_proxy,
+                Connector::try_from_env(&env)
+                    .await
+                    .expect("Could not make target proxy test connector"),
+                Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
                 serve_cmd_with_root,
                 test_env.context.clone(),
                 writer,
