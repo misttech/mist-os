@@ -329,7 +329,6 @@ sdk_molecule("fuchsia_idk_atoms_for_each_api_level_and_platform") {
   category = "partner"
   deps = [
     ":core_cc_prebuilt_libraries",
-    ":core_packages_for_each_api_level_and_platform",
     ":core_sysroot",
   ]
 
@@ -660,22 +659,13 @@ sdk_molecule("core_packages") {
   deps = [
     "//src/graphics/examples/vkproto/cmd-buf-benchmark:cmd-buf-benchmark-test-sdk",
     "//src/graphics/examples/vkproto/driver-tests:vkproto-driver-test-sdk",
+    "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
     "//src/graphics/tests/benchmark:vkcopy-test-sdk",
     "//src/graphics/tests/vkext:vkext-test-sdk",
     "//src/graphics/tests/vkloop:vkloop-test-sdk",
+    "//src/graphics/tests/vkreadback:vkreadback_test_sdk",
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
     "//src/performance/memory/heapdump/collector:collector_sdk",
-  ]
-}
-
-# TODO(https://fxbug.dev/310006516): Move the contents of this target to
-# ":core_packages" once downstream customers no longer need them in "API level
-# agnostic" form.
-sdk_molecule("core_packages_for_each_api_level_and_platform") {
-  category = "partner"
-  deps = [
-    "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
-    "//src/graphics/tests/vkreadback:vkreadback_test_sdk",
   ]
 }
 
