@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::DeviceMetadata;
+use crate::device::kobject::{Device, DeviceMetadata};
 use crate::device::DeviceMode;
 use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
 use crate::mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE};
@@ -50,6 +50,7 @@ bitflags! {
 struct LoopDeviceState {
     backing_file: Option<FileHandle>,
     block_size: u32,
+    k_device: Option<Device>,
 
     // See struct loop_info64 for details about these fields.
     offset: u64,
@@ -67,6 +68,7 @@ impl Default for LoopDeviceState {
         LoopDeviceState {
             backing_file: Default::default(),
             block_size: MIN_BLOCK_SIZE,
+            k_device: Default::default(),
             offset: Default::default(),
             size_limit: Default::default(),
             flags: Default::default(),
@@ -116,6 +118,10 @@ impl LoopDeviceState {
         }
         Ok(())
     }
+
+    fn set_k_device(&mut self, k_device: Device) {
+        self.k_device = Some(k_device);
+    }
 }
 
 #[derive(Debug, Default)]
@@ -136,7 +142,7 @@ impl LoopDevice {
             registry.get_or_create_class("block".into(), registry.virtual_bus());
         let device = Arc::new(Self { number: minor, state: Default::default() });
         let device_weak = Arc::<LoopDevice>::downgrade(&device);
-        registry.add_device(
+        let k_device = registry.add_device(
             locked,
             current_task,
             loop_device_name.as_ref(),
@@ -148,6 +154,10 @@ impl LoopDevice {
             virtual_block_class,
             move |dev| BlockDeviceDirectory::new(dev, device_weak.clone()),
         );
+        {
+            let mut state = device.state.lock();
+            state.set_k_device(k_device);
+        }
         device
     }
 
@@ -575,6 +585,13 @@ impl LoopDeviceRegistry {
         }
     }
 
+    fn get(&self, minor: u32) -> Result<Arc<LoopDevice>, Errno> {
+        match self.devices.lock().entry(minor) {
+            Entry::Occupied(e) => Ok(e.get().clone()),
+            Entry::Vacant(_) => return error!(ENODEV),
+        }
+    }
+
     fn get_or_create<L>(
         &self,
         locked: &mut Locked<'_, L>,
@@ -632,7 +649,16 @@ impl LoopDeviceRegistry {
         }
     }
 
-    fn remove(&self, minor: u32) -> Result<(), Errno> {
+    fn remove<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        k_device: Option<Device>,
+        minor: u32,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         match self.devices.lock().entry(minor) {
             Entry::Vacant(_) => Ok(()),
             Entry::Occupied(e) => {
@@ -640,6 +666,13 @@ impl LoopDeviceRegistry {
                     return error!(EBUSY);
                 }
                 e.remove();
+                let kernel = current_task.kernel();
+                let registry = &kernel.device_registry;
+                if let Some(dev) = &k_device {
+                    registry.remove_device(locked, current_task, dev.clone());
+                } else {
+                    return Err(errno!(EINVAL));
+                }
                 Ok(())
             }
         }
@@ -691,7 +724,12 @@ impl FileOps for LoopControlDevice {
             }
             LOOP_CTL_REMOVE => {
                 let minor = arg.into();
-                self.registry.remove(minor)?;
+                let device = self.registry.get(minor)?;
+                let k_device = {
+                    let state = device.state.lock();
+                    state.k_device.clone()
+                };
+                self.registry.remove(locked, current_task, k_device, minor)?;
                 Ok(minor.into())
             }
             _ => default_ioctl(file, current_task, request, arg),
