@@ -428,7 +428,7 @@ Valid options:
 
 **Current value (from the default):** `""`
 
-From //build/bazel/remote_services.gni:30
+From //build/bazel/remote_services.gni:32
 
 ### bless_goldens
 
@@ -2844,7 +2844,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `false`
 
-From //build/bazel/remote_services.gni:14
+From //build/bazel/remote_services.gni:16
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -2852,7 +2852,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `false`
 
-From //build/bazel/remote_services.gni:14
+From //build/bazel/remote_services.gni:16
 
 ### enable_frame_pointers
 
@@ -4601,7 +4601,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:35
 
 **Current value (from the default):** `false`
 
-From //src/graphics/magma/lib/magma/util/BUILD.gn:15
+From //src/graphics/magma/lib/magma/util/BUILD.gn:16
 
 ### magma_enable_tracing
 
@@ -7089,12 +7089,14 @@ The overall mode for RBE to be operating in.  The valid values are:
                  cloudtop. Suitable for high-bandwidth connections to
                  remote services.
  * 'infra' => The RBE configuration used by CI/CQ bots. Also high-bandwidth.
+ * 'remote_cache_only' => Use RBE only as a remote-cache: on cache-miss,
+                          execute locally instead of remotely.
  * 'low_bandwidth' => An RBE configuration for developers that have a
                       powerful workstations, but low bandwidth.
 
 **Current value (from the default):** `"default"`
 
-From //build/toolchain/rbe_modes.gni:32
+From //build/toolchain/rbe_modes.gni:34
 
 ### rbe_settings_overrides
 
@@ -7103,7 +7105,7 @@ variables whose default values are set by the chosen RBE mode (above).
 
 **Current value (from the default):** `{ }`
 
-From //build/toolchain/rbe_modes.gni:36
+From //build/toolchain/rbe_modes.gni:38
 
 ### recovery_label
 
