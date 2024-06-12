@@ -254,9 +254,34 @@ impl NetworkInterface for TunNetworkInterface {
             server_end,
         )?;
 
-        let subnet = fnetext::apply_subnet_mask(device_addr);
-
         info!("TunNetworkInterface: Successfully added address {:?}", addr);
+
+        self.add_forwarding_entry(device_addr)
+    }
+
+    fn remove_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error> {
+        let device_addr = fnet::Subnet {
+            addr: fnetext::IpAddress(addr.addr.into()).into(),
+            prefix_len: addr.prefix_len,
+        };
+        self.remove_address(device_addr)
+    }
+
+    fn remove_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
+        info!("TunNetworkInterface: Removing Address: {:?}", addr);
+
+        self.control_sync
+            .lock()
+            .remove_address(&addr, zx::Time::INFINITE)?
+            .expect("control_sync.remove_address");
+
+        info!("TunNetworkInterface: Successfully removed address {:?}", addr);
+
+        self.remove_forwarding_entry(addr)
+    }
+
+    fn add_forwarding_entry(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
+        let subnet = fnetext::apply_subnet_mask(addr);
 
         match subnet.addr {
             fidl_fuchsia_net::IpAddress::Ipv4(fnet::Ipv4Address { addr: _ }) => {
@@ -297,27 +322,8 @@ impl NetworkInterface for TunNetworkInterface {
         Ok(())
     }
 
-    fn remove_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error> {
-        let device_addr = fnet::Subnet {
-            addr: fnetext::IpAddress(addr.addr.into()).into(),
-            prefix_len: addr.prefix_len,
-        };
-        self.remove_address(device_addr)
-    }
-
-    fn remove_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
-        info!("TunNetworkInterface: Removing Address: {:?}", addr);
-
-        let device_addr = addr;
-
-        self.control_sync
-            .lock()
-            .remove_address(&device_addr, zx::Time::INFINITE)?
-            .expect("control_sync.remove_address");
-
-        let subnet = fnetext::apply_subnet_mask(device_addr);
-
-        info!("TunNetworkInterface: Successfully removed address {:?}", addr);
+    fn remove_forwarding_entry(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
+        let subnet = fnetext::apply_subnet_mask(addr);
 
         match subnet.addr {
             fidl_fuchsia_net::IpAddress::Ipv4(fnet::Ipv4Address { addr: _ }) => {

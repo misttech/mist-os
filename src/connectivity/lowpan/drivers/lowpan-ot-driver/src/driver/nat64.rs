@@ -178,7 +178,7 @@ impl Nat64 {
             }),
             prefix_len: cidr_addr_prefix_len,
         };
-        if let Err(err) = net_if.add_address(addr).ignore_already_exists() {
+        if let Err(err) = net_if.add_forwarding_entry(addr).ignore_already_exists() {
             warn!("Unable to add NAT64 route `{:?}` to lowpan interface: {:?}", addr, err);
         }
     }
@@ -195,7 +195,7 @@ impl Nat64 {
             }),
             prefix_len: cidr_addr_prefix_len,
         };
-        if let Err(err) = net_if.remove_address(addr).ignore_not_found() {
+        if let Err(err) = net_if.remove_forwarding_entry(addr).ignore_not_found() {
             warn!("Unable to delete NAT64 route `{:?}` to lowpan interface: {:?}", addr, err);
         }
     }
