@@ -205,18 +205,18 @@ tool meets Fuchsia requirements.
 
 > How will you distribute the tool?
 >
->     *   Will it only be available in-tree or included in the SDK?
+> *   Will it only be available in-tree or included in the SDK?
 >
 > Who will own the maintenance of the tool?
 >
->    *   Is there a plan in place to update, evolve, or deprecate the tool?
+> *   Is there a plan in place to update, evolve, or deprecate the tool?
 >
 > Where can users go to find answers to common questions or ask new
 > questions?
 >
 > How are you tracking user-reported issues?
 >
->     *   Does the help output and error output include a bug link?
+> *   Does the help output and error output include a bug link?
 >
 > What events have been instrumented? Where can one find metrics for this
 > tool?
