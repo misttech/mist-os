@@ -5,7 +5,6 @@
 use crate::component::map_to_raw_status;
 use crate::fuchsia::errors::map_to_status;
 use crate::volumes_directory::VolumesDirectory;
-use async_trait::async_trait;
 use fidl_fuchsia_fxfs::DebugRequest;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, Status};
@@ -71,7 +70,6 @@ impl DirectoryEntry for InternalFile {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for InternalFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let props = self.handle().await?.get_properties().await.map_err(map_to_status)?;
@@ -302,7 +300,6 @@ impl DirectoryEntry for ObjectDirectory {
     }
 }
 
-#[async_trait]
 impl Node for ObjectDirectory {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let id = upgrade_weak(&self.store)?.store_object_id();
@@ -342,7 +339,6 @@ impl Node for ObjectDirectory {
     }
 }
 
-#[async_trait]
 impl Directory for ObjectDirectory {
     fn open(
         self: Arc<Self>,

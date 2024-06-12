@@ -23,8 +23,6 @@ use crate::node::Node;
 use crate::path::Path;
 use crate::protocols::ProtocolsExt;
 use crate::{ObjectRequestRef, ToObjectRequest};
-
-use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
@@ -180,7 +178,6 @@ impl DirectoryEntry for Simple {
     }
 }
 
-#[async_trait]
 impl Node for Simple {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         Ok(fio::NodeAttributes {
@@ -217,7 +214,6 @@ impl Node for Simple {
     }
 }
 
-#[async_trait]
 impl Directory for Simple {
     fn open(
         self: Arc<Self>,

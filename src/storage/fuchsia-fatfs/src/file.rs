@@ -8,7 +8,6 @@ use crate::node::Node;
 use crate::refs::FatfsFileRef;
 use crate::types::File;
 use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
-use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, Status};
 use libc::{S_IRUSR, S_IWUSR};
@@ -203,7 +202,6 @@ impl Node for FatFile {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for FatFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let fs_lock = self.filesystem.lock().unwrap();

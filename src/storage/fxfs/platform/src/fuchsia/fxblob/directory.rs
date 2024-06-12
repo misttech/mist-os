@@ -387,7 +387,6 @@ impl FxNode for BlobDirectory {
     }
 }
 
-#[async_trait]
 impl MutableDirectory for BlobDirectory {
     async fn unlink(self: Arc<Self>, name: &str, must_be_directory: bool) -> Result<(), Status> {
         if must_be_directory {
@@ -411,16 +410,6 @@ impl MutableDirectory for BlobDirectory {
     async fn sync(&self) -> Result<(), Status> {
         self.directory.sync().await
     }
-
-    async fn rename(
-        self: Arc<Self>,
-        _src_dir: Arc<dyn vfs::directory::entry_container::MutableDirectory + 'static>,
-        _src_name: Path,
-        _dst_name: Path,
-    ) -> Result<(), Status> {
-        // Files in a blob directory can't be renamed.
-        Err(Status::NOT_SUPPORTED)
-    }
 }
 
 /// Implementation of VFS pseudo-directory for blobs. Forks a task per connection.
@@ -434,7 +423,6 @@ impl DirectoryEntry for BlobDirectory {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for BlobDirectory {
     async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
         self.directory.get_attrs().await
@@ -453,7 +441,6 @@ impl vfs::node::Node for BlobDirectory {
 }
 
 /// Implements VFS entry container trait for directories, allowing manipulation of their contents.
-#[async_trait]
 impl VfsDirectory for BlobDirectory {
     fn open(
         self: Arc<Self>,

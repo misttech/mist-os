@@ -4,7 +4,6 @@
 
 use crate::root_dir::RootDir;
 use anyhow::Context as _;
-use async_trait::async_trait;
 use fidl::HandleBased as _;
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
@@ -77,7 +76,6 @@ impl<S: crate::NonMetaStorage> vfs::node::IsDirectory for MetaFile<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::node::Node for MetaFile<S> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         Ok(fio::NodeAttributes {

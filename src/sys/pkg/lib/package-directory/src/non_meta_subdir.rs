@@ -4,7 +4,6 @@
 
 use crate::root_dir::RootDir;
 use anyhow::anyhow;
-use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
 use std::sync::Arc;
 use tracing::error;
@@ -33,7 +32,6 @@ impl<S: crate::NonMetaStorage> NonMetaSubdir<S> {
 
 impl<S: crate::NonMetaStorage> vfs::node::IsDirectory for NonMetaSubdir<S> {}
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::node::Node for NonMetaSubdir<S> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         Ok(fio::NodeAttributes {
@@ -72,7 +70,6 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for NonMetaSubdir<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for NonMetaSubdir<S> {
     fn open(
         self: Arc<Self>,

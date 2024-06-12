@@ -238,7 +238,6 @@ mod tests {
     use super::*;
     use crate::OpenFlags;
     use assert_matches::assert_matches;
-    use async_trait::async_trait;
     use fuchsia_async::{DurationExt, TimeoutExt};
     use fuchsia_zircon::prelude::*;
     use futures::prelude::*;
@@ -356,7 +355,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Node for MockDirectory {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
             unimplemented!()
@@ -371,7 +369,6 @@ mod tests {
         fn close(self: Arc<Self>) {}
     }
 
-    #[async_trait]
     impl Directory for MockDirectory {
         fn open(
             self: Arc<Self>,

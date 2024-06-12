@@ -7,11 +7,11 @@ use crate::node::{Closer, FatNode, Node, WeakFatNode};
 use crate::refs::{FatfsDirRef, FatfsFileRef};
 use crate::types::{Dir, DirEntry, File};
 use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
-use async_trait::async_trait;
 use fatfs::validate_filename;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::Status;
+use futures::future::BoxFuture;
 use libc::{S_IRUSR, S_IWUSR};
 use std::borrow::Borrow;
 use std::cell::UnsafeCell;
@@ -712,7 +712,6 @@ impl Debug for FatDirectory {
     }
 }
 
-#[async_trait]
 impl MutableDirectory for FatDirectory {
     async fn unlink(self: Arc<Self>, name: &str, must_be_directory: bool) -> Result<(), Status> {
         let fs_lock = self.filesystem.lock().unwrap();
@@ -792,42 +791,44 @@ impl MutableDirectory for FatDirectory {
         Ok(())
     }
 
-    async fn rename(
+    fn rename(
         self: Arc<Self>,
         src_dir: Arc<dyn MutableDirectory>,
         src_path: Path,
         dst_path: Path,
-    ) -> Result<(), Status> {
-        let src_dir =
-            src_dir.into_any().downcast::<FatDirectory>().map_err(|_| Status::INVALID_ARGS)?;
-        if self.is_deleted() {
-            // Can't rename into a deleted folder.
-            return Err(Status::NOT_FOUND);
-        }
+    ) -> BoxFuture<'static, Result<(), Status>> {
+        Box::pin(async move {
+            let src_dir =
+                src_dir.into_any().downcast::<FatDirectory>().map_err(|_| Status::INVALID_ARGS)?;
+            if self.is_deleted() {
+                // Can't rename into a deleted folder.
+                return Err(Status::NOT_FOUND);
+            }
 
-        let src_name = src_path.peek().unwrap();
-        validate_filename(src_name).map_err(fatfs_error_to_status)?;
-        let dst_name = dst_path.peek().unwrap();
-        validate_filename(dst_name).map_err(fatfs_error_to_status)?;
+            let src_name = src_path.peek().unwrap();
+            validate_filename(src_name).map_err(fatfs_error_to_status)?;
+            let dst_name = dst_path.peek().unwrap();
+            validate_filename(dst_name).map_err(fatfs_error_to_status)?;
 
-        let mut closer = Closer::new(&self.filesystem);
-        let filesystem = self.filesystem.lock().unwrap();
+            let mut closer = Closer::new(&self.filesystem);
+            let filesystem = self.filesystem.lock().unwrap();
 
-        // Figure out if src is a directory.
-        let entry = src_dir.find_child(&filesystem, &src_name)?;
-        if entry.is_none() {
-            // No such src (if we don't return NOT_FOUND here, fatfs will return it when we
-            // call rename() later).
-            return Err(Status::NOT_FOUND);
-        }
-        let src_is_dir = entry.unwrap().is_dir();
-        if (dst_path.is_dir() || src_path.is_dir()) && !src_is_dir {
-            // The caller wanted a directory (src or dst), but src is not a directory. This is
-            // an error.
-            return Err(Status::NOT_DIR);
-        }
+            // Figure out if src is a directory.
+            let entry = src_dir.find_child(&filesystem, &src_name)?;
+            if entry.is_none() {
+                // No such src (if we don't return NOT_FOUND here, fatfs will return it when we
+                // call rename() later).
+                return Err(Status::NOT_FOUND);
+            }
+            let src_is_dir = entry.unwrap().is_dir();
+            if (dst_path.is_dir() || src_path.is_dir()) && !src_is_dir {
+                // The caller wanted a directory (src or dst), but src is not a directory. This is
+                // an error.
+                return Err(Status::NOT_DIR);
+            }
 
-        self.rename_locked(&filesystem, &src_dir, src_name, dst_name, src_is_dir, &mut closer)
+            self.rename_locked(&filesystem, &src_dir, src_name, dst_name, src_is_dir, &mut closer)
+        })
     }
 }
 
@@ -841,7 +842,6 @@ impl DirectoryEntry for FatDirectory {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for FatDirectory {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let fs_lock = self.filesystem.lock().unwrap();
@@ -909,7 +909,6 @@ impl vfs::node::Node for FatDirectory {
     }
 }
 
-#[async_trait]
 impl Directory for FatDirectory {
     fn open(
         self: Arc<Self>,

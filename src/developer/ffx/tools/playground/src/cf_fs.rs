@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_trait::async_trait;
 use component_debug::realm::{GetAllInstancesError, Instance};
 use fuchsia_zircon_status::Status;
 use futures::channel::oneshot;
@@ -370,7 +369,6 @@ impl CFDirectory {
     }
 }
 
-#[async_trait]
 impl Node for CFDirectory {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         Ok(fio::NodeAttributes {
@@ -406,7 +404,6 @@ impl Node for CFDirectory {
     }
 }
 
-#[async_trait]
 impl Directory for CFDirectory {
     fn open2(
         self: Arc<Self>,

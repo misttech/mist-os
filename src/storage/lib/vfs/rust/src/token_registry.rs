@@ -252,8 +252,6 @@ mod tests {
         use crate::path::Path;
         use crate::token_registry::{TokenInterface, TokenRegistry};
         use crate::ObjectRequestRef;
-
-        use async_trait::async_trait;
         use fidl::endpoints::ServerEnd;
         use fidl_fuchsia_io as fio;
         use fuchsia_zircon_status::Status;
@@ -279,7 +277,6 @@ mod tests {
             }
         }
 
-        #[async_trait]
         impl Node for MockDirectory {
             async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
                 unimplemented!("Not implemented!")
@@ -293,7 +290,6 @@ mod tests {
             }
         }
 
-        #[async_trait]
         impl Directory for MockDirectory {
             fn open(
                 self: Arc<Self>,
@@ -336,7 +332,6 @@ mod tests {
             }
         }
 
-        #[async_trait]
         impl MutableDirectory for MockDirectory {
             async fn unlink(
                 self: Arc<Self>,
@@ -362,15 +357,6 @@ mod tests {
             }
 
             async fn sync(&self) -> Result<(), Status> {
-                unimplemented!("Not implemented!");
-            }
-
-            async fn rename(
-                self: Arc<Self>,
-                _src_dir: Arc<dyn MutableDirectory>,
-                _src_name: Path,
-                _dst_name: Path,
-            ) -> Result<(), Status> {
                 unimplemented!("Not implemented!");
             }
         }

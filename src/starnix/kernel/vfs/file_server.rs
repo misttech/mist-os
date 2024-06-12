@@ -9,9 +9,9 @@ use crate::vfs::{
     DirectoryEntryType, DirentSink, FileHandle, FileObject, FsStr, LookupContext, NamespaceNode,
     RenameFlags, SeekTarget, UnlinkKind,
 };
-use async_trait::async_trait;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::HandleBased;
+use futures::future::BoxFuture;
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
@@ -421,7 +421,6 @@ impl StarnixNodeConnection {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for StarnixNodeConnection {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         Ok(StarnixNodeConnection::get_attrs(self))
@@ -435,7 +434,6 @@ impl vfs::node::Node for StarnixNodeConnection {
     }
 }
 
-#[async_trait]
 impl directory::entry_container::Directory for StarnixNodeConnection {
     fn open(
         self: Arc<Self>,
@@ -496,7 +494,6 @@ impl directory::entry_container::Directory for StarnixNodeConnection {
     fn unregister_watcher(self: Arc<Self>, _key: usize) {}
 }
 
-#[async_trait]
 impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
     async fn set_attrs(
         &self,
@@ -533,27 +530,31 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
     async fn sync(&self) -> Result<(), zx::Status> {
         Ok(())
     }
-    async fn rename(
+    fn rename(
         self: Arc<Self>,
         src_dir: Arc<dyn directory::entry_container::MutableDirectory>,
         src_name: path::Path,
         dst_name: path::Path,
-    ) -> Result<(), zx::Status> {
-        let src_name = src_name.into_string();
-        let dst_name = dst_name.into_string();
-        let src_dir =
-            src_dir.into_any().downcast::<StarnixNodeConnection>().map_err(|_| errno!(EXDEV))?;
-        let (src_node, src_name) = src_dir.lookup_parent(src_name.as_str().into()).await?;
-        let (dst_node, dst_name) = self.lookup_parent(dst_name.as_str().into()).await?;
-        NamespaceNode::rename(
-            &*self.task().await?,
-            &src_node,
-            src_name,
-            &dst_node,
-            dst_name,
-            RenameFlags::empty(),
-        )?;
-        Ok(())
+    ) -> BoxFuture<'static, Result<(), zx::Status>> {
+        Box::pin(async move {
+            let src_name = src_name.into_string();
+            let dst_name = dst_name.into_string();
+            let src_dir = src_dir
+                .into_any()
+                .downcast::<StarnixNodeConnection>()
+                .map_err(|_| errno!(EXDEV))?;
+            let (src_node, src_name) = src_dir.lookup_parent(src_name.as_str().into()).await?;
+            let (dst_node, dst_name) = self.lookup_parent(dst_name.as_str().into()).await?;
+            NamespaceNode::rename(
+                &*self.task().await?,
+                &src_node,
+                src_name,
+                &dst_node,
+                dst_name,
+                RenameFlags::empty(),
+            )?;
+            Ok(())
+        })
     }
 }
 

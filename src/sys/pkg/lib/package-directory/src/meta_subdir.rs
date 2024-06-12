@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::root_dir::RootDir;
-use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
 use std::sync::Arc;
 use vfs::common::send_on_open_with_error;
@@ -29,7 +28,6 @@ impl<S: crate::NonMetaStorage> MetaSubdir<S> {
 
 impl<S: crate::NonMetaStorage> vfs::node::IsDirectory for MetaSubdir<S> {}
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::node::Node for MetaSubdir<S> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         let size = crate::usize_to_u64_safe(self.root_dir.meta_files.len());
@@ -70,7 +68,6 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaSubdir<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for MetaSubdir<S> {
     fn open(
         self: Arc<Self>,

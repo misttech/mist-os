@@ -323,7 +323,6 @@ mod tests {
     use crate::node::{IsDirectory, Node};
     use crate::ToObjectRequest;
     use assert_matches::assert_matches;
-    use async_trait::async_trait;
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon_status::Status;
@@ -374,7 +373,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Node for TestSymlink {
         async fn get_attributes(
             &self,

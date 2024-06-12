@@ -12,8 +12,6 @@ use crate::execution_scope::ExecutionScope;
 use crate::node::Node;
 use crate::object_request::{ObjectRequestRef, ObjectRequestSend};
 use crate::ProtocolsExt;
-
-use async_trait::async_trait;
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::Channel;
@@ -122,7 +120,6 @@ impl DirectoryEntry for Service {
     }
 }
 
-#[async_trait]
 impl Node for Service {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         Ok(fio::NodeAttributes {

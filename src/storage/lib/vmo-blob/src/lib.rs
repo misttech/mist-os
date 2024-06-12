@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use async_trait::async_trait;
 use fidl::AsHandleRef;
 use std::sync::{Arc, OnceLock};
 use tracing::error;
@@ -47,7 +46,6 @@ impl IsDirectory for VmoBlob {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for VmoBlob {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         let content_size = self.get_size().await?;

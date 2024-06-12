@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use async_trait::async_trait;
 use fidl::endpoints::{create_endpoints, ServerEnd};
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder};
 use fuchsia_zircon::{self as zx, HandleBased, Status};
@@ -226,7 +225,6 @@ async fn test_read_link_error() {
         }
     }
 
-    #[async_trait]
     impl Node for ErrorSymlink {
         async fn get_attributes(
             &self,
@@ -812,7 +810,6 @@ impl FileIo for AllocateFile {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for AllocateFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         unimplemented!()

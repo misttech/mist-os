@@ -11,12 +11,12 @@ use crate::execution_scope::ExecutionScope;
 use crate::node::Node;
 use crate::object_request::ObjectRequestRef;
 use crate::path::Path;
-
-use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
+use futures::future::BoxFuture;
 use std::any::Any;
+use std::future::{ready, Future};
 use std::sync::Arc;
 
 mod private {
@@ -52,7 +52,6 @@ pub use private::DirectoryWatcher;
 
 /// All directories implement this trait.  If a directory can be modified it should
 /// also implement the `MutableDirectory` trait.
-#[async_trait]
 pub trait Directory: Node {
     /// Opens a connection to this item if the `path` is "." or a connection to an item inside this
     /// one otherwise.  `path` will not contain any "." or ".." components.
@@ -111,11 +110,13 @@ pub trait Directory: Node {
     /// Reads directory entries starting from `pos` by adding them to `sink`.
     /// Once finished, should return a sealed sink.
     // The lifetimes here are because of https://github.com/rust-lang/rust/issues/63033.
-    async fn read_dirents<'a>(
+    fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,
         sink: Box<dyn dirents_sink::Sink>,
-    ) -> Result<(TraversalPosition, Box<dyn dirents_sink::Sealed>), Status>;
+    ) -> impl Future<Output = Result<(TraversalPosition, Box<dyn dirents_sink::Sealed>), Status>> + Send
+    where
+        Self: Sized;
 
     /// Register a watcher for this directory.
     /// Implementations will probably want to use a `Watcher` to manage watchers.
@@ -134,76 +135,112 @@ pub trait Directory: Node {
 /// This trait indicates a directory that can be mutated by adding and removing entries.
 /// This trait must be implemented to use a `MutableConnection`, however, a directory could also
 /// implement the `DirectlyMutable` type, which provides a blanket implementation of this trait.
-#[async_trait]
 pub trait MutableDirectory: Directory + Send + Sync {
     /// Adds a child entry to this directory.  If the target exists, it should fail with
     /// ZX_ERR_ALREADY_EXISTS.
-    async fn link(
+    fn link<'a>(
         self: Arc<Self>,
         _name: String,
         _source_dir: Arc<dyn Any + Send + Sync>,
-        _source_name: &str,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+        _source_name: &'a str,
+    ) -> BoxFuture<'a, Result<(), Status>> {
+        Box::pin(ready(Err(Status::NOT_SUPPORTED)))
     }
 
     /// Set the attributes of this directory based on the values in `attrs`.
-    async fn set_attrs(
+    fn set_attrs(
         &self,
         flags: fio::NodeAttributeFlags,
         attributes: fio::NodeAttributes,
-    ) -> Result<(), Status>;
+    ) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized;
 
     /// Set the mutable attributes of this directory based on the values in `attributes`.
-    async fn update_attributes(&self, attributes: fio::MutableNodeAttributes)
-        -> Result<(), Status>;
+    fn update_attributes(
+        &self,
+        attributes: fio::MutableNodeAttributes,
+    ) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized;
 
     /// Removes an entry from this directory.
-    async fn unlink(self: Arc<Self>, name: &str, must_be_directory: bool) -> Result<(), Status>;
+    fn unlink(
+        self: Arc<Self>,
+        name: &str,
+        must_be_directory: bool,
+    ) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized;
 
     /// Syncs the directory.
-    async fn sync(&self) -> Result<(), Status>;
+    fn sync(&self) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized;
 
     /// Renames into this directory.
-    async fn rename(
+    fn rename(
         self: Arc<Self>,
-        src_dir: Arc<dyn MutableDirectory>,
-        src_name: Path,
-        dst_name: Path,
-    ) -> Result<(), Status>;
+        _src_dir: Arc<dyn MutableDirectory>,
+        _src_name: Path,
+        _dst_name: Path,
+    ) -> BoxFuture<'static, Result<(), Status>> {
+        Box::pin(ready(Err(Status::NOT_SUPPORTED)))
+    }
 
     /// Creates a symbolic link.
-    async fn create_symlink(
+    fn create_symlink(
         &self,
         _name: String,
         _target: Vec<u8>,
         _connection: Option<ServerEnd<fio::SymlinkMarker>>,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    ) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized,
+    {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// List extended attributes.
-    async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn list_extended_attributes(&self) -> impl Future<Output = Result<Vec<Vec<u8>>, Status>> + Send
+    where
+        Self: Sized,
+    {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Get the value for an extended attribute.
-    async fn get_extended_attribute(&self, _name: Vec<u8>) -> Result<Vec<u8>, Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn get_extended_attribute(
+        &self,
+        _name: Vec<u8>,
+    ) -> impl Future<Output = Result<Vec<u8>, Status>> + Send
+    where
+        Self: Sized,
+    {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Set the value for an extended attribute.
-    async fn set_extended_attribute(
+    fn set_extended_attribute(
         &self,
         _name: Vec<u8>,
         _value: Vec<u8>,
         _mode: fio::SetExtendedAttributeMode,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    ) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized,
+    {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Remove the value for an extended attribute.
-    async fn remove_extended_attribute(&self, _name: Vec<u8>) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    fn remove_extended_attribute(
+        &self,
+        _name: Vec<u8>,
+    ) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized,
+    {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 }

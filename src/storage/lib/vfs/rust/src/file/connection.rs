@@ -1088,7 +1088,6 @@ mod tests {
     use super::*;
     use crate::node::{IsDirectory, Node};
     use assert_matches::assert_matches;
-    use async_trait::async_trait;
     use futures::prelude::*;
     use std::sync::Mutex;
 
@@ -1194,7 +1193,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Node for MockFile {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
             self.handle_operation(FileOperation::GetAttrs)?;

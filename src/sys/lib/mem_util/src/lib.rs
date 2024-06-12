@@ -84,7 +84,6 @@ pub enum DataError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
     use fidl::endpoints::{create_proxy, ServerEnd};
     use fuchsia_zircon_status::Status;
     use futures::StreamExt;
@@ -146,7 +145,6 @@ mod tests {
             }
         }
 
-        #[async_trait]
         impl vfs::node::Node for NonVMOTestFile {
             async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
                 Err(Status::NOT_SUPPORTED)

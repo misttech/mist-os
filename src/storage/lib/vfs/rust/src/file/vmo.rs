@@ -14,8 +14,6 @@ use crate::file::common::vmo_flags_to_rights;
 use crate::file::{File, FileLike, FileOptions, GetVmo, StreamIoConnection, SyncMode};
 use crate::node::Node;
 use crate::ObjectRequestRef;
-
-use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, HandleBased as _, Status, Vmo};
 use std::sync::Arc;
@@ -144,7 +142,6 @@ impl DirectoryEntry for VmoFile {
     }
 }
 
-#[async_trait]
 impl Node for VmoFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let content_size = self.vmo.get_content_size()?;

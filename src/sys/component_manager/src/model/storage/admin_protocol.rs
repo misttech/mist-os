@@ -655,7 +655,6 @@ impl StorageAdmin {
 #[cfg(test)]
 mod tests {
     use super::{DirType, StorageAdmin, StorageError};
-    use async_trait::async_trait;
     use fidl::endpoints::ServerEnd;
     use std::fmt::Formatter;
     use std::path::PathBuf;
@@ -997,7 +996,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl vfs::node::Node for FakeDir {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
             Err(zx::Status::INTERNAL)
@@ -1027,7 +1025,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Directory for FakeDir {
         fn open(
             self: Arc<Self>,

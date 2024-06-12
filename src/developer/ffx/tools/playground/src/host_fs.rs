@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
+use futures::future::BoxFuture;
 use std::any::Any;
+use std::future::ready;
 use std::io::{Read, Seek, Write};
 use std::os::unix::fs::{DirEntryExt, FileTypeExt, MetadataExt};
 use std::path::PathBuf;
@@ -238,7 +239,6 @@ impl FileIo for HostFile {
     }
 }
 
-#[async_trait]
 impl Node for HostFile {
     async fn get_attributes(
         &self,
@@ -328,7 +328,6 @@ impl DirectoryEntry for HostDirectory {
     }
 }
 
-#[async_trait]
 impl Node for HostDirectory {
     async fn get_attributes(
         &self,
@@ -362,7 +361,6 @@ impl Node for HostDirectory {
     }
 }
 
-#[async_trait]
 impl Directory for HostDirectory {
     fn open(
         self: Arc<Self>,
@@ -446,17 +444,16 @@ impl Directory for HostDirectory {
     }
 }
 
-#[async_trait]
 impl MutableDirectory for HostDirectory {
     /// Adds a child entry to this directory.  If the target exists, it should fail with
     /// ZX_ERR_ALREADY_EXISTS.
-    async fn link(
+    fn link<'a>(
         self: Arc<Self>,
         _name: String,
         _source_dir: Arc<dyn Any + Send + Sync>,
-        _source_name: &str,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+        _source_name: &'a str,
+    ) -> BoxFuture<'a, Result<(), Status>> {
+        Box::pin(ready(Err(Status::NOT_SUPPORTED)))
     }
 
     /// Set the attributes of this directory based on the values in `attrs`.
@@ -500,14 +497,14 @@ impl MutableDirectory for HostDirectory {
     }
 
     /// Renames into this directory.
-    async fn rename(
+    fn rename(
         self: Arc<Self>,
         _src_dir: Arc<dyn MutableDirectory>,
         _src_name: VfsPath,
         _dst_name: VfsPath,
-    ) -> Result<(), Status> {
+    ) -> BoxFuture<'static, Result<(), Status>> {
         //TODO(https://fxbug.dev/333799815)
-        Err(Status::NOT_SUPPORTED)
+        Box::pin(ready(Err(Status::NOT_SUPPORTED)))
     }
 
     /// Creates a symbolic link.

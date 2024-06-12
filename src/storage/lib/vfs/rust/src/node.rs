@@ -11,15 +11,13 @@ use crate::name::Name;
 use crate::object_request::Representation;
 use crate::protocols::ToNodeOptions;
 use crate::{node, ObjectRequestRef, ToObjectRequest};
-
 use anyhow::Error;
-use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
 use futures::stream::StreamExt;
 use libc::{S_IRUSR, S_IWUSR};
-use std::future::Future;
+use std::future::{ready, Future};
 use std::sync::Arc;
 
 /// POSIX emulation layer access attributes for all services created with service().
@@ -40,16 +38,19 @@ pub trait IsDirectory {
 }
 
 /// All nodes must implement this trait.
-#[async_trait]
 pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
     /// Returns node attributes (io2).
-    async fn get_attributes(
+    fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, Status>;
+    ) -> impl Future<Output = Result<fio::NodeAttributes2, Status>> + Send
+    where
+        Self: Sized;
 
     /// Get this node's attributes.
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status>;
+    fn get_attrs(&self) -> impl Future<Output = Result<fio::NodeAttributes, Status>> + Send
+    where
+        Self: Sized;
 
     /// Called when the node is about to be opened as the node protocol.  Implementers can use this
     /// to perform any initialization or reference counting.  Errors here will result in the open
@@ -67,12 +68,15 @@ pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
     /// Called when the node is closed.
     fn close(self: Arc<Self>) {}
 
-    async fn link_into(
+    fn link_into(
         self: Arc<Self>,
         _destination_dir: Arc<dyn MutableDirectory>,
         _name: Name,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    ) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized,
+    {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Returns information about the filesystem.

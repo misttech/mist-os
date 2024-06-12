@@ -11,7 +11,6 @@ use crate::fuchsia::pager::{
 };
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume};
 use anyhow::Error;
-use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, HandleBased, Status};
 use futures::future::BoxFuture;
@@ -265,7 +264,6 @@ impl vfs::node::IsDirectory for FxFile {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for FxFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let props = self.handle.get_properties().await.map_err(map_to_status)?;

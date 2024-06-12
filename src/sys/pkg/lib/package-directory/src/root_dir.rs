@@ -8,7 +8,6 @@ use crate::meta_subdir::MetaSubdir;
 use crate::non_meta_subdir::NonMetaSubdir;
 use crate::{usize_to_u64_safe, Error};
 use anyhow::Context as _;
-use async_trait::async_trait;
 use async_utils::async_once::Once;
 use fidl::endpoints::ServerEnd;
 use fuchsia_fs::file::AsyncReadAtExt as _;
@@ -309,7 +308,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::node::Node for RootDir<S> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         Ok(fio::NodeAttributes {
@@ -348,7 +346,6 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for RootDir<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for RootDir<S> {
     fn open(
         self: Arc<Self>,

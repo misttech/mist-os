@@ -7,8 +7,6 @@ use crate::execution_scope::ExecutionScope;
 use crate::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
 use crate::node::Node;
 use crate::ObjectRequestRef;
-
-use async_trait::async_trait;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
 use std::sync::{Arc, Mutex};
@@ -48,7 +46,6 @@ impl DirectoryEntry for SimpleFile {
     }
 }
 
-#[async_trait]
 impl Node for SimpleFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let content_size = self.data.lock().unwrap().len().try_into().unwrap();

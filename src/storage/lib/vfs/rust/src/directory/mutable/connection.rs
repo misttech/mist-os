@@ -333,8 +333,9 @@ mod tests {
     use crate::directory::traversal_position::TraversalPosition;
     use crate::node::{IsDirectory, Node};
     use crate::ToObjectRequest;
-    use async_trait::async_trait;
+    use futures::future::BoxFuture;
     use std::any::Any;
+    use std::future::ready;
     use std::sync::{Mutex, Weak};
 
     #[derive(Debug, PartialEq)]
@@ -366,7 +367,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Node for MockDirectory {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
             unimplemented!("Not implemented");
@@ -384,7 +384,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Directory for MockDirectory {
         fn open(
             self: Arc<Self>,
@@ -428,15 +427,15 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl MutableDirectory for MockDirectory {
-        async fn link(
+        fn link<'a>(
             self: Arc<Self>,
             path: String,
             _source_dir: Arc<dyn Any + Send + Sync>,
-            _source_name: &str,
-        ) -> Result<(), Status> {
-            self.fs.handle_event(MutableDirectoryAction::Link { id: self.id, path })
+            _source_name: &'a str,
+        ) -> BoxFuture<'a, Result<(), Status>> {
+            let result = self.fs.handle_event(MutableDirectoryAction::Link { id: self.id, path });
+            Box::pin(ready(result))
         }
 
         async fn unlink(
@@ -470,19 +469,20 @@ mod tests {
             self.fs.handle_event(MutableDirectoryAction::Sync)
         }
 
-        async fn rename(
+        fn rename(
             self: Arc<Self>,
             src_dir: Arc<dyn MutableDirectory>,
             src_name: Path,
             dst_name: Path,
-        ) -> Result<(), Status> {
+        ) -> BoxFuture<'static, Result<(), Status>> {
             let src_dir = src_dir.into_any().downcast::<MockDirectory>().unwrap();
-            self.fs.handle_event(MutableDirectoryAction::Rename {
+            let result = self.fs.handle_event(MutableDirectoryAction::Rename {
                 id: src_dir.id,
                 src_name: src_name.into_string(),
                 dst_dir: self.id,
                 dst_name: dst_name.into_string(),
-            })
+            });
+            Box::pin(ready(result))
         }
     }
 

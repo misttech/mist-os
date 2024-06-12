@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -66,7 +65,6 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for Validation {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         Ok(fio::NodeAttributes {
@@ -100,7 +98,6 @@ impl vfs::node::Node for Validation {
     }
 }
 
-#[async_trait]
 impl vfs::directory::entry_container::Directory for Validation {
     fn open(
         self: Arc<Self>,

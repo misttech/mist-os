@@ -9,7 +9,6 @@
 // interact with block devices.
 
 use anyhow::Error;
-use async_trait::async_trait;
 use fidl::endpoints::{create_endpoints, ServerEnd};
 use remote_block_device::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use std::sync::Arc;
@@ -50,7 +49,6 @@ impl DirectoryEntry for BlockFile {
     }
 }
 
-#[async_trait]
 impl Node for BlockFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         let block_size = self.block_client.block_size();

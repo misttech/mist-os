@@ -4,7 +4,6 @@
 
 use crate::root_dir::RootDir;
 use crate::usize_to_u64_safe;
-use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
 use std::sync::Arc;
 use vfs::common::send_on_open_with_error;
@@ -27,7 +26,6 @@ impl<S: crate::NonMetaStorage> MetaAsDir<S> {
 
 impl<S: crate::NonMetaStorage> vfs::node::IsDirectory for MetaAsDir<S> {}
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         Ok(fio::NodeAttributes {
@@ -66,7 +64,6 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for MetaAsDir<S> {
     fn open(
         self: Arc<Self>,

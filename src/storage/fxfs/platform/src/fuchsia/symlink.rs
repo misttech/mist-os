@@ -7,7 +7,6 @@ use crate::fuchsia::errors::map_to_status;
 use crate::fuchsia::node::FxNode;
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume};
 use anyhow::Error;
-use async_trait::async_trait;
 use fxfs::errors::FxfsError;
 use fxfs::object_handle::{ObjectHandle, ObjectProperties};
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
@@ -108,7 +107,6 @@ impl Symlink for FxSymlink {
     }
 }
 
-#[async_trait]
 impl Node for FxSymlink {
     async fn get_attributes(
         &self,
