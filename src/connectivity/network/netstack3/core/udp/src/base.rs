@@ -1893,8 +1893,7 @@ where
 
     /// Sets the specified socket's membership status for the given group.
     ///
-    /// If `id` is unbound, the membership state will take effect when it is
-    /// bound. An error is returned if the membership change request is invalid
+    /// An error is returned if the membership change request is invalid
     /// (e.g. leaving a group that was not joined, or joining a group multiple
     /// times) or if the device to use to join is unspecified or conflicts with
     /// the existing socket state.
@@ -1908,9 +1907,7 @@ where
         >,
         want_membership: bool,
     ) -> Result<(), SetMulticastMembershipError> {
-        self.datagram()
-            .set_multicast_membership(id, multicast_group, interface, want_membership)
-            .map_err(Into::into)
+        self.datagram().set_multicast_membership(id, multicast_group, interface, want_membership)
     }
 
     /// Sets the hop limit for packets sent by the socket to a unicast
