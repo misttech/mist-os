@@ -97,8 +97,12 @@ _default_rbe_settings = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
     cxx_download_objects = false
+
     link_enable = true
-    link_download_unstripped_binaries = false
+
+    # TODO(b/339694617): explore skipping more unstripped binaries
+    link_download_unstripped_binaries = true
+
     rust_enable = true
     rust_exec_strategy = "remote"
     rust_download_rlibs = false
