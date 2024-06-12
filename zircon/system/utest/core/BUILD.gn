@@ -245,14 +245,16 @@ if (is_fuchsia) {
       "kernel.compression.storage-strategy=tri_page",
       "kernel.compression.reclaim_anonymous=true",
       "kernel.compression.reclaim_zero_forks=true",
-      "kernel.compression.random-debug-compress=true",
     ]
 
     # Only add this switch if we're building with ZX_DEBUG_ASSERT enabled
     # in the kernel, or we'll trigger a panic on kernel start. Some kernel
     # code asserts that this switch is only set for a debug configuration.
     if (zx_assert_level > 1) {
-      args += [ "kernel.pmm.alloc-random-should-wait=true" ]
+      args += [
+        "kernel.pmm.alloc-random-should-wait=true",
+        "kernel.compression.random-debug-compress=true",
+      ]
     }
   }
 }
