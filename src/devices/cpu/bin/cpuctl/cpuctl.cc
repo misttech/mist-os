@@ -25,8 +25,8 @@
 
 using ListCb = std::function<void(const char*)>;
 
-constexpr char kCpuDevicePath[] = "/dev/class/cpu-ctrl";
-constexpr char kCpuDeviceFormat[] = "/dev/class/cpu-ctrl/%s";
+constexpr char kCpuDevicePath[] = "/svc/fuchsia.hardware.cpu.ctrl.Service";
+constexpr char kCpuDeviceFormat[] = "/svc/fuchsia.hardware.cpu.ctrl.Service/%s";
 
 // TODO(gkalsi): Maybe parameterize these?
 constexpr uint64_t kDefaultStressTestIterations = 1000;
