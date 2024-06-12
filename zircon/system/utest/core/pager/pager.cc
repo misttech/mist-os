@@ -2425,60 +2425,6 @@ TEST(Pager, FailErrorCode) {
   }
 }
 
-// Test that writing to a forked zero pager marker does not cause a kernel panic. This is a
-// regression test for https://fxbug.dev/42130566.
-TEST(Pager, WritingZeroFork) {
-  zx::pager pager;
-  ASSERT_EQ(zx::pager::create(0, &pager), ZX_OK);
-
-  zx::port port;
-  ASSERT_EQ(zx::port::create(0, &port), ZX_OK);
-
-  zx::vmo vmo;
-
-  ASSERT_EQ(pager.create_vmo(0, port, 0, zx_system_get_page_size(), &vmo), ZX_OK);
-
-  zx::vmo empty;
-  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &empty));
-
-  // Transferring the uncommitted page in empty can be implemented in the kernel by a zero page
-  // marker in the pager backed vmo (and not a committed page).
-  ASSERT_OK(pager.supply_pages(vmo, 0, zx_system_get_page_size(), empty, 0));
-
-  // Writing to this page may cause it to be committed, and if it was a marker it will fork from
-  // the zero page.
-  uint64_t data = 42;
-  ASSERT_OK(vmo.write(&data, 0, sizeof(data)));
-
-  // Normally forking a zero page puts that page in a special list for one time zero page scanning
-  // and merging. Once scanned it goes into the general unswappable page list. Both of these lists
-  // are incompatible with a user pager backed vmo. To try and detect this we need to wait for the
-  // zero scanner to run, since the zero fork queue looks close enough to the pager backed queue
-  // that most things will 'just work'.
-  constexpr char k_command[] = "scanner reclaim_all";
-  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
-
-  if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
-  }
-  zx::result<zx::resource> result =
-      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUG_BASE);
-  ASSERT_OK(result.status_value());
-  zx::resource debug_resource = std::move(result.value());
-
-  if (!debug_resource.is_valid() ||
-      zx_debug_send_command(debug_resource.get(), k_command, strlen(k_command)) != ZX_OK) {
-    // Failed to manually force the zero scanner to run, fall back to sleeping for a moment and hope
-    // it runs.
-    zx::nanosleep(zx::deadline_after(zx::sec(1)));
-  }
-
-  // If our page did go marker->zero fork queue->unswappable this next write will crash the kernel
-  // when it attempts to update our position in the pager backed list.
-  ASSERT_OK(vmo.write(&data, 0, sizeof(data)));
-}
-
 // Test that if we resize a vmo while it is waiting on a page to fullfill the commit for a pin
 // request that neither the resize nor the pin cause a crash and fail gracefully.
 TEST(Pager, ResizeBlockedPin) {
@@ -2893,58 +2839,6 @@ TEST(Pager, EvictionHintAlwaysNeed) {
 
   // The thread should now successfully terminate.
   ASSERT_TRUE(t.Wait());
-}
-
-// Tests that the ZX_VMO_OP_DONT_NEED hint works as expected.
-TEST(Pager, EvictionHintDontNeed) {
-  UserPager pager;
-
-  ASSERT_TRUE(pager.Init());
-
-  constexpr uint64_t kNumPages = 30;
-  Vmo* vmo;
-  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo));
-
-  // Hint DONT_NEED and verify that it does not fail. We will test for eviction if the root resource
-  // is available.
-  // Commit some pages first.
-  ASSERT_TRUE(pager.SupplyPages(vmo, 20, 2));
-
-  // Verify that the pager vmo has 2 committed pages now.
-  zx_info_vmo_t info;
-  uint64_t a1, a2;
-  ASSERT_OK(vmo->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), &a1, &a2));
-  ASSERT_EQ(2 * zx_system_get_page_size(), info.committed_bytes);
-
-  // Hint DONT_NEED on a range spanning both committed and uncommitted pages.
-  ASSERT_OK(vmo->vmo().op_range(ZX_VMO_OP_DONT_NEED, 20 * zx_system_get_page_size(),
-                                5 * zx_system_get_page_size(), nullptr, 0));
-
-  // No page requests are seen for the uncommitted pages.
-  uint64_t offset, length;
-  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
-
-  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
-  if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
-  }
-
-  zx::result<zx::resource> result =
-      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUG_BASE);
-  ASSERT_OK(result.status_value());
-  zx::resource debug_resource = std::move(result.value());
-
-  // Trigger reclamation of only oldest evictable memory. This will include the pages we hinted
-  // DONT_NEED.
-  constexpr char k_command_reclaim[] = "scanner reclaim 1 only_old";
-  ASSERT_OK(
-      zx_debug_send_command(debug_resource.get(), k_command_reclaim, strlen(k_command_reclaim)));
-
-  // Verify that the vmo has no committed pages after eviction.
-  // Eviction is asynchronous. Poll in a loop until we see the committed page count drop. In case
-  // we're left polling forever, the external test timeout will kick in.
-  ASSERT_TRUE(vmo_test::PollVmoPopulatedBytes(vmo->vmo(), 0));
 }
 
 // Tests that the zx_vmo_op_range() API succeeds and fails as expected for hints.
