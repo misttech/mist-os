@@ -359,7 +359,22 @@ class Scheduler {
   static void SetCurrCpuActive(bool is_active) {
     Scheduler& scheduler = *Get();
     Guard<MonitoredSpinLock, IrqSave> guard{&scheduler.queue_lock_, SOURCE_TAG};
-    scheduler.SetCpuActive(is_active);
+    scheduler.SetIsActive(is_active);
+  }
+
+  // Peek at the current active mask for all schedulers.
+  //
+  // Note that this is just a lockless atomic load.  Baring special
+  // circumstances, the set of active schedulers can change at any time.
+  static cpu_mask_t PeekActiveMask() { return active_schedulers_.load(ktl::memory_order_relaxed); }
+
+  // Peek at the current active mask state for a given CPU's scheduler.
+  //
+  // Note that this is just a lockless atomic load.  Baring special
+  // circumstances, the set of active schedulers can change at any time.
+  static bool PeekIsActive(cpu_num_t cpu) {
+    const cpu_mask_t mask = cpu_num_to_mask(cpu);
+    return (PeekActiveMask() & mask) != 0;
   }
 
  private:
@@ -488,7 +503,7 @@ class Scheduler {
       Scheduler* const target = Get(target_cpu);
       Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
 
-      if (target->IsCpuActive()) {
+      if (target->IsLockedSchedulerActive()) {
         action(thread, target);
         return target_cpu;
       }
@@ -515,18 +530,31 @@ class Scheduler {
   // declare the counter.
   static void IncFindTargetCpuRetriesKcounter();
 
-  // Change this scheduler's CPU's active state in the global mp_active_mask.
-  // We require that the scheduler's queue_lock be held during the operation.
-  // This enforces the invariant that "the scheduler's active bit only changes
-  // while holding the scheduler's queue lock".
+  // Change this scheduler's CPU's active state. We require that the scheduler's
+  // queue_lock be held during the operation. This enforces the invariant that
+  // "the scheduler's active bit only changes while holding the scheduler's
+  // queue lock".
   //
   // This means that things like "FindTargetCpu" are free to check the global
   // active mask to see whether or not we _think_ that a given scheduler is
   // likely to be active for selection purposes, but when it comes time to
   // actually add a thread to a scheduler's queues, we check the active state of
-  // the scheduler's assigned CPU from within the safety of the queue lock, fo
-  void SetCpuActive(bool is_active) TA_REQ(queue_lock_) { mp_set_curr_cpu_active(is_active); }
-  bool IsCpuActive() TA_REQ(queue_lock_) { return mp_is_cpu_active(this_cpu_); }
+  // the scheduler's assigned CPU from within the safety of the queue lock using
+  // IsLockedSchedulerActive()
+  void SetIsActive(bool is_active) TA_REQ(queue_lock_) {
+    const cpu_mask_t mask = cpu_num_to_mask(this_cpu_);
+    if (is_active) {
+      active_schedulers_.fetch_or(mask, ktl::memory_order_relaxed);
+    } else {
+      active_schedulers_.fetch_and(~mask, ktl::memory_order_relaxed);
+    }
+    arch_set_blocking_disallowed(!is_active);
+  }
+
+  // Check to see if |this| scheduler is currently active while holding its
+  // queue_lock, ensuring that it will stay in its current state until after we
+  // drop the lock.
+  bool IsLockedSchedulerActive() TA_REQ(queue_lock_) { return PeekIsActive(this_cpu_); }
 
   // Handle all of the common tasks associated with each of the possible PI
   // interactions.  The outline of this is:
@@ -918,6 +946,11 @@ class Scheduler {
   static inline void MarkInFindActiveSchedulerForThreadCbk(const Thread& t, const Scheduler& s)
       TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT(t.get_lock()) TA_ASSERT(s.queue_lock_) {}
 
+  static inline ktl::atomic<cpu_mask_t> active_schedulers_{0};
+
+  // Flow id counter for sched_latency flow events.
+  inline static RelaxedAtomic<uint64_t> next_flow_id_{1};
+
   // The run queue of fair scheduled threads ready to run, but not currently running.
   TA_GUARDED(queue_lock_)
   RunQueue fair_run_queue_;
@@ -1006,18 +1039,18 @@ class Scheduler {
   // Performance scale of this CPU relative to the highest performance CPU. This
   // value is initially determined from the system topology, when available, and
   // by userspace performance/thermal management at runtime.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale performance_scale_ {1};
+  TA_GUARDED(queue_lock_) SchedPerformanceScale performance_scale_{1};
   TA_GUARDED(queue_lock_)
   RelaxedAtomic<SchedPerformanceScale> performance_scale_reciprocal_{SchedPerformanceScale{1}};
 
   // Performance scale requested by userspace. The operational performance scale
   // is updated to this value (possibly adjusted for the minimum allowed value)
   // on the next reschedule, after the current thread's accounting is updated.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale pending_user_performance_scale_ {1};
+  TA_GUARDED(queue_lock_) SchedPerformanceScale pending_user_performance_scale_{1};
 
   // Default performance scale, determined from the system topology, when
   // available.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale default_performance_scale_ {1};
+  TA_GUARDED(queue_lock_) SchedPerformanceScale default_performance_scale_{1};
 
   // The CPU this scheduler instance is associated with.
   // NOTE: This member is not initialized to prevent clobbering the value set
@@ -1050,9 +1083,6 @@ class Scheduler {
   // cache performance.
   RelaxedAtomic<SchedDuration> exported_total_expected_runtime_ns_{SchedNs(0)};
   RelaxedAtomic<SchedUtilization> exported_total_deadline_utilization_{SchedUtilization{0}};
-
-  // Flow id counter for sched_latency flow events.
-  inline static RelaxedAtomic<uint64_t> next_flow_id_{1};
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_H_

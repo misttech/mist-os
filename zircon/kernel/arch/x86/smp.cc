@@ -20,6 +20,7 @@
 #include <arch/x86/descriptor.h>
 #include <arch/x86/mmu_mem_types.h>
 #include <kernel/mp.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 #include <lk/main.h>
@@ -161,7 +162,7 @@ zx_status_t x86_bringup_aps(uint32_t* apic_ids, uint32_t count) {
 
       // It shouldn't have been possible for it to have been in the
       // scheduler...
-      ASSERT(!mp_is_cpu_active(cpu));
+      ASSERT(!Scheduler::PeekIsActive(cpu));
 
       // Make sure the CPU is not marked online
       mp.online_cpus.fetch_and(~mask);

@@ -26,6 +26,7 @@
 
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <vm/vm_aspace.h>
 
@@ -103,7 +104,7 @@ bool run_unittest(const unittest_testcase_registration_t* testcase) {
       unittest_printf("  %-*s : ", static_cast<int>(max_namelen), test->name ? test->name : "");
 
       const cpu_mask_t online_mask_before = mp_get_online_mask();
-      const cpu_mask_t active_mask_before = mp_get_active_mask();
+      const cpu_mask_t active_mask_before = Scheduler::PeekActiveMask();
 
       const zx_time_t test_start = current_time();
       bool good = (test->fn ? test->fn() : false);
@@ -111,7 +112,7 @@ bool run_unittest(const unittest_testcase_registration_t* testcase) {
 
       // Make sure that this test didn't change the online or active state of any CPUs.
       const cpu_mask_t online_mask_after = mp_get_online_mask();
-      const cpu_mask_t active_mask_after = mp_get_active_mask();
+      const cpu_mask_t active_mask_after = Scheduler::PeekActiveMask();
       if ((online_mask_before != online_mask_after) || (active_mask_before != active_mask_after)) {
         KERNEL_OOPS(
             "Online/active CPUs changed during test!\n"

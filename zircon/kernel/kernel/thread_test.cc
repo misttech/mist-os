@@ -27,6 +27,7 @@
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
 #include <kernel/percpu.h>
+#include <kernel/scheduler.h>
 #include <kernel/task_runtime_stats.h>
 #include <kernel/thread.h>
 #include <ktl/array.h>
@@ -279,7 +280,7 @@ bool thread_conflicting_soft_and_hard_affinity() {
 bool set_migrate_fn_test() {
   BEGIN_TEST;
 
-  cpu_mask_t active_cpus = mp_get_active_mask();
+  cpu_mask_t active_cpus = Scheduler::PeekActiveMask();
   if (active_cpus == 0 || ispow2(active_cpus)) {
     printf("Expected multiple CPUs to be active.\n");
     return true;
@@ -289,7 +290,7 @@ bool set_migrate_fn_test() {
   auto worker_body = [](void* arg) -> int {
     cpu_num_t current_cpu = arch_curr_cpu_num();
     Thread* self = Thread::Current::Get();
-    self->SetCpuAffinity(mp_get_active_mask() ^ cpu_num_to_mask(current_cpu));
+    self->SetCpuAffinity(Scheduler::PeekActiveMask() ^ cpu_num_to_mask(current_cpu));
 
     cpu_num_t target_cpu = arch_curr_cpu_num();
     if (current_cpu == target_cpu) {
@@ -360,7 +361,7 @@ bool set_migrate_fn_test() {
 bool set_migrate_ready_threads_test() {
   BEGIN_TEST;
 
-  cpu_mask_t active_cpus = mp_get_active_mask();
+  cpu_mask_t active_cpus = Scheduler::PeekActiveMask();
   if (active_cpus == 0 || ispow2(active_cpus)) {
     printf("Expected multiple CPUs to be active.\n");
     return true;
@@ -446,7 +447,7 @@ bool set_migrate_ready_threads_test() {
 
 bool migrate_unpinned_threads_test() {
   BEGIN_TEST;
-  cpu_mask_t active_cpus = mp_get_active_mask();
+  const cpu_mask_t active_cpus = Scheduler::PeekActiveMask();
   if (active_cpus == 0 || ispow2(active_cpus)) {
     printf("Expected multiple CPUs to be active.\n");
     return true;
@@ -521,7 +522,7 @@ bool migrate_stress_test() {
   }
 
   // Get number of CPUs in the system.
-  int active_cpus = ktl::popcount(mp_get_active_mask());
+  const int active_cpus = ktl::popcount(Scheduler::PeekActiveMask());
   printf("Found %d active CPU(s)\n", active_cpus);
   if (active_cpus <= 1) {
     printf("Test can only proceed with multiple active CPUs.\n");
@@ -627,7 +628,7 @@ bool migrate_stress_test() {
   // Mutate threads as they run.
   for (int i = 0; i < 10'000; i++) {
     for (size_t j = 0; j < threads.size(); j++) {
-      const cpu_mask_t affinity = static_cast<cpu_mask_t>(i + j) & mp_get_active_mask();
+      const cpu_mask_t affinity = static_cast<cpu_mask_t>(i + j) & Scheduler::PeekActiveMask();
       if (affinity) {
         threads[j].thread->SetSoftCpuAffinity(affinity);
       }
@@ -666,7 +667,7 @@ bool set_migrate_fn_stress_test() {
   BEGIN_TEST;
 
   // Get number of CPUs in the system.
-  int active_cpus = ktl::popcount(mp_get_active_mask());
+  int active_cpus = ktl::popcount(Scheduler::PeekActiveMask());
   printf("Found %d active CPU(s)\n", active_cpus);
   if (active_cpus <= 1) {
     printf("Test can only proceed with multiple active CPUs.\n");

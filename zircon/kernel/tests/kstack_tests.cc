@@ -10,6 +10,7 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/event.h>
 #include <kernel/mp.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 
 namespace {
@@ -58,7 +59,7 @@ bool kstack_mp_sync_exec_test() {
 
   // We need 2 or more CPUs for this test, CPU-A and CPU-B.  The thread calling into this test will
   // be pinned to CPU-A and the thread spawned by this test will be pinned to CPU-B.
-  cpu_mask_t mask = mp_get_active_mask();
+  cpu_mask_t mask = Scheduler::PeekActiveMask();
   const cpu_num_t cpu_a = remove_cpu_from_mask(mask);
   const cpu_num_t cpu_b = remove_cpu_from_mask(mask);
   if (cpu_a == INVALID_CPU || cpu_b == INVALID_CPU) {

@@ -25,6 +25,7 @@
 #include <arch/quirks.h>
 #include <dev/interrupt.h>
 #include <dev/timer/arm_generic.h>
+#include <kernel/scheduler.h>
 #include <ktl/atomic.h>
 #include <ktl/limits.h>
 #include <lk/init.h>
@@ -714,13 +715,13 @@ bool test_event_stream() {
   Thread* threads[SMP_MAX_CPUS]{};
 
   // How many online+active CPUs do we have?
-  uint32_t num_cpus = ktl::popcount(mp_get_online_mask() & mp_get_active_mask());
+  uint32_t num_cpus = ktl::popcount(mp_get_online_mask() & Scheduler::PeekActiveMask());
   args.waiting.store(num_cpus);
 
   // Create a thread bound to each online+active CPU, but don't start them just yet.
   cpu_num_t last = 0;
   for (cpu_num_t i = 0; i < percpu::processor_count(); ++i) {
-    if (mp_is_cpu_online(i) && mp_is_cpu_active(i)) {
+    if (mp_is_cpu_online(i) && Scheduler::PeekIsActive(i)) {
       threads[i] = Thread::Create("test_event_stream", func, &args, DEFAULT_PRIORITY);
       threads[i]->SetCpuAffinity(cpu_num_to_mask(i));
       last = i;

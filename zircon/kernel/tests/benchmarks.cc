@@ -23,6 +23,7 @@
 #include <kernel/brwlock.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
+#include <kernel/scheduler.h>
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <ktl/type_traits.h>
@@ -44,7 +45,7 @@ namespace {
 // calling CPU has become unresponsive (the lockup detector only monitors active CPUs).
 class InactiveCpuGuard {
  public:
-  InactiveCpuGuard() : was_active_(mp_is_cpu_active(arch_curr_cpu_num())) {
+  InactiveCpuGuard() : was_active_(Scheduler::PeekIsActive(arch_curr_cpu_num())) {
     if (was_active_) {
       Scheduler::SetCurrCpuActive(false);
     }

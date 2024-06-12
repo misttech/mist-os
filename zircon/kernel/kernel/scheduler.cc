@@ -219,7 +219,7 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
 
     const uint64_t arg0 = thread->tid();
     const uint64_t arg1 =
-        (thread->scheduler_state().GetEffectiveCpuMask(mp_get_active_mask()) & 0xFFFF) |
+        (thread->scheduler_state().GetEffectiveCpuMask(PeekActiveMask()) & 0xFFFF) |
         (ktl::clamp<uint64_t>(this_cpu_, 0, 0xF) << 16) |
         (ktl::clamp<uint64_t>(cnt, 0, 0xFF) << 20) | ((fair ? 1 : 0) << 28) |
         ((eligible ? 1 : 0) << 29) | ((thread->IsIdle() ? 1 : 0) << 30);
@@ -596,7 +596,7 @@ Thread* Scheduler::StealWork(SchedTime now, SchedPerformanceScale scale_up_facto
 
   const cpu_num_t current_cpu = this_cpu();
   const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
-  const cpu_mask_t active_cpu_mask = mp_get_active_mask();
+  const cpu_mask_t active_cpu_mask = PeekActiveMask();
 
   Thread* thread = nullptr;
   const CpuSearchSet& search_set = percpu::Get(current_cpu).search_set;
@@ -885,7 +885,7 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
 
   const cpu_num_t current_cpu = arch_curr_cpu_num();
   const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
-  const cpu_mask_t active_mask = mp_get_active_mask();
+  const cpu_mask_t active_mask = PeekActiveMask();
 
   // Returns true when the given thread requires active migration.
   const auto needs_migration = [active_mask,
@@ -1040,7 +1040,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread, FindTargetCpuReason reason) {
 
   // Determine the set of CPUs the thread is allowed to run on.
   const cpu_num_t current_cpu = arch_curr_cpu_num();
-  const cpu_mask_t active_mask = mp_get_active_mask();
+  const cpu_mask_t active_mask = PeekActiveMask();
   const SchedulerState& thread_state = const_cast<const Thread*>(thread)->scheduler_state();
   const cpu_mask_t available_mask = thread_state.GetEffectiveCpuMask(active_mask);
   DEBUG_ASSERT_MSG(available_mask != 0,
@@ -2063,8 +2063,8 @@ void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
 
   DEBUG_ASSERT(thread->state() == THREAD_READY);
   DEBUG_ASSERT(!thread->IsIdle());
-  DEBUG_ASSERT(IsCpuActive());  // We should never be inserting a thread into an inactive CPU's
-                                // queues.
+  // We should never be inserting a thread into an inactive CPU's queues.
+  DEBUG_ASSERT(IsLockedSchedulerActive());
 
   SchedulerQueueState& queue_state = thread->scheduler_queue_state();
   SchedulerState& state = thread->scheduler_state();
@@ -2471,7 +2471,7 @@ void Scheduler::Migrate(Thread* thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_migrate");
 
   SchedulerState* const state = &thread->scheduler_state();
-  const cpu_mask_t effective_cpu_mask = state->GetEffectiveCpuMask(mp_get_active_mask());
+  const cpu_mask_t effective_cpu_mask = state->GetEffectiveCpuMask(PeekActiveMask());
   const cpu_mask_t thread_cpu_mask = cpu_num_to_mask(state->curr_cpu_);
   const bool stale_curr_cpu = (thread_cpu_mask & effective_cpu_mask) == 0;
   cpu_mask_t cpus_to_reschedule_mask = 0;
@@ -2753,9 +2753,10 @@ template <Affinity AffinityType>
 cpu_mask_t Scheduler::SetCpuAffinity(Thread& thread, cpu_mask_t affinity) {
   if constexpr (AffinityType == Affinity::Hard) {
     DEBUG_ASSERT_MSG(
-        (affinity & mp_get_active_mask()) != 0,
+        const cpu_mask_t active_mask = PeekActiveMask();
+        (affinity & active_mask) != 0,
         "Attempted to set affinity mask to %#x, which has no overlap of active CPUs %#x.", affinity,
-        mp_get_active_mask());
+        active_mask);
   }
 
   auto AssignAffinity = [](Thread& thread, cpu_mask_t affinity)

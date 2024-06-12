@@ -25,6 +25,7 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <ktl/array.h>
 #include <ktl/atomic.h>
@@ -407,7 +408,7 @@ void DoHeartbeatAndCheckPeerCpus(Timer* timer, zx_time_t now_mono, void* arg) {
 
   // Now, check each of the lockup conditions for each of our peers.
   for (cpu_num_t cpu = 0; cpu < percpu::processor_count(); ++cpu) {
-    if (cpu == current_cpu || !mp_is_cpu_online(cpu) || !mp_is_cpu_active(cpu)) {
+    if (cpu == current_cpu || !mp_is_cpu_online(cpu) || !Scheduler::PeekIsActive(cpu)) {
       continue;
     }
     LockupDetectorState& state = gLockupDetectorPerCpuState[cpu];
@@ -608,7 +609,7 @@ void lockup_status() {
          TicksToDuration(ticks) / ZX_MSEC(1));
   if (ticks != 0) {
     for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
-      if (!mp_is_cpu_active(i)) {
+      if (!Scheduler::PeekIsActive(i)) {
         printf("CPU-%u is not active, skipping\n", i);
         continue;
       }
@@ -635,7 +636,7 @@ void lockup_status() {
          HeartbeatLockupChecker::threshold() / ZX_MSEC(1));
 
   for (cpu_num_t cpu = 0; cpu < percpu::processor_count(); ++cpu) {
-    if (!mp_is_cpu_online(cpu) || !mp_is_cpu_active(cpu)) {
+    if (!mp_is_cpu_online(cpu) || !Scheduler::PeekIsActive(cpu)) {
       continue;
     }
 

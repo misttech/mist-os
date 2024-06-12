@@ -19,6 +19,7 @@
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 
@@ -226,7 +227,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
 
   // Keep track of which non-boot CPUs to resume.
   const cpu_mask_t cpus_active_before_suspend =
-      mp_get_active_mask() & ~cpu_num_to_mask(BOOT_CPU_ID);
+      Scheduler::PeekActiveMask() & ~cpu_num_to_mask(BOOT_CPU_ID);
   dprintf(INFO, "Active non-boot CPUs before suspend: %#x\n", cpus_active_before_suspend);
 
   // Suspend all of the active CPUs besides the boot CPU.

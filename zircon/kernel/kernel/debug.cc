@@ -32,6 +32,7 @@
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <vm/vm.h>
 
@@ -131,7 +132,7 @@ static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags) {
 
 static int cmd_threadstats(int argc, const cmd_args* argv, uint32_t flags) {
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
-    if (!mp_is_cpu_active(i)) {
+    if (!Scheduler::PeekIsActive(i)) {
       continue;
     }
     const auto& percpu = percpu::Get(i);
@@ -173,7 +174,7 @@ RecurringCallback g_threadload_callback([]() {
     using optional_duration = ktl::optional<zx_duration_t>;
     auto maybe_idle_time = Scheduler::RunInLockedScheduler(i, [&]() -> optional_duration {
       // dont display time for inactive cpus
-      if (!mp_is_cpu_active(i)) {
+      if (!Scheduler::PeekIsActive(i)) {
         return ktl::nullopt;
       }
 
@@ -231,7 +232,7 @@ RecurringCallback g_threadload_callback([]() {
 RecurringCallback g_threadq_callback([]() {
   printf("----------------------------------------------------\n");
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
-    if (mp_is_cpu_active(i)) {
+    if (Scheduler::PeekIsActive(i)) {
       printf("thread queue cpu %2u:\n", i);
       percpu::Get(i).scheduler.Dump();
     }

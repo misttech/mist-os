@@ -13,6 +13,7 @@
 #include <dev/power.h>
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <ktl/iterator.h>
 
@@ -71,7 +72,7 @@ static zx_status_t wait_for_cpu_offline(cpu_num_t i) {
 static void wait_for_cpu_active(cpu_num_t i) {
   zx_time_t print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
   while (true) {
-    if (mp_is_cpu_active(i)) {
+    if (Scheduler::PeekIsActive(i)) {
       return;
     }
     if (current_time() > print_time) {
