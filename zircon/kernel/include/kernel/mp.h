@@ -80,9 +80,6 @@ struct mp_state {
   // cpus that are currently online
   ktl::atomic<cpu_mask_t> online_cpus;
 
-  // cpus that are currently idle.
-  ktl::atomic<cpu_mask_t> idle_cpus;
-
   SpinLock ipi_task_lock{"mp_state:ipi_task_lock"_intern};
   // list of outstanding tasks for CPUs to execute.  Should only be
   // accessed with the ipi_task_lock held
@@ -93,16 +90,6 @@ struct mp_state {
 };
 
 extern struct mp_state mp;
-
-// idle/busy is used to track if the cpu is running anything or has a non empty run queue
-// idle == (cpu run queue empty & cpu running idle thread)
-// busy == !idle
-static inline cpu_mask_t mp_get_idle_mask() { return mp.idle_cpus.load(); }
-static inline void mp_set_cpu_idle(cpu_num_t cpu) { mp.idle_cpus.fetch_or(cpu_num_to_mask(cpu)); }
-static inline void mp_set_cpu_busy(cpu_num_t cpu) { mp.idle_cpus.fetch_and(~cpu_num_to_mask(cpu)); }
-static inline bool mp_is_cpu_idle(cpu_num_t cpu) {
-  return mp_get_idle_mask() & cpu_num_to_mask(cpu);
-}
 
 // tracks if a cpu is online and initialized
 static inline void mp_set_curr_cpu_online(bool online) {

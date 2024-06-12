@@ -377,6 +377,18 @@ class Scheduler {
     return (PeekActiveMask() & mask) != 0;
   }
 
+  // Accessors for the "idle" state mask; similar to the active state mask.
+  void SetIdle(bool is_idle) {
+    const cpu_mask_t mask = cpu_num_to_mask(this_cpu_);
+    if (is_idle) {
+      idle_schedulers_.fetch_or(mask, ktl::memory_order_relaxed);
+    } else {
+      idle_schedulers_.fetch_and(~mask, ktl::memory_order_relaxed);
+    }
+  }
+  static cpu_mask_t PeekIdleMask() { return idle_schedulers_.load(ktl::memory_order_relaxed); }
+  static bool PeekIsIdle(cpu_num_t cpu) { return (PeekIdleMask() & cpu_num_to_mask(cpu)) != 0; }
+
  private:
   // fwd decl of a helper class used for PI Join/Split operations
   template <typename T>
@@ -946,7 +958,25 @@ class Scheduler {
   static inline void MarkInFindActiveSchedulerForThreadCbk(const Thread& t, const Scheduler& s)
       TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT(t.get_lock()) TA_ASSERT(s.queue_lock_) {}
 
+  // A mask of all of the currently active scheduler's in the system.  An
+  // "active" scheduler is one who will accept threads to be executed.  An
+  // "in-active" scheduler will not, and is typically the scheduler for a CPU
+  // which is in the process of being taken offline.
+  //
+  // Note that to change the active state of a scheduler for CPU X (eg; to
+  // toggle the state of bit X in the active_schedulers_ mask) that scheduler's
+  // queue_lock_ must be held.  Therefore, observations of the schedulers'
+  // active mask must typically be assumed to be volatile.  As soon as the mask
+  // is observed, it can immediately change.
   static inline ktl::atomic<cpu_mask_t> active_schedulers_{0};
+
+  // A mask of all of the currently idle scheduler's in the system.  An
+  // "idle" scheduler is one which last selected the idle/power thread to run,
+  // while a "busy" scheduler is one which is running a non-idle thread.
+  //
+  // Like the active mask, the idle mask is volatile and subject to change at
+  // any time barring special circumstances.
+  static inline ktl::atomic<cpu_mask_t> idle_schedulers_{0};
 
   // Flow id counter for sched_latency flow events.
   inline static RelaxedAtomic<uint64_t> next_flow_id_{1};

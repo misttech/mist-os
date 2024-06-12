@@ -1931,7 +1931,7 @@ void Thread::Current::BecomeIdle() {
 
     // Cpu must be marked active by now, indicate that it is idle as well.
     DEBUG_ASSERT(Scheduler::PeekIsActive(curr_cpu));
-    mp_set_cpu_idle(curr_cpu);
+    Scheduler::Get()->SetIdle(true);
 
     // Pend a preemption to ensure a reschedule.
     arch_set_blocking_disallowed(true);

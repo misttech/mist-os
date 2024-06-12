@@ -20,6 +20,7 @@
 
 #include <fbl/ref_ptr.h>
 #include <kernel/mp.h>
+#include <kernel/scheduler.h>
 #include <kernel/stats.h>
 #include <ktl/algorithm.h>
 #include <ktl/iterator.h>
@@ -720,7 +721,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
           clt.Finalize();
 
           zx_time_t idle_time = cpu->stats.idle_time;
-          bool is_idle = mp_is_cpu_idle(i);
+          const bool is_idle = Scheduler::PeekIsIdle(i);
           if (is_idle) {
             zx_duration_t recent_idle = zx_time_sub_time(
                 current_time(), idle_power_thread.scheduler_state().last_started_running());

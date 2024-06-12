@@ -186,8 +186,7 @@ RecurringCallback g_threadload_callback([]() {
 
       // if the cpu is currently idle, add the time since it went idle up until now to the idle
       // counter
-      bool is_idle = !!mp_is_cpu_idle(i);
-      if (is_idle) {
+      if (Scheduler::PeekIsIdle(i)) {
         ChainLockTransaction::AssertActive();
         idle_power_thread.get_lock().AssertHeld();
         zx_duration_t recent_idle_time = zx_time_sub_time(

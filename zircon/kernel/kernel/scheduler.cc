@@ -1047,7 +1047,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread, FindTargetCpuReason reason) {
                    "thread=%s affinity=%#x soft_affinity=%#x active=%#x "
                    "idle=%#x arch_ints_disabled=%d",
                    thread->name(), thread_state.hard_affinity_, thread_state.soft_affinity_,
-                   active_mask, mp_get_idle_mask(), arch_ints_disabled());
+                   active_mask, PeekIdleMask(), arch_ints_disabled());
 
   LOCAL_KTRACE(DETAILED, "target_mask", ("online", mp_get_online_mask()), ("active", active_mask));
 
@@ -1552,11 +1552,7 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     performance_scale_reciprocal_ = 1 / performance_scale_;
   }
 
-  if (next_thread->IsIdle()) {
-    mp_set_cpu_idle(current_cpu);
-  } else {
-    mp_set_cpu_busy(current_cpu);
-  }
+  SetIdle(next_thread->IsIdle());
 
   if (current_thread->IsIdle()) {
     percpu::Get(current_cpu).stats.idle_time += actual_runtime_ns;
