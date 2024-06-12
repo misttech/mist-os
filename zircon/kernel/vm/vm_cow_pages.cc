@@ -5403,57 +5403,49 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
     zero_pages_count += (end_offset - interval_start) / PAGE_SIZE;
   }
 
-  // If we have found any zero pages to populate, then we need to allocate and transition them to
-  // the dirty state.
-  if (zero_pages_count > 0) {
-    // Allocate the number of zero pages required upfront, so that we can fail the call early if the
-    // page allocation fails. First determine how many pages we still need to allocate, based on the
-    // number of existing pages in the list.
-    uint64_t alloc_list_len = list_length(alloc_list);
-    zero_pages_count = zero_pages_count > alloc_list_len ? zero_pages_count - alloc_list_len : 0;
+  // Utilize the already allocated pages in alloc_list.
+  uint64_t alloc_list_len = list_length(alloc_list);
+  zero_pages_count = zero_pages_count > alloc_list_len ? zero_pages_count - alloc_list_len : 0;
 
+  // Allocate the number of zero pages required upfront, so that we can fail the call early if the
+  // page allocation fails.
+  if (zero_pages_count > 0) {
     // First try to allocate all the pages at once. This is an optimization and avoids repeated
     // calls to the PMM to allocate single pages. If the PMM returns ZX_ERR_SHOULD_WAIT, fall back
     // to allocating one page at a time below, giving reclamation strategies a better chance to
     // catch up with incoming allocation requests.
     status = pmm_alloc_pages(zero_pages_count, pmm_alloc_flags_, alloc_list);
-    if (status == ZX_OK) {
-      // All requested pages allocated.
-      zero_pages_count = 0;
-    } else {
-      if (status != ZX_ERR_SHOULD_WAIT) {
-        return status;
-      }
-
-      // Fall back to allocating a single page at a time. We want to do this before we can start
-      // inserting pages into the page list, to avoid rolling back any pages we inserted but could
-      // not dirty in case we fail partway after having inserted some pages into the page list.
-      // Rolling back like this can lead to a livelock where we are constantly allocating some
-      // pages, freeing them, waiting on the page_request, and then repeating.
-      //
-      // If allocations do fail partway here, we will have accumulated the allocated pages in
-      // alloc_list, so we will be able to reuse them on a subsequent call to DirtyPagesLocked. This
-      // ensures we are making forward progress across successive calls.
-      while (zero_pages_count > 0) {
-        vm_page_t* new_page;
-        status = pmm_alloc_page(pmm_alloc_flags_, &new_page);
-        // If single page allocation fails, bubble up the failure.
-        if (status != ZX_OK) {
-          // If asked to wait, fill in the page request for the caller to wait on.
-          if (status == ZX_ERR_SHOULD_WAIT) {
-            DEBUG_ASSERT(page_request);
-            status = AnonymousPageRequester::Get().FillRequest(page_request->get());
-            DEBUG_ASSERT(status == ZX_ERR_SHOULD_WAIT);
-            return status;
-          }
-          // Map all allocation failures except ZX_ERR_SHOULD_WAIT to ZX_ERR_NO_MEMORY.
-          return ZX_ERR_NO_MEMORY;
-        }
-        list_add_tail(alloc_list, &new_page->queue_node);
-        zero_pages_count--;
-      }
+    if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
+      return status;
     }
-    DEBUG_ASSERT(zero_pages_count == 0);
+
+    // Fall back to allocating a single page at a time. We want to do this before we can start
+    // inserting pages into the page list, to avoid rolling back any pages we inserted but could not
+    // dirty in case we fail partway after having inserted some pages into the page list. Rolling
+    // back like this can lead to a livelock where we are constantly allocating some pages, freeing
+    // them, waiting on the page_request, and then repeating.
+    //
+    // If allocations do fail partway here, we will have accumulated the allocated pages in
+    // alloc_list, so we will be able to reuse them on a subsequent call to DirtyPagesLocked. This
+    // ensures we are making forward progress across successive calls.
+    while (zero_pages_count > 0) {
+      vm_page_t* new_page;
+      status = pmm_alloc_page(pmm_alloc_flags_, &new_page);
+      // If single page allocation fails, bubble up the failure.
+      if (status != ZX_OK) {
+        // If asked to wait, fill in the page request for the caller to wait on.
+        if (status == ZX_ERR_SHOULD_WAIT) {
+          DEBUG_ASSERT(page_request);
+          status = AnonymousPageRequester::Get().FillRequest(page_request->get());
+          DEBUG_ASSERT(status == ZX_ERR_SHOULD_WAIT);
+          return status;
+        }
+        // Map all allocation failures except ZX_ERR_SHOULD_WAIT to ZX_ERR_NO_MEMORY.
+        return ZX_ERR_NO_MEMORY;
+      }
+      list_add_tail(alloc_list, &new_page->queue_node);
+      zero_pages_count--;
+    }
 
     // We have to mark all the requested pages Dirty *atomically*. The user pager might be tracking
     // filesystem space reservations based on the success / failure of this call. So if we fail
