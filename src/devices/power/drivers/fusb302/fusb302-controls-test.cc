@@ -9,6 +9,7 @@
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/mock-i2c/mock-i2c.h>
+#include <zircon/errors.h>
 
 #include <cstdint>
 #include <optional>
@@ -158,6 +159,8 @@ TEST_F(Fusb302ControlsTest, ConfigureAllRolesSinkOnCc1AllWrites) {
   mock_i2c_.ExpectWriteStop({kControl4Address, 0x00});
   mock_i2c_.ExpectWrite({kMeasureAddress}).ExpectReadStop({0x7f});
   mock_i2c_.ExpectWriteStop({kMeasureAddress, 0x30});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x2f});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x73});
 
   EXPECT_OK(controls_->ConfigureAllRoles(
       usb_pd::ConfigChannelPinSwitch::kCc1, usb_pd::PowerRole::kSink,
@@ -193,6 +196,8 @@ TEST_F(Fusb302ControlsTest, ConfigureAllRolesSinkOnCc2AllWrites) {
   mock_i2c_.ExpectWriteStop({kControl4Address, 0x00});
   mock_i2c_.ExpectWrite({kMeasureAddress}).ExpectReadStop({0x7f});
   mock_i2c_.ExpectWriteStop({kMeasureAddress, 0x30});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x73});
 
   EXPECT_OK(controls_->ConfigureAllRoles(
       usb_pd::ConfigChannelPinSwitch::kCc2, usb_pd::PowerRole::kSink,
@@ -202,6 +207,131 @@ TEST_F(Fusb302ControlsTest, ConfigureAllRolesSinkOnCc2AllWrites) {
   EXPECT_EQ(usb_pd::PowerRole::kSink, controls_->power_role());
   EXPECT_EQ(usb_pd::DataRole::kUpstreamFacingPort, controls_->data_role());
   EXPECT_EQ(usb_pd::SpecRevision::kRev2, controls_->spec_revision());
+}
+
+TEST_F(Fusb302ControlsTest, ConfigureAllRolesTxFlushSlow) {
+  mock_i2c_.ExpectWrite({kControl2Address}).ExpectReadStop({0xef});
+  mock_i2c_.ExpectWriteStop({kControl2Address, 0x22});
+  mock_i2c_.ExpectWriteStop({kResetAddress, 0x02});
+  mock_i2c_.ExpectWrite({kSwitches0Address}).ExpectReadStop({0xff});
+  mock_i2c_.ExpectWriteStop({kSwitches0Address, 0x07});
+  mock_i2c_.ExpectWrite({kSwitches1Address}).ExpectReadStop({0xf7});
+  mock_i2c_.ExpectWriteStop({kSwitches1Address, 0x25});
+  mock_i2c_.ExpectWrite({kPowerAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWriteStop({kPowerAddress, 0x0f});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x6f});
+  mock_i2c_.ExpectWriteStop({kControl0Address, 0x40});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x77});
+  mock_i2c_.ExpectWriteStop({kControl1Address, 0x04});
+  mock_i2c_.ExpectWrite({kControl3Address}).ExpectReadStop({0x7f});
+  mock_i2c_.ExpectWriteStop({kControl3Address, 0x07});
+  mock_i2c_.ExpectWrite({kControl4Address}).ExpectReadStop({0x01});
+  mock_i2c_.ExpectWriteStop({kControl4Address, 0x00});
+  mock_i2c_.ExpectWrite({kMeasureAddress}).ExpectReadStop({0x7f});
+  mock_i2c_.ExpectWriteStop({kMeasureAddress, 0x30});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x6f});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x6f});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x2f});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x73});
+
+  EXPECT_OK(controls_->ConfigureAllRoles(
+      usb_pd::ConfigChannelPinSwitch::kCc1, usb_pd::PowerRole::kSink,
+      usb_pd::DataRole::kUpstreamFacingPort, usb_pd::SpecRevision::kRev2));
+}
+
+TEST_F(Fusb302ControlsTest, ConfigureAllRolesRxFlushSlow) {
+  mock_i2c_.ExpectWrite({kControl2Address}).ExpectReadStop({0xef});
+  mock_i2c_.ExpectWriteStop({kControl2Address, 0x22});
+  mock_i2c_.ExpectWriteStop({kResetAddress, 0x02});
+  mock_i2c_.ExpectWrite({kSwitches0Address}).ExpectReadStop({0xff});
+  mock_i2c_.ExpectWriteStop({kSwitches0Address, 0x07});
+  mock_i2c_.ExpectWrite({kSwitches1Address}).ExpectReadStop({0xf7});
+  mock_i2c_.ExpectWriteStop({kSwitches1Address, 0x25});
+  mock_i2c_.ExpectWrite({kPowerAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWriteStop({kPowerAddress, 0x0f});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x6f});
+  mock_i2c_.ExpectWriteStop({kControl0Address, 0x40});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x77});
+  mock_i2c_.ExpectWriteStop({kControl1Address, 0x04});
+  mock_i2c_.ExpectWrite({kControl3Address}).ExpectReadStop({0x7f});
+  mock_i2c_.ExpectWriteStop({kControl3Address, 0x07});
+  mock_i2c_.ExpectWrite({kControl4Address}).ExpectReadStop({0x01});
+  mock_i2c_.ExpectWriteStop({kControl4Address, 0x00});
+  mock_i2c_.ExpectWrite({kMeasureAddress}).ExpectReadStop({0x7f});
+  mock_i2c_.ExpectWriteStop({kMeasureAddress, 0x30});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x2f});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x77});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x77});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x73});
+
+  EXPECT_OK(controls_->ConfigureAllRoles(
+      usb_pd::ConfigChannelPinSwitch::kCc1, usb_pd::PowerRole::kSink,
+      usb_pd::DataRole::kUpstreamFacingPort, usb_pd::SpecRevision::kRev2));
+}
+
+TEST_F(Fusb302ControlsTest, ConfigureAllRolesTxFlushFailed) {
+  mock_i2c_.ExpectWrite({kControl2Address}).ExpectReadStop({0xef});
+  mock_i2c_.ExpectWriteStop({kControl2Address, 0x22});
+  mock_i2c_.ExpectWriteStop({kResetAddress, 0x02});
+  mock_i2c_.ExpectWrite({kSwitches0Address}).ExpectReadStop({0xff});
+  mock_i2c_.ExpectWriteStop({kSwitches0Address, 0x07});
+  mock_i2c_.ExpectWrite({kSwitches1Address}).ExpectReadStop({0xf7});
+  mock_i2c_.ExpectWriteStop({kSwitches1Address, 0x25});
+  mock_i2c_.ExpectWrite({kPowerAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWriteStop({kPowerAddress, 0x0f});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x6f});
+  mock_i2c_.ExpectWriteStop({kControl0Address, 0x40});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x77});
+  mock_i2c_.ExpectWriteStop({kControl1Address, 0x04});
+  mock_i2c_.ExpectWrite({kControl3Address}).ExpectReadStop({0x7f});
+  mock_i2c_.ExpectWriteStop({kControl3Address, 0x07});
+  mock_i2c_.ExpectWrite({kControl4Address}).ExpectReadStop({0x01});
+  mock_i2c_.ExpectWriteStop({kControl4Address, 0x00});
+  mock_i2c_.ExpectWrite({kMeasureAddress}).ExpectReadStop({0x7f});
+  mock_i2c_.ExpectWriteStop({kMeasureAddress, 0x30});
+
+  // Brittle test: This relies an implementation detail (10 retries).
+  for (int retry_count = 0; retry_count < 10; ++retry_count) {
+    mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x6f});
+  }
+
+  zx::result<> result = controls_->ConfigureAllRoles(
+      usb_pd::ConfigChannelPinSwitch::kCc1, usb_pd::PowerRole::kSink,
+      usb_pd::DataRole::kUpstreamFacingPort, usb_pd::SpecRevision::kRev2);
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, result.status_value());
+}
+
+TEST_F(Fusb302ControlsTest, ConfigureAllRolesRxFlushFailed) {
+  mock_i2c_.ExpectWrite({kControl2Address}).ExpectReadStop({0xef});
+  mock_i2c_.ExpectWriteStop({kControl2Address, 0x22});
+  mock_i2c_.ExpectWriteStop({kResetAddress, 0x02});
+  mock_i2c_.ExpectWrite({kSwitches0Address}).ExpectReadStop({0xff});
+  mock_i2c_.ExpectWriteStop({kSwitches0Address, 0x07});
+  mock_i2c_.ExpectWrite({kSwitches1Address}).ExpectReadStop({0xf7});
+  mock_i2c_.ExpectWriteStop({kSwitches1Address, 0x25});
+  mock_i2c_.ExpectWrite({kPowerAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWriteStop({kPowerAddress, 0x0f});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x6f});
+  mock_i2c_.ExpectWriteStop({kControl0Address, 0x40});
+  mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x77});
+  mock_i2c_.ExpectWriteStop({kControl1Address, 0x04});
+  mock_i2c_.ExpectWrite({kControl3Address}).ExpectReadStop({0x7f});
+  mock_i2c_.ExpectWriteStop({kControl3Address, 0x07});
+  mock_i2c_.ExpectWrite({kControl4Address}).ExpectReadStop({0x01});
+  mock_i2c_.ExpectWriteStop({kControl4Address, 0x00});
+  mock_i2c_.ExpectWrite({kMeasureAddress}).ExpectReadStop({0x7f});
+  mock_i2c_.ExpectWriteStop({kMeasureAddress, 0x30});
+  mock_i2c_.ExpectWrite({kControl0Address}).ExpectReadStop({0x2f});
+
+  // Brittle test: This relies an implementation detail (10 retries).
+  for (int retry_count = 0; retry_count < 10; ++retry_count) {
+    mock_i2c_.ExpectWrite({kControl1Address}).ExpectReadStop({0x77});
+  }
+
+  zx::result<> result = controls_->ConfigureAllRoles(
+      usb_pd::ConfigChannelPinSwitch::kCc1, usb_pd::PowerRole::kSink,
+      usb_pd::DataRole::kUpstreamFacingPort, usb_pd::SpecRevision::kRev2);
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, result.status_value());
 }
 
 }  // namespace
