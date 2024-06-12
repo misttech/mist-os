@@ -2,21 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# :bump_api_level increases the platform's API level from N to N+1.
-#
-# A new ABI revision is generated and associated with the new API level, and
-# the golden files used for static compatibility testing are updated.
-#
-# This target is a tool for managing the platform version. It should only be
-# built by an infra bot or a human manually bumping the platform version, as
-# it updates several files in the checkout.
-#
-# To run this tool, use:
-#
-#   fx set bringup.x64 --with-host //scripts/versioning:bump_api_level --args=bump_api_level=true
-#   fx build.
-#
-
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/python/python_host_test.gni")
 
@@ -44,6 +29,19 @@ group("tests") {
 }
 
 if (bump_api_level) {
+  # Adds a new in-development API level that is one greater than the highest
+  # existing numbered API level.
+  #
+  # A new ABI revision is generated and associated with the new API level, and
+  # the golden files used for static compatibility checks are generated.
+  #
+  # This target is a tool for managing the platform version. It should only be
+  # built by an infra bot or a human manually bumping the platform version, as
+  # it updates several files in the checkout.
+  #
+  # To use this tool manually, run the following:
+  #   fx set bringup.x64 --with-host //scripts/versioning:bump_api_level --args=bump_api_level=true
+  #   fx build
   action("bump_api_level") {
     # Generate the golden files and manifest before updating the platform version.
     deps = [ "//sdk:compatibility_testing_goldens($target_toolchain)" ]
@@ -86,6 +84,18 @@ if (bump_api_level) {
 }
 
 if (freeze_api_level) {
+  # Freezes the current in-development API level, marking it stable in
+  # `//sdk/version_history.json`.
+  #
+  # It results in no in-development API level until ":bump_api_level" is run.
+  #
+  # This target is a tool for managing the platform version. It should only be
+  # built by an infra bot or a human manually bumping the platform version, as
+  # it updates several files in the checkout.
+  #
+  # To use this tool manually, run the following:
+  #   fx set bringup.x64 --with-host //scripts/versioning:freeze_api_level --args=freeze_api_level=true
+  #   fx build
   action("freeze_api_level") {
     script = "//scripts/versioning/freeze_in_development_api_level.py"
 
