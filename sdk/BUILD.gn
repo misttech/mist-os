@@ -24,6 +24,15 @@ import("config.gni")
 
 visibility = [ ":*" ]
 
+# There is currently no need to build the IDK with a toolchain other than
+# `default_toolchain`. The following assert prevents accidentally adding
+# dependencies that cause this file and the many SDK-specific rules to be
+# processed in other toolchains.
+# None of the Fuchsia targets are binaries that would have variants applied.
+# The host tools may be built with toolchain variants.
+assert(current_toolchain == default_toolchain || is_host,
+       "Unexpected target toolchain")
+
 # Log a message if a non-default set of API levels or CPU architecture will be
 # built as this reduces the compatibility coverage of the build and should not
 # happen in infra. Ensure the messages are only logged once per build.
@@ -382,7 +391,7 @@ if (override_target_api_level == "PLATFORM") {
       ":core_data",
       ":core_documentation",
       ":core_licenses",
-      ":version_history_sdk",
+      ":version_history_sdk($default_toolchain)",
       "//sdk/devices",
       "//sdk/docs",
     ]
@@ -428,11 +437,14 @@ group("tests") {
   ]
 }
 
-sdk_version_history("version_history") {
-  visibility += [ "*" ]
-  id = "sdk://version_history"
-  category = "partner"
-  source = "version_history.json"
+# Version history does not differ by toolchain.
+if (current_toolchain == default_toolchain) {
+  sdk_version_history("version_history") {
+    visibility += [ "*" ]
+    id = "sdk://version_history"
+    category = "partner"
+    source = "version_history.json"
+  }
 }
 
 # License/rights related information for the SDK.
@@ -860,7 +872,7 @@ sdk_molecule("platform_libs") {
   visibility += [ ":platform" ]
   category = "internal"
   deps = [
-    ":version_history_sdk",
+    ":version_history_sdk($default_toolchain)",
     "//sdk/lib/driver/devicetree/manager:manager_sdk",
     "//sdk/lib/driver/devicetree/testing:board-test-helper_sdk",
     "//sdk/lib/driver/devicetree/visitors:driver-visitor_sdk",

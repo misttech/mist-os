@@ -9,8 +9,10 @@ import("//build/go/go_test.gni")
 import("//build/host.gni")
 import("//build/testing/host_test_data.gni")
 
+_version_history_dep = "//sdk:version_history($default_toolchain)"
+
 _version_history_json_dir =
-    get_label_info("//sdk:version_history", "target_out_dir")
+    get_label_info(_version_history_dep, "target_out_dir")
 
 copy("copy-files") {
   sources = [
@@ -18,7 +20,7 @@ copy("copy-files") {
     "version_history.go",
     "version_history_test.go",
   ]
-  deps = [ "//sdk:version_history" ]
+  deps = [ _version_history_dep ]
   outputs = [ "$target_gen_dir/{{source_file_part}}" ]
 }
 
@@ -39,7 +41,7 @@ go_library("version-history") {
 if (is_host) {
   host_test_data("version-history-test-data") {
     sources = [ "${_version_history_json_dir}/version_history.json" ]
-    deps = [ "//sdk:version_history" ]
+    deps = [ _version_history_dep ]
     outputs =
         [ "$root_out_dir/test_data/version-history/go/{{source_file_part}}" ]
   }
