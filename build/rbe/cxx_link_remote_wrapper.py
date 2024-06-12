@@ -35,7 +35,7 @@ _EXEC_PERMS = (
 )
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
@@ -68,9 +68,9 @@ class CxxLinkRemoteAction(object):
     def __init__(
         self,
         argv: Sequence[str],
-        exec_root: Path = None,
-        working_dir: Path = None,
-        host_platform: str = None,
+        exec_root: Path | None = None,
+        working_dir: Path | None = None,
+        host_platform: str | None = None,
         auto_reproxy: bool = True,  # can disable for unit-testing
     ):
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
@@ -104,9 +104,9 @@ class CxxLinkRemoteAction(object):
         # Determine whether this action can be done remotely.
         self._local_only = self._main_args.local or self._detect_local_only()
 
-        self._prepare_status = None
-        self._cleanup_files = []  # Sequence[Path]
-        self._remote_action = None
+        self._prepare_status: int | None = None
+        self._cleanup_files: list[Path] = []
+        self._remote_action: remote_action.RemoteAction
 
     @property
     def compiler_path(self) -> Path:
@@ -146,9 +146,9 @@ class CxxLinkRemoteAction(object):
 
     def _depfile_exists(self) -> bool:
         # Defined for easy precise mocking.
-        return self.depfile and self.depfile.exists()
+        return self.depfile is not None and self.depfile.exists()
 
-    def check_preconditions(self):
+    def check_preconditions(self) -> None:
         if not self.cxx_action.target and self.cxx_action.compiler_is_clang:
             raise Exception(
                 "For remote linking with clang, an explicit --target is required, but is missing."
@@ -192,7 +192,7 @@ class CxxLinkRemoteAction(object):
 
         # This is temporary to help debug the origins of unexpected absolute
         # paths in remote depfiles.
-        if self.compiler_type == cxx.Compiler.GCC and self.depfile.exists():
+        if self.compiler_type == cxx.Compiler.GCC and self._depfile_exists():
             return self._verify_remote_depfile()
             # self._rewrite_remote_depfile()
 
@@ -209,7 +209,8 @@ class CxxLinkRemoteAction(object):
         # --action_log (reproxy remote_metadata), this workaround can
         # be replaced with a more generalized solution.
         if (
-            self.remote_action.skipping_some_download
+            self.primary_output is not None
+            and self.remote_action.skipping_some_download
             and self._main_args.output_is_executable
         ):
             self.primary_output.chmod(_EXEC_PERMS)
@@ -217,6 +218,8 @@ class CxxLinkRemoteAction(object):
         return 0
 
     def _verify_remote_depfile(self) -> int:
+        if self.depfile is None:
+            raise ValueError("self.depfile is None")
         abspaths = depfile.absolute_paths(
             depfile.parse_lines(
                 self.depfile.read_text().splitlines(keepends=True)
@@ -236,17 +239,19 @@ class CxxLinkRemoteAction(object):
 
         return 0
 
-    def _rewrite_remote_depfile(self):
+    def _rewrite_remote_depfile(self) -> None:
+        if self.depfile is None:
+            raise ValueError("self.depfile is None")
         remote_action.rewrite_depfile(
             dep_file=self.working_dir / self.depfile,  # in-place
             transform=self.remote_action._relativize_remote_or_local_deps,
         )
 
     def _remote_output_files(self) -> Sequence[Path]:
-        return (
-            list(self.cxx_action.linker_output_files())
-            + self.command_line_output_files
-        )
+        return [
+            *self.cxx_action.linker_output_files(),
+            *self.command_line_output_files,
+        ]
 
     @property
     def _sysroot_is_outside_exec_root(self) -> bool:
@@ -320,7 +325,7 @@ class CxxLinkRemoteAction(object):
         self.check_preconditions()
 
         remote_command = self.cxx_action.command
-        remote_inputs = []
+        remote_inputs: list[Path] = []
 
         remote_inputs.extend(self.cxx_action.linker_inputs_from_flags())
 
@@ -377,9 +382,11 @@ class CxxLinkRemoteAction(object):
         remote_inputs += self.command_line_inputs
 
         # Prepare remote compile action
-        remote_output_dirs = (
-            list(self.cxx_action.output_dirs()) + self.command_line_output_dirs
-        )
+        remote_output_dirs = [
+            *self.cxx_action.output_dirs(),
+            *self.command_line_output_dirs,
+        ]
+
         remote_options = [
             "--labels=tool=clang,type=link",
             "--canonicalize_working_dir=true",
@@ -462,7 +469,7 @@ class CxxLinkRemoteAction(object):
     def dry_run(self) -> bool:
         return self._main_args.dry_run
 
-    def vmsg(self, text: str):
+    def vmsg(self, text: str) -> None:
         if self.verbose:
             msg(text)
 
@@ -485,7 +492,7 @@ class CxxLinkRemoteAction(object):
         else:
             yield from items
 
-    def vprintlist(self, desc: str, items: Iterable[Any]):
+    def vprintlist(self, desc: str, items: Iterable[Any]) -> None:
         """In verbose mode, print elements.
 
         Args:
@@ -563,6 +570,7 @@ class CxxLinkRemoteAction(object):
                 msg(f"Failed to download input: {path}\n{status.stderr_text}")
                 return status.returncode
 
+        command: Sequence[str]
         if self.check_determinism:
             self.vmsg(
                 "Running the original link command locally twice and comparing outputs."
@@ -624,7 +632,7 @@ class CxxLinkRemoteAction(object):
             if not self._main_args.save_temps:
                 self._cleanup()
 
-    def _cleanup(self):
+    def _cleanup(self) -> None:
         with cl_utils.timer_cm("CxxLinkRemoteAction._cleanup()"):
             for f in self._cleanup_files:
                 f.unlink()

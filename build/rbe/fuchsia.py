@@ -14,7 +14,15 @@ import os
 import platform
 import sys
 from pathlib import Path
-from typing import Callable, FrozenSet, Iterable, List, Optional, Sequence
+from typing import (
+    AbstractSet,
+    Callable,
+    FrozenSet,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+)
 
 _SCRIPT_PATH = Path(__file__)
 _SCRIPT_BASENAME = _SCRIPT_PATH.name
@@ -136,7 +144,7 @@ _CHECK_DETERMINISM_SCRIPT = Path("build", "tracer", "output_cacher.py")
 def check_determinism_command(
     exec_root: Path,
     outputs: Sequence[Path],
-    command: Optional[Iterable[Path]] = None,
+    command: Optional[Iterable[str]] = None,
     max_attempts: Optional[int] = None,
     miscomparison_export_dir: Optional[Path] = None,
     label: Optional[str] = None,
@@ -175,7 +183,7 @@ def check_determinism_command(
         ]
         + [str(p) for p in outputs]
         + ["--"]
-        + ([str(c) for c in command] if command else [])
+        + (list(command) if command else [])
     )
 
 
@@ -365,7 +373,7 @@ def _versioned_libclang_dir(
 
 def _clang_sanitizer_share_files(
     versioned_share_dir: Path,
-    sanitizers: FrozenSet[str],
+    sanitizers: AbstractSet[str],
 ) -> Iterable[Path]:
     if "address" in sanitizers:
         yield versioned_share_dir / "asan_ignorelist.txt"
@@ -396,10 +404,10 @@ def remote_clang_linker_toolchain_inputs(
     clang_path_rel: Path,
     target: str,
     shared: bool,
-    rtlib: str,
+    rtlib: str | None,
     unwindlib: str,
     profile: bool,
-    sanitizers: FrozenSet[str],
+    sanitizers: AbstractSet[str],
     want_all_libclang_rt: bool,
 ) -> Iterable[Path]:
     """List linker support libraries.

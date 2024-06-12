@@ -28,7 +28,7 @@ _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
@@ -63,7 +63,7 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 
 def check_missing_remote_tools(
-    compiler_type: cxx.Compiler, project_root: Path = None
+    compiler_type: cxx.Compiler, project_root: Path | None = None
 ) -> Iterable[Path]:
     """Check for the existence of tools needed for remote execution.
 
@@ -91,9 +91,9 @@ class CxxRemoteAction(object):
     def __init__(
         self,
         argv: Sequence[str],
-        exec_root: Path = None,
-        working_dir: Path = None,
-        host_platform: str = None,
+        exec_root: Path | None = None,
+        working_dir: Path | None = None,
+        host_platform: str | None = None,
         auto_reproxy: bool = True,  # can disable for unit-testing
     ):
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
@@ -127,12 +127,12 @@ class CxxRemoteAction(object):
         # Determine whether this action can be done remotely.
         self._local_only = self._main_args.local or self._detect_local_only()
 
-        self._local_preprocess_command = None
+        self._local_preprocess_command: Sequence[str] | None = None
         self._cpp_strategy = self._resolve_cpp_strategy()
 
-        self._prepare_status = None
-        self._cleanup_files = []  # Sequence[Path]
-        self._remote_action = None
+        self._prepare_status: int | None = None
+        self._cleanup_files: list[Path] = []
+        self._remote_action: remote_action.RemoteAction
 
     @property
     def compiler_path(self) -> Path:
@@ -152,9 +152,9 @@ class CxxRemoteAction(object):
 
     def _depfile_exists(self) -> bool:
         # Defined for easy precise mocking.
-        return self.depfile and self.depfile.exists()
+        return self.depfile is not None and self.depfile.exists()
 
-    def check_preconditions(self):
+    def check_preconditions(self) -> None:
         if not self.cxx_action.target and self.cxx_action.compiler_is_clang:
             raise Exception(
                 "For remote compiling with clang, an explicit --target is required, but is missing."
@@ -204,7 +204,7 @@ class CxxRemoteAction(object):
 
         # This is temporary to help debug the origins of unexpected absolute
         # paths in remote depfiles.
-        if self.compiler_type == cxx.Compiler.GCC and self.depfile.exists():
+        if self.compiler_type == cxx.Compiler.GCC and self._depfile_exists():
             # Unfortunately, -no-canonical-prefixes was not enough to
             # eliminate the absolute path problem, so we must rewrite
             # the depfile ourslves.
@@ -215,6 +215,9 @@ class CxxRemoteAction(object):
         return 0
 
     def _verify_remote_depfile(self) -> int:
+        if self.depfile is None:
+            return 0
+
         abspaths = depfile.absolute_paths(
             depfile.parse_lines(
                 self.depfile.read_text().splitlines(keepends=True)
@@ -234,7 +237,10 @@ class CxxRemoteAction(object):
 
         return 0
 
-    def _rewrite_remote_depfile(self):
+    def _rewrite_remote_depfile(self) -> None:
+        if self.depfile is None:
+            raise ValueError("self.depfile is None")
+
         remote_action.rewrite_depfile(
             dep_file=self.working_dir / self.depfile,  # in-place
             transform=self.remote_action._relativize_remote_or_local_deps,
@@ -242,11 +248,11 @@ class CxxRemoteAction(object):
 
     def _remote_output_files(self) -> Sequence[Path]:
         depfile_list = [self.depfile] if self.depfile else []
-        return (
-            list(self.cxx_action.output_files())
-            + depfile_list
-            + self.command_line_output_files
-        )
+        return [
+            *self.cxx_action.output_files(),
+            *depfile_list,
+            *self.command_line_output_files,
+        ]
 
     def prepare(self) -> int:
         """Setup everything ahead of remote execution."""
@@ -266,9 +272,10 @@ class CxxRemoteAction(object):
             self._compile_preprocessed_command,
         ) = self.cxx_action.split_preprocessing()
 
-        remote_inputs = (
-            list(self.cxx_action.input_files()) + self.command_line_inputs
-        )
+        remote_inputs = [
+            *self.cxx_action.input_files(),
+            *self.command_line_inputs,
+        ]
         if self.cpp_strategy == "local":
             # preprocess locally, then compile the result remotely
             preprocessed_source = self.cxx_action.preprocessed_output
@@ -291,14 +298,15 @@ class CxxRemoteAction(object):
             remote_inputs.extend(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
                     clang_path_rel=self.remote_compiler,
-                    sanitizers=self.cxx_action.sanitizers,
+                    sanitizers=frozenset(self.cxx_action.sanitizers),
                 )
             )
 
         # Prepare remote compile action
-        remote_output_dirs = (
-            list(self.cxx_action.output_dirs()) + self.command_line_output_dirs
-        )
+        remote_output_dirs = [
+            *self.cxx_action.output_dirs(),
+            *self.command_line_output_dirs,
+        ]
         remote_options = [
             "--labels=type=compile,compiler=clang,lang=cpp",  # TODO: gcc?
             "--canonicalize_working_dir=true",
@@ -383,11 +391,11 @@ class CxxRemoteAction(object):
     def dry_run(self) -> bool:
         return self._main_args.dry_run
 
-    def vmsg(self, text: str):
+    def vmsg(self, text: str) -> None:
         if self.verbose:
             msg(text)
 
-    def vprintlist(self, desc: str, items: Iterable[Any]):
+    def vprintlist(self, desc: str, items: Iterable[Any]) -> None:
         """In verbose mode, print elements.
 
         Args:
@@ -464,6 +472,8 @@ class CxxRemoteAction(object):
 
     @property
     def local_preprocess_command(self) -> Sequence[str]:
+        if self._local_preprocess_command is None:
+            raise ValueError("self._local_preprocess_command is None")
         return self._local_preprocess_command
 
     @property
@@ -472,6 +482,7 @@ class CxxRemoteAction(object):
 
     def _run_locally(self) -> int:
         export_dir = self.miscomparison_export_dir
+        command: Sequence[str]
         if self.check_determinism:
             self.vmsg(
                 "Running the original compile command (with -Wdate-time) locally twice and comparing outputs."
@@ -491,7 +502,7 @@ class CxxRemoteAction(object):
             command = fuchsia.check_determinism_command(
                 exec_root=self.exec_root_rel,
                 outputs=output_files,
-                command=self.original_compile_command,
+                command=list(self.original_compile_command),
                 max_attempts=max_attempts,
                 miscomparison_export_dir=(
                     export_dir / self.build_subdir if export_dir else None
@@ -501,7 +512,7 @@ class CxxRemoteAction(object):
             # Both clang and gcc support -Wdate-time to catch nonreproducible
             # builds.  This can induce a failure earlier, without having
             # to build twice and compare.
-            command += ["-Wdate-time"]
+            command = [*command, "-Wdate-time"]
         else:
             self.vmsg("Running the original compile command locally.")
             command = self.original_compile_command
@@ -555,7 +566,7 @@ class CxxRemoteAction(object):
             if not self._main_args.save_temps:
                 self._cleanup()
 
-    def _cleanup(self):
+    def _cleanup(self) -> None:
         with cl_utils.timer_cm("CxxRemoteAction._cleanup()"):
             for f in self._cleanup_files:
                 f.unlink()

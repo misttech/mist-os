@@ -113,21 +113,21 @@ if (is_host) {
   }
 
   python_library("cxx_link_remote_wrapper") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _cxx_link_remote_wrapper_sources
   }
   python_host_test("cxx_link_remote_wrapper_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "cxx_link_remote_wrapper_test.py"
     sources = _cxx_link_remote_wrapper_sources
   }
 
   python_library("cxx_remote_wrapper") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _cxx_remote_wrapper_sources
   }
   python_host_test("cxx_remote_wrapper_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "cxx_remote_wrapper_test.py"
     sources = _cxx_remote_wrapper_sources
   }

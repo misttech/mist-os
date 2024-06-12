@@ -34,7 +34,7 @@ def _strs(items: Sequence[Any]) -> Sequence[str]:
     return [str(i) for i in items]
 
 
-def _paths(items: Sequence[Any]) -> Sequence[Path]:
+def _paths(items: Sequence[Any]) -> Sequence[Path] | set[Path]:
     if isinstance(items, list):
         return [Path(i) for i in items]
     elif isinstance(items, set):
@@ -49,7 +49,7 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 class CheckMissingRemoteToolsTests(unittest.TestCase):
     _PROJECT_ROOT = Path("..", "..", "fake", "project", "root")
 
-    def test_clang_exists(self):
+    def test_clang_exists(self) -> None:
         with mock.patch.object(Path, "is_dir", return_value=True):
             self.assertEqual(
                 list(
@@ -60,7 +60,7 @@ class CheckMissingRemoteToolsTests(unittest.TestCase):
                 [],
             )
 
-    def test_clang_not_exists(self):
+    def test_clang_not_exists(self) -> None:
         with mock.patch.object(Path, "is_dir", return_value=False):
             self.assertEqual(
                 list(
@@ -71,7 +71,7 @@ class CheckMissingRemoteToolsTests(unittest.TestCase):
                 [fuchsia.REMOTE_CLANG_SUBDIR],
             )
 
-    def test_gcc_exists(self):
+    def test_gcc_exists(self) -> None:
         with mock.patch.object(Path, "is_dir", return_value=True):
             self.assertEqual(
                 list(
@@ -82,7 +82,7 @@ class CheckMissingRemoteToolsTests(unittest.TestCase):
                 [],
             )
 
-    def test_gcc_not_exists(self):
+    def test_gcc_not_exists(self) -> None:
         with mock.patch.object(Path, "is_dir", return_value=False):
             self.assertEqual(
                 list(
@@ -95,7 +95,7 @@ class CheckMissingRemoteToolsTests(unittest.TestCase):
 
 
 class CxxRemoteActionTests(unittest.TestCase):
-    def test_clang_cxx(self):
+    def test_clang_cxx(self) -> None:
         fake_root = Path("/home/project")
         fake_builddir = Path("out/really-not-default")
         fake_cwd = fake_root / fake_builddir
@@ -113,7 +113,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             ]
         )
         c = cxx_remote_wrapper.CxxRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=fake_root,
             working_dir=fake_cwd,
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
@@ -151,7 +151,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_once()
 
-    def test_pp_asm_local_only(self):
+    def test_pp_asm_local_only(self) -> None:
         compiler = Path("clang++")
         source = Path("hello.S")
         output = Path("hello.o")
@@ -167,7 +167,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             ]
         )
         c = cxx_remote_wrapper.CxxRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             auto_reproxy=False,
             exec_root=exec_root,
             working_dir=exec_root / "work",
@@ -183,7 +183,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_with(command, cwd=c.working_dir)  # ran locally
 
-    def test_objc_local_only(self):
+    def test_objc_local_only(self) -> None:
         compiler = Path("clang++")
         source = Path("hello.mm")
         output = Path("hello.o")
@@ -199,7 +199,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             ]
         )
         c = cxx_remote_wrapper.CxxRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             auto_reproxy=False,
             exec_root=exec_root,
             working_dir=exec_root / "work",
@@ -215,7 +215,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_with(command, cwd=c.working_dir)  # ran locally
 
-    def test_remote_action_paths(self):
+    def test_remote_action_paths(self) -> None:
         fake_root = Path("/home/project")
         fake_builddir = Path("out/not-default")
         fake_cwd = fake_root / fake_builddir
@@ -245,7 +245,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                         remote_action, "PROJECT_ROOT", fake_root
                     ):
                         c = cxx_remote_wrapper.CxxRemoteAction(
-                            ["--"] + command,
+                            ["--", *command],
                             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
                             auto_reproxy=False,
                         )
@@ -255,7 +255,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                             c.remote_action.build_subdir, fake_builddir
                         )
 
-    def test_clang_crash_diagnostics_dir(self):
+    def test_clang_crash_diagnostics_dir(self) -> None:
         fake_root = Path("/usr/project")
         fake_builddir = Path("build-it")
         fake_cwd = fake_root / fake_builddir
@@ -279,7 +279,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         ) as mock_check:
             with mock.patch.object(remote_action, "PROJECT_ROOT", fake_root):
                 c = cxx_remote_wrapper.CxxRemoteAction(
-                    ["--"] + command,
+                    ["--", *command],
                     working_dir=fake_cwd,
                     host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
                     auto_reproxy=False,
@@ -304,7 +304,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                 )
                 mock_tc_inputs.assert_called_once()
 
-    def test_remote_flag_back_propagating(self):
+    def test_remote_flag_back_propagating(self) -> None:
         compiler = Path("clang++")
         source = Path("hello.cc")
         output = Path("hello.o")
@@ -332,7 +332,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         )
 
         c = cxx_remote_wrapper.CxxRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
             auto_reproxy=False,
         )
@@ -354,7 +354,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertIn(flag, prefix)
         self.assertEqual(wrapped_command, filtered_command)
 
-    def test_gcc_cxx(self):
+    def test_gcc_cxx(self) -> None:
         fake_root = remote_action.PROJECT_ROOT
         fake_builddir = Path("make-it-so")
         fake_cwd = fake_root / fake_builddir
@@ -364,7 +364,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         depfile = Path("hello.d")
         command = _strs([compiler, "-MF", depfile, "-c", source, "-o", output])
         c = cxx_remote_wrapper.CxxRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             working_dir=fake_cwd,
             exec_root=fake_root,
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
@@ -411,7 +411,7 @@ class CxxRemoteActionTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
 
-    def test_rewrite_remote_depfile(self):
+    def test_rewrite_remote_depfile(self) -> None:
         compiler = Path("ppc-macho-g++")
         source = Path("hello.cc")
         output = Path("hello.o")
@@ -425,7 +425,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             )
             c = cxx_remote_wrapper.CxxRemoteAction(
                 # For this test, make the remote/local working dirs match
-                ["--canonicalize_working_dir=false", "--"] + command,
+                ["--canonicalize_working_dir=false", "--", *command],
                 working_dir=fake_cwd,
                 exec_root=fake_root,
                 host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
@@ -455,7 +455,7 @@ class CxxRemoteActionTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def test_help_implicit(self):
+    def test_help_implicit(self) -> None:
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
         stdout = io.StringIO()
@@ -467,7 +467,7 @@ class MainTests(unittest.TestCase):
                     cxx_remote_wrapper.main([])
         mock_exit.assert_called_with(0)
 
-    def test_help_flag(self):
+    def test_help_flag(self) -> None:
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
         stdout = io.StringIO()
@@ -479,7 +479,7 @@ class MainTests(unittest.TestCase):
                     cxx_remote_wrapper.main(["--help"])
         mock_exit.assert_called_with(0)
 
-    def test_local_mode_forced(self):
+    def test_local_mode_forced(self) -> None:
         exit_code = 24
         with mock.patch.object(
             remote_action, "auto_relaunch_with_reproxy"
@@ -506,7 +506,7 @@ class MainTests(unittest.TestCase):
         mock_relaunch.assert_called_once()
         mock_run.assert_called_with()
 
-    def test_auto_relaunched_with_reproxy(self):
+    def test_auto_relaunched_with_reproxy(self) -> None:
         argv = ["--", "clang++", "-c", "foo.cc", "-o", "foo.o"]
         with mock.patch.object(
             os.environ, "get", return_value=None
