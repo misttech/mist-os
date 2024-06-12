@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 group("drivers") {
+  testonly = true
   deps = [
     "bind/bindlib_codegen",
     "bind/fidl_bindlib_codegen",
@@ -20,6 +21,7 @@ group("hermetic_tests") {
   testonly = true
   deps = [
     "driver_test_realm:hermetic_tests",
+    "metadata:hermetic_tests",
     "simple/dfv2/tests:simple-driver-hermetic-test-pkg",
     "template:template-test",
     "transport:hermetic_tests",

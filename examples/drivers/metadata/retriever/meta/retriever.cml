@@ -8,8 +8,9 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/retriever.so",
+        binary: "driver/retriever_driver.so",
         bind: "meta/bind/retriever.bindbc",
+        default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     use: [
         { service: "fuchsia.examples.metadata.Metadata" },

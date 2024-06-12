@@ -8,8 +8,9 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/sender.so",
+        binary: "driver/sender_driver.so",
         bind: "meta/bind/sender.bindbc",
+        default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     capabilities: [
         { service: "fuchsia.examples.metadata.Metadata" },

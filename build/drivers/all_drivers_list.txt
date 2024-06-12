@@ -1,7 +1,7 @@
 //examples/drivers/driver_test_realm/sample-driver:driver
-//examples/drivers/metadata:forwarder_driver
-//examples/drivers/metadata:retriever_driver
-//examples/drivers/metadata:sender_driver
+//examples/drivers/metadata/forwarder:driver
+//examples/drivers/metadata/retriever:driver
+//examples/drivers/metadata/sender:driver
 //examples/drivers/simple/dfv1:driver
 //examples/drivers/simple/dfv2:driver
 //examples/drivers/skeleton:driver
