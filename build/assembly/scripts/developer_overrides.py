@@ -20,7 +20,7 @@ class ShellCommandEntryFromGN:
     components: list[str]
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Tool for creating the file for Assembly developer overrides in-tree"
     )
@@ -51,6 +51,8 @@ def main():
 
     with open(args.output, "w") as output:
         json.dump(overrides_json, output, indent=2)
+
+    return 0
 
 
 if __name__ == "__main__":
