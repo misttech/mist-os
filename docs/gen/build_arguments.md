@@ -345,7 +345,7 @@ to save about 3 minutes of build time when they are not needed.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_fuchsia_sdk.gni:10
+From //build/bazel/bazel_fuchsia_sdk.gni:14
 
 ### bazel_product_bundle_board
 
