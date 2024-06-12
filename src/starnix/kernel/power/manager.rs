@@ -16,7 +16,7 @@ use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use starnix_logging::{log_error, log_info};
+use starnix_logging::{log_error, log_info, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -155,11 +155,22 @@ impl SuspendResumeManager {
                 })
                 .expect("Power Mode should be uninitialized");
 
-            let parent_lease = handoff
-                .take(zx::Time::INFINITE)
-                .context("Handoff::Take")?
-                .map_err(|e| anyhow!("Failed to take lessor and lease from parent: {e:?}"))?;
-            drop(parent_lease);
+            // We may not have a session manager to take a lease from in tests.
+            match handoff.take(zx::Time::INFINITE) {
+                Ok(parent_lease) => {
+                    let parent_lease = parent_lease.map_err(|e| {
+                        anyhow!("Failed to take lessor and lease from parent: {e:?}")
+                    })?;
+                    drop(parent_lease)
+                }
+                Err(e) => {
+                    if e.is_closed() {
+                        log_warn!("Failed to send the fuchsia.session.power/Handoff.Take request. Assuming no Handoff protocol exists and moving on...");
+                    } else {
+                        return Err(e).context("Handoff::Take");
+                    }
+                }
+            }
         };
 
         Ok(())
@@ -174,6 +185,8 @@ impl SuspendResumeManager {
             create_request_stream::<fsystem::ActivityGovernorListenerMarker>().unwrap();
         let self_ref = self.clone();
         system_task.kernel().kthreads.spawn_future(async move {
+            log_info!("Activity Governor Listener task starting...");
+
             while let Some(stream) = listener_stream.next().await {
                 match stream {
                     Ok(req) => match req {
@@ -220,6 +233,8 @@ impl SuspendResumeManager {
                     }
                 }
             }
+
+            log_warn!("Activity Governor Listener task done");
         });
         if let Err(err) = activity_governor.register_listener(
             fsystem::ActivityGovernorRegisterListenerRequest {
