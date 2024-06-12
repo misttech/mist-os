@@ -38,7 +38,7 @@ ffx log --filter starnix --severity TRACE --select "core/starnix_runner/kernels*
 When running tests, you will need to pass the log selection parameters to fx test instead:
 
 ```sh
-fx test --min-severity-logs TRACE <test name>
+fx test <test name> --min-severity-logs TRACE
 ```
 
 
