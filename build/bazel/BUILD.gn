@@ -125,7 +125,10 @@ action("generate_main_workspace") {
 action("generate_fuchsia_sdk_repository") {
   script = "//build/bazel/scripts/generate-fuchsia-sdk-symlink.py"
   outputs = [ "$bazel_main_top_dir/fuchsia_sdk" ]
-  deps = [ ":generate_main_workspace" ]
+  deps = [
+    ":generate_main_workspace",
+    "//build/bazel/bazel_sdk:verify_fuchsia_sdk_repository",
+  ]
   inputs = get_target_outputs(deps[0])
   args = [
     "--bazel-launcher",

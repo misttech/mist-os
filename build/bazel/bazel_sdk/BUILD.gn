@@ -2,7 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_action.gni")
 import("//build/bazel/bazel_fuchsia_sdk.gni")
+import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 import("//build/bazel/logging.gni")
 import("//build/bazel/remote_services.gni")
@@ -38,6 +40,27 @@ idk("idk") {
   if (host_os == "mac") {
     api_levels = []
   }
+}
+
+# Generate a Bazel SDK directly from the content of :idk and verify that
+# it matches the content of @fuchsia_sdk. Doing this ensures that there are
+# no differences between the Starlark and Python executions of
+# generated_sdk_build_rules.{bzl,py}.
+bazel_input_directory("idk.bazel_input") {
+  generator = ":idk"
+  output_directory = "$root_build_dir/sdk/exported/bazel_fuchsia_sdk_idk"
+}
+
+bazel_action("verify_fuchsia_sdk_repository") {
+  command = "build"
+  bazel_targets = [ ":verify_fuchsia_sdk_repository" ]
+  deps = [ ":idk.bazel_input" ]
+  copy_outputs = [
+    {
+      bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
+      ninja = "$target_name.verified"
+    },
+  ]
 }
 
 # Run the //build/bazel_sdk/tests/scripts/bazel_test.sh
@@ -271,11 +294,5 @@ group("bazel_sdk_tests_idk") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":bazel_sdk_tests",
-    # DO NOT INCLUDE bazel_sdk_tests_idk here to avoid making all core builds
-    # longer than necessary (https://fxbug.dev/42082370). It is still possible
-    # to invoke the target manually during local development though.
-    # ":bazel_sdk_tests_idk",
-  ]
+  deps = [ ":bazel_sdk_tests" ]
 }

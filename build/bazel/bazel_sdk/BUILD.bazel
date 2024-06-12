@@ -1,0 +1,23 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load(":rules.bzl", "compare_bazel_sdk_contents", "generate_bazel_sdk")
+
+py_binary(
+    name = "compare_bazel_sdks",
+    srcs = ["compare_bazel_sdks.py"],
+    main = "compare_bazel_sdks.py",
+)
+
+generate_bazel_sdk(
+    name = "bazel_sdk",
+    idk_export_dir = "@gn_targets//build/bazel/bazel_sdk:idk",
+)
+
+compare_bazel_sdk_contents(
+    name = "verify_fuchsia_sdk_repository",
+    first_sdk = "@fuchsia_sdk//:WORKSPACE.bazel",
+    second_sdk = ":bazel_sdk",
+)
