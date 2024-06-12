@@ -82,9 +82,7 @@ systems, repositories, and integrations.
 > `fx test` to run tests on a host machine)
 
 
-#### CLI tools to interact with Fuchsia devices
-
-Tools for interacting with and managing a Fuchsia target device
+#### CLI tools to interact with or manage Fuchsia devices
 
 *   Distributed as part of the SDK; also used by developers developing for
 Fuchsia, including in-tree developers.
@@ -96,9 +94,7 @@ support developers
 integration scripts or build systems.
 
 
-#### In-tree tools
-
-Tools that are used for Fuchsia development in the platform source tree
+#### In-tree tools for Fuchsia development in the platform source tree
 
 *   For in-tree developers working in fuchsia.git
 *   Emphasize low barrier of entry and allowing rapid evolution for tools,
@@ -106,9 +102,7 @@ commonly the main user is the tool author
 *   Expected to change more often, may not be well-documented
 
 
-#### Build system tools and scripts
-
-Tools used as part of build systems (e.g., cmc, fidlc)
+#### Build system tools and scripts (e.g., cmc, fidlc)
 
 *   Controlled exclusively through command line options and/or response files.
 *   Emphasize stability in CLI to aid use in build systems.
@@ -163,48 +157,68 @@ tool meets Fuchsia requirements.
 
 #### UX considerations
 
-> *   Who are the intended users of the tool and how will they use it?
->   *   Where does the tool fit in the existing command structure?
-> *   Can human users and scripts/other tools use the tool equally well?
->   *   Is it clearly defined which parts of the tool are intended for machine
->   and automated workflows?
->   *   Is the machine interface well documented?
-> *   Is the command interface in line with Fuchsia guidelines and best
+> Who are the intended users of the tool and how will they use it?
+>
+> * Where does the tool fit in the existing command structure?
+>
+> Can human users and scripts/other tools use the tool equally well?
+>
+> * Is it clearly defined which parts of the tool are intended for machine and
+> automated workflows?
+> * Is the machine interface well documented?
+>
+> Is the command interface in line with Fuchsia guidelines and best
 > practices?
->   *   Does the tool follow UX guidelines?
->   *   Does the tool provide solid documentation and help for the user
->   following the [CLI Help requirements](/docs/development/api/cli_help.md)?
->   *   Does the tool provide clear and useful error messages?
->   *   Have you considered [accessibility](/docs/concepts/accessibility/accessibility_framework.md)?
-> *   Have other users tested the tool?
->   *   Ask someone outside of your team to run through the commands and outputs
+>
+> *   Does the tool follow UX guidelines?
+> *   Does the tool provide solid documentation and help for the user
+> following the [CLI Help requirements](/docs/development/api/cli_help.md)?
+> *   Does the tool provide clear and useful error messages?
+> *   Have you considered [accessibility](/docs/concepts/accessibility/accessibility_framework.md)?
+>
+> Have other users tested the tool?
+>
+> * Ask someone outside of your team to run through the commands and outputs
 >   to see if they are usable.
 
 
 #### Technical requirements
 
-> *   Is the tool compiled and independent of the runtime environment?
->     *   Does the tool minimize runtime link dependencies?
->     *   Is the tool built from the fuchsia.git source tree?
-> *   Does the tool support machine interfaces?
->     *   Is there comprehensive documentation for machine interfaces?
->     *   Does the tool include manifest or JSON files for machine input?
-> *   What are the tool’s compatibility guarantees?
-> *   Does the tool collect metrics?
->     *   Is it compliant with privacy requirements for collecting metrics?
+> Is the tool compiled and independent of the runtime environment?
+>
+> * Does the tool minimize runtime link dependencies?
+> * Is the tool built from the fuchsia.git source tree?
+>
+> Does the tool support machine interfaces?
+>
+> * Is there comprehensive documentation for machine interfaces?
+> * Does the tool include manifest or JSON files for machine input?
+>
+> What are the tool’s compatibility guarantees?
+>
+> Does the tool collect metrics?
+>
+> * Is it compliant with privacy requirements for collecting metrics?
 
 
 #### Product management
 
-> *   How will you distribute the tool?
+> How will you distribute the tool?
+>
 >     *   Will it only be available in-tree or included in the SDK?
-> *   Who will own the maintenance of the tool?
+>
+> Who will own the maintenance of the tool?
+>
 >    *   Is there a plan in place to update, evolve, or deprecate the tool?
-> *   Where can users go to find answers to common questions or ask new
+>
+> Where can users go to find answers to common questions or ask new
 > questions?
-> *   How are you tracking user-reported issues?
+>
+> How are you tracking user-reported issues?
+>
 >     *   Does the help output and error output include a bug link?
-> *   What events have been instrumented? Where can one find metrics for this
+>
+> What events have been instrumented? Where can one find metrics for this
 > tool?
 
 <br/>
@@ -212,9 +226,9 @@ tool meets Fuchsia requirements.
 
 ## CLI tool development rubric {#rubric}
 
-Tip: Rate each criterion based on how well your tool meets it. Identify areas
-for improvement (low ratings), then prioritize enhancements based on user needs
-and project goals.
+Tip: Score each criterion on a scale of 1-5 (low to high) based on how well your
+tool meets it. Identify areas for improvement, then prioritize enhancements
+based on user needs and project goals.
 
 <table>
   <tr>
@@ -223,7 +237,7 @@ and project goals.
    </td>
    <td style="background-color: null"><strong>Description</strong>
    </td>
-   <td style="background-color: null"><strong>Rating (1-5)</strong>
+   <td style="background-color: null"><strong>Score</strong>
    </td>
   </tr>
   <tr>
@@ -232,7 +246,7 @@ and project goals.
    <td style="background-color: null">Clearly defined intended users and their
    usage scenarios
    </td>
-   <td style="background-color: null">
+   <td style="background-color: null">(1-5)
    </td>
   </tr>
   <tr>
@@ -298,7 +312,7 @@ and project goals.
    </td>
    <td style="background-color: null"><strong>Description</strong>
    </td>
-   <td style="background-color: null"><strong>Rating (1-5)</strong>
+   <td style="background-color: null"><strong>Score</strong>
    </td>
   </tr>
   <tr>
@@ -307,7 +321,7 @@ and project goals.
    <td style="background-color: null">Tool is written in C++, Rust, or Go; not
    Bash, Python, Perl, or JavaScript
    </td>
-   <td style="background-color: null">
+   <td style="background-color: null">(1-5)
    </td>
   </tr>
   <tr>
@@ -362,7 +376,7 @@ and project goals.
    </td>
    <td style="background-color: null"><strong>Description</strong>
    </td>
-   <td style="background-color: null"><strong>Rating (1-5)</strong>
+   <td style="background-color: null"><strong>Score</strong>
    </td>
   </tr>
   <tr>
@@ -371,7 +385,7 @@ and project goals.
    <td style="background-color: null">Clear ownership and maintenance plan for
    the tool
    </td>
-   <td style="background-color: null">
+   <td style="background-color: null">(1-5)
    </td>
   </tr>
   <tr>
@@ -436,10 +450,11 @@ integrating CLI tools create a consistent developer experience for users.
 These guidelines use Fuchsia’s main developer tool, ffx, to illustrate best
 practices.
 
-Key Point: ffx is a unified tooling platform and command line interface (CLI) for Fuchsia
-development. The ffx tool is the top-level interface for connecting to,
-flashing, and communicating with a device running Fuchsia. ffx tools are used by
-humans and in scripts, and should be designed for readability and ease of use.
+Key Point: [ffx](/reference/tools/sdk/ffx) is a unified tooling platform and
+command line interface (CLI) for Fuchsia development. The ffx tool is the
+top-level interface for connecting to, flashing, and communicating with a device
+running Fuchsia. ffx tools are used by humans and in scripts, and should be
+designed for readability and ease of use.
 
 
 ### Design principles
@@ -510,7 +525,7 @@ documentation.
 
 In general, for tools that cover common workflows (such as host-to-target
 interaction, system integration, and publishing), prefer extending an existing
-tool rather than creating a new standalone tool. Add flags, options or
+tool rather than creating a new standalone tool. Add flags, options, or
 subcommands to take advantage of shared code and functionality.
 
 However, if the overall workflow enabled does not exist, consider a new command
@@ -558,7 +573,7 @@ tool may be useful to automate a time-consuming process. Larger, more featureful
 tools should encompass an entire task at the user (developer) level.
 
 > **Examples**
-
+>
 > *   Avoid making a tool that accomplishes one small step of a task;
 > instead design a tool that will perform a complete task.
 >     *   For example, when developing a C++ application: run the preprocessor,
@@ -574,7 +589,7 @@ tools should encompass an entire task at the user (developer) level.
 ffx subtools (previously called plugins) are organized into command groups that
 map to high-level Fuchsia subsystems. In `ffx target`, ffx is the root command
 and target is the subtool (subcommand). ffx subtools may have their own
-arguments and options (e.g.,`ffx target list --format [format] [nodename]`).
+arguments and options (e.g., `ffx target list --format [format] [nodename]`).
 
 The ffx CLI should follow a standard structure and vocabulary so that users
 experience ffx as an integrated whole rather than a patchwork of separate tools.
@@ -583,7 +598,7 @@ command names in another tool.
 
 When designing ffx subtools, there will be tradeoffs between complexity and
 brevity. In general, ffx subtools should map to documented Fuchsia concepts or
-subsystems (e.g.,`target, package, bluetooth`). When possible, subtool command
+subsystems (e.g., `target, package, bluetooth`). When possible, subtool command
 groups should be limited to a primary feature or capability, with additional
 options added as flags. Adding a secondary command group is discouraged, but
 sometimes is unavoidable. Clarity is more important than brevity.
@@ -597,7 +612,7 @@ subtools. Subcommands should be imperative verbs.
 *   Well-known nouns are those that appear in documentation as common use for
 Fuchsia concepts or subsystems. See the [ffx reference documentation](/reference/tools/sdk/ffx)
 for a list of current ffx commands.
-*   ffx subtool names should be three characters or longer.  (e.g.,`ffx
+*   ffx subtool names should be three characters or longer.  (e.g., `ffx
 bluetooth`, not `ffx bt`)
 *   Commands and options should always be lowercase letters (a-z)
 *   Subtool names should not contain hyphens. Options (flags) may use single
@@ -741,7 +756,7 @@ Instead create a `foo` command that accepts `add` and `remove` subcommands.
 
 Use clear, concise verbs that accurately reflect the command’s action.
 
-Prefer subcommands to multiple tools that are hyphenated (e.g.,avoid `foo-start,
+Prefer subcommands to multiple tools that are hyphenated (e.g., avoid `foo-start,
 foo-stop, foo-reset`; instead have `foo` that accepts commands
 `start|stop|reset`)
 
@@ -779,7 +794,7 @@ foo-stop, foo-reset`; instead have `foo` that accepts commands
 ### Consistency
 
 Align with established Fuchsia terminology and patterns to minimize cognitive
-load. Use common verb pairings (e.g.,`start/stop, add/remove, import/export`)
+load. Use common verb pairings (e.g., `start/stop, add/remove, import/export`)
 and follow existing ffx command patterns.
 
 <br/>
@@ -812,8 +827,6 @@ and follow existing ffx command patterns.
 <p>
 <code>watch</code>
 <p>
-<code>dump</code>
-<p>
 <code>test</code>
 <p>
 <code>run</code>
@@ -830,7 +843,7 @@ and follow existing ffx command patterns.
 Aim for the shortest command and option names without sacrificing clarity or
 discoverability. Command names should be at least 3 characters long.
 
-Avoid acronyms or abbreviations with ambiguous definitions (e.g.,`bt` could mean
+Avoid acronyms or abbreviations with ambiguous definitions (e.g., `bt` could mean
 bluetooth, Bigtable, or British Telecom on different Google products).
 
 <br/>
@@ -865,7 +878,7 @@ Options (also called flags) are unordered, and can appear anywhere after the
 group or command in which they're defined, including at the very end. See the
 [top-level ffx options](/reference/tools/sdk/ffx).
 
-*   Options should be at least 3 characters long, and human readable
+*   Options should be at least 3 characters long and human readable
 *   Options may use single hyphens to separate words if necessary. Use a single
 dash between words in multi-word option names (e.g., `--log-level`)
 *   Preface options with a double hyphen (--). Single hyphens (-) may be used
@@ -952,6 +965,7 @@ controlled than feature flags.
   </tr>
 </table>
 
+<br/>
 
 Running switches together is not allowed, e.g., `-xzf` or `-vv`, each
 must be separate: `-x -z -f` or `-v -v`.
@@ -962,7 +976,7 @@ must be separate: `-x -z -f` or `-v -v`.
 In general, UX recommends avoiding short flags. However, we recognize that it
 can be helpful for experts to use short aliases for some frequently used
 options. Overuse of short aliases can introduce confusion and ambiguity (e.g.,
-does `-b` mean `--bootloader` or `--product-bundle` or `--build-dir`). Short
+does `-b` mean `--bootloader` or `--product-bundle` or `--build-dir`?). Short
 aliases should be used sparingly.
 
 *   Every option does not need an alias. When in doubt, spell it out.
@@ -989,8 +1003,6 @@ Short aliases should be used in a consistent manner throughout the ffx CLI
 <p>
 <code>-c, --remote-component</code>
 <p>
-<code>-c, --kernel-args</code>
-<p>
 <code>-c, --font-color</code>
 <p>
 <code>-c, --cred</code>
@@ -1015,7 +1027,7 @@ parameters where the sequence is crucial for understanding (e.g.,
 prefer exact text arguments with specific options.
 
 Caution: Avoid using more than one positional argument in the same command.
-Positional arguments should relate to the same type of elements (e.g.,filenames)
+Positional arguments should relate to the same type of elements (e.g., filenames)
 that are processed together. Do not use positional arguments that refer to
 different elements.
 
@@ -1070,6 +1082,7 @@ values_
 *   Examples - _Illustrative examples of how to use the tool_
 *   Error Codes - _A list of tool-specific errors and their meanings_
 
+<br/>
 
 Caution: Avoid recursive help explanations. That is, do not repurpose a
 command's name to explain what it does.
@@ -1178,7 +1191,7 @@ to create shortlinks.
 
 Indicate if specific constraints or pre-conditions were not met. Users should
 understand if an error occurred because of input validation (e.g., file not
-found), processing (e.g.,syntax errors in the file), or other unexpected reasons
+found), processing (e.g., syntax errors in the file), or other unexpected reasons
 (e.g., file corrupt, cannot read from disk).
 
 <br/>
@@ -1362,8 +1375,7 @@ remain portable between disparate platforms.
 Where practical, configuration information should be stored in a way familiar to
 the user of the host machine (e.g., on Windows, use the registry). Tools should
 gather information from SDK files or platform-specific tools that encapsulate
-the work of reading from the Windows registry, Linux environment, or Mac
-settings.
+the work of reading from the Windows registry or Linux environment.
 
 Tools should be unbiased towards any build system or environment. Accessing a
 common file such as a build input dependency file is allowed.
@@ -1397,7 +1409,7 @@ troubleshooting guide. Standard `--help` output must include:
 *   **Description:** A summary of the tool's function and purpose including key
 information on usage.
 *   **Usage:** A clear outline of how to use the command, including syntax and
-arguments, using &lt;> to denote required elements and [] for optional ones.
+arguments, using &lt;> to denote required elements and [ ] for optional ones.
 *   **Options:** A detailed breakdown of all options, their effects, and default
 values
 *   **Subcommands:** A list and summary of all available subcommands
@@ -1489,9 +1501,9 @@ about documentation standards on Fuchsia.](/docs/contribute/docs/documentation-s
 ### Case sensitivity in file paths
 
 Don't rely on case sensitivity in file paths. Different platforms handle
-uppercase and lowercase differently. Windows is case insensitive, Mac is
-configurable, and Linux is case sensitive. Be explicit about specific filenames.
-Don’t expect that `src/BUILD` and `src/build` are different files.
+uppercase and lowercase differently. Windows is case insensitive and Linux is
+case sensitive. Be explicit about specific filenames. Don’t expect that
+`src/BUILD` and `src/build` are different files.
 
 
 ### Color
@@ -1499,13 +1511,13 @@ Don’t expect that `src/BUILD` and `src/build` are different files.
 You may use ANSI color in the command line interface to make text easier to read
 or to highlight important information. When using color, be sure to use colors
 that are distinct for readers who may not be able to see a full range of color
-(e.g.,color-blindness)
+(e.g., color-blindness)
 
 *   Use standard [8/16 colors](https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#8-16-colors),
 which are easier for users to remap than [256 colors](https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#256-colors)
 *   When possible, check whether the terminal supports color, and suppress
 color output if not.
-*   Always allow the user to manually suppress color output, e.g.,with a
+*   Always allow the user to manually suppress color output, e.g., with a
 --no-color flag and/or by setting the NO\_COLOR environment variable
 ([no-color.org](http://no-color.org/))
 
