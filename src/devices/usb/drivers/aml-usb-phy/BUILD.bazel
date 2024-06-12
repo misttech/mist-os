@@ -25,7 +25,7 @@ fuchsia_driver_bind_bytecode(
         "@fuchsia_sdk//bind/fuchsia.platform",
         "@fuchsia_sdk//bind/fuchsia.power",
         "@fuchsia_sdk//bind/fuchsia.register",
-        "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib",
     ],
 )
 
@@ -63,13 +63,13 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//bind/fuchsia.power:fuchsia.power_cc",
         "@fuchsia_sdk//bind/fuchsia.register:fuchsia.register_cc",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_runtime",
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
-        "@internal_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
     ],
 )
 
@@ -130,6 +130,8 @@ fuchsia_cc_test(
         "@fuchsia_sdk//bind/fuchsia.power:fuchsia.power_cc",
         "@fuchsia_sdk//bind/fuchsia.register:fuchsia.register_cc",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
         "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_runtime",
@@ -137,8 +139,6 @@ fuchsia_cc_test(
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
-        "@internal_sdk//fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
         "@internal_sdk//pkg/fake-mmio-reg",
         "@internal_sdk//pkg/mock-registers",
     ],
