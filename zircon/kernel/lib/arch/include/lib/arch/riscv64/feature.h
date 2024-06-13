@@ -20,6 +20,9 @@ namespace arch {
 // Values should not be prescribed manually and are intended to automatically
 // increment from 0.
 enum class RiscvFeature {
+  // Extension for supervisor based timer
+  kSstc,
+
   // SuperVisor extension for Page-Based Memory Types
   kSvpbmt,
 

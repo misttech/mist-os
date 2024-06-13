@@ -15,7 +15,9 @@
 #include <trace.h>
 #include <zircon/types.h>
 
+#include <arch/riscv64/feature.h>
 #include <arch/riscv64/sbi.h>
+#include <ktl/algorithm.h>
 #include <ktl/atomic.h>
 #include <ktl/limits.h>
 #include <pdev/timer.h>
@@ -47,17 +49,24 @@ zx_ticks_t riscv_sbi_current_ticks() { return riscv64_csr_read(RISCV64_CSR_TIME)
 zx_status_t riscv_sbi_set_oneshot_timer(zx_time_t deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
 
-  if (deadline < 0) {
-    deadline = 0;
-  }
+  deadline = ktl::max<zx_time_t>(deadline, 0);
 
-  // enable the timer
-  riscv64_csr_set(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
-
-  // convert interval to ticks
+  // Convert interval to ticks.
   const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
   const uint64_t ticks = time_to_ticks.Scale(deadline) + 1;
-  sbi_set_timer(ticks);
+
+  LTRACEF("cpu %u: deadline %#" PRIx64 "\n", arch_curr_cpu_num(), ticks);
+
+  // If sstc feature is present, directly set the compare register instead of
+  // making a call to SBI.
+  if (gRiscvFeatures[arch::RiscvFeature::kSstc]) {
+    riscv64_csr_write(RISCV64_CSR_STIMECMP, ticks);
+  } else {
+    sbi_set_timer(ticks);
+  }
+
+  // Enable the timer interrupt.
+  riscv64_csr_set(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
 
   return ZX_OK;
 }

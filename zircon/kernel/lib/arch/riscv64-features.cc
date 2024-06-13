@@ -32,7 +32,9 @@ RiscvFeatures& RiscvFeatures::SetMany(std::string_view isa_string) {
 
   while (!isa_string.empty()) {
     std::string_view ext = next_token();
-    if (ext == "svpbmt"sv) {
+    if (ext == "sstc"sv) {
+      Set(RiscvFeature::kSstc);
+    } else if (ext == "svpbmt"sv) {
       Set(RiscvFeature::kSvpbmt);
     } else if (ext == "zicbom"sv) {
       Set(RiscvFeature::kZicbom);

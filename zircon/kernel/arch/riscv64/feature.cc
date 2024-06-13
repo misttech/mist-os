@@ -60,6 +60,9 @@ void riscv64_feature_init() {
     // Make sure the detected cboz size is usable.
     DEBUG_ASSERT(riscv_cboz_size > 0 && ispow2(riscv_cboz_size) && riscv_cboz_size < PAGE_SIZE);
   }
+  if (gRiscvFeatures[arch::RiscvFeature::kSstc]) {
+    dprintf(INFO, "RISCV: feature sstc\n");
+  }
   if (gRiscvFeatures[arch::RiscvFeature::kSvpbmt]) {
     dprintf(INFO, "RISCV: feature svpbmt\n");
   }
