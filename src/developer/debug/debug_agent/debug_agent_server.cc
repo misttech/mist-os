@@ -289,7 +289,11 @@ void DebugAgentServer::GetProcessInfo(GetProcessInfoRequest& request,
 
 void DebugAgentServer::OnUnboundFn(DebugAgentServer* impl, fidl::UnbindInfo info,
                                    fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end) {
-  FX_DCHECK(debug_agent_);
+  // DebugAgent will be destructed before the server bound to the outgoing directory, so it is
+  // possible for DebugAgent to be null here.
+  if (!debug_agent_)
+    return;
+
   debug_agent_->RemoveObserver(this);
 }
 
