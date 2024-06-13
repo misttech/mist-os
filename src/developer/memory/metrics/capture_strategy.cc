@@ -15,7 +15,6 @@
 #include <tuple>
 
 #include "src/developer/memory/metrics/capture.h"
-#include "src/developer/memory/metrics/capture_strategy.h"
 
 namespace memory {
 BaseCaptureStrategy::BaseCaptureStrategy() {}

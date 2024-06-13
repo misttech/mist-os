@@ -291,15 +291,15 @@ TEST_F(PrinterUnitTest, PrintSummaryKMEM) {
                                    .time = 1234,
                                    .kmem =
                                        {
-                                           .total_bytes = 1024 * 1024,
+                                           .total_bytes = 1024ul * 1024,
                                            .free_bytes = 1024,
-                                           .wired_bytes = 2 * 1024,
-                                           .total_heap_bytes = 3 * 1024,
-                                           .free_heap_bytes = 2 * 1024,
-                                           .vmo_bytes = 5 * 1024,
-                                           .mmu_overhead_bytes = 6 * 1024,
-                                           .ipc_bytes = 7 * 1024,
-                                           .other_bytes = 8 * 1024,
+                                           .wired_bytes = 2ul * 1024,
+                                           .total_heap_bytes = 3ul * 1024,
+                                           .free_heap_bytes = 2ul * 1024,
+                                           .vmo_bytes = 5ul * 1024,
+                                           .mmu_overhead_bytes = 6ul * 1024,
+                                           .ipc_bytes = 7ul * 1024,
+                                           .other_bytes = 8ul * 1024,
                                        },
                                });
 
@@ -319,15 +319,15 @@ TEST_F(PrinterUnitTest, PrintSummaryPROCESS) {
                                    .time = 1234,
                                    .kmem =
                                        {
-                                           .total_bytes = 1024 * 1024,
+                                           .total_bytes = 1024ul * 1024,
                                            .free_bytes = 1024,
-                                           .wired_bytes = 2 * 1024,
-                                           .total_heap_bytes = 3 * 1024,
-                                           .free_heap_bytes = 2 * 1024,
-                                           .vmo_bytes = 5 * 1024,
-                                           .mmu_overhead_bytes = 6 * 1024,
-                                           .ipc_bytes = 7 * 1024,
-                                           .other_bytes = 8 * 1024,
+                                           .wired_bytes = 2ul * 1024,
+                                           .total_heap_bytes = 3ul * 1024,
+                                           .free_heap_bytes = 2ul * 1024,
+                                           .vmo_bytes = 5ul * 1024,
+                                           .mmu_overhead_bytes = 6ul * 1024,
+                                           .ipc_bytes = 7ul * 1024,
+                                           .other_bytes = 8ul * 1024,
                                        },
                                    .vmos = {{.koid = 1, .name = "v1", .committed_bytes = 1024}},
                                    .processes = {{.koid = 100, .name = "p1", .vmos = {1}}},
@@ -351,15 +351,15 @@ TEST_F(PrinterUnitTest, PrintSummaryVMO) {
                                    .time = 1234,
                                    .kmem =
                                        {
-                                           .total_bytes = 1024 * 1024,
+                                           .total_bytes = 1024ul * 1024,
                                            .free_bytes = 1024,
-                                           .wired_bytes = 2 * 1024,
-                                           .total_heap_bytes = 3 * 1024,
-                                           .free_heap_bytes = 2 * 1024,
-                                           .vmo_bytes = 5 * 1024,
-                                           .mmu_overhead_bytes = 6 * 1024,
-                                           .ipc_bytes = 7 * 1024,
-                                           .other_bytes = 8 * 1024,
+                                           .wired_bytes = 2ul * 1024,
+                                           .total_heap_bytes = 3ul * 1024,
+                                           .free_heap_bytes = 2ul * 1024,
+                                           .vmo_bytes = 5ul * 1024,
+                                           .mmu_overhead_bytes = 6ul * 1024,
+                                           .ipc_bytes = 7ul * 1024,
+                                           .other_bytes = 8ul * 1024,
                                        },
                                    .vmos = {{.koid = 1, .name = "v1", .committed_bytes = 1024}},
                                    .processes = {{.koid = 100, .name = "p1", .vmos = {1}}},
@@ -388,12 +388,12 @@ TEST_F(PrinterUnitTest, PrintSummaryVMOShared) {
   Capture c;
   TestUtils::CreateCapture(&c, {
                                    .time = 1234,
-                                   .kmem = {.vmo_bytes = 6 * 1024},
+                                   .kmem = {.vmo_bytes = 6ul * 1024},
                                    .vmos =
                                        {
                                            {.koid = 1, .name = "v1", .committed_bytes = 1024},
-                                           {.koid = 2, .name = "v2", .committed_bytes = 2 * 1024},
-                                           {.koid = 3, .name = "v3", .committed_bytes = 3 * 1024},
+                                           {.koid = 2, .name = "v2", .committed_bytes = 2ul * 1024},
+                                           {.koid = 3, .name = "v3", .committed_bytes = 3ul * 1024},
                                        },
                                    .processes =
                                        {
@@ -656,21 +656,21 @@ TEST_F(PrinterUnitTest, FormatSize) {
     const char* val;
   };
   std::vector<TestCase> tests = {
-      {0, "0B"},
-      {1, "1B"},
-      {1023, "1023B"},
-      {1024, "1K"},
-      {1025, "1K"},
-      {1029, "1K"},
-      {1124, "1.1K"},
-      {1536, "1.5K"},
-      {2047, "2K"},
-      {1024 * 1024, "1M"},
-      {1024 * 1024 * 1024, "1G"},
-      {1024UL * 1024 * 1024 * 1024, "1T"},
-      {1024UL * 1024 * 1024 * 1024 * 1024, "1P"},
-      {1024UL * 1024 * 1024 * 1024 * 1024 * 1024, "1E"},
-      {1024UL * 1024 * 1024 * 1024 * 1024 * 1024 * 1024, "0B"},
+      {.bytes = 0, .val = "0B"},
+      {.bytes = 1, .val = "1B"},
+      {.bytes = 1023, .val = "1023B"},
+      {.bytes = 1024, .val = "1K"},
+      {.bytes = 1025, .val = "1K"},
+      {.bytes = 1029, .val = "1K"},
+      {.bytes = 1124, .val = "1.1K"},
+      {.bytes = 1536, .val = "1.5K"},
+      {.bytes = 2047, .val = "2K"},
+      {.bytes = 1024ul * 1024, .val = "1M"},
+      {.bytes = 1024ul * 1024 * 1024, .val = "1G"},
+      {.bytes = 1024UL * 1024 * 1024 * 1024, .val = "1T"},
+      {.bytes = 1024UL * 1024 * 1024 * 1024 * 1024, .val = "1P"},
+      {.bytes = 1024UL * 1024 * 1024 * 1024 * 1024 * 1024, .val = "1E"},
+      {.bytes = 1024UL * 1024 * 1024 * 1024 * 1024 * 1024 * 1024, .val = "0B"},
   };
   for (const auto& test : tests) {
     char buf[kMaxFormattedStringSize];

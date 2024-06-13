@@ -4,7 +4,6 @@
 
 #include "src/developer/memory/monitor/monitor.h"
 
-#include <errno.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
 #include <lib/async/default.h>
@@ -28,7 +27,6 @@
 #include <soc/aml-common/aml-ram.h>
 #include <trace-vthread/event_vthread.h>
 
-#include "fuchsia/mem/cpp/fidl.h"
 #include "lib/fpromise/result.h"
 #include "src/developer/memory/metrics/bucket_match.h"
 #include "src/developer/memory/metrics/capture.h"
@@ -37,15 +35,22 @@
 #include "src/developer/memory/monitor/high_water.h"
 #include "src/developer/memory/monitor/memory_metrics_registry.cb.h"
 #include "src/developer/memory/monitor/pressure_observer.h"
+#include "src/lib/files/file.h"
 #include "src/lib/fsl/socket/strings.h"
-#include "src/lib/fsl/vmo/file.h"
-#include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 
 namespace monitor {
 
-using namespace memory;
+using memory::Capture;
+using memory::CaptureLevel;
+using memory::CaptureStrategy;
+using memory::Digest;
+using memory::Digester;
+using memory::Printer;
+using memory::SORTED;
+using memory::StarnixCaptureStrategy;
+using memory::Summary;
 
 const char Monitor::kTraceName[] = "memory_monitor";
 
@@ -53,7 +58,7 @@ namespace {
 // Path to the configuration file for buckets.
 const std::string kBucketConfigPath = "/config/data/buckets.json";
 const zx::duration kHighWaterPollFrequency = zx::sec(10);
-const uint64_t kHighWaterThreshold = 10 * 1024 * 1024;
+const uint64_t kHighWaterThreshold = 10ul * 1024 * 1024;
 const zx::duration kMetricsPollFrequency = zx::min(5);
 const char kTraceNameHighPrecisionBandwidth[] = "memory_monitor:high_precision_bandwidth";
 const char kTraceNameHighPrecisionBandwidthCamera[] =
@@ -193,7 +198,7 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       FX_LOGS(ERROR) << "Invalid value for prealloc: " << prealloc_as_string;
       exit(-1);
     }
-    prealloc_size_ *= (1024 * 1024);
+    prealloc_size_ *= 1024ul * 1024;
     status = zx::vmo::create(prealloc_size_, 0, &prealloc_vmo_);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "zx::vmo::create() returns " << zx_status_get_string(status);
@@ -320,11 +325,11 @@ void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
 }
 
 void Monitor::PrintHelp() {
-  std::cout << "memory_monitor [options]" << std::endl;
-  std::cout << "Options:" << std::endl;
-  std::cout << "  --log" << std::endl;
-  std::cout << "  --prealloc=kbytes" << std::endl;
-  std::cout << "  --delay=msecs" << std::endl;
+  std::cout << "memory_monitor [options]\n";
+  std::cout << "Options:\n";
+  std::cout << "  --log\n";
+  std::cout << "  --prealloc=kbytes\n";
+  std::cout << "  --delay=msecs\n";
 }
 
 inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& bucket_matches) {

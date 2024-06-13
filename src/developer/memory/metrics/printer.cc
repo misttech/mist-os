@@ -130,7 +130,7 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
 
   rapidjson::Value vmo_names(rapidjson::kArrayType);
   for (const auto& nc : sorted_counts) {
-    vmo_names.PushBack(rapidjson::StringRef(nc.name_.data()), a);
+    vmo_names.PushBack(rapidjson::StringRef(nc.name_.data(), nc.name_.length()), a);
   }
   TRACE_DURATION_END("memory_metrics", "Printer::DocumentFromCapture::Names");
 
@@ -307,7 +307,7 @@ void Printer::OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t pid
   if (sorted == SORTED) {
     sorted_summaries = summaries;
     std::sort(sorted_summaries.begin(), sorted_summaries.end(),
-              [](ProcessSummary a, ProcessSummary b) {
+              [](const ProcessSummary& a, const ProcessSummary& b) {
                 return a.sizes().private_bytes > b.sizes().private_bytes;
               });
   }
@@ -324,12 +324,14 @@ void Printer::OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t pid
         names.push_back(name);
       }
       if (sorted == SORTED) {
-        std::sort(names.begin(), names.end(), [&name_to_sizes](std::string a, std::string b) {
-          const auto& sa = name_to_sizes.at(a);
-          const auto& sb = name_to_sizes.at(b);
-          return sa.private_bytes == sb.private_bytes ? sa.scaled_bytes > sb.scaled_bytes
-                                                      : sa.private_bytes > sb.private_bytes;
-        });
+        std::sort(names.begin(), names.end(),
+                  [&name_to_sizes](const std::string& a, const std::string& b) {
+                    const auto& sa = name_to_sizes.at(a);
+                    const auto& sb = name_to_sizes.at(b);
+                    return sa.private_bytes == sb.private_bytes
+                               ? sa.scaled_bytes > sb.scaled_bytes
+                               : sa.private_bytes > sb.private_bytes;
+                  });
       }
       for (const auto& name : names) {
         const auto& sizes = name_to_sizes.at(name);

@@ -11,9 +11,6 @@
 #include <lib/fdio/fdio.h>
 #include <lib/sys/cpp/component_context.h>
 #include <stdlib.h>
-#include <string.h>
-
-#include <sstream>
 
 #include <gmock/gmock.h>
 #include <src/lib/files/file.h>

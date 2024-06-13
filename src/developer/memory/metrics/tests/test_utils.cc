@@ -149,7 +149,7 @@ void TestUtils::CreateCapture(Capture* capture, const CaptureTemplate& t, Captur
 std::vector<ProcessSummary> TestUtils::GetProcessSummaries(const Summary& summary) {
   std::vector<ProcessSummary> summaries = summary.process_summaries();
   sort(summaries.begin(), summaries.end(),
-       [](ProcessSummary a, ProcessSummary b) { return a.koid() < b.koid(); });
+       [](const ProcessSummary& a, const ProcessSummary& b) { return a.koid() < b.koid(); });
   return summaries;
 }
 

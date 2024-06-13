@@ -20,7 +20,7 @@ namespace memory {
 
 struct Sizes {
   Sizes() : private_bytes(0), scaled_bytes(0), total_bytes(0) {}
-  Sizes(uint64_t b) : private_bytes(b), scaled_bytes(b), total_bytes(b) {}
+  explicit Sizes(uint64_t b) : private_bytes(b), scaled_bytes(b), total_bytes(b) {}
 
   uint64_t private_bytes;
   uint64_t scaled_bytes;
@@ -37,7 +37,7 @@ class ProcessSummary {
   const std::string& name() const { return name_; }
   const Sizes& sizes() const { return sizes_; }
   const std::unordered_map<std::string, Sizes>& name_to_sizes() const { return name_to_sizes_; }
-  const Sizes& GetSizes(std::string name) const;
+  const Sizes& GetSizes(const std::string& name) const;
 
  private:
   zx_koid_t koid_;

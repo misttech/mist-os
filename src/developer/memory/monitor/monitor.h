@@ -70,14 +70,14 @@ class Monitor : public fuchsia::memory::inspection::Collector {
   void SampleAndPost();
   void MeasureBandwidthAndPost();
   void PeriodicMeasureBandwidth();
-  void PrintHelp();
+  static void PrintHelp();
   inspect::Inspector Inspect(const std::vector<memory::BucketMatch>& bucket_matches);
 
   // Overridable for testing purpose.
   virtual zx_status_t GetCapture(memory::Capture* capture,
                                  const memory::CaptureState& capture_state,
                                  memory::CaptureLevel level,
-                                 std::unique_ptr<memory::CaptureStrategy> filter);
+                                 std::unique_ptr<memory::CaptureStrategy> strategy);
   void GetDigest(const memory::Capture& capture, memory::Digest* digest);
   void PressureLevelChanged(Level level);
 
