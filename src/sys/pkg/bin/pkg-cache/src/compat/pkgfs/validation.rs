@@ -11,11 +11,8 @@ use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path as VfsPath;
-use vfs::{immutable_attributes, ObjectRequestRef, ToObjectRequest};
+use vfs::{immutable_attributes, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest};
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
-
-#[cfg(feature = "supports_open2")]
-use vfs::ProtocolsExt as _;
 
 /// The pkgfs /ctl/validation directory, except it contains only the "missing" file (e.g. does not
 /// have the "present" file).
@@ -147,18 +144,6 @@ impl vfs::directory::entry_container::Directory for Validation {
         object_request.shutdown(zx::Status::NOT_FOUND);
     }
 
-    #[cfg(not(feature = "supports_open2"))]
-    fn open2(
-        self: Arc<Self>,
-        _scope: ExecutionScope,
-        _path: VfsPath,
-        _protocols: fio::ConnectionProtocols,
-        _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
-    }
-
-    #[cfg(feature = "supports_open2")]
     fn open2(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -576,7 +561,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_self() {
         let (_env, validation) = TestEnv::new().await;
@@ -599,7 +583,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, validation) = TestEnv::new().await;
@@ -623,7 +606,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_rights() {
         let (_env, validation) = TestEnv::new().await;
@@ -646,7 +628,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_file_protocols() {
         let (_env, validation) = TestEnv::new().await;
@@ -677,7 +658,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "supports_open2")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_missing() {
         let (_env, validation) = TestEnv::with_base_blobs_and_blobfs_contents(
