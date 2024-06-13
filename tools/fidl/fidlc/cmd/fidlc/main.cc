@@ -522,6 +522,13 @@ int main(int argc, char* argv[]) {
       auto [platform, versions] = ParsePlatformAndVersions(args->Claim());
       if (versions.empty())
         FailWithUsage("Missing version for flag `available`\n");
+      if (versions.count(fidlc::Version::kLegacy) != 0)
+        FailWithUsage("LEGACY is no longer allowed (see RFC-0232)\n");
+      if (versions.size() > 1 && versions.count(fidlc::Version::kHead) == 0) {
+        FailWithUsage(
+            "Targeting multiple versions without including HEAD is not yet "
+            "supported (https://fxbug.dev/42085274)");
+      }
       version_selection.Insert(std::move(platform), std::move(versions));
     } else if (flag == "--versioned") {
       auto [platform, versions] = ParsePlatformAndVersions(args->Claim());
@@ -549,18 +556,6 @@ int main(int argc, char* argv[]) {
       FailWithUsage("Unknown argument: %s\n", flag.c_str());
     }
   }
-
-  // TODO(https://fxbug.dev/42085274): Remove.
-  for (auto& [platform, versions] : version_selection) {
-    if (versions.count(fidlc::Version::kLegacy) != 0) {
-      FailWithUsage("LEGACY is no longer allowed (see RFC-0232)\n");
-    }
-    if (versions.size() > 1 && versions.count(fidlc::Version::kHead) == 0) {
-      FailWithUsage(
-          "Targeting multiple versions without including HEAD is not yet "
-          "supported (https://fxbug.dev/42085274)");
-    }
-  };
 
   // Prepare source files.
   std::vector<fidlc::SourceManager> source_managers;

@@ -427,7 +427,7 @@ constexpr ErrorDef<215, const Element *, Version, std::string_view> ErrInvalidRe
     "'{2}' marked added={1}; please define it");
 constexpr ErrorDef<216, const Element *, Version, AbiKind, AbiValue, SourceSpan, std::string_view>
     ErrInvalidRemovedAbi(
-        "{0} is marked removed={1}, but its {2} ({t3}) is reused at {4}; use "
+        "{0} is marked removed={1}, but its {2} ({3}) is reused at {4}; use "
         "replaced={1}, renamed=\"{5}\" instead of removed={1} if you intend to "
         "replace the ABI, otherwise choose a different {2}");
 constexpr ErrorDef<217, const Element *, Version, AbiKind, AbiValue, AbiValue, SourceSpan>
