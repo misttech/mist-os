@@ -64,10 +64,6 @@ namespace fidl_display = fuchsia_hardware_display;
 
 namespace display {
 
-void Controller::PopulateDisplayMode(const display::DisplayTiming& timing, display_mode_t* mode) {
-  *mode = display::ToBanjoDisplayMode(timing);
-}
-
 void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   if (!info->edid.has_value()) {
     return;
@@ -669,27 +665,22 @@ void Controller::OnClientDead(ClientProxy* client) {
       [client](std::unique_ptr<ClientProxy>& list_client) { return list_client.get() == client; });
 }
 
-bool Controller::GetPanelConfig(DisplayId display_id,
-                                const fbl::Vector<display::DisplayTiming>** timings,
-                                const display_mode_t** mode) {
+zx::result<cpp20::span<const DisplayTiming>> Controller::GetDisplayTimings(DisplayId display_id) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   if (unbinding_) {
-    return false;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   for (auto& display : displays_) {
     if (display.id == display_id) {
       if (display.edid.has_value()) {
-        *timings = &display.edid->timings;
-        *mode = nullptr;
-      } else {
-        ZX_DEBUG_ASSERT(display.mode.has_value());
-        *timings = nullptr;
-        *mode = &*display.mode;
+        return zx::ok(cpp20::span(display.edid->timings));
       }
-      return true;
+
+      ZX_DEBUG_ASSERT(display.mode.has_value());
+      return zx::ok(cpp20::span(&*display.mode, 1));
     }
   }
-  return false;
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelFormats(

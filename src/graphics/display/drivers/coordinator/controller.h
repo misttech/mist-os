@@ -93,8 +93,6 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
   ~Controller() override;
 
-  static void PopulateDisplayMode(const display::DisplayTiming& timing, display_mode_t* mode);
-
   // References the `PrepareStop()` method in the DFv2 (fdf::DriverBase) driver
   // lifecycle.
   void PrepareStop();
@@ -122,9 +120,15 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   void ReleaseImage(DriverImageId driver_image_id);
   void ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id);
 
-  // |mtx()| must be held for as long as |edid| and |params| are retained.
-  bool GetPanelConfig(DisplayId display_id, const fbl::Vector<display::DisplayTiming>** timings,
-                      const display_mode_t** mode) __TA_REQUIRES(mtx());
+  // On success, the span of DisplayTiming objects is guaranteed to be
+  // non-empty.
+  //
+  // The display timings are guaranteed to be valid as long as the display with
+  // `display_id` is valid.
+  //
+  // `mtx()` must be held for as long as the return value is retained.
+  zx::result<cpp20::span<const DisplayTiming>> GetDisplayTimings(DisplayId display_id)
+      __TA_REQUIRES(mtx());
 
   zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(DisplayId display_id)
       __TA_REQUIRES(mtx());

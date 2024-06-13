@@ -90,8 +90,8 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id.value()).c_str());
 
   if (mode.has_value()) {
-    node.CreateUint("width", mode->h_addressable, &properties);
-    node.CreateUint("height", mode->v_addressable, &properties);
+    node.CreateUint("width", mode->horizontal_active_px, &properties);
+    node.CreateUint("height", mode->vertical_active_lines, &properties);
     return;
   }
 
@@ -142,7 +142,7 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
   out->pixel_formats = std::move(get_display_info_pixel_formats_result.value());
 
   if (info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE) {
-    out->mode = info.panel.mode;
+    out->mode = ToDisplayTiming(info.panel.mode);
     return zx::ok(std::move(out));
   }
 

@@ -72,7 +72,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
 
   // Exactly one of `edid` and `mode` can be non-nullopt.
   std::optional<Edid> edid;
-  std::optional<display_mode_t> mode;
+  std::optional<DisplayTiming> mode;
 
   fbl::Vector<CoordinatorPixelFormat> pixel_formats;
 
