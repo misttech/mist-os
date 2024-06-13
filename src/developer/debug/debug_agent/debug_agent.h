@@ -102,7 +102,7 @@ class DebugAgent : public RemoteAPI,
     if (is_connected() && !serialized.empty())
       buffered_stream_->stream().Write(std::move(serialized));
 
-    for (auto observer : observers_) {
+    for (auto& observer : observers_) {
       observer.OnNotification(notify);
     }
   }

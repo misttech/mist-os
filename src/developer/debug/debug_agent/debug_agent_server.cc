@@ -8,6 +8,7 @@
 
 #include <utility>
 
+#include "src/developer/debug/debug_agent/backtrace_utils.h"
 #include "src/developer/debug/debug_agent/component_manager.h"
 #include "src/developer/debug/debug_agent/debug_agent.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
@@ -15,6 +16,7 @@
 #include "src/developer/debug/debug_agent/process_info_iterator.h"
 #include "src/developer/debug/debug_agent/system_interface.h"
 #include "src/developer/debug/ipc/filter_utils.h"
+#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/ipc/records.h"
 
 namespace debug_agent {
@@ -104,8 +106,9 @@ void DebugAgentServer::BindServer(async_dispatcher_t* dispatcher,
   auto server = std::make_unique<DebugAgentServer>(debug_agent, dispatcher);
   auto impl_ptr = server.get();
 
-  fidl::BindServer(dispatcher, std::move(server_end), std::move(server),
-                   cpp20::bind_front(&debug_agent::DebugAgentServer::OnUnboundFn, impl_ptr));
+  impl_ptr->binding_ref_ =
+      fidl::BindServer(dispatcher, std::move(server_end), std::move(server),
+                       cpp20::bind_front(&debug_agent::DebugAgentServer::OnUnboundFn, impl_ptr));
 }
 
 DebugAgentServer::DebugAgentServer(fxl::WeakPtr<DebugAgent> agent, async_dispatcher_t* dispatcher)
@@ -229,6 +232,56 @@ void DebugAgentServer::OnNotification(const debug_ipc::NotifyProcessStarting& no
   }
 
   AttachToKoids({notify.koid});
+}
+
+void DebugAgentServer::OnNotification(const debug_ipc::NotifyException& notify) {
+  // We always destruct ourselves whenever the client hangs up.
+  FX_DCHECK(binding_ref_);
+
+  if (debug_ipc::IsDebug(notify.type)) {
+    // Not the kind of exception that our clients are interested in.
+    return;
+  }
+
+  // The thread is in an exception, we don't need to suspend it, but we do need
+  // to resume it when we're done (if there isn't a debug_ipc client).
+  auto thread = debug_agent_->GetDebuggedThread(notify.thread.id);
+
+  fuchsia_debugger::DebugAgentOnFatalExceptionRequest event;
+
+  event.thread(notify.thread.id.thread);
+  event.backtrace(
+      GetBacktraceMarkupForThread(thread->process()->process_handle(), thread->thread_handle()));
+
+  fit::result result = fidl::SendEvent(*binding_ref_)->OnFatalException(event);
+  if (!result.is_ok()) {
+    FX_LOGS(WARNING) << "Error sending event: " << result.error_value();
+  }
+
+  // Asynchronously detach from the process so the system can handle the exception as normal if
+  // there is no debug_ipc client. This must be asynchronous so that the low level exception handler
+  // doesn't have the process removed out from under it when we should be synchronously handling the
+  // exception.
+  //
+  // |this| is owned by the async dispatcher associated with this message loop, so it's safe to
+  // capture. Similarly, DebugAgent is allocated in main, so our reference should also always be
+  // valid here.
+  debug::MessageLoop::Current()->PostTask(FROM_HERE, [=]() {
+    FX_DCHECK(this);
+    FX_DCHECK(debug_agent_);
+
+    if (!debug_agent_->is_connected()) {
+      debug_ipc::DetachRequest request;
+      request.koid = thread->process()->koid();
+      debug_ipc::DetachReply reply;
+      debug_agent_->OnDetach(request, &reply);
+
+      if (reply.status.has_error()) {
+        FX_LOGS(WARNING) << "Failed to detach from process " << std::hex
+                         << thread->process()->koid() << ": " << reply.status.message();
+      }
+    }
+  });
 }
 
 DebugAgentServer::GetMatchingProcessesResult DebugAgentServer::GetMatchingProcesses(

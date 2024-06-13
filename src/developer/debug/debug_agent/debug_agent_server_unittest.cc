@@ -7,14 +7,16 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/debug/debug_agent/mock_debug_agent_harness.h"
+#include "src/developer/debug/debug_agent/mock_process.h"
 #include "src/developer/debug/debug_agent/mock_process_handle.h"
+#include "src/developer/debug/debug_agent/mock_thread.h"
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/shared/test_with_loop.h"
 
 namespace debug_agent {
 
 // This class is a friend of DebugAgentServer so that we may test the private, non-FIDL APIs
-// directly. Those APIs are designed to expose as
+// directly.
 class DebugAgentServerTest : public debug::TestWithLoop {
  public:
   DebugAgentServerTest()
@@ -41,6 +43,10 @@ class DebugAgentServerTest : public debug::TestWithLoop {
     debug_ipc::StatusReply reply;
     harness_.debug_agent()->OnStatus({}, &reply);
     return reply;
+  }
+
+  void Bind(fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end) {
+    server_.binding_ref_ = fidl::BindServer(server_.dispatcher_, std::move(server_end), &server_);
   }
 
   MockDebugAgentHarness* harness() { return &harness_; }
@@ -88,6 +94,19 @@ TEST_F(DebugAgentServerTest, AddNewFilter) {
   EXPECT_EQ(status_reply.processes.size(), 1u);
   EXPECT_EQ(status_reply.processes[0].process_koid,
             reply.matched_processes_for_filter[0].matched_pids[0]);
+
+  // Run the loop so the process has a chance to update its thread list.
+  loop().RunUntilNoTasks();
+
+  auto proc = agent->GetDebuggedProcess(reply.matched_processes_for_filter[0].matched_pids[0]);
+  auto thread_records = proc->GetThreadRecords();
+
+  ASSERT_FALSE(thread_records.empty());
+
+  // No threads should be suspended because we should have attached weakly.
+  for (auto& record : thread_records) {
+    EXPECT_EQ(record.state, debug_ipc::ThreadRecord::State::kRunning);
+  }
 
   // Corresponds to the koid of the process under the "fixed/moniker" component.
   constexpr zx_koid_t kProcessKoid = 26;
@@ -225,6 +244,102 @@ TEST_F(DebugAgentServerTest, GetMatchingProcesses) {
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(result.value().size(), 1u);
   EXPECT_EQ(result.value()[0]->koid(), kProcessKoid);
+}
+
+class FakeClient : public fidl::AsyncEventHandler<fuchsia_debugger::DebugAgent> {
+ public:
+  explicit FakeClient(fidl::ClientEnd<fuchsia_debugger::DebugAgent> client_end,
+                      async_dispatcher_t* dispatcher)
+      : client_(std::move(client_end), dispatcher, this) {}
+
+  void OnFatalException(
+      fidl::Event<fuchsia_debugger::DebugAgent::OnFatalException>& event) override {
+    exceptions_.emplace_back(event);
+    debug::MessageLoop::Current()->QuitNow();
+  }
+
+  const auto& GetExceptions() const { return exceptions_; }
+
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_debugger::DebugAgent> metadata) override {
+    FX_LOGS(WARNING) << "Unknown event: " << metadata.event_ordinal;
+  }
+
+ private:
+  std::vector<fidl::Event<fuchsia_debugger::DebugAgent::OnFatalException>> exceptions_;
+  fidl::Client<fuchsia_debugger::DebugAgent> client_;
+};
+
+TEST_F(DebugAgentServerTest, OnFatalException) {
+  constexpr zx_koid_t kProcessKoid = 0x1234;
+  constexpr zx_koid_t kThreadKoid = 0x2345;
+  auto mock_process = harness()->AddProcess(kProcessKoid);
+  auto mock_thread = mock_process->AddThread(kThreadKoid);
+
+  auto [client_end, server_end] = *fidl::CreateEndpoints<fuchsia_debugger::DebugAgent>();
+
+  FakeClient fake(std::move(client_end), debug::MessageLoopFuchsia::Current()->dispatcher());
+  Bind(std::move(server_end));
+
+  // Now that the server is bound to the message loop with a client, we can send the notification.
+  // Note that there may be an error from inspector complaining about a process koid that doesn't
+  // exist, but that's not important for this test.
+  mock_thread->SendException(0x12345678, debug_ipc::ExceptionType::kGeneral);
+
+  loop().Run();
+
+  ASSERT_EQ(fake.GetExceptions().size(), 1u);
+  EXPECT_TRUE(fake.GetExceptions()[0].thread());
+  EXPECT_EQ(*fake.GetExceptions()[0].thread(), kThreadKoid);
+}
+
+// Debug exception types should not send notifications to clients, e.g. single step, software
+// breakpoints, etc.
+TEST_F(DebugAgentServerTest, DebugExceptionDoesNotSendEvent) {
+  constexpr zx_koid_t kProcessKoid = 0x1234;
+  constexpr zx_koid_t kThreadKoid = 0x2345;
+  auto mock_process = harness()->AddProcess(kProcessKoid);
+  auto mock_thread = mock_process->AddThread(kThreadKoid);
+
+  auto [client_end, server_end] = *fidl::CreateEndpoints<fuchsia_debugger::DebugAgent>();
+
+  FakeClient fake(std::move(client_end), debug::MessageLoopFuchsia::Current()->dispatcher());
+  Bind(std::move(server_end));
+
+  // clang-format off
+  constexpr std::array<debug_ipc::ExceptionType, 5> debug_exceptions = {
+    // These are taken from the same set that populates the IsDebug function in ipc/records.cc. We
+    // don't need to worry about the process and thread lifetime exceptions that will return true in
+    // that function because separate debug_ipc notifications will be sent for those and if we
+    // decide to make them !IsDebug then it shouldn't affect this FIDL event.
+    debug_ipc::ExceptionType::kHardwareBreakpoint,
+    debug_ipc::ExceptionType::kWatchpoint,
+    debug_ipc::ExceptionType::kSingleStep,
+    debug_ipc::ExceptionType::kSoftwareBreakpoint,
+    debug_ipc::ExceptionType::kSynthetic,
+  };
+  // clang-format on
+
+  constexpr uint64_t kExceptionAddress = 0x12345678;
+  for (auto exception_type : debug_exceptions) {
+    // Watchpoints need some special set up.
+    if (exception_type == debug_ipc::ExceptionType::kWatchpoint) {
+      DebugRegisters debug_registers;
+      auto wp_info = debug_registers.SetWatchpoint(debug_ipc::BreakpointType::kReadWrite,
+                                                   {kExceptionAddress, kExceptionAddress + 1}, 4);
+      ASSERT_TRUE(wp_info);
+      debug_registers.SetForHitWatchpoint(wp_info->slot);
+
+      mock_thread->mock_thread_handle().SetDebugRegisters(debug_registers);
+    }
+
+    mock_thread->SendException(kExceptionAddress, exception_type);
+
+    // This should return immediately.
+    loop().RunUntilNoTasks();
+
+    ASSERT_TRUE(fake.GetExceptions().empty());
+  }
 }
 
 }  // namespace debug_agent
