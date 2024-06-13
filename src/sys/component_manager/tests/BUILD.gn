@@ -41,7 +41,7 @@ group("hermetic_tests") {
     "namespace_capabilities:tests",
     "panic-test:component_manager_panic_test",
     "pkg_from_framework:tests",
-    "realm:realm_integration_tests",
+    "realm:tests",
     "reboot_on_terminate:tests",
     "resolvers:tests",
     "rights:tests",

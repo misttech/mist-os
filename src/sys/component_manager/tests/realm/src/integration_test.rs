@@ -35,8 +35,12 @@ pub async fn get_instance_self() {
 
     let instance = query.get_instance("./").await.unwrap().unwrap();
     let url = instance.url.unwrap();
-    assert!(url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_test"));
-    assert!(url.ends_with("#meta/realm_integration_test.cm"));
+    assert!(
+        url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_tests")
+            || url.starts_with("realm_integration_tests-ctf"),
+        "{url}"
+    );
+    assert!(url.ends_with("#meta/realm_integration_test.cm"), "{url}");
 
     let resolved = instance.resolved_info.unwrap();
     let execution = resolved.execution_info.unwrap();
@@ -105,8 +109,12 @@ pub async fn echo_server() {
     let instance = query.get_instance("./echo_server").await.unwrap().unwrap();
     let resolved = instance.resolved_info.unwrap();
     let resolved_url = resolved.resolved_url.unwrap();
-    assert!(resolved_url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_test"));
-    assert!(resolved_url.ends_with("#meta/echo_server.cm"));
+    assert!(
+        resolved_url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_test")
+            || resolved_url.starts_with("realm_integration_tests-ctf"),
+        "{resolved_url}"
+    );
+    assert!(resolved_url.ends_with("#meta/echo_server.cm"), "{resolved_url}");
 
     let execution = resolved.execution_info.unwrap();
     execution.start_reason.unwrap();

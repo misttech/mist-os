@@ -65,6 +65,15 @@
     "package_name": "simulate-scan-wlan-hw-sim-tests"
   },
   {
+    "archive_gn_label": "//src/sys/component_manager/tests/realm:realm_integration_tests-ctf_archive_copy",
+    "archive_name": "realm_integration_tests-ctf",
+    "package_name": "realm_integration_tests-ctf",
+    "test_component_names": [
+      "realm_integration_test",
+      "realm_namespace_test"
+    ]
+  },
+  {
     "archive_gn_label": "//src/sys/pkg/tests/pkgdir:pkgdir-tests_archive_copy",
     "archive_name": "pkgdir-tests",
     "package_name": "pkgdir-tests"
