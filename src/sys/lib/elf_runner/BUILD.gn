@@ -13,6 +13,7 @@ rustc_library("elf_runner") {
   visibility = [
     "//src/sys/component_manager/*",
     "//src/sys/lib/elf_runner/*",
+    "//src/sys/mistos/*",
   ]
 
   deps = [
