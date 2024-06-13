@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
-import("//sdk/ctf/build/ctf.gni")
 
 rustc_test("realm_integration_test_bin") {
   edition = "2021"
@@ -55,54 +54,16 @@ fuchsia_test_component("realm_namespace_test") {
   deps = [ ":realm_namespace_test_bin" ]
 }
 
-template("ctf_or_integration_test") {
-  FUCHSIA_TEST_NAMES = [
-    "realm_integration_test",
-    "realm_namespace_test",
+fuchsia_test_package("realm_integration_tests") {
+  test_components = [
+    ":realm_integration_test",
+    ":realm_namespace_test",
   ]
-  DEPS = [
+  deps = [
     ":no_program",
     "//src/sys/component_manager/testing/echo_server",
 
     # https://fxbug.dev/42052321: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
-  if (defined(invoker.ctf) && invoker.ctf) {
-    ctf_fuchsia_package(target_name) {
-      testonly = true
-      package_name = target_name
-      deps = DEPS
-      test_component_names = []
-      foreach(fuchsia_test_name, FUCHSIA_TEST_NAMES) {
-        test_component_names += [ "${fuchsia_test_name}" ]
-        deps += [ ":${fuchsia_test_name}" ]
-      }
-    }
-  } else {
-    fuchsia_test_package(target_name) {
-      deps = DEPS
-      test_components = []
-      foreach(fuchsia_test_name, FUCHSIA_TEST_NAMES) {
-        test_components += [ ":${fuchsia_test_name}" ]
-      }
-    }
-  }
-}
-
-ctf_or_integration_test("realm_integration_tests") {
-  ctf = false
-}
-
-ctf_or_integration_test("realm_integration_tests-ctf") {
-  ctf = true
-}
-
-group("tests") {
-  testonly = true
-  deps = [ ":realm_integration_tests" ]
-}
-
-group("ctf-tests") {
-  testonly = true
-  deps = [ ":realm_integration_tests-ctf_archive" ]
 }

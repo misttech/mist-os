@@ -40,70 +40,6 @@ import("//sdk/ctf/build/internal/fuchsia_package_with_test.gni")
 import("//sdk/ctf/build/internal/generate_ctf_packages.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
-# This template has the same input as other generate_* templates,
-# but it handles the common operation of treating an input
-# package + test_component_names as a group of pre-packaged tests.
-#
-# We cannot change the name of the downloaded package, but we can
-# subpackage it in a new test component with a generated manifest.
-template("pre_packaged_test_with_names") {
-  test_info = invoker.test_info
-  package_name = test_info.name
-  assert(defined(test_info.test_component_names),
-         "Expected test_component_names for a pre-packaged test.")
-  test_component_names = test_info.test_component_names
-
-  generated_components = []
-
-  foreach(test_name, test_component_names) {
-    # Generate a simple manifest for this test that offers all diagnostics
-    # capabilities and simply exposes the test suite itself.
-    generated_manifest = "${test_name}_generated_manifest"
-    fuchsia_test_component_manifest(generated_manifest) {
-      metadata = {
-        test_component_manifest_cml = [
-          {
-            include = [
-              "//sdk/lib/syslog/offer.shard.cml",
-              "//sdk/lib/inspect/offer.shard.cml",
-            ]
-            children = [
-              {
-                name = "test"
-                url = "${package_name}#meta/${test_name}.cm"
-              },
-            ]
-            expose = [
-              {
-                protocol = "fuchsia.test.Suite"
-                from = "#test"
-              },
-            ]
-          },
-        ]
-      }
-      visibility = [ ":*" ]
-    }
-    manifest = get_target_outputs(":$generated_manifest")
-    manifest = manifest[0]
-    generated_component = "${test_name}_generated_component"
-    fuchsia_test_component(generated_component) {
-      component_name = test_name
-      manifest = manifest
-      deps = [ ":$generated_manifest" ]
-    }
-    generated_components += [ ":$generated_component" ]
-  }
-
-  # Package our wrapper component, and subpackage the test within
-  # the new package.
-  fuchsia_test_package(target_name) {
-    package_name = target_name
-    test_components = generated_components
-    subpackages = [ test_info.target_label ]
-  }
-}
-
 template("generate_fuchsia-diagnostics-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   if (defined(invoker.api_level) && invoker.api_level == "15") {
@@ -369,12 +305,6 @@ template("generate_nodegroup_test") {
   }
 }
 
-template("generate_realm_integration_tests-ctf") {
-  pre_packaged_test_with_names(target_name) {
-    forward_variables_from(invoker, "*")
-  }
-}
-
 template("generate_touch-test-suite") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
@@ -498,6 +428,70 @@ template("generate_media-button-test-suite") {
         },
       ]
     }
+  }
+}
+
+# This template has the same input as other generate_* templates,
+# but it handles the common operation of treating an input
+# package + test_component_names as a group of pre-packaged tests.
+#
+# We cannot change the name of the downloaded package, but we can
+# subpackage it in a new test component with a generated manifest.
+template("pre_packaged_test_with_names") {
+  test_info = invoker.test_info
+  package_name = test_info.name
+  assert(defined(test_info.test_component_names),
+         "Expected test_component_names for a pre-packaged test.")
+  test_component_names = test_info.test_component_names
+
+  generated_components = []
+
+  foreach(test_name, test_component_names) {
+    # Generate a simple manifest for this test that offers all diagnostics
+    # capabilities and simply exposes the test suite itself.
+    generated_manifest = "${test_name}_generated_manifest"
+    fuchsia_test_component_manifest(generated_manifest) {
+      metadata = {
+        test_component_manifest_cml = [
+          {
+            include = [
+              "//sdk/lib/syslog/offer.shard.cml",
+              "//sdk/lib/inspect/offer.shard.cml",
+            ]
+            children = [
+              {
+                name = "test"
+                url = "${package_name}#meta/${test_name}.cm"
+              },
+            ]
+            expose = [
+              {
+                protocol = "fuchsia.test.Suite"
+                from = "#test"
+              },
+            ]
+          },
+        ]
+      }
+      visibility = [ ":*" ]
+    }
+    manifest = get_target_outputs(":$generated_manifest")
+    manifest = manifest[0]
+    generated_component = "${test_name}_generated_component"
+    fuchsia_test_component(generated_component) {
+      component_name = test_name
+      manifest = manifest
+      deps = [ ":$generated_manifest" ]
+    }
+    generated_components += [ ":$generated_component" ]
+  }
+
+  # Package our wrapper component, and subpackage the test within
+  # the new package.
+  fuchsia_test_package(target_name) {
+    package_name = target_name
+    test_components = generated_components
+    subpackages = [ test_info.target_label ]
   }
 }
 
