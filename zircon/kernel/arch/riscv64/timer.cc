@@ -40,7 +40,7 @@ inline affine::Ratio riscv_generic_timer_compute_conversion_factors(uint32_t cnt
 }  // anonymous namespace
 
 void riscv64_timer_exception() {
-  riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
+  riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_STIE);
   timer_tick();
 }
 
@@ -66,20 +66,20 @@ zx_status_t riscv_sbi_set_oneshot_timer(zx_time_t deadline) {
   }
 
   // Enable the timer interrupt.
-  riscv64_csr_set(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
+  riscv64_csr_set(RISCV64_CSR_SIE, RISCV64_CSR_SIE_STIE);
 
   return ZX_OK;
 }
 
 zx_status_t riscv_sbi_timer_stop() {
-  riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
+  riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_STIE);
 
   return ZX_OK;
 }
 
 zx_status_t riscv_sbi_timer_shutdown() {
   DEBUG_ASSERT(arch_ints_disabled());
-  riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
+  riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_STIE);
 
   return ZX_OK;
 }

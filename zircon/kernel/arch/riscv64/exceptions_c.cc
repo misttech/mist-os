@@ -258,14 +258,14 @@ void riscv64_syscall_handler(struct iframe_t* frame) {
 }  // namespace
 
 extern "C" void riscv64_exception_handler(int64_t cause, struct iframe_t* frame) {
-  const bool user = (frame->status & RISCV64_CSR_SSTATUS_PP) == 0;
+  const bool user = (frame->status & RISCV64_CSR_SSTATUS_SPP) == 0;
 
   LTRACEF("hart %u cause %s epc %#lx status %#lx user %u\n", arch_curr_cpu_num(),
           cause_to_string(cause), frame->regs.pc, frame->status, user);
 
   // Some basic state checks of the current status register
   uint64_t status = riscv64_csr_read(sstatus);
-  DEBUG_ASSERT((status & RISCV64_CSR_SSTATUS_IE) == 0);
+  DEBUG_ASSERT((status & RISCV64_CSR_SSTATUS_SIE) == 0);
   DEBUG_ASSERT((status & RISCV64_CSR_SSTATUS_UBE) == 0);
   DEBUG_ASSERT((status & RISCV64_CSR_SSTATUS_SUM) == 0);
   DEBUG_ASSERT((status & RISCV64_CSR_SSTATUS_MXR) == 0);

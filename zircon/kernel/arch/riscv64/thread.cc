@@ -79,7 +79,7 @@ void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uint
   // FPU/vector state a the time this thread enters user space. All other bits
   // set to zero, default options.
   iframe->status =
-      RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT | RISCV64_CSR_SSTATUS_FS_INITIAL |
+      RISCV64_CSR_SSTATUS_SPIE | RISCV64_CSR_SSTATUS_UXL_64BIT | RISCV64_CSR_SSTATUS_FS_INITIAL |
       (gRiscvFeatures[arch::RiscvFeature::kVector] ? RISCV64_CSR_SSTATUS_VS_INITIAL : 0);
 }
 

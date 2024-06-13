@@ -58,7 +58,7 @@ void riscv64_software_exception() {
   DEBUG_ASSERT(arch_curr_cpu_num() < SMP_MAX_CPUS);
 
   // Clear the IPI by clearing the pending software IPI bit.
-  riscv64_csr_clear(RISCV64_CSR_SIP, RISCV64_CSR_SIP_SIP);
+  riscv64_csr_clear(RISCV64_CSR_SIP, RISCV64_CSR_SIP_SSIP);
 
   rmb();
   uint32_t reason = riscv64_read_percpu_ptr()->ipi_data.exchange(0);
