@@ -30,10 +30,20 @@ pub struct DeleteProfileSubCommand {
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "stop_profile",
+    example = "ffx storage fxfs stop_profile",
+    description = "Blocks while stopping all profile recording and replay activity."
+)]
+pub struct StopProfileSubCommand {}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum FxfsSubCommand {
     Compact(CompactSubCommand),
     DeleteProfile(DeleteProfileSubCommand),
+    StopProfile(StopProfileSubCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -59,6 +69,13 @@ pub async fn handle_cmd(
         FxfsSubCommand::DeleteProfile(args) => {
             fxfs_proxy
                 .delete_profile(&args.volume, &args.profile)
+                .await
+                .map_err(|e| Error::User(e.into()))?
+                .map_err(|e| Error::ExitWithCode(e))?;
+        }
+        FxfsSubCommand::StopProfile(_) => {
+            fxfs_proxy
+                .stop_profile_tasks()
                 .await
                 .map_err(|e| Error::User(e.into()))?
                 .map_err(|e| Error::ExitWithCode(e))?;

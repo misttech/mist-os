@@ -288,11 +288,12 @@ impl VolumesDirectory {
         Err(zx::Status::NOT_FOUND)
     }
 
-    async fn finish_profiling(self: &Arc<Self>) {
+    /// Stop all ongoing replays, and complete and persist ongoing recordings.
+    pub async fn stop_profile_tasks(self: &Arc<Self>) {
         let volumes = self.mounted_volumes.lock().await;
         let mut state = self.profiling_state.lock().await;
         for (_, (_, volume_and_root)) in &*volumes {
-            volume_and_root.volume().finish_profiling().await;
+            volume_and_root.volume().stop_profile_tasks().await;
         }
         *state = None;
     }
@@ -326,7 +327,7 @@ impl VolumesDirectory {
             let this = self.clone();
             let timer_task = fasync::Task::spawn(async move {
                 fasync::Timer::new(fasync::Duration::from_seconds(duration_secs.into())).await;
-                this.finish_profiling().await;
+                this.stop_profile_tasks().await;
             });
             *state = Some((name, timer_task));
             Ok(())
@@ -402,7 +403,7 @@ impl VolumesDirectory {
 
     /// Terminates all opened volumes.
     pub async fn terminate(self: &Arc<Self>) {
-        self.finish_profiling().await;
+        self.stop_profile_tasks().await;
         self.lock().await.terminate().await
     }
 
@@ -1902,7 +1903,7 @@ mod tests {
             Status::UNAVAILABLE
         );
 
-        volumes_directory.finish_profiling().await;
+        volumes_directory.stop_profile_tasks().await;
 
         // Missing volume name.
         assert_eq!(

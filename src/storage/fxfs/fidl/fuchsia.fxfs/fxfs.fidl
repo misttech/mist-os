@@ -292,9 +292,14 @@ closed protocol Debug {
     /// Forces a compaction.
     strict Compact() -> () error zx.Status;
 
-    /// Deletes a recorded profile from a volume.
+    /// Deletes a recorded profile from a volume. Fails if the volume isn't mounted or there is
+    /// active profile recording or replay.
     strict DeleteProfile(struct {
         volume string:fuchsia.io.MAX_FILENAME;
         profile string:fuchsia.io.MAX_FILENAME;
     }) -> () error zx.Status;
+
+    /// Stops all profile recording and replay activity. Ongoing recordings are completed and
+    /// persisted.
+    strict StopProfileTasks() -> () error zx.Status;
 };

@@ -250,7 +250,7 @@ impl FxVolume {
     }
 
     /// Stop profiling, recover resources from it and finalize recordings.
-    pub async fn finish_profiling(self: &Arc<Self>) {
+    pub async fn stop_profile_tasks(self: &Arc<Self>) {
         // If there was a file being recorded, place it in the profile directory.
         if let Some(holder) = self.stop_profiler() {
             if let Err(e) = self.place_file(&holder.recording_name, holder.recording_object).await {
@@ -2329,7 +2329,7 @@ mod tests {
                 let vmo = fixture.get_blob_vmo(*hash).await;
                 vmo.read(&mut writable, 0).expect("Vmo read");
             }
-            fixture.volume().volume().finish_profiling().await;
+            fixture.volume().volume().stop_profile_tasks().await;
             fixture.close().await
         };
 
@@ -2400,7 +2400,7 @@ mod tests {
                 }
 
                 // Complete the recording.
-                fixture.volume().volume().finish_profiling().await;
+                fixture.volume().volume().stop_profile_tasks().await;
             }
             device = fixture.close().await;
         }
@@ -2437,7 +2437,7 @@ mod tests {
                 let vmo = fixture.get_blob_vmo(*hash).await;
                 vmo.read(&mut writable, 0).expect("Vmo read");
             }
-            fixture.volume().volume().finish_profiling().await;
+            fixture.volume().volume().stop_profile_tasks().await;
             fixture.close().await
         };
 
@@ -2485,7 +2485,7 @@ mod tests {
             }
 
             // Complete the recording.
-            fixture.volume().volume().finish_profiling().await;
+            fixture.volume().volume().stop_profile_tasks().await;
         }
         let device = fixture.close().await;
 
@@ -2525,7 +2525,7 @@ mod tests {
             }
 
             // Complete the recording.
-            fixture.volume().volume().finish_profiling().await;
+            fixture.volume().volume().stop_profile_tasks().await;
 
             // Verify that first blob was not paged in as the it should be dropped from the profile.
             {
