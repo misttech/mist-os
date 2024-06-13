@@ -21,7 +21,7 @@ import cl_utils
 import fuchsia
 import remote_action
 
-from typing import Any, Iterable, Sequence
+from typing import Any, Collection, Iterable, Sequence
 
 
 class ImmediateExit(Exception):
@@ -30,7 +30,7 @@ class ImmediateExit(Exception):
     pass
 
 
-def _write_file_contents(path: Path, contents: str):
+def _write_file_contents(path: Path, contents: str) -> None:
     with open(path, "w") as f:
         f.write(contents)
 
@@ -44,7 +44,7 @@ def _strs(items: Sequence[Any]) -> Sequence[str]:
     return [str(i) for i in items]
 
 
-def _paths(items: Sequence[Any]) -> Sequence[Path]:
+def _paths(items: Sequence[Any]) -> Collection[Path]:
     if isinstance(items, list):
         return [Path(i) for i in items]
     elif isinstance(items, set):
@@ -57,13 +57,13 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 
 
 class AccompanyRlibWithSoTests(unittest.TestCase):
-    def test_not_rlib(self):
+    def test_not_rlib(self) -> None:
         deps = Path("../path/to/foo.rs")
         self.assertEqual(
             list(rustc_remote_wrapper.accompany_rlib_with_so([deps])), [deps]
         )
 
-    def test_rlib_without_so(self):
+    def test_rlib_without_so(self) -> None:
         deps = Path("obj/build/foo.rlib")
         with mock.patch.object(
             Path, "is_file", return_value=False
@@ -74,7 +74,7 @@ class AccompanyRlibWithSoTests(unittest.TestCase):
             )
         mock_isfile.assert_called_once()
 
-    def test_rlib_with_so(self):
+    def test_rlib_with_so(self) -> None:
         deps = Path("obj/build/foo.rlib")
         with mock.patch.object(
             Path, "is_file", return_value=True
@@ -87,7 +87,7 @@ class AccompanyRlibWithSoTests(unittest.TestCase):
 
 
 class ExpandDepsForRlibCompileTests(unittest.TestCase):
-    def test_proc_macro(self):
+    def test_proc_macro(self) -> None:
         deps = list(
             rustc_remote_wrapper.expand_deps_for_rlib_compile(
                 [Path("foo/barmac.so")]
@@ -95,7 +95,7 @@ class ExpandDepsForRlibCompileTests(unittest.TestCase):
         )
         self.assertEqual(deps, [Path("foo/barmac.so")])
 
-    def test_rlib(self):
+    def test_rlib(self) -> None:
         deps = list(
             rustc_remote_wrapper.expand_deps_for_rlib_compile(
                 [Path("foo/bar.rlib")]
@@ -103,7 +103,7 @@ class ExpandDepsForRlibCompileTests(unittest.TestCase):
         )
         self.assertEqual(deps, [Path("foo/bar.rlib")])
 
-    def test_rmeta_missing_rlib(self):
+    def test_rmeta_missing_rlib(self) -> None:
         deps = list(
             rustc_remote_wrapper.expand_deps_for_rlib_compile(
                 [Path("foo/bar.rmeta")]
@@ -111,7 +111,7 @@ class ExpandDepsForRlibCompileTests(unittest.TestCase):
         )
         self.assertEqual(deps, [Path("foo/bar.rmeta")])
 
-    def test_rmeta_with_coexisting_rlib(self):
+    def test_rmeta_with_coexisting_rlib(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_rlib_exists:
@@ -127,11 +127,11 @@ class ExpandDepsForRlibCompileTests(unittest.TestCase):
 class RustRemoteActionPrepareTests(unittest.TestCase):
     def generate_prepare_mocks(
         self,
-        depfile_contents: Sequence[str] = None,
-        compiler_shlibs: Sequence[Path] = None,
-        clang_rt_libdir: Path = None,
-        libcxx_static: Path = None,
-    ) -> Iterable[mock.patch.object]:
+        depfile_contents: Sequence[str] | None = None,
+        compiler_shlibs: Sequence[Path] | None = None,
+        clang_rt_libdir: Path | None = None,
+        libcxx_static: Path | None = None,
+    ) -> Iterable[Any]:
         """common mocks needed for RustRemoteAction.prepare()"""
         # depfile only command
         yield mock.patch.object(
@@ -179,7 +179,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             return_value=Path("../some/random/sysroot"),
         )
 
-    def test_prepare_basic(self):
+    def test_prepare_basic(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -192,7 +192,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         depfile_contents = [str(d) + ":" for d in deps]
         command = _strs([compiler, source, "-o", rlib])
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -203,7 +203,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         (
             internal_dep_command,
             internal_aux_rspfiles,
-        ) = r._rust_action.dep_only_command_with_rspfiles(r.local_depfile)
+        ) = r._rust_action.dep_only_command_with_rspfiles(str(r.local_depfile))
         self.assertEqual(dep_command, internal_dep_command)
         self.assertEqual(aux_rspfiles, internal_aux_rspfiles)
         self.assertEqual(aux_rspfiles, [])
@@ -226,7 +226,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {rlib})
 
-    def test_cxx_stdlibdir(self):
+    def test_cxx_stdlibdir(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -240,7 +240,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         command = _strs([compiler, source, "-o", rlib])
         cxx_libdir = Path("../tools/clang/find/libcxx/here")
         r = rustc_remote_wrapper.RustRemoteAction(
-            [f"--cxx-stdlibdir={cxx_libdir}", "--"] + command,
+            [f"--cxx-stdlibdir={cxx_libdir}", "--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -248,7 +248,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
 
         self.assertEqual(r.clang_cxx_stdlibdir, cxx_libdir)
 
-    def test_prepare_with_rmeta_file_in_scanned_deps(self):
+    def test_prepare_with_rmeta_file_in_scanned_deps(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -266,7 +266,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             tdp = Path(td)
             command = _strs([compiler, source, "-o", rlib])
             r = rustc_remote_wrapper.RustRemoteAction(
-                ["--"] + command,
+                ["--", *command],
                 exec_root=exec_root,
                 working_dir=working_dir,
                 auto_reproxy=False,
@@ -299,7 +299,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {rlib})
 
-    def test_prepare_with_response_file(self):
+    def test_prepare_with_response_file(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -322,7 +322,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 [compiler, f"@{rsp}"]
             )  # pass args through response file
             r = rustc_remote_wrapper.RustRemoteAction(
-                ["--"] + command,
+                ["--", *command],
                 exec_root=exec_root,
                 working_dir=working_dir,
                 auto_reproxy=False,
@@ -354,7 +354,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {rlib})
 
-    def test_dep_only_command_filtered(self):
+    def test_dep_only_command_filtered(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -377,7 +377,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             ]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -386,7 +386,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertIn("--foo=bar", dep_command)
         self.assertNotIn("--local-only=--foo=bar", dep_command)
 
-    def test_prepare_depfile(self):
+    def test_prepare_depfile(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -402,7 +402,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             [compiler, source, "-o", rlib, f"--emit=dep-info={depfile_path}"]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -429,7 +429,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         # Even if download_outputs=false, the depfile is required locally.
         self.assertEqual(set(a.expected_downloads), remote_output_files)
 
-    def test_prepare_depfile_download_false(self):
+    def test_prepare_depfile_download_false(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -453,7 +453,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             ]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -480,7 +480,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         # Even if download_outputs=false, the depfile is required locally.
         self.assertEqual(set(a.expected_downloads), {depfile_path})
 
-    def test_prepare_depfile_failure(self):
+    def test_prepare_depfile_failure(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -492,7 +492,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             [compiler, source, "-o", rlib, f"--emit=dep-info={depfile_path}"]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -506,7 +506,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
 
         self.assertEqual(prepare_status, 1)  # failure
 
-    def test_prepare_llvm_ir(self):
+    def test_prepare_llvm_ir(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -521,7 +521,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         depfile_contents = [str(d) + ":" for d in deps]
         command = _strs([compiler, source, "-o", rlib, f"--emit=llvm-ir"])
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -548,7 +548,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertFalse(a.skipping_some_download)
         self.assertEqual(set(a.expected_downloads), remote_output_files)
 
-    def test_prepare_llvm_ir_download_false(self):
+    def test_prepare_llvm_ir_download_false(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -572,7 +572,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             ]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -599,7 +599,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertTrue(a.skipping_some_download)
         self.assertEqual(set(a.expected_downloads), {llvm_ir})
 
-    def test_prepare_externs(self):
+    def test_prepare_externs(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -610,11 +610,13 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         rlib = Path("obj/foo.rlib")
         deps = [Path("../foo/src/other.rs")]
         depfile_contents = [str(d) + ":" for d in deps]
-        externs = _paths(
-            [
-                "obj/path/to/this.rlib",
-                "obj/path/to/that.rlib",
-            ]
+        externs = list(
+            _paths(
+                [
+                    "obj/path/to/this.rlib",
+                    "obj/path/to/that.rlib",
+                ]
+            )
         )
         extern_flags = [
             "--extern",
@@ -622,9 +624,12 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             "--extern",
             f"that={externs[1]}",
         ]
-        command = _strs([compiler, source, "-o", rlib]) + extern_flags
+        command: Sequence[str] = [
+            *_strs([compiler, source, "-o", rlib]),
+            *extern_flags,
+        ]
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -648,7 +653,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {rlib})
 
-    def test_prepare_link_arg_files(self):
+    def test_prepare_link_arg_files(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -664,7 +669,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             [compiler, source, "-o", rlib, f"-Clink-arg={link_arg}"]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -689,7 +694,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {rlib})
 
-    def test_prepare_needs_linker(self):
+    def test_prepare_needs_linker(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         exec_root_rel = cl_utils.relpath(exec_root, start=working_dir)
@@ -720,7 +725,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             ]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -755,7 +760,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {exe})
 
-    def test_prepare_remote_option_forwarding(self):
+    def test_prepare_remote_option_forwarding(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -771,7 +776,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             [compiler, source, "-o", rlib, f"--remote-flag={remote_flag}"]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -798,7 +803,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         # Could override the set of standard options.
         self.assertEqual(r.remote_options[-1], remote_flag)
 
-    def test_prepare_environment_names_input_file(self):
+    def test_prepare_environment_names_input_file(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -821,7 +826,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             ]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -853,7 +858,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {rlib})
 
-    def test_native_compile(self):
+    def test_native_compile(self) -> None:
         host_platform = fuchsia.REMOTE_PLATFORM
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
@@ -862,7 +867,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         rlib = Path("obj/foo.rlib")
         command = _strs([compiler, source, "-o", rlib])
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             host_platform=host_platform,
@@ -870,7 +875,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertTrue(r.host_matches_remote)
 
-    def test_target_linker_prefix(self):
+    def test_target_linker_prefix(self) -> None:
         for target, ld in [
             ("arm64-unknown-linux-gnu", "ld"),
             ("x86_64-unknown-linux-gnu", "ld"),
@@ -887,14 +892,14 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 [compiler, source, "-o", rlib, f"--target={target}"]
             )
             r = rustc_remote_wrapper.RustRemoteAction(
-                ["--"] + command,
+                ["--", *command],
                 exec_root=exec_root,
                 working_dir=working_dir,
                 auto_reproxy=False,
             )
             self.assertEqual(r.target_linker_prefix, ld)
 
-    def test_remote_mode_ok_with_relative_c_sysroot(self):
+    def test_remote_mode_ok_with_relative_c_sysroot(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/host-platform/bin/rustc")
@@ -914,7 +919,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             ]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -927,7 +932,9 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         sysroot_files = list(r._c_sysroot_files())
         self.assertNotEqual(sysroot_files, [])
 
-    def test_forced_local_mode_ok_with_external_absolute_c_sysroot(self):
+    def test_forced_local_mode_ok_with_external_absolute_c_sysroot(
+        self,
+    ) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/host-platform/bin/rustc")
@@ -947,7 +954,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             ]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -962,7 +969,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(sysroot_files, [])
         mock_files.assert_not_called()
 
-    def test_cdylib_rust_lld(self):
+    def test_cdylib_rust_lld(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/mac-x64/bin/rustc")
@@ -976,7 +983,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             [compiler, source, "--crate-type", "cdylib", "-o", dylib]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -1001,7 +1008,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertIn(remote_compiler, remote_inputs)
         self.assertIn(remote_rust_lld, remote_inputs)
 
-    def test_prepare_remote_cross_compile(self):
+    def test_prepare_remote_cross_compile(self) -> None:
         host_platform = "mac-arm64"
         remote_platform = fuchsia.REMOTE_PLATFORM
         exec_root = Path("/home/project")
@@ -1034,7 +1041,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             ]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             host_platform=host_platform,
@@ -1085,7 +1092,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
         self.assertEqual(remote_output_files, {rlib})
 
-    def test_run_local_downloads_inputs_if_needed(self):
+    def test_run_local_downloads_inputs_if_needed(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -1102,7 +1109,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             [compiler, source, "-o", rlib, f"--emit=dep-info={depfile_path}"]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            [f"--inputs={input_rlib}", "--"] + command,
+            [f"--inputs={input_rlib}", "--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -1138,7 +1145,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(run_status, 0)
         mock_download_inputs.assert_called_once()
 
-    def test_post_run_actions(self):
+    def test_post_run_actions(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"
         compiler = Path("../tools/bin/rustc")
@@ -1154,7 +1161,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             [compiler, source, "-o", rlib, f"--emit=dep-info={depfile_path}"]
         )
         r = rustc_remote_wrapper.RustRemoteAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=exec_root,
             working_dir=working_dir,
             auto_reproxy=False,
@@ -1204,7 +1211,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 run_status = r.run()
             mock_rewrite.assert_called_with()
 
-    def test_rewrite_remote_depfile(self):
+    def test_rewrite_remote_depfile(self) -> None:
         compiler = Path("../tools/bin/rustc")
         source = Path("../foo/src/lib.rs")
         rlib = Path("obj/foo.rlib")
@@ -1222,7 +1229,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 ]
             )
             r = rustc_remote_wrapper.RustRemoteAction(
-                ["--canonicalize_working_dir=true", "--"] + command,
+                ["--canonicalize_working_dir=true", "--", *command],
                 exec_root=exec_root,
                 working_dir=working_dir,
                 auto_reproxy=False,
@@ -1255,7 +1262,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def test_help_implicit(self):
+    def test_help_implicit(self) -> None:
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
         stdout = io.StringIO()
@@ -1267,7 +1274,7 @@ class MainTests(unittest.TestCase):
                     rustc_remote_wrapper.main([])
         mock_exit.assert_called_with(0)
 
-    def test_help_flag(self):
+    def test_help_flag(self) -> None:
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
         stdout = io.StringIO()
@@ -1279,7 +1286,7 @@ class MainTests(unittest.TestCase):
                     rustc_remote_wrapper.main(["--help"])
         mock_exit.assert_called_with(0)
 
-    def test_auto_relaunched_with_reproxy(self):
+    def test_auto_relaunched_with_reproxy(self) -> None:
         argv = ["--", "rustc", "foo.rs", "-o", "foo.rlib"]
         with mock.patch.object(
             os.environ, "get", return_value=None

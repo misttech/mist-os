@@ -237,11 +237,11 @@ if (is_host) {
   }
 
   python_library("rustc_remote_wrapper") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _rustc_remote_wrapper_sources
   }
   python_host_test("rustc_remote_wrapper_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "rustc_remote_wrapper_test.py"
     sources = _rustc_remote_wrapper_sources
   }

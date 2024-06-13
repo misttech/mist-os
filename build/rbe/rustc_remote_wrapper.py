@@ -41,7 +41,7 @@ _EXEC_PERMS = (
 )
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
@@ -181,7 +181,7 @@ class RemoteInputProcessingError(RuntimeError):
         super().__init__(message)
 
 
-def _filter_local_command(args: Iterable[str]) -> Sequence[str]:
+def _filter_local_command(args: Iterable[str]) -> list[str]:
     return list(cl_utils.strip_option_prefix(args, "--local-only"))
 
 
@@ -191,9 +191,10 @@ class RustRemoteAction(object):
         argv: Sequence[str],
         exec_root: Optional[Path] = None,
         working_dir: Optional[Path] = None,
-        host_platform: str = None,
+        host_platform: str | None = None,
         auto_reproxy: bool = True,  # Ok to disable during unit-tests
     ):
+        self._remote_action: remote_action.RemoteAction  # will be set by prepare() step
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
         self._exec_root = (exec_root or remote_action.PROJECT_ROOT).absolute()
         self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
@@ -230,9 +231,10 @@ class RustRemoteAction(object):
 
         self._local_only = self._main_args.local or self._remote_disqualified()
 
-        self._cleanup_files: Sequence[Path] = []
-        self._prepare_status: int = None  # 0 means success, like an exit code
-        self._remote_action = None  # will be set by prepare() step
+        self._cleanup_files: list[Path] = []
+        self._prepare_status: int | None = (
+            None  # 0 means success, like an exit code
+        )
 
     @property
     def _c_sysroot_is_outside_exec_root(self) -> bool:
@@ -247,7 +249,7 @@ class RustRemoteAction(object):
         # Check all absolute path parents.
         return self.exec_root not in c_sysroot_dir.parents
 
-    def _remote_disqualified(self):
+    def _remote_disqualified(self) -> bool:
         """Detects when the action cannot run remotely for various reasons."""
         # If the C sysroot is outside of exec_root, (e.g. an absolute path
         # like /Library/Developer/... for Mac OS SDKs) then the command
@@ -277,7 +279,7 @@ class RustRemoteAction(object):
     def verbose(self) -> bool:
         return self._main_args.verbose
 
-    def vmsg(self, text: str):
+    def vmsg(self, text: str) -> None:
         if self.verbose:
             msg(text)
 
@@ -314,11 +316,7 @@ class RustRemoteAction(object):
     def label(self) -> str:
         return self._main_args.label
 
-    def vmsg(self, text: str):
-        if self.verbose:
-            msg(text)
-
-    def value_verbose(self, desc: str, value: str) -> str:
+    def value_verbose(self, desc: str, value: Path) -> Path:
         """In verbose mode, print and forward value."""
         self.vmsg(f"{desc}: {value}")
         return value
@@ -349,10 +347,6 @@ class RustRemoteAction(object):
     @property
     def exec_root(self) -> Path:
         return self._exec_root
-
-    @property
-    def label(self) -> Optional[str]:
-        return self._main_args.label
 
     @property
     def host_platform(self) -> str:
@@ -411,19 +405,21 @@ class RustRemoteAction(object):
         return fuchsia.remote_executable(self.local_clang_toolchain_dir)
 
     @property
-    def depfile(self) -> Optional[Path]:
+    def depfile(self) -> Path | None:
         return self._rust_action.depfile
 
     @property
-    def primary_output(self) -> Path:
+    def primary_output(self) -> Path | None:
         return self._rust_action.output_file
 
     @property
-    def host_compiler(self) -> Path:
+    def host_compiler(self) -> Path | None:
         return self._rust_action.compiler
 
     @property
-    def remote_compiler(self) -> Path:
+    def remote_compiler(self) -> Path | None:
+        if not self.host_compiler:
+            return None
         return fuchsia.remote_executable(self.host_compiler)
 
     @property
@@ -434,19 +430,20 @@ class RustRemoteAction(object):
     def original_command(self) -> Sequence[str]:
         return self._rust_action.original_command
 
-    def _replace_with_remote_compiler(self, tok) -> Optional[str]:
+    def _replace_with_remote_compiler(self, tok: str) -> str | None:
         if tok == str(self.host_compiler):
             return str(self.remote_compiler)
+        return None
 
     @staticmethod
-    def _replace_with_remote_linker(tok) -> Optional[str]:
+    def _replace_with_remote_linker(tok: str) -> str | None:
         """Replace the host platform linker with the remote platform one."""
         return cl_utils.match_prefix_transform_suffix(
             tok, "-Clinker=", lambda x: str(fuchsia.remote_executable(Path(x)))
         )
 
     @staticmethod
-    def _normalize_libcxx(tok) -> Optional[str]:
+    def _normalize_libcxx(tok: str) -> Optional[str]:
         # A path like ".../bin/../lib/libc++a" needs to be normalized
         # so that the remote linker does not fail when looking for a
         # non-existent "bin" part of the path.
@@ -458,6 +455,7 @@ class RustRemoteAction(object):
             # os.path.normpath() behavior.
             normpath = os.path.normpath(right)
             return prefix + normpath
+        return None
 
     @property
     def local_depfile(self) -> Path:
@@ -468,7 +466,7 @@ class RustRemoteAction(object):
         self,
     ) -> Tuple[Sequence[str], Sequence[Path]]:
         command, aux_files = self._rust_action.dep_only_command_with_rspfiles(
-            self.local_depfile
+            str(self.local_depfile)
         )
         return (
             cl_utils.auto_env_prefix_command(_filter_local_command(command)),
@@ -526,7 +524,7 @@ class RustRemoteAction(object):
         fuchsia_use_host_rust_sysroot = self._rust_action.default_rust_sysroot()
         yield f"--sysroot={fuchsia_use_host_rust_sysroot}"
 
-    def _cleanup(self):
+    def _cleanup(self) -> None:
         for f in self._cleanup_files:
             f.unlink(missing_ok=True)  # does remove or rmdir
 
@@ -581,6 +579,8 @@ class RustRemoteAction(object):
 
     def _remote_compiler_inputs(self) -> Iterable[Path]:
         # remote compiler is an input
+        if self.remote_compiler is None:
+            raise ValueError("self.remote_compiler is None")
         remote_compiler = self.remote_compiler
         if not _tool_is_executable(remote_compiler):
             raise RemoteInputProcessingError(
@@ -596,6 +596,8 @@ class RustRemoteAction(object):
           shared library paths relative to current working dir.
         """
         if self.host_platform == fuchsia.REMOTE_PLATFORM:
+            if self.remote_compiler is None:
+                raise ValueError("self.remote_compiler is None")
             # remote and host execution environments match
             yield from self.yield_verbose(
                 "remote compiler shlibs (detected)",
@@ -625,6 +627,8 @@ class RustRemoteAction(object):
         # instead of whole directories.
         if not self.target:
             return
+        if not self.rust_sysroot:
+            raise ValueError("self.rust_sysroot is None")
         libunwind_a = (
             self.rust_sysroot
             / fuchsia.rust_stdlib_subdir(  # relative to self.working_dir
@@ -693,7 +697,8 @@ class RustRemoteAction(object):
 
     def _remote_output_files(self) -> Iterable[Path]:
         """Remote output files are relative to current working dir."""
-        yield self.value_verbose("main output", self.primary_output)
+        if self.primary_output:
+            yield self.value_verbose("main output", self.primary_output)
 
         depfile = self.depfile
         if depfile:
@@ -750,7 +755,7 @@ class RustRemoteAction(object):
         try:
             remote_inputs = list(self._remote_inputs())
         except RemoteInputProcessingError as e:
-            msg(e)
+            msg(str(e))
             return 1
 
         remote_output_files = list(self._remote_output_files())
@@ -762,7 +767,7 @@ class RustRemoteAction(object):
         # including the depfile and emitted llvm-ir (if applicable).
         # The depfile *must* be downloaded because it is consumed by ninja.
 
-        translated_remote_options = []
+        translated_remote_options: list[str] = []
         for opt in self.remote_options:
             if opt == "--download_outputs=false":
                 translated_remote_options.append(
@@ -811,12 +816,15 @@ class RustRemoteAction(object):
         prefix = self.target_linker_prefix
         if not prefix:
             return None
+        if not self.remote_linker:
+            return None
         return self.remote_linker.parent / f"{prefix}.{ld}"
 
     def _remote_linker_executables(self) -> Iterable[Path]:
         if self.linker:
             remote_linker = self.remote_linker
-            yield self.value_verbose("remote linker", remote_linker)
+            if remote_linker:
+                yield self.value_verbose("remote linker", remote_linker)
 
             # ld.lld -> lld, but the symlink is required for the clang
             # linker driver to be able to use lld.
@@ -824,7 +832,7 @@ class RustRemoteAction(object):
             # ld.LINKER is expected to be in the remote environment PATH.
             # See ToolChain::GetLinkerPath() in llvm-project:clang/lib/Driver/ToolChain.cpp
             ld = self._rust_action.use_ld  # e.g. "lld"
-            if ld:
+            if ld and self.remote_ld_path:
                 yield self.value_verbose(
                     "remote clang -fuse-ld", self.remote_ld_path
                 )
@@ -853,6 +861,7 @@ class RustRemoteAction(object):
             yield self.value_verbose(
                 "remote runtime libdir", rt_libdir_remote[0]
             )
+
         if len(rt_libdir_remote) > 1:
             raise RemoteInputProcessingError(
                 f"Found more than one clang runtime lib dir (don't know which one to use): {rt_libdir_remote}"
@@ -883,6 +892,8 @@ class RustRemoteAction(object):
                 working_dir_abs=self.working_dir, search_paths=search_paths
             )
 
+            if not self.host_compiler:
+                raise ValueError("self.host_compiler is None")
             lld = self.host_compiler.parent / "ld.lld"  # co-located with clang
 
             def linker_script_expander(paths: Sequence[Path]) -> Iterable[Path]:
@@ -917,6 +928,8 @@ class RustRemoteAction(object):
         # This will always be linux-x64, even when cross-compiling, because
         # that is the only RBE remote backend option available.
         if self.crate_type == rustc.CrateType.CDYLIB:
+            if not self.remote_compiler:
+                raise ValueError("self.remote_compiler is None")
             yield self.value_verbose(
                 "remote rust-lld",
                 fuchsia.remote_rustc_to_rust_lld_path(self.remote_compiler),
@@ -926,7 +939,7 @@ class RustRemoteAction(object):
 
     def _depfile_exists(self) -> bool:
         # Defined for easy mocking.
-        return self.depfile and self.depfile.exists()
+        return self.depfile is not None and self.depfile.exists()
 
     def _post_remote_success_action(self) -> int:
         if self._depfile_exists():
@@ -944,11 +957,13 @@ class RustRemoteAction(object):
             # Once re-client presents permission information in the
             # --action_log (reproxy remote_metadata), this workaround can
             # be replaced with a more generalized solution.
+            if not self.primary_output:
+                raise ValueError("self.primary_output is None")
             if remote_action.is_download_stub_file(self.primary_output):
                 self.primary_output.chmod(_EXEC_PERMS)
         return 0
 
-    def _rewrite_remote_or_local_depfile(self):
+    def _rewrite_remote_or_local_depfile(self) -> None:
         """Rewrite depfile without working dir absolute paths.
 
         TEMPORARY WORKAROUND until upstream fix lands:
@@ -972,6 +987,8 @@ class RustRemoteAction(object):
         # In the future, it might be possible to determine whether the local
         # or remote result was used from self.action_log.
         self.vmsg(f"Rewriting the (remote or local) depfile {self.depfile}")
+        if self.depfile is None:
+            raise ValueError("self.depfile is None")
         remote_action.rewrite_depfile(
             dep_file=self.working_dir / self.depfile,  # in-place
             transform=self.remote_action._relativize_remote_or_local_deps,
