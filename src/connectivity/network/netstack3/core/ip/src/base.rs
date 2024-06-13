@@ -3099,7 +3099,6 @@ pub trait FilterHandlerProvider<I: packet_formats::ip::IpExt, BT: FilterBindings
 pub(crate) mod testutil {
     use super::*;
 
-    use net_types::ip::IpInvariant;
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId};
     use netstack3_base::{SendFrameContext, SendableFrameMeta};
 
@@ -3122,12 +3121,7 @@ pub(crate) mod testutil {
                 SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>,
             );
             use DualStackSendIpPacketMeta::*;
-            let IpInvariant(dual_stack) = I::map_ip(
-                Wrap(value),
-                |Wrap(value)| IpInvariant(V4(value)),
-                |Wrap(value)| IpInvariant(V6(value)),
-            );
-            dual_stack
+            I::map_ip_in(Wrap(value), |Wrap(value)| V4(value), |Wrap(value)| V6(value))
         }
     }
 

@@ -477,10 +477,10 @@ impl FakeBindingsCtxState {
                 Vec<Vec<u8>>,
             >,
         );
-        let Wrapper(map) = I::map_ip::<_, Wrapper<'_, I>>(
-            IpInvariant(self),
-            |IpInvariant(this)| Wrapper(&mut this.udpv4_received),
-            |IpInvariant(this)| Wrapper(&mut this.udpv6_received),
+        let Wrapper(map) = I::map_ip_out::<_, Wrapper<'_, I>>(
+            self,
+            |this| Wrapper(&mut this.udpv4_received),
+            |this| Wrapper(&mut this.udpv6_received),
         );
         map
     }
@@ -647,12 +647,11 @@ impl FakeBindingsCtx {
         &mut self,
         conn: &IcmpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {
-        I::map_ip::<_, IpInvariant<Option<Vec<_>>>>(
+        I::map_ip_in(
             (IpInvariant(self), conn),
-            |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv4_replies.remove(conn)),
-            |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv6_replies.remove(conn)),
+            |(IpInvariant(this), conn)| this.state_mut().icmpv4_replies.remove(conn),
+            |(IpInvariant(this), conn)| this.state_mut().icmpv6_replies.remove(conn),
         )
-        .into_inner()
         .unwrap_or_else(Vec::default)
     }
 

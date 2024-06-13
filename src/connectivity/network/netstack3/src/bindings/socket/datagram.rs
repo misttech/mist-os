@@ -1806,9 +1806,9 @@ where
                 );
             }
 
-            let IpInvariant(ipv6_control_data) = I::map_ip(
+            let ipv6_control_data = I::map_ip_in(
                 (version_specific_data, destination_addr, IpInvariant(interface_id)),
-                |(Ipv4BindingsData {}, _ipv4_dst_addr, _interface_id)| IpInvariant(None),
+                |(Ipv4BindingsData {}, _ipv4_dst_addr, _interface_id)| None,
                 |(Ipv6BindingsData { recv_pkt_info }, ipv6_dst_addr, IpInvariant(interface_id))| {
                     let mut ipv6_control_data = None;
                     if *recv_pkt_info {
@@ -1821,7 +1821,7 @@ where
                     }
                     // TODO(https://fxbug.dev/326102014): Support SOL_IPV6, IPV6_RECVTCLASS.
                     // TODO(https://fxbug.dev/326102020): Support SOL_IPV6, IPV6_RECVHOPLIMIT.
-                    IpInvariant(ipv6_control_data)
+                    ipv6_control_data
                 },
             );
 

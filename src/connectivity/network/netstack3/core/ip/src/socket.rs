@@ -1023,9 +1023,7 @@ pub(crate) mod testutil {
     use core::num::NonZeroUsize;
 
     use derivative::Derivative;
-    use net_types::ip::{
-        GenericOverIp, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Subnet,
-    };
+    use net_types::ip::{GenericOverIp, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Subnet};
     use net_types::{MulticastAddr, Witness as _};
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId};
     use netstack3_base::SendFrameContext;
@@ -1255,11 +1253,11 @@ pub(crate) mod testutil {
 
         /// Returns the [`FakeIpSocketCtx`] for IP version `I`.
         pub fn inner_mut<I: Ip>(&mut self) -> &mut FakeIpSocketCtx<I, D> {
-            I::map_ip(IpInvariant(self), |IpInvariant(s)| &mut s.v4, |IpInvariant(s)| &mut s.v6)
+            I::map_ip_out(self, |s| &mut s.v4, |s| &mut s.v6)
         }
 
         fn inner<I: Ip>(&self) -> &FakeIpSocketCtx<I, D> {
-            I::map_ip(IpInvariant(self), |IpInvariant(s)| &s.v4, |IpInvariant(s)| &s.v6)
+            I::map_ip_out(self, |s| &s.v4, |s| &s.v6)
         }
 
         /// Adds a fake direct route to `ip` through `device`.

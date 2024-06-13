@@ -2004,32 +2004,30 @@ where
         if ip_version == I::VERSION {
             return Ok(self.datagram().get_ip_hop_limits(id).unicast);
         }
-        self.datagram()
-            .with_other_stack_ip_options_and_default_hop_limits(
-                id,
-                |other_stack, default_hop_limits| {
-                    I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
-                        (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
-                        |_v4| Err(NotDualStackCapableError),
-                        |(
-                            WrapOtherStackIpOptions(other_stack),
-                            IpInvariant(HopLimits { unicast: default_unicast, multicast: _ }),
-                        )| {
-                            let DualStackSocketState {
-                                socket_options:
-                                    DatagramSocketOptions {
-                                        hop_limits:
-                                            SocketHopLimits { unicast, multicast: _, version: _ },
-                                        ..
-                                    },
-                                ..
-                            } = other_stack;
-                            Ok(IpInvariant(unicast.unwrap_or(default_unicast)))
-                        },
-                    )
-                },
-            )?
-            .map(|IpInvariant(unicast)| unicast)
+        self.datagram().with_other_stack_ip_options_and_default_hop_limits(
+            id,
+            |other_stack, default_hop_limits| {
+                I::map_ip_in(
+                    (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
+                    |_v4| Err(NotDualStackCapableError),
+                    |(
+                        WrapOtherStackIpOptions(other_stack),
+                        IpInvariant(HopLimits { unicast: default_unicast, multicast: _ }),
+                    )| {
+                        let DualStackSocketState {
+                            socket_options:
+                                DatagramSocketOptions {
+                                    hop_limits:
+                                        SocketHopLimits { unicast, multicast: _, version: _ },
+                                    ..
+                                },
+                            ..
+                        } = other_stack;
+                        Ok(unicast.unwrap_or(default_unicast))
+                    },
+                )
+            },
+        )?
     }
 
     /// Gets the hop limit for packets sent by the socket to a multicast
@@ -2048,32 +2046,30 @@ where
         if ip_version == I::VERSION {
             return Ok(self.datagram().get_ip_hop_limits(id).multicast);
         }
-        self.datagram()
-            .with_other_stack_ip_options_and_default_hop_limits(
-                id,
-                |other_stack, default_hop_limits| {
-                    I::map_ip::<_, Result<IpInvariant<NonZeroU8>, _>>(
-                        (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
-                        |_v4| Err(NotDualStackCapableError),
-                        |(
-                            WrapOtherStackIpOptions(other_stack),
-                            IpInvariant(HopLimits { unicast: _, multicast: default_multicast }),
-                        )| {
-                            let DualStackSocketState {
-                                socket_options:
-                                    DatagramSocketOptions {
-                                        hop_limits:
-                                            SocketHopLimits { unicast: _, multicast, version: _ },
-                                        ..
-                                    },
-                                ..
-                            } = other_stack;
-                            Ok(IpInvariant(multicast.unwrap_or(default_multicast)))
-                        },
-                    )
-                },
-            )?
-            .map(|IpInvariant(multicast)| multicast)
+        self.datagram().with_other_stack_ip_options_and_default_hop_limits(
+            id,
+            |other_stack, default_hop_limits| {
+                I::map_ip_in(
+                    (WrapOtherStackIpOptions(other_stack), IpInvariant(default_hop_limits)),
+                    |_v4| Err(NotDualStackCapableError),
+                    |(
+                        WrapOtherStackIpOptions(other_stack),
+                        IpInvariant(HopLimits { unicast: _, multicast: default_multicast }),
+                    )| {
+                        let DualStackSocketState {
+                            socket_options:
+                                DatagramSocketOptions {
+                                    hop_limits:
+                                        SocketHopLimits { unicast: _, multicast, version: _ },
+                                    ..
+                                },
+                            ..
+                        } = other_stack;
+                        Ok(multicast.unwrap_or(default_multicast))
+                    },
+                )
+            },
+        )?
     }
 
     /// Returns the configured multicast interface for the socket.
@@ -2089,17 +2085,15 @@ where
             return Ok(self.datagram().get_multicast_interface(id));
         };
 
-        self.datagram()
-            .with_other_stack_ip_options(id, |other_stack| {
-                I::map_ip::<_, Result<IpInvariant<Option<_>>, _>>(
-                    WrapOtherStackIpOptions(other_stack),
-                    |_v4| Err(NotDualStackCapableError),
-                    |WrapOtherStackIpOptions(other_stack)| {
-                        Ok(IpInvariant(other_stack.socket_options.multicast_interface.clone()))
-                    },
-                )
-            })
-            .map(|IpInvariant(result)| result)
+        self.datagram().with_other_stack_ip_options(id, |other_stack| {
+            I::map_ip_in(
+                WrapOtherStackIpOptions(other_stack),
+                |_v4| Err(NotDualStackCapableError),
+                |WrapOtherStackIpOptions(other_stack)| {
+                    Ok(other_stack.socket_options.multicast_interface.clone())
+                },
+            )
+        })
     }
 
     /// Sets the multicast interface to `interface` for a socket.
@@ -2147,17 +2141,15 @@ where
             return Ok(self.datagram().get_multicast_loop(id));
         };
 
-        self.datagram()
-            .with_other_stack_ip_options(id, |other_stack| {
-                I::map_ip::<_, Result<IpInvariant<bool>, _>>(
-                    WrapOtherStackIpOptions(other_stack),
-                    |_v4| Err(NotDualStackCapableError),
-                    |WrapOtherStackIpOptions(other_stack)| {
-                        Ok(IpInvariant(other_stack.socket_options.multicast_loop))
-                    },
-                )
-            })
-            .map(|IpInvariant(result)| result)
+        self.datagram().with_other_stack_ip_options(id, |other_stack| {
+            I::map_ip_in(
+                WrapOtherStackIpOptions(other_stack),
+                |_v4| Err(NotDualStackCapableError),
+                |WrapOtherStackIpOptions(other_stack)| {
+                    Ok(other_stack.socket_options.multicast_loop)
+                },
+            )
+        })
     }
 
     /// Sets the loopback multicast option.
@@ -2700,21 +2692,13 @@ mod tests {
 
     impl<D: StrongDeviceIdentifier> FakeBoundSockets<D> {
         fn bound_sockets<I: IpExt>(&self) -> &BoundSockets<I, D::Weak, FakeUdpBindingsCtx<D>> {
-            I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(state)| &state.v4,
-                |IpInvariant(state)| &state.v6,
-            )
+            I::map_ip_out(self, |state| &state.v4, |state| &state.v6)
         }
 
         fn bound_sockets_mut<I: IpExt>(
             &mut self,
         ) -> &mut BoundSockets<I, D::Weak, FakeUdpBindingsCtx<D>> {
-            I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(state)| &mut state.v4,
-                |IpInvariant(state)| &mut state.v6,
-            )
+            I::map_ip_out(self, |state| &mut state.v4, |state| &mut state.v6)
         }
     }
 
@@ -2753,10 +2737,10 @@ mod tests {
             struct Wrap<'a, I: TestIpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
                 &'a HashMap<WeakUdpSocketId<I, D, BT>, SocketReceived<I>>,
             );
-            let Wrap(map) = I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(state)| Wrap(&state.received_v4),
-                |IpInvariant(state)| Wrap(&state.received_v6),
+            let Wrap(map) = I::map_ip_out(
+                self,
+                |state| Wrap(&state.received_v4),
+                |state| Wrap(&state.received_v6),
             );
             map
         }
@@ -2770,10 +2754,10 @@ mod tests {
             struct Wrap<'a, I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
                 &'a mut HashMap<WeakUdpSocketId<I, D, BT>, SocketReceived<I>>,
             );
-            let Wrap(map) = I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(state)| Wrap(&mut state.received_v4),
-                |IpInvariant(state)| Wrap(&mut state.received_v6),
+            let Wrap(map) = I::map_ip_out(
+                self,
+                |state| Wrap(&mut state.received_v4),
+                |state| Wrap(&mut state.received_v6),
             );
             map
         }
@@ -2977,10 +2961,10 @@ mod tests {
                 type Type = Wrap<'a, NewIp, D>;
             }
 
-            let Wrap(context) = I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(this)| Wrap(MaybeDualStack::NotDualStack(this)),
-                |IpInvariant(this)| Wrap(MaybeDualStack::DualStack(this)),
+            let Wrap(context) = I::map_ip_out(
+                self,
+                |this| Wrap(MaybeDualStack::NotDualStack(this)),
+                |this| Wrap(MaybeDualStack::DualStack(this)),
             );
             context
         }
@@ -3108,25 +3092,17 @@ mod tests {
 
     impl<D: StrongDeviceIdentifier> FakeDualStackSocketState<D> {
         fn socket_set<I: IpExt>(&self) -> &UdpSocketSet<I, D::Weak, FakeUdpBindingsCtx<D>> {
-            I::map_ip(IpInvariant(self), |IpInvariant(dual)| &dual.v4, |IpInvariant(dual)| &dual.v6)
+            I::map_ip_out(self, |dual| &dual.v4, |dual| &dual.v6)
         }
 
         fn socket_set_mut<I: IpExt>(
             &mut self,
         ) -> &mut UdpSocketSet<I, D::Weak, FakeUdpBindingsCtx<D>> {
-            I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(dual)| &mut dual.v4,
-                |IpInvariant(dual)| &mut dual.v6,
-            )
+            I::map_ip_out(self, |dual| &mut dual.v4, |dual| &mut dual.v6)
         }
 
         fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
-            I::map_ip(
-                IpInvariant(self),
-                |IpInvariant(dual)| &dual.udpv4_counters,
-                |IpInvariant(dual)| &dual.udpv6_counters,
-            )
+            I::map_ip_out(self, |dual| &dual.udpv4_counters, |dual| &dual.udpv6_counters)
         }
     }
     struct FakeUdpCoreCtx<D: FakeStrongDeviceId> {

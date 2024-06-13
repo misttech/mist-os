@@ -737,19 +737,18 @@ fn handle_set_icmpv6_filter<I: IpExt>(
     socket: &SocketWorkerState<I>,
     filter: fpraw::Icmpv6Filter,
 ) -> Result<(), fposix::Errno> {
-    I::map_ip::<_, Result<(), IpInvariant<fposix::Errno>>>(
+    I::map_ip_in(
         (IpInvariant(filter), &socket.id),
-        |_| Err(IpInvariant(fposix::Errno::Enoprotoopt)),
+        |_| Err(fposix::Errno::Enoprotoopt),
         |(IpInvariant(filter), id)| {
             let _old_filter = ctx
                 .api()
                 .raw_ip_socket()
                 .set_icmp_filter(id, Some(filter.into_core()))
-                .map_err(|e| IpInvariant(e.into_errno()))?;
+                .map_err(IntoErrno::into_errno)?;
             Ok(())
         },
     )
-    .map_err(|IpInvariant(e)| e)
 }
 
 /// Handler for a [`fpraw::SocketRequest::GetIcmpv6Filter`] request.
@@ -757,15 +756,14 @@ fn handle_get_icmpv6_filter<I: IpExt>(
     ctx: &mut Ctx,
     socket: &SocketWorkerState<I>,
 ) -> Result<fpraw::Icmpv6Filter, fposix::Errno> {
-    let IpInvariant(result) = I::map_ip(
+    I::map_ip_in(
         (IpInvariant(ctx), &socket.id),
-        |_| IpInvariant(Err(fposix::Errno::Enoprotoopt)),
+        |_| Err(fposix::Errno::Enoprotoopt),
         |(IpInvariant(ctx), id)| match ctx.api().raw_ip_socket().get_icmp_filter(id) {
-            Err(e) => IpInvariant(Err(e.into_errno())),
-            Ok(filter) => IpInvariant(Ok(filter.into_fidl())),
+            Err(e) => Err(e.into_errno()),
+            Ok(filter) => Ok(filter.into_fidl()),
         },
-    );
-    result
+    )
 }
 
 /// The type of hop limit to set/get.

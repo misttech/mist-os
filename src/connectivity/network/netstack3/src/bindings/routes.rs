@@ -26,8 +26,7 @@ use futures::{
 };
 use log::{debug, error, info, warn};
 use net_types::ip::{
-    GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-    Subnet,
+    GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
 };
 use net_types::SpecifiedAddr;
 use netstack3_core::routes::AddableMetric;
@@ -97,12 +96,11 @@ impl ChangeEither {
 
 impl<A: IpAddress> From<Change<A>> for ChangeEither {
     fn from(change: Change<A>) -> Self {
-        let IpInvariant(change) = A::Version::map_ip(
+        A::Version::map_ip_in(
             change,
-            |change| IpInvariant(ChangeEither::V4(change)),
-            |change| IpInvariant(ChangeEither::V6(change)),
-        );
-        change
+            |change| ChangeEither::V4(change),
+            |change| ChangeEither::V6(change),
+        )
     }
 }
 
@@ -952,10 +950,10 @@ impl ChangeSink {
             sender: &'a mpsc::UnboundedSender<TableWorkItem<I>>,
         }
 
-        let ChangeSender { sender } = I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(ChangeSink { v4, v6: _ })| ChangeSender { sender: &v4.table_work_sink },
-            |IpInvariant(ChangeSink { v4: _, v6 })| ChangeSender { sender: &v6.table_work_sink },
+        let ChangeSender { sender } = I::map_ip_out(
+            self,
+            |ChangeSink { v4, v6: _ }| ChangeSender { sender: &v4.table_work_sink },
+            |ChangeSink { v4: _, v6 }| ChangeSender { sender: &v6.table_work_sink },
         );
         sender
     }
@@ -969,14 +967,10 @@ impl ChangeSink {
             sender: &'a mpsc::UnboundedSender<RouteWorkItem<A>>,
         }
 
-        let ChangeSender { sender } = I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(ChangeSink { v4, v6: _ })| ChangeSender {
-                sender: &v4.main_table_route_work_sink,
-            },
-            |IpInvariant(ChangeSink { v4: _, v6 })| ChangeSender {
-                sender: &v6.main_table_route_work_sink,
-            },
+        let ChangeSender { sender } = I::map_ip_out(
+            self,
+            |ChangeSink { v4, v6: _ }| ChangeSender { sender: &v4.main_table_route_work_sink },
+            |ChangeSink { v4: _, v6 }| ChangeSender { sender: &v6.main_table_route_work_sink },
         );
         sender
     }

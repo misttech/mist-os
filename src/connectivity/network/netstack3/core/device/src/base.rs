@@ -10,7 +10,7 @@ use core::num::NonZeroU64;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ethernet::Mac;
-use net_types::ip::{Ip, IpInvariant, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
     Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector, InstantContext,
@@ -245,12 +245,10 @@ pub struct DeviceCounters {
 impl DeviceCounters {
     /// Either `send_ipv4_frame` or `send_ipv6_frame` depending on `I`.
     pub fn send_frame<I: Ip>(&self) -> &Counter {
-        I::map_ip::<_, IpInvariant<&Counter>>(
-            (),
-            |()| IpInvariant(&self.send_ipv4_frame),
-            |()| IpInvariant(&self.send_ipv6_frame),
-        )
-        .into_inner()
+        match I::VERSION {
+            IpVersion::V4 => &self.send_ipv4_frame,
+            IpVersion::V6 => &self.send_ipv6_frame,
+        }
     }
 }
 

@@ -4,7 +4,7 @@
 
 //! Structs containing the entire stack state.
 
-use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
+use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_base::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair};
 use netstack3_device::{DeviceId, DeviceLayerState};
 use netstack3_ip::icmp::IcmpState;
@@ -76,10 +76,10 @@ impl<BT: BindingsTypes> StackState<BT> {
     }
 
     pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| state.device.nud_counters::<Ipv4>(),
-            |IpInvariant(state)| state.device.nud_counters::<Ipv6>(),
+        I::map_ip_out(
+            self,
+            |state| state.device.nud_counters::<Ipv4>(),
+            |state| state.device.nud_counters::<Ipv6>(),
         )
     }
 

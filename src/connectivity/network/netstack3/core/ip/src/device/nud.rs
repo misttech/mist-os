@@ -2736,7 +2736,7 @@ mod tests {
 
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
-    use net_types::ip::{IpInvariant, Ipv4Addr, Ipv6Addr};
+    use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeLinkAddress, FakeLinkDevice,
         FakeLinkDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
@@ -4865,14 +4865,14 @@ mod tests {
     }
 
     fn generate_ip_addr<I: Ip>(i: usize) -> SpecifiedAddr<I::Addr> {
-        I::map_ip(
-            IpInvariant(i),
-            |IpInvariant(i)| {
+        I::map_ip_out(
+            i,
+            |i| {
                 let start = u32::from_be_bytes(net_ip_v4!("192.168.0.1").ipv4_bytes());
                 let bytes = (start + u32::try_from(i).unwrap()).to_be_bytes();
                 SpecifiedAddr::new(Ipv4Addr::new(bytes)).unwrap()
             },
-            |IpInvariant(i)| {
+            |i| {
                 let start = u128::from_be_bytes(net_ip_v6!("fe80::1").ipv6_bytes());
                 let bytes = (start + u128::try_from(i).unwrap()).to_be_bytes();
                 SpecifiedAddr::new(Ipv6Addr::from_bytes(bytes)).unwrap()

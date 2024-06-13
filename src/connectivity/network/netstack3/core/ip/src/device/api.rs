@@ -9,8 +9,8 @@ use alloc::vec::Vec;
 use either::Either;
 use log::trace;
 use net_types::ip::{
-    AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant,
-    IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+    AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpVersionMarker, Ipv4,
+    Ipv4Addr, Ipv6, Ipv6Addr,
 };
 use net_types::SpecifiedAddr;
 use netstack3_base::{
@@ -218,18 +218,18 @@ where
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
             struct Wrap<'a, I: IpDeviceIpExt, II: Instant>(&'a mut I::AddressState<II>);
-            let IpInvariant(valid_until) = I::map_ip(
+            let valid_until = I::map_ip_in(
                 Wrap(address_state),
                 |Wrap(Ipv4AddressState { config })| {
-                    IpInvariant(match config {
+                    match config {
                         Some(Ipv4AddrConfig { valid_until }) => Ok(valid_until),
                         // Address is being removed, configuration has been
                         // taken out.
                         None => Err(NotFoundError.into()),
-                    })
+                    }
                 },
                 |Wrap(Ipv6AddressState { flags: _, config })| {
-                    IpInvariant(match config {
+                    match config {
                         // Address is being removed, configuration has been
                         // taken out.
                         None => Err(NotFoundError.into()),
@@ -239,7 +239,7 @@ where
                         Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until })) => {
                             Ok(valid_until)
                         }
-                    })
+                    }
                 },
             );
             let valid_until = valid_until?;
@@ -437,13 +437,13 @@ impl<Inst: Instant> AddrSubnetAndManualConfigEither<Inst> {
             config: I::ManualAddressConfig<Inst>,
         }
 
-        let IpInvariant(result) = I::map_ip(
+        let result = I::map_ip_in(
             AddrSubnetAndConfig { addr_subnet, config },
             |AddrSubnetAndConfig { addr_subnet, config }| {
-                IpInvariant(AddrSubnetAndManualConfigEither::V4(addr_subnet, config))
+                AddrSubnetAndManualConfigEither::V4(addr_subnet, config)
             },
             |AddrSubnetAndConfig { addr_subnet, config }| {
-                IpInvariant(AddrSubnetAndManualConfigEither::V6(addr_subnet, config))
+                AddrSubnetAndManualConfigEither::V6(addr_subnet, config)
             },
         );
         result

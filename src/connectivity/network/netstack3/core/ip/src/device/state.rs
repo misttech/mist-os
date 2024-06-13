@@ -15,8 +15,8 @@ use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ip::{
-    AddrSubnet, GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersionMarker, Ipv4,
-    Ipv4Addr, Ipv6, Ipv6Addr,
+    AddrSubnet, GenericOverIp, Ip, IpAddress, IpMarked, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
+    Ipv6Addr,
 };
 use net_types::SpecifiedAddr;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
@@ -764,10 +764,10 @@ impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
 
     /// Returns the IP device state for version `I`.
     pub fn ip_state<I: IpDeviceStateIpExt>(&self) -> &IpDeviceState<I, BT> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(dual_stack)| &dual_stack.ipv4.ip_state,
-            |IpInvariant(dual_stack)| &dual_stack.ipv6.ip_state,
+        I::map_ip_out(
+            self,
+            |dual_stack| &dual_stack.ipv4.ip_state,
+            |dual_stack| &dual_stack.ipv6.ip_state,
         )
     }
 }

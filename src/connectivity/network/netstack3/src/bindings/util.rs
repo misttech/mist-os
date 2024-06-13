@@ -15,8 +15,8 @@ use futures::{Future, FutureExt as _, Stream, StreamExt as _};
 use log::debug;
 use net_types::ethernet::Mac;
 use net_types::ip::{
-    AddrSubnetEither, AddrSubnetError, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant as IpInv,
-    Ipv4Addr, Ipv6Addr, SubnetEither, SubnetError,
+    AddrSubnetEither, AddrSubnetError, GenericOverIp, Ip, IpAddr, IpAddress, Ipv4Addr, Ipv6Addr,
+    SubnetEither, SubnetError,
 };
 use net_types::{AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_core::device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId};
@@ -665,9 +665,9 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::IpMulticastMembership>
     type Error = MulticastMembershipConversionError;
 
     fn try_from_fidl(fidl: fposix_socket::IpMulticastMembership) -> Result<Self, Self::Error> {
-        <A::Version as Ip>::map_ip(
-            IpInv(fidl),
-            |IpInv(fidl)| {
+        <A::Version as Ip>::map_ip_out(
+            fidl,
+            |fidl| {
                 let fposix_socket::IpMulticastMembership { iface, local_addr, mcast_addr } = fidl;
                 let mcast_addr = MulticastAddr::new(mcast_addr.into_core())
                     .ok_or(Self::Error::AddrNotMulticast)?;
@@ -681,7 +681,7 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::IpMulticastMembership>
                     });
                 Ok((mcast_addr, selector))
             },
-            |IpInv(_fidl)| Err(Self::Error::WrongIpVersion),
+            |_fidl| Err(Self::Error::WrongIpVersion),
         )
     }
 }
@@ -692,10 +692,10 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::Ipv6MulticastMembership>
     type Error = MulticastMembershipConversionError;
 
     fn try_from_fidl(fidl: fposix_socket::Ipv6MulticastMembership) -> Result<Self, Self::Error> {
-        <A::Version as Ip>::map_ip(
-            IpInv(fidl),
-            |IpInv(_fidl)| Err(Self::Error::WrongIpVersion),
-            |IpInv(fidl)| {
+        <A::Version as Ip>::map_ip_out(
+            fidl,
+            |_fidl| Err(Self::Error::WrongIpVersion),
+            |fidl| {
                 let fposix_socket::Ipv6MulticastMembership { iface, mcast_addr } = fidl;
                 let mcast_addr = MulticastAddr::new(mcast_addr.into_core())
                     .ok_or(Self::Error::AddrNotMulticast)?;

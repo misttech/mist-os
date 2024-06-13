@@ -1659,10 +1659,10 @@ pub mod testutil {
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeTcpSegment {
             fn proto() -> I::Proto {
-                I::map_ip(
-                    IpInvariant(()),
-                    |IpInvariant(())| Ipv4Proto::Proto(IpProto::Tcp),
-                    |IpInvariant(())| Ipv6Proto::Proto(IpProto::Tcp),
+                I::map_ip_out(
+                    (),
+                    |()| Ipv4Proto::Proto(IpProto::Tcp),
+                    |()| Ipv6Proto::Proto(IpProto::Tcp),
                 )
             }
         }
@@ -1714,10 +1714,10 @@ pub mod testutil {
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeUdpPacket {
             fn proto() -> I::Proto {
-                I::map_ip(
-                    IpInvariant(()),
-                    |IpInvariant(())| Ipv4Proto::Proto(IpProto::Udp),
-                    |IpInvariant(())| Ipv6Proto::Proto(IpProto::Udp),
+                I::map_ip_out(
+                    (),
+                    |()| Ipv4Proto::Proto(IpProto::Udp),
+                    |()| Ipv6Proto::Proto(IpProto::Udp),
                 )
             }
         }
@@ -1768,11 +1768,7 @@ pub mod testutil {
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeIcmpEchoRequest {
             fn proto() -> I::Proto {
-                I::map_ip(
-                    IpInvariant(()),
-                    |IpInvariant(())| Ipv4Proto::Icmp,
-                    |IpInvariant(())| Ipv6Proto::Icmpv6,
-                )
+                I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
             }
         }
 

@@ -10,7 +10,7 @@ use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 
 use net_types::ip::{
-    AddrSubnet, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+    AddrSubnet, GenericOverIp, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
 use net_types::{SpecifiedAddr, Witness};
 use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer as _};
@@ -103,14 +103,14 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
         #[generic_over_ip(I, Ip)]
         struct WrapVecAddrSubnet<I: Ip>(Vec<AddrSubnet<I::Addr>>);
 
-        let WrapVecAddrSubnet(subnets) = I::map_ip(
-            IpInvariant((&mut ctx.core_ctx(), &device)),
-            |IpInvariant((core_ctx, device))| {
+        let WrapVecAddrSubnet(subnets) = I::map_ip_out(
+            (&mut ctx.core_ctx(), &device),
+            |(core_ctx, device)| {
                 ip::device::testutil::with_assigned_ipv4_addr_subnets(core_ctx, device, |addrs| {
                     WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
                 })
             },
-            |IpInvariant((core_ctx, device))| {
+            |(core_ctx, device)| {
                 ip::device::testutil::with_assigned_ipv6_addr_subnets(core_ctx, device, |addrs| {
                     WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
                 })

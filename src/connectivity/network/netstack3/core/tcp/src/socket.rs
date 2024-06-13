@@ -33,8 +33,8 @@ use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::{debug, error, trace};
 use net_types::ip::{
-    GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr,
-    Ipv6, Ipv6Addr,
+    GenericOverIp, Ip, IpAddr, IpAddress, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
+    Ipv6Addr,
 };
 use net_types::{AddrAndPortFormatter, AddrAndZone, SpecifiedAddr, ZonedAddr};
 use netstack3_base::socket::{
@@ -825,12 +825,7 @@ impl<A: IpAddress, D> From<SocketAddr<A, D>>
     for IpAddr<SocketAddr<Ipv4Addr, D>, SocketAddr<Ipv6Addr, D>>
 {
     fn from(addr: SocketAddr<A, D>) -> IpAddr<SocketAddr<Ipv4Addr, D>, SocketAddr<Ipv6Addr, D>> {
-        let IpInvariant(addr) = <A::Version as Ip>::map_ip(
-            addr,
-            |i| IpInvariant(IpAddr::V4(i)),
-            |i| IpInvariant(IpAddr::V6(i)),
-        );
-        addr
+        <A::Version as Ip>::map_ip_in(addr, |i| IpAddr::V4(i), |i| IpAddr::V6(i))
     }
 }
 

@@ -16,7 +16,7 @@ use futures::{FutureExt, StreamExt as _, TryStream, TryStreamExt as _};
 use itertools::Itertools as _;
 use log::{debug, error, info, warn};
 use net_types::ethernet::Mac;
-use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv6};
+use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use netstack3_core::device::{DeviceId, EthernetDeviceId, EthernetLinkDevice};
 use netstack3_core::error::AddressResolutionFailed;
@@ -329,7 +329,7 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
             <<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::RequestStream as TryStream>::Ok,
         events: Vec<fnet_routes_ext::Event<I>>,
     }
-    let IpInvariant(result) = I::map_ip::<Inputs<I>, _>(
+    let result = I::map_ip_in::<Inputs<I>, _>(
         Inputs { req, events },
         |Inputs { req, events }| match req {
             fnet_routes::WatcherV4Request::Watch { responder } => {
@@ -343,7 +343,7 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
                         })
                     })
                     .collect::<Vec<_>>();
-                IpInvariant(responder.send(&events))
+                responder.send(&events)
             }
         },
         |Inputs { req, events }| match req {
@@ -358,7 +358,7 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
                         })
                     })
                     .collect::<Vec<_>>();
-                IpInvariant(responder.send(&events))
+                responder.send(&events)
             }
         },
     );
