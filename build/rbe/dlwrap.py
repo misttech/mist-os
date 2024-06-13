@@ -29,14 +29,14 @@ _PROJECT_ROOT = fuchsia.project_root_dir()
 
 # Needs to be computed with os.path.relpath instead of Path.relative_to
 # to support testing a fake (test-only) value of PROJECT_ROOT.
-_PROJECT_ROOT_REL = cl_utils.relpath(_PROJECT_ROOT, start=os.curdir)
+_PROJECT_ROOT_REL = cl_utils.relpath(_PROJECT_ROOT, start=Path(os.curdir))
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
-def vmsg(verbose: bool, text: str):
+def vmsg(verbose: bool, text: str) -> None:
     if verbose:
         msg(text)
 
@@ -147,7 +147,7 @@ def _main(
 
     # Download artifacts from their stubs.
     status = download_artifacts(
-        stub_paths=paths,
+        stub_paths=list(paths),
         downloader=downloader,
         working_dir_abs=working_dir_abs,
         verbose=main_args.verbose,

@@ -21,7 +21,7 @@ from typing import Tuple
 
 
 class MainArgParserTests(unittest.TestCase):
-    def test_defaults(self):
+    def test_defaults(self) -> None:
         args = dlwrap._MAIN_ARG_PARSER.parse_args([])
         self.assertFalse(args.verbose)
         self.assertFalse(args.dry_run)
@@ -30,31 +30,31 @@ class MainArgParserTests(unittest.TestCase):
         self.assertEqual(args.download_list, [])
         self.assertEqual(args.command, [])
 
-    def test_verbose(self):
+    def test_verbose(self) -> None:
         args = dlwrap._MAIN_ARG_PARSER.parse_args(["--verbose"])
         self.assertTrue(args.verbose)
 
-    def test_dry_run(self):
+    def test_dry_run(self) -> None:
         args = dlwrap._MAIN_ARG_PARSER.parse_args(["--dry-run"])
         self.assertTrue(args.dry_run)
 
-    def test_undownload(self):
+    def test_undownload(self) -> None:
         args = dlwrap._MAIN_ARG_PARSER.parse_args(["--undownload"])
         self.assertTrue(args.undownload)
 
-    def test_download(self):
+    def test_download(self) -> None:
         args = dlwrap._MAIN_ARG_PARSER.parse_args(
             ["--download", "aa.o", "bb.o"]
         )
         self.assertEqual(args.download, [Path("aa.o"), Path("bb.o")])
 
-    def test_download_list(self):
+    def test_download_list(self) -> None:
         args = dlwrap._MAIN_ARG_PARSER.parse_args(
             ["--download_list", "f1.rsp", "f2.rsp"]
         )
         self.assertEqual(args.download_list, [Path("f1.rsp"), Path("f2.rsp")])
 
-    def test_command(self):
+    def test_command(self) -> None:
         args = dlwrap._MAIN_ARG_PARSER.parse_args(["--", "cat", "dog.txt"])
         self.assertEqual(args.command, ["cat", "dog.txt"])
 
@@ -95,7 +95,7 @@ class DownloadArtifactsTests(unittest.TestCase):
             build_id="50f93-a38e-b112",
         )
 
-    def test_success(self):
+    def test_success(self) -> None:
         path = Path("road/to/perdition.obj")
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
@@ -113,7 +113,7 @@ class DownloadArtifactsTests(unittest.TestCase):
         self.assertEqual(status, download_status)
         mock_download.assert_called_once()
 
-    def test_failure(self):
+    def test_failure(self) -> None:
         path = Path("highway/to/hell.obj")
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
@@ -133,7 +133,7 @@ class DownloadArtifactsTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def test_dry_run(self):
+    def test_dry_run(self) -> None:
         path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
@@ -149,7 +149,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(status, 0)
         mock_run.assert_not_called()
 
-    def test_download_fail(self):
+    def test_download_fail(self) -> None:
         path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
@@ -166,7 +166,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(status, 1)
         mock_run.assert_not_called()
 
-    def test_no_command(self):
+    def test_no_command(self) -> None:
         path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
@@ -182,7 +182,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(status, 0)
         mock_run.assert_not_called()
 
-    def test_success(self):
+    def test_success(self) -> None:
         path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
@@ -200,7 +200,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(status, 0)
         mock_run.assert_called_with(["cat", "foo"])
 
-    def test_success_from_list(self):
+    def test_success_from_list(self) -> None:
         path = "dir/file.o"
         rspfile = "f.rsp"
         exec_root = Path("/exec/root")
@@ -225,7 +225,7 @@ class MainTests(unittest.TestCase):
         mock_expand_files.assert_called_with([Path(rspfile)])
         mock_run.assert_called_with(["cat", "foo"])
 
-    def test_undownload(self):
+    def test_undownload(self) -> None:
         path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"

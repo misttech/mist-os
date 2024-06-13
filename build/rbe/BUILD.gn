@@ -137,21 +137,21 @@ if (is_host) {
   }
 
   python_library("depfile") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _depfile_sources
   }
   python_host_test("depfile_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "depfile_test.py"
     sources = _depfile_sources
   }
 
   python_library("dlwrap") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _dlwrap_sources
   }
   python_host_test("dlwrap_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "dlwrap_test.py"
     sources = _dlwrap_sources
   }
