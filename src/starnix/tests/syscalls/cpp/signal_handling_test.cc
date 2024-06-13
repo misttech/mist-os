@@ -21,6 +21,7 @@
 #include <thread>
 
 #include <gtest/gtest.h>
+#include <linux/futex.h>
 
 #include "src/lib/files/file.h"
 #include "src/lib/fxl/strings/split_string.h"
@@ -922,4 +923,50 @@ TEST(SignalHandling, ExitSignalIsAProcessSignal) {
     SAFE_SYSCALL(pthread_sigmask(SIG_SETMASK, &old_mask, nullptr));
   });
 }
+
+void empty_signal_handler(int, siginfo_t *, void *) {}
+
+TEST(SignalHandling, FutexIsInterruptedBySignalHandler) {
+  test_helper::ForkHelper helper;
+
+  auto futex_wait = [](std::atomic<uint32_t> *uaddr, uint32_t value) -> long {
+    return syscall(SYS_futex, uaddr, FUTEX_WAIT, value, 0, 0, nullptr);
+  };
+
+  auto sleep_ms = [](size_t millis) {
+    constexpr size_t kMillisToMicros = 1000;
+    return usleep(static_cast<useconds_t>(millis * kMillisToMicros));
+  };
+
+  helper.RunInForkedProcess([&]() {
+    struct sigaction sig_action = {};
+    sig_action.sa_sigaction = empty_signal_handler;
+    sig_action.sa_flags = SA_SIGINFO;
+    SAFE_SYSCALL(sigaction(SIGUSR1, &sig_action, nullptr));
+
+    std::atomic<bool> done = false;
+    std::atomic<uint32_t> futex_word = 0;
+
+    std::thread t([&done, &sleep_ms]() {
+      sigset_t block_mask, old_mask;
+      sigemptyset(&block_mask);
+      sigaddset(&block_mask, SIGUSR1);
+
+      SAFE_SYSCALL(pthread_sigmask(SIG_BLOCK, &block_mask, &old_mask));
+
+      // We need to wait for the main thread to be in the futex wait.
+      while (!done) {
+        kill(getpid(), SIGUSR1);
+        sleep_ms(100);
+      }
+    });
+
+    long res = futex_wait(&futex_word, 0);
+    EXPECT_EQ(res, -1);
+    EXPECT_EQ(errno, EINTR);
+    done = true;
+    t.join();
+  });
+}
+
 }  // namespace
