@@ -19,7 +19,6 @@ import platform
 import shlex
 import shutil
 import subprocess
-import struct
 import sys
 from pathlib import Path
 from typing import ClassVar, List, Optional
@@ -113,13 +112,12 @@ def atomic_link(link: Path, target: Path):
             os.remove(tmp_file)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TestEnvironment:
     build_dir: Path
     sdk_dir: Path
     target: str
     toolchain_dir: Path
-    abi_revision: str
     local_pb_path: Optional[Path]
     use_local_pb: bool
     verbose: bool = False
@@ -170,7 +168,6 @@ class TestEnvironment:
             sdk_dir=Path(args.sdk).absolute(),
             target=args.target,
             toolchain_dir=Path(args.toolchain_dir).absolute(),
-            args.abi_revision,
             local_pb_path=local_pb_path,
             use_local_pb=args.use_local_product_bundle_if_exists,
             verbose=args.verbose,
@@ -189,7 +186,6 @@ class TestEnvironment:
                 sdk_dir=Path(test_env["sdk_dir"]),
                 target=test_env["target"],
                 toolchain_dir=Path(test_env["toolchain_dir"]),
-                abi_revision=test_env["abi_revision"],
                 local_pb_path=local_pb_path,
                 use_local_pb=test_env["use_local_pb"],
                 verbose=test_env["verbose"],
@@ -270,7 +266,6 @@ class TestEnvironment:
                     "sdk_dir": str(self.sdk_dir),
                     "target": self.target,
                     "toolchain_dir": str(self.toolchain_dir),
-                    "abi_revision": self.abi_revision,
                     "local_pb_path": local_pb_path,
                     "use_local_pb": self.use_local_pb,
                     "verbose": self.verbose,
@@ -1167,11 +1162,6 @@ def main():
         "--toolchain-dir",
         help="the toolchain directory",
         required=True,
-    )
-    start_parser.add_argument(
-        "--abi-revision",
-        help="the 64-bit abi revision in hex string",
-        default="0x099D5AB9C26B64DA",
     )
     start_parser.add_argument(
         "--local-product-bundle-path",
