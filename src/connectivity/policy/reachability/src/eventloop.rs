@@ -9,36 +9,33 @@
 
 use reachability_handler::ReachabilityState;
 
+use anyhow::{anyhow, Context as _};
+use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
+use fuchsia_async::{self as fasync};
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::Inspector;
+use futures::channel::mpsc;
+use futures::prelude::*;
+use futures::select;
+use named_timer::NamedTimeoutExt;
+use reachability_core::dig::Dig;
+use reachability_core::fetch::Fetch;
+use reachability_core::ping::Ping;
+use reachability_core::route_table::RouteTable;
+use reachability_core::telemetry::{self, TelemetryEvent, TelemetrySender};
+use reachability_core::{
+    watchdog, InterfaceView, Monitor, NeighborCache, NetworkCheckAction, NetworkCheckCookie,
+    NetworkCheckResult, NetworkChecker, NetworkCheckerOutcome, PortType, FIDL_TIMEOUT_ID,
+};
+use reachability_handler::ReachabilityHandler;
+use std::collections::{HashMap, HashSet};
+use std::pin::pin;
+use tracing::{debug, error, info, warn};
 use {
-    anyhow::{anyhow, Context as _},
-    fidl_fuchsia_hardware_network as fhardware_network,
-    fidl_fuchsia_net_debug as fnet_debug,
-    fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _},
-    fidl_fuchsia_net_neighbor as fnet_neighbor,
-    fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fuchsia_async::{self as fasync},
-    fuchsia_inspect::{health::Reporter, Inspector},
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug,
+    fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_neighbor as fnet_neighbor,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
     fuchsia_zircon as zx,
-    futures::{channel::mpsc, prelude::*, select},
-    named_timer::NamedTimeoutExt,
-    // net_declare::std_ip,
-    reachability_core::{
-        dig::Dig,
-        fetch::Fetch,
-        ping::Ping,
-        route_table::RouteTable,
-        telemetry::{self, TelemetryEvent, TelemetrySender},
-        watchdog, InterfaceView, Monitor, NeighborCache, NetworkCheckAction, NetworkCheckCookie,
-        NetworkCheckResult, NetworkChecker, NetworkCheckerOutcome, PortType, FIDL_TIMEOUT_ID,
-    },
-    reachability_handler::ReachabilityHandler,
-    std::{
-        collections::{HashMap, HashSet},
-        pin::pin,
-    },
-    tracing::{debug, error, info, warn},
 };
 
 const REPORT_PERIOD: zx::Duration = zx::Duration::from_seconds(60);
@@ -131,7 +128,9 @@ async fn handle_network_check_message<'a>(
     >,
     msg: Option<(NetworkCheckAction, NetworkCheckCookie)>,
 ) {
-    let (action, cookie) = msg.expect("network check receiver unexpectedly closed");
+    let (action, cookie) = msg
+        .context("network check receiver unexpectedly closed")
+        .unwrap_or_else(|err| exit_with_anyhow_error(err));
     match action {
         NetworkCheckAction::Ping(parameters) => {
             netcheck_futures.push(Box::pin(async move {
@@ -207,7 +206,8 @@ impl EventLoop {
         let cobalt_svc = fuchsia_component::client::connect_to_protocol::<
             fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
         >()
-        .context("connect to metrics service")?;
+        .context("connect to metrics service")
+        .unwrap_or_else(|err| exit_with_anyhow_error(err));
 
         let cobalt_proxy = match telemetry::create_metrics_logger(cobalt_svc).await {
             Ok(proxy) => proxy,
@@ -219,7 +219,8 @@ impl EventLoop {
                 let (proxy, _) = fidl::endpoints::create_proxy::<
                     fidl_fuchsia_metrics::MetricEventLoggerMarker,
                 >()
-                .context("failed to create MetricEventLoggerMarker endponts")?;
+                .context("failed to create MetricEventLoggerMarker endponts")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err));
                 proxy
             }
         };
@@ -233,7 +234,8 @@ impl EventLoop {
 
         let if_watcher_stream = {
             let interface_state = connect_to_protocol::<fnet_interfaces::StateMarker>()
-                .context("network_manager failed to connect to interface state")?;
+                .context("network_manager failed to connect to interface state")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err));
             // TODO(https://fxbug.dev/42061810): Don't register interest in
             // valid-until. Note that the event stream returned by the extension
             // crate is created from a watcher with interest in all fields.
@@ -241,19 +243,23 @@ impl EventLoop {
                 &interface_state,
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )
-            .context("get interface event stream")?
+            .context("get interface event stream")
+            .unwrap_or_else(|err| exit_with_anyhow_error(err))
             .fuse()
         };
 
         let neigh_watcher_stream = {
             let view = connect_to_protocol::<fnet_neighbor::ViewMarker>()
-                .context("failed to connect to neighbor view")?;
+                .context("failed to connect to neighbor view")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err));
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fnet_neighbor::EntryIteratorMarker>()
-                    .context("failed to create EntryIterator proxy")?;
+                    .context("failed to create EntryIterator proxy")
+                    .unwrap_or_else(|err| exit_with_anyhow_error(err));
             let () = view
                 .open_entry_iterator(server_end, &fnet_neighbor::EntryIteratorOptions::default())
-                .context("failed to open EntryIterator")?;
+                .context("failed to open EntryIterator")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err));
             futures::stream::try_unfold(proxy, |proxy| {
                 proxy.get_next().map_ok(|e| {
                     Some((
@@ -268,16 +274,20 @@ impl EventLoop {
 
         let ipv4_route_event_stream = {
             let state_v4 = connect_to_protocol::<fnet_routes::StateV4Marker>()
-                .context("failed to connect to fuchsia.net.routes/StateV4")?;
+                .context("failed to connect to fuchsia.net.routes/StateV4")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err));
             fnet_routes_ext::event_stream_from_state(&state_v4)
-                .context("failed to initialize a `WatcherV4` client")?
+                .context("failed to initialize a `WatcherV4` client")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err))
                 .fuse()
         };
         let ipv6_route_event_stream = {
             let state_v6 = connect_to_protocol::<fnet_routes::StateV6Marker>()
-                .context("failed to connect to fuchsia.net.routes/StateV6")?;
+                .context("failed to connect to fuchsia.net.routes/StateV6")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err));
             fnet_routes_ext::event_stream_from_state(&state_v6)
-                .context("failed to initialize a `WatcherV6` client")?
+                .context("failed to initialize a `WatcherV6` client")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err))
                 .fuse()
         };
 
@@ -302,8 +312,12 @@ impl EventLoop {
             )
         );
         self.routes = RouteTable::new_with_existing_routes(
-            v4_routes.context("get existing IPv4 routes")?,
-            v6_routes.context("get existing IPv6 routes")?,
+            v4_routes
+                .context("get existing IPv4 routes")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err)),
+            v6_routes
+                .context("get existing IPv6 routes")
+                .unwrap_or_else(|err| exit_with_anyhow_error(err)),
         );
 
         debug!("starting event loop");
@@ -313,30 +327,44 @@ impl EventLoop {
         loop {
             select! {
                 if_watcher_res = if_watcher_stream.try_next() => {
-                    if let Ok(Some(id)) = self.handle_interface_watcher_result(if_watcher_res).await {
+                    if let Some(id) = self.handle_interface_watcher_result(if_watcher_res).await {
                         probe_futures.push(fasync::Interval::new(PROBE_PERIOD).map(move |()| id).into_future());
                     }
                 },
                 neigh_res = neigh_watcher_stream.try_next() => {
                     let event = neigh_res
-                        .unwrap_or_else(|err| exit_with_fidl_error(err))
-                        .ok_or(anyhow!("neighbor event stream ended"))?;
+                        .unwrap_or_else(|err| exit_with_anyhow_error(
+                            anyhow!("neighbor watcher event stream fidl error: {err}")
+                        ))
+                        .unwrap_or_else(|| exit_with_anyhow_error(
+                            anyhow!("neighbor event stream ended")
+                        ));
                     self.neighbor_cache.process_neighbor_event(event);
                 }
                 route_v4_res = ipv4_route_event_stream.try_next() => {
                     let event = route_v4_res
-                        .unwrap_or_else(|err| exit_with_route_watch_error(err))
-                        .ok_or(anyhow!("ipv4 route event stream ended"))?;
+                        .unwrap_or_else(|err| exit_with_anyhow_error(
+                            anyhow!("ipv4 route watch error: {err}")
+                        ))
+                        .unwrap_or_else(|| exit_with_anyhow_error(
+                            anyhow!("ipv4 route event stream ended")
+                        ));
                     self.handle_route_watcher_event(event);
                 }
                 route_v6_res = ipv6_route_event_stream.try_next() => {
                     let event = route_v6_res
-                        .unwrap_or_else(|err| exit_with_route_watch_error(err))
-                        .ok_or(anyhow!("ipv6 route event stream ended"))?;
+                        .unwrap_or_else(|err| exit_with_anyhow_error(
+                            anyhow!("ipv6 route watch error: {err}")
+                        ))
+                        .unwrap_or_else(|| exit_with_anyhow_error(
+                            anyhow!("ipv6 route event stream ended")
+                        ));
                     self.handle_route_watcher_event(event);
                 }
                 report = report_stream.next() => {
-                    let () = report.context("periodic timer for reporting unexpectedly ended")?;
+                    let () = report
+                        .context("periodic timer for reporting unexpectedly ended")
+                        .unwrap_or_else(|err| exit_with_anyhow_error(err));
                     let () = self.monitor.report_state();
                 },
                 probe = probe_futures.select_next_some() => {
@@ -356,8 +384,8 @@ impl EventLoop {
                             }
                         }
                         (None, _) => {
-                            return Err(anyhow!(
-                                "period timer for probing reachability unexpectedly ended"
+                            exit_with_anyhow_error(anyhow!(
+                                "probe timer for probing reachability unexpectedly ended"
                             ));
                         }
                     }
@@ -368,9 +396,7 @@ impl EventLoop {
                 netcheck_res = netcheck_futures.select_next_some() => {
                     self.handle_netcheck_response(netcheck_res).await;
                 },
-                () = telemetry_fut => {
-                    error!("unexpectedly stopped serving telemetry");
-                },
+                () = telemetry_fut => exit_with_anyhow_error(anyhow!("unexpectedly stopped serving telemetry")),
             }
         }
     }
@@ -378,14 +404,18 @@ impl EventLoop {
     async fn handle_interface_watcher_result(
         &mut self,
         if_watcher_res: Result<Option<fidl_fuchsia_net_interfaces::Event>, fidl::Error>,
-    ) -> Result<Option<u64>, anyhow::Error> {
+    ) -> Option<u64> {
         let event = if_watcher_res
-            .unwrap_or_else(|err| exit_with_fidl_error(err))
-            .ok_or(anyhow!("interface watcher stream unexpectedly ended"))?;
+            .unwrap_or_else(|err| {
+                exit_with_anyhow_error(anyhow!("interface watcher event stream fidl error: {err}"))
+            })
+            .unwrap_or_else(|| {
+                exit_with_anyhow_error(anyhow!("interface watcher stream unexpectedly ended"))
+            });
         let discovered_id = self
             .handle_interface_watcher_event(event)
             .await
-            .context("failed to handle interface watcher event")?;
+            .unwrap_or_else(|err| exit_with_anyhow_error(err));
         if let Some(id) = discovered_id {
             if let Some(telemetry_sender) = &self.telemetry_sender {
                 let has_default_ipv4_route =
@@ -397,9 +427,9 @@ impl EventLoop {
                     has_default_ipv6_route,
                 });
             }
-            return Ok(Some(id));
+            return Some(id);
         }
-        Ok(None)
+        None
     }
 
     async fn handle_interface_watcher_event(
@@ -625,19 +655,11 @@ impl EventLoop {
     }
 }
 
-/// If we can't reach netstack via fidl, log an error and exit.
+/// If we encounter an unrecoverable state, log an error and exit.
 //
 // TODO(https://fxbug.dev/42070352): add a test that works as intended.
-fn exit_with_fidl_error(cause: fidl::Error) -> ! {
-    error!(%cause, "exiting due to fidl error");
-    std::process::exit(1);
-}
-
-/// If we can't get route events from netstack, log an error and exit.
-//
-// TODO(https://fxbug.dev/42070352): add a test that works as intended.
-fn exit_with_route_watch_error(cause: fnet_routes_ext::WatchError) -> ! {
-    error!(%cause, "exiting due to route watch error");
+fn exit_with_anyhow_error(cause: anyhow::Error) -> ! {
+    error!(%cause, "exiting due to error");
     std::process::exit(1);
 }
 
@@ -661,14 +683,6 @@ mod tests {
         let () = monitor.set_inspector(inspector);
 
         return EventLoop::new(monitor, handler, receiver, inspector);
-    }
-
-    #[fuchsia::test]
-    async fn test_handle_interface_watcher_result_error() {
-        let mut event_loop = create_eventloop();
-
-        let event_res = Ok(None);
-        assert!(event_loop.handle_interface_watcher_result(event_res).await.is_err());
     }
 
     #[fuchsia::test]
@@ -702,17 +716,11 @@ mod tests {
         };
 
         let event_res = Ok(Some(Event::Existing(props.clone())));
-        assert_eq!(
-            event_loop.handle_interface_watcher_result(event_res).await.unwrap_or_default(),
-            Some(12345)
-        );
+        assert_eq!(event_loop.handle_interface_watcher_result(event_res).await, Some(12345));
 
         props.id = Some(54321);
         let event_res = Ok(Some(Event::Added(props.clone())));
-        assert_eq!(
-            event_loop.handle_interface_watcher_result(event_res).await.unwrap_or_default(),
-            Some(54321)
-        );
+        assert_eq!(event_loop.handle_interface_watcher_result(event_res).await, Some(54321));
     }
 
     #[fuchsia::test]
@@ -746,16 +754,10 @@ mod tests {
         };
 
         let event_res = Ok(Some(Event::Existing(props.clone())));
-        assert_eq!(
-            event_loop.handle_interface_watcher_result(event_res).await.unwrap_or_default(),
-            Some(12345)
-        );
+        assert_eq!(event_loop.handle_interface_watcher_result(event_res).await, Some(12345));
 
         props.id = Some(54321);
         let event_res = Ok(Some(Event::Added(props.clone())));
-        assert_eq!(
-            event_loop.handle_interface_watcher_result(event_res).await.unwrap_or_default(),
-            Some(54321)
-        );
+        assert_eq!(event_loop.handle_interface_watcher_result(event_res).await, Some(54321));
     }
 }
