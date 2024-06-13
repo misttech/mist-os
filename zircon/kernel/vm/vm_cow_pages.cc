@@ -256,6 +256,7 @@ zx_status_t VmCowPages::CacheAllocPage(uint alloc_flags, vm_page_t** p, paddr_t*
 void VmCowPages::CacheFree(list_node_t* list) {
   if (!page_cache_) {
     pmm_free(list);
+    return;
   }
 
   page_cache_.Free(ktl::move(*list));
@@ -264,6 +265,7 @@ void VmCowPages::CacheFree(list_node_t* list) {
 void VmCowPages::CacheFree(vm_page_t* p) {
   if (!page_cache_) {
     pmm_free_page(p);
+    return;
   }
 
   page_cache::PageCache::PageList list;
