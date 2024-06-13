@@ -12,9 +12,11 @@
 #include <cstring>
 #include <iterator>
 #include <memory>
+#include <sstream>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
+#include <fbl/string_buffer.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
@@ -44,6 +46,64 @@ bool base_validate(const T* block) {
 }  // namespace
 
 namespace edid {
+
+namespace {
+
+// Unpacks the ID Manufacturer Name Field specified in the base EDID.
+//
+// The ID Manufacturer name is a 3-character code containing three upper case
+// letters. They are encoded in the base EDID byte 08h and 09h based on a 5-bit
+// compressed ASCII code.
+//
+// E-EDID standard Section 3.4.1 "ID Manufacture Name", page 21.
+std::string UnpackIdManufacturerName(uint8_t byte_08h, uint8_t byte_09h) {
+  int compressed_character1 = (byte_08h & 0b01111100) >> 2;
+  int compressed_character2 = ((byte_08h & 0b00000011) << 3) | ((byte_09h & 0b11100000) >> 5);
+  int compressed_character3 = byte_09h & 0b0011111;
+
+  // Some EDIDs may contain invalid manufacturer name codes. We replace the
+  // invalid characters with the fallback character 'A'.
+  if (compressed_character1 < 1 || compressed_character1 > 26) {
+    zxlogf(WARNING, "Invalid manufacturer name code character #1: %d", compressed_character1);
+    compressed_character1 = 1;
+  }
+  if (compressed_character2 < 1 || compressed_character2 > 26) {
+    zxlogf(WARNING, "Invalid manufacturer name code character #2: %d", compressed_character2);
+    compressed_character2 = 1;
+  }
+  if (compressed_character3 < 1 || compressed_character3 > 26) {
+    zxlogf(WARNING, "Invalid manufacturer name code character #3: %d", compressed_character3);
+    compressed_character3 = 1;
+  }
+
+  // The cast won't overflow because the compressed_character values are
+  // guaranteed to be in the range [1, 26].
+  const char characters[3] = {
+      static_cast<char>(compressed_character1 + 'A' - 1),
+      static_cast<char>(compressed_character2 + 'A' - 1),
+      static_cast<char>(compressed_character3 + 'A' - 1),
+  };
+  return std::string(characters, std::size(characters));
+}
+
+bool IsDisplayDescriptor(const Descriptor& descriptor) {
+  // A Descriptor can be either a Detailed Timing Descriptor or a Display
+  // Descriptor. For Display Descriptors, its first two bytes must be 0x0000,
+  // while for Detailed Timing Descriptors the first two bytes
+  // (`pixel_clock_10khz`) must not be 0x0000.
+  //
+  // Accessing any field within the union before figuring out its underlying
+  // type is an undefined behavior in C++. So we use reinterpret_cast to access
+  // its first two bytes.
+  const uint8_t* descriptor_bytes = reinterpret_cast<const uint8_t*>(&descriptor);
+
+  // sizeof(Descriptor) > 2, so it's always valid to access the first two bytes.
+  const uint8_t descriptor_type_indicator_low_byte = *descriptor_bytes;
+  const uint8_t descriptor_type_indicator_high_byte = *(descriptor_bytes + 1);
+  return descriptor_type_indicator_low_byte == 0x00 && descriptor_type_indicator_high_byte == 0x00;
+}
+
+}  // namespace
 
 const char* GetEisaVendorName(uint16_t manufacturer_name_code) {
   uint8_t c1 = static_cast<uint8_t>((((manufacturer_name_code >> 8) & 0x7c) >> 2) + 'A' - 1);
@@ -160,7 +220,7 @@ fit::result<const char*> Edid::Init(void* ctx, ddc_i2c_transact transact) {
     return read_edid_result.take_error();
   }
   bytes_ = std::move(read_edid_result).value();
-  return Initialize();
+  return Validate();
 }
 
 fit::result<const char*> Edid::Init(cpp20::span<const uint8_t> bytes) {
@@ -177,10 +237,108 @@ fit::result<const char*> Edid::Init(cpp20::span<const uint8_t> bytes) {
   }
   std::copy(bytes.begin(), bytes.end(), bytes_.begin());
 
-  return Initialize();
+  return Validate();
 }
 
-fit::result<const char*> Edid::Initialize() {
+std::string Edid::GetManufacturerId() const {
+  const BaseEdid& base = base_edid();
+  return UnpackIdManufacturerName(base.manufacturer_id1, base.manufacturer_id2);
+}
+
+const char* Edid::GetManufacturerName() const {
+  std::string manufacturer_id = GetManufacturerId();
+  return lookup_eisa_vid(EISA_ID(manufacturer_id[0], manufacturer_id[1], manufacturer_id[2]));
+}
+
+std::string Edid::GetDisplayProductName() const {
+  for (auto it = internal::descriptor_iterator(this); it.is_valid(); ++it) {
+    const Descriptor* descriptor_raw = it.get();
+    ZX_DEBUG_ASSERT(descriptor_raw != nullptr);
+
+    // `descriptor` may not be aligned correctly. Copy the bytes to a locally-
+    // constructed `Descriptor` first.
+    Descriptor descriptor;
+    memcpy(&descriptor, descriptor_raw, sizeof(Descriptor));
+
+    if (!IsDisplayDescriptor(descriptor)) {
+      continue;
+    }
+
+    const Descriptor::Monitor& display_descriptor = descriptor.monitor;
+    if (display_descriptor.type == Descriptor::Monitor::kName) {
+      std::string_view name(reinterpret_cast<const char*>(display_descriptor.data),
+                            std::size(display_descriptor.data));
+
+      // The E-EDID standard requires that the display product name data string
+      // is terminated with ASCII code 0Ah (line feed) if there are less than
+      // 13 characters in the string. Thus, we truncate the string at the first
+      // line feed character.
+      //
+      // E-EDID standard, Section 3.10.3.4 "Display Product Name (ASCII) String
+      // Descriptor Definition", page 44.
+      static constexpr char kStringTerminatorCharacter = 0x0a;
+      size_t terminator_pos = name.find(kStringTerminatorCharacter);
+      std::string_view actual_name = name.substr(/*pos=*/0, /*n=*/terminator_pos);
+
+      return std::string(actual_name);
+    }
+  }
+
+  // No display product name is provided in the Display Descriptors. Return
+  // an empty string.
+  return {};
+}
+
+std::string Edid::GetDisplayProductSerialNumber() const {
+  for (auto it = internal::descriptor_iterator(this); it.is_valid(); ++it) {
+    const Descriptor* descriptor_raw = it.get();
+    ZX_DEBUG_ASSERT(descriptor_raw != nullptr);
+
+    // `descriptor` may not be aligned correctly. Copy the bytes to a locally-
+    // constructed `Descriptor` first.
+    Descriptor descriptor;
+    memcpy(&descriptor, descriptor_raw, sizeof(Descriptor));
+
+    if (!IsDisplayDescriptor(descriptor)) {
+      continue;
+    }
+
+    const Descriptor::Monitor& display_descriptor = descriptor.monitor;
+    if (display_descriptor.type == Descriptor::Monitor::kSerial) {
+      // The E-EDID standard requires that the serial number data string must be
+      // ASCII-encoded. So `data` can be directly casted to a string_view.
+      //
+      // E-EDID standard, Section 3.10.3.1 "Display Product Serial Number
+      // Descriptor Definition", page 38.
+      std::string_view serial_number(reinterpret_cast<const char*>(display_descriptor.data),
+                                     std::size(display_descriptor.data));
+
+      // The E-EDID standard requires that the serial number data string must be
+      // terminated with ASCII code 0Ah (line feed) if there are less than 13
+      // characters in the string.
+      //
+      // E-EDID standard, Section 3.10.3.1 "Display Product Serial Number
+      // Descriptor Definition", page 38.
+      static constexpr char kStringTerminatorCharacter = 0x0a;
+      size_t terminator_pos = serial_number.find(kStringTerminatorCharacter);
+      std::string_view actual_serial_number = serial_number.substr(/*pos=*/0, /*n=*/terminator_pos);
+
+      return std::string(actual_serial_number);
+    }
+  }
+
+  // No display product serial number is provided in the Display Descriptors.
+  // Fall back to the "ID Serial Number" field defined in the base EDID.
+  //
+  // E-EDID standard, Section 3.4.3 "ID Serial Number", page 22.
+  std::ostringstream fallback_serial_number;
+  const BaseEdid& base = base_edid();
+
+  fallback_serial_number << base.serial_number;
+  return fallback_serial_number.str();
+}
+
+fit::result<const char*> Edid::Validate() {
   const BaseEdid& base = base_edid();
   if (!base.validate()) {
     return fit::error("Failed to validate base edid");
@@ -199,47 +357,6 @@ fit::result<const char*> Edid::Initialize() {
       }
     }
   }
-
-  monitor_serial_[0] = monitor_name_[0] = '\0';
-  for (auto it = internal::descriptor_iterator(this); it.is_valid(); ++it) {
-    char* dest;
-    if (it->timing.pixel_clock_10khz != 0) {
-      continue;
-    } else if (it->monitor.type == Descriptor::Monitor::kName) {
-      dest = monitor_name_;
-    } else if (it->monitor.type == Descriptor::Monitor::kSerial) {
-      dest = monitor_serial_;
-    } else {
-      continue;
-    }
-
-    // Look for '\n' if it exists, otherwise take the whole string.
-    uint32_t len;
-    for (len = 0; len < sizeof(Descriptor::Monitor::data) && it->monitor.data[len] != 0x0A; ++len) {
-      // Empty body
-    }
-
-    // Copy the string and remember to null-terminate.
-    memcpy(dest, it->monitor.data, len);
-    dest[len] = '\0';
-  }
-
-  // If we didn't find a valid serial descriptor, use the base serial number
-  if (monitor_serial_[0] == '\0') {
-    sprintf(monitor_serial_, "%d", base.serial_number);
-  }
-
-  uint8_t c1 = static_cast<uint8_t>(((base.manufacturer_id1 & 0x7c) >> 2) + 'A' - 1);
-  uint8_t c2 = static_cast<uint8_t>(
-      (((base.manufacturer_id1 & 0x03) << 3) | (base.manufacturer_id2 & 0xe0) >> 5) + 'A' - 1);
-  uint8_t c3 = static_cast<uint8_t>(((base.manufacturer_id2 & 0x1f)) + 'A' - 1);
-
-  manufacturer_id_[0] = c1;
-  manufacturer_id_[1] = c2;
-  manufacturer_id_[2] = c3;
-  manufacturer_id_[3] = '\0';
-  manufacturer_name_ = lookup_eisa_vid(EISA_ID(c1, c2, c3));
-
   return fit::ok();
 }
 

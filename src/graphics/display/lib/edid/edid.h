@@ -14,6 +14,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 
 #include <fbl/vector.h>
@@ -21,6 +22,16 @@
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/internal/iterators.h"
+
+// References
+//
+// The code contains references to the following documents.
+//
+// - VESA Enhanced Extended Display Identification Data (E-EDID) Standard,
+//   Video Electronics Standards Association (VESA), Release A, Revision 2,
+//   dated September 25, 2006, revised December 31, 2020.
+//   Referenced as "E-EDID standard".
+//   Available at https://vesa.org/vesa-standards/ .
 
 namespace edid {
 
@@ -337,15 +348,31 @@ class Edid {
   size_t edid_length() const { return bytes_.size(); }
 
   uint16_t product_code() const { return base_edid().product_code; }
-  uint16_t manufacturer_name_code() const {
-    return static_cast<uint16_t>(base_edid().manufacturer_id1 << 8 | base_edid().manufacturer_id2);
-  }
   bool is_standard_rgb() const { return base_edid().standard_srgb(); }
   bool supports_basic_audio() const;
-  const char* manufacturer_id() const { return manufacturer_id_; }
-  const char* manufacturer_name() const { return manufacturer_name_; }
-  const char* monitor_name() const { return monitor_name_; }
-  const char* monitor_serial() const { return monitor_serial_; }
+
+  // Returns the display manufacturer's ISA / UEFI Plug and Play device
+  // identifier (PNPID).
+  std::string GetManufacturerId() const;
+
+  // Returns an empty string ("") if the manufacturer is not found.
+  //
+  // Otherwise, returns the name of the display product manufacturer as
+  // registered in the PNP ID Registry from the Unified Extensible Firmware
+  // Interface (UEFI) Forum (https://uefi.org/PNP_ID_List).
+  //
+  // The returned string is guaranteed to have a static storage duration.
+  const char* GetManufacturerName() const;
+
+  // Returns the display product name stored in the Display Product Name String
+  // Descriptor, defined in the E-EDID standard, Section 3.10.3.4 "Display
+  // Product Name (ASCII) String Descriptor Definition (tag #FCh)", page 44.
+  std::string GetDisplayProductName() const;
+
+  // Returns the display product serial number stored in the Display Product
+  // Serial Number Descriptor, defined in the E-EDID standard, Section 3.10.3.2
+  // "Display Product Serial Number Descriptor Definition (tag #FFh)".
+  std::string GetDisplayProductSerialNumber() const;
 
   // Guaranteed to be >= 0 and < 2^16.
   int horizontal_size_mm() const;
@@ -364,14 +391,9 @@ class Edid {
   template <typename T>
   const T* GetBlock(uint8_t block_num) const;
 
-  fit::result<const char*> Initialize();
+  fit::result<const char*> Validate();
 
   fbl::Vector<uint8_t> bytes_;
-
-  char manufacturer_id_[sizeof(Descriptor::Monitor::data) + 1];
-  char monitor_name_[sizeof(Descriptor::Monitor::data) + 1];
-  char monitor_serial_[sizeof(Descriptor::Monitor::data) + 1];
-  const char* manufacturer_name_ = nullptr;
 };
 
 template <typename T>

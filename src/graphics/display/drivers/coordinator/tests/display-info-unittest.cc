@@ -48,9 +48,9 @@ TEST(DisplayInfo, InitializeWithEdidValueSingleBlock) {
 
   const edid::Edid& edid_base = display_info->edid->base;
   EXPECT_EQ(edid_base.edid_length(), edid::kHpZr30wEdid.size());
-  EXPECT_STREQ(edid_base.manufacturer_name(), "HEWLETT PACKARD");
+  EXPECT_EQ(edid_base.GetManufacturerName(), std::string("HEWLETT PACKARD"));
   EXPECT_EQ(edid_base.product_code(), 10348u);
-  EXPECT_STREQ(edid_base.monitor_serial(), "CN413010YH");
+  EXPECT_EQ(edid_base.GetDisplayProductSerialNumber(), std::string("CN413010YH"));
 }
 
 TEST(DisplayInfo, InitializeWithEdidValueMultipleBlocks) {
@@ -83,9 +83,9 @@ TEST(DisplayInfo, InitializeWithEdidValueMultipleBlocks) {
 
   const edid::Edid& edid_base = display_info->edid->base;
   EXPECT_EQ(edid_base.edid_length(), edid::kSamsungCrg9Edid.size());
-  EXPECT_STREQ(edid_base.manufacturer_name(), "SAMSUNG ELECTRIC COMPANY");
+  EXPECT_EQ(edid_base.GetManufacturerName(), std::string("SAMSUNG ELECTRIC COMPANY"));
   EXPECT_EQ(edid_base.product_code(), 28754u);
-  EXPECT_STREQ(edid_base.monitor_serial(), "H4ZR701271");
+  EXPECT_EQ(edid_base.GetDisplayProductSerialNumber(), std::string("H4ZR701271"));
 }
 
 TEST(DisplayInfo, InitializeWithEdidValueOfInvalidLength) {

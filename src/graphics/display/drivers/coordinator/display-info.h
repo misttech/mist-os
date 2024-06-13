@@ -57,13 +57,14 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
   int GetVerticalSizeMm() const;
 
   // Returns an empty view if the information is not available.
+  // The returned string view is guaranteed to be of static storage duration.
   std::string_view GetManufacturerName() const;
 
-  // Returns an empty view if the information is not available.
-  std::string_view GetMonitorName() const;
+  // Returns an empty string if the information is not available.
+  std::string GetMonitorName() const;
 
   // Returns an empty string if the information is not available.
-  std::string_view GetMonitorSerial() const;
+  std::string GetMonitorSerial() const;
 
   struct Edid {
     edid::Edid base;

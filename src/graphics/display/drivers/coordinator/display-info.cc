@@ -172,10 +172,17 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
 
   if (zxlog_level_enabled(DEBUG)) {
     const auto& edid = out->edid->base;
+    std::string manufacturer_id = edid.GetManufacturerId();
+    const char* manufacturer_name = edid.GetManufacturerName();
     const char* manufacturer =
-        strlen(edid.manufacturer_name()) ? edid.manufacturer_name() : edid.manufacturer_id();
+        (strlen(manufacturer_name) > 0) ? manufacturer_name : manufacturer_id.c_str();
+
+    std::string display_product_name = edid.GetDisplayProductName();
+    std::string display_product_serial_number = edid.GetDisplayProductSerialNumber();
+
     zxlogf(DEBUG, "Manufacturer \"%s\", product %d, name \"%s\", serial \"%s\"", manufacturer,
-           edid.product_code(), edid.monitor_name(), edid.monitor_serial());
+           edid.product_code(), display_product_name.c_str(),
+           display_product_serial_number.c_str());
     edid.Print([](const char* str) { zxlogf(DEBUG, "%s", str); });
   }
   return zx::ok(std::move(out));
@@ -199,29 +206,22 @@ std::string_view DisplayInfo::GetManufacturerName() const {
   if (!edid.has_value()) {
     return std::string_view();
   }
-
-  std::string_view manufacturer_name(edid->base.manufacturer_name());
-  if (!manufacturer_name.empty()) {
-    return manufacturer_name;
-  }
-
-  return std::string_view(edid->base.manufacturer_id());
+  const char* manufacturer_name = edid->base.GetManufacturerName();
+  return std::string_view(manufacturer_name);
 }
 
-std::string_view DisplayInfo::GetMonitorName() const {
+std::string DisplayInfo::GetMonitorName() const {
   if (!edid.has_value()) {
-    return std::string_view();
+    return {};
   }
-
-  return std::string_view(edid->base.monitor_name());
+  return edid->base.GetDisplayProductName();
 }
 
-std::string_view DisplayInfo::GetMonitorSerial() const {
+std::string DisplayInfo::GetMonitorSerial() const {
   if (!edid.has_value()) {
-    return std::string_view();
+    return {};
   }
-
-  return std::string_view(edid->base.monitor_serial());
+  return edid->base.GetDisplayProductSerialNumber();
 }
 
 }  // namespace display

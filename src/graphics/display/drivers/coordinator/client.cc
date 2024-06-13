@@ -1251,8 +1251,8 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
         controller_->FindDisplayInfo(added_display_id, [&](const DisplayInfo& display_info) {
           info.manufacturer_name =
               fidl::StringView::FromExternal(display_info.GetManufacturerName());
-          info.monitor_name = fidl::StringView::FromExternal(display_info.GetMonitorName());
-          info.monitor_serial = fidl::StringView::FromExternal(display_info.GetMonitorSerial());
+          info.monitor_name = fidl::StringView(arena, display_info.GetMonitorName());
+          info.monitor_serial = fidl::StringView(arena, display_info.GetMonitorSerial());
 
           // The return value of `GetHorizontalSizeMm()` is guaranteed to be
           // >= 0 and < 2^16 < std::numeric_limits<uint32_t>::max(). So it can
