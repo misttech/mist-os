@@ -132,5 +132,5 @@ pub async fn main() {
     let signals = fasync::OnSignals::new(&proc, zx::Signals::PROCESS_TERMINATED)
         .await
         .expect("failed to observe process termination signals");
-    panic!("netstack exited unexpectedly with {signals:?}");
+    println!("netstack exited unexpectedly with {signals:?}");
 }
