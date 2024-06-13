@@ -1386,7 +1386,7 @@ dependencies = [
  "netlink-packet-route",
  "netlink-packet-sock-diag",
  "netlink-packet-utils",
- "nix",
+ "nix 0.26.2",
  "nom",
  "nom_locate",
  "notify",
@@ -1444,6 +1444,7 @@ dependencies = [
  "rustls",
  "rustls-native-certs",
  "rustyline",
+ "rutabaga_gfx",
  "schemars",
  "scopeguard",
  "scrypt",
@@ -1533,7 +1534,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "libc",
- "nix",
+ "nix 0.26.2",
  "serde",
  "slab",
  "tokio",
@@ -2289,6 +2290,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
+dependencies = [
+ "autocfg 1.1.0",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2427,6 +2437,18 @@ dependencies = [
  "memoffset 0.7.1",
  "pin-utils",
  "static_assertions",
+]
+
+[[package]]
+name = "nix"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
+dependencies = [
+ "bitflags 2.4.1",
+ "cfg-if 1.0.0",
+ "libc",
+ "memoffset 0.9.1",
 ]
 
 [[package]]
@@ -2957,6 +2979,10 @@ dependencies = [
  "der",
  "spki",
 ]
+
+[[package]]
+name = "pkg-config"
+version = "0.3.30"
 
 [[package]]
 name = "png"
@@ -3521,6 +3547,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adad44e29e4c806119491a7f06f03de4d1af22c3a680dd47f1e6e179439d1f56"
 
 [[package]]
+name = "remain"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46aef80f842736de545ada6ec65b81ee91504efd6853f4b96de7414c42ae7443"
+dependencies = [
+ "proc-macro2 1.0.79",
+ "quote 1.0.35",
+ "syn 2.0.55",
+]
+
+[[package]]
 name = "remove_dir_all"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3764,10 +3801,28 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix",
+ "nix 0.26.2",
  "unicode-segmentation",
  "unicode-width",
  "utf8parse",
+]
+
+[[package]]
+name = "rutabaga_gfx"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe2630cf42077f1d55dbf6ce76578c89ed3fc8b9717864d09faf875d00d1a0c2"
+dependencies = [
+ "anyhow",
+ "cfg-if 1.0.0",
+ "libc",
+ "log",
+ "nix 0.27.1",
+ "pkg-config",
+ "remain",
+ "thiserror",
+ "winapi",
+ "zerocopy 0.7.15",
 ]
 
 [[package]]
@@ -5122,6 +5177,7 @@ version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81ba595b9f2772fbee2312de30eeb80ec773b4cb2f1e8098db024afadda6c06f"
 dependencies = [
+ "byteorder",
  "zerocopy-derive 0.7.15",
 ]
 

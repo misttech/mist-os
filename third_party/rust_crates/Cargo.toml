@@ -187,6 +187,7 @@ ring = "0.16.20"
 rustc-hash = "1.0.1"
 rustls = { version = "0.19.1", features = ["dangerous_configuration"] }
 rustyline = "2.1.0"
+rutabaga_gfx = { version = "0.1.3", features = ["gfxstream"] }
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
 scopeguard = "1.1.0"
 scrypt = "0.10.0"
@@ -351,6 +352,7 @@ js-sys = { path = "empty/js-sys" }
 miow = { path = "empty/miow" }
 ntapi = { path = "empty/ntapi" }
 output_vt100 = { path = "empty/output_vt100" }
+pkg-config = { path = "empty/pkg-config" }
 redox_syscall = { path = "empty/redox_syscall" }
 rustversion = { path = "empty/rustversion" }
 wasi-0_10_1 = { path = "empty/wasi-0.10.1", package = "wasi" }
@@ -627,6 +629,8 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 [gn.package.memoffset."0.7.1"]
 rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
 
+[gn.package.memoffset."0.9.1"]
+rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
 
 [gn.package.mockall."0.9.0"]
 deps = ["//build/validate:non_production_tag"]
@@ -772,6 +776,9 @@ target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "ic
 [gn.package.rust_icu_ustring."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+
+[gn.package.rutabaga_gfx."0.1.3"]
+# Has build script but no config needed.
 
 [gn.package.ryu."1.0.3"]
 rustflags = ["--cfg=integer128", "--cfg=must_use_return", "--cfg=maybe_uninit"]
