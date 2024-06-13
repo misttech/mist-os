@@ -93,7 +93,7 @@ pub mod filter {
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
         FilterBindingsTypes, Hook, InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines,
         PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule, TransparentProxy,
-        TransportProtocolMatcher, UninstalledRoutine, ValidationError,
+        TransportProtocolMatcher, Tuple, UninstalledRoutine, ValidationError,
     };
 }
 
@@ -191,9 +191,9 @@ pub mod tcp {
     pub use netstack3_tcp::{
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-        Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload, SetDeviceError,
-        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
-        TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
+        OriginalDestinationError, Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
+        SetDeviceError, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
+        TcpBindingsTypes, TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 

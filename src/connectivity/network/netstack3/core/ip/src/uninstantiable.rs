@@ -6,6 +6,8 @@ use explicit::UnreachableExt as _;
 use net_types::SpecifiedAddr;
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{AnyDevice, DeviceIdContext, EitherDeviceId, UninstantiableWrapper};
+use netstack3_filter::Tuple;
+
 use packet::{BufferMut, Serializer};
 
 use crate::internal::base::{BaseTransportIpContext, HopLimits, IpExt, IpLayerIpExt};
@@ -34,6 +36,9 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
         _dst: SpecifiedAddr<I::Addr>,
         _device: Option<&Self::DeviceId>,
     ) {
+        self.uninstantiable_unreachable()
+    }
+    fn get_original_destination(&mut self, _tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
         self.uninstantiable_unreachable()
     }
 }

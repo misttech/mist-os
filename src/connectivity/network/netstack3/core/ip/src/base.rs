@@ -28,8 +28,8 @@ use netstack3_base::{
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
-    FilterHandler as _, FilterIpMetadata, FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket,
-    NestedWithInnerIpPacket, TransportPacketSerializer,
+    FilterHandler as _, FilterIpContext, FilterIpMetadata, FilterTimerId, ForwardedPacket,
+    IngressVerdict, IpPacket, NatType, NestedWithInnerIpPacket, TransportPacketSerializer, Tuple,
 };
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
 use packet_formats::error::IpParseError;
@@ -297,6 +297,11 @@ pub trait BaseTransportIpContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     );
+
+    /// Gets the original destination for the tracked connection indexed by
+    /// `tuple`, which includes the source and destination addresses and
+    /// transport-layer ports as well as the transport protocol number.
+    fn get_original_destination(&mut self, tuple: &Tuple<I>) -> Option<(I::Addr, u16)>;
 }
 
 /// A marker trait for the traits required by the transport layer from the IP
@@ -383,10 +388,11 @@ where
 
 impl<
         I: IpLayerIpExt,
-        BC,
+        BC: FilterBindingsContext,
         CC: IpDeviceContext<I, BC>
             + IpSocketHandler<I, BC>
             + IpStateContext<I, BC>
+            + FilterIpContext<I, BC>
             + UseTransportIpContextBlanket,
     > BaseTransportIpContext<I, BC> for CC
 {
@@ -444,6 +450,21 @@ impl<
                 debug!("can't confirm {dst:?}@{device:?} as reachable: no route");
             }
         }
+    }
+
+    fn get_original_destination(&mut self, tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
+        self.with_filter_state(|state| {
+            let conn = state.conntrack.get_connection(&tuple)?;
+
+            // If NAT has not been configured for the connection, return None.
+            let _: NatType = conn.external_data().nat_type()?;
+
+            // The tuple marking the original direction of the connection is
+            // never modified by NAT. This means it can be used to recover the
+            // destination before NAT was performed.
+            let original = conn.original_tuple();
+            Some((original.dst_addr, original.dst_port_or_id))
+        })
     }
 }
 

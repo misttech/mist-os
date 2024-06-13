@@ -23,9 +23,11 @@ use logic::nat::NatConfig;
 pub type ConntrackConnection<I, BT> = conntrack::Connection<I, BT, NatConfig>;
 
 pub use api::FilterApi;
+pub use conntrack::{Table, Tuple};
 pub use context::{
     FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext, NatContext,
 };
+pub use logic::nat::NatType;
 pub use logic::{
     FilterHandler, FilterImpl, FilterTimerId, IngressVerdict, ProofOfEgressCheck, Verdict,
 };

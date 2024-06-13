@@ -88,6 +88,13 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Table<I, BT, E> {
     pub(crate) fn contains_tuple(&self, tuple: &Tuple<I>) -> bool {
         self.inner.lock().table.contains_key(tuple)
     }
+
+    /// Returns a [`Connection`] for the flow indexed by `tuple`, if one exists.
+    pub fn get_connection(&self, tuple: &Tuple<I>) -> Option<Connection<I, BT, E>> {
+        let guard = self.inner.lock();
+        let conn = guard.table.get(&tuple)?;
+        Some(Connection::Shared(conn.clone()))
+    }
 }
 
 fn schedule_gc<BC>(bindings_ctx: &mut BC, timer: &mut BC::Timer)
@@ -329,11 +336,16 @@ impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for Table<I,
 #[derive(Debug, Clone, PartialEq, Eq, Hash, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct Tuple<I: IpExt> {
-    pub(crate) protocol: I::Proto,
-    pub(crate) src_addr: I::Addr,
-    pub(crate) dst_addr: I::Addr,
-    pub(crate) src_port_or_id: u16,
-    pub(crate) dst_port_or_id: u16,
+    /// The IP protocol number of the flow.
+    pub protocol: I::Proto,
+    /// The source IP address of the flow.
+    pub src_addr: I::Addr,
+    /// The destination IP address of the flow.
+    pub dst_addr: I::Addr,
+    /// The transport-layer source port or ID of the flow.
+    pub src_port_or_id: u16,
+    /// The transport-layer destination port or ID of the flow.
+    pub dst_port_or_id: u16,
 }
 
 impl<I: IpExt> Tuple<I> {
@@ -436,7 +448,7 @@ pub enum Connection<I: IpExt, BT: FilterBindingsTypes, E> {
 
 impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
     /// Returns the tuple of the original direction of this connection.
-    pub(crate) fn original_tuple(&self) -> &Tuple<I> {
+    pub fn original_tuple(&self) -> &Tuple<I> {
         match self {
             Connection::Exclusive(c) => &c.inner.original_tuple,
             Connection::Shared(c) => &c.inner.original_tuple,
@@ -452,7 +464,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
     }
 
     /// Returns a reference to the [`Connection::external_data`] field.
-    pub(crate) fn external_data(&self) -> &E {
+    pub fn external_data(&self) -> &E {
         match self {
             Connection::Exclusive(c) => &c.inner.external_data,
             Connection::Shared(c) => &c.inner.external_data,

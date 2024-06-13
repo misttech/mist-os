@@ -56,12 +56,13 @@ use netstack3_base::{
     RemoveResourceResult, RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes,
     TimerContext, TracingContext, WeakDeviceIdentifier, ZonedAddressError,
 };
+use netstack3_filter::Tuple;
 use netstack3_ip::icmp::IcmpErrorCode;
 use netstack3_ip::socket::{
     DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
     IpSockCreationError, IpSocketHandler,
 };
-use netstack3_ip::{self as ip, IpExt, TransportIpContext};
+use netstack3_ip::{self as ip, BaseTransportIpContext, IpExt, TransportIpContext};
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
@@ -109,6 +110,11 @@ pub trait DualStackBaseIpExt:
     /// be just [`ListenerIpAddr`] for [`Ipv4`], but a [`DualStackListenerIpAddr`]
     /// for [`Ipv6`].
     type ListenerIpAddr: Send + Sync + Debug + Clone;
+
+    /// The type for the original destination address of a connection. For
+    /// [`Ipv4`], this is always an [`Ipv4Addr`], and for [`Ipv6`], it is an
+    /// [`EitherStack<Ipv6Addr, Ipv4Addr>`].
+    type OriginalDstAddr;
 
     /// IP options unique to a particular IP version.
     type DualStackIpOptions: Send + Sync + Debug + Default + Clone + Copy;
@@ -169,6 +175,12 @@ pub trait DualStackBaseIpExt:
         demux_id: Self::DemuxSocketId<CC::WeakDeviceId, BC>,
     ) where
         Self::OtherVersion: DualStackBaseIpExt;
+
+    /// Take the original destination of the socket's connection and return an
+    /// address that is always in this socket's stack. For [`Ipv4`], this is a
+    /// no-op, but for [`Ipv6`] it may require mapping a dual-stack IPv4 address
+    /// into the IPv6 address space.
+    fn get_original_dst(addr: Self::OriginalDstAddr) -> Self::Addr;
 }
 
 impl DualStackBaseIpExt for Ipv4 {
@@ -177,6 +189,7 @@ impl DualStackBaseIpExt for Ipv4 {
     type ConnectionAndAddr<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> =
         (Connection<Ipv4, Ipv4, D, BT>, ConnAddr<ConnIpAddr<Ipv4Addr, NonZeroU16, NonZeroU16>, D>);
     type ListenerIpAddr = ListenerIpAddr<Ipv4Addr, NonZeroU16>;
+    type OriginalDstAddr = Ipv4Addr;
     type DualStackIpOptions = ();
 
     fn as_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
@@ -243,6 +256,10 @@ impl DualStackBaseIpExt for Ipv4 {
             EitherStack::OtherStack(id) => destroy_socket(core_ctx, bindings_ctx, id),
         }
     }
+
+    fn get_original_dst(addr: Self::OriginalDstAddr) -> Self::Addr {
+        addr
+    }
 }
 
 /// Socket options that are accessible on IPv6 sockets.
@@ -262,6 +279,7 @@ impl DualStackBaseIpExt for Ipv6 {
     >;
     type DualStackIpOptions = Ipv6Options;
     type ListenerIpAddr = DualStackListenerIpAddr<Ipv6Addr, NonZeroU16>;
+    type OriginalDstAddr = EitherStack<Ipv6Addr, Ipv4Addr>;
 
     fn as_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: &Self::DemuxSocketId<D, BT>,
@@ -368,6 +386,13 @@ impl DualStackBaseIpExt for Ipv6 {
         demux_id: Self::DemuxSocketId<CC::WeakDeviceId, BC>,
     ) {
         destroy_socket(core_ctx, bindings_ctx, demux_id)
+    }
+
+    fn get_original_dst(addr: Self::OriginalDstAddr) -> Self::Addr {
+        match addr {
+            EitherStack::ThisStack(addr) => addr,
+            EitherStack::OtherStack(addr) => *addr.to_ipv6_mapped(),
+        }
     }
 }
 
@@ -574,7 +599,7 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         + OwnedOrRefsBidirectionalConverter<
             ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
             ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
-        >;
+        > + OwnedOrRefsBidirectionalConverter<I::OriginalDstAddr, I::Addr>;
 
     /// The core context that will give access to both versions of the IP layer.
     type DualStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
@@ -619,6 +644,9 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         > + OwnedOrRefsBidirectionalConverter<
             ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
             ListenerAddr<DualStackListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
+        > + OwnedOrRefsBidirectionalConverter<
+            I::OriginalDstAddr,
+            EitherStack<I::Addr, <I::OtherVersion as Ip>::Addr>,
         >;
 
     /// Calls the function with mutable access to the set with all TCP sockets.
@@ -4153,6 +4181,89 @@ where
         })
     }
 
+    /// Gets the original destination address for the socket, if it is connected
+    /// and has a destination in the specified stack.
+    ///
+    /// Note that this always returns the original destination in the IP stack
+    /// in which the socket is; for example, for a dual-stack IPv6 socket that
+    /// is connected to an IPv4 address, this will return the IPv4-mapped IPv6
+    /// version of that address.
+    pub fn get_original_destination(
+        &mut self,
+        id: &TcpApiSocketId<I, C>,
+    ) -> Result<(SpecifiedAddr<I::Addr>, NonZeroU16), OriginalDestinationError> {
+        self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, state| {
+            let TcpSocketState { socket_state, .. } = state;
+            let conn = match socket_state {
+                TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => conn,
+                TcpSocketStateInner::Bound(BoundSocketState::Listener(_))
+                | TcpSocketStateInner::Unbound(_) => {
+                    return Err(OriginalDestinationError::NotConnected)
+                }
+            };
+
+            fn tuple<I: IpExt>(
+                ConnIpAddr { local, remote }: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
+            ) -> Tuple<I> {
+                let (local_addr, local_port) = local;
+                let (remote_addr, remote_port) = remote;
+                Tuple {
+                    protocol: IpProto::Tcp.into(),
+                    src_addr: local_addr.addr(),
+                    dst_addr: remote_addr.addr(),
+                    src_port_or_id: local_port.get(),
+                    dst_port_or_id: remote_port.get(),
+                }
+            }
+
+            let (addr, port) = match core_ctx {
+                MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                    let (_conn, addr) = converter.convert(conn);
+                    let tuple: Tuple<I> = tuple(addr.ip);
+                    core_ctx
+                        .get_original_destination(&tuple)
+                        .ok_or(OriginalDestinationError::NotFound)
+                }
+                MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(conn) {
+                    EitherStack::ThisStack((_conn, addr)) => {
+                        let tuple: Tuple<I> = tuple(addr.ip);
+                        let (addr, port) = core_ctx
+                            .get_original_destination(&tuple)
+                            .ok_or(OriginalDestinationError::NotFound)?;
+                        let addr = I::get_original_dst(
+                            converter.convert_back(EitherStack::ThisStack(addr)),
+                        );
+                        Ok((addr, port))
+                    }
+                    EitherStack::OtherStack((_conn, addr)) => {
+                        let tuple: Tuple<I::OtherVersion> = tuple(addr.ip);
+                        let (addr, port) = core_ctx
+                            .get_original_destination(&tuple)
+                            .ok_or(OriginalDestinationError::NotFound)?;
+                        let addr = I::get_original_dst(
+                            converter.convert_back(EitherStack::OtherStack(addr)),
+                        );
+                        Ok((addr, port))
+                    }
+                },
+            }?;
+
+            // TCP connections always have a specified destination address and
+            // port, but this invariant is not upheld in the type system here
+            // because we are retrieving the destination from the connection
+            // tracking table.
+            let addr = SpecifiedAddr::new(addr).ok_or_else(|| {
+                error!("original destination for socket {id:?} had unspecified addr (port {port})");
+                OriginalDestinationError::UnspecifiedDestinationAddr
+            })?;
+            let port = NonZeroU16::new(port).ok_or_else(|| {
+                error!("original destination for socket {id:?} had unspecified port (addr {addr})");
+                OriginalDestinationError::UnspecifiedDestinationPort
+            })?;
+            Ok((addr, port))
+        })
+    }
+
     /// Provides access to shared and per-socket TCP stats via a visitor.
     pub fn inspect<N>(&mut self, inspector: &mut N)
     where
@@ -4672,6 +4783,23 @@ pub enum BindError {
     LocalAddressError(#[from] LocalAddressError),
 }
 
+/// Possible errors when retrieving the original destination of a socket.
+#[derive(GenericOverIp)]
+#[generic_over_ip()]
+pub enum OriginalDestinationError {
+    /// Cannot retrieve original destination for an unconnected socket.
+    NotConnected,
+    /// The socket's original destination could not be found in the connection
+    /// tracking table.
+    NotFound,
+    /// The socket's original destination had an unspecified address, which is
+    /// invalid for TCP.
+    UnspecifiedDestinationAddr,
+    /// The socket's original destination had an unspecified port, which is
+    /// invalid for TCP.
+    UnspecifiedDestinationPort,
+}
+
 fn connect_inner<CC, BC, SockI, WireI>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -5030,7 +5158,7 @@ mod tests {
         ContextProvider, Instant as _, InstantContext, LinkDevice, ReferenceNotifiers,
         StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
     };
-    use netstack3_filter::TransportPacketSerializer;
+    use netstack3_filter::{TransportPacketSerializer, Tuple};
     use netstack3_ip::device::IpDeviceStateIpExt;
     use netstack3_ip::icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode};
     use netstack3_ip::nud::testutil::FakeLinkResolutionNotifier;
@@ -5436,6 +5564,13 @@ mod tests {
                 bindings_ctx,
                 dst,
                 device,
+            )
+        }
+
+        fn get_original_destination(&mut self, tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
+            BaseTransportIpContext::<I, BC>::get_original_destination(
+                &mut self.ip_socket_ctx,
+                tuple,
             )
         }
     }

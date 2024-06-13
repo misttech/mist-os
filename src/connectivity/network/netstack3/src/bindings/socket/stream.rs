@@ -17,15 +17,17 @@ use fidl::{AsHandleRef as _, HandleBased as _};
 use fuchsia_zircon::{self as zx, Peered as _};
 use futures::future::FusedFuture as _;
 use futures::{FutureExt as _, StreamExt as _};
-use log::debug;
-use net_types::ip::{IpAddress, IpVersion, Ipv4, Ipv6};
+use log::{debug, error};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6};
+use net_types::{NonMappedAddr, SpecifiedAddr, ZonedAddr};
 use netstack3_core::device::{DeviceId, WeakDeviceId};
 use netstack3_core::socket::ShutdownType;
 use netstack3_core::tcp::{
     self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
     ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-    Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload, SetReuseAddrError, SocketAddr,
-    SocketInfo, SocketOptions, Takeable, TcpBindingsTypes, UnboundInfo,
+    OriginalDestinationError, Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
+    SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
+    UnboundInfo,
 };
 use netstack3_core::IpExt;
 use once_cell::sync::Lazy;
@@ -616,6 +618,17 @@ impl IntoErrno for ConnectionError {
     }
 }
 
+impl IntoErrno for OriginalDestinationError {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            Self::NotConnected
+            | Self::NotFound
+            | Self::UnspecifiedDestinationAddr
+            | Self::UnspecifiedDestinationPort => fposix::Errno::Enoent,
+        }
+    }
+}
+
 /// Spawns a task that sends more data from the `socket` each time we observe
 /// a wakeup through the `watcher`.
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
@@ -945,6 +958,65 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         ctx.api().tcp().reuseaddr(id)
     }
 
+    fn get_original_destination(
+        self,
+        ip_version: IpVersion,
+    ) -> Result<fnet::SocketAddress, fposix::Errno> {
+        let result = self
+            .ctx
+            .api()
+            .tcp()
+            .get_original_destination(&self.data.id)
+            .map_err(IntoErrno::into_errno);
+
+        fn sockaddr<I: IpSockAddrExt>(
+            addr: SpecifiedAddr<I::Addr>,
+            port: NonZeroU16,
+        ) -> fnet::SocketAddress {
+            I::SocketAddress::new(Some(ZonedAddr::Unzoned(addr)), port.get()).into_sock_addr()
+        }
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct In<I: Ip>(Result<(SpecifiedAddr<I::Addr>, NonZeroU16), fposix::Errno>);
+
+        I::map_ip_in(
+            In(result),
+            |In(result)| match ip_version {
+                IpVersion::V4 => {
+                    let (addr, port) = result?;
+                    Ok(sockaddr::<Ipv4>(addr, port))
+                }
+                IpVersion::V6 => Err(fposix::Errno::Eopnotsupp),
+            },
+            |In(result)| {
+                let (addr, port) = result?;
+                match ip_version {
+                    IpVersion::V4 => {
+                        let addr = addr.to_ipv4_mapped().ok_or(fposix::Errno::Enoent)?;
+                        // TCP connections always have a specified destination address, but this
+                        // invariant is not upheld in the type system here because we are retrieving
+                        // the destination from the connection tracking table.
+                        let addr = SpecifiedAddr::new(addr).ok_or_else(|| {
+                            error!(
+                                "original destination for socket {:?} had unspecified addr \
+                                (port {port})",
+                                self.data.id
+                            );
+                            fposix::Errno::Enoent
+                        })?;
+
+                        Ok(sockaddr::<Ipv4>(addr, port))
+                    }
+                    IpVersion::V6 => {
+                        let addr = NonMappedAddr::new(addr).ok_or(fposix::Errno::Enoent)?;
+                        Ok(sockaddr::<Ipv6>(*addr, port))
+                    }
+                }
+            },
+        )
+    }
+
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
     /// continue being polled or dropped.
     ///
@@ -1112,9 +1184,9 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetTimestamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetOriginalDestination { responder } => {
-                // TODO(https://fxbug.dev/338042280): when we support destination NAT, we should
-                // return the original address.
-                responder.send(Err(fposix::Errno::Enoent)).unwrap_or_log("failed to respond");
+                responder
+                    .send(self.get_original_destination(IpVersion::V4).as_ref().map_err(|e| *e))
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Disconnect { responder } => {
                 respond_not_supported!("stream::Disconnect", responder);

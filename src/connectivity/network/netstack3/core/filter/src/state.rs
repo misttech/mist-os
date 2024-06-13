@@ -336,7 +336,7 @@ pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     /// that have any references in order to report them in inspect data.
     pub(crate) uninstalled_routines: Vec<UninstalledRoutine<I, BT::DeviceClass, ()>>,
     /// Connection tracking state.
-    pub(crate) conntrack: conntrack::Table<I, BT, NatConfig>,
+    pub conntrack: conntrack::Table<I, BT, NatConfig>,
 }
 
 impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {

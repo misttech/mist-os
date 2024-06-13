@@ -1051,6 +1051,7 @@ pub(crate) mod testutil {
     use net_types::{MulticastAddr, Witness as _};
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId};
     use netstack3_base::SendFrameContext;
+    use netstack3_filter::Tuple;
 
     use super::*;
     use crate::internal::base::{
@@ -1110,6 +1111,10 @@ pub(crate) mod testutil {
             _dst: SpecifiedAddr<<I>::Addr>,
             _device: Option<&D>,
         ) {
+        }
+
+        fn get_original_destination(&mut self, _tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
+            unimplemented!()
         }
     }
 
@@ -1229,6 +1234,13 @@ pub(crate) mod testutil {
                 bindings_ctx,
                 dst,
                 device,
+            )
+        }
+
+        fn get_original_destination(&mut self, tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
+            BaseTransportIpContext::<I, BC>::get_original_destination(
+                self.state.fake_ip_socket_ctx_mut(),
+                tuple,
             )
         }
     }

@@ -16,8 +16,8 @@ use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
 use crate::ip_hooks::{
-    Addrs, ExpectedConnectivity, Ports, Realms, SockAddrs, SocketType as _, Subnets, TestIpExt,
-    TestNet, TestRealm, LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
+    Addrs, ExpectedConnectivity, OriginalDestination, Ports, Realms, SockAddrs, SocketType as _,
+    Subnets, TestIpExt, TestNet, TestRealm, LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
 };
 use crate::matchers::{Matcher, Tcp, Udp};
 
@@ -190,11 +190,15 @@ async fn redirect_ingress<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
         sockets,
         SockAddrs { client: sock_addrs.client, server: original_dst },
         ExpectedConnectivity::TwoWay,
+        Some(OriginalDestination {
+            dst: original_dst,
+            // The NAT redirection is done on the server netstack, so the client
+            // is unable to observe the original destination of the connection.
+            known_to_client: false,
+            known_to_server: true,
+        }),
     )
     .await;
-
-    // TODO(https://fxbug.dev/338042280): ensure that SO_ORIGINAL_DST returns
-    // the pre-NAT destination on the server socket.
 }
 
 // TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
@@ -267,9 +271,13 @@ async fn redirect_local_egress<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
         sockets,
         SockAddrs { client: sock_addrs.client, server: original_dst },
         ExpectedConnectivity::TwoWay,
+        Some(OriginalDestination {
+            dst: original_dst,
+            // The client and server sockets are on the same netstack, so they
+            // can both observe the original destination of the connection.
+            known_to_client: true,
+            known_to_server: true,
+        }),
     )
     .await;
-
-    // TODO(https://fxbug.dev/338042280): ensure that SO_ORIGINAL_DST returns
-    // the pre-NAT destination on the server socket.
 }

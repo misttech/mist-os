@@ -4,9 +4,15 @@
 
 #![cfg(test)]
 
+use std::num::{NonZeroU16, NonZeroU64};
+use std::ops::RangeInclusive;
+use std::os::fd::AsFd;
+use std::pin::pin;
+
 use anyhow::{anyhow, Context as _};
 use assert_matches::assert_matches;
 use async_trait::async_trait;
+use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
@@ -18,7 +24,7 @@ use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{
     fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet,
-    net_subnet_v4, net_subnet_v6, std_ip_v4, std_socket_addr,
+    net_subnet_v4, net_subnet_v6, std_ip, std_ip_v4, std_socket_addr,
 };
 use net_types::ethernet::Mac;
 use net_types::ip::{
@@ -27,27 +33,17 @@ use net_types::ip::{
 use net_types::Witness as _;
 use netemul::{
     InterfaceConfig, RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _,
-    TestFakeEndpoint, TestInterface, TestNetwork,
+    TestFakeEndpoint, TestInterface, TestNetwork, TestRealm, TestSandbox,
 };
 use netstack_testing_common::constants::ipv6 as ipv6_consts;
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
 use netstack_testing_common::realms::{
-    KnownServiceProvider, Netstack, NetstackVersion, TestRealmExt, TestSandboxExt as _,
+    KnownServiceProvider, Netstack, Netstack3, NetstackVersion, TestRealmExt, TestSandboxExt as _,
 };
 use netstack_testing_common::{
     devices, ndp, ping, Result, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
-use {
-    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_tun as fnet_tun,
-    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fposix_socket,
-    fidl_fuchsia_posix_socket_packet as fpacket,
-};
-
 use netstack_testing_macros::netstack_test;
 use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::arp::{ArpOp, ArpPacketBuilder};
@@ -66,10 +62,17 @@ use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
 use packet_formats::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::{InterfaceIndexOrAddress, SockRef};
-use std::num::NonZeroU64;
-use std::os::fd::AsFd;
-use std::pin::pin;
 use test_case::test_case;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_tun as fnet_tun,
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fpacket,
+};
 
 async fn run_udp_socket_test(
     server: &netemul::TestRealm<'_>,
@@ -4111,4 +4114,319 @@ async fn multicast_loop_on_loopback_dev<N: Netstack, I: net_types::ip::Ip + Mult
         .map(|output| panic!("unexpected received duplicate packet {output:?}"))
         .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || ())
         .await;
+}
+
+trait RedirectTestIpExt: Ip {
+    const SUBNET: fnet::Subnet;
+    const ADDR: std::net::IpAddr;
+}
+
+impl RedirectTestIpExt for Ipv4 {
+    const SUBNET: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+    const ADDR: std::net::IpAddr = std_ip!("192.0.2.1");
+}
+
+impl RedirectTestIpExt for Ipv6 {
+    const SUBNET: fnet::Subnet = fidl_subnet!("2001:db8::1/64");
+    const ADDR: std::net::IpAddr = std_ip!("2001:db8::1");
+}
+
+struct RedirectTestSetup<'a> {
+    netstack: TestRealm<'a>,
+    _network: TestNetwork<'a>,
+    _interface: TestInterface<'a>,
+    _control: fnet_filter::ControlProxy,
+    _controller: fnet_filter_ext::Controller,
+}
+
+async fn setup_redirect_test<'a>(
+    name: &str,
+    sandbox: &'a TestSandbox,
+    subnet: fnet::Subnet,
+    matcher: fnet_filter_ext::TransportProtocolMatcher,
+    redirect: Option<RangeInclusive<NonZeroU16>>,
+) -> RedirectTestSetup<'a> {
+    use fnet_filter_ext::{
+        Action, Change, Controller, ControllerId, Domain, InstalledNatRoutine, Matchers, Namespace,
+        NamespaceId, NatHook, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
+    };
+
+    let netstack =
+        sandbox.create_netstack_realm::<Netstack3, _>(name.to_owned()).expect("create netstack");
+    let network = sandbox.create_network("net").await.expect("create network");
+    let interface = netstack.join_network(&network, "interface").await.expect("join network");
+    interface.add_address_and_subnet_route(subnet).await.expect("set ip");
+
+    let control =
+        netstack.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller = Controller::new(&control, &ControllerId(String::from("redirect")))
+        .await
+        .expect("create controller");
+    let namespace_id = NamespaceId(String::from("namespace"));
+    let routine_id = RoutineId { namespace: namespace_id.clone(), name: String::from("routine") };
+    let resources = [
+        Resource::Namespace(Namespace { id: namespace_id.clone(), domain: Domain::AllIp }),
+        Resource::Routine(Routine {
+            id: routine_id.clone(),
+            routine_type: RoutineType::Nat(Some(InstalledNatRoutine {
+                hook: NatHook::LocalEgress,
+                priority: 0,
+            })),
+        }),
+        Resource::Rule(Rule {
+            id: RuleId { routine: routine_id.clone(), index: 0 },
+            matchers: Matchers { transport_protocol: Some(matcher), ..Default::default() },
+            action: Action::Redirect { dst_port: redirect },
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(Change::Create).collect())
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    RedirectTestSetup {
+        netstack,
+        _network: network,
+        _interface: interface,
+        _control: control,
+        _controller: controller,
+    }
+}
+
+const LISTEN_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(11111));
+
+struct TestCaseV4 {
+    original_dst: std::net::SocketAddr,
+    matcher: fnet_filter_ext::TransportProtocolMatcher,
+    redirect_dst: Option<RangeInclusive<NonZeroU16>>,
+    expect_redirect: bool,
+}
+
+#[netstack_test]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(Ipv4::ADDR, LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: None,
+        expect_redirect: true,
+    };
+    "redirect to localhost"
+)]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(Ipv4::ADDR, 22222),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: Some(LISTEN_PORT..=LISTEN_PORT),
+        expect_redirect: true,
+    };
+    "redirect to localhost port 11111"
+)]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(std_ip!("127.0.0.1"), LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Udp { src_port: None, dst_port: None },
+        redirect_dst: None,
+        expect_redirect: false,
+    };
+    "no redirect"
+)]
+async fn redirect_original_destination_v4(name: &str, test_case: TestCaseV4) {
+    let TestCaseV4 { original_dst, matcher, redirect_dst, expect_redirect } = test_case;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let setup = setup_redirect_test(name, &sandbox, Ipv4::SUBNET, matcher, redirect_dst).await;
+
+    let server = setup
+        .netstack
+        .stream_socket(Ipv4::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    server
+        .bind(
+            &std::net::SocketAddr::from((Ipv4::LOOPBACK_ADDRESS.to_ip_addr(), LISTEN_PORT.get()))
+                .into(),
+        )
+        .expect("no conflict");
+    server.listen(1).expect("listen on server socket");
+
+    let client = setup
+        .netstack
+        .stream_socket(Ipv4::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    client.connect(&original_dst.into()).expect("connect to server");
+
+    let (server, _addr) = server.accept().expect("accept incoming connection");
+
+    // The original destination should be observable on both the client and server sockets.
+    let verify_original_dst = |socket: &socket2::Socket| {
+        let result = socket.original_dst();
+        if expect_redirect {
+            assert_eq!(
+                result
+                    .expect("get original destination of connection")
+                    .as_socket()
+                    .expect("should be valid socket addr"),
+                original_dst
+            );
+        } else {
+            let error = result.expect_err("socket should have no original destination").kind();
+            assert_eq!(error, std::io::ErrorKind::NotFound);
+        }
+    };
+    verify_original_dst(&client);
+    verify_original_dst(&server);
+}
+
+struct TestCaseV6 {
+    original_dst: std::net::SocketAddr,
+    matcher: fnet_filter_ext::TransportProtocolMatcher,
+    redirect_dst: Option<RangeInclusive<NonZeroU16>>,
+}
+
+#[netstack_test]
+#[test_case(
+    TestCaseV6 {
+        original_dst: std::net::SocketAddr::new(Ipv6::ADDR, LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: None,
+    };
+    "redirect to localhost"
+)]
+#[test_case(
+    TestCaseV6 {
+        original_dst: std::net::SocketAddr::new(Ipv6::ADDR, 22222),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: Some(LISTEN_PORT..=LISTEN_PORT),
+    };
+    "redirect to localhost port 11111"
+)]
+#[test_case(
+    TestCaseV6 {
+        original_dst: std::net::SocketAddr::new(std_ip!("::1"), LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Udp { src_port: None, dst_port: None },
+        redirect_dst: None,
+    };
+    "no redirect"
+)]
+async fn redirect_original_destination_v6(name: &str, test_case: TestCaseV6) {
+    let TestCaseV6 { original_dst, matcher, redirect_dst } = test_case;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let setup = setup_redirect_test(name, &sandbox, Ipv6::SUBNET, matcher, redirect_dst).await;
+
+    let server = setup
+        .netstack
+        .stream_socket(Ipv6::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    server
+        .bind(
+            &std::net::SocketAddr::from((Ipv6::LOOPBACK_ADDRESS.to_ip_addr(), LISTEN_PORT.get()))
+                .into(),
+        )
+        .expect("no conflict");
+    server.listen(1).expect("listen on server socket");
+
+    let client = setup
+        .netstack
+        .stream_socket(Ipv6::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    client.connect(&original_dst.into()).expect("connect to server");
+
+    let (server, _addr) = server.accept().expect("accept incoming connection");
+
+    // Although this connection was redirected, SO_ORIGINAL_DST should return
+    // ENOENT because the original destination was not an IPv4 address.
+    let verify_original_dst = |socket: &socket2::Socket| {
+        let result = socket.original_dst();
+        let error = result.expect_err("socket should have no original destination").kind();
+        assert_eq!(error, std::io::ErrorKind::NotFound);
+    };
+    verify_original_dst(&client);
+    verify_original_dst(&server);
+
+    // TODO(https://fxbug.dev/345465222): exercise SOL_IPV6 - IP6T_SO_ORIGINAL_DST
+    // when it is available and implemented.
+}
+
+#[netstack_test]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(Ipv4::ADDR, LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: None,
+        expect_redirect: true,
+    };
+    "redirect to localhost"
+)]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(Ipv4::ADDR, 22222),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: Some(LISTEN_PORT..=LISTEN_PORT),
+        expect_redirect: true,
+    };
+    "redirect to localhost port 11111"
+)]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(std_ip!("127.0.0.1"), LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Udp { src_port: None, dst_port: None },
+        redirect_dst: None,
+        expect_redirect: false,
+    };
+    "no redirect"
+)]
+async fn redirect_original_destination_dual_stack(name: &str, test_case: TestCaseV4) {
+    let TestCaseV4 { original_dst, matcher, redirect_dst, expect_redirect } = test_case;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let setup = setup_redirect_test(name, &sandbox, Ipv4::SUBNET, matcher, redirect_dst).await;
+
+    let server = setup
+        .netstack
+        .stream_socket(Ipv6::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    server
+        .bind(
+            &std::net::SocketAddr::from((
+                Ipv6::UNSPECIFIED_ADDRESS.to_ip_addr(),
+                LISTEN_PORT.get(),
+            ))
+            .into(),
+        )
+        .expect("no conflict");
+    server.listen(1).expect("listen on server socket");
+
+    let client = setup
+        .netstack
+        .stream_socket(Ipv4::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    client.connect(&original_dst.into()).expect("connect to server");
+
+    let (server, _addr) = server.accept().expect("accept incoming connection");
+
+    // The original destination should be observable on both the client and server sockets.
+    let verify_original_dst = |socket: &socket2::Socket| {
+        let result = socket.original_dst();
+        if expect_redirect {
+            assert_eq!(
+                result
+                    .expect("get original destination of connection")
+                    .as_socket()
+                    .expect("should be valid socket addr"),
+                original_dst
+            );
+        } else {
+            let error = result.expect_err("socket should have no original destination").kind();
+            assert_eq!(error, std::io::ErrorKind::NotFound);
+        }
+    };
+    verify_original_dst(&client);
+    verify_original_dst(&server);
 }

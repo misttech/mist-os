@@ -113,6 +113,13 @@ pub(crate) enum ExpectedConnectivity {
     None,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct OriginalDestination {
+    pub dst: std::net::SocketAddr,
+    pub known_to_client: bool,
+    pub known_to_server: bool,
+}
+
 pub(crate) trait SocketType {
     type Client;
     type Server;
@@ -124,6 +131,7 @@ pub(crate) trait SocketType {
         sockets: Sockets<Self>,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
+        expected_original_dst: Option<OriginalDestination>,
     );
 }
 
@@ -158,6 +166,7 @@ impl SocketType for IrrelevantToTest {
         sockets: Sockets<Self>,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
+        expected_original_dst: Option<OriginalDestination>,
     ) {
         let Sockets { client: client_sock, server: server_sock } = sockets;
         UdpSocket::run_test::<I>(
@@ -165,6 +174,7 @@ impl SocketType for IrrelevantToTest {
             Sockets { client: client_sock, server: server_sock },
             sock_addrs,
             expected_connectivity,
+            expected_original_dst,
         )
         .await
     }
@@ -229,6 +239,7 @@ impl SocketType for TcpSocket {
         sockets: Sockets<Self>,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
+        expected_original_dst: Option<OriginalDestination>,
     ) {
         let Sockets { client, mut server } = sockets;
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
@@ -276,15 +287,33 @@ impl SocketType for TcpSocket {
                     let bytes =
                         stream.write(SERVER_PAYLOAD.as_bytes()).await.expect("write to client");
                     assert_eq!(bytes, SERVER_PAYLOAD.as_bytes().len());
+
+                    if let Some(OriginalDestination {
+                        dst: expected,
+                        known_to_server,
+                        known_to_client: _,
+                    }) = expected_original_dst
+                    {
+                        if !known_to_server {
+                            return;
+                        }
+                        if expected.is_ipv4() {
+                            let original_dst = socket2::Socket::from(
+                                stream.std().try_clone().expect("clone socket"),
+                            )
+                            .original_dst()
+                            .expect("get original destination of connection");
+                            assert_eq!(original_dst, expected.into());
+                        } else {
+                            // TODO(https://fxbug.dev/345465222): implement SOL_IPV6 ->
+                            // IP6T_SO_ORIGINAL_DST on Fuchsia.
+                        };
+                    }
                 }
             }
         };
 
         let client_fut = async move {
-            // We clone the client socket because `fasync::net::TcpStream::connect_from_raw`
-            // takes an owned socket, and we only have a borrow to the socket in this
-            // function because the caller may be reusing the socket across invocations.
-            let client = client.try_clone().expect("clone socket");
             match expected_connectivity {
                 ExpectedConnectivity::None | ExpectedConnectivity::ClientToServerOnly => {
                     match fasync::net::TcpStream::connect_from_raw(client, server_addr)
@@ -318,6 +347,28 @@ impl SocketType for TcpSocket {
                     let bytes = stream.read(&mut buf).await.expect("read from server");
                     assert_eq!(bytes, SERVER_PAYLOAD.as_bytes().len());
                     assert_eq!(&buf[..bytes], SERVER_PAYLOAD.as_bytes());
+
+                    if let Some(OriginalDestination {
+                        dst: expected,
+                        known_to_client,
+                        known_to_server: _,
+                    }) = expected_original_dst
+                    {
+                        if !known_to_client {
+                            return;
+                        }
+                        if expected.is_ipv4() {
+                            let original_dst = socket2::Socket::from(
+                                stream.std().try_clone().expect("clone socket"),
+                            )
+                            .original_dst()
+                            .expect("get original destination of connection");
+                            assert_eq!(original_dst, expected.into());
+                        } else {
+                            // TODO(https://fxbug.dev/345465222): implement SOL_IPV6 ->
+                            // IP6T_SO_ORIGINAL_DST on Fuchsia.
+                        };
+                    }
                 }
             }
         };
@@ -363,6 +414,8 @@ impl SocketType for UdpSocket {
         sockets: Sockets<Self>,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
+        // NB: SO_ORIGINAL_DST is not supported for UDP sockets.
+        _expected_original_dst: Option<OriginalDestination>,
     ) {
         let Sockets { client, server } = sockets;
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
@@ -486,6 +539,8 @@ impl SocketType for IcmpSocket {
         _sockets: Sockets<Self>,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
+        // NB: SO_ORIGINAL_DST is not supported for ICMP sockets.
+        _expected_original_dst: Option<OriginalDestination>,
     ) {
         let Realms { client, server } = realms;
 
@@ -697,7 +752,7 @@ impl<'a> TestNet<'a> {
         S: SocketType,
     {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), self.addrs()).await;
-        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity).await;
+        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await;
     }
 
     /// NB: in order for callers to provide a `setup` that captures its environment,
@@ -723,7 +778,7 @@ impl<'a> TestNet<'a> {
     {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), self.addrs()).await;
         setup(self, sock_addrs, &&()).await;
-        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity).await;
+        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await;
     }
 }
 
@@ -1602,7 +1657,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
 
     async fn run_test<S: SocketType>(&mut self, expected_connectivity: ExpectedConnectivity) {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), Self::addrs()).await;
-        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity).await;
+        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await;
     }
 
     /// NB: in order for callers to provide a `setup` that captures its environment,
@@ -1627,7 +1682,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
     {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), Self::addrs()).await;
         setup(self, sock_addrs, &&()).await;
-        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity).await;
+        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await;
     }
 }
 
@@ -1911,8 +1966,14 @@ async fn local_traffic_skips_forwarding<I: net_types::ip::Ip + RouterTestIpExt, 
         )
         .await;
 
-        M::SocketType::run_test::<I>(realms, sockets, sock_addrs, ExpectedConnectivity::TwoWay)
-            .await;
+        M::SocketType::run_test::<I>(
+            realms,
+            sockets,
+            sock_addrs,
+            ExpectedConnectivity::TwoWay,
+            None,
+        )
+        .await;
     }
 
     let TestRouterNet {

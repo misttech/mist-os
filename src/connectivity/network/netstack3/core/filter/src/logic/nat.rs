@@ -21,6 +21,7 @@ use crate::logic::{IngressVerdict, Interfaces, RoutineResult, Verdict};
 use crate::packets::{IpPacket, MaybeTransportPacketMut as _, TransportPacketMut as _};
 use crate::state::Hook;
 
+/// The NAT configuration for a given conntrack connection.
 #[derive(Default)]
 pub struct NatConfig {
     /// NAT is configured exactly once for a given connection, for the first
@@ -28,16 +29,25 @@ pub struct NatConfig {
     /// connections are NATed: the configuration could be `None`, but this field
     /// will always be initialized by the time a connection is inserted in the
     /// conntrack table.
-    config: OnceCell<Option<NatType>>,
+    pub(crate) config: OnceCell<Option<NatType>>,
 }
 
+impl NatConfig {
+    /// The type of NAT configured, if any.
+    pub fn nat_type(&self) -> Option<NatType> {
+        self.config.get().cloned().flatten()
+    }
+}
+
+/// The type of NAT that is performed on a given conntrack connection.
 // TODO(https://fxbug.dev/341771631): perform SNAT.
 //
 // Once we support SNAT of any kind, we will also need to remap source ports for
 // all non-NATed traffic by default to prevent locally-generated and forwarded
 // traffic from stepping on each other's toes.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum NatType {
+pub enum NatType {
+    /// Destination NAT is performed on this connection.
     Destination,
 }
 
