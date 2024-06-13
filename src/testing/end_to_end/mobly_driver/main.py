@@ -18,61 +18,61 @@ parser.add_argument(
     help="path to the Mobly test archive produced by the GN build system.",
 )
 parser.add_argument(
-    "-config_yaml_path",
+    "--config-yaml-path",
     default=None,
     help="path to the Mobly test config YAML file.",
 )
 parser.add_argument(
-    "-params_yaml_path",
+    "--params-yaml-path",
     default=None,
     help="path to the Mobly test params YAML file.",
 )
 parser.add_argument(
-    "-test_timeout_sec",
+    "--test-timeout-sec",
     default=None,
     help="integer to specify number of seconds before a Mobly test times out.",
 )
 parser.add_argument(
-    "-test_data_path",
+    "--test-data-path",
     default=None,
     help="path to directory containing test-time data dependencies.",
 )
-parser.add_argument("-ffx_path", default=None, help="path to FFX.")
+parser.add_argument("--ffx-path", default=None, help="path to FFX.")
 parser.add_argument(
-    "-ssh_path",
+    "--ssh-path",
     default=None,
     help="path to SSH binary used by test connectivity labs access points.",
 )
 parser.add_argument(
-    "-ffx_subtools_search_path",
+    "--ffx-subtools-path",
     default=None,
-    help="path to FFX subtools search path.",
+    help="path to FFX subtools path.",
 )
 parser.add_argument(
-    "-transport",
+    "--transport",
     default=None,
     help="value to use in mobly config for host->device transport type.",
 )
 parser.add_argument(
-    "-multi_device",
+    "--multi-device",
     action="store_const",
     const=True,
     default=False,
     help="Whether the mobly test requires 2+ Fuchsia devices to run.",
 )
 parser.add_argument(
-    "-hermetic",
+    "--hermetic",
     action="store_const",
     const=True,
     default=False,
     help="Whether the mobly test is a self-contained executable.",
 )
 parser.add_argument(
-    "-v",
+    "--v",
     action="store_const",
     const=True,
     default=False,
-    help="run the mobly test with the -v flag.",
+    help="run the mobly test with the --v flag.",
 )
 args = parser.parse_args()
 
@@ -90,8 +90,8 @@ def main() -> None:
         multi_device=args.multi_device,
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,
-        ffx_subtools_search_path=os.path.abspath(args.ffx_subtools_search_path)
-        if args.ffx_subtools_search_path
+        ffx_subtools_search_path=os.path.abspath(args.ffx_subtools_path)
+        if args.ffx_subtools_path
         else None,
         ssh_path=os.path.abspath(args.ssh_path) if args.ssh_path else None,
     )

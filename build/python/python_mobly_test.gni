@@ -291,19 +291,19 @@ template("python_mobly_test") {
   _md_test_data_dir =
       get_label_info("//src/testing/end_to_end/mobly_driver", "target_out_dir")
   _common_host_test_args = [
-    "-test_data_path",
+    "--test-data-path",
     rebase_path(_test_dir, root_build_dir),
-    "-ffx_path",
+    "--ffx-path",
     rebase_path("${host_tools_dir}/ffx", root_build_dir),
-    "-transport",
+    "--transport",
     invoker.transport,
-    "-ffx_subtools_search_path",
+    "--ffx-subtools-path",
     rebase_path(host_tools_dir, root_build_dir),
-    "-ssh_path",
+    "--ssh-path",
     rebase_path("${_test_dir}/ssh", root_build_dir),
   ]
   if (defined(invoker.multi_fuchsia_device) && invoker.multi_fuchsia_device) {
-    _common_host_test_args += [ "-multi_device" ]
+    _common_host_test_args += [ "--multi-device" ]
   }
 
   _additional_deps = []
@@ -335,7 +335,7 @@ template("python_mobly_test") {
     }
 
     _common_host_test_args += [
-      "-params_yaml_path",
+      "--params-yaml-path",
       rebase_path("${_test_dir}/test_params.yaml", root_build_dir),
     ]
 
@@ -379,7 +379,7 @@ template("python_mobly_test") {
     }
 
     _common_host_test_args += [
-      "-config_yaml_path",
+      "--config-yaml-path",
       rebase_path("${_test_dir}/config.yaml", root_build_dir),
     ]
 
@@ -562,7 +562,7 @@ template("python_mobly_test") {
                            root_build_dir),
                rebase_path("${_test_dir}/${_hermetic_test_binary_label}",
                            root_build_dir),
-               "-hermetic",
+               "--hermetic",
              ] + _common_host_test_args
 
       data_deps = [ "//src/developer/ffx:suite_test_data" ]
