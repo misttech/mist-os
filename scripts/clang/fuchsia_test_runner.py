@@ -51,7 +51,7 @@ def check_call_with_logging(
             executor_err.result()
     retcode = process.poll()
     if check and retcode:
-        subprocess.CalledProcessError(retcode, process.args)
+        raise subprocess.CalledProcessError(retcode, process.args)
     return subprocess.CompletedProcess(process.args, retcode)
 
 
