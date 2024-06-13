@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
@@ -97,6 +98,26 @@ func (f *FFXTool) TargetListForNode(ctx context.Context, nodeName string) ([]Tar
 	}
 
 	return matchingTargets, nil
+}
+
+func (f *FFXTool) WaitForTarget(ctx context.Context, address string) (TargetEntry, error) {
+	for attempt := 0; attempt < 10; attempt++ {
+		entries, err := f.TargetList(ctx)
+		if err != nil {
+			return TargetEntry{}, fmt.Errorf("failed to get target list: %w", err)
+		}
+
+		for _, target := range entries {
+			for _, addr := range target.Addresses {
+				if addr == address {
+					return target, nil
+				}
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	return TargetEntry{}, fmt.Errorf("no target found for address %v", address)
 }
 
 func (f *FFXTool) TargetGetSshAddress(ctx context.Context, target string) (string, error) {

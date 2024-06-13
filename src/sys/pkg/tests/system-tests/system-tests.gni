@@ -156,6 +156,10 @@ _environment_service_account =
 #   check_abr
 #   - Optional: check that the device booted into the expected ABR slot.
 #   - Type: bool, default true
+#
+#   resolver_mode
+#   - Optional: resolver mode to use
+#   - Type: string, default "constant"
 template("system_test_upgrade_suite") {
   assert(is_linux || is_mac, "system_tests are for linux/mac only")
 
@@ -388,6 +392,12 @@ template("system_test_upgrade_suite") {
       _args += [ "--check-abr=true" ]
     } else {
       _args += [ "--check-abr=false" ]
+    }
+
+    if (defined(invoker.resolver_mode)) {
+      _args += [ "--resolver-mode=" + invoker.resolver_mode ]
+    } else {
+      _args += [ "--resolver-mode=constant" ]
     }
 
     host_test(_host_test_target_name) {
