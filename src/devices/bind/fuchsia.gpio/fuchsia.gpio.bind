@@ -42,6 +42,8 @@ enum FUNCTION {
    SDMMC_RESET,
    WIFI_LPO,
    BT_REG_ON,
+   INTERRUPT,
+   RESET,
 
    // Audio TDM GPIOs.
    TDM_A_SCLK,
