@@ -126,6 +126,38 @@ class MoblyDriverLibTest(unittest.TestCase):
             env=mock.ANY,
         )
 
+    @parameterized.expand(
+        [
+            [True, ["/test/path", "-c", "/tmp/path"]],
+            [False, ["/py/path", "/test/path", "-c", "/tmp/path"]],
+        ]
+    )
+    @mock.patch("builtins.print")
+    @mock.patch("subprocess.Popen")
+    @mock.patch("mobly_driver.NamedTemporaryFile")
+    def test_run_hermetic(
+        self,
+        hermetic: bool,
+        expected_args: list[str],
+        mock_tempfile: Any,
+        mock_popen: Any,
+        *unused_args: Any,
+    ) -> None:
+        """Test case to ensure correct params are passed to Popen"""
+        self.mock_tmp.name = "/tmp/path"
+        self.mock_process.wait.return_value = 0
+        mock_tempfile.return_value.__enter__.return_value = self.mock_tmp
+        mock_popen.return_value.__enter__.return_value = self.mock_process
+
+        mobly_driver.run(
+            self.mock_driver, "/py/path", "/test/path", hermetic=hermetic
+        )
+        mock_popen.assert_called_once_with(
+            expected_args,
+            universal_newlines=mock.ANY,
+            env=mock.ANY,
+        )
+
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
     def test_run_updates_env_with_testdata_dir(

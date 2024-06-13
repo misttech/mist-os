@@ -17,6 +17,8 @@ python_mobly_test("soft_reboot_test_fc") {
   params_source = "params.yaml"
   transport = "fuchsia-controller"
 
+  enable_hermetic_exe = true
+
   environments = [
     # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
     aemu_env,
@@ -51,6 +53,7 @@ group("tests") {
   testonly = true
   public_deps = [
     ":soft_reboot_test_fc($host_toolchain)",
+    ":soft_reboot_test_fc.hermetic($host_toolchain)",
     ":soft_reboot_test_fc_preferred($host_toolchain)",
   ]
 }

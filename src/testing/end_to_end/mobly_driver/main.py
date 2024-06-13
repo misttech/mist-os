@@ -61,6 +61,13 @@ parser.add_argument(
     help="Whether the mobly test requires 2+ Fuchsia devices to run.",
 )
 parser.add_argument(
+    "-hermetic",
+    action="store_const",
+    const=True,
+    default=False,
+    help="Whether the mobly test is a self-contained executable.",
+)
+parser.add_argument(
     "-v",
     action="store_const",
     const=True,
@@ -102,4 +109,5 @@ def main() -> None:
         timeout_sec=args.test_timeout_sec,
         test_data_path=args.test_data_path,
         verbose=args.v,
+        hermetic=args.hermetic,
     )

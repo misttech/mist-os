@@ -29,6 +29,7 @@ def _execute_test(
     timeout_sec: Optional[int] = None,
     test_data_path: Optional[str] = None,
     verbose: bool = False,
+    hermetic: bool = False,
 ) -> None:
     """Executes a Mobly test with the specified Mobly Driver.
 
@@ -43,6 +44,7 @@ def _execute_test(
       test_data_path: path to directory containing test-time data
         dependencies.
       verbose: Whether to enable verbose output from the mobly test.
+      hermetic: Whether the mobly test is a self-contained executable.
 
     Raises:
       MoblyTestFailureException if Mobly test returns non-zero return code.
@@ -68,7 +70,8 @@ def _execute_test(
         tmp_config.write(config)
         tmp_config.flush()
 
-        cmd = [python_path, test_path, "-c", tmp_config.name]
+        cmd = [] if hermetic else [python_path]
+        cmd += [test_path, "-c", tmp_config.name]
         if verbose:
             cmd.append("-v")
         cmd_str = " ".join(cmd)
@@ -103,6 +106,7 @@ def run(
     timeout_sec: Optional[int] = None,
     test_data_path: Optional[str] = None,
     verbose: bool = False,
+    hermetic: bool = False,
 ) -> None:
     """Runs the Mobly Driver which handles the lifecycle of a Mobly test.
 
@@ -119,6 +123,7 @@ def run(
       test_data_path: path to directory containing test-time data
           dependencies.
       verbose: Whether to enable verbose output from the mobly test.
+      hermetic: Whether the mobly test is a self-contained executable.
 
     Raises:
       MoblyTestFailureException if the test returns a non-zero return code.
@@ -144,6 +149,7 @@ def run(
             timeout_sec=timeout_sec,
             test_data_path=test_data_path,
             verbose=verbose,
+            hermetic=hermetic,
         )
     finally:
         driver.teardown()
