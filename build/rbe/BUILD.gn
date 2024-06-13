@@ -32,6 +32,7 @@ group("tests") {
     ":remotetool_test($host_toolchain)",
     ":rustc_remote_wrapper_test($host_toolchain)",
     ":rustc_test($host_toolchain)",
+    ":tablefmt($host_toolchain)",
     ":tablefmt_test($host_toolchain)",
     ":textpb_test($host_toolchain)",
   ]
@@ -247,21 +248,21 @@ if (is_host) {
   }
 
   python_library("tablefmt") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _tablefmt_sources
   }
   python_host_test("tablefmt_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "tablefmt_test.py"
     sources = _tablefmt_sources
   }
 
   python_library("textpb") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _textpb_sources
   }
   python_host_test("textpb_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "textpb_test.py"
     sources = _textpb_sources
   }

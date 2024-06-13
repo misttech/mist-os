@@ -19,12 +19,12 @@ def unlex(tokens: Iterable[textpb.Token]) -> str:
 
 
 class LexTests(unittest.TestCase):
-    def _test_tokens(self, tokens: Sequence[textpb.Token]):
+    def _test_tokens(self, tokens: Sequence[textpb.Token]) -> None:
         text = unlex(tokens)
         lexed = list(textpb._lex_line(text))
         self.assertEqual(lexed, tokens)
 
-    def test_start_block(self):
+    def test_start_block(self) -> None:
         self._test_tokens(
             [textpb.Token(text="<", type=textpb.TokenType.START_BLOCK)]
         )
@@ -32,7 +32,7 @@ class LexTests(unittest.TestCase):
             [textpb.Token(text="{", type=textpb.TokenType.START_BLOCK)]
         )
 
-    def test_end_block(self):
+    def test_end_block(self) -> None:
         self._test_tokens(
             [textpb.Token(text=">", type=textpb.TokenType.END_BLOCK)]
         )
@@ -40,7 +40,7 @@ class LexTests(unittest.TestCase):
             [textpb.Token(text="}", type=textpb.TokenType.END_BLOCK)]
         )
 
-    def test_empty_block(self):
+    def test_empty_block(self) -> None:
         self._test_tokens(
             [
                 textpb.Token(text="<", type=textpb.TokenType.START_BLOCK),
@@ -54,7 +54,7 @@ class LexTests(unittest.TestCase):
             ]
         )
 
-    def test_spaces(self):
+    def test_spaces(self) -> None:
         self._test_tokens([textpb.Token(text=" ", type=textpb.TokenType.SPACE)])
         self._test_tokens(
             [textpb.Token(text="  ", type=textpb.TokenType.SPACE)]
@@ -66,7 +66,7 @@ class LexTests(unittest.TestCase):
             [textpb.Token(text="\t\t", type=textpb.TokenType.SPACE)]
         )
 
-    def test_newlines(self):
+    def test_newlines(self) -> None:
         self._test_tokens(
             [textpb.Token(text="\n", type=textpb.TokenType.NEWLINE)]
         )
@@ -74,7 +74,7 @@ class LexTests(unittest.TestCase):
             [textpb.Token(text="\r\n", type=textpb.TokenType.NEWLINE)]
         )
 
-    def test_field_name(self):
+    def test_field_name(self) -> None:
         self._test_tokens(
             [textpb.Token(text="field:", type=textpb.TokenType.FIELD_NAME)]
         )
@@ -85,7 +85,7 @@ class LexTests(unittest.TestCase):
             [textpb.Token(text="value:", type=textpb.TokenType.FIELD_NAME)]
         )
 
-    def test_strings(self):
+    def test_strings(self) -> None:
         self._test_tokens(
             [textpb.Token(text='""', type=textpb.TokenType.STRING_VALUE)]
         )
@@ -115,7 +115,7 @@ class LexTests(unittest.TestCase):
             ]
         )
 
-    def test_nonstring_values(self):
+    def test_nonstring_values(self) -> None:
         self._test_tokens(
             [textpb.Token(text="ENUM", type=textpb.TokenType.OTHER_VALUE)]
         )
@@ -126,7 +126,7 @@ class LexTests(unittest.TestCase):
             [textpb.Token(text="123", type=textpb.TokenType.OTHER_VALUE)]
         )
 
-    def test_combination(self):
+    def test_combination(self) -> None:
         self._test_tokens(
             [
                 textpb.Token(
@@ -153,14 +153,14 @@ class LexTests(unittest.TestCase):
 
 
 class AutoDictTests(unittest.TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         self.assertEqual(textpb._auto_dict([]), [])
 
-    def test_not_dict(self):
+    def test_not_dict(self) -> None:
         v = ["VAL1", "VAL2"]
         self.assertEqual(textpb._auto_dict(v), v)
 
-    def test_single(self):
+    def test_single(self) -> None:
         self.assertEqual(
             textpb._auto_dict(
                 [
@@ -177,7 +177,7 @@ class AutoDictTests(unittest.TestCase):
             {"foo": "BAR"},
         )
 
-    def test_multiple(self):
+    def test_multiple(self) -> None:
         self.assertEqual(
             textpb._auto_dict(
                 [
@@ -207,13 +207,13 @@ class AutoDictTests(unittest.TestCase):
 
 
 class ParseTests(unittest.TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         self.assertEqual(
             textpb.parse([]),
             dict(),
         )
 
-    def test_one_field(self):
+    def test_one_field(self) -> None:
         self.assertEqual(
             textpb.parse(["cost: 24"]),
             {
@@ -223,13 +223,13 @@ class ParseTests(unittest.TestCase):
             },
         )
 
-    def test_one_field_empty_struct(self):
+    def test_one_field_empty_struct(self) -> None:
         self.assertEqual(
             textpb.parse(["tools: {}"]),
             {"tools": [dict()]},
         )
 
-    def test_repeated_field(self):
+    def test_repeated_field(self) -> None:
         self.assertEqual(
             textpb.parse(
                 [
@@ -249,7 +249,7 @@ class ParseTests(unittest.TestCase):
             },
         )
 
-    def test_deeply_nested(self):
+    def test_deeply_nested(self) -> None:
         self.assertEqual(
             textpb.parse(
                 [
@@ -277,7 +277,7 @@ class ParseTests(unittest.TestCase):
             },
         )
 
-    def test_mixed_levels(self):
+    def test_mixed_levels(self) -> None:
         self.assertEqual(
             textpb.parse(
                 [
@@ -321,7 +321,7 @@ class ParseTests(unittest.TestCase):
             },
         )
 
-    def test_nested_dictionaries(self):
+    def test_nested_dictionaries(self) -> None:
         self.assertEqual(
             textpb.parse(
                 [
@@ -416,25 +416,25 @@ class ParseTests(unittest.TestCase):
             },
         )
 
-    def test_unbalanced_close_block(self):
+    def test_unbalanced_close_block(self) -> None:
         with self.assertRaisesRegex(
             textpb.ParseError, "Unexpected end-of-block"
         ):
             textpb.parse(["}"])
 
-    def test_unbalanced_open_block(self):
+    def test_unbalanced_open_block(self) -> None:
         with self.assertRaisesRegex(textpb.ParseError, "Unexpected EOF"):
             textpb.parse(["foo: {"])
 
-    def test_missing_value(self):
+    def test_missing_value(self) -> None:
         with self.assertRaisesRegex(textpb.ParseError, "Unexpected EOF"):
             textpb.parse(["foo: "])
 
-    def test_expected_field(self):
+    def test_expected_field(self) -> None:
         with self.assertRaisesRegex(textpb.ParseError, "Expected a field name"):
             textpb.parse(['"value"'])
 
-    def test_expected_value(self):
+    def test_expected_value(self) -> None:
         with self.assertRaisesRegex(
             textpb.ParseError, "Unexpected token: .*END_BLOCK"
         ):
