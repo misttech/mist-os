@@ -8,7 +8,7 @@ use fidl::endpoints::{create_request_stream, ServerEnd};
 use fidl_fuchsia_power_broker::{
     self as fpb, CurrentLevelRequest, CurrentLevelRequestStream, ElementControlMarker,
     ElementControlRequest, ElementControlRequestStream, LeaseControlMarker, LeaseControlRequest,
-    LeaseControlRequestStream, LeaseStatus, LessorRequest, LessorRequestStream, PowerLevel,
+    LeaseControlRequestStream, LeaseStatus, LessorRequest, LessorRequestStream,
     RequiredLevelRequest, RequiredLevelRequestStream, StatusRequest, StatusRequestStream,
     TopologyRequest, TopologyRequestStream,
 };
@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::broker::{Broker, LeaseID, RequiredLevelSubscriber};
-use crate::topology::ElementID;
+use crate::topology::{ElementID, IndexedPowerLevel};
 
 mod broker;
 mod credentials;
@@ -77,6 +77,7 @@ impl BrokerSvc {
                         tracing::debug!("Lease({:?}, {:?})", &element_id, &level);
                         let resp = {
                             let mut broker = self.broker.borrow_mut();
+                            let level = broker.get_level_index(&element_id, level).unwrap().clone();
                             broker.acquire_lease(&element_id, level)
                         };
                         match resp {
@@ -514,6 +515,8 @@ impl CurrentLevelHandler {
                             &current_level
                         );
                         let mut broker = self.broker.borrow_mut();
+                        let current_level =
+                            broker.get_level_index(&element_id, current_level).unwrap().clone();
                         broker.update_current_level(&element_id, current_level);
                         responder.send(Ok(())).context("send failed")
                     }
@@ -552,7 +555,7 @@ impl StatusChannelHandler {
     fn start(
         &mut self,
         mut stream: StatusRequestStream,
-        mut receiver: UnboundedReceiver<Option<PowerLevel>>,
+        mut receiver: UnboundedReceiver<Option<IndexedPowerLevel>>,
     ) {
         let element_id = self.element_id.clone();
         let mut shutdown = self.shutdown.wait_or_dropped();
@@ -581,13 +584,13 @@ impl StatusChannelHandler {
     async fn handle_request(
         element_id: ElementID,
         request: StatusRequest,
-        receiver: &mut UnboundedReceiver<Option<PowerLevel>>,
+        receiver: &mut UnboundedReceiver<Option<IndexedPowerLevel>>,
     ) -> Result<(), Error> {
         match request {
             StatusRequest::WatchPowerLevel { responder } => {
                 if let Some(Some(power_level)) = receiver.next().await {
-                    tracing::debug!("WatchPowerLevel: send({:?})", &power_level);
-                    return responder.send(Ok(power_level)).context("response failed");
+                    tracing::debug!("WatchPowerLevel: send({:?})", &power_level.level);
+                    return responder.send(Ok(power_level.level)).context("response failed");
                 } else {
                     tracing::info!(
                         "WatchPowerLevel: receiver closed, element {:?} is no longer available.",
