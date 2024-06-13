@@ -26,7 +26,7 @@ _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
@@ -57,9 +57,9 @@ class PrebuiltToolAction(object):
     def __init__(
         self,
         argv: Sequence[str],
-        exec_root: Path = None,
-        working_dir: Path = None,
-        host_platform: str = None,
+        exec_root: Path | None = None,
+        working_dir: Path | None = None,
+        host_platform: str | None = None,
         auto_reproxy: bool = True,  # can disable for unit-testing
     ):
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
@@ -102,16 +102,15 @@ class PrebuiltToolAction(object):
 
     @property
     def remote_command(self) -> Sequence[str]:
-        local_tool = self.local_tool
         return [
-            self.remote_tool if tok == local_tool else tok
+            str(self.remote_tool) if Path(tok) == self.local_tool else tok
             for tok in self._local_command
         ]
 
-    def check_preconditions(self):
+    def check_preconditions(self) -> None:
         # check for required remote tools
         tool = self.remote_tool
-        if not tool.exists():
+        if tool is None or not tool.exists():
             raise RuntimeError(
                 f"Missing the following tools for remote execution: {tool}.  See tqr/563535 for how to fetch the needed packages."
             )
@@ -147,7 +146,7 @@ class PrebuiltToolAction(object):
             )
         ]
 
-    def prepare(self):
+    def prepare(self) -> None:
         """Setup everything ahead of remote execution.
 
         Raises:
@@ -160,6 +159,8 @@ class PrebuiltToolAction(object):
         self.check_preconditions()
 
     def _setup_remote_action(self) -> remote_action.RemoteAction:
+        if self.label_toolname is None:
+            raise ValueError("self.label_toolname is None")
         tool_name = self.label_toolname.name
         remote_options = [
             # type=tool says we are providing a custom tool, and thus,
@@ -177,7 +178,9 @@ class PrebuiltToolAction(object):
         ] + self._main_remote_options  # allow forwarded options to override defaults
 
         # Automatically add the tool.
-        remote_inputs = [self.remote_tool]
+        remote_inputs = (
+            [self.remote_tool] if self.remote_tool is not None else []
+        )
 
         action = remote_action.remote_action_from_args(
             main_args=self._main_args,  # includes inputs and outputs already
@@ -225,11 +228,11 @@ class PrebuiltToolAction(object):
     def dry_run(self) -> bool:
         return self._main_args.dry_run
 
-    def vmsg(self, text: str):
+    def vmsg(self, text: str) -> None:
         if self.verbose:
             msg(text)
 
-    def vprintlist(self, desc: str, items: Iterable[Any]):
+    def vprintlist(self, desc: str, items: Iterable[Any]) -> None:
         """In verbose mode, print elements.
 
         Args:
@@ -252,19 +255,27 @@ class PrebuiltToolAction(object):
         for tok in self.local_command:
             if "=" not in tok:
                 return Path(tok)
+        return None
 
     @property
-    def label_toolname(self) -> Path:
-        return self._main_args.label_toolname or self.local_tool
+    def label_toolname(self) -> Path | None:
+        toolname = self._main_args.label_toolname
+        return (
+            toolname
+            if (isinstance(toolname, Path) and toolname is not None)
+            else self.local_tool
+        )
 
     @property
     def remote_tool(self) -> Optional[Path]:
         # selects the binary for the remote execution platform
+        if self.local_tool is None:
+            return None
         return fuchsia.remote_executable(self.local_tool)
 
     def _run_locally(self) -> int:
         return subprocess.call(
-            cl_utils.auto_env_prefix_command(self.local_command)
+            cl_utils.auto_env_prefix_command(list(self.local_command))
         )
 
     def _run_remote_action(self) -> int:
@@ -282,7 +293,7 @@ class PrebuiltToolAction(object):
             if not self._main_args.save_temps:
                 self._cleanup()
 
-    def _cleanup(self):
+    def _cleanup(self) -> None:
         for f in self._cleanup_files:
             f.unlink()
 

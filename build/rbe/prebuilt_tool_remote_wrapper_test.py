@@ -29,7 +29,7 @@ class ImmediateExit(Exception):
     pass
 
 
-def _write_file_contents(path: Path, contents: str):
+def _write_file_contents(path: Path, contents: str) -> None:
     with open(path, "w") as f:
         f.write(contents)
 
@@ -43,11 +43,11 @@ def _strs(items: Sequence[Any]) -> Sequence[str]:
     return [str(i) for i in items]
 
 
-def _paths(items: Sequence[Any]) -> Sequence[Path]:
+def _paths(items: Sequence[Any]) -> list[Path] | set[Path] | tuple[Path, ...]:
     if isinstance(items, list):
         return [Path(i) for i in items]
     elif isinstance(items, set):
-        return {Path(i) for i in items}
+        return set({Path(i) for i in items})
     elif isinstance(items, tuple):
         return tuple(Path(i) for i in items)
 
@@ -56,7 +56,7 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 
 
 class PrebuiltToolActionTests(unittest.TestCase):
-    def test_label_toolname(self):
+    def test_label_toolname(self) -> None:
         fake_root = Path("/home/project")
         fake_builddir = Path("out/really-not-default")
         fake_cwd = fake_root / fake_builddir
@@ -81,11 +81,11 @@ class PrebuiltToolActionTests(unittest.TestCase):
         for opt in remote_options:
             if opt.startswith("--label="):
                 labels = cl_utils.keyed_flags_to_values_dict(
-                    opt.remove_prefix("--label=").split(",")
+                    opt.removeprefix("--label=").split(",")
                 )
                 self.assertEqual(labels["toolname"], [real_tool.name])
 
-    def test_host_remote_same(self):
+    def test_host_remote_same(self) -> None:
         fake_root = Path("/home/project")
         fake_builddir = Path("out/really-not-default")
         fake_cwd = fake_root / fake_builddir
@@ -94,7 +94,7 @@ class PrebuiltToolActionTests(unittest.TestCase):
         output = Path("furniture.obj")
         command = _strs([local_tool, "-i", source, "-o", output])
         c = prebuilt_tool_remote_wrapper.PrebuiltToolAction(
-            [f"--inputs={source}", f"--output_files={output}", "--"] + command,
+            [f"--inputs={source}", f"--output_files={output}", "--", *command],
             exec_root=fake_root,
             working_dir=fake_cwd,
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
@@ -115,7 +115,7 @@ class PrebuiltToolActionTests(unittest.TestCase):
             prebuilt_tool_remote_wrapper.PrebuiltToolAction,
             "check_preconditions",
         ) as mock_check:
-            self.assertIsNone(c.prepare())
+            c.prepare()
             self.assertEqual(
                 set(c.remote_action.inputs_relative_to_project_root),
                 {fake_builddir / source, Path("path/to/hammer")},
@@ -129,7 +129,8 @@ class PrebuiltToolActionTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_once()
 
-    def test_host_remote_different(self):
+    def test_host_remote_different(self) -> None:
+        print("\n\nXXX THIS TEST")
         fake_root = Path("/home/project")
         fake_builddir = Path("out/really-not-default")
         fake_cwd = fake_root / fake_builddir
@@ -143,7 +144,7 @@ class PrebuiltToolActionTests(unittest.TestCase):
         output = Path("furniture.obj")
         command = _strs([local_tool, "-i", source, "-o", output])
         c = prebuilt_tool_remote_wrapper.PrebuiltToolAction(
-            [f"--inputs={source}", f"--output_files={output}", "--"] + command,
+            [f"--inputs={source}", f"--output_files={output}", "--", *command],
             exec_root=fake_root,
             working_dir=fake_cwd,
             host_platform="mac-arm64",  # host != remote exec
@@ -157,14 +158,17 @@ class PrebuiltToolActionTests(unittest.TestCase):
         self.assertEqual(c.command_line_output_files, [output])
         self.assertEqual(c.command_line_output_dirs, [])
         self.assertEqual(c.local_command, command)
-        self.assertEqual(c.remote_command, command)
+        expected_remote_command = _strs(
+            [remote_tool, "-i", source, "-o", output]
+        )
+        self.assertEqual(c.remote_command, expected_remote_command)
         self.assertFalse(c.local_only)
 
         with mock.patch.object(
             prebuilt_tool_remote_wrapper.PrebuiltToolAction,
             "check_preconditions",
         ) as mock_check:
-            self.assertIsNone(c.prepare())
+            c.prepare()
             self.assertEqual(
                 set(c.remote_action.inputs_relative_to_project_root),
                 {
@@ -181,14 +185,14 @@ class PrebuiltToolActionTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_once()
 
-    def test_remote_failure(self):
+    def test_remote_failure(self) -> None:
         fake_root = Path("/home/project")
         fake_builddir = Path("out/really-not-default")
         fake_cwd = fake_root / fake_builddir
         local_tool = Path("../../path/to/hammer")  # platform-independent
         command = _strs([local_tool])
         c = prebuilt_tool_remote_wrapper.PrebuiltToolAction(
-            ["--"] + command,
+            ["--", *command],
             exec_root=fake_root,
             working_dir=fake_cwd,
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
@@ -200,7 +204,7 @@ class PrebuiltToolActionTests(unittest.TestCase):
             prebuilt_tool_remote_wrapper.PrebuiltToolAction,
             "check_preconditions",
         ) as mock_check:
-            self.assertIsNone(c.prepare())
+            c.prepare()
             with mock.patch.object(
                 prebuilt_tool_remote_wrapper.PrebuiltToolAction,
                 "_run_remote_action",
@@ -210,7 +214,7 @@ class PrebuiltToolActionTests(unittest.TestCase):
         self.assertEqual(exit_code, mock_exit_code)
         mock_call.assert_called_once()
 
-    def test_remote_flag_back_propagating(self):
+    def test_remote_flag_back_propagating(self) -> None:
         tool = Path("path/to/drill")
         flag = "--foo-bar"
         command = _strs(
@@ -221,7 +225,7 @@ class PrebuiltToolActionTests(unittest.TestCase):
         )
         filtered_command = _strs([tool])
         c = prebuilt_tool_remote_wrapper.PrebuiltToolAction(
-            ["--"] + command,
+            ["--", *command],
             host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
             auto_reproxy=False,
         )
@@ -230,7 +234,7 @@ class PrebuiltToolActionTests(unittest.TestCase):
             prebuilt_tool_remote_wrapper.PrebuiltToolAction,
             "check_preconditions",
         ) as mock_check:
-            self.assertIsNone(c.prepare())
+            c.prepare()
         # check that rewrapper option sees --foo=bar
         remote_action_command = c.remote_action.launch_command
         prefix, sep, wrapped_command = cl_utils.partition_sequence(
@@ -241,7 +245,7 @@ class PrebuiltToolActionTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def test_help_implicit(self):
+    def test_help_implicit(self) -> None:
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
         stdout = io.StringIO()
@@ -253,7 +257,7 @@ class MainTests(unittest.TestCase):
                     prebuilt_tool_remote_wrapper.main([])
         mock_exit.assert_called_with(0)
 
-    def test_help_flag(self):
+    def test_help_flag(self) -> None:
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
         stdout = io.StringIO()
@@ -265,7 +269,7 @@ class MainTests(unittest.TestCase):
                     prebuilt_tool_remote_wrapper.main(["--help"])
         mock_exit.assert_called_with(0)
 
-    def test_local_mode_forced(self):
+    def test_local_mode_forced(self) -> None:
         exit_code = 24
         with mock.patch.object(
             remote_action, "auto_relaunch_with_reproxy"
@@ -292,7 +296,7 @@ class MainTests(unittest.TestCase):
         mock_relaunch.assert_called_once()
         mock_run.assert_called_with()
 
-    def test_auto_relaunched_with_reproxy(self):
+    def test_auto_relaunched_with_reproxy(self) -> None:
         argv = ["--", "shebang", "-c", "flu.cc", "-o", "cuckoo"]
         with mock.patch.object(
             os.environ, "get", return_value=None

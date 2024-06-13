@@ -7,7 +7,7 @@ import os
 
 import unittest
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 from unittest import mock
 
 import fuchsia
@@ -17,7 +17,7 @@ import fuchsia
 
 
 class RemoteExecutableTests(unittest.TestCase):
-    def test_linux_x64(self):
+    def test_linux_x64(self) -> None:
         self.assertEqual(
             fuchsia.remote_executable(
                 Path("../prebuilt/some/tool/linux-x64/bin/tool1")
@@ -25,7 +25,7 @@ class RemoteExecutableTests(unittest.TestCase):
             Path("../prebuilt/some/tool/linux-x64/bin/tool1"),
         )
 
-    def test_mac_arm64(self):
+    def test_mac_arm64(self) -> None:
         self.assertEqual(
             fuchsia.remote_executable(
                 Path("../prebuilt/some/tool/mac-arm64/bin/tool2")
@@ -35,7 +35,7 @@ class RemoteExecutableTests(unittest.TestCase):
 
 
 class GCCSupportToolsTests(unittest.TestCase):
-    def test_partial_paths_c(self):
+    def test_partial_paths_c(self) -> None:
         arch = "x86_64"
         objfmt = "elf"
         gcc_install_base = Path("../../some/where/install_gcc")
@@ -55,7 +55,7 @@ class GCCSupportToolsTests(unittest.TestCase):
         for t in tools:
             self.assertIn(gcc_install_base, t.parents)
 
-    def test_partial_paths_cxx(self):
+    def test_partial_paths_cxx(self) -> None:
         arch = "powerpc64"
         objfmt = "macho"
         gcc_install_base = Path("../../some/where/install_gcc")
@@ -77,7 +77,7 @@ class GCCSupportToolsTests(unittest.TestCase):
         for t in tools:
             self.assertIn(gcc_install_base, t.parents)
 
-    def test_partial_paths_cxx_link(self):
+    def test_partial_paths_cxx_link(self) -> None:
         arch = "powerpc64"
         objfmt = "macho"
         gcc_install_base = Path("../../some/where/install_gcc")
@@ -103,13 +103,13 @@ class GCCSupportToolsTests(unittest.TestCase):
 
 
 class RustStdlibDirTests(unittest.TestCase):
-    def test_substitution(self):
+    def test_substitution(self) -> None:
         target = "powerpc-apple-darwin8"
         self.assertIn(target, fuchsia.rust_stdlib_subdir(target).parts)
 
 
 class RustcTargetToSysrootTripleTests(unittest.TestCase):
-    def test_known(self):
+    def test_known(self) -> None:
         for t in (
             "x86_64-linux-gnu",
             "aarch64-linux-gnu",
@@ -118,13 +118,13 @@ class RustcTargetToSysrootTripleTests(unittest.TestCase):
         ):
             fuchsia.rustc_target_to_sysroot_triple(t)
 
-    def test_unknown(self):
+    def test_unknown(self) -> None:
         with self.assertRaises(ValueError):
             fuchsia.rustc_target_to_sysroot_triple("pdp11-alien-vax")
 
 
 class RustcTargetToClangTargetTests(unittest.TestCase):
-    def test_known(self):
+    def test_known(self) -> None:
         for t in (
             "x86_64-linux-gnu",
             "aarch64-linux-gnu",
@@ -134,43 +134,43 @@ class RustcTargetToClangTargetTests(unittest.TestCase):
         ):
             fuchsia.rustc_target_to_clang_target(t)
 
-    def test_unknown(self):
+    def test_unknown(self) -> None:
         with self.assertRaises(ValueError):
             fuchsia.rustc_target_to_clang_target("pdp11-alien-vax")
 
 
-def fake_linker_script_expander(path: Path) -> Iterable[Path]:
-    yield path
+def fake_linker_script_expander(path: Sequence[Path]) -> Iterable[Path]:
+    return iter(path)
 
 
 class RemoteClangCompilerToolchainInputsTests(unittest.TestCase):
     @property
-    def _fake_path(self):
+    def _fake_path(self) -> Path:
         return Path("../fake/path")
 
     @property
-    def _fake_clangdir(self):
+    def _fake_clangdir(self) -> Path:
         return self._fake_path / "lib" / "clang" / "66"
 
-    def test_no_sanitizers(self):
+    def test_no_sanitizers(self) -> None:
         with mock.patch.object(
             fuchsia, "_versioned_libclang_dir", return_value=self._fake_clangdir
         ) as mock_clangdir:
             inputs = list(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
-                    self._fake_path, {}
+                    self._fake_path, frozenset()
                 )
             )
         self.assertEqual(inputs, [])
         mock_clangdir.assert_called_once_with(self._fake_path)
 
-    def test_asan(self):
+    def test_asan(self) -> None:
         with mock.patch.object(
             fuchsia, "_versioned_libclang_dir", return_value=self._fake_clangdir
         ) as mock_clangdir:
             inputs = list(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
-                    self._fake_path, {"address"}
+                    self._fake_path, frozenset({"address"})
                 )
             )
         self.assertIn(
@@ -178,13 +178,13 @@ class RemoteClangCompilerToolchainInputsTests(unittest.TestCase):
         )
         mock_clangdir.assert_called_once_with(self._fake_path)
 
-    def test_hwasan(self):
+    def test_hwasan(self) -> None:
         with mock.patch.object(
             fuchsia, "_versioned_libclang_dir", return_value=self._fake_clangdir
         ) as mock_clangdir:
             inputs = list(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
-                    self._fake_path, {"hwaddress"}
+                    self._fake_path, frozenset({"hwaddress"})
                 )
             )
         self.assertIn(
@@ -192,13 +192,13 @@ class RemoteClangCompilerToolchainInputsTests(unittest.TestCase):
         )
         mock_clangdir.assert_called_once_with(self._fake_path)
 
-    def test_asan(self):
+    def test_asan_memory(self) -> None:
         with mock.patch.object(
             fuchsia, "_versioned_libclang_dir", return_value=self._fake_clangdir
         ) as mock_clangdir:
             inputs = list(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
-                    self._fake_path, {"memory"}
+                    self._fake_path, frozenset({"memory"})
                 )
             )
         self.assertIn(
@@ -209,10 +209,10 @@ class RemoteClangCompilerToolchainInputsTests(unittest.TestCase):
 
 class RemoteClangLinkerToolchainInputsTests(unittest.TestCase):
     @property
-    def _clang_path(self):
+    def _clang_path(self) -> Path:
         return Path("../path/to/linux-x64/bin/clang")
 
-    def test_select_libclang_rt(self):
+    def test_select_libclang_rt(self) -> None:
         # just test for execution without errors
         with mock.patch.object(
             Path, "glob", return_value=iter([Path("ignore")])
@@ -231,7 +231,7 @@ class RemoteClangLinkerToolchainInputsTests(unittest.TestCase):
             )
         mock_glob.assert_called()
 
-    def test_want_all_libclang_rt(self):
+    def test_want_all_libclang_rt(self) -> None:
         # just test for execution without errors
         with mock.patch.object(
             Path, "glob", return_value=iter([Path("ignore")])
@@ -252,7 +252,7 @@ class RemoteClangLinkerToolchainInputsTests(unittest.TestCase):
 
 
 class CSysrootFilesTest(unittest.TestCase):
-    def test_list(self):
+    def test_list(self) -> None:
         with mock.patch.object(
             Path, "is_file", return_value=True
         ) as mock_is_file:

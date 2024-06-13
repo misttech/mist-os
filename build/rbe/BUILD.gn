@@ -157,41 +157,41 @@ if (is_host) {
   }
 
   python_library("fuchsia") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _fuchsia_sources
   }
   python_host_test("fuchsia_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "fuchsia_test.py"
     sources = _fuchsia_sources
   }
 
   python_library("linker") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _linker_sources
   }
   python_host_test("linker_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "linker_test.py"
     sources = _linker_sources
   }
 
   python_library("output_leak_scanner") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _output_leak_scanner_sources
   }
   python_host_test("output_leak_scanner_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "output_leak_scanner_test.py"
     sources = _output_leak_scanner_sources
   }
 
   python_library("prebuilt_tool_remote_wrapper") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _prebuilt_tool_remote_wrapper_sources
   }
   python_host_test("prebuilt_tool_remote_wrapper_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "prebuilt_tool_remote_wrapper_test.py"
     sources = _prebuilt_tool_remote_wrapper_sources
   }
