@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <array>
 #include <lib/affine/ratio.h>
 #include <lib/fit/function.h>
+
+#include <array>
 #include <type_traits>
+
 #include <zxtest/zxtest.h>
 
 namespace {
@@ -303,56 +305,94 @@ TEST(RatioTestCase, Product) {
   }
 }
 
-TEST(RatioTestCase, Scale) {
+template <affine::Ratio::Round kRoundBehavior>
+void RatioTestScale() {
   using Ratio = affine::Ratio;
+  enum class Method { Static, Instanced, MulOperatorRatioVal, MulOperatorValRatio, DivOperator };
+  enum class FractionalResult { Yes, No };
 
   struct TestVector {
     int64_t val;
     uint32_t n, d;
     int64_t expected;
     Fatal expect_fatal;
+    FractionalResult fractional_result;
   };
-
-  enum class Method { Static, MulOperatorRatioVal, MulOperatorValRatio, DivOperator };
 
   // clang-format on
   constexpr std::array TEST_VECTORS{
-      TestVector{0, 0, 1, 0, Fatal::No},
-      TestVector{1234567890, 0, 1, 0, Fatal::No},
-      TestVector{0, 1, 1, 0, Fatal::No},
-      TestVector{1234567890, 1, 1, 1234567890, Fatal::No},
-      TestVector{0, 1, 0, 0, Fatal::Yes},
-      TestVector{1234567890, 1, 0, 0, Fatal::Yes},
-      TestVector{198, 48000, 44100, 215, Fatal::No},
-      TestVector{-198, 48000, 44100, -216, Fatal::No},
-      TestVector{(49 * 198), 48000, 44100, 10560, Fatal::No},
-      TestVector{-(49 * 198), 48000, 44100, -10560, Fatal::No},
-      TestVector{0x1517ffffeae80, 0xbebc200, 0x33333333, 0x4e94914f0000, Fatal::No},
-      TestVector{-0x1517ffffeae80, 0xbebc200, 0x33333333, -0x4e94914f0000, Fatal::No},
+      TestVector{0, 0, 1, 0, Fatal::No, FractionalResult::No},
+      TestVector{1234567890, 0, 1, 0, Fatal::No, FractionalResult::No},
+      TestVector{0, 1, 1, 0, Fatal::No, FractionalResult::No},
+      TestVector{1234567890, 1, 1, 1234567890, Fatal::No, FractionalResult::No},
+      TestVector{0, 1, 0, 0, Fatal::Yes, FractionalResult::No},
+      TestVector{1234567890, 1, 0, 0, Fatal::Yes, FractionalResult::No},
+      TestVector{198, 48000, 44100, 215, Fatal::No, FractionalResult::Yes},
+      TestVector{-198, 48000, 44100, -216, Fatal::No, FractionalResult::Yes},
+      TestVector{(49 * 198), 48000, 44100, 10560, Fatal::No, FractionalResult::No},
+      TestVector{-(49 * 198), 48000, 44100, -10560, Fatal::No, FractionalResult::No},
+      TestVector{((49 * 198) + 1), 48000, 44100, 10561, Fatal::No, FractionalResult::Yes},
+      TestVector{-((49 * 198) + 1), 48000, 44100, -10562, Fatal::No, FractionalResult::Yes},
+      TestVector{0x1517ffffeae80, 0xbebc200, 0x33333333, 0x4e94914f0000, Fatal::No,
+                 FractionalResult::No},
+      TestVector{-0x1517ffffeae80, 0xbebc200, 0x33333333, -0x4e94914f0000, Fatal::No,
+                 FractionalResult::No},
 
       // Overflow
-      TestVector{std::numeric_limits<int64_t>::max(), 1000001, 1000000, Ratio::kOverflow,
-                 Fatal::No},
+      TestVector{std::numeric_limits<int64_t>::max(), 1000001, 1000000, Ratio::kOverflow, Fatal::No,
+                 FractionalResult::No},
 
       // Underflow where we spill into the upper [64, 96) bit range
       TestVector{std::numeric_limits<int64_t>::min(), 1000001, 1000000, Ratio::kUnderflow,
-                 Fatal::No},
+                 Fatal::No, FractionalResult::No},
 
       // Underflow where bit 63 ends up set, and not all of the rest of the
       // bits are zero.
-      TestVector{-0x2000000000000001, 4, 1, Ratio::kUnderflow, Fatal::No},
+      TestVector{-0x2000000000000001, 4, 1, Ratio::kUnderflow, Fatal::No, FractionalResult::No},
   };
   // clang-format off
 
     constexpr std::array METHODS = { Method::Static,
+                                     Method::Instanced,
                                      Method::MulOperatorRatioVal,
                                      Method::MulOperatorValRatio,
                                      Method::DivOperator };
+
+    auto MethodToString = [](Method m) -> const char* {
+      switch (m) {
+        case Method::Static: return "Static";
+        case Method::Instanced: return "Instanced";
+        case Method::MulOperatorRatioVal: return "MulOperatorRatioVal";
+        case Method::MulOperatorValRatio: return "MulOperatorValRatio";
+        case Method::DivOperator: return "DivOperator";
+        default: return "<unknown>";
+      }
+    };
+
+    auto RoundToString = [](Ratio::Round r) -> const char* {
+      switch (r) {
+        case Ratio::Round::Down: return "Down";
+        case Ratio::Round::Up: return "Up";
+        case Ratio::Round::TowardsZero: return "TowardsZero";
+        case Ratio::Round::AwayFromZero: return "AwayFromZero";
+        default: return "<unknown>";
+      }
+    };
 
     for (const auto& V : TEST_VECTORS) {
         for (auto method : METHODS) {
             fit::function<void()> func;
             int64_t res;
+
+            // The inline operators always round down.  If we are using a method other than
+            // round-down, skip in operator overload tests.
+            if constexpr (kRoundBehavior != Ratio::Round::Down) {
+              if ((method == Method::MulOperatorRatioVal) ||
+                  (method == Method::MulOperatorValRatio) ||
+                  (method == Method::DivOperator)) {
+                continue;
+              }
+            }
 
             // Expect failure if we plan to divide by a ratio with a zero
             // numerator.
@@ -362,7 +402,10 @@ TEST(RatioTestCase, Scale) {
 
             switch (method) {
             case Method::Static:
-                func = [&V, &res]() { res = Ratio::Scale(V.val, V.n, V.d); };
+                func = [&V, &res]() { res = Ratio::Scale<kRoundBehavior>(V.val, V.n, V.d); };
+                break;
+            case Method::Instanced:
+                func = [&V, &res]() { res = Ratio{V.n, V.d}.Scale<kRoundBehavior>(V.val); };
                 break;
             case Method::MulOperatorRatioVal:
                 func = [&V, &res]() { res = Ratio{V.n, V.d} * V.val; };
@@ -375,19 +418,42 @@ TEST(RatioTestCase, Scale) {
                 break;
             }
 
+            // If we are doing something other than round-down, we may need an adjustment to the
+            // expected value.
+            const int64_t adjusted_expected = [&]() -> int64_t {
+              if ((V.fractional_result == FractionalResult::No) || (kRoundBehavior == Ratio::Round::Down)) {
+                return V.expected;
+              }
+
+              if (V.val >= 0) {
+                // If our value is >= 0, and we are rounding towards zero, we expect the same result
+                // as rounding down.
+                return (kRoundBehavior == Ratio::Round::TowardsZero) ? V.expected : V.expected + 1;
+              } else {
+                // If our value is < 0, and we are rounding away from zero, we expect the same
+                // result as rounding down.
+                return (kRoundBehavior == Ratio::Round::AwayFromZero) ? V.expected : V.expected + 1;
+              }
+            }();
+
             if (expect_fatal == Fatal::No) {
                 func();
-                ASSERT_TRUE(res == V.expected,
-                            "Expected %ld * %u/%u to produce %ld; got %ld instead (method %u).",
-                            V.val, V.n, V.d, V.expected, res, static_cast<uint32_t>(method));
+                ASSERT_TRUE(res == adjusted_expected,
+                            "Expected %ld * %u/%u to produce %ld; got %ld instead (method %s, round %s).",
+                            V.val, V.n, V.d, adjusted_expected, res, MethodToString(method), RoundToString(kRoundBehavior));
             } else if constexpr (ZX_DEBUG_ASSERT_IMPLEMENTED) {
                 ASSERT_DEATH(std::move(func),
-                            "Expected Death; %ld * %u/%u (method %u).",
-                            V.val, V.n, V.d, static_cast<uint32_t>(method));
+                            "Expected Death; %ld * %u/%u (method %s, round %s).",
+                            V.val, V.n, V.d, MethodToString(method), RoundToString(kRoundBehavior));
             }
         }
     }
 }
+
+TEST(RatioTestCase, ScaleRoundDown) { RatioTestScale<affine::Ratio::Round::Down>(); }
+TEST(RatioTestCase, ScaleRoundUp) { RatioTestScale<affine::Ratio::Round::Up>(); }
+TEST(RatioTestCase, ScaleRoundTowardsZero) { RatioTestScale<affine::Ratio::Round::TowardsZero>(); }
+TEST(RatioTestCase, ScaleRoundAwayFromZero) { RatioTestScale<affine::Ratio::Round::AwayFromZero>(); }
 
 TEST(RatioTestCase, Inverse) {
     struct TestVector { uint32_t N, D; };

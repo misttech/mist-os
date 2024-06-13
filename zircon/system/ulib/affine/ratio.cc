@@ -48,13 +48,12 @@ T BinaryGcd(T a, T b) {
   return a << twos;
 }
 
-enum class RoundDirection { Down, Up };
-
 // Scales a uint64_t value by the ratio of two uint32_t values. If round_up is
 // true, the result is rounded up rather than down. overflow is set to indicate
 // overflow.
-template <RoundDirection ROUND_DIR, uint64_t OVERFLOW_LIMIT_64>
+template <Ratio::Round ROUND_DIR, uint64_t OVERFLOW_LIMIT_64>
 uint64_t ScaleUInt64(uint64_t value, uint32_t numerator, uint32_t denominator) {
+  static_assert((ROUND_DIR == Ratio::Round::Up) || (ROUND_DIR == Ratio::Round::Down));
   constexpr uint64_t kLow32Bits = 0xffffffffu;
 
   // high and low are the product of the numerator and the high and low halves
@@ -88,17 +87,16 @@ uint64_t ScaleUInt64(uint64_t value, uint32_t numerator, uint32_t denominator) {
   // divmod for the low portion
   low |= high_r << 32u;
 
-  uint64_t low_q = low / denominator;
-  [[maybe_unused]] uint64_t low_r = low % denominator;
+  const uint64_t low_q = low / denominator;
+  [[maybe_unused]] const uint64_t low_r = low % denominator;
+  const uint64_t result = (high_q << 32u) | low_q;
+  if (result >= OVERFLOW_LIMIT_64) {
+    return OVERFLOW_LIMIT_64;
+  }
 
-  uint64_t result = (high_q << 32u) | low_q;
-
-  if constexpr (ROUND_DIR == RoundDirection::Up) {
-    if (result >= OVERFLOW_LIMIT_64) {
-      return OVERFLOW_LIMIT_64;
-    }
+  if constexpr (ROUND_DIR == Ratio::Round::Up) {
     if (low_r) {
-      ++result;
+      return result + 1;
     }
   }
 
@@ -198,14 +196,20 @@ void Ratio::Product(uint32_t a_numerator, uint32_t a_denominator, uint32_t b_num
   *product_denominator = static_cast<uint32_t>(denominator);
 }
 
+template <Ratio::Round kRoundBehavior>
 int64_t Ratio::Scale(int64_t value, uint32_t numerator, uint32_t denominator) {
   internal::Assert(denominator != 0u);
 
   if (value >= 0) {
     // LIMIT == 0x7FFFFFFFFFFFFFFF
     constexpr uint64_t LIMIT = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
-    return static_cast<int64_t>(ScaleUInt64<RoundDirection::Down, LIMIT>(
-        static_cast<uint64_t>(value), numerator, denominator));
+    constexpr Ratio::Round ROUND =
+        (kRoundBehavior == Ratio::Round::Down) || (kRoundBehavior == Ratio::Round::TowardsZero)
+            ? Ratio::Round::Down
+            : Ratio::Round::Up;
+
+    return static_cast<int64_t>(
+        ScaleUInt64<ROUND, LIMIT>(static_cast<uint64_t>(value), numerator, denominator));
   } else {
     // LIMIT == 0x8000000000000000
     //
@@ -222,13 +226,23 @@ int64_t Ratio::Scale(int64_t value, uint32_t numerator, uint32_t denominator) {
     // get properly flipped back to MIN during the return.
     //
     constexpr uint64_t LIMIT = static_cast<uint64_t>(std::numeric_limits<int64_t>::min());
-    return static_cast<int64_t>(-ScaleUInt64<RoundDirection::Up, LIMIT>(
-        -static_cast<uint64_t>(value), numerator, denominator));
+    constexpr Ratio::Round ROUND =
+        (kRoundBehavior == Ratio::Round::Down) || (kRoundBehavior == Ratio::Round::AwayFromZero)
+            ? Ratio::Round::Up
+            : Ratio::Round::Down;
+    return static_cast<int64_t>(
+        -ScaleUInt64<ROUND, LIMIT>(-static_cast<uint64_t>(value), numerator, denominator));
   }
 }
 
-// Explicit instantiation of the two supported types of Ratio
+// Explicit instantiation of the two supported types of Ratio::Reduce
 template void Ratio::Reduce<uint32_t>(uint32_t*, uint32_t*);
 template void Ratio::Reduce<uint64_t>(uint64_t*, uint64_t*);
+
+// Explicit instantiation of the 4 supported types of Ratio::Scale
+template int64_t Ratio::Scale<Ratio::Round::Down>(int64_t, uint32_t, uint32_t);
+template int64_t Ratio::Scale<Ratio::Round::Up>(int64_t, uint32_t, uint32_t);
+template int64_t Ratio::Scale<Ratio::Round::TowardsZero>(int64_t, uint32_t, uint32_t);
+template int64_t Ratio::Scale<Ratio::Round::AwayFromZero>(int64_t, uint32_t, uint32_t);
 
 }  // namespace affine
