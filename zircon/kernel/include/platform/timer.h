@@ -67,9 +67,6 @@ void platform_stop_timer();
 void platform_shutdown_timer();
 
 void timer_tick();
-// TODO(http://fxbug.dev/341785588): Remove this version of timer_tick once all external
-// dependencies have stopped passing in the timestamp.
-inline void timer_tick(zx_time_t unused_now) { timer_tick(); }
 
 // A bool indicating whether or not user mode has direct access to the registers
 // which allow directly observing the tick counter or not.
