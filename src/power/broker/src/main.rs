@@ -17,15 +17,14 @@ use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
-use futures::channel::mpsc::UnboundedReceiver;
 use futures::prelude::*;
 use futures::select;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::broker::{Broker, LeaseID, RequiredLevelSubscriber};
-use crate::topology::{ElementID, IndexedPowerLevel};
+use crate::broker::{Broker, CurrentLevelSubscriber, LeaseID, RequiredLevelSubscriber};
+use crate::topology::ElementID;
 
 mod broker;
 mod credentials;
@@ -417,13 +416,11 @@ impl BrokerSvc {
         element_id: ElementID,
         server_end: ServerEnd<fpb::StatusMarker>,
     ) -> Result<(), Error> {
-        let receiver = {
-            let mut broker = self.broker.borrow_mut();
-            broker.watch_current_level(&element_id)
-        };
+        let current_level_subscriber =
+            self.broker.borrow_mut().new_current_level_subscriber(&element_id);
         let mut handler = StatusChannelHandler::new(element_id.clone());
         let stream = server_end.into_stream()?;
-        handler.start(stream, receiver);
+        handler.start(stream, current_level_subscriber);
         self.element_handlers
             .borrow_mut()
             .entry(element_id.clone())
@@ -552,15 +549,12 @@ impl StatusChannelHandler {
         Self { element_id, shutdown: Event::new() }
     }
 
-    fn start(
-        &mut self,
-        mut stream: StatusRequestStream,
-        mut receiver: UnboundedReceiver<Option<IndexedPowerLevel>>,
-    ) {
+    fn start(&mut self, mut stream: StatusRequestStream, subscriber: CurrentLevelSubscriber) {
         let element_id = self.element_id.clone();
         let mut shutdown = self.shutdown.wait_or_dropped();
         tracing::debug!("Starting new StatusChannelHandler for {:?}", &self.element_id);
         Task::local(async move {
+            let subscriber = subscriber;
             loop {
                 select! {
                     _ = shutdown => {
@@ -568,7 +562,7 @@ impl StatusChannelHandler {
                     }
                     next = stream.next() => {
                         if let Some(Ok(request)) = next {
-                            if let Err(err) = StatusChannelHandler::handle_request(element_id.clone(), request, &mut receiver).await {
+                            if let Err(err) = StatusChannelHandler::handle_request(request, &subscriber).await {
                                 tracing::debug!("handle_request error: {:?}", err);
                             }
                         } else {
@@ -582,22 +576,13 @@ impl StatusChannelHandler {
     }
 
     async fn handle_request(
-        element_id: ElementID,
         request: StatusRequest,
-        receiver: &mut UnboundedReceiver<Option<IndexedPowerLevel>>,
+        subscriber: &CurrentLevelSubscriber,
     ) -> Result<(), Error> {
         match request {
             StatusRequest::WatchPowerLevel { responder } => {
-                if let Some(Some(power_level)) = receiver.next().await {
-                    tracing::debug!("WatchPowerLevel: send({:?})", &power_level.level);
-                    return responder.send(Ok(power_level.level)).context("response failed");
-                } else {
-                    tracing::info!(
-                        "WatchPowerLevel: receiver closed, element {:?} is no longer available.",
-                        &element_id
-                    );
-                    return Ok(());
-                }
+                subscriber.register(responder)?;
+                Ok(())
             }
             StatusRequest::_UnknownMethod { ordinal, .. } => {
                 tracing::warn!("Received unknown StatusRequest: {ordinal}");

@@ -1441,16 +1441,16 @@ mod tests {
     }
 
     #[test]
-    fn test_required_level_watch() -> Result<()> {
+    fn test_status_watch_power_level() -> Result<()> {
         let mut executor = fasync::TestExecutor::new();
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
 
         // Create a topology with only one element:
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-        let (_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
-        let _element_control = executor.run_singlethreaded(async {
+        let (current, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
+        let element_control = executor.run_singlethreaded(async {
             topology
                 .add_element(ElementSchema {
                     element_name: Some("E".into()),
@@ -1467,40 +1467,33 @@ mod tests {
                 .unwrap()
                 .expect("add_element failed")
         });
+        let element_control = element_control.into_proxy()?;
+        let status = {
+            let (client, server) = create_proxy::<StatusMarker>()?;
+            element_control.open_status_channel(server)?;
+            client
+        };
 
         executor.run_singlethreaded(async {
-            // Initial required level should be 0.
-            assert_eq!(required.watch().await.unwrap(), Ok(0));
-            // Acquire lease for level 1.
-            let lease = lessor
-                .lease(1)
-                .await
-                .unwrap()
-                .expect("Lease response not ok")
-                .into_proxy()
-                .unwrap();
-            // Required level should become 1.
-            assert_eq!(required.watch().await.unwrap(), Ok(1));
-            // Drop lease.
-            drop(lease);
-            // Required level should become 0.
-            assert_eq!(required.watch().await.unwrap(), Ok(0));
-
-            // Acquire and drop a level 2 lease.
-            let lease = lessor
-                .lease(2)
-                .await
-                .unwrap()
-                .expect("Lease response not ok")
-                .into_proxy()
-                .unwrap();
-            drop(lease);
-            // Watch should return the most up-to-date level.
-            assert_eq!(required.watch().await.unwrap(), Ok(0));
+            // Initial power level should be 0.
+            assert_eq!(status.watch_power_level().await.unwrap(), Ok(0));
+            // Change to level 1.
+            current.update(1).await.unwrap().expect("update_current_power_level failed");
+            // Current level should become 1.
+            assert_eq!(status.watch_power_level().await.unwrap(), Ok(1));
+            // Change to level 0.
+            current.update(0).await.unwrap().expect("update_current_power_level failed");
+            // Current level should become 0.
+            assert_eq!(status.watch_power_level().await.unwrap(), Ok(0));
+            // Change level to 2 then to 1.
+            current.update(2).await.unwrap().expect("update_current_power_level failed");
+            current.update(1).await.unwrap().expect("update_current_power_level failed");
+            // Should get most up-to-date current level.
+            assert_eq!(status.watch_power_level().await.unwrap(), Ok(1));
         });
 
-        // Ensure there are no more required levels in the queue.
-        assert!(executor.run_until_stalled(&mut required.watch()).is_pending());
+        // Ensure there are no more current levels in the queue.
+        assert!(executor.run_until_stalled(&mut status.watch_power_level()).is_pending());
 
         Ok(())
     }
