@@ -107,8 +107,13 @@ def main() -> int:
             elif image["type"] == "zbi":
                 if "postprocessing_script" in image:
                     script = image["postprocessing_script"]
-                    if "path" in script:
+                    if "path" in script and script["path"]:
                         inputs.add(script["path"])
+                    if (
+                        "board_script_path" in script
+                        and script["board_script_path"]
+                    ):
+                        inputs.add(script["board_script_path"])
 
     if deps:
         with open(args.depfile, "w") as depfile:
