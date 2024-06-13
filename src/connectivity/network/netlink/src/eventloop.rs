@@ -10,7 +10,7 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt as _, StreamExt as _};
-use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
+use net_types::ip::{Ip, Ipv4, Ipv6};
 use {
     fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
@@ -39,12 +39,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> From<rout
     for UnifiedRequest<S>
 {
     fn from(request: routes::Request<S, I>) -> Self {
-        let IpInvariant(request) = I::map_ip(
-            request,
-            |request| IpInvariant(UnifiedRequest::RoutesV4Request(request)),
-            |request| IpInvariant(UnifiedRequest::RoutesV6Request(request)),
-        );
-        request
+        I::map_ip_in(request, UnifiedRequest::RoutesV4Request, UnifiedRequest::RoutesV6Request)
     }
 }
 

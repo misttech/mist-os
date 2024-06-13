@@ -29,7 +29,7 @@ use linux_uapi::{
     rt_class_t_RT_TABLE_COMPAT, rt_class_t_RT_TABLE_MAIN, rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
     rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
 };
-use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Subnet};
 use net_types::{SpecifiedAddr, SpecifiedAddress as _, Witness as _};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::route::{
@@ -428,13 +428,13 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             proof: ProofOfInterfaceAuthorization,
         }
 
-        let IpInvariant(authorize_fut) = I::map_ip(
+        let authorize_fut = I::map_ip_in(
             AuthorizeInputs::<'_, I> { route_set_proxy, proof },
             |AuthorizeInputs { route_set_proxy, proof }| {
-                IpInvariant(route_set_proxy.authenticate_for_interface(proof))
+                route_set_proxy.authenticate_for_interface(proof)
             },
             |AuthorizeInputs { route_set_proxy, proof }| {
-                IpInvariant(route_set_proxy.authenticate_for_interface(proof))
+                route_set_proxy.authenticate_for_interface(proof)
             },
         );
 
@@ -1513,7 +1513,7 @@ mod tests {
     use futures::{SinkExt as _, Stream};
     use linux_uapi::rtnetlink_groups_RTNLGRP_LINK;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-    use net_types::ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_types::ip::{GenericOverIp, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
     use net_types::SpecifiedAddr;
     use netlink_packet_core::NetlinkPayload;
     use std::pin::pin;
@@ -2158,9 +2158,9 @@ mod tests {
         );
 
         let (StateStreamWrapper(state_stream), IpInvariant(routes_state_background_work)) =
-            I::map_ip(
-                IpInvariant((v4_routes_state, v6_routes_state)),
-                |IpInvariant((main_state, other_state))| {
+            I::map_ip_out(
+                (v4_routes_state, v6_routes_state),
+                |(main_state, other_state)| {
                     let main_stream = main_state.into_stream().expect("into stream");
                     (
                         StateStreamWrapper(main_stream.boxed_local()),
@@ -2170,7 +2170,7 @@ mod tests {
                         ),
                     )
                 },
-                |IpInvariant((other_state, main_state))| {
+                |(other_state, main_state)| {
                     let main_stream = main_state.into_stream().expect("into stream");
                     (
                         StateStreamWrapper(main_stream.boxed_local()),

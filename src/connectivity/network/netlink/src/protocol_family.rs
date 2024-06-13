@@ -540,7 +540,11 @@ pub mod route {
         // this once we've merged the routes and interfaces event loops.
         const LOOPBACK_INTERFACE_ID: u64 = 1;
 
-        let IpInvariant(priority) = I::map_ip((), |()| IpInvariant(0), |()| IpInvariant(1));
+        let priority = match I::VERSION {
+            IpVersion::V4 => 0,
+            IpVersion::V6 => 1,
+        };
+
         priority + {
             // Bump the default priority by 1 on loopback interfaces as a hack
             // to avoid conflicts between routes that would otherwise be in
@@ -1234,14 +1238,10 @@ pub mod route {
             client: client.clone(),
             completer,
         };
-        let IpInvariant(fut) = I::map_ip(
+        let fut = I::map_ip_in(
             (request, IpInvariant(sink)),
-            |(request, IpInvariant(sink))| {
-                IpInvariant(sink.send(UnifiedRequest::RoutesV4Request(request)))
-            },
-            |(request, IpInvariant(sink))| {
-                IpInvariant(sink.send(UnifiedRequest::RoutesV6Request(request)))
-            },
+            |(request, IpInvariant(sink))| sink.send(UnifiedRequest::RoutesV4Request(request)),
+            |(request, IpInvariant(sink))| sink.send(UnifiedRequest::RoutesV6Request(request)),
         );
         fut.await.expect("route event loop should never terminate");
         waiter.await.expect("routes event loop should have handled the request")
@@ -1381,8 +1381,7 @@ mod test {
     };
     use net_declare::{net_addr_subnet, net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::ip::{
-        AddrSubnetEither, GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr, Subnet,
+        AddrSubnetEither, GenericOverIp, Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
     };
     use net_types::{SpecifiedAddr, Witness as _};
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP, NLM_F_REPLACE};
@@ -3319,11 +3318,7 @@ mod test {
     }
 
     fn route_addr_from_spec_addr<I: Ip>(a: &SpecifiedAddr<I::Addr>) -> RouteAddress {
-        let IpInvariant(bytes) = I::map_ip(
-            a,
-            |a| IpInvariant(a.ipv4_bytes().to_vec()),
-            |a| IpInvariant(a.ipv6_bytes().to_vec()),
-        );
+        let bytes = I::map_ip_in(a, |a| a.ipv4_bytes().to_vec(), |a| a.ipv6_bytes().to_vec());
         match I::VERSION {
             IpVersion::V4 => RouteAddress::parse(AddressFamily::Inet, &bytes).unwrap(),
             IpVersion::V6 => RouteAddress::parse(AddressFamily::Inet6, &bytes).unwrap(),
@@ -3331,10 +3326,10 @@ mod test {
     }
 
     fn route_addr_from_subnet<I: Ip>(a: &Subnet<I::Addr>) -> RouteAddress {
-        let IpInvariant(bytes) = I::map_ip(
+        let bytes = I::map_ip_in(
             a,
-            |a| IpInvariant(a.network().ipv4_bytes().to_vec()),
-            |a| IpInvariant(a.network().ipv6_bytes().to_vec()),
+            |a| a.network().ipv4_bytes().to_vec(),
+            |a| a.network().ipv6_bytes().to_vec(),
         );
         match I::VERSION {
             IpVersion::V4 => RouteAddress::parse(AddressFamily::Inet, &bytes).unwrap(),
@@ -3371,8 +3366,10 @@ mod test {
             kind,
             flags,
             family: {
-                let IpInvariant(family) =
-                    I::map_ip((), |()| IpInvariant(AF_INET), |()| IpInvariant(AF_INET6));
+                let family = match I::VERSION {
+                    IpVersion::V4 => AF_INET,
+                    IpVersion::V6 => AF_INET6,
+                };
                 // Conversion is safe as family is guaranteed to fit into an 8-bit integer.
                 family as u16
             },
@@ -3382,11 +3379,7 @@ mod test {
                 .chain(extra_nlas.into_iter())
                 .collect(),
             destination_prefix_len: {
-                let IpInvariant(prefix_len) = I::map_ip(
-                    dst,
-                    |dst| IpInvariant(dst.prefix()),
-                    |dst| IpInvariant(dst.prefix()),
-                );
+                let prefix_len = I::map_ip_in(dst, |dst| dst.prefix(), |dst| dst.prefix());
                 prefix_len
             },
             table,
