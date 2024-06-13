@@ -14,10 +14,10 @@ use crate::model::context::ModelContext;
 use crate::model::environment::Environment;
 use crate::model::escrow::{self, EscrowedState};
 use crate::model::namespace::create_namespace;
+use crate::model::routing::legacy::RouteRequestExt;
 use crate::model::routing::router_ext::{RouterExt, WeakComponentTokenExt};
 use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
 use crate::model::routing::{self, RoutingError};
-use crate::model::routing_fns::RouteEntry;
 use crate::model::start::Start;
 use crate::model::storage::build_storage_admin_dictionary;
 use crate::model::token::{InstanceToken, InstanceTokenState};
@@ -595,17 +595,18 @@ impl ResolvedInstanceState {
     /// [`Router`]s. This [`Dict`] is used to generate the `exposed_dir`. This function creates a new [`Dict`],
     /// so allocation cost is paid only when called.
     pub async fn make_exposed_dict(&self) -> Dict {
+        let component = self.weak_component.upgrade().unwrap();
         let dict = Router::dict_routers_to_open(
             &WeakComponentToken::new_component(self.weak_component.clone()),
-            &self.weak_component.upgrade().unwrap().execution_scope,
+            &component.execution_scope,
             &self.sandbox.component_output_dict,
         );
-        Self::extend_exposed_dict_with_legacy(&self.weak_component, self.decl(), &dict);
+        Self::extend_exposed_dict_with_legacy(&component, self.decl(), &dict);
         dict
     }
 
     fn extend_exposed_dict_with_legacy(
-        component: &WeakComponentInstance,
+        component: &Arc<ComponentInstance>,
         decl: &cm_rust::ComponentDecl,
         target_dict: &Dict,
     ) {
@@ -613,23 +614,12 @@ impl ResolvedInstanceState {
         let exposes = decl.exposes.iter().filter(|e| !sandbox_construction::is_supported_expose(e));
         let exposes_by_target_name = routing::aggregate_exposes(exposes);
         for (target_name, exposes) in exposes_by_target_name {
-            // If there are multiple exposes, choosing the first expose for `cap`. `cap` is only used
-            // for debug info.
-            //
-            // TODO(https://fxbug.dev/42124541): This could lead to incomplete debug output because the source name
-            // is what's printed, so if the exposes have different source names only one of them will
-            // appear in the output. However, in practice routing is unlikely to fail for an aggregate
-            // because the algorithm typically terminates once an aggregate is found. Find a more robust
-            // solution, such as including all exposes or switching to the target name.
-            let first_expose = *exposes.first().expect("empty exposes is impossible");
-            let cap = ComponentCapability::Expose(first_expose.clone());
-            let type_name = cap.type_name();
             let request = match routing::request_for_namespace_capability_expose(exposes) {
                 Some(r) => r,
                 None => continue,
             };
-            let open = Open::new(RouteEntry::new(component.clone(), request, type_name.into()));
-            match target_dict.insert_capability(target_name, open.into()) {
+            let capability = request.into_capability(component);
+            match target_dict.insert_capability(target_name, capability) {
                 Ok(()) => (),
                 Err(e) => warn!("failed to insert {} in target dict: {e:?}", target_name),
             };

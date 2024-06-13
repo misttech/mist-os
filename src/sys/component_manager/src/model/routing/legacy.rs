@@ -4,10 +4,14 @@
 
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::routing;
+use crate::model::routing_fns::RouteEntry;
+use ::routing::capability_source::ComponentCapability;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::rights::Rights;
 use ::routing::RouteRequest;
-use cm_rust::{UseDirectoryDecl, UseEventStreamDecl, UseStorageDecl};
+use cm_rust::{
+    CapabilityTypeName, ExposeDecl, UseDirectoryDecl, UseEventStreamDecl, UseStorageDecl,
+};
 use router_error::Explain;
 use sandbox::{Capability, Directory, Open};
 use std::sync::Arc;
@@ -50,11 +54,33 @@ impl RouteRequestExt for RouteRequest {
             Self::UseProtocol(_) => {
                 panic!("Protocols should use bedrock instead");
             }
+            Self::ExposeProtocol(ref e) => {
+                let cap = ComponentCapability::Expose(ExposeDecl::Protocol(e.clone()));
+                expose_any(self, target, cap.type_name())
+            }
+            Self::ExposeService(ref e) => {
+                let cap = ComponentCapability::Expose(ExposeDecl::Service(
+                    e.iter().next().unwrap().clone(),
+                ));
+                expose_any(self, target, cap.type_name())
+            }
+            Self::ExposeDirectory(ref e) => {
+                let cap = ComponentCapability::Expose(ExposeDecl::Directory(e.clone()));
+                expose_any(self, target, cap.type_name())
+            }
             _ => {
                 panic!("Capability conversion is not supported for {:?}", self);
             }
         }
     }
+}
+
+fn expose_any(
+    request: RouteRequest,
+    target: &Arc<ComponentInstance>,
+    type_name: CapabilityTypeName,
+) -> Capability {
+    Open::new(RouteEntry::new(target.as_weak(), request, type_name.into())).into()
 }
 
 fn use_service(decl: cm_rust::UseServiceDecl, target: &Arc<ComponentInstance>) -> Capability {

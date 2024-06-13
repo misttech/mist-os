@@ -9,7 +9,10 @@ use crate::model::routing::router_ext::RouterExt;
 use crate::model::routing::{report_routing_failure, BedrockUseRouteRequest};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::mapper::NoopRouteMapper;
-use ::routing::{route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest};
+use ::routing::{
+    route_to_storage_decl, verify_instance_in_component_id_index,
+    RouteRequest as LegacyRouteRequest,
+};
 use cm_rust::{ComponentDecl, UseDecl, UseProtocolDecl};
 use errors::CreateNamespaceError;
 use fidl::endpoints::ClientEnd;
@@ -129,7 +132,7 @@ async fn add_use_decls(
 
             // Legacy
             use_ => {
-                let request = RouteRequest::from(use_.clone());
+                let request = LegacyRouteRequest::from(use_.clone());
                 request.into_capability(component)
             }
         };
@@ -171,7 +174,7 @@ fn protocol_use(
     // When there are router errors, they are sent to the error handler, which reports
     // errors.
     let weak_target = component.as_weak();
-    let legacy_request = RouteRequest::UseProtocol(decl);
+    let legacy_request = LegacyRouteRequest::UseProtocol(decl);
     Open::new(router.into_directory_entry(
         request,
         fio::DirentType::Service,
