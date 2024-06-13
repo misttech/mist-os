@@ -181,7 +181,11 @@ assert(
     defined(_default_rbe_settings[rbe_mode]),
     "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'default', 'cloudtop', 'infra', 'remote_cache_only' (*), and 'low_bandwidth_remote' (*).  (*) denotes an experimental mode.")
 
+# Set the RBE settings to use based on the chosen RBE mode
+_settings_defaults = _default_rbe_settings[rbe_mode]
+
 if (_print_warnings) {
+  # Warn about using experimental modes.
   _experimental_rbe_modes = [
     "low_bandwidth_remote",
     "remote_cache_only",
@@ -190,12 +194,6 @@ if (_print_warnings) {
       _experimental_rbe_modes) {
     print("WARNING: You're using an experimental 'rbe_mode':  \"${rbe_mode}\"")
   }
-}
-
-rbe_settings = {
-  # Set the RBE settings to use based on the chosen RBE mode
-  _settings_defaults = _default_rbe_settings[rbe_mode]
-  forward_variables_from(_settings_defaults, "*")
 
   # Warn if the overridden settings are not at their default value for this
   # compilation mode, or are using experimental flags
@@ -206,36 +204,39 @@ rbe_settings = {
     "rust_download_rlibs",
   ]
 
-  if (_print_warnings) {
-    foreach(_setting_name,
-            [
-              "cxx_enable",
-              "cxx_download_objects",
-              "link_enable",
-              "link_download_unstripped_binaries",
-              "rust_enable",
-              "rust_download_rlibs",
-              "rust_download_unstripped_binaries",
-              "rust_exec_strategy",
-              "bazel_enable",
-            ]) {
-      if (defined(rbe_settings_overrides[_setting_name]) &&
-          rbe_settings_overrides[_setting_name] ==
-          _settings_defaults[_setting_name]) {
-        _default_value = _settings_defaults[_setting_name]
-        print(
-            "  WARNING:  You are setting '${_setting_name}' to the default value (${_default_value}) for this RBE mode (${rbe_mode}). This is unncessary.")
-      }
-    }
-
-    foreach(_setting_name, _experimental_options) {
-      if (defined(rbe_settings_overrides[_setting_name])) {
-        _value = rbe_settings_overrides[_setting_name]
-        print(
-            "  WARNING:  You are using an experimental RBE setting: ${_setting_name} = ${_value}")
-      }
+  foreach(_setting_name,
+          [
+            "cxx_enable",
+            "cxx_download_objects",
+            "link_enable",
+            "link_download_unstripped_binaries",
+            "rust_enable",
+            "rust_download_rlibs",
+            "rust_download_unstripped_binaries",
+            "rust_exec_strategy",
+            "bazel_enable",
+          ]) {
+    if (defined(rbe_settings_overrides[_setting_name]) &&
+        rbe_settings_overrides[_setting_name] ==
+        _settings_defaults[_setting_name]) {
+      _default_value = _settings_defaults[_setting_name]
+      print(
+          "  WARNING:  You are setting '${_setting_name}' to the default value (${_default_value}) for this RBE mode (${rbe_mode}). This is unncessary.")
     }
   }
+
+  foreach(_setting_name, _experimental_options) {
+    if (defined(rbe_settings_overrides[_setting_name])) {
+      _value = rbe_settings_overrides[_setting_name]
+      print(
+          "  WARNING:  You are using an experimental RBE setting: ${_setting_name} = ${_value}")
+    }
+  }
+}
+
+# Construct the actual (exported from this file) 'rbe_settings' struct.
+rbe_settings = {
+  forward_variables_from(_settings_defaults, "*")
 
   # cxx overrides
   if (defined(rbe_settings_overrides["cxx_enable"])) {
