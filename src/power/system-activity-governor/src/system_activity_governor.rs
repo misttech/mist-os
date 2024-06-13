@@ -245,6 +245,8 @@ impl ExecutionStateManager {
                     }
                     None => {
                         tracing::warn!("No suspender available, suspend was a no-op");
+                        stats.fail_count = stats.fail_count.map(|c| c + 1);
+                        stats.last_failed_error = Some(zx::sys::ZX_ERR_NOT_SUPPORTED);
                     }
                 }
                 true
