@@ -32,6 +32,7 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Mapping,
     Optional,
     Sequence,
     TextIO,
@@ -443,7 +444,7 @@ def values_dict_to_config_value(
 
 def keyed_flags_to_values_dict(
     flags: Iterable[str], convert_type: Optional[Callable[[str], Any]] = None
-) -> Dict[str, List[str]]:
+) -> Mapping[str, Sequence[str]]:
     """Convert a series of key[=value]s into a dictionary.
 
     All dictionary values are accumulated sequences of 'value's,
@@ -465,7 +466,7 @@ def keyed_flags_to_values_dict(
     """
     partitions = (f.partition("=") for f in flags)
     # each partition is a tuple (left, sep, right)
-    d = collections.defaultdict(list)
+    d: dict[str, list[str]] = collections.defaultdict(list)
     for key, sep, value in partitions:
         if sep == "=":
             d[key].append(convert_type(value) if convert_type else value)
@@ -481,7 +482,7 @@ def last_value_or_default(values: Sequence[str], default: str) -> str:
 
 
 def last_value_of_dict_flag(
-    d: Dict[str, Sequence[str]], key: str, default: str = ""
+    d: Mapping[str, Sequence[str]], key: str, default: str = ""
 ) -> str:
     """This selects the last value among repeated occurrences of a flag as a winner."""
     return last_value_or_default(d.get(key, []), default)

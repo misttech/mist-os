@@ -217,21 +217,21 @@ if (is_host) {
   }
 
   python_library("remotetool") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _remotetool_sources
   }
   python_host_test("remotetool_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "remotetool_test.py"
     sources = _remotetool_sources
   }
 
   python_library("rustc") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _rustc_sources
   }
   python_host_test("rustc_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "rustc_test.py"
     sources = _rustc_sources
   }
