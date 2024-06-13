@@ -75,9 +75,10 @@ void VirtualController::CreateLoopbackDevice(CreateLoopbackDeviceRequestView req
 
   loopback_device_ = std::make_unique<LoopbackDevice>();
 
-  zx_handle_t channel = request->channel.release();
+  BT_ASSERT(request->has_uart_channel());
+  zx_handle_t uart_channel = request->uart_channel().release();
   zx_status_t status =
-      loopback_device_->Initialize(channel, std::string_view(name), [this](auto args) {
+      loopback_device_->Initialize(uart_channel, std::string_view(name), [this](auto args) {
         // Add LoopbackDevice as a child node of VirtualController
         FDF_LOG(INFO, "LoopbackDevice successfully initialized");
         AddLoopbackChildNode(args);
@@ -88,6 +89,13 @@ void VirtualController::CreateLoopbackDevice(CreateLoopbackDeviceRequestView req
     auto _ = loopback_node_controller_->Remove();
     return;
   }
+}
+
+void VirtualController::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::VirtualController> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown method in VirtualController request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 void VirtualController::Connect(

@@ -8,16 +8,16 @@ using zx;
 const MAX_NAME_LENGTH uint32 = 32;
 
 /// Used for spawning virtual Bluetooth devices.
-closed protocol VirtualController {
+open protocol VirtualController {
     /// Creates a child device, and returns the name of the child created.
-    strict CreateEmulator() -> (struct {
+    flexible CreateEmulator() -> (struct {
         name string:<MAX_NAME_LENGTH, optional>;
     }) error zx.Status;
 
     /// Creates a virtual Bluetooth serial device, speaking the BT HCI UART
     /// protocol on the provided handle.
     /// The zircon channel is closed in the event of an error.
-    strict CreateLoopbackDevice(resource struct {
-        channel zx.Handle:CHANNEL;
+    flexible CreateLoopbackDevice(resource table {
+        1: uart_channel zx.Handle:CHANNEL;
     });
 };

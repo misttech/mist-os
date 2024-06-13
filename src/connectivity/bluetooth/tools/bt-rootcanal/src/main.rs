@@ -6,7 +6,9 @@ use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_bluetooth_pandora::{
     RootcanalClientControllerRequest, RootcanalClientControllerRequestStream, ServiceError,
 };
-use fidl_fuchsia_hardware_bluetooth::VirtualControllerMarker;
+use fidl_fuchsia_hardware_bluetooth::{
+    VirtualControllerCreateLoopbackDeviceRequest, VirtualControllerMarker,
+};
 use fuchsia_async::net::TcpStream;
 use fuchsia_async::{self as fasync};
 use fuchsia_bluetooth::constants::DEV_DIR;
@@ -86,7 +88,11 @@ async fn open_virtual_device(control_device: &str) -> Result<fasync::Channel, Er
     .with_context(|| format!("failed to open {}", control_device))?;
 
     let (remote_channel, local_channel) = zx::Channel::create();
-    controller.create_loopback_device(remote_channel)?;
+    let request = VirtualControllerCreateLoopbackDeviceRequest {
+        uart_channel: Some(remote_channel),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+    controller.create_loopback_device(request)?;
     Ok(fasync::Channel::from_channel(local_channel))
 }
 

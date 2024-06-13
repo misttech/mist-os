@@ -47,6 +47,9 @@ class VirtualController
   void CreateEmulator(CreateEmulatorCompleter::Sync& completer) override;
   void CreateLoopbackDevice(CreateLoopbackDeviceRequestView request,
                             CreateLoopbackDeviceCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::VirtualController> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::VirtualController> request);
 
