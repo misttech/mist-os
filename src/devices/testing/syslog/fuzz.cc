@@ -30,7 +30,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     kMaxValue = kDoubleField,
     kBooleanField,
   };
-  syslog_runtime::LogBuffer buffer;
   auto severity = provider.ConsumeIntegral<fuchsia_logging::LogSeverity>();
   // Fatal crashes...
   if (severity == fuchsia_logging::LOG_FATAL) {
@@ -40,7 +39,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   auto line = provider.ConsumeIntegral<unsigned int>();
   auto msg = provider.ConsumeRandomLengthString();
   auto condition = provider.ConsumeRandomLengthString();
-  syslog_runtime::BeginRecord(&buffer, severity, file.data(), line, msg.data(), condition.data());
+  auto builder = syslog_runtime::LogBufferBuilder(severity);
+  auto buffer = builder.WithCondition(condition).WithMsg(msg).SetFile(file, line).Build();
   while (provider.remaining_bytes()) {
     auto op = provider.ConsumeEnum<OP>();
     auto key = provider.ConsumeRandomLengthString();
