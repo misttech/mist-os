@@ -2593,10 +2593,10 @@ impl<'a> NetCfg<'a> {
             s
         } else {
             warn!(
-                "Attempted to acquire prefix when DHCPv6 is not supported; interface_id={:?}, preferred_prefix_len={:?}",
+                "Attempted to acquire prefix when DHCPv6 is not \
+                supported; interface_id={:?}, preferred_prefix_len={:?}",
                 interface_id, preferred_prefix_len,
             );
-
             return control_handle
                 .send_on_exit(fnet_dhcpv6::PrefixControlExitReason::NotSupported)
                 .context("failed to send NotSupported terminal event")
@@ -2608,9 +2608,23 @@ impl<'a> NetCfg<'a> {
                 .interface_states
                 .get(&interface_id.try_into().expect("interface ID should be nonzero"))
             {
-                // It is invalid to acquire a prefix over an interface that netcfg doesn't own,
-                // or a WLAN AP interface.
-                None | Some(InterfaceState { config: InterfaceConfigState::WlanAp(_), .. }) => {
+                None => {
+                    warn!(
+                        "Attempted to acquire a prefix on unmanaged interface; \
+                        id={:?}, preferred_prefix_len={:?}",
+                        interface_id, preferred_prefix_len,
+                    );
+                    return control_handle
+                        .send_on_exit(fnet_dhcpv6::PrefixControlExitReason::InvalidInterface)
+                        .context("failed to send InvalidInterface terminal event")
+                        .map_err(errors::Error::NonFatal);
+                }
+                Some(InterfaceState { config: InterfaceConfigState::WlanAp(_), .. }) => {
+                    warn!(
+                        "Attempted to acquire a prefix on AP interface; \
+                        id={:?}, preferred_prefix_len={:?}",
+                        interface_id, preferred_prefix_len,
+                    );
                     return control_handle
                         .send_on_exit(fnet_dhcpv6::PrefixControlExitReason::InvalidInterface)
                         .context("failed to send InvalidInterface terminal event")
@@ -2632,6 +2646,11 @@ impl<'a> NetCfg<'a> {
         };
         let pd_config = if let Some(preferred_prefix_len) = preferred_prefix_len {
             if preferred_prefix_len > net_types::ip::Ipv6Addr::BYTES * 8 {
+                warn!(
+                    "Preferred prefix length exceeds bits in IPv6 address; \
+                    interface_id={:?}, preferred_prefix_len={:?}",
+                    interface_id, preferred_prefix_len,
+                );
                 return control_handle
                     .send_on_exit(fnet_dhcpv6::PrefixControlExitReason::InvalidPrefixLength)
                     .context("failed to send InvalidPrefixLength terminal event")
@@ -2642,7 +2661,14 @@ impl<'a> NetCfg<'a> {
             fnet_dhcpv6::PrefixDelegationConfig::Empty(fnet_dhcpv6::Empty)
         };
 
+        // TODO(https://fxbug.dev/142065403): Support multiple clients asking
+        // for IPv6 prefixes.
         if self.dhcpv6_prefix_provider_handler.is_some() {
+            warn!(
+                "Attempted to acquire a prefix while a prefix is already being acquired for \
+                another iface; interface_id={:?}, preferred_prefix_len={:?}",
+                interface_id, preferred_prefix_len,
+            );
             return control_handle
                 .send_on_exit(fnet_dhcpv6::PrefixControlExitReason::AlreadyAcquiring)
                 .context("failed to send AlreadyAcquiring terminal event")
@@ -2758,6 +2784,7 @@ impl<'a> NetCfg<'a> {
             .as_mut()
             .expect("DHCPv6 prefix provider handler must be present to handle WatchPrefix");
         if let Some(responder) = watch_prefix_responder.take() {
+            warn!("Attempted to call WatchPrefix twice on PrefixControl channel, closing channel");
             match responder
                 .control_handle()
                 .send_on_exit(fnet_dhcpv6::PrefixControlExitReason::DoubleWatch)
