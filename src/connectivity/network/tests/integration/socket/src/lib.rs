@@ -13,7 +13,7 @@ use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
 use fuchsia_zircon::{self as zx, AsHandleRef as _};
-use futures::future::{self, join_all, LocalBoxFuture};
+use futures::future::{self, LocalBoxFuture};
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{
@@ -32,7 +32,7 @@ use netemul::{
 use netstack_testing_common::constants::ipv6 as ipv6_consts;
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
 use netstack_testing_common::realms::{
-    KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _,
+    KnownServiceProvider, Netstack, NetstackVersion, TestRealmExt, TestSandboxExt as _,
 };
 use netstack_testing_common::{
     devices, ndp, ping, Result, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
@@ -65,7 +65,7 @@ use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
 use packet_formats::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
-use socket2::SockRef;
+use socket2::{InterfaceIndexOrAddress, SockRef};
 use std::num::NonZeroU64;
 use std::os::fd::AsFd;
 use std::pin::pin;
@@ -3196,7 +3196,7 @@ async fn send_to_remote_with_zone<N: Netstack>(name: &str) {
         |networks, multinic, ()| {
             Box::pin(async move {
                 let networks_and_peer_sockets =
-                    join_all(networks.iter().map(|network| async move {
+                    future::join_all(networks.iter().map(|network| async move {
                         let Network { peer_realm, peer_interface, _network, multinic_interface } =
                             network;
                         let Interface { iface: _, ip: peer_ip } = peer_interface;
@@ -3208,7 +3208,7 @@ async fn send_to_remote_with_zone<N: Netstack>(name: &str) {
                 let host_sock = make_socket(&multinic).await;
                 let host_sock = &host_sock;
 
-                let _: Vec<()> = join_all(networks_and_peer_sockets.iter().map(
+                let _: Vec<()> = future::join_all(networks_and_peer_sockets.iter().map(
                     |(multinic_interface, (peer_socket, peer_ip))| async move {
                         let Interface { iface: interface, ip: _ } = multinic_interface;
                         let id: u8 = interface.id().try_into().unwrap();
@@ -3265,7 +3265,7 @@ async fn tcp_communicate_with_remote_with_zone<
         |networks, multinic, ()| {
             Box::pin(async move {
                 let interfaces_and_listeners =
-                    join_all(networks.iter().map(|network| async move {
+                    future::join_all(networks.iter().map(|network| async move {
                         let Network { peer_realm, peer_interface, _network, multinic_interface } =
                             network;
                         let Interface { iface: _, ip: peer_ip } = peer_interface;
@@ -3279,7 +3279,7 @@ async fn tcp_communicate_with_remote_with_zone<
                     }))
                     .await;
 
-                let _: Vec<()> = join_all(interfaces_and_listeners.into_iter().map(
+                let _: Vec<()> = future::join_all(interfaces_and_listeners.into_iter().map(
                     |(multinic_interface, (peer_listener, peer_ip))| async move {
                         let mut host_conn =
                             make_multinic_conn(multinic, multinic_interface, peer_ip).await;
@@ -3780,6 +3780,13 @@ trait MulticastTestIpExt:
 {
     const NETWORKS: [fnet::Subnet; 2];
     const MCAST_ADDR: std::net::SocketAddr;
+
+    fn iface_ip(index: usize) -> std::net::IpAddr {
+        match Self::NETWORKS[index].addr {
+            fnet::IpAddress::Ipv4(addr) => std::net::IpAddr::V4(addr.addr.into()),
+            fnet::IpAddress::Ipv6(addr) => std::net::IpAddr::V6(addr.addr.into()),
+        }
+    }
 }
 
 impl MulticastTestIpExt for Ipv4 {
@@ -3794,6 +3801,28 @@ impl MulticastTestIpExt for Ipv6 {
     const MCAST_ADDR: std::net::SocketAddr = std_socket_addr!("[FF00::1:2]:3513");
 }
 
+struct MulticastTestNetwork<'a> {
+    _net: TestNetwork<'a>,
+    iface: TestInterface<'a>,
+    receiver: TestFakeEndpoint<'a>,
+}
+
+async fn init_multicast_test_networks<'a, I: MulticastTestIpExt>(
+    sandbox: &'a netemul::TestSandbox,
+    client: &netemul::TestRealm<'a>,
+) -> Vec<MulticastTestNetwork<'a>> {
+    future::join_all(I::NETWORKS.iter().enumerate().map(|(i, subnet)| async move {
+        let net =
+            sandbox.create_network(format!("net{i}")).await.expect("failed to create network");
+        let iface =
+            client.join_network(&net, format!("if{i}")).await.expect("failed to join network");
+        iface.add_address_and_subnet_route(subnet.clone()).await.expect("failed to set ip");
+        let receiver = net.create_fake_endpoint().expect("failed to create endpoint");
+        MulticastTestNetwork { _net: net, iface, receiver }
+    }))
+    .await
+}
+
 #[netstack_test]
 #[test_case(0)]
 #[test_case(1)]
@@ -3805,23 +3834,7 @@ async fn multicast_send<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
     let client = sandbox
         .create_netstack_realm::<N, _>(format!("{name}_client"))
         .expect("failed to create client realm");
-
-    struct Network<'a> {
-        _net: TestNetwork<'a>,
-        iface: TestInterface<'a>,
-        receiver: TestFakeEndpoint<'a>,
-    }
-
-    let mut networks: Vec<Network<'_>> = vec![];
-    for i in 0..I::NETWORKS.len() {
-        let net =
-            sandbox.create_network(format!("net{i}")).await.expect("failed to create network");
-        let iface =
-            client.join_network(&net, format!("if{i}")).await.expect("failed to join network");
-        iface.add_address_and_subnet_route(I::NETWORKS[i].clone()).await.expect("failed to set ip");
-        let receiver = net.create_fake_endpoint().expect("failed to create endpoint");
-        networks.push(Network { _net: net, iface, receiver });
-    }
+    let networks = init_multicast_test_networks::<I>(&sandbox, &client).await;
 
     let sock = client
         .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
@@ -3895,4 +3908,207 @@ async fn multicast_send<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
                 .await;
         }
     }
+}
+
+#[netstack_test]
+#[test_case(None, 0, false)]
+#[test_case(Some(true), 0, false)]
+#[test_case(Some(true), 1, true)]
+#[test_case(Some(false), 0, false)]
+#[test_case(Some(false), 1, true)]
+async fn multicast_loop<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
+    name: &str,
+    multicast_loop_value: Option<bool>,
+    target_interface: usize,
+    dual_stack: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+
+    let networks = init_multicast_test_networks::<I>(&sandbox, &client).await;
+
+    // Initialize send socket to send the packet on the `target_interface`.
+    let send_socket = client
+        .datagram_socket(
+            if dual_stack { Ipv6::DOMAIN } else { I::DOMAIN },
+            fposix_socket::DatagramSocketProtocol::Udp,
+        )
+        .await
+        .expect("failed to create UDP socket");
+    if I::VERSION == IpVersion::V6 {
+        // TODO(https://fxbug.dev//346622422): NS3 may bind the socket to a
+        // link-local address. Bind the socket explicitly to workaround that
+        // issue. Remove when the bug is fixed.
+        send_socket
+            .bind(&std::net::SocketAddr::new(I::iface_ip(target_interface), 0).into())
+            .expect("failed to bind UDP socket");
+    }
+
+    match I::VERSION {
+        IpVersion::V4 => {
+            let addr = match I::NETWORKS[target_interface].addr {
+                fnet::IpAddress::Ipv4(a) => a.addr.into(),
+                fnet::IpAddress::Ipv6(_) => unreachable!("NETWORKS expected to be Ipv4"),
+            };
+            send_socket.set_multicast_if_v4(&addr).expect("failed to set IP_MULTICAST_IF");
+            if let Some(value) = multicast_loop_value {
+                send_socket.set_multicast_loop_v4(value).expect("failed to set IP_MULTICAST_LOOP");
+            }
+        }
+        IpVersion::V6 => {
+            let iface_id = networks[target_interface].iface.id().try_into().unwrap();
+            send_socket.set_multicast_if_v6(iface_id).expect("Failed to set IPV6_MULTICAST_LOOP");
+            if let Some(value) = multicast_loop_value {
+                send_socket
+                    .set_multicast_loop_v6(value)
+                    .expect("failed to set IPV6_MULTICAST_LOOP");
+
+                // Set the IPv4 option to the reverse value. It's expected to
+                // have no effect on IPv6 packets. NS2 doesn't implement this
+                // correctly, so we only set this option in NS3.
+                if N::VERSION == NetstackVersion::Netstack3 {
+                    send_socket
+                        .set_multicast_loop_v4(!value)
+                        .expect("failed to set IP_MULTICAST_LOOP");
+                }
+            }
+        }
+    };
+
+    // Create one socket per interface and join the same multicast group from each.
+    let recv_sockets = future::join_all(networks.iter().map(|network| async {
+        let recv_socket = client
+            .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+            .await
+            .expect("failed to create socket");
+        recv_socket
+            .bind_device(Some(
+                network
+                    .iface
+                    .get_interface_name()
+                    .await
+                    .expect("get_interface_name failed")
+                    .as_bytes(),
+            ))
+            .expect("failed to bind socket to an interface");
+        recv_socket.bind(&I::MCAST_ADDR.into()).expect("failed to bind UDP socket");
+
+        let iface_id = network.iface.id().try_into().unwrap();
+        match I::MCAST_ADDR.ip() {
+            std::net::IpAddr::V4(addr_v4) => recv_socket
+                .join_multicast_v4_n(&addr_v4.into(), &InterfaceIndexOrAddress::Index(iface_id))
+                .expect("failed to join multicast group"),
+            std::net::IpAddr::V6(addr_v6) => recv_socket
+                .join_multicast_v6(&addr_v6.into(), iface_id)
+                .expect("failed to join multicast group"),
+        }
+        fasync::net::UdpSocket::from_socket(recv_socket.into()).unwrap()
+    }))
+    .await;
+
+    // IP_MULTICAST_LOOP should be enabled if not set explicitly.
+    let multicast_loop_value = multicast_loop_value.unwrap_or(true);
+
+    let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    assert_eq!(
+        send_socket.send_to(&data, &I::MCAST_ADDR.into()).expect("failed to send multicast packet"),
+        data.len()
+    );
+
+    // Check that the packet is delivered where it's expected.
+    for (i, recv_socket) in recv_sockets.iter().enumerate() {
+        let mut buf = [0u8; 200];
+        let recv_fut = recv_socket.recv_from(&mut buf);
+        let packet_expected = multicast_loop_value && i == target_interface;
+        if packet_expected {
+            let (size, addr) = recv_fut
+                .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || {
+                    Err(std::io::ErrorKind::TimedOut.into())
+                })
+                .await
+                .expect("recv_from failed");
+            assert_eq!(size, data.len());
+            assert_eq!(&buf[..size], &data[..]);
+            assert_eq!(addr.ip(), I::iface_ip(i));
+        } else {
+            recv_fut
+                .map(|output| panic!("unexpected received packet {output:?}"))
+                .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || ())
+                .await;
+        }
+    }
+}
+
+#[netstack_test]
+#[test_case(true)]
+#[test_case(false)]
+async fn multicast_loop_on_loopback_dev<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
+    name: &str,
+    multicast_loop_value: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+
+    let loopback_id: u32 =
+        client.loopback_properties().await.unwrap().unwrap().id.get().try_into().unwrap();
+
+    // Initialize send socket to send the packet on the `target_interface`.
+    let send_socket = client
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create UDP socket");
+    let loopback_ip: std::net::IpAddr = I::LOOPBACK_ADDRESS.to_ip_addr().into();
+    send_socket
+        .bind(&std::net::SocketAddr::new(loopback_ip, 0).into())
+        .expect("failed to bind UDP socket");
+
+    match I::VERSION {
+        IpVersion::V4 => send_socket.set_multicast_loop_v4(multicast_loop_value),
+        IpVersion::V6 => send_socket.set_multicast_loop_v6(multicast_loop_value),
+    }
+    .expect("failed to set IPV6_MULTICAST_LOOP");
+
+    let recv_socket = client
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create socket");
+    recv_socket.bind(&I::MCAST_ADDR.into()).expect("failed to bind UDP socket");
+
+    match I::MCAST_ADDR.ip() {
+        std::net::IpAddr::V4(addr_v4) => recv_socket
+            .join_multicast_v4_n(&addr_v4.into(), &InterfaceIndexOrAddress::Index(loopback_id))
+            .expect("failed to join multicast group"),
+        std::net::IpAddr::V6(addr_v6) => recv_socket
+            .join_multicast_v6(&addr_v6.into(), loopback_id)
+            .expect("failed to join multicast group"),
+    }
+
+    let recv_socket = fasync::net::UdpSocket::from_socket(recv_socket.into()).unwrap();
+
+    let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    assert_eq!(
+        send_socket.send_to(&data, &I::MCAST_ADDR.into()).expect("failed to send multicast packet"),
+        data.len()
+    );
+
+    // `recv_socket` is expected to receive one and only one packet.
+    let mut buf = [0u8; 200];
+    let (size, addr) = recv_socket
+        .recv_from(&mut buf)
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || Err(std::io::ErrorKind::TimedOut.into()))
+        .await
+        .expect("recv_from failed");
+    assert_eq!(size, data.len());
+    assert_eq!(&buf[..size], &data[..]);
+    assert_eq!(addr.ip(), loopback_ip);
+
+    recv_socket
+        .recv_from(&mut buf)
+        .map(|output| panic!("unexpected received duplicate packet {output:?}"))
+        .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || ())
+        .await;
 }

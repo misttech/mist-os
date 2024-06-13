@@ -8,18 +8,19 @@ use core::cmp::Ordering;
 use core::convert::Infallible;
 use core::num::{NonZeroU32, NonZeroU8};
 
+use log::error;
 use net_types::ip::{Ip, IpVersionMarker, Ipv6Addr, Ipv6SourceAddr, Mtu};
 use net_types::{MulticastAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
-    trace_duration, AnyDevice, CounterContext, DeviceIdContext, EitherDeviceId, InstantContext,
-    StrongDeviceIdentifier, TracingContext, WeakDeviceIdentifier as _,
+    trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
+    InstantContext, StrongDeviceIdentifier, TracingContext, WeakDeviceIdentifier as _,
 };
 use netstack3_filter::{
-    self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties,
+    self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties, RawIpBody,
     TransportPacketSerializer,
 };
-use packet::{BufferMut, SerializeError};
+use packet::{BufferMut, PacketConstraints, SerializeError};
 use thiserror::Error;
 
 use crate::internal::base::{
@@ -29,7 +30,7 @@ use crate::internal::base::{
 use crate::internal::device::state::IpDeviceStateIpExt;
 use crate::internal::device::IpDeviceAddr;
 use crate::internal::types::{ResolvedRoute, RoutableIpAddr};
-use crate::{HopLimits, NextHop};
+use crate::HopLimits;
 
 /// An execution context defining a type of IP socket.
 pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
@@ -636,34 +637,57 @@ where
         next_hop = new_next_hop;
     }
 
-    // Extracted to a function without the serializer parameter to ease code
-    // generation.
-    fn resolve_metadata<I: IpExt, O: SendOptions<I> + ?Sized, D>(
-        src_ip: SpecifiedAddr<I::Addr>,
-        dst_ip: SpecifiedAddr<I::Addr>,
-        next_hop: NextHop<I::Addr>,
-        options: &O,
-        mtu: Option<u32>,
-        device: D,
-        proto: I::Proto,
-    ) -> Result<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, IpSockSendError> {
-        let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
-        let ttl = options.hop_limit(&dst_ip);
-        Ok(SendIpPacketMeta { device, src_ip, dst_ip, destination, ttl, proto, mtu })
+    let loopback_packet = (options.multicast_loop()
+        && remote_ip.addr().is_multicast()
+        && !egress_device.is_loopback())
+    .then(|| body.serialize_new_buf(PacketConstraints::UNCONSTRAINED, packet::new_buf_vec))
+    .transpose()?
+    .map(|buf| RawIpBody::new(*proto, local_ip.addr(), remote_ip.addr(), buf));
+
+    let ttl = options.hop_limit(&remote_ip.into());
+    let meta = SendIpPacketMeta {
+        device: &egress_device,
+        src_ip: local_ip.into(),
+        dst_ip: remote_ip.into(),
+        destination: IpPacketDestination::from_next_hop(next_hop, remote_ip.into()),
+        ttl,
+        proto: *proto,
+        mtu,
+    };
+    IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata)
+        .map_err(|_s| IpSockSendError::Mtu)?;
+
+    match (loopback_packet, core_ctx.get_loopback_device()) {
+        (Some(loopback_packet), Some(loopback_device)) => {
+            let meta = SendIpPacketMeta {
+                device: &loopback_device,
+                src_ip: local_ip.into(),
+                dst_ip: remote_ip.into(),
+                destination: IpPacketDestination::Loopback(&egress_device),
+                ttl,
+                proto: *proto,
+                mtu,
+            };
+            let packet_metadata = IpLayerPacketMetadata::default();
+
+            // The loopback packet will hit the egress hook. LOCAL_EGRESS hook
+            // is not called again.
+            IpSocketContext::send_ip_packet(
+                core_ctx,
+                bindings_ctx,
+                meta,
+                loopback_packet,
+                packet_metadata,
+            )
+            .unwrap_or_else(|_s| error!("Failed to send multicast loopback packet"));
+        }
+        (Some(_loopback_packet), None) => {
+            error!("can't send multicast loopback packet without the loopback device")
+        }
+        _ => (),
     }
 
-    let meta = resolve_metadata(
-        local_ip.into(),
-        remote_ip.into(),
-        next_hop,
-        options,
-        mtu,
-        &egress_device,
-        *proto,
-    )
-    .inspect_err(|_| packet_metadata.acknowledge_drop())?;
-    IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata)
-        .map_err(|_s| IpSockSendError::Mtu)
+    Ok(())
 }
 
 /// Enables a blanket implementation of [`DeviceIpSocketHandler`].
