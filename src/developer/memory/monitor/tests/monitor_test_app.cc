@@ -65,7 +65,23 @@ class TestMonitor : public monitor::Monitor {
                                                    .value_count = 1,
                                                    .ret = ZX_OK};
 
-    const zx_info_kmem_stats_compression_t kmem_stats_cmp = {.compressed_storage_bytes = 42};
+    const zx_info_kmem_stats_compression_t kmem_stats_cmp = {
+        .uncompressed_storage_bytes = 60,
+        .compressed_storage_bytes = 61,
+        .compressed_fragmentation_bytes = 62,
+        .compression_time = 63,
+        .decompression_time = 64,
+        .total_page_compression_attempts = 65,
+        .failed_page_compression_attempts = 66,
+        .total_page_decompressions = 67,
+        .compressed_page_evictions = 68,
+        .eager_page_compressions = 69,
+        .memory_pressure_page_compressions = 70,
+        .critical_memory_page_compressions = 71,
+        .pages_decompressed_unit_ns = 72,
+        .pages_decompressed_within_log_time = {73, 74, 75, 76, 77, 78, 79, 80},
+
+    };
     const memory::GetInfoResponse zram_stat = {.handle = 1,
                                                .topic = ZX_INFO_KMEM_STATS_COMPRESSION,
                                                .values = &kmem_stats_cmp,

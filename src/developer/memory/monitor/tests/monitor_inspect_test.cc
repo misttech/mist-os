@@ -10,25 +10,37 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/sys/cpp/component_context.h>
+#include <lib/syslog/cpp/macros.h>
 #include <stdlib.h>
 
+#include <filesystem>
+
 #include <gmock/gmock.h>
+#include <rapidjson/ostreamwrapper.h>
+#include <rapidjson/writer.h>
 #include <src/lib/files/file.h>
 #include <src/lib/files/glob.h>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "third_party/rapidjson/include/rapidjson/rapidjson.h"
 
-using diagnostics::reader::InspectData;
+using ::diagnostics::reader::InspectData;
 
 constexpr char kTestCollectionName[] = "test_apps";
 constexpr char kTestChildUrl[] = "#meta/memory_monitor_test_app.cm";
-
 class InspectTest : public gtest::RealLoopFixture {
  protected:
   InspectTest()
       : context_(sys::ComponentContext::Create()),
         child_name_(::testing::UnitTest::GetInstance()->current_test_info()->name()) {
+    // Clear the persistent storage provided to the memory_monitor between tests so the
+    // `*_previous_boot` information is not returned.
+    for (std::filesystem::recursive_directory_iterator i("/cache"), end; i != end; ++i) {
+      if (!is_directory(i->path())) {
+        std::filesystem::remove(i->path());
+      }
+    }
+
     context_->svc()->Connect(realm_proxy_.NewRequest());
     StartChild();
   }
@@ -123,38 +135,58 @@ class InspectTest : public gtest::RealLoopFixture {
   fuchsia::component::RealmPtr realm_proxy_;
 };
 
-void expect_array_non_empty(const InspectData& data, const std::vector<std::string>& path) {
-  auto& value = data.GetByPath(path);
-  EXPECT_EQ(value.GetType(), rapidjson::kArrayType) << path.back() << " is not an array";
-  EXPECT_NE(value.GetArray().Size(), 0u) << path.back() << " is empty";
+MATCHER_P(IsString, matcher,
+          "Is a string that " + testing::DescribeMatcher<std::string>(matcher, negation)) {
+  return ExplainMatchResult(testing::Eq(rapidjson::kStringType), arg.GetType(), result_listener) &&
+         ExplainMatchResult(matcher, arg.GetString(), result_listener);
+}
+MATCHER_P(IsNumber, matcher,
+          "Is a number that " + testing::DescribeMatcher<std::string>(matcher, negation)) {
+  return ExplainMatchResult(testing::Eq(rapidjson::kNumberType), arg.GetType(), result_listener) &&
+         ExplainMatchResult(matcher, arg.GetInt64(), result_listener);
 }
 
-void expect_number(const InspectData& data, const std::vector<std::string>& path) {
-  auto& value = data.GetByPath(path);
-  EXPECT_EQ(value.GetType(), rapidjson::kNumberType) << path.back() << " is not a number";
+namespace rapidjson {
+void PrintTo(const Value& value, ::std::ostream* os) {
+  OStreamWrapper osw(*os);
+  Writer<OStreamWrapper> writer(osw);
+  value.Accept(writer);
 }
 
-void expect_string_not_empty(const InspectData& data, const std::vector<std::string>& path) {
-  auto& value = data.GetByPath(path);
-  EXPECT_EQ(value.GetType(), rapidjson::kStringType) << path.back() << " is not a string";
-  EXPECT_NE(value.GetStringLength(), 0u) << path.back() << " is empty";
+void PrintTo(const Document& value, ::std::ostream* os) {
+  OStreamWrapper osw(*os);
+  Writer<OStreamWrapper> writer(osw);
+  value.Accept(writer);
 }
 
-void expect_object_not_empty(const InspectData& data, const std::vector<std::string>& path) {
-  auto& value = data.GetByPath(path);
-  EXPECT_EQ(value.GetType(), rapidjson::kObjectType) << path.back() << " is not an object";
-  EXPECT_FALSE(value.ObjectEmpty()) << path.back() << " is empty";
+}  // namespace rapidjson
+
+MATCHER_P(EqJson, json_text, "") {
+  rapidjson::Document expected;
+  expected.Parse(json_text);
+  return arg == expected;
+}
+
+MATCHER_P(IsObjectWithKeys, matcher,
+          "Is an object with keys that " +
+              testing::DescribeMatcher<std::vector<std::string>>(matcher, negation)) {
+  std::vector<std::string> keys;
+  for (auto i = arg.MemberBegin(); i != arg.MemberEnd(); ++i) {
+    keys.push_back(i->name.GetString());
+  }
+  return ExplainMatchResult(testing::Eq(rapidjson::kObjectType), arg.GetType(), result_listener) &&
+         ExplainMatchResult(matcher, keys, result_listener);
 }
 
 TEST_F(InspectTest, FirstLaunch) {
   auto result = GetInspect();
   ASSERT_TRUE(result.is_ok());
   auto data = result.take_value();
-  expect_string_not_empty(data, {"root", "current"});
-  expect_string_not_empty(data, {"root", "current_digest"});
-  expect_string_not_empty(data, {"root", "high_water"});
-  expect_string_not_empty(data, {"root", "high_water_digest"});
-  expect_object_not_empty(data, {"root", "values"});
+
+  EXPECT_THAT(data.GetByPath({"root"}),
+              IsObjectWithKeys(testing::UnorderedElementsAreArray(
+                  {"current", "high_water", "current_digest", "high_water_digest",
+                   "kmem_stats_compression", "values"})));
 }
 
 TEST_F(InspectTest, SecondLaunch) {
@@ -163,11 +195,11 @@ TEST_F(InspectTest, SecondLaunch) {
   auto result = GetInspect();
   ASSERT_TRUE(result.is_ok());
   auto data = result.take_value();
-  expect_string_not_empty(data, {"root", "current"});
-  expect_string_not_empty(data, {"root", "current_digest"});
-  expect_string_not_empty(data, {"root", "high_water"});
-  expect_string_not_empty(data, {"root", "high_water_digest"});
-  expect_object_not_empty(data, {"root", "values"});
+
+  EXPECT_THAT(data.GetByPath({"root"}),
+              IsObjectWithKeys(testing::UnorderedElementsAreArray(
+                  {"current", "high_water", "current_digest", "high_water_digest",
+                   "kmem_stats_compression", "values"})));
 
   DestroyChild();
   StartChild();
@@ -175,43 +207,76 @@ TEST_F(InspectTest, SecondLaunch) {
   result = GetInspect();
   ASSERT_TRUE(result.is_ok());
   data = result.take_value();
-  expect_string_not_empty(data, {"root", "current"});
-  expect_string_not_empty(data, {"root", "current_digest"});
-  expect_string_not_empty(data, {"root", "high_water"});
-  expect_string_not_empty(data, {"root", "high_water_previous_boot"});
-  expect_string_not_empty(data, {"root", "high_water_digest"});
-  expect_string_not_empty(data, {"root", "high_water_digest_previous_boot"});
 
-  expect_object_not_empty(data, {"root", "values"});
-  expect_number(data, {"root", "values", "total_bytes"});
-  expect_number(data, {"root", "values", "free_bytes"});
-  expect_number(data, {"root", "values", "wired_bytes"});
-  expect_number(data, {"root", "values", "total_heap_bytes"});
-  expect_number(data, {"root", "values", "free_heap_bytes"});
-  expect_number(data, {"root", "values", "vmo_bytes"});
-  expect_number(data, {"root", "values", "vmo_pager_total_bytes"});
-  expect_number(data, {"root", "values", "vmo_pager_newest_bytes"});
-  expect_number(data, {"root", "values", "vmo_pager_oldest_bytes"});
-  expect_number(data, {"root", "values", "vmo_discardable_locked_bytes"});
-  expect_number(data, {"root", "values", "vmo_discardable_unlocked_bytes"});
-  expect_number(data, {"root", "values", "mmu_overhead_bytes"});
-  expect_number(data, {"root", "values", "ipc_bytes"});
-  expect_number(data, {"root", "values", "other_bytes"});
-  expect_number(data, {"root", "values", "vmo_reclaim_disabled_bytes"});
+  EXPECT_THAT(data.GetByPath({"root"}),
+              IsObjectWithKeys(testing::UnorderedElementsAreArray(
+                  {"current", "high_water", "high_water_previous_boot", "current_digest",
+                   "high_water_digest", "high_water_digest_previous_boot", "kmem_stats_compression",
+                   "values"})));
+  EXPECT_THAT(data.GetByPath({"root", "current"}), EqJson(R"json(
+    "Time: 0 VMO: 45B Free: 41B\nkernel<1> 271B\n other 48B\n ipc 47B\n mmu 46B\n vmo 45B\n heap 43B\n wired 42B\n"
+  )json"));
+  EXPECT_THAT(data.GetByPath({"root", "high_water"}), EqJson(R"json(
+    "Time: 0 VMO: 45B Free: 41B\nkernel<1> 271B\n other 48B\n ipc 47B\n mmu 46B\n vmo 45B\n heap 43B\n wired 42B\n"
+  )json"));
+  EXPECT_THAT(data.GetByPath({"root", "high_water_previous_boot"}), EqJson(R"json(
+    "Time: 0 VMO: 45B Free: 41B\nkernel<1> 271B\n other 48B\n ipc 47B\n mmu 46B\n vmo 45B\n heap 43B\n wired 42B\n"
+  )json"));
+  EXPECT_THAT(data.GetByPath({"root", "current_digest"}), EqJson(R"json(
+    "Orphaned: 45B\nKernel: 226B\nFree: 41B\n[Addl]PagerTotal: 46B\n[Addl]PagerNewest: 47B\n[Addl]PagerOldest: 48B\n[Addl]DiscardableLocked: 49B\n[Addl]DiscardableUnlocked: 50B\n[Addl]ZramCompressedBytes: 61B\n"
+  )json"));
+  EXPECT_THAT(data.GetByPath({"root", "high_water_digest"}), EqJson(R"json(
+    "Orphaned: 45B\nKernel: 226B\nFree: 41B\n[Addl]PagerTotal: 46B\n[Addl]PagerNewest: 47B\n[Addl]PagerOldest: 48B\n[Addl]DiscardableLocked: 49B\n[Addl]DiscardableUnlocked: 50B\n[Addl]ZramCompressedBytes: 61B\n"
+  )json"));
+  EXPECT_THAT(data.GetByPath({"root", "high_water_digest_previous_boot"}), EqJson(R"json(
+    "Orphaned: 45B\nKernel: 226B\nFree: 41B\n[Addl]PagerTotal: 46B\n[Addl]PagerNewest: 47B\n[Addl]PagerOldest: 48B\n[Addl]DiscardableLocked: 49B\n[Addl]DiscardableUnlocked: 50B\n[Addl]ZramCompressedBytes: 61B\n"
+  )json"));
 
-  expect_object_not_empty(data, {"root", "kmem_stats_compression"});
-  expect_number(data, {"root", "kmem_stats_compression", "uncompressed_storage_bytes"});
-  expect_number(data, {"root", "kmem_stats_compression", "compressed_storage_bytes"});
-  expect_number(data, {"root", "kmem_stats_compression", "compressed_fragmentation_bytes"});
-  expect_number(data, {"root", "kmem_stats_compression", "compression_time"});
-  expect_number(data, {"root", "kmem_stats_compression", "decompression_time"});
-  expect_number(data, {"root", "kmem_stats_compression", "total_page_compression_attempts"});
-  expect_number(data, {"root", "kmem_stats_compression", "failed_page_compression_attempts"});
-  expect_number(data, {"root", "kmem_stats_compression", "total_page_decompressions"});
-  expect_number(data, {"root", "kmem_stats_compression", "compressed_page_evictions"});
-  expect_number(data, {"root", "kmem_stats_compression", "eager_page_compressions"});
-  expect_number(data, {"root", "kmem_stats_compression", "critical_memory_page_compressions"});
-  expect_number(data, {"root", "kmem_stats_compression", "pages_decompressed_unit_ns"});
-  expect_array_non_empty(data,
-                         {"root", "kmem_stats_compression", "pages_decompressed_within_log_time"});
+  EXPECT_THAT(data.GetByPath({"root", "values"}), EqJson(R"json(
+    {
+      "total_bytes": 40,
+      "free_bytes": 41,
+      "wired_bytes": 42,
+      "total_heap_bytes": 43,
+      "free_heap_bytes": 44,
+      "vmo_bytes": 45,
+      "vmo_pager_total_bytes": 46,
+      "vmo_pager_newest_bytes": 47,
+      "vmo_pager_oldest_bytes": 48,
+      "vmo_discardable_locked_bytes": 49,
+      "vmo_discardable_unlocked_bytes": 50,
+      "mmu_overhead_bytes": 51,
+      "ipc_bytes": 52,
+      "other_bytes": 53,
+      "vmo_reclaim_disabled_bytes": 54
+    }
+  )json"));
+
+  EXPECT_THAT(data.GetByPath({"root", "kmem_stats_compression"}), EqJson(R"json(
+    {
+      "uncompressed_storage_bytes": 60,
+      "compressed_storage_bytes": 61,
+      "compressed_fragmentation_bytes": 62,
+      "compression_time": 63,
+      "decompression_time": 64,
+      "total_page_compression_attempts": 65,
+      "failed_page_compression_attempts": 66,
+      "total_page_decompressions": 67,
+      "compressed_page_evictions": 68,
+      "eager_page_compressions": 69,
+      "memory_pressure_page_compressions": 70,
+      "critical_memory_page_compressions": 71,
+      "pages_decompressed_unit_ns": 72,
+      "pages_decompressed_within_log_time": [
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80
+      ]
+    }
+  )json"));
 }
