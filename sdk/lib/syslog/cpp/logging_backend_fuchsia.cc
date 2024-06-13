@@ -176,9 +176,9 @@ class LogState {
 // If the logger is not initialized, this will implicitly init the logger.
 class GlobalStateLock {
  public:
-  GlobalStateLock() {
+  GlobalStateLock(bool autoinit = true) {
     FuchsiaLogAcquireState();
-    if (!FuchsiaLogGetStateLocked()) {
+    if (autoinit && !FuchsiaLogGetStateLocked()) {
       LogState::Set(LogSettings(), *this);
     }
   }
@@ -455,12 +455,12 @@ LogState::LogState(const LogSettings& in_settings, const std::initializer_list<s
 }
 
 void SetLogSettings(const LogSettings& settings) {
-  GlobalStateLock lock;
+  GlobalStateLock lock(false);
   LogState::Set(settings, lock);
 }
 
 void SetLogSettings(const LogSettings& settings, const std::initializer_list<std::string>& tags) {
-  GlobalStateLock lock;
+  GlobalStateLock lock(false);
   LogState::Set(settings, tags, lock);
 }
 

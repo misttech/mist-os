@@ -68,7 +68,11 @@ int main(const std::string& process_name, const std::string& suspend_enabled_fla
                                 std::unique_ptr<fuchsia::exception::internal::CrashReporter>>;
 
   const std::string handler_index = ExtractHandlerIndex(process_name);
-  fuchsia_logging::SetTags({"forensics", "exception", handler_index});
+
+  fuchsia_logging::LogSettingsBuilder()
+      // Prevents blocking on initialization in case logging subsystem is stuck.
+      .DisableWaitForInitialInterest()
+      .BuildAndInitializeWithTags({"forensics", "exception", handler_index});
 
   // We receive a channel that we interpret as a fuchsia.exception.internal.CrashReporter
   // connection.
