@@ -506,7 +506,7 @@ impl SuperBlockHeader {
         target_super_block: SuperBlockInstance,
     ) -> Result<(SuperBlockHeader, RecordReader), Error> {
         let mut handle = BootstrapObjectHandle::new(target_super_block.object_id(), device);
-        handle.push_extent(target_super_block.first_extent());
+        handle.push_extent(0, target_super_block.first_extent());
         let mut reader = JournalReader::new(handle, &JournalCheckpoint::default());
 
         reader.fill_buf().await?;
@@ -627,7 +627,7 @@ impl RecordReader {
                 ReadResult::ChecksumMismatch => bail!("Checksum mismatch"),
                 ReadResult::Some(SuperBlockRecord::Extent(extent)) => {
                     ensure!(extent.is_valid(), FxfsError::Inconsistent);
-                    self.reader.handle().push_extent(extent)
+                    self.reader.handle().push_extent(0, extent)
                 }
                 ReadResult::Some(x) => return Ok(x),
             }

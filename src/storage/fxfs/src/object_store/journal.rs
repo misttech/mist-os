@@ -387,12 +387,15 @@ pub struct JournaledChecksums {
 /// Handles for journal-like objects have some additional functionality to manage their extents,
 /// since during replay we need to add extents as we find them.
 pub trait JournalHandle: ReadObjectHandle {
-    /// The offset at which the journal stream starts.  Used only for validating extents (which will
-    /// be skipped if None is returned).
-    fn start_offset(&self) -> Option<u64>;
+    /// The end offset of the last extent in the JournalHandle.  Used only for validating extents
+    /// (which will be skipped if None is returned).
+    /// Note this is equivalent in value to ReadObjectHandle::get_size, when present.
+    fn end_offset(&self) -> Option<u64>;
     /// Adds an extent to the current end of the journal stream.
-    fn push_extent(&mut self, device_range: Range<u64>);
-    /// Discards all extents whose logical offset succeeds |discard_offset|.
+    /// `added_offset` is the offset into the journal of the transaction which added this extent,
+    /// used for discard_extents.
+    fn push_extent(&mut self, added_offset: u64, device_range: Range<u64>);
+    /// Discards all extents which were added in a transaction at offset >= |discard_offset|.
     fn discard_extents(&mut self, discard_offset: u64);
 }
 
@@ -400,10 +403,10 @@ pub trait JournalHandle: ReadObjectHandle {
 // Journal::read_transactions.  Manual extent management is a NOP (which is OK since presumably the
 // DataObjectHandle already knows where its extents live).
 impl<S: HandleOwner> JournalHandle for DataObjectHandle<S> {
-    fn start_offset(&self) -> Option<u64> {
+    fn end_offset(&self) -> Option<u64> {
         None
     }
-    fn push_extent(&mut self, _device_range: Range<u64>) {
+    fn push_extent(&mut self, _added_offset: u64, _device_range: Range<u64>) {
         // NOP
     }
     fn discard_extents(&mut self, _discard_offset: u64) {
@@ -649,14 +652,16 @@ impl Journal {
                         ExtentKey { range },
                         ExtentValue::Some { device_offset, .. },
                     )) if object_id == super_block.journal_object_id => {
-                        if range.start != start_offset + handle.get_size() {
-                            bail!(anyhow!(FxfsError::Inconsistent).context(format!(
-                                "Unexpected journal extent {:?}, expected start: {}",
-                                item,
-                                handle.get_size()
-                            )));
+                        if let Some(end_offset) = handle.end_offset() {
+                            if range.start != end_offset {
+                                bail!(anyhow!(FxfsError::Inconsistent).context(format!(
+                                    "Unexpected journal extent {:?}, expected start: {}",
+                                    item, end_offset
+                                )));
+                            }
                         }
                         handle.push_extent(
+                            0, // We never discard extents from the root parent store.
                             *device_offset
                                 ..*device_offset + range.length().context("Invalid extent")?,
                         );
@@ -997,6 +1002,7 @@ impl Journal {
                         }
                         JournalRecord::Commit => {
                             if let Some(JournaledTransaction {
+                                ref checkpoint,
                                 ref root_parent_mutations,
                                 ref mut end_offset,
                                 ..
@@ -1037,20 +1043,19 @@ impl Journal {
                                         if *object_id != handle.object_id() {
                                             continue;
                                         }
-                                        if let Some(start_offset) = handle.start_offset() {
-                                            if range.start != start_offset + handle.get_size() {
+                                        if let Some(end_offset) = handle.end_offset() {
+                                            if range.start != end_offset {
                                                 bail!(anyhow!(FxfsError::Inconsistent).context(
                                                     format!(
                                                         "Unexpected journal extent {:?} -> {}, \
                                                            expected start: {}",
-                                                        range,
-                                                        device_offset,
-                                                        handle.get_size()
+                                                        range, device_offset, end_offset,
                                                     )
                                                 ));
                                             }
                                         }
                                         handle.push_extent(
+                                            checkpoint.file_offset,
                                             *device_offset
                                                 ..*device_offset
                                                     + range.length().context("Invalid extent")?,
@@ -1061,6 +1066,10 @@ impl Journal {
                             }
                         }
                         JournalRecord::Discard(offset) => {
+                            if offset == 0 {
+                                bail!(anyhow!(FxfsError::Inconsistent)
+                                    .context("Invalid offset for Discard"));
+                            }
                             if let Some(transaction) = current_transaction.as_ref() {
                                 if transaction.checkpoint.file_offset < offset {
                                     // Odd, but OK.
@@ -1794,7 +1803,10 @@ mod tests {
     use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
     use crate::object_store::directory::Directory;
     use crate::object_store::transaction::Options;
+    use crate::object_store::volume::root_volume;
     use crate::object_store::{lock_keys, HandleOptions, LockKey, ObjectStore};
+    use fuchsia_async as fasync;
+    use fuchsia_async::Duration;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
 
@@ -2003,6 +2015,116 @@ mod tests {
                 assert_eq!(&buf.as_slice()[..TEST_DATA.len()], TEST_DATA);
             }
         }
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_discard() {
+        let device = {
+            let device = DeviceHolder::new(FakeDevice::new(8192, 4096));
+            let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+            let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+
+            let store = root_volume.new_volume("test", None).await.expect("new_volume failed");
+            let root_directory = Directory::open(&store, store.root_directory_object_id())
+                .await
+                .expect("open failed");
+
+            // Create enough data so that another journal extent is used.
+            let mut i = 0;
+            loop {
+                let mut transaction = fs
+                    .clone()
+                    .new_transaction(
+                        lock_keys![LockKey::object(
+                            store.store_object_id(),
+                            store.root_directory_object_id()
+                        )],
+                        Options::default(),
+                    )
+                    .await
+                    .expect("new_transaction failed");
+                root_directory
+                    .create_child_file(&mut transaction, &format!("a {i}"), None)
+                    .await
+                    .expect("create_child_file failed");
+                if transaction.commit().await.expect("commit failed") > super::CHUNK_SIZE {
+                    break;
+                }
+                i += 1;
+            }
+
+            // Compact and then disable compactions.
+            fs.journal().compact().await.expect("compact failed");
+            fs.journal().stop_compactions().await;
+
+            // Keep going until we need another journal extent.
+            let mut i = 0;
+            loop {
+                let mut transaction = fs
+                    .clone()
+                    .new_transaction(
+                        lock_keys![LockKey::object(
+                            store.store_object_id(),
+                            store.root_directory_object_id()
+                        )],
+                        Options::default(),
+                    )
+                    .await
+                    .expect("new_transaction failed");
+                root_directory
+                    .create_child_file(&mut transaction, &format!("b {i}"), None)
+                    .await
+                    .expect("create_child_file failed");
+                if transaction.commit().await.expect("commit failed") > 2 * super::CHUNK_SIZE {
+                    break;
+                }
+                i += 1;
+            }
+
+            // Allow the journal to flush, but we don't want to sync.
+            fasync::Timer::new(Duration::from_millis(10)).await;
+            // Because we're not gracefully closing the filesystem, a Discard record will be
+            // emitted.
+            fs.device().snapshot().expect("snapshot failed")
+        };
+
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+
+        {
+            let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+
+            let store = root_volume.volume("test", None).await.expect("volume failed");
+
+            let root_directory = Directory::open(&store, store.root_directory_object_id())
+                .await
+                .expect("open failed");
+
+            // Write one more transaction.
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            root_directory
+                .create_child_file(&mut transaction, &format!("d"), None)
+                .await
+                .expect("create_child_file failed");
+            transaction.commit().await.expect("commit failed");
+        }
+
+        fs.close().await.expect("close failed");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        fsck(fs.clone()).await.expect("fsck failed");
         fs.close().await.expect("close failed");
     }
 }

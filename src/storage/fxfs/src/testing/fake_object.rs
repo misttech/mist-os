@@ -105,10 +105,10 @@ impl WriteObjectHandle for FakeObjectHandle {
 }
 
 impl JournalHandle for FakeObjectHandle {
-    fn start_offset(&self) -> Option<u64> {
+    fn end_offset(&self) -> Option<u64> {
         None
     }
-    fn push_extent(&mut self, _device_range: Range<u64>) {
+    fn push_extent(&mut self, _added_offset: u64, _device_range: Range<u64>) {
         // NOP
     }
     fn discard_extents(&mut self, _discard_offset: u64) {
