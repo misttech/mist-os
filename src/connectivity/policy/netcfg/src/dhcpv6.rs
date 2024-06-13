@@ -4,7 +4,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU64;
-use std::pin::Pin;
 
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
@@ -17,7 +16,8 @@ use async_utils::hanging_get::client::HangingGetStream;
 use async_utils::stream::{StreamMap, Tagged};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
 use futures::future::TryFutureExt as _;
-use futures::stream::{BoxStream, Stream, TryStreamExt as _};
+use futures::stream::{Stream, TryStreamExt as _};
+use tracing::warn;
 
 use crate::{dns, errors, DnsServerWatchers};
 
@@ -313,19 +313,26 @@ pub(super) async fn stop_client(
     let source = DnsServersUpdateSource::Dhcpv6 { interface_id: interface_id.get() };
 
     // Dropping all fuchsia.net.dhcpv6/Client proxies will stop the DHCPv6 client.
-    let _: Pin<Box<BoxStream<'_, _>>> = watchers.remove(&source).unwrap_or_else(|| {
-        unreachable!(
-            "DNS server watchers must contain key {:?}; interface_id={}",
+    if let None = watchers.remove(&source) {
+        // It's surprising that the DNS Watcher for the interface doesn't exist
+        // when the DHCP client is trying to be stopped, but this can happen
+        // when multiple futures try to stop the client at the same time.
+        warn!(
+            "DNS Watcher for key not present; multiple futures stopped DHCPv6 \
+            client for key {:?}; interface_id={}",
             source, interface_id
-        )
-    });
-    let _: Pin<Box<InterfaceIdTaggedPrefixesStream>> =
-        prefixes_streams.remove(&interface_id).unwrap_or_else(|| {
-            unreachable!(
-                "DHCPv6 prefixes streams must hold stream for interface_id={}",
-                interface_id
-            )
-        });
+        );
+    }
+    if let None = prefixes_streams.remove(&interface_id) {
+        // It's surprising that the Prefix Stream for the interface doesn't exist
+        // when the DHCP client is trying to be stopped, but this can happen
+        // when multiple futures try to stop the client at the same time.
+        warn!(
+            "Prefix Stream for key not present; multiple futures stopped DHCPv6 \
+            client for key {:?}; interface_id={}",
+            source, interface_id
+        );
+    }
 
     dns::update_servers(lookup_admin, dns_servers, source, vec![]).await
 }
