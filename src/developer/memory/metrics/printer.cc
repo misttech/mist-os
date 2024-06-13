@@ -24,6 +24,7 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
   TRACE_DURATION("memory_metrics", "Printer::DocumentFromCapture");
   rapidjson::Document j(rapidjson::kObjectType);
   auto& a = j.GetAllocator();
+  j.AddMember("Time", capture.time(), a);
 
   rapidjson::Value kernel(rapidjson::kObjectType);
   const auto& k = capture.kmem();
@@ -48,19 +49,44 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
         .AddMember("vmo_discardable_unlocked", k_ext.vmo_discardable_unlocked_bytes, a)
         .AddMember("vmo_reclaim_disabled", k_ext.vmo_reclaim_disabled_bytes, a);
   }
+  j.AddMember("Kernel", kernel, a);
 
-  const auto& k_zram = capture.kmem_compression();
-  bool has_zram = k_zram.compressed_storage_bytes > 0;
-  if (has_zram) {
-    kernel.AddMember("zram_compressed_total", k_zram.compressed_storage_bytes, a)
-        .AddMember("zram_uncompressed", k_zram.uncompressed_storage_bytes, a)
-        .AddMember("zram_fragmentation", k_zram.compressed_fragmentation_bytes, a);
+  if (capture.kmem_compression()) {
+    rapidjson::Value kmem_stats_compression(rapidjson::kObjectType);
+
+    const auto& k_zram = capture.kmem_compression().value();
+    constexpr size_t log_time_size =
+        sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time) /
+        sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time[0]);
+    rapidjson::Value log_time(rapidjson::kArrayType);
+    log_time.Reserve(log_time_size, a);
+    for (auto v : k_zram.pages_decompressed_within_log_time) {
+      log_time.PushBack(v, a);
+    }
+
+    kmem_stats_compression
+        .AddMember("uncompressed_storage_bytes", k_zram.uncompressed_storage_bytes, a)
+        .AddMember("compressed_storage_bytes", k_zram.compressed_storage_bytes, a)
+        .AddMember("compressed_fragmentation_bytes", k_zram.compressed_fragmentation_bytes, a)
+        .AddMember("compression_time", k_zram.compression_time, a)
+        .AddMember("decompression_time", k_zram.decompression_time, a)
+        .AddMember("total_page_compression_attempts", k_zram.total_page_compression_attempts, a)
+        .AddMember("failed_page_compression_attempts", k_zram.failed_page_compression_attempts, a)
+        .AddMember("total_page_decompressions", k_zram.total_page_decompressions, a)
+        .AddMember("compressed_page_evictions", k_zram.compressed_page_evictions, a)
+        .AddMember("eager_page_compressions", k_zram.eager_page_compressions, a)
+        .AddMember("memory_pressure_page_compressions", k_zram.memory_pressure_page_compressions, a)
+        .AddMember("critical_memory_page_compressions", k_zram.critical_memory_page_compressions, a)
+        .AddMember("pages_decompressed_unit_ns", k_zram.pages_decompressed_unit_ns, a)
+        .AddMember("pages_decompressed_within_log_time", log_time, a);
+
+    j.AddMember("kmem_stats_compression", kmem_stats_compression, a);
   }
 
   struct NameCount {
     std::string_view name_;
-    mutable size_t count;
-    explicit NameCount(const char* n) : name_(n, strlen(n)), count(1) {}
+    mutable size_t count = 1;
+    explicit NameCount(const char* n) : name_(n, strlen(n)) {}
 
     bool operator==(const NameCount& kc) const { return name_ == kc.name_; }
   };
@@ -116,7 +142,7 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
       .PushBack("parent_koid", a)
       .PushBack("committed_bytes", a)
       .PushBack("allocated_bytes", a);
-  if (has_zram) {
+  if (capture.kmem_compression()) {
     vmo_header.PushBack("populated_bytes", a);
   }
   vmos.PushBack(vmo_header, a);
@@ -127,16 +153,14 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
         .PushBack(v.parent_koid, a)
         .PushBack(v.committed_bytes, a)
         .PushBack(v.allocated_bytes, a);
-    if (has_zram) {
+    if (capture.kmem_compression()) {
       vmo_value.PushBack(v.populated_bytes, a);
     }
     vmos.PushBack(vmo_value, a);
   }
   TRACE_DURATION_END("memory_metrics", "Printer::DocumentFromCapture::Vmos");
 
-  j.AddMember("Time", capture.time(), a)
-      .AddMember("Kernel", kernel, a)
-      .AddMember("Processes", processes, a)
+  j.AddMember("Processes", processes, a)
       .AddMember("VmoNames", vmo_names, a)
       .AddMember("Vmos", vmos, a);
 

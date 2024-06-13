@@ -17,6 +17,8 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <optional>
+
 #include <task-utils/walker.h>
 
 namespace memory {
@@ -247,7 +249,12 @@ zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, Cap
   // Some Fuchsia systems use ZRAM, ie. compressed RAM. ZX_INFO_KMEM_STATS_COMPRESSION retrieves
   // information about this compression, so we can get an accurate view of the actual physical
   // memory used.
-  err = os.GetKernelMemoryStatsCompression(state.stats_client, capture->kmem_compression_);
+  err =
+      os.GetKernelMemoryStatsCompression(state.stats_client, capture->kmem_compression_.emplace());
+  // Assume compression is disabled when there is no storage.
+  if (!capture->kmem_compression_->compressed_storage_bytes) {
+    capture->kmem_compression_ = std::nullopt;
+  }
   if (err != ZX_OK) {
     return err;
   }

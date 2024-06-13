@@ -51,9 +51,10 @@ executable("bin-monitor") {
   output_name = "memory_monitor_test_app"
 
   sources = [ "monitor_test_app.cc" ]
-
+  testonly = true
   deps = [
     "//sdk/lib/sys/cpp",
+    "//src/developer/memory/metrics/tests:utils",
     "//src/developer/memory/monitor:lib",
     "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

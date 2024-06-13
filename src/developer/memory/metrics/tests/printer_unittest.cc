@@ -90,7 +90,6 @@ TEST_F(PrinterUnitTest, PrintCapture) {
                                });
   std::ostringstream oss;
   Printer(oss).PrintCapture(c);
-
   rapidjson::Document doc;
   doc.Parse(oss.str().c_str());
 

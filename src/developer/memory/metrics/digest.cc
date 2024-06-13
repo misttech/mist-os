@@ -88,10 +88,10 @@ void Digester::Digest(const Capture& capture, class Digest* digest) {
                                       kmem_ext.vmo_discardable_unlocked_bytes);
       }
     }
-    const auto& kmem_zram = capture.kmem_compression();
-    if (kmem_zram.compressed_storage_bytes > 0) {
+
+    if (capture.kmem_compression()) {
       digest->buckets_.emplace_back("[Addl]ZramCompressedBytes",
-                                    kmem_zram.compressed_storage_bytes);
+                                    capture.kmem_compression()->compressed_storage_bytes);
     }
   }
 }
