@@ -128,26 +128,6 @@ class LogState {
 
   void Connect();
   void ConnectAsync();
-  struct Task : public async_task_t {
-    LogState* context;
-    sync_completion_t completion;
-  };
-  static void RunTask(async_dispatcher_t* dispatcher, async_task_t* task, zx_status_t status) {
-    Task* callback = static_cast<Task*>(task);
-    callback->context->ConnectAsync();
-    sync_completion_signal(&callback->completion);
-  }
-
-  // Thunk to initialize logging and allocate HLCPP objects
-  // which are "thread-hostile" and cannot be allocated on a remote thread.
-  void InitializeAsyncTask() {
-    Task task = {};
-    task.deadline = 0;
-    task.handler = RunTask;
-    task.context = this;
-    async_post_task(executor_->dispatcher(), &task);
-    sync_completion_wait(&task.completion, ZX_TIME_INFINITE);
-  }
 
  private:
   LogState(const LogSettings& settings, const std::initializer_list<std::string>& tags);
@@ -156,7 +136,6 @@ class LogState {
   void (*handler_)(void* context, fuchsia_logging::LogSeverity severity);
   void* handler_context_;
   async::Loop loop_;
-  std::optional<async::Executor> executor_;
   std::atomic<fuchsia_logging::LogSeverity> min_severity_;
   const fuchsia_logging::LogSeverity default_severity_;
   mutable cpp17::variant<zx::socket, std::ofstream> descriptor_ = zx::socket();
@@ -266,7 +245,8 @@ void LogState::ConnectAsync() {
     logger = sync_log_sink.TakeClientEnd().TakeChannel();
   }
 
-  log_sink_.Bind(fidl::ClientEnd<fuchsia_logger::LogSink>(std::move(logger)), loop_.dispatcher());
+  log_sink_.Bind(fidl::ClientEnd<fuchsia_logger::LogSink>(std::move(logger)),
+                 interest_listener_dispatcher_);
   zx::socket local, remote;
   if (zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote) != ZX_OK) {
     return;
@@ -285,11 +265,10 @@ void LogState::Connect() {
   if (serve_interest_listener_) {
     if (!interest_listener_dispatcher_) {
       loop_.StartThread("log-interest-listener-thread");
-    } else {
-      executor_.emplace(interest_listener_dispatcher_);
+      interest_listener_dispatcher_ = loop_.dispatcher();
     }
     handler_ = [](void* ctx, fuchsia_logging::LogSeverity severity) {};
-    InitializeAsyncTask();
+    ConnectAsync();
   } else {
     zx::channel logger, logger_request;
     if (provided_log_sink_ == ZX_HANDLE_INVALID) {
@@ -435,7 +414,6 @@ void LogState::Set(const LogSettings& settings, const std::initializer_list<std:
 
 LogState::LogState(const LogSettings& in_settings, const std::initializer_list<std::string>& tags)
     : loop_(&kAsyncLoopConfigNeverAttachToThread),
-      executor_(loop_.dispatcher()),
       min_severity_(in_settings.min_log_level),
       default_severity_(in_settings.min_log_level),
       wait_for_initial_interest_(in_settings.wait_for_initial_interest) {
