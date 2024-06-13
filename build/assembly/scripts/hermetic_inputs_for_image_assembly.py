@@ -113,7 +113,11 @@ def main() -> int:
                         "board_script_path" in script
                         and script["board_script_path"]
                     ):
-                        inputs.add(script["board_script_path"])
+                        script_dir = os.path.dirname(
+                            script["board_script_path"]
+                        )
+                        for file in os.listdir(script_dir):
+                            inputs.add(os.path.join(script_dir, file))
 
     if deps:
         with open(args.depfile, "w") as depfile:
