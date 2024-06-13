@@ -4,13 +4,8 @@
 
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fidl_examples_routing_echo::EchoMarker;
-use fuchsia_async::DurationExt;
 use fuchsia_component::client::*;
-use fuchsia_zircon::DurationNum;
-use {
-    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync,
-};
+use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {
     let iterator = query.get_resolved_declaration(moniker).await.unwrap().unwrap();
@@ -270,36 +265,31 @@ pub async fn echo_server() {
         .await
         .unwrap()
         .unwrap();
+    let mut entries = fuchsia_fs::directory::readdir(&elf_dir).await.unwrap();
 
-    // ELF runner doesn't doesn't fully populate the runtime_dir before it begins serving it, so
-    // poll in a loop.
-    let expected_entries = vec![
-        fuchsia_fs::directory::DirEntry {
-            name: "job_id".to_string(),
-            kind: fuchsia_fs::directory::DirentKind::File,
-        },
-        fuchsia_fs::directory::DirEntry {
-            name: "process_id".to_string(),
-            kind: fuchsia_fs::directory::DirentKind::File,
-        },
-        fuchsia_fs::directory::DirEntry {
-            name: "process_start_time".to_string(),
-            kind: fuchsia_fs::directory::DirentKind::File,
-        },
-    ];
-    loop {
-        let mut entries = fuchsia_fs::directory::readdir(&elf_dir).await.unwrap();
-        if let Some(position) =
-            entries.iter().position(|e| e.name == "process_start_time_utc_estimate")
-        {
-            entries.remove(position);
-        }
-        if entries.len() >= expected_entries.len() {
-            assert_eq!(entries, expected_entries);
-            break;
-        }
-        fasync::Timer::new(100.millis().after_now()).await;
+    // TODO(https://fxbug.dev/42182309): The existence of "process_start_time_utc_estimate" is flaky.
+    if let Some(position) = entries.iter().position(|e| e.name == "process_start_time_utc_estimate")
+    {
+        entries.remove(position);
     }
+
+    assert_eq!(
+        entries,
+        vec![
+            fuchsia_fs::directory::DirEntry {
+                name: "job_id".to_string(),
+                kind: fuchsia_fs::directory::DirentKind::File,
+            },
+            fuchsia_fs::directory::DirEntry {
+                name: "process_id".to_string(),
+                kind: fuchsia_fs::directory::DirentKind::File,
+            },
+            fuchsia_fs::directory::DirEntry {
+                name: "process_start_time".to_string(),
+                kind: fuchsia_fs::directory::DirentKind::File,
+            },
+        ]
+    );
 }
 
 #[fuchsia::test]
