@@ -161,7 +161,7 @@ class DownloadFromStubPathTests(unittest.TestCase):
             ) as mock_exists:
                 subprocess_result = remote_action.download_from_stub_path(
                     stub_path,
-                    downloader=None,  # not needed
+                    downloader=None,  # type: ignore[arg-type]
                     working_dir_abs=Path(td),
                 )
         self.assertEqual(subprocess_result.returncode, 0)
@@ -188,7 +188,7 @@ class DownloadFromStubPathTests(unittest.TestCase):
             ) as mock_download:
                 subprocess_result = remote_action.download_from_stub_path(
                     stub_path,
-                    downloader=None,  # not needed
+                    downloader=None,  # type: ignore[arg-type]
                     working_dir_abs=Path(td),
                 )
             # Ensure that we use the invoked path,
@@ -390,6 +390,11 @@ class FakeReproxyLogEntry(remote_action.ReproxyLogEntry):
     """Mimic a ReproxyLogEntry by setting properties without parsing."""
 
     def __init__(self, **kwargs: Any):
+        self._execution_id: str
+        self._action_digest: str
+        self._output_file_digests: Dict[Path, str]
+        self._output_directory_digests: Dict[Path, str]
+        self._completion_status: str
         # intentionally does not call super().__init__(), but instead
         # sets property attributes.
         for k, v in kwargs.items():
@@ -495,7 +500,8 @@ class TextDiffTests(unittest.TestCase):
             cl_utils, "subprocess_call", return_value=result
         ) as mock_call:
             self.assertEqual(
-                remote_action._text_diff("file1.txt", "file2.txt"), result
+                remote_action._text_diff(Path("file1.txt"), Path("file2.txt")),
+                result,
             )
         mock_call.assert_called_once()
         first_call = mock_call.call_args_list[0]
@@ -537,7 +543,7 @@ class FilesUnderDirTests(unittest.TestCase):
             _write_file_contents(f1path, "\n")
             _write_file_contents(f2path, "\n")
             self.assertEqual(
-                set(remote_action._files_under_dir(td)),
+                set(remote_action._files_under_dir(Path(td))),
                 _paths({"left.txt", "sub/right.txt"}),
             )
 
@@ -550,7 +556,9 @@ class CommonFilesUnderDirsTests(unittest.TestCase):
             side_effect=[iter(["a", "b", "c"]), iter(["d", "e", "f"])],
         ) as mock_lsr:
             self.assertEqual(
-                remote_action._common_files_under_dirs("foo-dir", "bar-dir"),
+                remote_action._common_files_under_dirs(
+                    Path("foo-dir"), Path("bar-dir")
+                ),
                 set(),
             )
 
@@ -564,8 +572,10 @@ class CommonFilesUnderDirsTests(unittest.TestCase):
             ],
         ) as mock_lsr:
             self.assertEqual(
-                remote_action._common_files_under_dirs(
-                    Path("foo-dir"), Path("bar-dir")
+                set(
+                    remote_action._common_files_under_dirs(
+                        Path("foo-dir"), Path("bar-dir")
+                    )
                 ),
                 _paths({"b/x", "c"}),
             )
@@ -583,7 +593,7 @@ class ExpandCommonFilesBetweenDirs(unittest.TestCase):
             self.assertEqual(
                 list(
                     remote_action._expand_common_files_between_dirs(
-                        [_paths(("c", "d")), _paths(("a", "b"))]
+                        [(Path("c"), Path("d")), (Path("a"), Path("b"))]
                     )
                 ),
                 [
@@ -602,7 +612,9 @@ class FileLinesMatchingTests(unittest.TestCase):
         ) as mock_file:
             self.assertEqual(
                 list(
-                    remote_action._file_lines_matching("log.txt", "never-match")
+                    remote_action._file_lines_matching(
+                        Path("log.txt"), "never-match"
+                    )
                 ),
                 [],
             )
@@ -612,7 +624,7 @@ class FileLinesMatchingTests(unittest.TestCase):
             "builtins.open", mock.mock_open(read_data="ab\nbc\ncd\n")
         ) as mock_file:
             self.assertEqual(
-                list(remote_action._file_lines_matching("file.txt", "c")),
+                list(remote_action._file_lines_matching(Path("file.txt"), "c")),
                 ["bc\n", "cd\n"],
             )
 
@@ -749,7 +761,9 @@ class HostToolNonsystemShlibsTests(unittest.TestCase):
         ) as mock_host_tool_shlibs:
             self.assertEqual(
                 list(
-                    remote_action.host_tool_nonsystem_shlibs("../path/to/rustc")
+                    remote_action.host_tool_nonsystem_shlibs(
+                        Path("../path/to/rustc")
+                    )
                 ),
                 _paths(
                     [
@@ -1274,7 +1288,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         # Confirm that the remote command is wrapped with fsatrace
         self.assertIn(str(fake_fsatrace_rel), fsatrace_prefix)
         self.assertEqual(
-            fsatrace_prefix + ["--"],
+            [*fsatrace_prefix, "--"],
             action._fsatrace_command_prefix(
                 Path(str(output) + ".remote-fsatrace")
             ),
@@ -1319,7 +1333,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         # Confirm that the remote command is wrapped with fsatrace
         self.assertIn(str(fake_fsatrace_rel), trace_wrapper)
         self.assertEqual(
-            trace_wrapper + ["--"],
+            [*trace_wrapper, "--"],
             action._fsatrace_command_prefix(
                 Path(str(output) + ".remote-fsatrace")
             ),
@@ -1386,7 +1400,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         )
         # Confirm that the inner wrapper is for fsatrace
         self.assertEqual(
-            trace_wrapper + ["--"],
+            [*trace_wrapper, "--"],
             action._fsatrace_command_prefix(
                 Path(str(output) + ".remote-fsatrace")
             ),
@@ -2159,7 +2173,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         """Create a RemoteAction for testing with some defaults."""
         return remote_action.RemoteAction(
             rewrapper=rewrapper or self._rewrapper,
-            command=command,
+            command=command,  # type: ignore[arg-type]
             exec_root=exec_root or self._PROJECT_ROOT,
             working_dir=working_dir or self._WORKING_DIR,
             **kwargs,
@@ -2704,7 +2718,7 @@ remote_metadata: {{
 
             def fake_download_file(
                 downloader_self: object, path: Path, digest: str, **kwargs: Any
-            ) -> None:
+            ) -> cl_utils.SubprocessResult:
                 (tdp / path).write_text("hello\n")
                 return cl_utils.SubprocessResult(0)
 
@@ -2753,7 +2767,7 @@ remote_metadata: {{
 
             def fake_download_dir(
                 downloader_self: object, path: Path, digest: str, **kwargs: Any
-            ) -> None:
+            ) -> cl_utils.SubprocessResult:
                 (tdp / path).mkdir()
                 (tdp / path / "readme.txt").write_text("hello\n")
                 return cl_utils.SubprocessResult(0)
@@ -3282,9 +3296,11 @@ remote_metadata: {{
             action, fake_log_record = self._setup_update_stub_test(Path(td))
 
             # create a pre-existing stub-file with the same digest as the new output
+            assert fake_log_record is not None
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
             old_stub_info.create(self.working_dir)
             self.assertTrue(
                 remote_action.is_download_stub_file(
@@ -3309,6 +3325,7 @@ remote_metadata: {{
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
             new_stub_info = copy.deepcopy(old_stub_info)
             old_stub_info._blob_digest = "66776677/33"  # mismatched digest
             old_stub_info.create(self.working_dir)
@@ -3342,6 +3359,7 @@ remote_metadata: {{
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
             old_stub_info.create(self.working_dir, dest=stub_location)
             self.assertTrue(
                 remote_action.is_download_stub_file(
@@ -3373,6 +3391,7 @@ remote_metadata: {{
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
 
             # bypass the remote action running
             with mock.patch.object(
@@ -3413,6 +3432,7 @@ remote_metadata: {{
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
             new_stub_info = copy.deepcopy(old_stub_info)
             old_stub_info.create(self.working_dir, dest=stub_location)
             new_stub_info._blob_digest = "43218765/11"  # mismatched digest
@@ -3445,6 +3465,7 @@ remote_metadata: {{
             new_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert new_stub_info is not None
             new_stub_info._blob_digest = "43218765/11"  # mismatched digest
 
             # bypass the remote action running
@@ -3465,7 +3486,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
         exec_root = Path("/path/to/project/root")
         working_dir = exec_root / "build/stuff/here"
         return remote_action.RemoteAction(
-            rewrapper="/path/to/rewrapper",
+            rewrapper=Path("/path/to/rewrapper"),
             command=command,
             exec_root=exec_root,
             working_dir=working_dir,

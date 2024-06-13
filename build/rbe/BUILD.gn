@@ -197,21 +197,21 @@ if (is_host) {
   }
 
   python_library("relativize_args") {
-    enable_mypy = false
+    enable_mypy = true
     sources = [ "relativize_args.py" ]
   }
   python_host_test("relativize_args_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "relativize_args_test.py"
     sources = [ "relativize_args.py" ]
   }
 
   python_library("remote_action") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _remote_action_sources
   }
   python_host_test("remote_action_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "remote_action_test.py"
     sources = _remote_action_sources
   }

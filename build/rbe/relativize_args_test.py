@@ -12,28 +12,28 @@ import relativize_args
 
 
 class SplitTransformJoinTest(unittest.TestCase):
-    def test_no_change(self):
+    def test_no_change(self) -> None:
         self.assertEqual(
             relativize_args.split_transform_join("text", "=", lambda x: x),
             "text",
         )
 
-    def test_repeat(self):
+    def test_repeat(self) -> None:
         self.assertEqual(
             relativize_args.split_transform_join("text", "=", lambda x: x + x),
             "texttext",
         )
 
-    def test_with_split(self):
+    def test_with_split(self) -> None:
         self.assertEqual(
             relativize_args.split_transform_join("a=b", "=", lambda x: x + x),
             "aa=bb",
         )
 
-    def test_with_split_recorded(self):
+    def test_with_split_recorded(self) -> None:
         renamed_tokens = {}
 
-        def recorded_transform(x):
+        def recorded_transform(x: str) -> str:
             new_text = x + x
             renamed_tokens[x] = new_text
             return new_text
@@ -48,13 +48,13 @@ class SplitTransformJoinTest(unittest.TestCase):
 
 
 class LexicallyRewriteTokenTest(unittest.TestCase):
-    def test_repeat_text(self):
+    def test_repeat_text(self) -> None:
         self.assertEqual(
             relativize_args.lexically_rewrite_token("foo", lambda x: x + x),
             "foofoo",
         )
 
-    def test_delimters_only(self):
+    def test_delimters_only(self) -> None:
         self.assertEqual(
             relativize_args.lexically_rewrite_token(
                 ",,==,=,=,", lambda x: x + x
@@ -62,8 +62,8 @@ class LexicallyRewriteTokenTest(unittest.TestCase):
             ",,==,=,=,",
         )
 
-    def test_flag_with_value(self):
-        def transform(x):
+    def test_flag_with_value(self) -> None:
+        def transform(x: str) -> str:
             if x.startswith("file"):
                 return "tmp-" + x
             else:
@@ -88,12 +88,12 @@ class LexicallyRewriteTokenTest(unittest.TestCase):
 
 
 class GreatestPathParentTest(unittest.TestCase):
-    def test_one_component(self):
+    def test_one_component(self) -> None:
         self.assertEqual(
             relativize_args.greatest_path_parent(Path("/root")), Path("/root")
         )
 
-    def test_multiple_components(self):
+    def test_multiple_components(self) -> None:
         self.assertEqual(
             relativize_args.greatest_path_parent(
                 Path("/root/for/the/home/team")
@@ -103,7 +103,7 @@ class GreatestPathParentTest(unittest.TestCase):
 
 
 class RelativizePathTest(unittest.TestCase):
-    def test_abspath(self):
+    def test_abspath(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_exists:
@@ -113,7 +113,7 @@ class RelativizePathTest(unittest.TestCase):
             )
         mock_exists.assert_called_with()
 
-    def test_relpath(self):
+    def test_relpath(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_exists:
@@ -122,7 +122,7 @@ class RelativizePathTest(unittest.TestCase):
             )
         mock_exists.assert_not_called()  # no absolute path in arg
 
-    def test_cxx_Iflag(self):
+    def test_cxx_Iflag(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_exists:
@@ -132,7 +132,7 @@ class RelativizePathTest(unittest.TestCase):
             )
         mock_exists.assert_called_with()
 
-    def test_cxx_Lflag(self):
+    def test_cxx_Lflag(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_exists:
@@ -142,7 +142,7 @@ class RelativizePathTest(unittest.TestCase):
             )
         mock_exists.assert_called_with()
 
-    def test_cxx_isystemflag(self):
+    def test_cxx_isystemflag(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_exists:
@@ -154,7 +154,7 @@ class RelativizePathTest(unittest.TestCase):
             )
         mock_exists.assert_called_with()
 
-    def test_windows_style_flag(self):
+    def test_windows_style_flag(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=False
         ) as mock_exists:
@@ -165,7 +165,7 @@ class RelativizePathTest(unittest.TestCase):
 
 
 class RelativizeCommandTest(unittest.TestCase):
-    def test_no_transform(self):
+    def test_no_transform(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_exists:
@@ -177,7 +177,7 @@ class RelativizeCommandTest(unittest.TestCase):
             )
         mock_exists.assert_not_called()  # nothing looks like an absolute path
 
-    def test_with_env(self):
+    def test_with_env(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_exists:
@@ -189,7 +189,7 @@ class RelativizeCommandTest(unittest.TestCase):
             )
         mock_exists.assert_called_with()
 
-    def test_relativize(self):
+    def test_relativize(self) -> None:
         with mock.patch.object(
             Path, "exists", return_value=True
         ) as mock_exists:
@@ -203,34 +203,34 @@ class RelativizeCommandTest(unittest.TestCase):
 
 
 class MainArgParserTest(unittest.TestCase):
-    def test_no_flags(self):
+    def test_no_flags(self) -> None:
         parser = relativize_args.main_arg_parser()
         args = parser.parse_args([])
         self.assertFalse(args.verbose)
         self.assertFalse(args.dry_run)
         self.assertTrue(args.enable)
 
-    def test_verbose(self):
+    def test_verbose(self) -> None:
         parser = relativize_args.main_arg_parser()
         args = parser.parse_args(["--verbose"])
         self.assertTrue(args.verbose)
 
-    def test_dry_run(self):
+    def test_dry_run(self) -> None:
         parser = relativize_args.main_arg_parser()
         args = parser.parse_args(["--dry-run"])
         self.assertTrue(args.dry_run)
 
-    def test_disable(self):
+    def test_disable(self) -> None:
         parser = relativize_args.main_arg_parser()
         args = parser.parse_args(["--disable"])
         self.assertFalse(args.enable)
 
-    def test_cwd(self):
+    def test_cwd(self) -> None:
         parser = relativize_args.main_arg_parser()
         args = parser.parse_args(["--cwd", "/home/foo"])
         self.assertEqual(args.cwd, Path("/home/foo"))
 
-    def test_command(self):
+    def test_command(self) -> None:
         parser = relativize_args.main_arg_parser()
         args = parser.parse_args(["--", "echo", "bye"])
         self.assertEqual(args.command, ["echo", "bye"])
