@@ -12,10 +12,10 @@
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/scope.h>
 
-#include <memory>
 #include <string>
 
 #include "src/developer/forensics/utils/errors.h"
+#include "src/developer/forensics/utils/fidl_event_handler.h"
 
 namespace forensics::exceptions::handler {
 
@@ -67,15 +67,13 @@ class WakeLease : public WakeLeaseBase {
   bool add_power_element_called_;
   fpromise::barrier add_power_element_barrier_;
 
-  std::unique_ptr<fidl::AsyncEventHandler<fuchsia_power_system::ActivityGovernor>>
-      sag_event_handler_;
+  AsyncEventHandlerOpen<fuchsia_power_system::ActivityGovernor> sag_event_handler_;
   fidl::Client<fuchsia_power_system::ActivityGovernor> sag_;
 
-  std::unique_ptr<fidl::AsyncEventHandler<fuchsia_power_broker::Topology>> topology_event_handler_;
+  AsyncEventHandlerOpen<fuchsia_power_broker::Topology> topology_event_handler_;
   fidl::Client<fuchsia_power_broker::Topology> topology_;
 
-  std::unique_ptr<fidl::AsyncEventHandler<fuchsia_power_broker::LeaseControl>>
-      lease_control_event_handler_;
+  AsyncEventHandlerOpen<fuchsia_power_broker::LeaseControl> lease_control_event_handler_;
 
   // Channels that will be valid and must be kept open once the element is added to the topology.
   fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_channel_;

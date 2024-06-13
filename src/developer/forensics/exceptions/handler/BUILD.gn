@@ -33,6 +33,7 @@ source_set("lib") {
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//src/developer/forensics/exceptions/fidl:fuchsia.exception.internal_hlcpp",
+    "//src/developer/forensics/utils:fidl_event_handler",
     "//src/developer/forensics/utils:fidl_oneshot",
     "//src/lib/fsl",
     "//src/lib/fxl",

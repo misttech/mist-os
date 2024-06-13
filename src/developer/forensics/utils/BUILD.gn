@@ -35,6 +35,15 @@ source_set("errors") {
   ]
 }
 
+source_set("fidl_event_handler") {
+  sources = [ "fidl_event_handler.h" ]
+
+  public_deps = [
+    "//sdk/lib/fidl/cpp/wire",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
 source_set("fidl_oneshot") {
   sources = [ "fidl_oneshot.h" ]
 

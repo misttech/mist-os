@@ -25,34 +25,6 @@ namespace {
 namespace fpb = fuchsia_power_broker;
 namespace fps = fuchsia_power_system;
 
-class SagEventHandler : public fidl::AsyncEventHandler<fps::ActivityGovernor> {
- public:
-  void on_fidl_error(const fidl::UnbindInfo error) override { FX_LOGS(ERROR) << error; }
-
-  void handle_unknown_event(
-      const fidl::UnknownEventMetadata<fps::ActivityGovernor> metadata) override {
-    FX_LOGS(ERROR) << "Unexpected event ordinal: " << metadata.event_ordinal;
-  }
-};
-
-class TopologyEventHandler : public fidl::AsyncEventHandler<fpb::Topology> {
- public:
-  void on_fidl_error(const fidl::UnbindInfo error) override { FX_LOGS(ERROR) << error; }
-
-  void handle_unknown_event(const fidl::UnknownEventMetadata<fpb::Topology> metadata) override {
-    FX_LOGS(ERROR) << "Unexpected event ordinal: " << metadata.event_ordinal;
-  }
-};
-
-class LeaseControlEventHandler : public fidl::AsyncEventHandler<fpb::LeaseControl> {
- public:
-  void on_fidl_error(const fidl::UnbindInfo error) override { FX_LOGS(ERROR) << error; }
-
-  void handle_unknown_event(const fidl::UnknownEventMetadata<fpb::LeaseControl> metadata) override {
-    FX_LOGS(ERROR) << "Unexpected event ordinal: " << metadata.event_ordinal;
-  }
-};
-
 fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Lessor> server_end,
                                const std::string& element_name) {
   fpb::LevelDependency dependency(
@@ -111,11 +83,8 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, const std::string& power_el
     : dispatcher_(dispatcher),
       power_element_name_(power_element_name),
       add_power_element_called_(false),
-      sag_event_handler_(std::make_unique<SagEventHandler>()),
-      sag_(std::move(sag_client_end), dispatcher_, sag_event_handler_.get()),
-      topology_event_handler_(std::make_unique<TopologyEventHandler>()),
-      topology_(std::move(topology_client_end), dispatcher_, topology_event_handler_.get()),
-      lease_control_event_handler_(std::make_unique<LeaseControlEventHandler>()) {}
+      sag_(std::move(sag_client_end), dispatcher_, &sag_event_handler_),
+      topology_(std::move(topology_client_end), dispatcher_, &topology_event_handler_) {}
 
 fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::Acquire(
     const zx::duration timeout) {
@@ -215,9 +184,8 @@ fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::DoAcquireLe
                   fpromise::error(Error::kBadValue));
             })
             .and_then([this](fpb::LessorLeaseResponse& result) {
-              fidl::Client<fpb::LeaseControl> lease_control(std::move(result.lease_control()),
-                                                            dispatcher_,
-                                                            lease_control_event_handler_.get());
+              fidl::Client<fpb::LeaseControl> lease_control(
+                  std::move(result.lease_control()), dispatcher_, &lease_control_event_handler_);
 
               return WaitForLeaseSatisfied(std::move(lease_control), fpb::LeaseStatus::kUnknown);
             });
