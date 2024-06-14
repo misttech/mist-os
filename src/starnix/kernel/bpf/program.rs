@@ -128,7 +128,7 @@ impl Program {
         if let Some(vm) = self.vm.as_ref() {
             let mut context = HelperFunctionContext {
                 locked: &mut locked.cast_locked::<BpfHelperOps>(),
-                _current_task: current_task,
+                current_task,
             };
             Ok(vm.run(&mut context, data))
         } else {
