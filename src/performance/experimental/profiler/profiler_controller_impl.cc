@@ -252,53 +252,80 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
       break;
     }
     case fuchsia_cpu_profiler::TargetConfig::Tag::kComponent: {
-      if (request.config()->target()->component()->url().has_value()) {
-        std::string url = request.config()->target()->component()->url().value();
-        std::string moniker;
-        if (request.config()->target()->component()->moniker().has_value()) {
-          moniker = request.config()->target()->component()->moniker().value();
-        } else {
-          // Default to core/ffx-laboratory
-          const std::string parent_moniker = "./core";
-          const std::string collection = "ffx-laboratory";
+      const auto& attach_config = request.config()->target()->component();
+      switch (attach_config->Which()) {
+        case fuchsia_cpu_profiler::AttachConfig::Tag::kLaunchComponent: {
+          auto& launch_config = attach_config->launch_component();
+          if (!launch_config->url()) {
+            FX_LOGS(ERROR) << "Cannot launch a component without a specified url!";
+            completer.Reply(
+                fit::error(fuchsia_cpu_profiler::SessionConfigureError::kMissingComponentUrl));
+            return;
+          }
+          auto url = launch_config->url().value();
 
-          // url: fuchsia-pkg://fuchsia.com/package#meta/component.cm
-          const size_t name_start = url.find_last_of('/');
-          const size_t name_end = url.find_last_of('.');
-          if (name_start == std::string::npos || name_end == std::string::npos) {
-            FX_LOGS(ERROR) << "Invalid url: " << url;
+          std::string moniker;
+          if (launch_config->moniker()) {
+            moniker = launch_config->moniker().value();
+          } else {
+            // If we are launching the component and a moniker isn't specified, default to
+            // core/ffx-laboratory.
+
+            // url: fuchsia-pkg://fuchsia.com/package#meta/component.cm
+            const size_t name_start = url.find_last_of('/');
+            const size_t name_end = url.find_last_of('.');
+            if (name_start == std::string::npos || name_end == std::string::npos) {
+              FX_LOGS(ERROR) << "Invalid url: " << url;
+              completer.Reply(
+                  fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+              return;
+            }
+            // name: component
+            const std::string name = url.substr(name_start + 1, name_end - (name_start + 1));
+            moniker = "./core/ffx-laboratory:" + name;
+          }
+
+          zx::result<std::unique_ptr<profiler::Component>> res =
+              profiler::Component::Create(dispatcher_, url, moniker);
+          if (res.is_error()) {
+            FX_PLOGS(INFO, res.error_value())
+                << "No access to fuchsia.sys2.LifecycleController.root. Component launching and attaching is disabled";
             completer.Reply(
                 fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
             return;
           }
-          // name: component
-          const std::string name = url.substr(name_start + 1, name_end - (name_start + 1));
-          moniker = "./core/ffx-laboratory:" + name;
+          component_target_ = std::move(*res);
+          break;
         }
-
-        zx::result<std::unique_ptr<profiler::Component>> res =
-            profiler::Component::Create(dispatcher_, url, moniker);
-        if (res.is_error()) {
-          FX_PLOGS(INFO, res.error_value())
-              << "No access to fuchsia.sys2.LifecycleController.root. Component launching and attaching is disabled";
+        case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentMoniker: {
+          auto& attach_moniker = attach_config->attach_to_component_moniker();
+          zx::result<std::unique_ptr<profiler::Component>> res =
+              profiler::UnownedComponent::Create(dispatcher_, attach_moniker, std::nullopt);
+          if (res.is_error()) {
+            completer.Reply(
+                fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+            return;
+          }
+          component_target_ = std::move(*res);
+          break;
+        }
+        case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentUrl: {
+          auto& attach_url = attach_config->attach_to_component_url();
+          zx::result<std::unique_ptr<profiler::Component>> res =
+              profiler::UnownedComponent::Create(dispatcher_, std::nullopt, attach_url);
+          if (res.is_error()) {
+            completer.Reply(
+                fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+            return;
+          }
+          component_target_ = std::move(*res);
+          break;
+        }
+        default: {
           completer.Reply(
               fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
           return;
         }
-        component_target_ = std::move(*res);
-      } else if (request.config()->target()->component()->moniker()) {
-        zx::result<std::unique_ptr<profiler::Component>> res = profiler::UnownedComponent::Create(
-            dispatcher_, *request.config()->target()->component()->moniker());
-        if (res.is_error()) {
-          completer.Reply(
-              fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-          return;
-        }
-        component_target_ = std::move(*res);
-      } else {
-        completer.Reply(
-            fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
-        return;
       }
       break;
     }
@@ -386,6 +413,7 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
       }
     };
     if (zx::result<> res = component_target_->Start(std::move(on_start_handler)); res.is_error()) {
+      FX_PLOGS(ERROR, res.error_value()) << "Failed to start!";
       completer.Close(res.error_value());
       Reset();
       return;
@@ -458,20 +486,20 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
 
   for (const auto& [pid, samples] : sampler_->GetSamples()) {
     if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::kReset, socket_)) {
-      completer.Close(ZX_ERR_IO);
+      FX_LOGS(ERROR) << "Failed to write symbolizer markup to socket";
       return;
     }
     auto process_modules = modules->process_contexts[pid];
     for (const profiler::Module& mod : process_modules) {
       if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatModule(mod), socket_)) {
-        completer.Close(ZX_ERR_IO);
+        FX_LOGS(ERROR) << "Failed to write modules to socket";
         return;
       }
     }
     for (const Sample& sample : samples) {
       if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::FormatSample(sample),
                                        socket_)) {
-        completer.Close(ZX_ERR_IO);
+        FX_LOGS(ERROR) << "Failed to write samples to socket";
         return;
       }
     }

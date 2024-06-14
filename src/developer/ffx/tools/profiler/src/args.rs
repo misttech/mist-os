@@ -15,20 +15,20 @@ pub struct ProfilerCommand {
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
 pub enum ProfilerSubCommand {
-    Start(Start),
+    Attach(Attach),
+    Launch(Launch),
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
-/// Record a profile.
-#[argh(subcommand, name = "start")]
+/// Profile a running task or component
+#[argh(subcommand, name = "attach")]
 #[derive(Default)]
-pub struct Start {
-    /// url of a component to launch and profile
+pub struct Attach {
+    /// url of a component to profile. If there is no matching component, wait for one to appear.
     #[argh(option)]
     pub url: Option<String>,
 
-    /// moniker of a component to attach to and profile. If specified in combination with `--url`,
-    /// will attempt to launch the component at the given moniker.
+    /// moniker of a component to profile. If there is no matching component, the profiler will
     #[argh(option)]
     pub moniker: Option<String>,
 
@@ -46,7 +46,47 @@ pub struct Start {
 
     /// how long to profiler for. If unspecified, will interactively wait until <ENTER> is pressed.
     #[argh(option)]
-    pub duration: Option<f64>,
+    pub duration: Option<u64>,
+
+    /// name of output trace file. Defaults to profile.pb.
+    #[argh(option, default = "String::from(\"profile.pb\")")]
+    pub output: String,
+
+    /// print stats about how the profiling session went
+    #[argh(switch)]
+    pub print_stats: bool,
+
+    /// if false, output the raw sample file instead of attempting to symbolize it
+    #[argh(option, default = "true")]
+    pub symbolize: bool,
+
+    /// if false, output the raw symbolized sample file instead of attempting to convert to the
+    /// pprof format. Ignored if --symbolize is false.
+    #[argh(option, default = "true")]
+    pub pprof_conversion: bool,
+
+    /// how frequently to take a sample
+    #[argh(option, default = "10000")]
+    pub sample_period_us: u64,
+}
+
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
+/// Record a profile.
+#[argh(subcommand, name = "launch")]
+#[derive(Default)]
+pub struct Launch {
+    /// url of a component to launch and profile
+    #[argh(option)]
+    pub url: String,
+
+    /// moniker of a component to attach to and profile. If specified in combination with `--url`,
+    /// will attempt to launch the component at the given moniker.
+    #[argh(option)]
+    pub moniker: Option<String>,
+
+    /// how long in seconds to profile for. If unspecified, will interactively wait until <ENTER> is pressed.
+    #[argh(option)]
+    pub duration: Option<u64>,
 
     /// name of output trace file. Defaults to profile.pb.
     #[argh(option, default = "String::from(\"profile.pb\")")]

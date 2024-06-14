@@ -22,10 +22,14 @@ class UnownedComponent : public Component {
     needs_destruction_ = false;
   }
   static zx::result<std::unique_ptr<Component>> Create(async_dispatcher_t* dispatcher,
-                                                       const std::string& moniker);
+                                                       const std::optional<std::string>& moniker,
+                                                       const std::optional<std::string>& url);
   zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start = nullptr) override;
   zx::result<> Stop() override;
   zx::result<> Destroy() override;
+
+  zx::result<> Attach(const fidl::SyncClient<fuchsia_sys2::RealmQuery>& client,
+                      std::string moniker);
 };
 
 }  // namespace profiler

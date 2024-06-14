@@ -34,27 +34,22 @@ impl FfxMain for ProfilerTool {
     }
 }
 
-fn gather_targets(opts: &args::Start) -> Result<fidl_fuchsia_cpu_profiler::TargetConfig> {
-    if let Some(url) = &opts.url {
+fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::TargetConfig> {
+    if let Some(moniker) = &opts.moniker {
         if !opts.pids.is_empty() || !opts.tids.is_empty() || !opts.job_ids.is_empty() {
             ffx_bail!(
                 "Targeting both a component and specific jobs/processes/threads is not supported"
             )
         }
-        let component_config = profiler::ComponentConfig {
-            url: Some(url.clone()),
-            moniker: opts.moniker.clone(),
-            ..Default::default()
-        };
+        let component_config = profiler::AttachConfig::AttachToComponentMoniker(moniker.clone());
         Ok(profiler::TargetConfig::Component(component_config))
-    } else if let Some(moniker) = &opts.moniker {
+    } else if let Some(url) = &opts.url {
         if !opts.pids.is_empty() || !opts.tids.is_empty() || !opts.job_ids.is_empty() {
             ffx_bail!(
                 "Targeting both a component and specific jobs/processes/threads is not supported"
             )
         }
-        let component_config =
-            profiler::ComponentConfig { moniker: Some(moniker.clone()), ..Default::default() };
+        let component_config = profiler::AttachConfig::AttachToComponentUrl(url.clone());
         Ok(profiler::TargetConfig::Component(component_config))
     } else {
         let tasks: Vec<_> = opts
@@ -116,13 +111,104 @@ pub fn pprof_conversion(from: &PathBuf, to: PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub async fn profiler(
+struct SessionOpts {
+    symbolize: bool,
+    print_stats: bool,
+    pprof_conversion: bool,
+    output: String,
+    duration: Option<u64>,
+}
+
+async fn run_session(
     controller: fho::Deferred<profiler::SessionProxy>,
     mut writer: Writer,
+    config: profiler::Config,
+    opts: SessionOpts,
+) -> Result<()> {
+    let (client, server) = fidl::Socket::create_stream();
+    let client = fidl::AsyncSocket::from_socket(client);
+    let controller = controller.await?;
+    controller
+        .configure(profiler::SessionConfigureRequest {
+            output: Some(server),
+            config: Some(config),
+            ..Default::default()
+        })
+        .await?
+        .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
+
+    let tmp_dir = Builder::new().prefix("fuchsia_cpu_profiler_").tempdir()?;
+
+    let unsymbolized_path = if opts.symbolize {
+        tmp_dir.path().join("unsymbolized.txt")
+    } else {
+        std::path::PathBuf::from(&opts.output)
+    };
+
+    let mut output = File::create(&unsymbolized_path).await?;
+    let copy_task =
+        fuchsia_async::Task::local(async move { futures::io::copy(client, &mut output).await });
+
+    controller
+        .start(&profiler::SessionStartRequest { buffer_results: Some(true), ..Default::default() })
+        .await?
+        .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
+
+    if let &Some(duration) = &opts.duration {
+        writer.line(format!("Waiting for {} seconds...", duration))?;
+        fuchsia_async::Timer::new(Duration::from_secs(duration)).await;
+    } else {
+        writer.line("Press <enter> to stop profiling...")?;
+        blocking::unblock(|| {
+            let _ = stdin().lock().read_line(&mut String::new());
+        })
+        .await;
+    }
+    let stats = controller.stop().await?;
+    if opts.print_stats {
+        writer.line(format!("\nSession Stats: "))?;
+        if let Some(num_samples) = stats.samples_collected {
+            writer.line(format!("    Num of samples collected: {}", num_samples))?;
+        }
+        if let Some(median_sample_time) = stats.median_sample_time {
+            writer.line(format!("    Median sample time: {}us", median_sample_time))?;
+        }
+        if let Some(mean_sample_time) = stats.mean_sample_time {
+            writer.line(format!("    Mean sample time: {}us", mean_sample_time))?;
+        }
+        if let Some(max_sample_time) = stats.max_sample_time {
+            writer.line(format!("    Max sample time: {}us", max_sample_time))?;
+        }
+        if let Some(min_sample_time) = stats.min_sample_time {
+            writer.line(format!("    Min sample time: {}us", min_sample_time))?;
+        }
+    }
+    copy_task.await?;
+    controller.reset().await?;
+
+    if !opts.symbolize {
+        return Ok(());
+    }
+    let symbolized_path = if opts.pprof_conversion {
+        tmp_dir.path().join("symbolized.txt")
+    } else {
+        std::path::PathBuf::from(&opts.output)
+    };
+    symbolize(&unsymbolized_path, &symbolized_path).await?;
+
+    if !opts.pprof_conversion {
+        return Ok(());
+    }
+    pprof_conversion(&symbolized_path, PathBuf::from(&opts.output))
+}
+
+pub async fn profiler(
+    controller: fho::Deferred<profiler::SessionProxy>,
+    writer: Writer,
     cmd: ProfilerCommand,
 ) -> Result<()> {
-    match cmd.sub_cmd {
-        ProfilerSubCommand::Start(opts) => {
+    let (targets, config, session_opts) = match cmd.sub_cmd {
+        ProfilerSubCommand::Attach(opts) => {
             let target = gather_targets(&opts)?;
             let config = profiler::SamplingConfig {
                 period: Some(opts.sample_period_us * 1000),
@@ -138,94 +224,53 @@ pub async fn profiler(
                 }),
                 ..Default::default()
             };
-            let profiler_config = profiler::Config {
-                configs: Some(vec![config]),
-                target: Some(target),
+            let session_opts = SessionOpts {
+                symbolize: opts.symbolize,
+                print_stats: opts.print_stats,
+                output: opts.output,
+                duration: opts.duration,
+                pprof_conversion: opts.pprof_conversion,
+            };
+            (target, config, session_opts)
+        }
+        ProfilerSubCommand::Launch(opts) => {
+            let attach_config =
+                profiler::AttachConfig::LaunchComponent(profiler::LaunchComponent {
+                    url: Some(opts.url.clone()),
+                    moniker: opts.moniker.clone(),
+                    ..Default::default()
+                });
+            let target = profiler::TargetConfig::Component(attach_config);
+            let config = profiler::SamplingConfig {
+                period: Some(opts.sample_period_us * 1000),
+                timebase: Some(profiler::Counter::PlatformIndependent(
+                    profiler::CounterId::Nanoseconds,
+                )),
+                sample: Some(profiler::Sample {
+                    callgraph: Some(profiler::CallgraphConfig {
+                        strategy: Some(profiler::CallgraphStrategy::FramePointer),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
                 ..Default::default()
             };
-
-            let (client, server) = fidl::Socket::create_stream();
-            let client = fidl::AsyncSocket::from_socket(client);
-            let controller = controller.await?;
-            controller
-                .configure(profiler::SessionConfigureRequest {
-                    output: Some(server),
-                    config: Some(profiler_config),
-                    ..Default::default()
-                })
-                .await?
-                .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
-
-            let tmp_dir = Builder::new().prefix("fuchsia_cpu_profiler_").tempdir()?;
-
-            let unsymbolized_path = if opts.symbolize {
-                tmp_dir.path().join("unsymbolized.txt")
-            } else {
-                std::path::PathBuf::from(&opts.output)
+            let session_opts = SessionOpts {
+                symbolize: opts.symbolize,
+                print_stats: opts.print_stats,
+                output: opts.output,
+                duration: opts.duration,
+                pprof_conversion: opts.pprof_conversion,
             };
-
-            let mut output = File::create(&unsymbolized_path).await?;
-            let copy_task =
-                fuchsia_async::Task::local(
-                    async move { futures::io::copy(client, &mut output).await },
-                );
-
-            controller
-                .start(&profiler::SessionStartRequest {
-                    buffer_results: Some(true),
-                    ..Default::default()
-                })
-                .await?
-                .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
-
-            if let &Some(duration) = &opts.duration {
-                writer.line(format!("Waiting for {} seconds...", duration))?;
-                fuchsia_async::Timer::new(Duration::from_secs_f64(duration)).await;
-            } else {
-                writer.line("Press <enter> to stop profiling...")?;
-                blocking::unblock(|| {
-                    let _ = stdin().lock().read_line(&mut String::new());
-                })
-                .await;
-            }
-            let stats = controller.stop().await?;
-            if opts.print_stats {
-                writer.line(format!("\nSession Stats: "))?;
-                if let Some(num_samples) = stats.samples_collected {
-                    writer.line(format!("    Num of samples collected: {}", num_samples))?;
-                }
-                if let Some(median_sample_time) = stats.median_sample_time {
-                    writer.line(format!("    Median sample time: {}us", median_sample_time))?;
-                }
-                if let Some(mean_sample_time) = stats.mean_sample_time {
-                    writer.line(format!("    Mean sample time: {}us", mean_sample_time))?;
-                }
-                if let Some(max_sample_time) = stats.max_sample_time {
-                    writer.line(format!("    Max sample time: {}us", max_sample_time))?;
-                }
-                if let Some(min_sample_time) = stats.min_sample_time {
-                    writer.line(format!("    Min sample time: {}us", min_sample_time))?;
-                }
-            }
-            copy_task.await?;
-            controller.reset().await?;
-
-            if !opts.symbolize {
-                return Ok(());
-            }
-            let symbolized_path = if opts.pprof_conversion {
-                tmp_dir.path().join("symbolized.txt")
-            } else {
-                std::path::PathBuf::from(&opts.output)
-            };
-            symbolize(&unsymbolized_path, &symbolized_path).await?;
-
-            if !opts.pprof_conversion {
-                return Ok(());
-            }
-            pprof_conversion(&symbolized_path, PathBuf::from(&opts.output))
+            (target, config, session_opts)
         }
-    }
+    };
+    let config = profiler::Config {
+        configs: Some(vec![config]),
+        target: Some(targets),
+        ..Default::default()
+    };
+    run_session(controller, writer, config, session_opts).await
 }
 
 #[cfg(test)]
@@ -233,7 +278,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_gather_targets() {
-        let args = args::Start {
+        let args = args::Attach {
             pids: vec![1, 2, 3],
             tids: vec![4, 5, 6],
             job_ids: vec![7, 8, 9],
@@ -249,7 +294,7 @@ mod tests {
             _ => assert!(false),
         }
 
-        let empty_args = args::Start {
+        let empty_args = args::Attach {
             pids: vec![],
             tids: vec![],
             job_ids: vec![],
@@ -263,7 +308,7 @@ mod tests {
         let empty_targets = gather_targets(&empty_args);
         assert!(empty_targets.is_err());
 
-        let invalid_args1 = args::Start {
+        let invalid_args1 = args::Attach {
             pids: vec![1],
             tids: vec![],
             job_ids: vec![],
@@ -273,7 +318,7 @@ mod tests {
             output: String::from("output_file"),
             ..Default::default()
         };
-        let invalid_args2 = args::Start {
+        let invalid_args2 = args::Attach {
             pids: vec![],
             tids: vec![1],
             job_ids: vec![],
@@ -283,7 +328,7 @@ mod tests {
             output: String::from("output_file"),
             ..Default::default()
         };
-        let invalid_args3 = args::Start {
+        let invalid_args3 = args::Attach {
             pids: vec![],
             tids: vec![],
             job_ids: vec![1],
