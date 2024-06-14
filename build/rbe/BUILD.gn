@@ -32,7 +32,6 @@ group("tests") {
     ":remotetool_test($host_toolchain)",
     ":rustc_remote_wrapper_test($host_toolchain)",
     ":rustc_test($host_toolchain)",
-    ":tablefmt($host_toolchain)",
     ":tablefmt_test($host_toolchain)",
     ":textpb_test($host_toolchain)",
   ]
@@ -88,11 +87,11 @@ if (is_host) {
   }
 
   python_library("build_summary") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _build_summary_sources
   }
   python_host_test("build_summary_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "build_summary_test.py"
     sources = _build_summary_sources
   }

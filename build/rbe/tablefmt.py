@@ -70,7 +70,7 @@ def auto_size_column_widths(table: Sequence[Sequence[Any]]) -> Sequence[int]:
 
 def make_table_header(columns: Sequence[str], title: str = "") -> Sequence[str]:
     """Build a table row that can be used as a table header."""
-    return [title, *columns]
+    return [title] + list(columns)
 
 
 def make_separator_row(
