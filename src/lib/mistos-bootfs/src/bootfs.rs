@@ -322,7 +322,7 @@ impl BootfsSvc {
 
         // Run the service with its own executor to avoid reentrancy issues.
         std::thread::spawn(move || {
-            let flags = fio::OpenFlags::RIGHT_READABLE
+            let flags: fio::OpenFlags = fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_EXECUTABLE
                 | fio::OpenFlags::DIRECTORY;
             fasync::LocalExecutor::new().run_singlethreaded(
@@ -349,6 +349,114 @@ impl BootfsSvc {
         ns.bind("/boot", directory).map_err(BootfsError::Namespace)?;
 
         info!("[BootfsSvc] Bootfs is ready and is now serving /boot.");
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        anyhow::{Context, Error},
+        fidl_fuchsia_io as fio,
+        fuchsia_fs::{directory, file, node, OpenFlags},
+        futures::StreamExt,
+        libc::S_IRUSR,
+    };
+
+    // Since this is a system test, we're actually going to verify real system critical files. That
+    // means that these tests take a dependency on these files existing in the system, which may
+    // not forever be true. If any of the files listed here are removed, it's fine to update the set
+    // of checked files.
+    const SAMPLE_UTF8_READONLY_FILE: &str = "/boot/config/build_info/minimum_utc_stamp";
+    //const SAMPLE_REQUIRED_DIRECTORY: &str = "/boot/lib";
+    //const KERNEL_VDSO_DIRECTORY: &str = "/boot/kernel/vdso";
+    //const BOOTFS_READONLY_FILES: &[&str] = &["/boot/config/component_manager"];
+    //const BOOTFS_DATA_DIRECTORY: &str = "/boot/data";
+    const BOOTFS_EXECUTABLE_LIB_FILES: &[&str] = &["ld.so.1"];
+    const BOOTFS_EXECUTABLE_NON_LIB_FILES: &[&str] = &["/boot/bin/mistos_elf_runner"];
+
+    #[fuchsia::test(logging = false)]
+    async fn basic_filenode_test() -> Result<(), Error> {
+        // Open the known good file as a node, and check its attributes.
+        let node = node::open_in_namespace(SAMPLE_UTF8_READONLY_FILE, OpenFlags::RIGHT_READABLE)
+            .context("failed to open as a readable node")?;
+
+        // This node should be a readonly file, the inode should not be unknown,
+        // and creation and modification times should be 0 since system UTC
+        // isn't available or reliable in early boot.
+        assert_eq!(node.get_attr().await?.1.mode, fio::MODE_TYPE_FILE | S_IRUSR);
+        assert_ne!(node.get_attr().await?.1.id, fio::INO_UNKNOWN);
+        assert_eq!(node.get_attr().await?.1.creation_time, 0);
+        assert_eq!(node.get_attr().await?.1.modification_time, 0);
+
+        node::close(node).await?;
+
+        // Reopen the known good file as a file to make use of the helper functions.
+        let file = file::open_in_namespace(SAMPLE_UTF8_READONLY_FILE, OpenFlags::RIGHT_READABLE)
+            .context("failed to open as a readable file")?;
+
+        // Check for data corruption. This file should contain a single utf-8 string which can
+        // be converted into a non-zero unsigned integer.
+        let file_contents =
+            file::read_to_string(&file).await.context("failed to read utf-8 file to string")?;
+        let parsed_time = file_contents
+            .trim()
+            .parse::<u64>()
+            .context("failed to utf-8 string as a number (and it should be a number!)")?;
+        assert_ne!(parsed_time, 0);
+
+        file::close(file).await?;
+
+        Ok(())
+    }
+
+    #[fuchsia::test(logging = false)]
+    async fn check_executable_files() -> Result<(), Error> {
+        // Sanitizers nest lib files within '/boot/lib/asan' or '/boot/lib/asan-ubsan' etc., so
+        // we need to just search recursively for these files instead.
+        let directory = directory::open_in_namespace(
+            "/boot/lib",
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .context("failed to open /boot/lib directory")?;
+        let lib_paths = fuchsia_fs::directory::readdir_recursive(&directory, None)
+            .filter_map(|result| async {
+                assert!(result.is_ok());
+                let entry = result.unwrap();
+                for file in BOOTFS_EXECUTABLE_LIB_FILES {
+                    if entry.name.ends_with(file) {
+                        return Some(format!("/boot/lib/{}", entry.name));
+                    }
+                }
+
+                None
+            })
+            .collect::<Vec<String>>()
+            .await;
+        directory::close(directory).await?;
+
+        // Should have found all of the library files.
+        assert_eq!(lib_paths.len(), BOOTFS_EXECUTABLE_LIB_FILES.len());
+        let paths = [
+            lib_paths,
+            BOOTFS_EXECUTABLE_NON_LIB_FILES.iter().map(|val| val.to_string()).collect::<Vec<_>>(),
+        ]
+        .concat();
+
+        for path in paths {
+            let file = file::open_in_namespace(
+                &path,
+                OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
+            )
+            .context("failed to open file")?;
+            let data = file::read_num_bytes(&file, 1).await.context(format!(
+                "failed to read a single byte from a file opened as read-execute: {}",
+                path
+            ))?;
+            assert_ne!(data.len(), 0);
+            file::close(file).await?;
+        }
 
         Ok(())
     }

@@ -4,12 +4,13 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
-import("//build/testing/boot_tests/kernel_zbi_test.gni")
+import("//build/testing/boot_tests/mistos_unittest_zbi.gni")
 
 rustc_library("mistos-bootfs") {
   edition = "2021"
   version = "0.1.0"
   source_root = "src/lib.rs"
+  with_unit_tests = true
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -26,8 +27,30 @@ rustc_library("mistos-bootfs") {
     "//third_party/rust_crates:tracing",
   ]
 
+  test_deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-fs",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:libc",
+  ]
+
   sources = [
     "src/bootfs.rs",
     "src/lib.rs",
   ]
+
+  #data_deps = [ "//build/info:build_info_files" ]
+}
+
+mistos_unittest_zbi("mistos-bootfs-test") {
+  executable_path = "bin/mistos_bootfs_lib_test"
+  test_target_label = ":mistos-bootfs_test"
+  prefix = ""
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":mistos-bootfs-test" ]
 }
