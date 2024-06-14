@@ -35,15 +35,6 @@ if (is_host) {
       nuc11_env,
     ]
   }
-
-  # Group containing all of the UI affordance functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":screenshot_test_ffx($host_toolchain)",
-      ":user_input_test_fc($host_toolchain)",
-    ]
-  }
 }
 
 group("packages") {
@@ -51,10 +42,27 @@ group("packages") {
   public_deps = [ "//src/ui/examples:flatland-examples" ]
 }
 
-group("test_ui") {
+group("test_screenshot") {
   testonly = true
   public_deps = [
     ":packages",
-    ":tests($host_toolchain)",
+    ":screenshot_test_ffx($host_toolchain)",
+  ]
+}
+
+group("test_user_input") {
+  testonly = true
+  public_deps = [
+    ":packages",
+    ":user_input_test_fc($host_toolchain)",
+  ]
+}
+
+# Group containing all of the UI affordance functional test cases and their dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":test_screenshot",
+    ":test_user_input",
   ]
 }

@@ -73,17 +73,17 @@ if (is_host) {
     params_source = "params_vim3.yaml"
     transport = "fuchsia-controller-preferred"
   }
+}
 
-  # Group containing all of the fuchsia_device functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":vim3_test_fc($host_toolchain)",
-      ":vim3_test_fc_preferred($host_toolchain)",
-      ":x64_emu_test_fc($host_toolchain)",
-      ":x64_emu_test_fc_preferred($host_toolchain)",
-      ":x64_nuc_test_fc($host_toolchain)",
-      ":x64_nuc_test_fc_preferred($host_toolchain)",
-    ]
-  }
+# Group containing all of the fuchsia_device functional test cases and its dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":vim3_test_fc($host_toolchain)",
+    ":vim3_test_fc_preferred($host_toolchain)",
+    ":x64_emu_test_fc($host_toolchain)",
+    ":x64_emu_test_fc_preferred($host_toolchain)",
+    ":x64_nuc_test_fc($host_toolchain)",
+    ":x64_nuc_test_fc_preferred($host_toolchain)",
+  ]
 }

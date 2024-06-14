@@ -29,7 +29,7 @@ if (is_host) {
   }
 }
 
-# Group containing all of the SystemPowerStateController affordance functional test cases.
+# Group containing all of the SystemPowerStateController affordance functional test cases and its dependencies.
 group("tests") {
   testonly = true
   public_deps = [

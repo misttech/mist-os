@@ -2,34 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-if (is_host) {
-  # Group containing all of the Honeydew affordances functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [
-      "test_bluetooth:tests",
-      "test_rtc:tests",
-      "test_session:tests",
-      "test_system_power_state_controller:tests",
-      "test_tracing:tests",
-      "test_ui:tests",
-      "test_wlan:tests",
-    ]
-  }
-}
-
-group("packages") {
+# Group containing all of the Honeydew affordances functional test cases and its dependencies.
+group("tests") {
   testonly = true
   public_deps = [
-    "test_session:packages",
-    "test_ui:packages",
-  ]
-}
-
-group("affordance_tests") {
-  testonly = true
-  public_deps = [
-    ":packages",
-    ":tests($host_toolchain)",
+    "test_bluetooth:tests",
+    "test_rtc:tests",
+    "test_session:tests",
+    "test_system_power_state_controller:tests",
+    "test_tracing:tests",
+    "test_ui:tests",
+    "test_wlan:tests",
   ]
 }

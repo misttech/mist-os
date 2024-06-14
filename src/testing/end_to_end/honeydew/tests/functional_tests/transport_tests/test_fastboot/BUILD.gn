@@ -17,10 +17,10 @@ if (is_host) {
     params_source = "params.yaml"
     environments = [ vim3_env ]
   }
+}
 
-  # Group containing all of the Fastboot transport functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [ ":fastboot_test_fc($host_toolchain)" ]
-  }
+# Group containing all of the Fastboot transport functional test cases and its dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [ ":fastboot_test_fc($host_toolchain)" ]
 }

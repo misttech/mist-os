@@ -45,16 +45,6 @@ if (is_host) {
     # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
     environments = [ aemu_env ]
   }
-
-  # Group containing all of the FFX transport functional test cases and their dependencies.
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":ffx_test_on_vim3_fc($host_toolchain)",
-      ":ffx_test_on_x64_fc($host_toolchain)",
-      ":ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
-    ]
-  }
 }
 
 group("packages") {
@@ -62,10 +52,28 @@ group("packages") {
   public_deps = [ "//examples/hello_world/rust:hermetic_tests" ]
 }
 
-group("test_ffx") {
+group("test_ffx_on_x64") {
   testonly = true
   public_deps = [
+    ":ffx_test_on_x64_fc($host_toolchain)",
     ":packages",
-    ":tests($host_toolchain)",
+  ]
+}
+
+group("test_ffx_on_vim3") {
+  testonly = true
+  public_deps = [
+    ":ffx_test_on_vim3_fc($host_toolchain)",
+    ":packages",
+  ]
+}
+
+# Group containing all of the FFX transport functional test cases and their dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
+    ":test_ffx_on_vim3",
+    ":test_ffx_on_x64",
   ]
 }

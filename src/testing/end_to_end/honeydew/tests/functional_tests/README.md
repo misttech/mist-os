@@ -75,7 +75,7 @@ device and if your host has only that one device connected.
 
   Here is an example to run a functional test on emulator
   ```shell
-  $ fx set core.x64 --with //src/testing/end_to_end/honeydew/tests/functional_tests
+  $ fx set core.x64 --with //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
   # start the emulator with networking enabled
   $ ffx emu stop ; ffx emu start -H --net tap

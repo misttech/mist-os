@@ -4,35 +4,33 @@
 
 ######### STEPS FOR ADDING HONEYDEW FUNCTIONAL TEST TO INFRA - START ###########
 # 1. Identify which all <PRODUCT>.<BOARD> you like to run this test on
-# 2. For each of the <PRODUCT>.<BOARD> there is a Test group and Package group
-#    defined below. Accordingly update each of <PRODUCT>.<BOARD> Infra Test and
-#    Package group where you like to run the test
+# 2. For each of the <PRODUCT>.<BOARD> there is a Test group defined below.
+#    Accordingly update each of <PRODUCT>.<BOARD> Infra Test group where you
+#    like to run the test
 ########## STEPS FOR ADDING HONEYDEW FUNCTIONAL TEST TO INFRA - END ############
 
-# Infra Test and Package groups:
-# For every <PRODUCT>.<BOARD> that we plans to run the tests on, below test
-# and package groups are created:
-#     Test groups
-#         <PRODUCT>.<BOARD>
-#             Stable (Tests that passed for at least 200+ consecutive runs)
-#                 Tests that require SL4F transport, if any
-#                 Tests that does not require SL4F transport
-#             Unstable (Tests that are yet to pass 200 consecutive runs)
-#                 Tests that require SL4F transport, if any
-#                 Tests that does not require SL4F transport
-#     Package groups
-#         <PRODUCT>.<BOARD>
-#             Stable (Packages needed for Stable test groups)
-#                 Packages needed for SL4F test groups, if any
-#                 Packages needed for non-SL4F test groups
-#             Unstable (Packages needed for Stable test groups)
-#                 Packages needed for SL4F test groups, if any
-#                 Packages needed for non-SL4F test groups
-
-# See https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/tests/functional_tests/#cq-vs-ci-vs-fyi
-# for test distribution rules.
-
-# Note - Please refrain from referencing one group in another one (such as
+# Infra Test groups:
+# For every <PRODUCT>.<BOARD> that we plan to run the tests on, below test
+# groups are created:
+#
+# <PRODUCT>.<BOARD>
+#     Stable (Tests that passed for at least 200+ consecutive runs)
+#         Tests that require SL4F transport, if any
+#         Tests that does not require SL4F transport
+#     Unstable (Tests that are yet to pass 200 consecutive runs)
+#         Tests that require SL4F transport, if any
+#         Tests that does not require SL4F transport
+#
+# Note: Each entry in test group should refer to a test case along with its
+# dependencies (if any). For example,
+#   * `affordance_tests/test_session:test_session` is a group that contains
+#     `affordance_tests/test_session:session_test_fc` test and its dependencies
+#     `affordance_tests/test_session:packages`. So include this group name (not
+#     the test name)
+#   * `affordance_tests/test_rtc:rtc_test_fc` is a test and it does not have any
+#     dependencies. So you can include this test name directly
+#
+# Note: Please refrain from referencing one group in another one (such as
 # including `core_x64_stable_tests` in `workbench_x64_stable_tests`)
 # as it is not guaranteed that every single test case supported by
 # <product-#1>.<board-#1> is supported by other <product-#2>.<board-#2>
@@ -56,8 +54,8 @@ group_with_no_dir_target_deps("core_x64_stable_tests") {
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_x64_fc($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
+    "transport_tests/test_ffx:test_ffx_on_x64",
   ]
 }
 
@@ -70,15 +68,15 @@ group_with_no_dir_target_deps("core_x64_unstable_tests") {
 group_with_no_dir_target_deps("workbench_x64_stable_tests") {
   testonly = true
   public_deps = [
-    "affordance_tests/test_session:session_test_fc($host_toolchain)",
+    "affordance_tests/test_session:test_session",
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
-    "affordance_tests/test_ui:user_input_test_fc($host_toolchain)",
+    "affordance_tests/test_ui:test_screenshot",
+    "affordance_tests/test_ui:test_user_input",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_x64_fc($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
+    "transport_tests/test_ffx:test_ffx_on_x64",
   ]
 }
 
@@ -93,7 +91,7 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
   public_deps = [
     "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_vim3_fc($host_toolchain)",
+    "transport_tests/test_ffx:test_ffx_on_vim3",
   ]
 }
 
@@ -113,7 +111,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     "affordance_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix_fc($host_toolchain)",
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_vim3_fc($host_toolchain)",
+    "transport_tests/test_ffx:test_ffx_on_vim3",
   ]
 }
 
@@ -121,9 +119,9 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
   public_deps = [
     "affordance_tests/test_rtc:rtc_test_fc($host_toolchain)",
-    "affordance_tests/test_session:session_test_fc($host_toolchain)",
-    "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
-    "affordance_tests/test_ui:user_input_test_fc($host_toolchain)",
+    "affordance_tests/test_session:test_session",
+    "affordance_tests/test_ui:test_screenshot",
+    "affordance_tests/test_ui:test_user_input",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test_fc($host_toolchain)",
   ]
@@ -139,108 +137,25 @@ group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
 group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
   testonly = true
   public_deps = [
-    "affordance_tests/test_session:session_test_fc($host_toolchain)",
+    "affordance_tests/test_session:test_session",
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
-    "affordance_tests/test_ui:user_input_test_fc($host_toolchain)",
+    "affordance_tests/test_ui:test_screenshot",
+    "affordance_tests/test_ui:test_user_input",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test_fc($host_toolchain)",
-    "transport_tests/test_ffx:ffx_test_on_vim3_fc($host_toolchain)",
+    "transport_tests/test_ffx:test_ffx_on_vim3",
   ]
 }
 
 ############################## Test groups - End ###############################
 
-############################ Package groups - Start ############################
-# core.x64
-group_with_no_dir_target_deps("core_x64_stable_packages") {
-  testonly = true
-  public_deps = [ "transport_tests/test_ffx:packages" ]
-}
-
-group_with_no_dir_target_deps("core_x64_unstable_packages") {
-  testonly = true
-  public_deps = []
-}
-
-# workbench.x64
-group_with_no_dir_target_deps("workbench_x64_stable_packages") {
-  testonly = true
-  public_deps = [
-    "affordance_tests/test_session:packages",
-    "transport_tests/test_ffx:packages",
-  ]
-}
-
-group_with_no_dir_target_deps("workbench_x64_unstable_packages") {
-  testonly = true
-  public_deps = []
-}
-
-# core.vim3
-group_with_no_dir_target_deps("core_vim3_stable_packages") {
-  testonly = true
-  public_deps = [ "transport_tests/test_ffx:packages" ]
-}
-
-group_with_no_dir_target_deps("core_vim3_unstable_packages") {
-  testonly = true
-  public_deps = []
-}
-
-# workbench.vim3
-group_with_no_dir_target_deps("workbench_vim3_stable_packages") {
-  testonly = true
-  public_deps = [ "transport_tests/test_ffx:packages" ]
-}
-
-group_with_no_dir_target_deps("workbench_vim3_unstable_packages") {
-  testonly = true
-  public_deps = [ "affordance_tests/test_session:packages" ]
-}
-
-# starnix.vim3
-# Note: This will be run on internal builder, hence using `starnix` here instead of internal `<PRODUCT>` name.
-group_with_no_dir_target_deps("starnix_vim3_stable_packages") {
-  testonly = true
-  public_deps = [ "transport_tests/test_ffx:packages" ]
-}
-
-group_with_no_dir_target_deps("starnix_vim3_unstable_packages") {
-  testonly = true
-  public_deps = [ "affordance_tests/test_session:packages" ]
-}
-
-############################ Package groups - End ##############################
-
-# All of the target-side packages needed by functional tests.
-group("packages") {
-  testonly = true
-  public_deps = [
-    "../..:sl4f_packages",
-    "affordance_tests:packages",
-    "transport_tests:packages",
-  ]
-}
-
-# All of the Honeydew functional tests
-if (is_host) {
-  group("tests") {
-    testonly = true
-    public_deps = [
-      "affordance_tests:tests",
-      "auxiliary_device_tests:tests",
-      "fuchsia_device_tests:tests",
-      "transport_tests:tests",
-    ]
-  }
-}
-
 # All of the Honeydew functional tests and their dependencies.
-group("functional_tests") {
+group("tests") {
   testonly = true
   public_deps = [
-    ":packages",
-    ":tests($host_toolchain)",
+    "affordance_tests:tests",
+    "auxiliary_device_tests:tests",
+    "fuchsia_device_tests:tests",
+    "transport_tests:tests",
   ]
 }

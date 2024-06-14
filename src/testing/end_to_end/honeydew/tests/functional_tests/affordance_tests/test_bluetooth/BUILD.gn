@@ -25,13 +25,21 @@ if (is_host) {
     transport = "fuchsia-controller"
     environments = [ sherlock_env ]
   }
+}
 
-  # Group containing all of the bluetooth affordance functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":bluetooth_avrcp_test_sl4f($host_toolchain)",
-      ":bluetooth_gap_test_fc($host_toolchain)",
-    ]
-  }
+group("test_bluetooth_avrcp_sl4f") {
+  testonly = true
+  public_deps = [
+    ":bluetooth_avrcp_test_sl4f($host_toolchain)",
+    "../../../../:sl4f_packages",
+  ]
+}
+
+# Group containing all of the bluetooth affordance functional test cases and its dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":bluetooth_gap_test_fc",
+    ":test_bluetooth_avrcp_sl4f($host_toolchain)",
+  ]
 }

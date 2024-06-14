@@ -2,18 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-if (is_host) {
-  # Group containing all of the transports functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [
-      "test_fastboot:tests",
-      "test_ffx:tests",
-    ]
-  }
-}
-
-group("packages") {
+# Group containing all of the transports functional test cases and its dependencies.
+group("tests") {
   testonly = true
-  public_deps = [ "test_ffx:packages" ]
+  public_deps = [
+    "test_fastboot:tests",
+    "test_ffx:tests",
+  ]
 }
