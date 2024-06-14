@@ -156,14 +156,13 @@ zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint
   auto gpio_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, controller_id),
               fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, pin),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
               fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
                                 bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, "fuchsia.gpio.FUNCTION." + gpio_name),

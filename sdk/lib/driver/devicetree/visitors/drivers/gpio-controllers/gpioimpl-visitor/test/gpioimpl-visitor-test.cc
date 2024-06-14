@@ -183,30 +183,28 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
       // 1st parent is pdev. Skipping that.
       // 2nd parent is GPIO PIN1.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-            fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+          {{fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
                               "fuchsia.gpio.FUNCTION." + std::string(PIN1_NAME))}},
           (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                    bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                                    bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id),
             fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(PIN1))}},
           (*mgr_request.parents())[1].bind_rules(), false));
 
       // 3rd parent is GPIO PIN2.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-            fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+          {{fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
                               "fuchsia.gpio.FUNCTION." + std::string(PIN2_NAME))}},
           (*mgr_request.parents())[2].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                    bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                                    bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id),
             fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(PIN2))}},
           (*mgr_request.parents())[2].bind_rules(), false));

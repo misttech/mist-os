@@ -23,7 +23,7 @@
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
-#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/platform/bus/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
@@ -283,11 +283,13 @@ zx_status_t Sherlock::AddPostInitDevice() {
   auto spec = ddk::CompositeNodeSpec(post_init_rules, post_init_properties);
   for (const uint32_t pin : kPostInitGpios) {
     const ddk::BindRule gpio_rules[] = {
-        ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+        ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                                bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
         ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, pin),
     };
     const device_bind_prop_t gpio_properties[] = {
-        ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+        ddk::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                          bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
         ddk::MakeProperty(bind_fuchsia::GPIO_PIN, pin),
     };
     spec.AddParentSpec(gpio_rules, gpio_properties);
