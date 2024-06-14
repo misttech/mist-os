@@ -43,6 +43,14 @@
                     "config": {
                         "type": "object",
                         "properties": {
+                            "total_domain_count": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "perf_rank": {
+                                "type": "number",
+                                "minimum": 0
+                            },
                             "sustainable_power": {
                                 "type": "number",
                                 "minimum": 0,
@@ -51,9 +59,6 @@
                             "power_gain": {
                                 "type": "number",
                                 "minimum": 0
-                            },
-                            "driver_path": {
-                                "type": "string"
                             },
                             "capacitance": {
                                 "type": "number",
@@ -76,7 +81,8 @@
                         },
                         "additionalProperties": false,
                         "required": [
-                            "driver_path",
+                            "total_domain_count",
+                            "perf_rank",
                             "capacitance",
                             "logical_cpu_numbers"
                         ]
@@ -114,13 +120,19 @@
                     "config": {
                         "type": "object",
                         "properties": {
-                            "driver_path": {
-                                "type": "string"
+                            "total_domain_count": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "perf_rank": {
+                                "type": "number",
+                                "minimum": 0
                             }
                         },
                         "additionalProperties": false,
                         "required": [
-                            "driver_path"
+                            "total_domain_count",
+                            "perf_rank"
                         ]
                     },
                     "name": {
@@ -299,8 +311,13 @@
                     "config": {
                         "type": "object",
                         "properties": {
-                            "driver_path": {
-                                "type": "string"
+                            "total_domain_count": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "perf_rank": {
+                                "type": "number",
+                                "minimum": 0
                             }
                         }
                     },

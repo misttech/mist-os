@@ -20,6 +20,7 @@ mod cpu_manager_main;
 mod cpu_stats_handler;
 mod syscall_handler;
 mod thermal_watcher;
+mod utils;
 
 #[cfg(test)]
 mod test;

@@ -52,12 +52,12 @@ void CpuCtrlProtocolServer::GetLogicalCoreId(GetLogicalCoreIdRequestView request
 }
 
 void CpuCtrlProtocolServer::GetDomainId(GetDomainIdCompleter::Sync& completer) {
-  completer.Reply(0);
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 void CpuCtrlProtocolServer::GetRelativePerformance(
     GetRelativePerformanceCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  completer.ReplySuccess(255);
 }
 
 void CpuCtrlProtocolServer::Serve(async_dispatcher_t* dispatcher,
