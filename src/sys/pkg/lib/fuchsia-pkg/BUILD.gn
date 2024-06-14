@@ -72,7 +72,7 @@ rustc_library("fuchsia-pkg") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   resource("dup1") {
     testonly = true
     sources = [ "duplicate-blob.txt" ]

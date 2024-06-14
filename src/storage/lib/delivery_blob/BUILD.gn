@@ -34,7 +34,7 @@ rustc_library("delivery_blob") {
     "//third_party/rust_crates:zstd",
     "//third_party/zstd",
   ]
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
   }
   test_deps = [ "//third_party/rust_crates:rand" ]
