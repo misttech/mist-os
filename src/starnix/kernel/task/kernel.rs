@@ -10,6 +10,7 @@ use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::sync_fence_registry::SyncFenceRegistry;
 use crate::device::{BinderDevice, DeviceMode, DeviceRegistry};
 use crate::fs::proc::SystemLimits;
+use crate::memory_attribution::MemoryAttributionManager;
 use crate::mm::{FutexTable, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
 use crate::task::{
@@ -30,7 +31,6 @@ use bstr::BString;
 use fidl::endpoints::{
     create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker, Proxy,
 };
-use fidl::AsHandleRef;
 use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use futures::FutureExt;
 use netlink::interfaces::InterfacesHandler;
@@ -50,7 +50,11 @@ use starnix_uapi::{errno, from_status_like_fdio};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU16, AtomicU8};
 use std::sync::{Arc, Weak};
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+use zx::AsHandleRef;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct KernelFeatures {
@@ -70,7 +74,7 @@ pub struct Kernel {
     /// The kernel threads running on behalf of this kernel.
     pub kthreads: KernelThreads,
 
-    /// The feaures enabled for this kernel.
+    /// The features enabled for this kernel.
     pub features: KernelFeatures,
 
     /// The processes and threads running in this kernel, organized by pid_t.
@@ -237,6 +241,9 @@ pub struct Kernel {
 
     /// The manager for creating and managing high-resolution timers.
     pub hrtimer_manager: HrTimerManagerHandle,
+
+    /// The manager for monitoring and reporting resources used by the kernel.
+    pub memory_attribution_manager: MemoryAttributionManager,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -361,6 +368,7 @@ impl Kernel {
             syslog: Default::default(),
             mounts: Mounts::new(),
             hrtimer_manager: HrTimerManager::new(),
+            memory_attribution_manager: MemoryAttributionManager::new(kernel.clone()),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
@@ -492,6 +500,13 @@ impl Kernel {
         }
 
         inspector
+    }
+
+    pub fn new_memory_attribution_observer(
+        &self,
+        control_handle: fattribution::ProviderControlHandle,
+    ) -> attribution::Observer {
+        self.memory_attribution_manager.new_observer(control_handle)
     }
 }
 

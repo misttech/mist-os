@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use attribution::{AttributionServer, AttributionServerHandle};
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{Proxy, ServerEnd};
 use fidl::HandleBased;
 use frunner::{ComponentControllerMarker, ComponentStartInfo};
 use fuchsia_component::client::connect_to_protocol;
@@ -120,6 +120,13 @@ fn attribution_info_for_kernel(kernel: &StarnixKernel) -> Vec<fattribution::Attr
             kernel.component_instance().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         )),
         type_: Some(fattribution::Type::Runnable),
+        detailed_attribution: kernel
+            .connect_to_protocol::<fattribution::ProviderMarker>()
+            .inspect_err(|e|
+                tracing::error!(%e, "Error connecting to memory attribution of the starnix kernel")
+            )
+            .ok()
+            .map(|proxy| proxy.into_channel().unwrap().into_zx_channel().into()),
         ..Default::default()
     };
     let attribution = fattribution::UpdatedPrincipal {

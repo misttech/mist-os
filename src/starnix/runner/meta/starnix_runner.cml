@@ -140,11 +140,10 @@
             from: "self",
         },
         {
-            protocol: [ "fuchsia.starnix.runner.Manager" ],
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.memory.attribution.Provider",
+            protocol: [
+                "fuchsia.memory.attribution.Provider",
+                "fuchsia.starnix.runner.Manager",
+            ],
             from: "self",
         },
     ],

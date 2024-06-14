@@ -12,6 +12,7 @@ pub mod dynamic_thread_spawner;
 pub mod execution;
 pub mod fs;
 pub mod loader;
+pub mod memory_attribution;
 pub mod mm;
 pub mod mutable_state;
 pub mod power;

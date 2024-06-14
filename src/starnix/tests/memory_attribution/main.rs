@@ -7,6 +7,7 @@ use diagnostics_reader::{ArchiveReader, Logs};
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
 use futures::StreamExt;
 use moniker::Moniker;
+use regex::Regex;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_memory_attribution as fattribution,
@@ -47,10 +48,6 @@ async fn mmap_anonymous() {
         .unwrap()
         .expect("start debian container");
 
-    // Use the container to start the Starnix program.
-    let factory = ScopedInstanceFactory::new(PROGRAM_COLLECTION).with_realm_proxy(realm_proxy);
-    let program = factory.new_instance(PROGRAM_URL).await.unwrap();
-
     // Connect to the attribution protocol of the starnix runner.
     let attribution_provider =
         realm.root.connect_to_protocol_at_exposed_dir::<fattribution::ProviderMarker>().unwrap();
@@ -76,6 +73,10 @@ async fn mmap_anonymous() {
     assert_eq!(tree.children[0].children.len(), 0);
     assert_eq!(tree.children[0].resources.len(), 1);
 
+    // Use the container to start the Starnix program.
+    let factory = ScopedInstanceFactory::new(PROGRAM_COLLECTION).with_realm_proxy(realm_proxy);
+    let program = factory.new_instance(PROGRAM_URL).await.unwrap();
+
     // Wait for magic log from the program.
     let mut reader = ArchiveReader::new();
     let selector: Moniker = realm.root.moniker().parse().unwrap();
@@ -90,10 +91,45 @@ async fn mmap_anonymous() {
         }
     }
 
-    // TODO(https://fxbug.dev/337865227): The starnix runner need to report the VMO KOIDs
-    // using the `fuchsia.memory.attribution.Provider` protocol.
+    // Wait for the desired attribution information.
+    // There should be three child principals under the container:
+    // - The init process (PID 1).
+    // - The system task (PID 2).
+    // - The test program we just launched (PID > 2), and its name should
+    //   match regex "PID (.*): mmap_anonymous_then_sleep".
+    loop {
+        tree = attribution.next().await.unwrap();
+        if tree.children.len() == 1 && tree.children[0].children.len() == 3 {
+            break;
+        }
+    }
+    let mut container = tree.children[0].clone();
+    assert_eq!(container.children.len(), 3);
+    let init = container
+        .children
+        .remove(container.children.iter().position(|c| c.name == "PID 1: init").unwrap());
+    assert_eq!(init.children.len(), 0);
+    assert_eq!(init.resources.len(), 0);
+    let system_task = container
+        .children
+        .remove(container.children.iter().position(|c| c.name == "PID 2: [system task]").unwrap());
+    assert_eq!(system_task.children.len(), 0);
+    assert_eq!(system_task.resources.len(), 0);
+    let test_program = container.children.pop().unwrap();
+    assert!(Regex::new(r"PID (.*): mmap_anonymous_then_sleep")
+        .unwrap()
+        .is_match(test_program.name.as_str()));
+    assert_eq!(test_program.children.len(), 0);
+    assert_eq!(test_program.resources.len(), 0);
 
+    // If we terminate the program, the tree should eventually no longer contain the program.
     drop(program);
+    loop {
+        tree = attribution.next().await.unwrap();
+        if tree.children.len() == 1 && tree.children[0].children.len() == 2 {
+            break;
+        }
+    }
 
     // Stop the container and verify that the starnix runner reports that the
     // container is removed.

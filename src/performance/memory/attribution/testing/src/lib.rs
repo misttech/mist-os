@@ -63,7 +63,7 @@ async fn get_next(mut state: StreamState) -> Option<(Principal, StreamState)> {
                 // New attribution information for this principal.
                 Event::Node(attributions) => {
                     for attribution in attributions {
-                        handle_update(attribution, &node, &mut state, &mut children).await;
+                        handle_update(attribution, &mut state, &mut children).await;
                     }
                 }
                 // New attribution information for a child principal.
@@ -82,7 +82,6 @@ async fn get_next(mut state: StreamState) -> Option<(Principal, StreamState)> {
 
 async fn handle_update(
     attribution: fattribution::AttributionUpdate,
-    node: &Principal,
     state: &mut StreamState,
     children: &mut HashMap<String, Principal>,
 ) {
@@ -90,7 +89,6 @@ async fn handle_update(
         fattribution::AttributionUpdate::Add(new_principal) => {
             let identifier = get_identifier_string(
                 new_principal.identifier.unwrap(),
-                &node.name,
                 &state.introspector,
                 &mut state.koid_to_component_moniker,
             )
@@ -112,7 +110,6 @@ async fn handle_update(
         fattribution::AttributionUpdate::Update(updated_principal) => {
             let identifier = get_identifier_string(
                 updated_principal.identifier.unwrap(),
-                &node.name,
                 &state.introspector,
                 &mut state.koid_to_component_moniker,
             )
@@ -138,7 +135,6 @@ async fn handle_update(
         fattribution::AttributionUpdate::Remove(identifier) => {
             let name = get_identifier_string(
                 identifier,
-                &node.name,
                 &state.introspector,
                 &mut state.koid_to_component_moniker,
             )
@@ -151,7 +147,6 @@ async fn handle_update(
 
 async fn get_identifier_string(
     identifier: fattribution::Identifier,
-    name: &String,
     introspector: &fcomponent::IntrospectorProxy,
     koid_to_component_moniker: &mut HashMap<zx::Koid, String>,
 ) -> String {
@@ -171,7 +166,7 @@ async fn get_identifier_string(
                 moniker
             }
         }
-        fattribution::Identifier::Part(sc) => format!("{}/{}", name, sc).to_owned(),
+        fattribution::Identifier::Part(sc) => sc.clone(),
         _ => todo!(),
     }
 }
@@ -199,7 +194,9 @@ struct StreamState {
     node: Option<Principal>,
 
     /// A stream of `AttributionUpdate` events for the current principal.
-    hanging_get_update: BoxStream<'static, Vec<fattribution::AttributionUpdate>>,
+    ///
+    /// If the stream finished, it will be set to `None`.
+    hanging_get_update: Option<BoxStream<'static, Vec<fattribution::AttributionUpdate>>>,
 
     /// A stream of child principal updates. Each `Principal` element should
     /// replace the existing child principal if there already is a child with
@@ -220,7 +217,7 @@ impl StreamState {
             introspector,
             koid_to_component_moniker: HashMap::new(),
             node: None,
-            hanging_get_update: Box::pin(hanging_get_stream(name, attribution_provider)),
+            hanging_get_update: Some(Box::pin(hanging_get_stream(name, attribution_provider))),
             child_update: SelectAll::new(),
         }
     }
@@ -233,11 +230,27 @@ fn hanging_get_stream(
     futures::stream::unfold(proxy, move |proxy| {
         let name = name.clone();
         proxy.get().map(move |get_result| {
-            let attributions = get_result
-                .unwrap_or_else(|e| panic!("Failed to get AttributionResponse for {name}: {e}"))
-                .unwrap_or_else(|e| panic!("Failed call to AttributionResponse for {name}: {e:?}"))
-                .attributions
-                .unwrap_or_else(|| panic!("Failed memory attribution for {name}"));
+            let attributions = match get_result {
+                Ok(application_result) => application_result
+                    .unwrap_or_else(|e| {
+                        panic!("Failed call to AttributionResponse for {name}: {e:?}")
+                    })
+                    .attributions
+                    .unwrap_or_else(|| panic!("Failed memory attribution for {name}")),
+                Err(fidl::Error::ClientChannelClosed {
+                    status: zx::Status::PEER_CLOSED, ..
+                }) => {
+                    // If the hanging-get failed due to peer closed, consider there are no more
+                    // updates to this principal. The closing of this hanging-get races with the
+                    // parent principal notifying with the `AttributionUpdate::Remove` message, so
+                    // it is possible to observe a peer-closed here first and then get a
+                    // `AttributionUpdate::Remove` for this principal.
+                    return None;
+                }
+                Err(e) => {
+                    panic!("Failed to get AttributionResponse for {name}: {e:?}");
+                }
+            };
             Some((attributions, proxy))
         })
     })
@@ -260,11 +273,17 @@ impl Stream for StreamState {
             Poll::Ready(None) => {}
             Poll::Pending => {}
         }
-        match this.hanging_get_update.poll_next_unpin(cx) {
-            Poll::Ready(attributions) => {
-                return Poll::Ready(Some(Event::Node(attributions.unwrap())));
-            }
-            Poll::Pending => {}
+        match this.hanging_get_update.as_mut() {
+            Some(hanging_get_update) => match hanging_get_update.poll_next_unpin(cx) {
+                Poll::Ready(Some(attributions)) => {
+                    return Poll::Ready(Some(Event::Node(attributions)));
+                }
+                Poll::Ready(None) => {
+                    this.hanging_get_update = None;
+                }
+                Poll::Pending => {}
+            },
+            None => {}
         }
         return Poll::Pending;
     }
