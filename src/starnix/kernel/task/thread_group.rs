@@ -1730,8 +1730,16 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
             self.set_stopped(StopState::Waking, Some(signal_info.clone()), false);
         }
 
+        let mut has_interrupted_task = false;
         for task in tasks.iter().flat_map(|t| t.upgrade()) {
             let mut task_state = task.write();
+
+            if signal_info.signal == SIGKILL {
+                task_state.set_stopped(StopState::ForceWaking, None, None, None);
+            } else if signal_info.signal == SIGCONT {
+                task_state.set_stopped(StopState::Waking, None, None, None);
+            }
+
             let is_masked = task_state.is_signal_masked(signal_info.signal);
             let was_masked = task_state.is_signal_masked_by_saved_mask(signal_info.signal);
 
@@ -1739,20 +1747,18 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
                 || is_masked
                 || was_masked
                 || task_state.is_ptraced();
+
             if is_queued {
                 task_state.notify_signal_waiters();
                 task_state.set_flags(TaskFlags::SIGNALS_AVAILABLE, true);
-            }
 
-            drop(task_state);
-            if is_queued && !is_masked && action.must_interrupt(sigaction) {
-                task.interrupt();
-            }
-
-            if signal_info.signal == SIGKILL {
-                task.write().set_stopped(StopState::ForceWaking, None, None, None);
-            } else if signal_info.signal == SIGCONT {
-                task.write().set_stopped(StopState::Waking, None, None, None);
+                if !is_masked && action.must_interrupt(sigaction) && !has_interrupted_task {
+                    // Only interrupt one task, and only interrupt if the signal was actually queued
+                    // and the action must interrupt.
+                    drop(task_state);
+                    task.interrupt();
+                    has_interrupted_task = true;
+                }
             }
         }
     }
