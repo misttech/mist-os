@@ -11,6 +11,7 @@ rustc_library("api_impl") {
     "src/binding_stubs.rs",
     "src/lib.rs",
   ]
+  deps = [ "//src/tee/tee_internal_api:tee_internal" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   with_unit_tests = true
 }
