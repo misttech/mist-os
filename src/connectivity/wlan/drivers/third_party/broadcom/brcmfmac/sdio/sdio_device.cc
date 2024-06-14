@@ -54,36 +54,49 @@ SdioDevice::SdioDevice(fdf::DriverStartArgs start_args,
 
 SdioDevice::~SdioDevice() = default;
 
-zx::result<> SdioDevice::Start() {
+void SdioDevice::Start(fdf::StartCompleter completer) {
   wlan::drivers::log::Instance::Init(Debug::kBrcmfMsgFilter);
 
-  fidl::Arena arena;
-  zx_status_t status = InitDevice(*outgoing());
-  if (status != ZX_OK) {
-    BRCMF_ERR("Init failed: %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<> result = [&]() -> zx::result<> {
+    fidl::Arena arena;
+    zx_status_t status = InitDevice(*outgoing());
+    if (status != ZX_OK) {
+      BRCMF_ERR("Init failed: %s", zx_status_get_string(status));
+      return zx::error(status);
+    }
+
+    std::unique_ptr<DeviceInspect> inspect;
+    if (status = DeviceInspect::Create(fdf_dispatcher_get_async_dispatcher(GetDriverDispatcher()),
+                                       &inspect);
+        status != ZX_OK) {
+      BRCMF_ERR("Device Inspect create failed: %s", zx_status_get_string(status));
+      return zx::error(status);
+    }
+    inspect_ = std::move(inspect);
+    return zx::ok();
+  }();
+
+  if (result.is_error()) {
+    // If initialization failed we need to shut down any parts that were initialized.
+    SdioDevice::Shutdown(
+        [result, completer = std::move(completer)]() mutable { completer(result.take_error()); });
+    return;
   }
 
-  std::unique_ptr<DeviceInspect> inspect;
-  if (status = DeviceInspect::Create(fdf_dispatcher_get_async_dispatcher(GetDriverDispatcher()),
-                                     &inspect);
-      status != ZX_OK) {
-    BRCMF_ERR("Device Inspect create failed: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  inspect_ = std::move(inspect);
-
-  return zx::ok();
+  completer(zx::ok());
 }
 
 void SdioDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
+  SdioDevice::Shutdown([completer = std::move(completer)]() mutable { completer(zx::ok()); });
+}
+
+void SdioDevice::Shutdown(fit::callback<void()>&& on_complete) {
   if (brcmf_bus_) {
     brcmf_sdio_exit(brcmf_bus_.get());
     brcmf_bus_.reset();
   }
 
-  Shutdown([completer = std::move(completer)]() mutable { completer(zx::ok()); });
+  Device::Shutdown([on_complete = std::move(on_complete)]() mutable { on_complete(); });
 }
 
 zx_status_t SdioDevice::BusInit() {

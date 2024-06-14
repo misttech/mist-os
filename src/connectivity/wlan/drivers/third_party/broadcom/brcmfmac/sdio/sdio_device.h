@@ -40,7 +40,7 @@ class SdioDevice final : public Device, public fdf::DriverBase {
   ~SdioDevice();
 
   static constexpr const char* Name() { return "brcmfmac-sdio"; }
-  zx::result<> Start() override;
+  void Start(fdf::StartCompleter completer) override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
   zx_status_t BusInit() override;
 
@@ -60,6 +60,7 @@ class SdioDevice final : public Device, public fdf::DriverBase {
   zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
 
  private:
+  void Shutdown(fit::callback<void()>&& on_complete);
   fidl::WireClient<fdf::Node> parent_node_;
   std::unique_ptr<DeviceInspect> inspect_;
   std::unique_ptr<brcmf_bus> brcmf_bus_;
