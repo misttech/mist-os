@@ -430,14 +430,6 @@ Valid options:
 
 From //build/bazel/remote_services.gni:32
 
-### bless_goldens
-
-TODO(https://fxbug.dev/42051023): delete bless_goldens, to give users time to switch to new gn arg, update_goldens
-
-**Current value (from the default):** `false`
-
-From //build/testing/config.gni:11
-
 ### blobfs_capacity
 
 Maximum allowable contents for the /blob in a release mode build for
