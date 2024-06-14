@@ -27,5 +27,11 @@
             from: "#power-broker",
             to: "#system-activity-governor",
         },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: [ "#system-activity-governor" ],
+            availability: "optional",
+        },
     ],
 }

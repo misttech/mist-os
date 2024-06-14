@@ -194,6 +194,7 @@ impl ExecutionStateManager {
 
             // LINT.IfChange
             let response = if let Some(suspender) = inner.suspender.as_ref() {
+                fuchsia_trace::duration!(c"power", c"suspend");
                 Some(
                     suspender
                         .suspend(&fhsuspend::SuspenderSuspendRequest {
