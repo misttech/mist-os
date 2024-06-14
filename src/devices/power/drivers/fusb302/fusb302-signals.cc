@@ -106,8 +106,8 @@ HardwareStateChanges Fusb302Signals::ServiceInterrupts() {
   }
 
   if (interrupt_a.i_retryfail()) {
-    FDF_LOG(ERROR,
-            "Interrupt: timed out waiting for GoodCRC. Transmitted message keeps getting lost.");
+    FDF_LOG(WARNING,
+            "Interrupt: timed out waiting for GoodCRC. Cable or host missing USB PD support?");
     protocol_.DidTimeoutWaitingForGoodCrc();
   }
 
