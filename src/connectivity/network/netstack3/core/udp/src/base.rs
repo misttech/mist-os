@@ -1907,6 +1907,10 @@ where
         >,
         want_membership: bool,
     ) -> Result<(), SetMulticastMembershipError> {
+        debug!(
+            "set multicast membership on {id:?} for group {multicast_group:?} with interface \
+            selector: {interface:?}: want_membership={want_membership}"
+        );
         self.datagram().set_multicast_membership(id, multicast_group, interface, want_membership)
     }
 
