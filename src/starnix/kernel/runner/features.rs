@@ -16,11 +16,13 @@ use starnix_core::device::ashmem::ashmem_device_init;
 use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};
 use starnix_core::device::perfetto_consumer::start_perfetto_consumer_thread;
 use starnix_core::device::remote_block_device::remote_block_device_init;
+use starnix_core::device::touch_power_policy_device::TouchPowerPolicyDevice;
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 use starnix_core::vfs::FsString;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
+use std::sync::mpsc::channel;
 use std::sync::Arc;
 
 use {
@@ -178,6 +180,12 @@ pub fn run_container_features(
         touch_device.start_touch_relay(&kernel, touch_source_proxy);
         keyboard_device.start_keyboard_relay(&kernel, keyboard, view_ref);
         keyboard_device.start_button_relay(&kernel, registry_proxy);
+
+        // Channel we use to inform the relay of changes to `touch_standby`
+        let (touch_standby_sender, touch_standby_receiver) = channel::<bool>();
+        let touch_policy_device = TouchPowerPolicyDevice::new(touch_standby_sender);
+        touch_policy_device.clone().register(locked, &kernel.kthreads.system_task());
+        touch_policy_device.start_relay(&kernel, touch_standby_receiver);
 
         if features.framebuffer2 {
             kernel
