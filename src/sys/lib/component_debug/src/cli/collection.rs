@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::realm::{get_all_instances, get_resolved_declaration, Durability},
-    anyhow::{bail, Result},
-    cm_rust::{OfferDeclCommon, OfferTarget},
-    fidl_fuchsia_sys2 as fsys,
-    moniker::Moniker,
-    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
-};
+use crate::realm::{get_all_instances, get_resolved_declaration, Durability};
+use anyhow::{bail, Result};
+use cm_rust::{OfferDeclCommon, OfferTarget};
+use fidl_fuchsia_sys2 as fsys;
+use moniker::Moniker;
+use prettytable::format::consts::FORMAT_CLEAN;
+use prettytable::{cell, row, Table};
 
 struct Collection {
     name: String,

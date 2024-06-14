@@ -2,24 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::ops,
-    anyhow::{bail, ensure, Context, Error},
-    chrono::Local,
-    fxfs::{
-        filesystem::{mkfs_with_volume, FxFilesystem, OpenFxFilesystem, SyncOptions},
-        object_store::ObjectStore,
-        serialized_types::{Version, LATEST_VERSION},
-    },
-    fxfs_crypto::Crypt,
-    fxfs_insecure_crypto::InsecureCrypt,
-    std::{
-        io::Write,
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
-    storage_device::{fake_device::FakeDevice, Device, DeviceHolder},
-};
+use crate::ops;
+use anyhow::{bail, ensure, Context, Error};
+use chrono::Local;
+use fxfs::filesystem::{mkfs_with_volume, FxFilesystem, OpenFxFilesystem, SyncOptions};
+use fxfs::object_store::ObjectStore;
+use fxfs::serialized_types::{Version, LATEST_VERSION};
+use fxfs_crypto::Crypt;
+use fxfs_insecure_crypto::InsecureCrypt;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use storage_device::fake_device::FakeDevice;
+use storage_device::{Device, DeviceHolder};
 
 const IMAGE_BLOCKS: u64 = 8192;
 // Version of first image with a verified file included in `create_image()`

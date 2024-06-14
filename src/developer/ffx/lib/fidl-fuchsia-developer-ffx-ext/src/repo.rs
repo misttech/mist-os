@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    camino::Utf8PathBuf,
-    fidl_fuchsia_developer_ffx as fidl,
-    fidl_fuchsia_net_ext::SocketAddress,
-    serde::{Deserialize, Serialize},
-    std::{collections::BTreeSet, net::SocketAddr},
-    thiserror::Error,
-};
+use camino::Utf8PathBuf;
+use fidl_fuchsia_developer_ffx as fidl;
+use fidl_fuchsia_net_ext::SocketAddress;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::net::SocketAddr;
+use thiserror::Error;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -429,11 +428,15 @@ pub enum RepositoryError {
 
     #[error("repository registration conflict")]
     ConflictingRegistration,
+
+    #[error("repository metadata cannot be found")]
+    NoRepositoryMetadata,
 }
 
 impl From<fidl::RepositoryError> for RepositoryError {
     fn from(err: fidl::RepositoryError) -> Self {
-        use {fidl::RepositoryError as fErr, RepositoryError as Err};
+        use fidl::RepositoryError as fErr;
+        use RepositoryError as Err;
         match err {
             fErr::MissingRepositoryName => Err::MissingRepositoryName,
             fErr::NoMatchingRepository => Err::NoMatchingRepository,
@@ -451,13 +454,15 @@ impl From<fidl::RepositoryError> for RepositoryError {
             fErr::ServerAddressAlreadyInUse => Err::ServerAddressAlreadyInUse,
             fErr::NoMatchingPackage => Err::NoMatchingPackage,
             fErr::ConflictingRegistration => Err::ConflictingRegistration,
+            fErr::RepositoryMetadataNotFound => Err::NoRepositoryMetadata,
         }
     }
 }
 
 impl From<RepositoryError> for fidl::RepositoryError {
     fn from(err: RepositoryError) -> Self {
-        use {fidl::RepositoryError as fErr, RepositoryError as Err};
+        use fidl::RepositoryError as fErr;
+        use RepositoryError as Err;
         match err {
             Err::MissingRepositoryName => fErr::MissingRepositoryName,
             Err::NoMatchingRepository => fErr::NoMatchingRepository,
@@ -475,6 +480,7 @@ impl From<RepositoryError> for fidl::RepositoryError {
             Err::ServerAddressAlreadyInUse => fErr::ServerAddressAlreadyInUse,
             Err::NoMatchingPackage => fErr::NoMatchingPackage,
             Err::ConflictingRegistration => fErr::ConflictingRegistration,
+            Err::NoRepositoryMetadata => fErr::RepositoryMetadataNotFound,
         }
     }
 }

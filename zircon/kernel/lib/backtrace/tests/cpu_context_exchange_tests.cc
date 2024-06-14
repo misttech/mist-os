@@ -10,6 +10,7 @@
 
 #include <arch/interrupt.h>
 #include <kernel/mp.h>
+#include <kernel/scheduler.h>
 
 #if defined(__x86_64__)
 #include <lib/backtrace/global_cpu_context_exchange.h>
@@ -90,7 +91,7 @@ bool OneToManyTest() {
   } responders[SMP_MAX_CPUS];
   size_t num_responders = 0;
 
-  cpu_mask_t mask = mp_get_active_mask();
+  cpu_mask_t mask = Scheduler::PeekActiveMask();
   const cpu_num_t requester = remove_cpu_from_mask(mask);
   if (requester == INVALID_CPU || mask == 0) {
     printf("not enough active cpus; skipping test\n");

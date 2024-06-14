@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use component_events::{events::EventStream, matcher::EventMatcher, sequence::*};
+use component_events::events::EventStream;
+use component_events::matcher::EventMatcher;
+use component_events::sequence::*;
 
 #[fuchsia::main(logging_tags = ["nested_reporter"])]
 async fn main() {

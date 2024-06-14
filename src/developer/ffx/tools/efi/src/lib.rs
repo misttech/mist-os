@@ -6,13 +6,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_efi_args::{EfiCommand, EfiSubCommand};
-use std::{
-    cmp::max,
-    collections::HashMap,
-    fs::{File, OpenOptions},
-    io::{prelude::*, BufReader},
-    path::Path,
-};
+use std::cmp::max;
+use std::collections::HashMap;
+use std::fs::{File, OpenOptions};
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::path::Path;
 
 #[derive(fho::FfxTool)]
 pub struct Efi {

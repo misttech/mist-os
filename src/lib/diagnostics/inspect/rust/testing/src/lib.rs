@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use crate::table::*;
-use fidl_fuchsia_inspect as finspect;
-use fidl_fuchsia_inspect_deprecated as fdeprecated;
 use fuchsia_inspect::{
     self as inspect, ArithmeticArrayProperty, ArrayProperty, DoubleArrayProperty,
     DoubleExponentialHistogramProperty, DoubleLinearHistogramProperty, Inspector, IntArrayProperty,
@@ -14,6 +12,7 @@ use fuchsia_inspect::{
 use futures::FutureExt;
 use std::ops::AddAssign;
 use structopt::StructOpt;
+use {fidl_fuchsia_inspect as finspect, fidl_fuchsia_inspect_deprecated as fdeprecated};
 
 pub mod deprecated_fidl_server;
 pub mod table;

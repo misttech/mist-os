@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{tcp::DnsTcpStream, udp::DnsUdpSocket, FuchsiaTime},
-    fuchsia_async as fasync,
-    futures::{Future, FutureExt},
-    trust_dns_proto::error::ProtoError,
-    trust_dns_resolver::{
-        name_server::{
-            GenericConnection as Connection, GenericConnectionProvider, RuntimeProvider, Spawn,
-        },
-        AsyncResolver,
-    },
+use crate::tcp::DnsTcpStream;
+use crate::udp::DnsUdpSocket;
+use crate::FuchsiaTime;
+use fuchsia_async as fasync;
+use futures::{Future, FutureExt};
+use trust_dns_proto::error::ProtoError;
+use trust_dns_resolver::name_server::{
+    GenericConnection as Connection, GenericConnectionProvider, RuntimeProvider, Spawn,
 };
+use trust_dns_resolver::AsyncResolver;
 
 /// Implement the `trust_dns_resolver::name_server::Spawn` trait in-terms-of fasync::Task.
 #[derive(Clone)]

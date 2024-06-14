@@ -4,10 +4,11 @@
 
 use super::*;
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_netemul_guest as fnetemul_guest;
-use fidl_fuchsia_virtualization_guest_interaction as fguest_interaction;
 use futures_util::io::AsyncReadExt as _;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_netemul_guest as fnetemul_guest,
+    fidl_fuchsia_virtualization_guest_interaction as fguest_interaction,
+};
 
 /// A controller for managing a single virtualized guest.
 ///

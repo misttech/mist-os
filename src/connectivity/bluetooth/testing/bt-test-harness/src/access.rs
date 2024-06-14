@@ -2,25 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_bluetooth_sys::{
-        AccessConnectResult, AccessDisconnectResult, AccessMakeDiscoverableResult, AccessMarker,
-        AccessProxy, AccessStartDiscoveryResult, ProcedureTokenMarker,
-    },
-    fuchsia_bluetooth::{
-        expectation::asynchronous::{expectable, Expectable, ExpectableExt, ExpectableState},
-        types::{Peer, PeerId},
-    },
-    futures::future::{self, BoxFuture, FutureExt},
-    std::{
-        collections::HashMap,
-        ops::{Deref, DerefMut},
-        sync::Arc,
-    },
-    test_harness::{SharedState, TestHarness},
-    tracing::warn,
+use anyhow::{Context, Error};
+use fidl_fuchsia_bluetooth_sys::{
+    AccessConnectResult, AccessDisconnectResult, AccessMakeDiscoverableResult, AccessMarker,
+    AccessProxy, AccessStartDiscoveryResult, ProcedureTokenMarker,
 };
+use fuchsia_bluetooth::expectation::asynchronous::{
+    expectable, Expectable, ExpectableExt, ExpectableState,
+};
+use fuchsia_bluetooth::types::{Peer, PeerId};
+use futures::future::{self, BoxFuture, FutureExt};
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use test_harness::{SharedState, TestHarness};
+use tracing::warn;
 
 use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
 
@@ -146,10 +142,8 @@ impl TestHarness for AccessHarness {
 pub mod expectation {
     use super::*;
     use crate::host_watcher::HostWatcherState;
-    use fuchsia_bluetooth::{
-        expectation::Predicate,
-        types::{Address, HostId, HostInfo, Peer, PeerId, Uuid},
-    };
+    use fuchsia_bluetooth::expectation::Predicate;
+    use fuchsia_bluetooth::types::{Address, HostId, HostInfo, Peer, PeerId, Uuid};
 
     mod peer {
         use super::*;

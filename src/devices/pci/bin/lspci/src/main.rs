@@ -4,18 +4,18 @@
 
 // All PCI layouts and information are documented in the PCI Local Bus Specification
 // https://pcisig.com/specifications/conventional/
-use {
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_hardware_pci::{Address, BusMarker, BusProxy, HeaderType},
-    fuchsia_fs::directory::{dir_contains, readdir, DirentKind},
-    fuchsia_fs::{directory::open_in_namespace, OpenFlags},
-    fuchsia_zircon::Status,
-    lspci::{
-        bridge::Bridge, db, device::Device, filter::Filter, util::Hexdumper, Args, SubCommand,
-    },
-    std::fs::File,
-    std::io::prelude::*,
-};
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_hardware_pci::{Address, BusMarker, BusProxy, HeaderType};
+use fuchsia_fs::directory::{dir_contains, open_in_namespace, readdir, DirentKind};
+use fuchsia_fs::OpenFlags;
+use fuchsia_zircon::Status;
+use lspci::bridge::Bridge;
+use lspci::device::Device;
+use lspci::filter::Filter;
+use lspci::util::Hexdumper;
+use lspci::{db, Args, SubCommand};
+use std::fs::File;
+use std::io::prelude::*;
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<(), Error> {

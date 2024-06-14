@@ -1,0 +1,44 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.examples.metadata;
+
+using zx;
+
+// Type of the metadata to be passed.
+type Metadata = table {
+    1: test_property string:MAX;
+};
+
+// The name of the FIDL service that serves `Metadata`. Must be unique when
+// compared to other FIDL services.
+const METADATA_SERVICE string = "fuchsia.examples.metadata.Metadata";
+
+// Implemented by the driver that will be sending metadata using the
+// //sdk/lib/driver/metadata library. Used only for testing.
+closed protocol Sender {
+    // Set the metadata of the driver that will be sent to its children using
+    // the //sdk/lib/driver/metadata library.
+    strict SetMetadata(struct {
+        metadata Metadata;
+    }) -> () error zx.Status;
+};
+
+// Implemented by the driver that will be forwarding metadata using the
+// //sdk/lib/driver/metadata library. Used only for testing.
+closed protocol Forwarder {
+    // Forward the metadata from the driver's parent driver to its children
+    // using the //sdk/lib/driver/metadata library.
+    strict ForwardMetadata() -> () error zx.Status;
+};
+
+// Implemented by the driver that will retrieve metadata using the
+// //sdk/lib/driver/metadata library. Used only for testing.
+closed protocol Retriever {
+    // Get the metadata offered by the driver's parent using the
+    // //sdk/lib/driver/metadata library.
+    strict GetMetadata() -> (struct {
+        metadata Metadata;
+    }) error zx.Status;
+};

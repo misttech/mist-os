@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    camino::{Utf8Path, Utf8PathBuf},
-    fuchsia_merkle::Hash,
-    fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo, SubpackageInfo},
-    std::collections::{BTreeMap, BTreeSet},
-};
+use anyhow::Result;
+use camino::{Utf8Path, Utf8PathBuf};
+use fuchsia_merkle::Hash;
+use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo, SubpackageInfo};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A builder that constructs base packages.
 #[derive(Default)]

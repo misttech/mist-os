@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::constants::{
-        HERMETIC_RESOLVER_REALM_NAME, TEST_ROOT_COLLECTION, TEST_TYPE_REALM_MAP, WRAPPER_REALM_NAME,
-    },
-    anyhow::{format_err, Error},
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_test as ftest,
-    fuchsia_component_test::{
-        error::Error as RealmBuilderError, Capability, RealmBuilder, Ref, Route, SubRealmBuilder,
-    },
-    std::collections::HashMap,
+use crate::constants::{
+    HERMETIC_RESOLVER_REALM_NAME, TEST_ROOT_COLLECTION, TEST_TYPE_REALM_MAP, WRAPPER_REALM_NAME,
 };
+use anyhow::{format_err, Error};
+use fuchsia_component_test::error::Error as RealmBuilderError;
+use fuchsia_component_test::{Capability, RealmBuilder, Ref, Route, SubRealmBuilder};
+use std::collections::HashMap;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_test as ftest};
 
 #[derive(Default)]
 struct CollectionData {

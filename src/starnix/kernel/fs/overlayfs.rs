@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable, fs_args,
-        CacheMode, DirEntry, DirEntryHandle, DirectoryEntryType, DirentSink, FallocMode,
-        FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        InputBuffer, MountInfo, OutputBuffer, RenameFlags, SeekTarget, SymlinkTarget, UnlinkKind,
-        ValueOrSize, VecInputBuffer, VecOutputBuffer, XattrOp,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::{
+    default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable, fs_args, CacheMode,
+    DirEntry, DirEntryHandle, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, InputBuffer, MountInfo, OutputBuffer, RenameFlags,
+    SeekTarget, SymlinkTarget, UnlinkKind, ValueOrSize, VecInputBuffer, VecOutputBuffer, XattrOp,
 };
 use once_cell::sync::OnceCell;
 use rand::Rng;
@@ -20,20 +17,14 @@ use starnix_sync::{
     DeviceOpen, FileOpsCore, FsNodeAllocate, LockBefore, LockEqualOrBefore, Locked, RwLock,
     RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
 };
-use starnix_uapi::{
-    auth::FsCred,
-    device_type::DeviceType,
-    errno, error,
-    errors::{Errno, EEXIST, ENOENT},
-    file_mode::FileMode,
-    ino_t, off_t,
-    open_flags::OpenFlags,
-    statfs,
-};
-use std::{
-    collections::{BTreeSet, HashMap},
-    sync::Arc,
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::{Errno, EEXIST, ENOENT};
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{errno, error, ino_t, off_t, statfs};
+use std::collections::{BTreeSet, HashMap};
+use std::sync::Arc;
 
 // Name and value for the xattr used to mark opaque directories in the upper FS.
 // See https://docs.kernel.org/filesystems/overlayfs.html#whiteouts-and-opaque-directories

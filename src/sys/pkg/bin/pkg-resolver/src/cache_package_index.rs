@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context as _,
-    fidl_fuchsia_pkg::PackageIndexIteratorMarker,
-    fuchsia_url::{PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl},
-    tracing::warn,
-};
+use anyhow::Context as _;
+use fidl_fuchsia_pkg::PackageIndexIteratorMarker;
+use fuchsia_url::{PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl};
+use tracing::warn;
 
 /// Load the list of cache_packages from fuchsia.pkg/PackageCache.CachePackageIndex.
 /// If any error is encountered during loading, an empty list will be returned.
@@ -46,18 +44,16 @@ async fn from_proxy_impl(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_pkg::{
-            self as fpkg, PackageCacheMarker, PackageCacheRequest, PackageCacheRequestStream,
-            PackageIndexEntry, PackageIndexIteratorRequest, PackageIndexIteratorRequestStream,
-        },
-        fidl_fuchsia_pkg_ext::BlobId,
-        fuchsia_async as fasync,
-        futures::prelude::*,
-        std::sync::Arc,
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_pkg::{
+        self as fpkg, PackageCacheMarker, PackageCacheRequest, PackageCacheRequestStream,
+        PackageIndexEntry, PackageIndexIteratorRequest, PackageIndexIteratorRequestStream,
     };
+    use fidl_fuchsia_pkg_ext::BlobId;
+    use fuchsia_async as fasync;
+    use futures::prelude::*;
+    use std::sync::Arc;
 
     // The actual pkg-cache will fit as many items per chunk as possible.  Intentionally choose a
     // small, fixed value here to verify the BasePackageIndex behavior with multiple chunks without

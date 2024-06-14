@@ -170,7 +170,6 @@ void LoopbackDevice::HciBeginShutdown() {
   bool was_shutting_down = shutting_down_.exchange(true, std::memory_order_relaxed);
   if (!was_shutting_down) {
     FDF_LOG(TRACE, "LoopbackDevice::HciBeginShutdown !was_shutting_down");
-    // DdkAsyncRemove(); // TODO(luluwang): Replace this
   }
 }
 

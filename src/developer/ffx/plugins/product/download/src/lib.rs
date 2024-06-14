@@ -15,10 +15,8 @@ use ffx_product_download_args::DownloadCommand;
 use ffx_product_list::pb_list_impl;
 use fho::{bug, return_user_error, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use pbms::{make_way_for_output, transfer_download, AuthFlowChoice};
-use std::{
-    io::{stdin, stdout},
-    path::Path,
-};
+use std::io::{stdin, stdout};
+use std::path::Path;
 
 #[derive(FfxTool)]
 pub struct PbDownloadTool {
@@ -203,10 +201,8 @@ pub async fn preprocess_cmd<I: structured_ui::Interface>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fuchsia_hyper_test_support::{
-        handler::{ForPath, StaticResponse},
-        TestServer,
-    };
+    use fuchsia_hyper_test_support::handler::{ForPath, StaticResponse};
+    use fuchsia_hyper_test_support::TestServer;
     use std::io::Write;
     use temp_test_env::TempTestEnv;
 

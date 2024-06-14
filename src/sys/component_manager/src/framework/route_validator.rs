@@ -2,33 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capability::{
+    CapabilityProvider, CapabilitySource, FrameworkCapability, InternalCapabilityProvider,
+};
+use crate::model::component::instance::ResolvedInstanceState;
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use crate::model::model::Model;
+use crate::model::routing::router_ext::WeakComponentTokenExt;
+use crate::model::routing::service::AnonymizedServiceRoute;
+use crate::model::routing::{
+    self, BedrockRouteRequest, Route, RouteRequest as LegacyRouteRequest, RoutingError,
+};
+use ::routing::capability_source::InternalCapability;
+use ::routing::component_instance::ComponentInstanceInterface;
+use async_trait::async_trait;
+use cm_rust::{ExposeDecl, SourceName, UseDecl};
+use cm_types::Name;
+use errors::{ActionError, StartActionError};
+use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
+use futures::future::join_all;
+use futures::TryStreamExt;
+use lazy_static::lazy_static;
+use moniker::{ExtendedMoniker, Moniker};
+use router_error::{Explain, RouterError};
+use sandbox::{Request, Router};
+use std::cmp::Ordering;
+use std::sync::{Arc, Weak};
+use tracing::warn;
 use {
-    crate::{
-        capability::{
-            CapabilityProvider, CapabilitySource, FrameworkCapability, InternalCapabilityProvider,
-        },
-        model::{
-            component::instance::ResolvedInstanceState,
-            component::{ComponentInstance, WeakComponentInstance},
-            model::Model,
-            routing::{self, service::AnonymizedServiceRoute, Route, RouteRequest, RoutingError},
-        },
-    },
-    ::routing::capability_source::InternalCapability,
-    async_trait::async_trait,
-    cm_rust::{ExposeDecl, SourceName, UseDecl},
-    cm_types::Name,
-    fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
-    futures::{future::join_all, TryStreamExt},
-    lazy_static::lazy_static,
-    moniker::{ExtendedMoniker, Moniker},
-    std::{
-        cmp::Ordering,
-        sync::{Arc, Weak},
-    },
-    tracing::warn,
 };
 
 lazy_static! {
@@ -145,7 +148,7 @@ impl RouteValidator {
                     name: use_.source_name().as_str().into(),
                     decl_type: fsys::DeclType::Use,
                 };
-                let request = use_.clone().into();
+                let request = RouteRequest::from(use_.clone());
                 (target, request)
             });
 
@@ -155,7 +158,7 @@ impl RouteValidator {
                     name: target_name.to_string(),
                     decl_type: fsys::DeclType::Expose,
                 };
-                let request = e.try_into().unwrap();
+                let request = RouteRequest::try_from(e).unwrap();
                 (target, request)
             });
             Ok(use_requests.chain(expose_requests).collect())
@@ -190,7 +193,7 @@ impl RouteValidator {
                                     name: u.source_name().to_string(),
                                     decl_type: target.decl_type,
                                 };
-                                let request = u.clone().into();
+                                let request = RouteRequest::from(u.clone());
                                 Some(Ok((target, request)))
                             })
                             .collect();
@@ -209,7 +212,7 @@ impl RouteValidator {
                                     name: target_name.to_string(),
                                     decl_type: target.decl_type,
                                 };
-                                let request = e.try_into().unwrap();
+                                let request = RouteRequest::try_from(e).unwrap();
                                 Some(Ok((target, request)))
                             })
                             .collect();
@@ -266,50 +269,12 @@ impl RouteValidator {
         scope_moniker: &Moniker,
         request: RouteRequest,
         target: &Arc<ComponentInstance>,
-    ) -> Result<(String, Option<Vec<fsys::ServiceInstance>>), RoutingError> {
-        let source = request.route(target).await?;
-        let source = &source.source;
-        let service_dir = match source {
-            CapabilitySource::AnonymizedAggregate { capability, component, members, .. } => {
-                let component = component.upgrade()?;
-                let route = AnonymizedServiceRoute {
-                    source_moniker: component.moniker.clone(),
-                    members: members.clone(),
-                    service_name: capability.source_name().clone(),
-                };
-                let state = component.lock_state().await;
-                state.get_resolved_state().and_then(|r| r.anonymized_services.get(&route).cloned())
-            }
-            _ => None,
-        };
-        let moniker = Self::extended_moniker_to_str(
-            scope_moniker,
-            source.source_instance().extended_moniker(),
-        );
-        let service_info = match service_dir {
-            Some(service_dir) => {
-                let mut service_info: Vec<_> = service_dir.entries().await;
-                // Sort the entries (they can show up in any order)
-                service_info.sort_by(|a, b| match a.source_id.cmp(&b.source_id) {
-                    Ordering::Equal => a.service_instance.cmp(&b.service_instance),
-                    o => o,
-                });
-                let service_info = service_info
-                    .into_iter()
-                    .map(|e| {
-                        let child_name = format!("{}", e.source_id);
-                        fsys::ServiceInstance {
-                            instance_name: Some(e.name.clone().into()),
-                            child_name: Some(child_name),
-                            child_instance_name: Some(e.service_instance.clone().into()),
-                            ..Default::default()
-                        }
-                    })
-                    .collect();
-                Some(service_info)
-            }
-            None => None,
-        };
+    ) -> Result<(String, Option<Vec<fsys::ServiceInstance>>), Box<dyn Explain>> {
+        let (_, res) = request.route(target).await;
+        let (moniker, service_info) = res?;
+        let moniker = moniker
+            .map(|m| Self::extended_moniker_to_str(scope_moniker, m))
+            .unwrap_or_else(|| "<unknown>".into());
         Ok((moniker, service_info))
     }
 
@@ -320,6 +285,132 @@ impl RouteValidator {
                 Ok(r) => r.to_string(),
                 Err(_) => "<above scope>".to_string(),
             },
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum RouteRequest {
+    Bedrock(BedrockRouteRequest),
+    Legacy(LegacyRouteRequest),
+}
+
+impl RouteRequest {
+    async fn route(
+        self,
+        instance: &Arc<ComponentInstance>,
+    ) -> (
+        Option<fdecl::Availability>,
+        Result<(Option<ExtendedMoniker>, Option<Vec<fsys::ServiceInstance>>), Box<dyn Explain>>,
+    ) {
+        match self {
+            Self::Legacy(route_request) => {
+                let availability = route_request.availability().map(From::from);
+                let res = Self::route_legacy(route_request, instance)
+                    .await
+                    .map_err(|e| -> Box<dyn Explain> { Box::new(e) });
+                (availability, res)
+            }
+            Self::Bedrock(route_request) => {
+                let availability = Some(route_request.availability().into());
+                let res = Self::route_bedrock(route_request, instance)
+                    .await
+                    .map_err(|e| -> Box<dyn Explain> { Box::new(e) });
+                (availability, res)
+            }
+        }
+    }
+
+    async fn route_legacy(
+        route_request: LegacyRouteRequest,
+        instance: &Arc<ComponentInstance>,
+    ) -> Result<(Option<ExtendedMoniker>, Option<Vec<fsys::ServiceInstance>>), RoutingError> {
+        let source = route_request.route(&instance).await?;
+        let source = source.source;
+        let source_moniker = source.source_instance().extended_moniker();
+        let service_info = match source {
+            CapabilitySource::AnonymizedAggregate { capability, component, members, .. } => {
+                let component = component.upgrade()?;
+                let route = AnonymizedServiceRoute {
+                    source_moniker: component.moniker.clone(),
+                    members: members.clone(),
+                    service_name: capability.source_name().clone(),
+                };
+                let state = component.lock_state().await;
+                if let Some(service_dir) = state
+                    .get_resolved_state()
+                    .and_then(|r| r.anonymized_services.get(&route).cloned())
+                {
+                    let mut service_info = service_dir.entries().await;
+                    // Sort the entries (they can show up in any order)
+                    service_info.sort_by(|a, b| match a.source_id.cmp(&b.source_id) {
+                        Ordering::Equal => a.service_instance.cmp(&b.service_instance),
+                        o => o,
+                    });
+                    let service_info = service_info
+                        .into_iter()
+                        .map(|e| {
+                            let child_name = format!("{}", e.source_id);
+                            fsys::ServiceInstance {
+                                instance_name: Some(e.name.clone().into()),
+                                child_name: Some(child_name),
+                                child_instance_name: Some(e.service_instance.clone().into()),
+                                ..Default::default()
+                            }
+                        })
+                        .collect();
+                    Some(service_info)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        Ok((Some(source_moniker), service_info))
+    }
+
+    async fn route_bedrock(
+        route_request: BedrockRouteRequest,
+        instance: &Arc<ComponentInstance>,
+    ) -> Result<(Option<ExtendedMoniker>, Option<Vec<fsys::ServiceInstance>>), RouterError> {
+        let res: Result<(Router, Request), ActionError> = async move {
+            let resolved_state = instance.lock_resolved_state().await.map_err(|err| {
+                ActionError::from(StartActionError::ResolveActionError {
+                    moniker: instance.moniker.clone(),
+                    err: Box::new(err),
+                })
+            })?;
+            Ok(route_request.into_router(instance.as_weak(), &resolved_state.sandbox, true))
+        }
+        .await;
+        let (router, request) = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
+        router.route(request).await.map(|capability| {
+            if let sandbox::Capability::Component(source) = capability {
+                (Some(source.moniker()), None)
+            } else {
+                warn!(target=%instance.moniker, "router did not return source info");
+                (None, None)
+            }
+        })
+    }
+}
+
+impl From<UseDecl> for RouteRequest {
+    fn from(u: UseDecl) -> Self {
+        match BedrockRouteRequest::try_from(u) {
+            Ok(r) => Self::Bedrock(r),
+            Err(r) => Self::Legacy(r.into()),
+        }
+    }
+}
+
+impl TryFrom<Vec<&ExposeDecl>> for RouteRequest {
+    type Error = RoutingError;
+
+    fn try_from(e: Vec<&ExposeDecl>) -> Result<Self, Self::Error> {
+        match BedrockRouteRequest::try_from(&e) {
+            Ok(r) => Ok(Self::Bedrock(r)),
+            Err(()) => Ok(Self::Legacy(e.try_into()?)),
         }
     }
 }
@@ -376,8 +467,8 @@ async fn validate_uses(
         let capability = Some(use_.source_name().to_string());
         let decl_type = Some(fsys::DeclType::Use);
         let route_request = RouteRequest::from(use_);
-        let availability = route_request.availability().map(fdecl::Availability::from);
-        let error = if let Err(e) = route_request.route(&instance).await {
+        let (availability, res) = route_request.route(instance).await;
+        let error = if let Err(e) = res {
             Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
         } else {
             None
@@ -410,8 +501,8 @@ async fn validate_exposes(
                 Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() }),
             ),
             Ok(route_request) => {
-                let availability = route_request.availability().map(fdecl::Availability::from);
-                if let Err(e) = route_request.route(instance).await {
+                let (availability, res) = route_request.route(instance).await;
+                if let Err(e) = res {
                     (
                         availability,
                         Some(fsys::RouteError {
@@ -438,23 +529,17 @@ async fn validate_exposes(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::{
-            component::StartReason,
-            start::Start,
-            testing::{
-                out_dir::OutDir,
-                test_helpers::{TestEnvironmentBuilder, TestModelResult},
-            },
-        },
-        ::routing::bedrock::structured_dict::ComponentInput,
-        assert_matches::assert_matches,
-        cm_rust::*,
-        cm_rust_testing::*,
-        fidl::endpoints,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    };
+    use super::*;
+    use crate::model::component::StartReason;
+    use crate::model::start::Start;
+    use crate::model::testing::out_dir::OutDir;
+    use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
+    use ::routing::bedrock::structured_dict::ComponentInput;
+    use assert_matches::assert_matches;
+    use cm_rust::*;
+    use cm_rust_testing::*;
+    use fidl::endpoints;
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[derive(Ord, PartialOrd, Eq, PartialEq)]
     struct Key {
@@ -778,8 +863,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn route_all() {
-        let use_from_framework_decl =
-            UseBuilder::protocol().source(UseSource::Framework).name("foo.bar").build();
+        let use_from_framework_decl = UseBuilder::protocol()
+            .source(UseSource::Framework)
+            .name("fuchsia.component.Realm")
+            .build();
         let expose_from_child_decl = ExposeBuilder::resolver()
             .name("qax.qux")
             .target_name("foo.buz")
@@ -833,7 +920,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.bar" && m == "."
+            } if s == "fuchsia.component.Realm" && m == "."
         );
 
         let report = results.remove(0);
@@ -851,20 +938,21 @@ mod tests {
 
     #[fuchsia::test]
     async fn route_fuzzy() {
-        let use_from_framework_decl =
-            UseBuilder::protocol().source(UseSource::Framework).name("foo.bar").build();
-        let use_from_framework_decl2 =
-            UseBuilder::protocol().source(UseSource::Framework).name("foo.buz").build();
-        let use_from_framework_decl3 =
+        let use_decl = UseBuilder::protocol()
+            .source(UseSource::Framework)
+            .name("fuchsia.component.Realm")
+            .build();
+        let use_decl2 = UseBuilder::protocol().source(UseSource::Self_).name("fuchsia.foo").build();
+        let use_decl3 =
             UseBuilder::protocol().source(UseSource::Framework).name("no.match").build();
         let expose_from_child_decl = ExposeBuilder::protocol()
             .name("qax.qux")
-            .target_name("foo.buz")
+            .target_name("fuchsia.buz")
             .source_static_child("my_child")
             .build();
         let expose_from_child_decl2 = ExposeBuilder::protocol()
             .name("qax.qux")
-            .target_name("foo.biz")
+            .target_name("fuchsia.biz")
             .source_static_child("my_child")
             .build();
         let expose_from_child_decl3 =
@@ -876,12 +964,13 @@ mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .use_(use_from_framework_decl)
-                    .use_(use_from_framework_decl2)
-                    .use_(use_from_framework_decl3)
+                    .use_(use_decl)
+                    .use_(use_decl2)
+                    .use_(use_decl3)
                     .expose(expose_from_child_decl)
                     .expose(expose_from_child_decl2)
                     .expose(expose_from_child_decl3)
+                    .protocol_default("fuchsia.foo")
                     .child_default("my_child")
                     .build(),
             ),
@@ -906,8 +995,10 @@ mod tests {
         model.start(ComponentInput::default()).await;
 
         // Validate the root
-        let targets =
-            &[fsys::RouteTarget { name: "foo.".parse().unwrap(), decl_type: fsys::DeclType::Any }];
+        let targets = &[fsys::RouteTarget {
+            name: "fuchsia.".parse().unwrap(),
+            decl_type: fsys::DeclType::Any,
+        }];
         let mut results = validator.route(".", targets).await.unwrap().unwrap();
 
         assert_eq!(results.len(), 4);
@@ -921,7 +1012,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.bar" && m == "."
+            } if s == "fuchsia.component.Realm" && m == "."
         );
 
         let report = results.remove(0);
@@ -933,7 +1024,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.buz" && m == "."
+            } if s == "fuchsia.foo" && m == "."
         );
 
         let report = results.remove(0);
@@ -945,7 +1036,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.biz" && m == "my_child"
+            } if s == "fuchsia.biz" && m == "my_child"
         );
 
         let report = results.remove(0);
@@ -957,7 +1048,7 @@ mod tests {
                 source_moniker: Some(m),
                 error: None,
                 ..
-            } if s == "foo.buz" && m == "my_child"
+            } if s == "fuchsia.buz" && m == "my_child"
         );
     }
 

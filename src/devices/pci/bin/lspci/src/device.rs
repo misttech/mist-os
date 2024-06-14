@@ -1,16 +1,14 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::capability::Capability,
-    crate::config::{CommandRegister, StatusRegister, Type00Config},
-    crate::db::PciDb,
-    crate::util::{format_bytes, Hexdumper},
-    crate::Args,
-    fidl_fuchsia_hardware_pci::PciDevice as FidlDevice,
-    std::fmt,
-    zerocopy::Ref,
-};
+use crate::capability::Capability;
+use crate::config::{CommandRegister, StatusRegister, Type00Config};
+use crate::db::PciDb;
+use crate::util::{format_bytes, Hexdumper};
+use crate::Args;
+use fidl_fuchsia_hardware_pci::PciDevice as FidlDevice;
+use std::fmt;
+use zerocopy::Ref;
 
 pub struct Device<'a> {
     pub device: &'a FidlDevice,

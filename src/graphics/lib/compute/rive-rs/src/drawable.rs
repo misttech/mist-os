@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    core::{Core, Object, ObjectRef, OnAdded, Property},
-    draw_rules::DrawRules,
-    dyn_vec::DynVec,
-    math::Mat,
-    node::Node,
-    option_cell::OptionCell,
-    shapes::{paint::BlendMode, ClippingShape, CommandPath, CommandPathBuilder, Shape},
-    Renderer,
-};
+use crate::core::{Core, Object, ObjectRef, OnAdded, Property};
+use crate::draw_rules::DrawRules;
+use crate::dyn_vec::DynVec;
+use crate::math::Mat;
+use crate::node::Node;
+use crate::option_cell::OptionCell;
+use crate::shapes::paint::BlendMode;
+use crate::shapes::{ClippingShape, CommandPath, CommandPathBuilder, Shape};
+use crate::Renderer;
 
 #[derive(Debug)]
 pub struct Drawable {

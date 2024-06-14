@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{thread, time::Duration};
+use std::thread;
+use std::time::Duration;
 
 fn main() {
     // this component run forever.

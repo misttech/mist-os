@@ -8,8 +8,8 @@
 #include <zircon/types.h>
 
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "src/developer/memory/metrics/bucket_match.h"
@@ -19,7 +19,7 @@ namespace memory {
 
 class Bucket {
  public:
-  Bucket(std::string name, uint64_t size) : name_(name), size_(size) {}
+  Bucket(std::string name, uint64_t size) : name_(std::move(name)), size_(size) {}
   const std::string& name() const { return name_; }
   uint64_t size() const { return size_; }
 

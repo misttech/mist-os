@@ -11,16 +11,15 @@ use crate::types::{NormPerfs, OperatingPoint, ThermalLoad, Watts};
 use anyhow::{bail, format_err, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
-use fidl_fuchsia_thermal as fthermal;
 use fuchsia_inspect::{self as inspect, ArrayProperty as _, Property as _};
 use fuchsia_zircon::sys;
 use serde_derive::Deserialize;
-use serde_json as json;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::TryInto as _;
 use std::fmt::Debug;
 use std::rc::Rc;
+use {fidl_fuchsia_thermal as fthermal, serde_json as json};
 
 /// Node: CpuManagerMain
 ///

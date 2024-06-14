@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::appendable::{Appendable, BufferTooSmall},
-    fuchsia_async::{DurationExt, OnTimeout, TimeoutExt},
-    fuchsia_zircon as zx,
-    futures::Future,
-};
+use crate::appendable::{Appendable, BufferTooSmall};
+use fuchsia_async::{DurationExt, OnTimeout, TimeoutExt};
+use fuchsia_zircon as zx;
+use futures::Future;
 
 pub mod fake_capabilities;
 pub mod fake_features;

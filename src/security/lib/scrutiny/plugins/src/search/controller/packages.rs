@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::collection::{Package, Packages},
-    anyhow::Result,
-    regex::Regex,
-    scrutiny::{
-        model::controller::{DataController, HintDataType},
-        model::model::*,
-    },
-    scrutiny_utils::usage::UsageBuilder,
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::sync::Arc,
-    tracing::warn,
-};
+use crate::core::collection::{Package, Packages};
+use anyhow::Result;
+use regex::Regex;
+use scrutiny::model::controller::{DataController, HintDataType};
+use scrutiny::model::model::*;
+use scrutiny_utils::usage::UsageBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::Arc;
+use tracing::warn;
 
 #[derive(Deserialize, Serialize)]
 pub struct PackageSearchRequest {

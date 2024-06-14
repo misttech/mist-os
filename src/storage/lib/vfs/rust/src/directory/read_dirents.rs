@@ -5,17 +5,15 @@
 //! A sink that can consume directory entry information, encoding them as expected by `fuchsia.io`
 //! `Directory::ReadDirents` result.
 
-use crate::directory::{
-    common::encode_dirent,
-    dirents_sink::{self, AppendResult},
-    entry::EntryInfo,
-    traversal_position::TraversalPosition,
-};
+use crate::directory::common::encode_dirent;
+use crate::directory::dirents_sink::{self, AppendResult};
+use crate::directory::entry::EntryInfo;
+use crate::directory::traversal_position::TraversalPosition;
 
-use {
-    fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, std::any::Any,
-    std::convert::TryInto as _,
-};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use std::any::Any;
+use std::convert::TryInto as _;
 
 /// An instance of this type represents a sink that may still accept additional entries.  Depending
 /// on the entry size it may turn itself into a [`Done`] value, indicating that the internal buffer

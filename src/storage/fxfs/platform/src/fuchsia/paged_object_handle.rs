@@ -2,39 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        pager::{MarkDirtyRange, Pager, PagerBacked, PagerVmoStatsOptions, VmoDirtyRange},
-        volume::FxVolume,
-    },
-    anyhow::{ensure, Context, Error},
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    fxfs::{
-        errors::FxfsError,
-        filesystem::MAX_FILE_SIZE,
-        log::*,
-        object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
-        object_store::{
-            allocator::{Allocator, Reservation, ReservationOwner},
-            transaction::{
-                lock_keys, AssocObj, LockKey, Mutation, Options, Transaction,
-                TRANSACTION_METADATA_MAX_AMOUNT,
-            },
-            AttributeKey, DataObjectHandle, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
-            Timestamp,
-        },
-        range::RangeExt,
-        round::{how_many, round_up},
-    },
-    scopeguard::ScopeGuard,
-    std::{
-        future::Future,
-        ops::Range,
-        sync::{Arc, Mutex},
-    },
-    storage_device::buffer::{Buffer, BufferFuture},
-    vfs::temp_clone::{unblock, TempClonable},
+use crate::fuchsia::pager::{
+    MarkDirtyRange, Pager, PagerBacked, PagerVmoStatsOptions, VmoDirtyRange,
 };
+use crate::fuchsia::volume::FxVolume;
+use anyhow::{ensure, Context, Error};
+use fxfs::errors::FxfsError;
+use fxfs::filesystem::MAX_FILE_SIZE;
+use fxfs::log::*;
+use fxfs::object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle};
+use fxfs::object_store::allocator::{Allocator, Reservation, ReservationOwner};
+use fxfs::object_store::transaction::{
+    lock_keys, AssocObj, LockKey, Mutation, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
+};
+use fxfs::object_store::{
+    AttributeKey, DataObjectHandle, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,
+    Timestamp,
+};
+use fxfs::range::RangeExt;
+use fxfs::round::{how_many, round_up};
+use scopeguard::ScopeGuard;
+use std::future::Future;
+use std::ops::Range;
+use std::sync::{Arc, Mutex};
+use storage_device::buffer::{Buffer, BufferFuture};
+use vfs::temp_clone::{unblock, TempClonable};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// How much data each sync transaction in a given flush will cover.
 const FLUSH_BATCH_SIZE: u64 = 524_288;
@@ -1090,43 +1083,33 @@ impl FlushRange {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::fuchsia::{
-            directory::FxDirectory,
-            node::FxNode,
-            pager::PagerPacketReceiverRegistration,
-            pager::{default_page_in, PageInRange},
-            testing::{close_dir_checked, close_file_checked, open_file_checked, TestFixture},
-            volume::FxVolumeAndRoot,
-        },
-        anyhow::bail,
-        assert_matches::assert_matches,
-        fidl::endpoints::{create_proxy, ServerEnd},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_fs::file,
-        fuchsia_zircon as zx,
-        futures::{
-            channel::mpsc::{unbounded, UnboundedSender},
-            join, StreamExt,
-        },
-        fxfs::{
-            filesystem::{FxFilesystemBuilder, OpenFxFilesystem},
-            object_store::{volume::root_volume, Directory},
-        },
-        fxfs_macros::ToWeakNode,
-        std::{
-            collections::HashSet,
-            sync::{
-                atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
-                Condvar, Weak,
-            },
-            time::Duration,
-        },
-        storage_device::{buffer, fake_device::FakeDevice, DeviceHolder},
-        test_util::{assert_geq, assert_lt},
-        vfs::path::Path,
+    use super::*;
+    use crate::fuchsia::directory::FxDirectory;
+    use crate::fuchsia::node::FxNode;
+    use crate::fuchsia::pager::{default_page_in, PageInRange, PagerPacketReceiverRegistration};
+    use crate::fuchsia::testing::{
+        close_dir_checked, close_file_checked, open_file_checked, TestFixture,
     };
+    use crate::fuchsia::volume::FxVolumeAndRoot;
+    use anyhow::bail;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{create_proxy, ServerEnd};
+    use fuchsia_fs::file;
+    use futures::channel::mpsc::{unbounded, UnboundedSender};
+    use futures::{join, StreamExt};
+    use fxfs::filesystem::{FxFilesystemBuilder, OpenFxFilesystem};
+    use fxfs::object_store::volume::root_volume;
+    use fxfs::object_store::Directory;
+    use fxfs_macros::ToWeakNode;
+    use std::collections::HashSet;
+    use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+    use std::sync::{Condvar, Weak};
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::{buffer, DeviceHolder};
+    use test_util::{assert_geq, assert_lt};
+    use vfs::path::Path;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const BLOCK_SIZE: u32 = 512;
     const BLOCK_COUNT: u64 = 16384;

@@ -4,12 +4,11 @@
 
 #![cfg(test)]
 
-use {
-    fuchsia_async as fasync,
-    shell_process::ProcessOutput,
-    std::{fs::File, path::Path},
-    tempfile::TempDir,
-};
+use fuchsia_async as fasync;
+use shell_process::ProcessOutput;
+use std::fs::File;
+use std::path::Path;
+use tempfile::TempDir;
 
 async fn run_far_tool(args: Vec<&str>, injected_dir: Option<&Path>) -> ProcessOutput {
     const BINARY_PATH: &str = "/pkg/bin/far";

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::TimeoutExt;
-use futures::{lock::Mutex, prelude::*};
+use futures::lock::Mutex;
+use futures::prelude::*;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;

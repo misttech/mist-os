@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    bt_rfcomm::profile::{is_rfcomm_protocol, server_channel_from_protocol},
-    fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_bluetooth::profile::*,
-    std::collections::HashSet,
-};
+use anyhow::format_err;
+use bt_rfcomm::profile::{is_rfcomm_protocol, server_channel_from_protocol};
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_bluetooth::profile::*;
+use std::collections::HashSet;
 
 use crate::types::ServiceRecord;
 
@@ -73,7 +71,8 @@ pub fn parse_service_definitions(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use {bt_rfcomm::ServerChannel, fuchsia_bluetooth::types::Uuid};
+    use bt_rfcomm::ServerChannel;
+    use fuchsia_bluetooth::types::Uuid;
 
     const SDP_SUPPORTED_FEATURES: u16 = 0x0311;
 
@@ -137,8 +136,7 @@ pub(crate) mod tests {
     /// This is done in the same function to maintain data consistency, such that if the
     /// parsing implementation changes, only this builder will need to be updated.
     fn avrcp_service_definition() -> (bredr::ServiceDefinition, ServiceRecord) {
-        use bredr::ServiceClassProfileIdentifier::AvRemoteControl;
-        use bredr::ServiceClassProfileIdentifier::AvRemoteControlController;
+        use bredr::ServiceClassProfileIdentifier::{AvRemoteControl, AvRemoteControlController};
         let prof_descs = vec![bredr::ProfileDescriptor {
             profile_id: bredr::ServiceClassProfileIdentifier::AvRemoteControl,
             major_version: 1,

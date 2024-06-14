@@ -4,25 +4,19 @@
 
 #![cfg(test)]
 
-use {
-    super::*,
-    assert_matches::assert_matches,
-    fuchsia_async::{self as fasync, net::TcpListener},
-    fuchsia_hyper::new_https_client,
-    futures::{
-        future::{join, TryFutureExt},
-        stream::{StreamExt, TryStreamExt},
-    },
-    hyper::{
-        server::{accept::from_stream, Server},
-        service::{make_service_fn, service_fn},
-    },
-    std::{
-        convert::Infallible,
-        net::{Ipv4Addr, SocketAddr},
-        sync::Arc,
-    },
-};
+use super::*;
+use assert_matches::assert_matches;
+use fuchsia_async::net::TcpListener;
+use fuchsia_async::{self as fasync};
+use fuchsia_hyper::new_https_client;
+use futures::future::{join, TryFutureExt};
+use futures::stream::{StreamExt, TryStreamExt};
+use hyper::server::accept::from_stream;
+use hyper::server::Server;
+use hyper::service::{make_service_fn, service_fn};
+use std::convert::Infallible;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 fn spawn_server(buffer_size: usize) -> (String, EventSender) {
     let (connections, url) = {

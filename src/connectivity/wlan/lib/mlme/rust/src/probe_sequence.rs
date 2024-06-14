@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    rand::seq::SliceRandom,
-    wlan_common::tx_vector::{TxVecIdx, MAX_VALID_IDX, START_IDX},
-};
+use rand::seq::SliceRandom;
+use wlan_common::tx_vector::{TxVecIdx, MAX_VALID_IDX, START_IDX};
 
 const NUM_PROBE_SEQUENCE: usize = 8;
 const SEQUENCE_LENGTH: usize = 1 + (MAX_VALID_IDX - START_IDX) as usize;
@@ -74,7 +72,8 @@ impl ProbeSequence {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::collections::HashSet};
+    use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn random_new() {

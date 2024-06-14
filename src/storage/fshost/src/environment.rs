@@ -2,47 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        boot_args::BootArgs,
-        copier::recursive_copy,
-        crypt::{
-            fxfs::{self, CryptService},
-            get_policy,
-            zxcrypt::{UnsealOutcome, ZxcryptDevice},
-            Policy,
-        },
-        device::{
-            constants::{
-                BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, DATA_PARTITION_LABEL, DATA_TYPE_GUID,
-                DEFAULT_F2FS_MIN_BYTES, FVM_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL,
-                ZXCRYPT_DRIVER_PATH,
-            },
-            BlockDevice, Device,
-        },
-        inspect::register_migration_status,
-    },
-    anyhow::{anyhow, bail, Context, Error},
-    async_trait::async_trait,
-    device_watcher::{recursive_wait, recursive_wait_and_open},
-    fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_fxfs::MountOptions,
-    fidl_fuchsia_hardware_block_partition::Guid,
-    fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker},
-    fidl_fuchsia_io as fio,
-    fs_management::{
-        filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem, ServingVolume},
-        format::DiskFormat,
-        partition::fvm_allocate_partition,
-        Blobfs, ComponentType, F2fs, FSConfig, Fxfs, Minfs,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path},
-    fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    std::{collections::HashSet, sync::Arc},
-    uuid::Uuid,
+use crate::boot_args::BootArgs;
+use crate::copier::recursive_copy;
+use crate::crypt::fxfs::{self, CryptService};
+use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
+use crate::crypt::{get_policy, Policy};
+use crate::device::constants::{
+    BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, DATA_PARTITION_LABEL, DATA_TYPE_GUID,
+    DEFAULT_F2FS_MIN_BYTES, FVM_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, ZXCRYPT_DRIVER_PATH,
 };
+use crate::device::{BlockDevice, Device};
+use crate::inspect::register_migration_status;
+use anyhow::{anyhow, bail, Context, Error};
+use async_trait::async_trait;
+use device_watcher::{recursive_wait, recursive_wait_and_open};
+use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl_fuchsia_fxfs::MountOptions;
+use fidl_fuchsia_hardware_block_partition::Guid;
+use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
+use fs_management::filesystem::{
+    ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem, ServingVolume,
+};
+use fs_management::format::DiskFormat;
+use fs_management::partition::fvm_allocate_partition;
+use fs_management::{Blobfs, ComponentType, F2fs, FSConfig, Fxfs, Minfs};
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
+use futures::lock::Mutex;
+use std::collections::HashSet;
+use std::sync::Arc;
+use uuid::Uuid;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const INITIAL_SLICE_COUNT: u64 = 1;
 
@@ -1127,6 +1116,15 @@ impl FilesystemLauncher {
                 ..Default::default()
             },
         );
+        if self.config.check_filesystems {
+            tracing::info!("fsck started for fxblob");
+            if let Err(error) = fs.fsck().await {
+                self.report_corruption(DiskFormat::Fxfs, &error);
+                return Err(error);
+            } else {
+                tracing::info!("fsck completed OK for fxblob");
+            }
+        }
         fs.serve_multi_volume().await
     }
 

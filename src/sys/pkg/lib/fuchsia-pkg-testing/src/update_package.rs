@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {serde_json::json, sha2::Digest as _, std::collections::BTreeMap};
+use serde_json::json;
+use sha2::Digest as _;
+use std::collections::BTreeMap;
 
 /// A fake `update_package::UpdatePackage` backed by a temp dir.
 pub struct FakeUpdatePackage {

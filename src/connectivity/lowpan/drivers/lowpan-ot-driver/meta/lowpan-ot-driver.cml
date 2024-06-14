@@ -17,6 +17,7 @@
         {
             protocol: [
                 "fuchsia.factory.lowpan.FactoryRegister",
+                "fuchsia.feedback.CrashReporter",
                 "fuchsia.hwinfo.Product",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",
                 "fuchsia.lowpan.driver.Register",

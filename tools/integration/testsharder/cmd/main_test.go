@@ -672,6 +672,7 @@ func fuchsiaTestSpec(basename string) build.TestSpec {
 				},
 			},
 		},
+		ExpectsSSH: true,
 	}
 }
 

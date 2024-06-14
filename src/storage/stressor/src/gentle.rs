@@ -7,22 +7,14 @@
 //! Open file count is kept probabilistically low to avoid using too much disk.
 //! Panics if operations fail.
 
-use {
-    rand::{
-        distributions::{Distribution, WeightedIndex},
-        seq::SliceRandom,
-        Rng,
-    },
-    std::{
-        fs::File,
-        io::ErrorKind,
-        os::unix::fs::FileExt,
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc, Mutex, RwLock,
-        },
-    },
-};
+use rand::distributions::{Distribution, WeightedIndex};
+use rand::seq::SliceRandom;
+use rand::Rng;
+use std::fs::File;
+use std::io::ErrorKind;
+use std::os::unix::fs::FileExt;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
 #[derive(Default)]
 pub struct Stressor {

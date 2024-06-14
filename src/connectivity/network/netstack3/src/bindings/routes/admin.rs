@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{borrow::BorrowMut, collections::HashSet, pin::pin};
+use std::borrow::BorrowMut;
+use std::collections::HashSet;
+use std::pin::pin;
 
 use assert_matches::assert_matches;
 use async_utils::event::Event;
@@ -10,26 +12,27 @@ use fidl::endpoints::{
     ControlHandle as _, ProtocolMarker as _, RequestStream as _, Responder as _,
 };
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use fnet_routes_ext::{
-    admin::{FidlRouteAdminIpExt, Responder as _, RouteSetRequest, RouteTableRequest},
-    FidlRouteIpExt,
+use fnet_routes_ext::admin::{
+    FidlRouteAdminIpExt, Responder as _, RouteSetRequest, RouteTableRequest,
 };
+use fnet_routes_ext::FidlRouteIpExt;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased as _};
-use futures::{
-    channel::{mpsc, oneshot},
-    Future, FutureExt as _, StreamExt as _, TryStream, TryStreamExt as _,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::{Future, FutureExt as _, StreamExt as _, TryStream, TryStreamExt as _};
+use log::{debug, error, warn};
 use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv6};
-use netstack3_core::{device::DeviceId, routes::AddableEntry};
-
-use crate::bindings::{
-    devices::StaticCommonInfo,
-    routes::{self, witness::TableId},
-    util::{TaskWaitGroupSpawner, TryFromFidlWithContext},
-    BindingsCtx, Ctx, DeviceIdExt,
+use netstack3_core::device::DeviceId;
+use netstack3_core::routes::AddableEntry;
+use {
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
+
+use crate::bindings::devices::StaticCommonInfo;
+use crate::bindings::routes::witness::TableId;
+use crate::bindings::routes::{self};
+use crate::bindings::util::{TaskWaitGroupSpawner, TryFromFidlWithContext};
+use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt};
 
 use super::{RouteWorkItem, WeakDeviceId};
 
@@ -74,13 +77,13 @@ pub(crate) async fn serve_route_set<
                 Ok(Some(request)) => {
                     route_set.borrow_mut().handle_request(request).await.unwrap_or_else(|e| {
                         if !e.is_closed() {
-                            tracing::error!("error handling {debug_name} request: {e:?}");
+                            error!("error handling {debug_name} request: {e:?}");
                         }
                     });
                 },
                 Err(err) => {
                     if !err.is_closed() {
-                        tracing::error!("error handling {debug_name} request: {err:?}");
+                        error!("error handling {debug_name} request: {err:?}");
                     }
                     break;
                 }
@@ -179,7 +182,7 @@ pub(crate) async fn serve_route_table<
 ) {
     serve_route_table_inner(stream, spawner, route_table).await.unwrap_or_else(|err| {
         if !err.is_closed() {
-            tracing::error!("error while serving {}: {err:?}", I::RouteTableMarker::DEBUG_NAME);
+            error!("error while serving {}: {err:?}", I::RouteTableMarker::DEBUG_NAME);
         }
     });
 }
@@ -234,7 +237,7 @@ async fn serve_route_table_inner<
     }
 
     if route_table.borrow().detached() {
-        tracing::debug!(
+        debug!(
             "RouteTable protocol for {:?} is shutting down, but the table is detached",
             route_table.borrow().id()
         );
@@ -470,7 +473,7 @@ impl<I: FidlRouteAdminIpExt> UserRouteSet<I> {
                 },
                 Err(err) => match err {
                     routes::ChangeError::TableRemoved => {
-                        tracing::warn!("the table backing this route set has been removed");
+                        warn!("the table backing this route set has been removed");
                     }
                     routes::ChangeError::DeviceRemoved => {
                         unreachable!("closing a route set should not require upgrading a DeviceId")
@@ -575,7 +578,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<I::Addr>>;
 
     async fn handle_request(&mut self, request: RouteSetRequest<I>) -> Result<(), fidl::Error> {
-        tracing::debug!("RouteSet::handle_request {request:?}");
+        debug!("RouteSet::handle_request {request:?}");
 
         match request {
             RouteSetRequest::AddRoute { route, responder } => {
@@ -734,7 +737,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
 
         let core_id =
             self.ctx().bindings_ctx().devices.get_core_id(bindings_id).ok_or_else(|| {
-                tracing::warn!("authentication interface {bindings_id} does not exist");
+                warn!("authentication interface {bindings_id} does not exist");
                 fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
             })?;
 
@@ -751,7 +754,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
             .token
             .basic_info()
             .map_err(|e| {
-                tracing::error!("failed to get basic info for client-provided token: {}", e);
+                error!("failed to get basic info for client-provided token: {}", e);
                 fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
             })?
             .koid;

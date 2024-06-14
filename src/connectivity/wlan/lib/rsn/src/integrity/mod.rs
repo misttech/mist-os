@@ -7,14 +7,12 @@ pub mod cmac_aes128;
 pub mod hmac_md5;
 pub mod hmac_sha1;
 
-use {
-    crate::{
-        integrity::{cmac_aes128::CmacAes128, hmac_md5::HmacMd5, hmac_sha1::HmacSha1},
-        Error,
-    },
-    mundane::bytes,
-    wlan_common::ie::rsn::akm,
-};
+use crate::integrity::cmac_aes128::CmacAes128;
+use crate::integrity::hmac_md5::HmacMd5;
+use crate::integrity::hmac_sha1::HmacSha1;
+use crate::Error;
+use mundane::bytes;
+use wlan_common::ie::rsn::akm;
 
 pub trait Algorithm {
     // NOTE: The default implementation truncates the output if it is larger than the given

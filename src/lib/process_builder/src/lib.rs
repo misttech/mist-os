@@ -55,7 +55,8 @@
 //! [zx_job_set_policy]: https://fuchsia.dev/fuchsia-src/reference/syscalls/job_set_policy.md
 //! [fuchsia.process.Launcher]: https://fuchsia.googlesource.com/fuchsia/+/HEAD/zircon/system/fidl/fuchsia-process/launcher.fidl
 
-pub use self::{process_args::*, process_builder::*};
+pub use self::process_args::*;
+pub use self::process_builder::*;
 
 pub mod elf_load;
 pub mod elf_parse;

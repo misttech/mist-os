@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_fuzzctl::OutputSink,
-    std::cell::RefCell,
-    std::env,
-    std::fmt::Debug,
-    std::fmt::Display,
-    std::io::{stdout, Write},
-    std::rc::Rc,
-};
+use fuchsia_fuzzctl::OutputSink;
+use std::cell::RefCell;
+use std::env;
+use std::fmt::{Debug, Display};
+use std::io::{stdout, Write};
+use std::rc::Rc;
 
 /// `BufferSink` saves its output in a buffer and can verify it against expected output.
 #[derive(Debug)]

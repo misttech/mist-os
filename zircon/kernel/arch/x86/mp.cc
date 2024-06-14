@@ -360,19 +360,36 @@ void arch_mp_reschedule(cpu_mask_t mask) {
   }
 }
 
-void arch_idle_enter(zx_duration_t max_latency) {
+void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) {
+  // Preemption and Interrupts *must* be disabled at this point in time.  We are
+  // not allowed to re-enable preemption during this method.  We are only
+  // allowed to re-enable interrupts at the very last instant before dropping
+  // into the `HLT` or `MWAIT` instruction.  This operation (enabling ints and
+  // dropping into the wait instruction) must be effectively atomic.  If it is
+  // possible for an interrupt to fire and be completely serviced before we make
+  // it into the wake instruction, it means that we have a race which could
+  // cause us to miss our wakeup IRQ and get our CPU stuck in its low power
+  // state.
+  //
+  // It's critical that the monitor only indicates this CPU is idle when this
+  // thread cannot be preempted.  If we are preempted while "showing idle", the
+  // signaling CPU may see we're idle, elide the IPI and result in a lost
+  // reschedule event.  Prior to exiting the method (and re-enabling preemption)
+  // (i.e. we must set the monitor back to "not idle".
+  PreemptionState& preemption_state = Thread::Current::preemption_state();
+  DEBUG_ASSERT(preemption_state.PreemptIsEnabled() == false);
+  DEBUG_ASSERT(arch_ints_disabled() == true);
+
+  // Preemption will be disabled for the entire time in this method; we should
+  // be able to rely on this pointer and mask being valid for the duration of
+  // the method.
   struct x86_percpu* percpu = x86_get_percpu();
   const cpu_mask_t local_reschedule_mask = cpu_num_to_mask(arch_curr_cpu_num());
-  PreemptionState& preemption_state = Thread::Current::preemption_state();
 
   if (use_monitor) {
     bool rsb_maybe_empty = false;
 
-    // It's critical that the monitor only indidates this CPU is idle when this thread cannot be
-    // preempted.  If we are preempted while "showing idle", the signaling CPU may see we're idle,
-    // elide the IPI and result in a lost reschedule event.  Prior to re-enabling preemption (i.e.
-    // prior to destroying this RAII object), we must set the moniotor to "not idle".
-    AutoPreemptDisabler preempt_disabled;
+    // Indicate that this CPU is entering the idle state.
     percpu->monitor->Write(kTargetStateIdle);
 
     while (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
@@ -381,18 +398,20 @@ void arch_idle_enter(zx_duration_t max_latency) {
       ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE_ENABLE(
           LOCAL_KTRACE_ENABLE, "kernel:sched", "idle", ("mwait hint", next_state->MwaitHint()));
 
-      // 1) Disable interrupts 2) Arm the monitor 3) Check our monitor flag and whether or not we
-      // have pending interrupts 4) Re-enable interrupts as we drop into mwait.
+      // Interrupts are currently disabled.  Now:
+      // 1) Arm the monitor
+      // 2) Check our monitor flag and whether or not we have pending interrupts.
+      // 3) Re-enable interrupts as we drop into mwait.
+      // 4) Disabled interrupts once again immediately after we exit the mwait.
       //
-      // We perform the final check in step #3 to make sure that no one ended up writing to
-      // percpu->monitor just before we managed to arm the monitor in step #2.  We keep interrupts
+      // We perform the final check in step #2 to make sure that no one ended up writing to
+      // percpu->monitor just before we managed to arm the monitor in step #1.  We keep interrupts
       // disabled during this sequence in order to make sure that we don't take an interrupt between
-      // steps #3 and #4 and then fail to drop out of mwait as a result.  Interrupts will be
+      // steps #2 and #3 and then fail to drop out of mwait as a result.  Interrupts will be
       // re-enabled on the instruction immediately before the mwait instruction, placing it in the
       // interrupt shadow and guaranteeing that we enter the mwait before any interrupts can
       // actually fire.
       //
-      arch_disable_ints();
       percpu->monitor->PrepareForWait();
       if (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
         auto start = current_time();
@@ -401,13 +420,15 @@ void arch_idle_enter(zx_duration_t max_latency) {
         if (x86_cpu_vulnerable_to_rsb_cross_thread()) {
           x86_ras_fill();
         }
+
+        // Enable ints, mwait, then immediately disable them again.
         x86_enable_ints_and_mwait(next_state->MwaitHint());
+        arch_disable_ints();
+
         auto duration = zx_time_sub_time(current_time(), start);
         percpu->idle_states->RecordDuration(duration);
         next_state->RecordDuration(duration);
         next_state->CountEntry();
-      } else {
-        arch_enable_ints();
       }
     }
 
@@ -417,21 +438,12 @@ void arch_idle_enter(zx_duration_t max_latency) {
       x86_ras_fill();
     }
 
-    // At this point, we woke up either because another CPU poked us, or because we have a local
-    // preempt pending.  When we exit this block, our AutoPreemptDisabler will destruct and perform
-    // trigger a preempt operation, but only if we have a local preemption pending.  This may not be
-    // the case if we woke up from being poked instead of because of an interrupt causing a thread
-    // to be assigned to this core.
-    //
-    // So, simply unconditionally force there to be a local preempt pending and let the APD
-    // destructor take care of things for us.  We are about to re-enable preemption, it is critical
-    // that we update our state to Not-Idle to avoid the possibility of a lost reschedule event.
-    // See the related comment earlier in this function where the |AutoPreemptDisabler| is
-    // constructed.
+    // Make sure we have a local preempt pending before we exit the method and
+    // re-enable preemption.  Also, make sure we set our monitor state back to
+    // "not idle"
     preemption_state.preempts_pending_add(local_reschedule_mask);
     percpu->monitor->Write(kTargetStateNotIdle);
   } else {
-    AutoPreemptDisabler preempt_disabled;
     // Set the halt_interlock flag and spin for a little bit, in case a wakeup happens very shortly
     // before we decide to go to sleep. If the halt_interlock flag is changed, another CPU has woken
     // us, avoid the halt instruction.
@@ -459,16 +471,14 @@ void arch_idle_enter(zx_duration_t max_latency) {
         x86_ras_fill();
       }
       if (!preemption_state.preempts_pending()) {
+        // Enable ints, hlt, then immediately disable them again.
         x86_enable_ints_and_hlt();
-      } else {
-        // Re-enable interrupts if a reschedule IPI, timer tick, or other PreemptSetPending happened
-        // and we didn't call x86_idle.
-        arch_enable_ints();
+        arch_disable_ints();
       }
     }
 
-    // See the comment above in the monitor/mwait version of this loop.  Make sure we have a local
-    // preempt pending before we drop our auto-preempt disabler.
+    // Make sure we have a local preempt pending before we exit the method and
+    // re-enable preemption.
     preemption_state.preempts_pending_add(local_reschedule_mask);
   }
 }

@@ -226,7 +226,7 @@ func NewGCE(ctx context.Context, config GCEConfig, opts Options) (*GCE, error) {
 	logger.Infof(ctx, "successfully connected to serial")
 
 	// If we're running a non-bringup configuration, we need to provision an SSH key.
-	if !opts.Netboot {
+	if opts.ExpectsSSH {
 		if err := g.provisionSSHKey(ctx); err != nil {
 			return nil, err
 		}
@@ -475,6 +475,6 @@ func (g *GCE) SSHClient() (*sshutil.Client, error) {
 	return g.sshClient(&net.IPAddr{IP: addr}, "gce")
 }
 
-func (g *GCE) TestConfig(netboot bool) (any, error) {
-	return TargetInfo(g, netboot, nil)
+func (g *GCE) TestConfig(expectsSSH bool) (any, error) {
+	return TargetInfo(g, expectsSSH, nil)
 }

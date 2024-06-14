@@ -67,19 +67,15 @@ RBE_WRAPPER=( "$FUCHSIA_DIR"/build/rbe/fuchsia-reproxy-wrap.sh -- )
 # initialization.
 function fx-rbe-enabled {
   # This function is called during tests without a build directory.
-  # Return failure ot indicate that RBE is not enabled.
+  # Returns 1 to indicate that RBE is not enabled.
   fx-build-dir-if-present || return 1
-  if grep -q -w -e "enable_rbe" "${FUCHSIA_BUILD_DIR}/args.gn" ; then
-    fx-warn "The 'enable_rbe' GN arg has been renamed to 'rust_rbe_enable'."
-    fx-warn "Please update your ${FUCHSIA_BUILD_DIR}/args.gn file (fx args)."
+
+  # Check to see if the rbe settings indicate that the reproxy wrapper is
+  # needed.
+  needs_reproxy=($("${PREBUILT_JQ}" '-r' '.final.needs_reproxy' < "${FUCHSIA_BUILD_DIR}/rbe_settings.json"))
+  if [[ "$needs_reproxy" != "true" ]]; then
+    return 1
   fi
-  # If reclient-RBE is enabled for any language, then the whole build needs
-  # to be wrapped with ${RBE_WRAPPER[@]}.
-  grep -q -e "^[ \t]*rust_rbe_enable[ ]*=[ ]*true" \
-    -e "^[ \t]*cxx_rbe_enable[ ]*=[ ]*true" \
-    -e "^[ \t]*link_rbe_enable[ ]*=[ ]*true" \
-    -e "^[ \t]*enable_rbe[ ]*=[ ]*true" \
-    "${FUCHSIA_BUILD_DIR}/args.gn"
 }
 
 # At the moment, direct use of RBE uses gcloud to authenticate.

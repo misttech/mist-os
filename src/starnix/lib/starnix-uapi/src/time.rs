@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    errors::{error, Errno},
-    itimerspec, timespec, timeval,
-};
+use crate::errors::{error, Errno};
+use crate::{itimerspec, timespec, timeval};
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
 

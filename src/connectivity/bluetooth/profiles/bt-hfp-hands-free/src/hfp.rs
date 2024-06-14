@@ -5,18 +5,18 @@
 use anyhow::{format_err, Result};
 use async_helpers::maybe_stream::MaybeStream;
 use fidl::endpoints::{ControlHandle, RequestStream, Responder};
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::PeerId;
-use fuchsia_zircon as zx;
 use futures::stream::{FusedStream, FuturesUnordered};
 use futures::{select, FutureExt, StreamExt};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::collections::HashMap;
 use std::future::Future;
 use tracing::{debug, info, warn};
+use {
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp as fidl_hfp,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::peer::Peer;

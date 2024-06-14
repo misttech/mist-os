@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error, Result},
-    async_trait::async_trait,
-    chrono::{prelude::*, LocalResult},
-    fdio::service_connect,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_hardware_rtc as frtc,
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_zircon::{self as zx, DurationNum},
-    futures::TryFutureExt,
-    lazy_static::lazy_static,
-    std::{fs, path::PathBuf},
-    thiserror::Error,
-    tracing::{debug, error},
-};
+use anyhow::{anyhow, Error, Result};
+use async_trait::async_trait;
+use chrono::prelude::*;
+use chrono::LocalResult;
+use fdio::service_connect;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_hardware_rtc as frtc;
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_zircon::{self as zx, DurationNum};
+use futures::TryFutureExt;
+use lazy_static::lazy_static;
+use std::fs;
+use std::path::PathBuf;
+use thiserror::Error;
+use tracing::error;
 #[cfg(test)]
 use {fuchsia_sync::Mutex, std::sync::Arc};
 
@@ -54,40 +54,9 @@ pub trait Rtc: Send + Sync {
     async fn set(&self, value: zx::Time) -> Result<()>;
 }
 
-// A read-only implementation of RTC.
-pub struct RtcReadOnlyImpl {
-    proxy: frtc::DeviceProxy,
-}
-
-#[async_trait]
-impl Rtc for RtcReadOnlyImpl {
-    async fn get(&self) -> Result<zx::Time> {
-        self.proxy
-            .get()
-            .map_err(|err| anyhow!("FIDL error on Rtc::get: {}", err))
-            .on_timeout(zx::Time::after(FIDL_TIMEOUT), || Err(anyhow!("FIDL timeout on Rtc::get")))
-            .await?
-            .map_err(|err| anyhow!("Driver error on Rtc::get: {}", err))
-            .and_then(fidl_time_to_zx_time)
-    }
-
-    async fn set(&self, value: zx::Time) -> Result<()> {
-        debug!("read only RTC clock: not updating to {:?}", value);
-        Ok(())
-    }
-}
-
-impl From<RtcImpl> for RtcReadOnlyImpl {
-    // Converts a R/W RTC clock implementation into read only implementation.
-    fn from(value: RtcImpl) -> Self {
-        value.inner
-    }
-}
-
 /// An implementation of the `Rtc` trait that connects to an RTC device in /dev/class/rtc.
 pub struct RtcImpl {
-    // Inside every R/W clock is a R/O clock that is fighting to get out.
-    inner: RtcReadOnlyImpl,
+    proxy: frtc::DeviceProxy,
 }
 
 impl RtcImpl {
@@ -120,7 +89,7 @@ impl RtcImpl {
         service_connect(&path_str, server.into_channel()).map_err(|err| {
             RtcCreationError::ConnectionFailed(anyhow!("Failed to connect to device: {}", err))
         })?;
-        Ok(RtcImpl { inner: RtcReadOnlyImpl { proxy } })
+        Ok(RtcImpl { proxy })
     }
 }
 
@@ -155,7 +124,13 @@ fn zx_time_to_fidl_time(zx_time: zx::Time) -> frtc::Time {
 #[async_trait]
 impl Rtc for RtcImpl {
     async fn get(&self) -> Result<zx::Time> {
-        self.inner.get().await
+        self.proxy
+            .get()
+            .map_err(|err| anyhow!("FIDL error on Rtc::get: {}", err))
+            .on_timeout(zx::Time::after(FIDL_TIMEOUT), || Err(anyhow!("FIDL timeout on Rtc::get")))
+            .await?
+            .map_err(|err| anyhow!("Driver error on Rtc::get: {}", err))
+            .and_then(fidl_time_to_zx_time)
     }
 
     async fn set(&self, value: zx::Time) -> Result<()> {
@@ -173,7 +148,6 @@ impl Rtc for RtcImpl {
             zx_time_to_fidl_time(value + 1.second())
         };
         let status = self
-            .inner
             .proxy
             .set(&fidl_time)
             .map_err(|err| anyhow!("FIDL error on Rtc::set: {}", err))
@@ -229,13 +203,11 @@ impl Rtc for FakeRtc {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fuchsia_async as fasync,
-        futures::StreamExt,
-        test_util::{assert_gt, assert_lt},
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
+    use test_util::{assert_gt, assert_lt};
 
     const TEST_FIDL_TIME: frtc::Time =
         frtc::Time { year: 2020, month: 8, day: 14, hours: 0, minutes: 0, seconds: 0 };
@@ -248,7 +220,7 @@ mod test {
     const DIFFERENT_ZX_TIME: zx::Time = zx::Time::from_nanos(1_597_999_999_000_000_000);
 
     fn new_rw_rtc(proxy: frtc::DeviceProxy) -> RtcImpl {
-        RtcImpl { inner: RtcReadOnlyImpl { proxy } }
+        RtcImpl { proxy }
     }
 
     #[fuchsia::test]
@@ -314,25 +286,6 @@ mod test {
         // Setting an integer second should not require any delay and therefore should complete
         // very fast - well under a millisecond typically. We did observe ~54ms very rarely.
         assert_lt!(span, RTC_SETUP_TIME);
-    }
-
-    #[fuchsia::test]
-    async fn rtc_read_only_does_not_update() {
-        let (proxy, mut stream) = create_proxy_and_stream::<frtc::DeviceMarker>().unwrap();
-
-        let rtc_impl = RtcReadOnlyImpl { proxy };
-
-        // Configure responder to fail at all set requests.
-        let _responder = fasync::Task::spawn(async move {
-            if let Some(Ok(frtc::DeviceRequest::Set { responder, .. })) = stream.next().await {
-                let status = zx::Status::INVALID_ARGS;
-                responder.send(status.into_raw()).expect("Failed response");
-            }
-        });
-
-        // A read-only RTC does not fail even if we told it to, as it never really
-        // tries to set the RTC.
-        assert!(rtc_impl.set(TEST_ZX_TIME).await.is_ok());
     }
 
     #[fuchsia::test]

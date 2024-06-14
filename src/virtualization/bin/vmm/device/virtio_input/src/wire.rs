@@ -5,10 +5,8 @@
 // Keep all consts and type defs for completeness.
 #![allow(dead_code)]
 
-use {
-    lazy_static::lazy_static,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
-};
+use lazy_static::lazy_static;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 pub use zerocopy::byteorder::little_endian::{U16 as LE16, U32 as LE32};
 

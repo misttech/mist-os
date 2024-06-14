@@ -6,20 +6,19 @@
 
 use core::num::NonZeroU16;
 
-use net_types::{
-    ip::{Ipv4, Ipv6, Ipv6Addr},
-    MulticastAddr, UnicastAddr, Witness as _,
-};
+use log::debug;
+use net_types::ip::{Ipv4, Ipv6, Ipv6Addr};
+use net_types::{MulticastAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, DeviceIdContext, EventContext, HandleableTimer,
     StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
-use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
-use tracing::debug;
+use packet_formats::icmp::ndp::NeighborSolicitation;
+use packet_formats::utils::NonZeroDuration;
 
+use crate::internal::device::state::Ipv6DadState;
 use crate::internal::device::{
-    state::Ipv6DadState, IpAddressId as _, IpAddressState, IpDeviceAddressIdContext, IpDeviceIpExt,
-    WeakIpAddressId,
+    IpAddressId as _, IpAddressState, IpDeviceAddressIdContext, IpDeviceIpExt, WeakIpAddressId,
 };
 
 /// A timer ID for duplicate address detection.
@@ -419,39 +418,26 @@ mod tests {
     use core::time::Duration;
 
     use assert_matches::assert_matches;
-    use net_types::{
-        ip::{AddrSubnet, IpAddress as _},
-        Witness as _,
+    use net_types::ip::{AddrSubnet, IpAddress as _};
+    use net_types::Witness as _;
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
     };
-    use netstack3_base::{
-        testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
-        },
-        CtxPair, InstantContext as _, SendFrameContext as _, TimerHandler,
-    };
+    use netstack3_base::{CtxPair, InstantContext as _, SendFrameContext as _, TimerHandler};
     use packet::EmptyBuf;
     use packet_formats::icmp::ndp::Options;
 
     use super::*;
-    use crate::internal::{
-        base::testutil::FakeIpDeviceIdCtx,
-        device::{testutil::FakeWeakAddressId, Ipv6DeviceAddr},
-    };
+    use crate::internal::device::testutil::FakeWeakAddressId;
+    use crate::internal::device::Ipv6DeviceAddr;
 
     struct FakeDadAddressContext {
         addr: UnicastAddr<Ipv6Addr>,
         assigned: bool,
         groups: HashMap<MulticastAddr<Ipv6Addr>, usize>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
     type FakeAddressCtxImpl = FakeCoreCtx<FakeDadAddressContext, (), FakeDeviceId>;
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeDadAddressContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
-    }
 
     impl IpDeviceAddressIdContext<Ipv6> for FakeAddressCtxImpl {
         type AddressId = AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>;
@@ -511,12 +497,6 @@ mod tests {
     struct DadMessageMeta {
         dst_ip: MulticastAddr<Ipv6Addr>,
         message: NeighborSolicitation,
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeDadContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.address_ctx.state.ip_device_id_ctx
-        }
     }
 
     type TestDadTimerId = DadTimerId<
@@ -608,7 +588,6 @@ mod tests {
                     addr: DAD_ADDRESS,
                     assigned: false,
                     groups: HashMap::default(),
-                    ip_device_id_ctx: Default::default(),
                 }),
             }));
         TimerHandler::handle_timer(&mut core_ctx, &mut bindings_ctx, dad_timer_id());
@@ -629,7 +608,6 @@ mod tests {
                         addr: DAD_ADDRESS,
                         assigned: false,
                         groups: HashMap::default(),
-                        ip_device_id_ctx: Default::default(),
                     }),
                 })
             });
@@ -707,7 +685,6 @@ mod tests {
                     addr: DAD_ADDRESS,
                     assigned: false,
                     groups: HashMap::default(),
-                    ip_device_id_ctx: Default::default(),
                 }),
             })
         });
@@ -759,7 +736,6 @@ mod tests {
                         addr: DAD_ADDRESS,
                         assigned: false,
                         groups: HashMap::default(),
-                        ip_device_id_ctx: Default::default(),
                     }),
                 })
             });

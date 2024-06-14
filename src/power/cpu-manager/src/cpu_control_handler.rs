@@ -10,17 +10,17 @@ use crate::types::{Farads, Hertz, OperatingPoint, ThermalLoad, Volts, Watts};
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
-use fidl_fuchsia_hardware_cpu_ctrl as fcpuctrl;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_thermal as fthermal;
 use fuchsia_inspect::{self as inspect, Property};
 use serde_derive::Deserialize;
-use serde_json as json;
 use std::cell::{Ref, RefCell};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+use {
+    fidl_fuchsia_hardware_cpu_ctrl as fcpuctrl, fidl_fuchsia_io as fio,
+    fidl_fuchsia_thermal as fthermal, serde_json as json,
+};
 
 /// Node: CpuControlHandler
 ///
@@ -725,10 +725,9 @@ pub mod tests {
     use crate::{msg_eq, msg_ok_return};
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use futures::TryStreamExt;
     use std::collections::HashSet;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     // Returns a proxy to a fake CpuCtrl driver pre-baked to return a single (fake) CPU opp.
     fn fake_cpu_ctrl_driver() -> fcpuctrl::DeviceProxy {

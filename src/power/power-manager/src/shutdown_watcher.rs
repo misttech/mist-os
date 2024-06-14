@@ -10,19 +10,19 @@ use crate::types::Seconds;
 use anyhow::Error;
 use async_trait::async_trait;
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_hardware_power_statecontrol as fpower;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, NumericProperty as _};
-use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use futures::prelude::*;
 use futures::TryStreamExt;
-use serde_json as json;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use tracing::*;
+use {
+    fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_zircon as zx, serde_json as json,
+};
 
 /// Node: ShutdownWatcher
 ///

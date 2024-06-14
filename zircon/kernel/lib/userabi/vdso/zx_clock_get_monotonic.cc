@@ -4,6 +4,7 @@
 
 #include <lib/fasttime/internal/time.h>
 
+#include "data-time-values.h"
 #include "private.h"
 
 // By default, when we get clock monotonic, simply transform the tick counter

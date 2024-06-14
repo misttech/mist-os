@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    app::{strategies::framebuffer::DisplayId, MessageInternal},
-    geometry::{IntPoint, Size},
-    input::{self, UserInputMessage},
-    message::Message,
-    render::Context,
-    scene::{facets::FacetId, scene::Scene},
-    view::strategies::base::ViewStrategyPtr,
-    IdFromRaw, MessageTarget,
-};
+use crate::app::strategies::framebuffer::DisplayId;
+use crate::app::MessageInternal;
+use crate::geometry::{IntPoint, Size};
+use crate::input::{self, UserInputMessage};
+use crate::message::Message;
+use crate::render::Context;
+use crate::scene::facets::FacetId;
+use crate::scene::scene::Scene;
+use crate::view::strategies::base::ViewStrategyPtr;
+use crate::{IdFromRaw, MessageTarget};
 use anyhow::{ensure, Error};
 use euclid::size2;
 use fuchsia_framebuffer::ImageId;

@@ -7,14 +7,12 @@
 //! `time_test_client` is a simple component that logs diagnostic information about the time it
 //! receives from the system to aid in debugging and (potentially in the future) automated testing.
 
-use {
-    anyhow::Error,
-    chrono::{DateTime, TimeZone as _, Timelike as _, Utc},
-    fuchsia_async as fasync, fuchsia_runtime as runtime, fuchsia_zircon as zx,
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    tracing::{info, warn},
-};
+use anyhow::Error;
+use chrono::{DateTime, TimeZone as _, Timelike as _, Utc};
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use tracing::{info, warn};
+use {fuchsia_async as fasync, fuchsia_runtime as runtime, fuchsia_zircon as zx};
 
 /// Delay between polls of system and userspace clocks.
 const POLL_DELAY: zx::Duration = zx::Duration::from_seconds(2);

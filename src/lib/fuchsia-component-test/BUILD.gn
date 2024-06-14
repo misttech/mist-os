@@ -77,7 +77,6 @@ rustc_library("fuchsia-component-test-lib") {
     "src/error.rs",
     "src/lib.rs",
     "src/local_component_runner.rs",
-    "src/mock.rs",
   ]
 
   test_deps = [

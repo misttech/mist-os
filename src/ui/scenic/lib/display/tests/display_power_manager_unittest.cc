@@ -9,12 +9,15 @@
 #include <fuchsia/ui/display/internal/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
+#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/reader.h>
 
 #include <thread>
 #include <unordered_set>
 
 #include <gtest/gtest.h>
 
+#include "lib/inspect/cpp/hierarchy.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/scenic/lib/display/display_manager.h"
 #include "src/ui/scenic/lib/display/tests/mock_display_coordinator.h"
@@ -39,14 +42,24 @@ class DisplayPowerManagerMockTest : public gtest::RealLoopFixture {
  public:
   DisplayPowerManagerMockTest() {
     display_manager_ = std::make_unique<display::DisplayManager>([] {});
-    display_power_manager_ = std::make_unique<display::DisplayPowerManager>(*display_manager_);
+    display_power_manager_ =
+        std::make_unique<display::DisplayPowerManager>(*display_manager_, inspector_.GetRoot());
   }
 
   display::DisplayManager* display_manager() { return display_manager_.get(); }
   display::DisplayPowerManager* display_power_manager() { return display_power_manager_.get(); }
   display::Display* display() { return display_manager()->default_display(); }
+  bool GetDisplayPowerInspectValue() {
+    auto result = inspect::ReadFromVmo(inspector_.DuplicateVmo());
+    EXPECT_TRUE(result.is_ok());
+    auto hierarchy = result.take_value();
+    EXPECT_EQ("DisplayPower", hierarchy.children()[0].name());
+    EXPECT_EQ("display_power_is_on", hierarchy.children()[0].node().properties()[0].name());
+    return hierarchy.children()[0].node().properties()[0].Get<inspect::BoolPropertyValue>().value();
+  }
 
  private:
+  inspect::Inspector inspector_;
   std::unique_ptr<display::DisplayManager> display_manager_;
   std::unique_ptr<display::DisplayPowerManager> display_power_manager_;
 };
@@ -69,6 +82,7 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
   mock_display_coordinator.set_set_display_power_result(ZX_OK);
 
   RunLoopUntilIdle();
+  EXPECT_TRUE(GetDisplayPowerInspectValue());
 
   {
     bool callback_executed = false;
@@ -83,6 +97,7 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
     });
 
     RunLoopUntil([&callback_executed] { return callback_executed; });
+    EXPECT_FALSE(GetDisplayPowerInspectValue());
     set_display_power_thread.join();
     EXPECT_FALSE(mock_display_coordinator.display_power_on());
   }
@@ -100,6 +115,7 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
     });
 
     RunLoopUntil([&callback_executed] { return callback_executed; });
+    EXPECT_TRUE(GetDisplayPowerInspectValue());
     set_display_power_thread.join();
     EXPECT_TRUE(mock_display_coordinator.display_power_on());
   }

@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_bluetooth_avrcp::{PeerManagerMarker, PeerManagerProxy},
-    fidl_fuchsia_bluetooth_avrcp_test::{PeerManagerExtMarker, PeerManagerExtProxy},
-    fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequest},
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
-    futures::{channel::mpsc, SinkExt, StreamExt},
-    realmbuilder_mock_helpers::mock_component,
-    tracing::info,
+use anyhow::Error;
+use fidl_fuchsia_bluetooth_avrcp::{PeerManagerMarker, PeerManagerProxy};
+use fidl_fuchsia_bluetooth_avrcp_test::{PeerManagerExtMarker, PeerManagerExtProxy};
+use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequest};
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
+use realmbuilder_mock_helpers::mock_component;
+use tracing::info;
 
 /// AVRCP component URL.
 const AVRCP_URL: &str = "fuchsia-pkg://fuchsia.com/bt-avrcp-smoke-test#meta/bt-avrcp.cm";

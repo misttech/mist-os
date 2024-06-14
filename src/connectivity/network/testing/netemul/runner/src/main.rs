@@ -5,22 +5,18 @@
 use anyhow::{anyhow, Context as _};
 use async_utils::stream::FlattenUnorderedExt as _;
 use component_events::events::{self};
-use fidl::endpoints::Proxy as _;
-use fidl::endpoints::{ControlHandle as _, RequestStream as _};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_data as fdata;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_netemul as fnetemul;
-use fidl_fuchsia_sys2 as fsys2;
-use fidl_fuchsia_test as ftest;
+use fidl::endpoints::{ControlHandle as _, Proxy as _, RequestStream as _};
 use fuchsia_component::client::{
     connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_root,
 };
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
-use fuchsia_zircon as zx;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use tracing::{error, info, warn};
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_netemul as fnetemul,
+    fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_test as ftest, fuchsia_zircon as zx,
+};
 
 mod config;
 

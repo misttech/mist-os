@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fidl_test_components as ftest,
     fuchsia_async as fasync,
-    fuchsia_component::{client, server::ServiceFs},
-    futures::{StreamExt, TryStreamExt},
-    tracing::*,
 };
 
 #[fuchsia::main]

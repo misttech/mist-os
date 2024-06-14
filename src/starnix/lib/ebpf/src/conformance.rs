@@ -14,9 +14,11 @@ pub mod test {
         BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
     };
     use linux_uapi::bpf_insn;
-    use pest::{iterators::Pair, Parser};
+    use pest::iterators::Pair;
+    use pest::Parser;
     use pest_derive::Parser;
-    use std::{str::FromStr, sync::Arc};
+    use std::str::FromStr;
+    use std::sync::Arc;
     use test_case::test_case;
     use zerocopy::{FromBytes, IntoBytes};
 

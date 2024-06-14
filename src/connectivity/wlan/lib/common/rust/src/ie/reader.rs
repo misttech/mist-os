@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{Header, Id, IeType},
-    crate::buffer_reader::BufferReader,
-    std::{mem::size_of, ops::Range},
-    zerocopy::ByteSlice,
-};
+use super::{Header, Id, IeType};
+use crate::buffer_reader::BufferReader;
+use std::mem::size_of;
+use std::ops::Range;
+use zerocopy::ByteSlice;
 
 // TODO(https://fxbug.dev/42164332): Should probably remove Reader in favor of
 // IeSummaryIter everywhere.

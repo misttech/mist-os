@@ -252,8 +252,10 @@ mod tests {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
-    use futures::{channel::mpsc, StreamExt};
-    use std::{cell::RefCell, rc::Rc};
+    use futures::channel::mpsc;
+    use futures::StreamExt;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     fn run_required_level_server(
         mut required_power_levels: Vec<fbroker::PowerLevel>,

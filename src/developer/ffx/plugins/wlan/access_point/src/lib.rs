@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    async_trait::async_trait,
-    ffx_wlan_ap_args as arg_types,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_wlan_policy as wlan_policy,
-};
+use anyhow::Error;
+use async_trait::async_trait;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use {ffx_wlan_ap_args as arg_types, fidl_fuchsia_wlan_policy as wlan_policy};
 
 #[derive(FfxTool)]
 pub struct AccessPointTool {

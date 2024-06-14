@@ -61,8 +61,31 @@ zx::result<> profiler::KernelSamplerSession::AttachThread(const zx::thread& thre
 }
 
 zx::result<> profiler::KernelSampler::Start(size_t buffer_size_mb) {
+  // Verify we support the requested samples
+  // We currently only support 1 samplespec, and that's backtraces via frame pointers
+  if (sample_specs_.size() != 1) {
+    FX_LOGS(ERROR) << "Kernel sampling currently only supports one sampling approach at a time. ("
+                   << sample_specs_.size() << " approaches specified)";
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  if (sample_specs_[0].timebase() != fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
+                                         fuchsia_cpu_profiler::CounterId::kNanoseconds)) {
+    FX_LOGS(ERROR) << "Sampling currently only supports timer based sampling";
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  if (!sample_specs_[0].sample()->callgraph() ||
+      !sample_specs_[0].sample()->callgraph()->strategy() ||
+      sample_specs_[0].sample()->callgraph()->strategy() !=
+          fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer) {
+    FX_LOGS(ERROR) << "Sampling currently only supports framepointer based sampling";
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
   buffer_size_bytes_ = (1 << 20) * buffer_size_mb;
-  zx_sampler_config_t config{.period = zx::msec(10).get(), .buffer_size = buffer_size_bytes_};
+  zx_sampler_config_t config{
+      .period =
+          zx::nsec(static_cast<int64_t>(sample_specs_[0].period().value_or(10'000'000))).get(),
+      .buffer_size = buffer_size_bytes_};
   zx::result session_result = KernelSamplerSession::CreateAndInit(config);
   if (session_result.is_error()) {
     return session_result.take_error();

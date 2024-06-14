@@ -4,65 +4,61 @@
 
 //! Implementations of device layer traits for [`CoreCtx`].
 
-use core::{fmt::Debug, num::NonZeroU8, ops::Deref as _};
+use core::fmt::Debug;
+use core::num::NonZeroU8;
+use core::ops::Deref as _;
 
-use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor},
-    relation::LockBefore,
-    wrap::prelude::*,
+use lock_order::lock::{
+    DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor,
 };
-use net_types::{
-    ethernet::Mac,
-    ip::{
-        AddrSubnet, Ip, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr, Mtu,
-    },
-    map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _,
+use lock_order::relation::LockBefore;
+use net_types::ethernet::Mac;
+use net_types::ip::{
+    AddrSubnet, Ip, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
+    Ipv6Addr, Mtu,
 };
-use netstack3_base::{AnyDevice, DeviceIdContext, RecvIpFrameMeta};
+use net_types::{map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _};
+use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
+use netstack3_base::{
+    AnyDevice, CounterContext, DeviceIdContext, ExistsError, NotFoundError, ReceivableFrameMeta,
+    RecvIpFrameMeta, ReferenceNotifiersExt, RemoveResourceResultWithContext,
+    ResourceCounterContext,
+};
+use netstack3_device::ethernet::{
+    self, EthernetDeviceCounters, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
+    EthernetLinkDevice, EthernetPrimaryDeviceId, EthernetWeakDeviceId,
+};
+use netstack3_device::loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId};
+use netstack3_device::pure_ip::{self, PureIpDeviceCounters, PureIpDeviceId};
+use netstack3_device::queue::TransmitQueueHandler;
+use netstack3_device::{
+    for_any_device_id, socket, ArpCounters, BaseDeviceId, DeviceCollectionContext,
+    DeviceConfigurationContext, DeviceCounters, DeviceId, DeviceLayerState, DeviceStateSpec,
+    Devices, DevicesIter, IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr,
+    OriginTracker, OriginTrackerContext, WeakDeviceId,
+};
+use netstack3_filter::{IpPacket, ProofOfEgressCheck};
+use netstack3_ip::device::{
+    AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
+    IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
+    IpDeviceSendContext, IpDeviceStateContext, Ipv4AddressEntry, Ipv4AddressState,
+    Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr,
+    Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+    Ipv6NetworkLearnedParameters,
+};
+use netstack3_ip::nud::{
+    ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
+};
+use netstack3_ip::{
+    self as ip, IpForwardingDeviceContext, IpPacketDestination, IpTypesIpExt, RawMetric,
+};
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
-use crate::{
-    context::{
-        CoreCtxAndResource, CounterContext, Locked, ReceivableFrameMeta,
-        ReferenceNotifiersExt as _, ResourceCounterContext,
-    },
-    device::{
-        ethernet::{
-            self, EthernetDeviceCounters, EthernetDeviceId,
-            EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice, EthernetPrimaryDeviceId,
-            EthernetWeakDeviceId,
-        },
-        for_any_device_id,
-        loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
-        pure_ip::{self, PureIpDeviceCounters, PureIpDeviceId},
-        queue::TransmitQueueHandler,
-        socket, ArpCounters, BaseDeviceId, DeviceCollectionContext, DeviceConfigurationContext,
-        DeviceCounters, DeviceId, DeviceLayerState, DeviceStateSpec, Devices, DevicesIter,
-        IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr, OriginTracker,
-        OriginTrackerContext, WeakDeviceId,
-    },
-    error::{ExistsError, NotFoundError},
-    filter::{IpPacket, ProofOfEgressCheck},
-    ip::{
-        device::{
-            AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
-            IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
-            IpDeviceSendContext, IpDeviceStateContext, Ipv4AddressEntry, Ipv4AddressState,
-            Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState, Ipv6DadState,
-            Ipv6DeviceAddr, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationContext,
-            Ipv6DeviceContext, Ipv6NetworkLearnedParameters,
-        },
-        integration::CoreCtxWithIpDeviceConfiguration,
-        nud::{
-            ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
-        },
-        IpForwardingDeviceContext, IpTypesIpExt, RawMetric,
-    },
-    sync::{PrimaryRc, RemoveResourceResultWithContext, StrongRc, WeakRc},
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::{CoreCtxAndResource, Locked, WrapLockLevel};
+use crate::ip::integration::CoreCtxWithIpDeviceConfiguration;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 impl<BC: BindingsTypes> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
     for StackState<BC>
@@ -176,10 +172,10 @@ where
         let device = device.into();
         match I::VERSION {
             IpVersion::V4 => {
-                crate::ip::receive_ipv4_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
+                ip::receive_ipv4_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
             }
             IpVersion::V6 => {
-                crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
+                ip::receive_ipv6_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
             }
         }
     }
@@ -193,16 +189,15 @@ impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::F
         &mut self,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
-        local_addr: SpecifiedAddr<<I as Ip>::Addr>,
+        destination: IpPacketDestination<I, &DeviceId<BC>>,
         body: S,
-        broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), S>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
     {
-        send_ip_frame(self, bindings_ctx, device, local_addr, body, broadcast)
+        send_ip_frame(self, bindings_ctx, device, destination, body)
     }
 }
 
@@ -218,9 +213,8 @@ impl<
         &mut self,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
-        local_addr: SpecifiedAddr<<I as Ip>::Addr>,
+        destination: IpPacketDestination<I, &DeviceId<BC>>,
         body: S,
-        broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), S>
     where
@@ -228,7 +222,7 @@ impl<
         S::Buffer: BufferMut,
     {
         let Self { config: _, core_ctx } = self;
-        send_ip_frame(core_ctx, bindings_ctx, device, local_addr, body, broadcast)
+        send_ip_frame(core_ctx, bindings_ctx, device, destination, body)
     }
 }
 
@@ -239,17 +233,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     type WithIpDeviceConfigurationInnerCtx<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s Ipv4DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>,
         BC,
     >;
     type WithIpDeviceConfigurationMutInner<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s mut Ipv4DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv4>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>,
         BC,
     >;
     type DeviceAddressAndGroupsAccessor<'s> =
-        CoreCtx<'s, BC, crate::lock_ordering::DeviceLayerState>;
+        CoreCtx<'s, BC, WrapLockLevel<crate::lock_ordering::DeviceLayerState>>;
 
     fn with_ip_device_configuration<
         O,
@@ -259,19 +253,15 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_core_ctx(self, device_id, |mut core_ctx_and_resource| {
-            let (state, mut locked) = core_ctx_and_resource
-                .read_lock_with_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>, _>(
-                |c| c.right(),
-            );
-            cb(
-                &state,
-                CoreCtxWithIpDeviceConfiguration {
-                    config: &state,
-                    core_ctx: locked.cast_core_ctx(),
-                },
-            )
-        })
+        let mut core_ctx_and_resource = ip_device_state_and_core_ctx(self, device_id);
+        let (state, mut locked) = core_ctx_and_resource
+            .read_lock_with_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>, _>(|c| {
+                c.right()
+            });
+        cb(
+            &state,
+            CoreCtxWithIpDeviceConfiguration { config: &state, core_ctx: locked.cast_core_ctx() },
+        )
     }
 
     fn with_ip_device_configuration_mut<
@@ -282,15 +272,14 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_core_ctx(self, device_id, |mut core_ctx_and_resource| {
-            let (mut state, mut locked) = core_ctx_and_resource
-                .write_lock_with_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>, _>(
-                |c| c.right(),
-            );
-            cb(CoreCtxWithIpDeviceConfiguration {
-                config: &mut state,
-                core_ctx: locked.cast_core_ctx(),
-            })
+        let mut core_ctx_and_resource = ip_device_state_and_core_ctx(self, device_id);
+        let (mut state, mut locked) = core_ctx_and_resource
+            .write_lock_with_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>, _>(
+            |c| c.right(),
+        );
+        cb(CoreCtxWithIpDeviceConfiguration {
+            config: &mut state,
+            core_ctx: locked.cast_core_ctx(),
         })
     }
 
@@ -353,16 +342,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv4DeviceAddressS
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv4>>>
     IpDeviceStateContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
-    type IpDeviceAddressCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IpDeviceAddresses<Ipv4>>;
+    type IpDeviceAddressCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpDeviceAddresses<Ipv4>>>;
 
     fn with_ip_device_flags<O, F: FnOnce(&IpDeviceFlags) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device_id, |mut state| {
-            cb(&*state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>())
-        })
+        let mut state = ip_device_state(self, device_id);
+        let flags = &*state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv4>>();
+        cb(flags)
     }
 
     fn add_ip_address(
@@ -371,11 +361,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         addr: AddrSubnet<Ipv4Addr>,
         config: <Ipv4 as IpDeviceIpExt>::AddressConfig<BC::Instant>,
     ) -> Result<Self::AddressId, ExistsError> {
-        with_ip_device_state(self, device_id, |mut state| {
-            state
-                .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
-                .add(Ipv4AddressEntry::new(addr, config))
-        })
+        let mut state = ip_device_state(self, device_id);
+        let addr_id = state
+            .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
+            .add(Ipv4AddressEntry::new(addr, config));
+        addr_id
     }
 
     fn remove_ip_address(
@@ -383,10 +373,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
     ) -> RemoveResourceResultWithContext<AddrSubnet<Ipv4Addr>, BC> {
-        let primary = with_ip_device_state(self, device_id, |mut state| {
-            state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>().remove(&addr.addr())
-        })
-        .expect("should exist when address ID exists");
+        let mut state = ip_device_state(self, device_id);
+        let primary = state
+            .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
+            .remove(&addr.addr())
+            .expect("should exist when address ID exists");
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
@@ -398,14 +389,14 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         addr: SpecifiedAddr<Ipv4Addr>,
     ) -> Result<Self::AddressId, NotFoundError> {
-        with_ip_device_state(self, device_id, |mut state| {
-            state
-                .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
-                .iter()
-                .find(|a| a.addr() == addr)
-                .map(PrimaryRc::clone_strong)
-                .ok_or(NotFoundError)
-        })
+        let mut state = ip_device_state(self, device_id);
+        let addr_id = state
+            .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>()
+            .iter()
+            .find(|a| a.addr() == addr)
+            .map(PrimaryRc::clone_strong)
+            .ok_or(NotFoundError);
+        addr_id
     }
 
     type AddressIdsIter<'a> = AddressIdIter<'a, Ipv4, BC>;
@@ -417,13 +408,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_core_ctx(self, device_id, |mut core_ctx_and_resource| {
-            let (state, mut locked) = core_ctx_and_resource
-                .read_lock_with_and::<crate::lock_ordering::IpDeviceAddresses<Ipv4>, _>(|c| {
-                    c.right()
-                });
-            cb(state.strong_iter(), &mut locked.cast_core_ctx())
-        })
+        let mut core_ctx_and_resource = ip_device_state_and_core_ctx(self, device_id);
+        let (state, mut locked) = core_ctx_and_resource
+            .read_lock_with_and::<crate::lock_ordering::IpDeviceAddresses<Ipv4>, _>(|c| c.right());
+        cb(state.strong_iter(), &mut locked.cast_core_ctx())
     }
 
     fn with_default_hop_limit<O, F: FnOnce(&NonZeroU8) -> O>(
@@ -431,11 +419,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device_id, |mut state| {
-            let mut state =
-                state.read_lock::<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>();
-            cb(&mut state)
-        })
+        let mut state = ip_device_state(self, device_id);
+        let mut state = state.read_lock::<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>();
+        cb(&mut state)
     }
 
     fn with_default_hop_limit_mut<O, F: FnOnce(&mut NonZeroU8) -> O>(
@@ -443,11 +429,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device_id, |mut state| {
-            let mut state =
-                state.write_lock::<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>();
-            cb(&mut state)
-        })
+        let mut state = ip_device_state(self, device_id);
+        let mut state = state.write_lock::<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>();
+        cb(&mut state)
     }
 
     fn join_link_multicast_group(
@@ -475,13 +459,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     type Ipv6DeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >;
     type WithIpv6DeviceConfigurationMutInner<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s mut Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >;
 
@@ -517,17 +501,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     type WithIpDeviceConfigurationInnerCtx<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >;
     type WithIpDeviceConfigurationMutInner<'s> = CoreCtxWithIpDeviceConfiguration<
         's,
         &'s mut Ipv6DeviceConfiguration,
-        crate::lock_ordering::IpDeviceConfiguration<Ipv6>,
+        WrapLockLevel<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>,
         BC,
     >;
     type DeviceAddressAndGroupsAccessor<'s> =
-        CoreCtx<'s, BC, crate::lock_ordering::DeviceLayerState>;
+        CoreCtx<'s, BC, WrapLockLevel<crate::lock_ordering::DeviceLayerState>>;
 
     fn with_ip_device_configuration<
         O,
@@ -537,19 +521,15 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_core_ctx(self, device_id, |mut core_ctx_and_resource| {
-            let (state, mut locked) = core_ctx_and_resource
-                .read_lock_with_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>, _>(
-                |c| c.right(),
-            );
-            cb(
-                &state,
-                CoreCtxWithIpDeviceConfiguration {
-                    config: &state,
-                    core_ctx: locked.cast_core_ctx(),
-                },
-            )
-        })
+        let mut core_ctx_and_resource = ip_device_state_and_core_ctx(self, device_id);
+        let (state, mut locked) = core_ctx_and_resource
+            .read_lock_with_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>, _>(|c| {
+                c.right()
+            });
+        cb(
+            &state,
+            CoreCtxWithIpDeviceConfiguration { config: &state, core_ctx: locked.cast_core_ctx() },
+        )
     }
 
     fn with_ip_device_configuration_mut<
@@ -560,15 +540,14 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_core_ctx(self, device_id, |mut core_ctx_and_resource| {
-            let (mut state, mut locked) = core_ctx_and_resource
-                .write_lock_with_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>, _>(
-                |c| c.right(),
-            );
-            cb(CoreCtxWithIpDeviceConfiguration {
-                config: &mut state,
-                core_ctx: locked.cast_core_ctx(),
-            })
+        let mut core_ctx_and_resource = ip_device_state_and_core_ctx(self, device_id);
+        let (mut state, mut locked) = core_ctx_and_resource
+            .write_lock_with_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>, _>(
+            |c| c.right(),
+        );
+        cb(CoreCtxWithIpDeviceConfiguration {
+            config: &mut state,
+            core_ctx: locked.cast_core_ctx(),
         })
     }
 
@@ -629,16 +608,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceAddressS
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>
     IpDeviceStateContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
-    type IpDeviceAddressCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IpDeviceAddresses<Ipv6>>;
+    type IpDeviceAddressCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpDeviceAddresses<Ipv6>>>;
 
     fn with_ip_device_flags<O, F: FnOnce(&IpDeviceFlags) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device_id, |mut state| {
-            cb(&*state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>())
-        })
+        let mut state = ip_device_state(self, device_id);
+        let flags = &*state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>();
+        cb(flags)
     }
 
     fn add_ip_address(
@@ -647,11 +627,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         addr: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         config: <Ipv6 as IpDeviceIpExt>::AddressConfig<BC::Instant>,
     ) -> Result<Self::AddressId, ExistsError> {
-        with_ip_device_state(self, device_id, |mut state| {
-            state
-                .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
-                .add(Ipv6AddressEntry::new(addr, Ipv6DadState::Uninitialized, config))
-        })
+        let mut state = ip_device_state(self, device_id);
+        let addr_id = state
+            .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
+            .add(Ipv6AddressEntry::new(addr, Ipv6DadState::Uninitialized, config));
+        addr_id
     }
 
     fn remove_ip_address(
@@ -659,12 +639,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
     ) -> RemoveResourceResultWithContext<AddrSubnet<Ipv6Addr>, BC> {
-        let primary = with_ip_device_state(self, device_id, |mut state| {
-            state
-                .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
-                .remove(&addr.addr().addr())
-        })
-        .expect("should exist when address ID exists");
+        let mut state = ip_device_state(self, device_id);
+        let primary = state
+            .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
+            .remove(&addr.addr().addr())
+            .expect("should exist when address ID exists");
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
         core::mem::drop(addr);
 
@@ -678,13 +657,13 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         addr: SpecifiedAddr<Ipv6Addr>,
     ) -> Result<Self::AddressId, NotFoundError> {
-        with_ip_device_state(self, device_id, |mut state| {
-            state
-                .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
-                .iter()
-                .find_map(|a| (a.addr().addr() == *addr).then(|| PrimaryRc::clone_strong(a)))
-                .ok_or(NotFoundError)
-        })
+        let mut state = ip_device_state(self, device_id);
+        let addr_id = state
+            .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
+            .iter()
+            .find_map(|a| (a.addr().addr() == *addr).then(|| PrimaryRc::clone_strong(a)))
+            .ok_or(NotFoundError);
+        addr_id
     }
 
     type AddressIdsIter<'a> = AddressIdIter<'a, Ipv6, BC>;
@@ -696,13 +675,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state_and_core_ctx(self, device_id, |mut core_ctx_and_resource| {
-            let (state, mut core_ctx) = core_ctx_and_resource
-                .read_lock_with_and::<crate::lock_ordering::IpDeviceAddresses<Ipv6>, _>(
-                |c| c.right(),
-            );
-            cb(state.strong_iter(), &mut core_ctx.cast_core_ctx())
-        })
+        let mut core_ctx_and_resource = ip_device_state_and_core_ctx(self, device_id);
+        let (state, mut core_ctx) = core_ctx_and_resource
+            .read_lock_with_and::<crate::lock_ordering::IpDeviceAddresses<Ipv6>, _>(|c| c.right());
+        cb(state.strong_iter(), &mut core_ctx.cast_core_ctx())
     }
 
     fn with_default_hop_limit<O, F: FnOnce(&NonZeroU8) -> O>(
@@ -710,11 +686,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device_id, |mut state| {
-            let mut state =
-                state.read_lock::<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>();
-            cb(&mut state)
-        })
+        let mut state = ip_device_state(self, device_id);
+        let mut state = state.read_lock::<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>();
+        cb(&mut state)
     }
 
     fn with_default_hop_limit_mut<O, F: FnOnce(&mut NonZeroU8) -> O>(
@@ -722,11 +696,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device_id, |mut state| {
-            let mut state =
-                state.write_lock::<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>();
-            cb(&mut state)
-        })
+        let mut state = ip_device_state(self, device_id);
+        let mut state = state.write_lock::<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>();
+        cb(&mut state)
     }
 
     fn join_link_multicast_group(
@@ -793,10 +765,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device_id, |mut state| {
-            let state = state.read_lock::<crate::lock_ordering::Ipv6DeviceLearnedParams>();
-            cb(&state)
-        })
+        let mut state = ip_device_state(self, device_id);
+        let state = state.read_lock::<crate::lock_ordering::Ipv6DeviceLearnedParams>();
+        cb(&state)
     }
 
     fn with_network_learned_parameters_mut<O, F: FnOnce(&mut Ipv6NetworkLearnedParameters) -> O>(
@@ -804,10 +775,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(self, device_id, |mut state| {
-            let mut state = state.write_lock::<crate::lock_ordering::Ipv6DeviceLearnedParams>();
-            cb(&mut state)
-        })
+        let mut state = ip_device_state(self, device_id);
+        let mut state = state.write_lock::<crate::lock_ordering::Ipv6DeviceLearnedParams>();
+        cb(&mut state)
     }
 }
 
@@ -832,71 +802,53 @@ impl<BT: BindingsTypes, L> DeviceIdContext<AnyDevice> for CoreCtx<'_, BT, L> {
     type WeakDeviceId = WeakDeviceId<BT>;
 }
 
-pub(crate) fn with_device_state<
-    BT: BindingsTypes,
-    O,
-    F: FnOnce(Locked<&'_ IpLinkDeviceState<D, BT>, L>) -> O,
-    L,
-    D: DeviceStateSpec,
->(
-    core_ctx: &mut CoreCtx<'_, BT, L>,
-    device_id: &BaseDeviceId<D, BT>,
-    cb: F,
-) -> O {
-    with_device_state_and_core_ctx(core_ctx, device_id, |mut core_ctx_and_resource| {
-        cb(core_ctx_and_resource.cast_resource())
-    })
+pub(crate) fn device_state<'a, BT: BindingsTypes, L, D: DeviceStateSpec>(
+    core_ctx: &'a mut CoreCtx<'_, BT, L>,
+    device_id: &'a BaseDeviceId<D, BT>,
+) -> Locked<&'a IpLinkDeviceState<D, BT>, L> {
+    let state = device_id
+        .device_state(core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>());
+    core_ctx.replace(state)
 }
 
-pub(crate) fn with_device_state_and_core_ctx<
-    BT: BindingsTypes,
-    O,
-    F: FnOnce(CoreCtxAndResource<'_, BT, IpLinkDeviceState<D, BT>, L>) -> O,
-    L,
-    D: DeviceStateSpec,
->(
-    core_ctx: &mut CoreCtx<'_, BT, L>,
-    id: &BaseDeviceId<D, BT>,
-    cb: F,
-) -> O {
+pub(crate) fn device_state_and_core_ctx<'a, BT: BindingsTypes, L, D: DeviceStateSpec>(
+    core_ctx: &'a mut CoreCtx<'_, BT, L>,
+    id: &'a BaseDeviceId<D, BT>,
+) -> CoreCtxAndResource<'a, BT, IpLinkDeviceState<D, BT>, L> {
     let state =
         id.device_state(core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>());
-    cb(core_ctx.adopt(state))
+    core_ctx.adopt(state)
 }
 
-pub(crate) fn with_ip_device_state<
-    BC: BindingsContext,
-    O,
-    F: FnOnce(Locked<&DualStackIpDeviceState<BC>, L>) -> O,
-    L,
->(
-    core_ctx: &mut CoreCtx<'_, BC, L>,
-    device: &DeviceId<BC>,
-    cb: F,
-) -> O {
+pub(crate) fn ip_device_state<'a, BC: BindingsContext, L>(
+    core_ctx: &'a mut CoreCtx<'_, BC, L>,
+    device: &'a DeviceId<BC>,
+) -> Locked<&'a DualStackIpDeviceState<BC>, L> {
     for_any_device_id!(
         DeviceId,
         device,
-        id => with_device_state(core_ctx, id, |mut state| cb(state.cast()))
+        id => {
+            let state = id.device_state(
+                core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>()
+            );
+            core_ctx.replace(state.as_ref())
+        }
     )
 }
 
-pub(crate) fn with_ip_device_state_and_core_ctx<
-    BC: BindingsContext,
-    O,
-    F: FnOnce(CoreCtxAndResource<'_, BC, DualStackIpDeviceState<BC>, L>) -> O,
-    L,
->(
-    core_ctx: &mut CoreCtx<'_, BC, L>,
-    device: &DeviceId<BC>,
-    cb: F,
-) -> O {
+pub(crate) fn ip_device_state_and_core_ctx<'a, BC: BindingsContext, L>(
+    core_ctx: &'a mut CoreCtx<'_, BC, L>,
+    device: &'a DeviceId<BC>,
+) -> CoreCtxAndResource<'a, BC, DualStackIpDeviceState<BC>, L> {
     for_any_device_id!(
         DeviceId,
         device,
-        id => with_device_state_and_core_ctx(core_ctx, id, |mut core_ctx_and_resource| {
-            cb(core_ctx_and_resource.cast_right(|r| r.as_ref()))
-        })
+        id => {
+            let state = id.device_state(
+                core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>()
+            );
+            core_ctx.adopt(state.as_ref())
+        }
     )
 }
 
@@ -906,11 +858,7 @@ fn get_mtu<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerS
 ) -> Mtu {
     match device {
         DeviceId::Ethernet(id) => ethernet::get_mtu(core_ctx, &id),
-        DeviceId::Loopback(id) => {
-            crate::device::integration::with_device_state(core_ctx, id, |mut state| {
-                state.cast_with(|s| &s.link.mtu).copied()
-            })
-        }
+        DeviceId::Loopback(id) => device_state(core_ctx, id).cast_with(|s| &s.link.mtu).copied(),
         DeviceId::PureIp(id) => pure_ip::get_mtu(core_ctx, &id),
     }
 }
@@ -957,41 +905,34 @@ fn leave_link_multicast_group<
     }
 }
 
-fn send_ip_frame<BC, S, A, L>(
+fn send_ip_frame<BC, S, I, L>(
     core_ctx: &mut CoreCtx<'_, BC, L>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
-    local_addr: SpecifiedAddr<A>,
+    destination: IpPacketDestination<I, &DeviceId<BC>>,
     body: S,
-    broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
     BC: BindingsContext,
     S: Serializer,
     S::Buffer: BufferMut,
-    A: IpAddress,
-    L: LockBefore<crate::lock_ordering::IpState<A::Version>>
+    I: EthernetIpExt + IpTypesIpExt,
+    L: LockBefore<crate::lock_ordering::IpState<I>>
         + LockBefore<crate::lock_ordering::LoopbackTxQueue>
         + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
-    A::Version: EthernetIpExt + IpTypesIpExt,
     for<'a> CoreCtx<'a, BC, L>: EthernetIpLinkDeviceDynamicStateContext<BC, DeviceId = EthernetDeviceId<BC>>
-        + NudHandler<A::Version, EthernetLinkDevice, BC>
+        + NudHandler<I, EthernetLinkDevice, BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>,
 {
     match device {
-        DeviceId::Ethernet(id) => ethernet::send_ip_frame::<_, _, A, _>(
-            core_ctx,
-            bindings_ctx,
-            &id,
-            local_addr,
-            body,
-            broadcast,
-        ),
+        DeviceId::Ethernet(id) => {
+            ethernet::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
+        }
         DeviceId::Loopback(id) => {
-            loopback::send_ip_frame::<_, _, A, _>(core_ctx, bindings_ctx, id, local_addr, body)
+            loopback::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
         }
         DeviceId::PureIp(id) => {
-            pure_ip::send_ip_frame::<_, _, A::Version, _>(core_ctx, bindings_ctx, id, body)
+            pure_ip::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
         }
     }
 }
@@ -1057,15 +998,14 @@ where
         device_id: &Self::DeviceId,
         f: F,
     ) -> O {
-        with_device_state(self, device_id, |state| {
-            // NB: We need map_ip here because we can't write a lock ordering
-            // restriction for all IP versions.
-            let IpInvariant(o) =
-                map_ip_twice!(I, IpInvariant((state, f)), |IpInvariant((mut state, f))| {
-                    IpInvariant(f(Some(&*state.read_lock::<crate::lock_ordering::NudConfig<I>>())))
-                });
-            o
-        })
+        let state = device_state(self, device_id);
+        // NB: We need map_ip here because we can't write a lock ordering
+        // restriction for all IP versions.
+        let IpInvariant(o) =
+            map_ip_twice!(I, IpInvariant((state, f)), |IpInvariant((mut state, f))| {
+                IpInvariant(f(Some(&*state.read_lock::<crate::lock_ordering::NudConfig<I>>())))
+            });
+        o
     }
 
     fn with_nud_config_mut<I: Ip, O, F: FnOnce(Option<&mut NudUserConfig>) -> O>(
@@ -1073,17 +1013,14 @@ where
         device_id: &Self::DeviceId,
         f: F,
     ) -> O {
-        with_device_state(self, device_id, |state| {
-            // NB: We need map_ip here because we can't write a lock ordering
-            // restriction for all IP versions.
-            let IpInvariant(o) =
-                map_ip_twice!(I, IpInvariant((state, f)), |IpInvariant((mut state, f))| {
-                    IpInvariant(f(Some(
-                        &mut *state.write_lock::<crate::lock_ordering::NudConfig<I>>(),
-                    )))
-                });
-            o
-        })
+        let state = device_state(self, device_id);
+        // NB: We need map_ip here because we can't write a lock ordering
+        // restriction for all IP versions.
+        let IpInvariant(o) =
+            map_ip_twice!(I, IpInvariant((state, f)), |IpInvariant((mut state, f))| {
+                IpInvariant(f(Some(&mut *state.write_lock::<crate::lock_ordering::NudConfig<I>>())))
+            });
+        o
     }
 }
 
@@ -1153,7 +1090,7 @@ impl<'a, BC: BindingsContext, L> ResourceCounterContext<DeviceId<BC>, DeviceCoun
         cb: F,
     ) -> O {
         for_any_device_id!(DeviceId, device_id, id => {
-            with_device_state(self, id, |state| cb(state.unlocked_access::<crate::lock_ordering::DeviceCounters>()))
+            cb(device_state(self, id).unlocked_access::<crate::lock_ordering::DeviceCounters>())
         })
     }
 }
@@ -1166,9 +1103,7 @@ impl<'a, BC: BindingsContext, D: DeviceStateSpec, L>
         device_id: &BaseDeviceId<D, BC>,
         cb: F,
     ) -> O {
-        with_device_state(self, device_id, |state| {
-            cb(state.unlocked_access::<crate::lock_ordering::DeviceCounters>())
-        })
+        cb(device_state(self, device_id).unlocked_access::<crate::lock_ordering::DeviceCounters>())
     }
 }
 
@@ -1180,9 +1115,8 @@ impl<'a, BC: BindingsContext, L>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        with_device_state(self, device_id, |state| {
-            cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceCounters>())
-        })
+        cb(device_state(self, device_id)
+            .unlocked_access::<crate::lock_ordering::EthernetDeviceCounters>())
     }
 }
 
@@ -1194,9 +1128,8 @@ impl<'a, BC: BindingsContext, L>
         device_id: &LoopbackDeviceId<BC>,
         cb: F,
     ) -> O {
-        with_device_state(self, device_id, |state| {
-            cb(state.unlocked_access::<crate::lock_ordering::LoopbackDeviceCounters>())
-        })
+        cb(device_state(self, device_id)
+            .unlocked_access::<crate::lock_ordering::LoopbackDeviceCounters>())
     }
 }
 
@@ -1208,9 +1141,8 @@ impl<'a, BC: BindingsContext, L> ResourceCounterContext<PureIpDeviceId<BC>, Pure
         device_id: &PureIpDeviceId<BC>,
         cb: F,
     ) -> O {
-        with_device_state(self, device_id, |state| {
-            cb(state.unlocked_access::<crate::lock_ordering::PureIpDeviceCounters>())
-        })
+        cb(device_state(self, device_id)
+            .unlocked_access::<crate::lock_ordering::PureIpDeviceCounters>())
     }
 }
 
@@ -1249,9 +1181,8 @@ where
     Self: IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
 {
     fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        crate::device::integration::with_ip_device_state(self, device_id, |state| {
-            *state.unlocked_access::<crate::lock_ordering::RoutingMetric>()
-        })
+        let state = ip_device_state(self, device_id);
+        *state.unlocked_access::<crate::lock_ordering::RoutingMetric>()
     }
 
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {

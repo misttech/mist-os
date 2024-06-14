@@ -19,10 +19,13 @@ pub fn monitored_child_process(child_arc: &Arc<SharedChild>) -> Result<()> {
     let child_arc_clone = child_arc.clone();
     let term = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&term))?;
+    signal_hook::flag::register(signal_hook::consts::SIGHUP, Arc::clone(&term))?;
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&term))?;
     let thread = std::thread::spawn(move || {
         while !term.load(Ordering::Relaxed) && child_arc_clone.try_wait().unwrap().is_none() {
             thread::sleep(time::Duration::from_secs(1));
         }
+        child_arc_clone.kill().expect("Error killing for emulator process");
         child_arc_clone.wait().expect("Error waiting for emulator process");
     });
     thread.join().expect("cannot join monitor thread");

@@ -2,49 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::color_transform_manager::ColorTransformManager;
+use ::input_pipeline::activity::ActivityManager;
+use ::input_pipeline::input_device::InputDeviceType;
+use ::input_pipeline::light_sensor::Configuration as LightSensorConfiguration;
+use anyhow::{Context, Error};
+use fidl_fuchsia_accessibility::{ColorTransformHandlerMarker, ColorTransformMarker};
+use fidl_fuchsia_element::{
+    GraphicalPresenterRequest, GraphicalPresenterRequestStream, PresentViewError, ViewSpec,
+};
+use fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream;
+use fidl_fuchsia_input_interaction::NotifierRequestStream;
+use fidl_fuchsia_input_interaction_observation::AggregatorRequestStream;
+use fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream;
+use fidl_fuchsia_recovery_policy::DeviceRequestStream as FactoryResetDeviceRequestStream;
+use fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream;
+use fidl_fuchsia_session_scene::{
+    ManagerRequest as SceneManagerRequest, ManagerRequestStream as SceneManagerRequestStream,
+    PresentRootViewError,
+};
+use fidl_fuchsia_ui_brightness::{
+    ColorAdjustmentHandlerRequestStream, ColorAdjustmentRequestStream,
+};
+use fidl_fuchsia_ui_focus::FocusChainProviderRequestStream;
+use fidl_fuchsia_ui_policy::{
+    DeviceListenerRegistryRequestStream as MediaButtonsListenerRegistryRequestStream,
+    DisplayBacklightRequestStream,
+};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::lock::Mutex;
+use futures::{StreamExt, TryStreamExt};
+use scene_management::{SceneManager, SceneManagerTrait, ViewingDistance};
+use scene_manager_structured_config::Config;
+use std::fs::File;
+use std::io::Read;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 use {
-    crate::color_transform_manager::ColorTransformManager,
-    ::input_pipeline::{
-        activity::ActivityManager, input_device::InputDeviceType,
-        light_sensor::Configuration as LightSensorConfiguration,
-    },
-    anyhow::{Context, Error},
-    fidl_fuchsia_accessibility::{ColorTransformHandlerMarker, ColorTransformMarker},
-    fidl_fuchsia_accessibility_scene as a11y_view,
-    fidl_fuchsia_element::{
-        GraphicalPresenterRequest, GraphicalPresenterRequestStream, PresentViewError, ViewSpec,
-    },
-    fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
-    fidl_fuchsia_input_interaction::NotifierRequestStream,
-    fidl_fuchsia_input_interaction_observation::AggregatorRequestStream,
-    fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream,
-    fidl_fuchsia_recovery_policy::DeviceRequestStream as FactoryResetDeviceRequestStream,
-    fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream,
-    fidl_fuchsia_session_scene::{
-        ManagerRequest as SceneManagerRequest, ManagerRequestStream as SceneManagerRequestStream,
-        PresentRootViewError,
-    },
-    fidl_fuchsia_ui_brightness::{
-        ColorAdjustmentHandlerRequestStream, ColorAdjustmentRequestStream,
-    },
-    fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_composition_internal as fcomp,
-    fidl_fuchsia_ui_display_color as color, fidl_fuchsia_ui_display_singleton as singleton_display,
-    fidl_fuchsia_ui_focus::FocusChainProviderRequestStream,
-    fidl_fuchsia_ui_policy::{
-        DeviceListenerRegistryRequestStream as MediaButtonsListenerRegistryRequestStream,
-        DisplayBacklightRequestStream,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
+    fidl_fuchsia_accessibility_scene as a11y_view, fidl_fuchsia_ui_composition as flatland,
+    fidl_fuchsia_ui_composition_internal as fcomp, fidl_fuchsia_ui_display_color as color,
+    fidl_fuchsia_ui_display_singleton as singleton_display, fuchsia_async as fasync,
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    futures::{StreamExt, TryStreamExt},
-    scene_management::{SceneManager, SceneManagerTrait, ViewingDistance},
-    scene_manager_structured_config::Config,
-    std::fs::File,
-    std::io::Read,
-    std::sync::Arc,
-    tracing::{error, info, warn},
 };
 
 mod color_transform_manager;
@@ -262,8 +261,9 @@ async fn inner_main() -> Result<(), Error> {
     };
 
     // Create Activity Manager.
+    let suspend_enabled = false;
     let activity_manager =
-        ActivityManager::new(zx::Duration::from_millis(idle_threshold_ms as i64));
+        ActivityManager::new(zx::Duration::from_millis(idle_threshold_ms as i64), suspend_enabled);
 
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;
@@ -534,11 +534,12 @@ pub async fn handle_graphical_presenter_request_stream(
 #[cfg(test)]
 
 mod tests {
-    use {
-        super::*, fidl::endpoints::create_proxy_and_stream, fidl::AsHandleRef,
-        fidl_fuchsia_element::GraphicalPresenterMarker, fuchsia_scenic as scenic,
-        scene_management_mocks::MockSceneManager,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::AsHandleRef;
+    use fidl_fuchsia_element::GraphicalPresenterMarker;
+    use fuchsia_scenic as scenic;
+    use scene_management_mocks::MockSceneManager;
 
     /// Tests that handle_graphical_presenter_request_stream, when receiving a GFX present_view request, errors.
     #[fasync::run_singlethreaded(test)]

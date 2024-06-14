@@ -20,7 +20,8 @@
 //! [`boxed`]: crate::event::boxed
 //! [`Handler`]: crate::event::Handler
 
-use crate::event::{convert::Try, And, Handled, Handler, Or, TryAnd, TryOr, TryOrUnmatched};
+use crate::event::convert::Try;
+use crate::event::{And, Handled, Handler, Or, TryAnd, TryOr, TryOrUnmatched};
 
 /// A handler and its inputs (state and event) that can be called once.
 #[derive(Debug)]

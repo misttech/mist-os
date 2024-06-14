@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    io::{Read, Seek, SeekFrom},
-    sync::{Arc, Mutex},
-};
+use std::io::{Read, Seek, SeekFrom};
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use tracing::error;
 
@@ -90,16 +88,14 @@ impl VecReader {
 
 #[cfg(target_os = "fuchsia")]
 mod fuchsia {
-    use {
-        super::{Reader, ReaderError},
-        anyhow::Error,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_hardware_block::BlockMarker,
-        fuchsia_zircon as zx,
-        remote_block_device::{Cache, RemoteBlockClientSync},
-        std::sync::{Arc, Mutex},
-        tracing::error,
-    };
+    use super::{Reader, ReaderError};
+    use anyhow::Error;
+    use fidl::endpoints::ClientEnd;
+    use fidl_fuchsia_hardware_block::BlockMarker;
+    use fuchsia_zircon as zx;
+    use remote_block_device::{Cache, RemoteBlockClientSync};
+    use std::sync::{Arc, Mutex};
+    use tracing::error;
 
     pub struct VmoReader {
         vmo: Arc<zx::Vmo>,

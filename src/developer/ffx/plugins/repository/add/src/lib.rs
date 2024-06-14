@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    errors::{ffx_bail, ffx_error},
-    ffx_core::ffx_plugin,
-    ffx_repository_add_args::AddCommand,
-    fidl_fuchsia_developer_ffx::RepositoryRegistryProxy,
-    fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec},
-    fuchsia_repo::repository::RepoProvider,
-    fuchsia_url::RepositoryUrl,
-    sdk_metadata::get_repositories,
-};
+use anyhow::Result;
+use errors::{ffx_bail, ffx_error};
+use ffx_core::ffx_plugin;
+use ffx_repository_add_args::AddCommand;
+use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
+use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
+use fuchsia_repo::repository::RepoProvider;
+use fuchsia_url::RepositoryUrl;
+use sdk_metadata::get_repositories;
 
 #[ffx_plugin("ffx-repo-add", RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn add_from_product(cmd: AddCommand, repos: RepositoryRegistryProxy) -> Result<()> {
@@ -53,20 +51,19 @@ pub async fn add_from_product(cmd: AddCommand, repos: RepositoryRegistryProxy) -
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assembly_partitions_config::PartitionsConfig,
-        assert_matches::assert_matches,
-        camino::Utf8Path,
-        fidl_fuchsia_developer_ffx::RepositoryRegistryMarker,
-        fidl_fuchsia_developer_ffx::{
-            FileSystemRepositorySpec, RepositoryRegistryRequest, RepositorySpec,
-        },
-        fuchsia_async as fasync,
-        futures::{channel::mpsc, SinkExt as _, StreamExt as _, TryStreamExt as _},
-        pretty_assertions::assert_eq,
-        sdk_metadata::{ProductBundle, ProductBundleV2, Repository},
+    use super::*;
+    use assembly_partitions_config::PartitionsConfig;
+    use assert_matches::assert_matches;
+    use camino::Utf8Path;
+    use fidl_fuchsia_developer_ffx::{
+        FileSystemRepositorySpec, RepositoryRegistryMarker, RepositoryRegistryRequest,
+        RepositorySpec,
     };
+    use fuchsia_async as fasync;
+    use futures::channel::mpsc;
+    use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
+    use pretty_assertions::assert_eq;
+    use sdk_metadata::{ProductBundle, ProductBundleV2, Repository};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_add_from_product() {

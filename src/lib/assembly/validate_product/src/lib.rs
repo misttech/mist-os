@@ -9,7 +9,10 @@ use assembly_validate_util::{BootfsContents, PkgNamespace};
 use camino::Utf8PathBuf;
 use fuchsia_pkg::PackageManifest;
 use rayon::iter::{ParallelBridge, ParallelIterator};
-use std::{collections::BTreeMap, fmt, fs::File, path::PathBuf};
+use std::collections::BTreeMap;
+use std::fmt;
+use std::fs::File;
+use std::path::PathBuf;
 use version_history::AbiRevision;
 
 /// Validate a product config.

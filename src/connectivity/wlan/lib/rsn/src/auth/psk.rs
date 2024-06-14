@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::Error,
-    anyhow::ensure,
-    core::num::NonZeroU32,
-    ieee80211::Ssid,
-    std::str,
-    wlan_common::security::wpa::{self, credential::Psk as CommonPsk},
-};
+use crate::Error;
+use anyhow::ensure;
+use core::num::NonZeroU32;
+use ieee80211::Ssid;
+use std::str;
+use wlan_common::security::wpa::credential::Psk as CommonPsk;
+use wlan_common::security::wpa::{self};
 
 // PBKDF2-HMAC-SHA1 is considered insecure but required for PSK computation.
 #[allow(deprecated)]
@@ -107,7 +106,9 @@ pub fn compute(passphrase: &[u8], ssid: &Ssid) -> Result<Psk, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, hex::FromHex, wlan_common::security::wpa::credential::Passphrase};
+    use super::*;
+    use hex::FromHex;
+    use wlan_common::security::wpa::credential::Passphrase;
 
     fn assert_psk(password: &str, ssid: &str, expected: &str) {
         let psk = compute(password.as_bytes(), &Ssid::try_from(ssid).unwrap())

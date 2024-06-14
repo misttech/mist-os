@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    byteorder::{BigEndian, ByteOrder, WriteBytesExt},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::{Inspector, Node},
-    futures::stream::StreamExt,
-    lazy_static::lazy_static,
-    std::{
-        fs,
-        io::Read,
-        path::{Path, PathBuf},
-    },
-    tracing::{info, warn},
-};
+use anyhow::{anyhow, Error};
+use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::{Inspector, Node};
+use futures::stream::StreamExt;
+use lazy_static::lazy_static;
+use std::fs;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use tracing::{info, warn};
 
 const U64_SIZE: usize = (u64::BITS / 8) as usize;
 const DEFAULT_VALUE: u64 = 1;
@@ -99,12 +95,10 @@ fn write_file(path: &Path, value: u64) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
-        tempfile::TempDir,
-        test_case::test_case,
-    };
+    use super::*;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use tempfile::TempDir;
+    use test_case::test_case;
 
     fn make_path() -> (TempDir, PathBuf) {
         let dir = TempDir::new().expect("error creating tempdir");

@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    fidl_fuchsia_boot as fboot,
-    fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult, ZbiType::StorageBootfsFactory},
-    fuchsia_zircon::{self as zx, HandleBased},
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    std::{collections::HashMap, sync::Arc},
-};
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_boot as fboot;
+use fuchsia_zbi::ZbiType::StorageBootfsFactory;
+use fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult};
+use fuchsia_zircon::{self as zx, HandleBased};
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 lazy_static! {
     // The default rights for an immutable VMO. For details see
@@ -93,7 +93,9 @@ impl FactoryItems {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl::AsHandleRef, fuchsia_async as fasync};
+    use super::*;
+    use fidl::AsHandleRef;
+    use fuchsia_async as fasync;
 
     fn serve_factory_items(items: Vec<ZbiResult>) -> Result<fboot::FactoryItemsProxy, Error> {
         let (proxy, stream) =

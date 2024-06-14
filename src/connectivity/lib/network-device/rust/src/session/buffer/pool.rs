@@ -6,19 +6,19 @@
 
 use fuchsia_sync::Mutex;
 use std::collections::VecDeque;
+use std::convert::TryInto as _;
+use std::fmt::Debug;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::mem::{ManuallyDrop, MaybeUninit};
 use std::num::TryFromIntError;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 use std::sync::Arc;
-use std::{convert::TryInto as _, fmt::Debug};
 
 use explicit::ResultExt as _;
-use fidl_fuchsia_hardware_network as netdev;
 use fuchsia_runtime::vmar_root_self;
-use fuchsia_zircon as zx;
 use futures::channel::oneshot::{channel, Receiver, Sender};
+use {fidl_fuchsia_hardware_network as netdev, fuchsia_zircon as zx};
 
 use super::{ChainLength, DescId, DescRef, DescRefMut, Descriptors};
 use crate::error::{Error, Result};

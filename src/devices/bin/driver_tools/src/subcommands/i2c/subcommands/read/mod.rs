@@ -4,12 +4,10 @@
 
 pub mod args;
 
-use {
-    anyhow::{Context, Result},
-    args::ReadCommand,
-    fidl_fuchsia_io as fio,
-    std::io::Write,
-};
+use anyhow::{Context, Result};
+use args::ReadCommand;
+use fidl_fuchsia_io as fio;
+use std::io::Write;
 
 pub async fn read(
     cmd: &ReadCommand,

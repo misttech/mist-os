@@ -12,7 +12,8 @@ use fidl_fuchsia_inspect::{
 };
 use fidl_fuchsia_mem::Buffer;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{reader::ReadableTree, Inspector};
+use fuchsia_inspect::reader::ReadableTree;
+use fuchsia_inspect::Inspector;
 use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use futures::{TryFutureExt, TryStreamExt};
 use tracing::warn;

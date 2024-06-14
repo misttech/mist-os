@@ -4,12 +4,10 @@
 
 //! Wrapper types for the Options table.
 
-use {
-    fuchsia_inspect as inspect,
-    proptest_derive::Arbitrary,
-    serde::{Deserialize, Serialize},
-    thiserror::Error,
-};
+use fuchsia_inspect as inspect;
+use proptest_derive::Arbitrary;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// Who or what initiated the update installation.
 #[derive(Clone, Debug, Copy, PartialEq, Arbitrary, Serialize, Deserialize)]
@@ -123,7 +121,8 @@ impl From<Initiator> for fidl_fuchsia_update_installer::Initiator {
 #[cfg(test)]
 mod tests {
 
-    use {super::*, proptest::prelude::*};
+    use super::*;
+    use proptest::prelude::*;
 
     proptest! {
         #[test]

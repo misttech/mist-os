@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::subcommands::add::args::AddTestNodeCommand,
-    super::subcommands::remove::args::RemoveTestNodeCommand,
-    argh::{ArgsInfo, FromArgs},
-};
+use super::subcommands::add::args::AddTestNodeCommand;
+use super::subcommands::remove::args::RemoveTestNodeCommand;
+use argh::{ArgsInfo, FromArgs};
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "test-node", description = "Commands to interact with test nodes.")]

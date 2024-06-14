@@ -184,7 +184,8 @@ impl FfxMain for StopTool {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::{macro_deps::ffx_writer::TestBuffer, Format, TestBuffers};
+    use fho::macro_deps::ffx_writer::TestBuffer;
+    use fho::{Format, TestBuffers};
     use futures_lite::StreamExt;
     use serde_json::json;
 

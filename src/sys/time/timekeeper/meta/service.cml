@@ -18,6 +18,9 @@
             durability: "transient",
         },
     ],
+    capabilities: [
+        { protocol: "fuchsia.time.test.RTC" },
+    ],
     use: [
         {
             protocol: [
@@ -61,6 +64,14 @@
             ],
             from: "parent",
             to: "#timesource",
+        },
+    ],
+    expose: [
+        {
+            protocol: [ "fuchsia.time.test.RTC" ],
+            from: "self",
+            to: "parent",
+            availability: "optional",
         },
     ],
 }

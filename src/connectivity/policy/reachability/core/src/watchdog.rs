@@ -8,12 +8,12 @@
 //! counters to evaluate interface health and triggers debug information dumps
 //! on the system logs when it finds unhealthy interfaces.
 
-use crate::{neighbor_cache::NeighborHealth, Id as InterfaceId, InterfaceView};
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fuchsia_zircon as zx;
+use crate::neighbor_cache::NeighborHealth;
+use crate::{Id as InterfaceId, InterfaceView};
 use itertools::Itertools as _;
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
+use {fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx};
 
 /// The minimum amount of time for a device counter to be stuck in the same
 /// value for the device to be considered unhealthy.
@@ -455,13 +455,14 @@ mod tests {
 
     use crate::route_table::Route;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_net as fnet;
-    use fidl_fuchsia_net_interfaces as fnet_interfaces;
     use futures::FutureExt as _;
     use net_declare::{fidl_ip, fidl_subnet};
     use std::sync::{Arc, Mutex};
+    use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces};
 
-    use crate::{neighbor_cache::NeighborState, route_table::RouteTable, testutil};
+    use crate::neighbor_cache::NeighborState;
+    use crate::route_table::RouteTable;
+    use crate::testutil;
 
     #[test]
     fn health_status_healthy() {

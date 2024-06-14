@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::scrutiny::Scrutiny,
-    anyhow::Result,
-    scrutiny_config::{Config, ConfigBuilder, ModelConfig},
-    scrutiny_plugins::{
-        additional_boot_args::AdditionalBootConfigPlugin, core::CorePlugin, engine::EnginePlugin,
-        search::SearchPlugin, static_pkgs::StaticPkgsPlugin, toolkit::ToolkitPlugin,
-        verify::VerifyPlugin, zbi::ZbiPlugin,
-    },
-    std::sync::Arc,
-};
+use crate::scrutiny::Scrutiny;
+use anyhow::Result;
+use scrutiny_config::{Config, ConfigBuilder, ModelConfig};
+use scrutiny_plugins::additional_boot_args::AdditionalBootConfigPlugin;
+use scrutiny_plugins::core::CorePlugin;
+use scrutiny_plugins::engine::EnginePlugin;
+use scrutiny_plugins::search::SearchPlugin;
+use scrutiny_plugins::static_pkgs::StaticPkgsPlugin;
+use scrutiny_plugins::toolkit::ToolkitPlugin;
+use scrutiny_plugins::verify::VerifyPlugin;
+use scrutiny_plugins::zbi::ZbiPlugin;
+use std::sync::Arc;
 
 /// Launches scrutiny from a configuration file. This is intended to be used by binaries that
 /// want to launch custom configurations of the Scrutiny framework with select features enabled.

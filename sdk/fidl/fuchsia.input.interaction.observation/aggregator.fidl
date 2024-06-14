@@ -5,6 +5,11 @@ library fuchsia.input.interaction.observation;
 
 using zx;
 
+type HandoffWakeError = enum {
+    /// The power framework is unavailable
+    POWER_NOT_AVAILABLE = 1;
+};
+
 /// The Aggregator protocol collects evidence of user activity and uses this
 /// evidence to set the system's activity state.
 @discoverable
@@ -13,4 +18,10 @@ closed protocol Aggregator {
     strict ReportDiscreteActivity(struct {
         event_time zx.Time;
     }) -> ();
+
+    /// Asks the server to create a wake lease and returns when a wake lease
+    /// has been created, signaling to the caller that it can cede system
+    /// wakefulness if it wants. The caller is responsible for ensuring the
+    /// CPUs remain awake until this call completes.
+    strict HandoffWake() -> () error HandoffWakeError;
 };

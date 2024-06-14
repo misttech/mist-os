@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    ffi::OsString,
-    io::ErrorKind,
-    os::unix::net::UnixStream,
-    path::{Path, PathBuf},
-    process::{Child, Command},
-};
+use std::ffi::OsString;
+use std::io::ErrorKind;
+use std::os::unix::net::UnixStream;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command};
 
 use anyhow::anyhow;
 use async_io::Async;
@@ -40,12 +38,12 @@ impl Emu {
     fn make_empty_disk(disk_path: &Path, efi_data: &[u8]) -> anyhow::Result<()> {
         use anyhow::Context;
 
-        use gpt::{
-            partition_types::{OperatingSystem, Type as PartType},
-            GptDisk,
-        };
+        use gpt::partition_types::{OperatingSystem, Type as PartType};
+        use gpt::GptDisk;
 
-        use std::{fs::OpenOptions, ops::Range, os::unix::prelude::FileExt};
+        use std::fs::OpenOptions;
+        use std::ops::Range;
+        use std::os::unix::prelude::FileExt;
 
         const fn part_type(guid: &'static str) -> PartType {
             PartType { guid, os: OperatingSystem::None }

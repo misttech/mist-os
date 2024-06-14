@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*,
-    crate::error::{FrameParseError, FrameParseResult},
-    anyhow::{format_err, Context},
-    zerocopy::ByteSlice,
-};
+use super::*;
+use crate::error::{FrameParseError, FrameParseResult};
+use anyhow::{format_err, Context};
+use zerocopy::ByteSlice;
 
 macro_rules! validate {
     ( $condition:expr, $debug_message:expr ) => {

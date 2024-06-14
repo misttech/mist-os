@@ -7,20 +7,17 @@
 use core::convert::Infallible as Never;
 
 use derivative::Derivative;
+use log::trace;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
-use tracing::trace;
+use netstack3_base::{CoreTimerContext, HandleableTimer, TimerHandler};
+use netstack3_device::{DeviceLayerTimerId, WeakDeviceId};
+use netstack3_ip::device::{IpDeviceIpExt, IpDeviceTimerId};
+use netstack3_ip::IpLayerTimerId;
 
-use crate::{
-    context::{CoreCtx, CoreTimerContext, HandleableTimer, TimerHandler},
-    device::{DeviceLayerTimerId, WeakDeviceId},
-    ip::{
-        device::{IpDeviceIpExt, IpDeviceTimerId},
-        integration::IpAddrCtxSpec,
-        IpLayerTimerId,
-    },
-    transport::TransportLayerTimerId,
-    BindingsTypes,
-};
+use crate::context::CoreCtx;
+use crate::ip::integration::IpAddrCtxSpec;
+use crate::transport::TransportLayerTimerId;
+use crate::BindingsTypes;
 
 pub use netstack3_base::Instant;
 

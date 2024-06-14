@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    num_traits::FromPrimitive,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref},
-};
+use num_traits::FromPrimitive;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref};
 
 #[repr(u8)]
 #[derive(num_derive::FromPrimitive)]

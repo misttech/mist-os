@@ -28,15 +28,13 @@ class EmulatedPeer : public fidl::Server<fuchsia_hardware_bluetooth::Peer> {
 
   // Registers a peer with the FakeController using the provided LE parameters. Returns the peer on
   // success or an error reporting the failure.
-  static Result NewLowEnergy(fuchsia_hardware_bluetooth::LowEnergyPeerParameters parameters,
-                             fidl::ServerEnd<fuchsia_hardware_bluetooth::Peer> request,
+  static Result NewLowEnergy(fuchsia_hardware_bluetooth::PeerParameters parameters,
                              bt::testing::FakeController* fake_controller,
                              async_dispatcher_t* dispatcher);
 
   // Registers a peer with the FakeController using the provided BR/EDR parameters. Returns the peer
   // on success or an error reporting the failure.
-  static Result NewBredr(fuchsia_hardware_bluetooth::BredrPeerParameters parameters,
-                         fidl::ServerEnd<fuchsia_hardware_bluetooth::Peer> request,
+  static Result NewBredr(fuchsia_hardware_bluetooth::PeerParameters parameters,
                          bt::testing::FakeController* fake_controller,
                          async_dispatcher_t* dispatcher);
 
@@ -60,6 +58,14 @@ class EmulatedPeer : public fidl::Server<fuchsia_hardware_bluetooth::Peer> {
   void EmulateDisconnectionComplete(
       EmulateDisconnectionCompleteCompleter::Sync& completer) override;
   void WatchConnectionStates(WatchConnectionStatesCompleter::Sync& completer) override;
+  void SetDeviceClass(SetDeviceClassRequest& request,
+                      SetDeviceClassCompleter::Sync& completer) override;
+  void SetServiceDefinitions(SetServiceDefinitionsRequest& request,
+                             SetServiceDefinitionsCompleter::Sync& completer) override;
+  void SetLeAdvertisement(SetLeAdvertisementRequest& request,
+                          SetLeAdvertisementCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Peer> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Updates this peer with the current connection state which is used to notify its FIDL client
   // of state changes that it is observing.

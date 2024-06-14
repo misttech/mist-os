@@ -5,7 +5,8 @@
 use anyhow::Error;
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fuchsia_component::server::ServiceFs;
-use futures::{channel::mpsc, future};
+use futures::channel::mpsc;
+use futures::future;
 use std::pin::pin;
 use tracing::{error, info, warn};
 

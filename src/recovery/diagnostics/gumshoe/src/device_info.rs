@@ -4,7 +4,8 @@
 
 use crate::storage_info::StorageInfo;
 use fidl_fuchsia_hwinfo::{Architecture, ArchitectureUnknown, BoardInfo, DeviceInfo, ProductInfo};
-use serde::{ser::SerializeStruct, Serialize, Serializer};
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 
 // In order to make BoardInfo (a type from another crate) Serializable,

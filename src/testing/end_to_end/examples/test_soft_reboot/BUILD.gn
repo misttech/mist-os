@@ -5,47 +5,64 @@
 import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
-assert(is_host, "Python E2E tests are host-only")
+if (is_host) {
+  python_mobly_test("soft_reboot_test_fc") {
+    main_source = "test_soft_reboot.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
 
-python_mobly_test("soft_reboot_test_fc") {
-  main_source = "test_soft_reboot.py"
-  libraries = [
-    "//src/testing/end_to_end/honeydew",
-    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-  ]
+    params_source = "params.yaml"
+    transport = "fuchsia-controller"
 
-  params_source = "params.yaml"
-  transport = "fuchsia-controller"
+    enable_hermetic_exe = true
 
-  environments = [
-    emu_env,
-    vim3_env,
-    nuc7_env,
-    nuc11_env,
+    environments = [
+      # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+      aemu_env,
+      vim3_env,
+      nuc11_env,
+    ]
+  }
+
+  # This test will run using "fuchsia-controller-preferred" transport.
+  # It uses "fuchsia-controller" to reboot the device. However, once device comes
+  # back up, it starts SL4F server and sends an SL4F request.
+  # Thus this test will ensure SL4F functionality in Honeydew is still working.
+
+  # Note - To run this test in CQ, ensure builder config has SL4F as dependency.
+  python_mobly_test("soft_reboot_test_fc_preferred") {
+    main_source = "test_soft_reboot.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+
+    params_source = "params.yaml"
+    transport = "fuchsia-controller-preferred"
+
+    environments = [
+      # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+      aemu_env,
+    ]
+  }
+}
+
+group("test_soft_reboot_fc_preferred") {
+  testonly = true
+  deps = [
+    ":soft_reboot_test_fc_preferred($host_toolchain)",
+    "../../honeydew:sl4f_packages",
   ]
 }
 
-# This test will run using "fuchsia-controller-preferred" transport.
-# It uses "fuchsia-controller" to reboot the device. However, once device comes
-# back up, it starts SL4F server and sends an SL4F request.
-# Thus this test will ensure SL4F functionality in Honeydew is still working.
-python_mobly_test("soft_reboot_test_fc_preferred") {
-  main_source = "test_soft_reboot.py"
-  libraries = [
-    "//src/testing/end_to_end/honeydew",
-    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-  ]
-
-  params_source = "params.yaml"
-  transport = "fuchsia-controller-preferred"
-
-  environments = [ emu_env ]
-}
-
+# Group containing all of the soft reboot test cases and their dependencies.
 group("tests") {
   testonly = true
   public_deps = [
     ":soft_reboot_test_fc($host_toolchain)",
-    ":soft_reboot_test_fc_preferred($host_toolchain)",
+    ":soft_reboot_test_fc.hermetic($host_toolchain)",
+    ":test_soft_reboot_fc_preferred",
   ]
 }

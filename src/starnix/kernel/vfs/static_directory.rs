@@ -2,26 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
-        DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
-        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::{
+    emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
+    DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
+    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
 };
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_uapi::{
-    auth::FsCred,
-    device_type::DeviceType,
-    errno,
-    errors::Errno,
-    file_mode::{mode, FileMode},
-    gid_t, off_t,
-    open_flags::OpenFlags,
-    uid_t,
-};
-use std::{collections::BTreeMap, sync::Arc};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::{mode, FileMode};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{errno, gid_t, off_t, uid_t};
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// Builds an implementation of [`FsNodeOps`] that serves as a directory of static and immutable
 /// entries.

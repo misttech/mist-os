@@ -6,12 +6,11 @@ use std::fmt::Debug;
 
 use futures::channel::oneshot;
 
-use crate::{
-    client::InternalClient,
-    logging::log_debug,
-    messaging::Sender,
-    protocol_family::{route::NetlinkRoute, ProtocolFamily},
-};
+use crate::client::InternalClient;
+use crate::logging::log_debug;
+use crate::messaging::Sender;
+use crate::protocol_family::route::NetlinkRoute;
+use crate::protocol_family::ProtocolFamily;
 
 pub(crate) fn respond_to_completer<
     S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,

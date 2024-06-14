@@ -69,9 +69,9 @@ class TestExecution:
         self._flags = flags
         self._run_suffix = run_suffix
         self._device_env = device_env
-        if self._flags.ffx_output_directory is not None:
+        if self._flags.artifact_output_directory is not None:
             self._outdir: str | None = os.path.join(
-                self._flags.ffx_output_directory, str(UNIQUE_OUTPUT_SUFFIX)
+                self._flags.artifact_output_directory, str(UNIQUE_OUTPUT_SUFFIX)
             )
             UNIQUE_OUTPUT_SUFFIX += 1
         else:

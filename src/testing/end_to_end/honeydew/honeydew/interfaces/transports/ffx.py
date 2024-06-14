@@ -81,16 +81,17 @@ class FFX(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_target_list(
+    def get_target_info_from_target_list(
         self, timeout: float = TIMEOUTS["FFX_CLI"]
-    ) -> list[dict[str, Any]]:
-        """Executed and returns the output of `ffx --machine json target list`.
+    ) -> dict[str, Any]:
+        """Executed and returns the output of
+        `ffx --machine json target list <target>`.
 
         Args:
             timeout: Timeout to wait for the ffx command to return.
 
         Returns:
-            Output of `ffx --machine json target list`.
+            Output of `ffx --machine json target list <target>`.
 
         Raises:
             errors.FfxCommandError: In case of failure.

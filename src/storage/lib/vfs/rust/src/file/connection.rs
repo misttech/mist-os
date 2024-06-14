@@ -2,37 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        common::{
-            decode_extended_attribute_value, encode_extended_attribute_value,
-            extended_attributes_sender, inherit_rights_for_clone,
-        },
-        execution_scope::ExecutionScope,
-        file::{
-            common::new_connection_validate_options, File, FileIo, FileOptions,
-            RawFileIoConnection, SyncMode,
-        },
-        name::parse_name,
-        node::OpenNode,
-        object_request::Representation,
-        protocols::ToFileOptions,
-        ObjectRequestRef, ProtocolsExt, ToObjectRequest,
-    },
-    anyhow::Error,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    futures::stream::StreamExt,
-    static_assertions::assert_eq_size,
-    std::{
-        convert::TryInto as _,
-        future::Future,
-        ops::{Deref, DerefMut},
-        sync::Arc,
-    },
-    storage_trace::{self as trace, TraceFutureExt},
+use crate::common::{
+    decode_extended_attribute_value, encode_extended_attribute_value, extended_attributes_sender,
+    inherit_rights_for_clone,
 };
+use crate::execution_scope::ExecutionScope;
+use crate::file::common::new_connection_validate_options;
+use crate::file::{File, FileIo, FileOptions, RawFileIoConnection, SyncMode};
+use crate::name::parse_name;
+use crate::node::OpenNode;
+use crate::object_request::Representation;
+use crate::protocols::ToFileOptions;
+use crate::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
+use anyhow::Error;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use futures::stream::StreamExt;
+use static_assertions::assert_eq_size;
+use std::convert::TryInto as _;
+use std::future::Future;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use storage_trace::{self as trace, TraceFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use {
@@ -1036,7 +1028,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             return Err(Status::ACCESS_DENIED);
         }
 
-        let (target_parent, _flags) = self
+        let target_parent = self
             .scope
             .token_registry()
             .get_owner(target_parent_token.into())?
@@ -1093,14 +1085,11 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::node::{IsDirectory, Node},
-        assert_matches::assert_matches,
-        async_trait::async_trait,
-        futures::prelude::*,
-        std::sync::Mutex,
-    };
+    use super::*;
+    use crate::node::{IsDirectory, Node};
+    use assert_matches::assert_matches;
+    use futures::prelude::*;
+    use std::sync::Mutex;
 
     #[cfg(target_os = "fuchsia")]
     use fuchsia_zircon::{self as zx};
@@ -1204,7 +1193,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Node for MockFile {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
             self.handle_operation(FileOperation::GetAttrs)?;

@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    config::Config,
-    fuchsia_component::client::connect_to_protocol,
-    std::{thread, time},
-};
+use anyhow::{Context as _, Error};
+use config::Config;
+use fuchsia_component::client::connect_to_protocol;
+use std::{thread, time};
 
 // [START diff_1]
-use {
-    fidl::endpoints::create_proxy,
-    fidl_examples_keyvaluestore_additerator::{Item, IteratorMarker, StoreMarker},
-    futures::join,
-};
+use fidl::endpoints::create_proxy;
+use fidl_examples_keyvaluestore_additerator::{Item, IteratorMarker, StoreMarker};
+use futures::join;
 // [END diff_1]
 
 #[fuchsia::main]

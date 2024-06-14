@@ -99,6 +99,16 @@ zx_status_t UsbFunction::UsbFunctionEpClearStall(uint8_t ep_address) {
 
 size_t UsbFunction::UsbFunctionGetRequestSize() { return peripheral_->ParentRequestSize(); }
 
+void UsbFunction::ConnectToEndpoint(ConnectToEndpointRequest& request,
+                                    ConnectToEndpointCompleter::Sync& completer) {
+  auto status = peripheral_->ConnectToEndpoint(request.ep_addr(), std::move(request.ep()));
+  if (status != ZX_OK) {
+    completer.Reply(fit::as_error(status));
+    return;
+  }
+  completer.Reply(fit::ok());
+}
+
 zx_status_t UsbFunction::SetConfigured(bool configured, usb_speed_t speed) {
   if (function_intf_.is_valid()) {
     return function_intf_.SetConfigured(configured, speed);

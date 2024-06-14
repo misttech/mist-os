@@ -5,7 +5,8 @@
 use at_commands as at;
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
-use crate::peer::{service_level_connection::SlcState, update::AgUpdate};
+use crate::peer::service_level_connection::SlcState;
+use crate::peer::update::AgUpdate;
 
 /// Represents the Ring (Alert) procedures as defined in HFP v1.8 Section 4.13 - 4.14.
 ///
@@ -56,10 +57,9 @@ impl Procedure for RingProcedure {
 mod tests {
     use super::*;
 
-    use {
-        assert_matches::assert_matches, bt_hfp::call::Direction,
-        fidl_fuchsia_bluetooth_hfp::CallState,
-    };
+    use assert_matches::assert_matches;
+    use bt_hfp::call::Direction;
+    use fidl_fuchsia_bluetooth_hfp::CallState;
 
     use crate::peer::calls::Call;
 

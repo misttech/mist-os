@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{signals::RunState, task::CurrentTask, vfs::FdNumber};
+use crate::signals::RunState;
+use crate::task::CurrentTask;
+use crate::vfs::FdNumber;
 use fidl::AsHandleRef as _;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
@@ -10,17 +12,14 @@ use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
 use starnix_sync::{
     EventWaitGuard, InterruptibleEvent, Mutex, NotifyKind, PortEvent, PortWaitResult,
 };
-use starnix_uapi::{
-    error,
-    errors::{Errno, EINTR},
-    ownership::debug_assert_no_local_temp_ref,
-    vfs::FdEvents,
-};
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::{Arc, Weak},
-};
-use syncio::{zxio::zxio_signals_t, Zxio, ZxioSignals};
+use starnix_uapi::error;
+use starnix_uapi::errors::{Errno, EINTR};
+use starnix_uapi::ownership::debug_assert_no_local_temp_ref;
+use starnix_uapi::vfs::FdEvents;
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Weak};
+use syncio::zxio::zxio_signals_t;
+use syncio::{Zxio, ZxioSignals};
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum ReadyItemKey {
@@ -1065,14 +1064,10 @@ impl WaitQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fs::fuchsia::*,
-        testing::*,
-        vfs::{
-            buffers::{VecInputBuffer, VecOutputBuffer},
-            eventfd::{new_eventfd, EventFdType},
-        },
-    };
+    use crate::fs::fuchsia::*;
+    use crate::testing::*;
+    use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::eventfd::{new_eventfd, EventFdType};
     use assert_matches::assert_matches;
     use starnix_uapi::open_flags::OpenFlags;
 

@@ -2,25 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_utils::hanging_get::server::{HangingGet, Subscriber},
-    core::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    fidl::endpoints::ClientEnd,
-    fidl::prelude::*,
-    fidl_fuchsia_bluetooth_hfp::{
-        HeadsetGainMarker, HeadsetGainRequest, HeadsetGainRequestStream,
-        HeadsetGainWatchMicrophoneGainResponder, HeadsetGainWatchSpeakerGainResponder,
-    },
-    fuchsia_zircon as zx,
-    futures::{
-        ready,
-        stream::{FusedStream, Stream, StreamExt},
-    },
-    tracing::info,
+use async_utils::hanging_get::server::{HangingGet, Subscriber};
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use fidl::endpoints::ClientEnd;
+use fidl::prelude::*;
+use fidl_fuchsia_bluetooth_hfp::{
+    HeadsetGainMarker, HeadsetGainRequest, HeadsetGainRequestStream,
+    HeadsetGainWatchMicrophoneGainResponder, HeadsetGainWatchSpeakerGainResponder,
 };
+use fuchsia_zircon as zx;
+use futures::ready;
+use futures::stream::{FusedStream, Stream, StreamExt};
+use tracing::info;
 
 use super::update::AgUpdate;
 use crate::error::Error;
@@ -243,10 +237,10 @@ impl FusedStream for GainControl {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, async_utils::PollExt,
-        fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use async_utils::PollExt;
+    use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync};
 
     #[fuchsia::test]
     fn new_gain_control_succeeds() {

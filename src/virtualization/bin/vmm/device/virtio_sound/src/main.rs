@@ -11,19 +11,17 @@ mod throttled_log;
 mod wire;
 mod wire_convert;
 
-use {
-    crate::wire::{LE32, LE64},
-    crate::wire_convert::*,
-    anyhow::{anyhow, Context, Error},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization_hardware::{VirtioSoundRequest, VirtioSoundRequestStream},
-    fuchsia_zircon::{self as zx, DurationNum},
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-    once_cell::sync::Lazy,
-    service::VirtSoundService,
-    std::rc::Rc,
-    virtio_device::chain::ReadableChain,
-};
+use crate::wire::{LE32, LE64};
+use crate::wire_convert::*;
+use anyhow::{anyhow, Context, Error};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization_hardware::{VirtioSoundRequest, VirtioSoundRequestStream};
+use fuchsia_zircon::{self as zx, DurationNum};
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use once_cell::sync::Lazy;
+use service::VirtSoundService;
+use std::rc::Rc;
+use virtio_device::chain::ReadableChain;
 
 // TODO(https://fxbug.dev/323262398): Remove this hardcoded profile once we've switched to
 // RoleManager, which supports output parameters.

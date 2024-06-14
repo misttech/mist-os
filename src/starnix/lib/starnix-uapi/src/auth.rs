@@ -4,10 +4,8 @@
 
 #![allow(dead_code)]
 
-use crate::{
-    errors::{error, Errno},
-    gid_t, uapi, uid_t,
-};
+use crate::errors::{error, Errno};
+use crate::{gid_t, uapi, uid_t};
 use bitflags::bitflags;
 use std::ops;
 

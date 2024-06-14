@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{policy::PolicyError, rights::Rights},
-    clonable_error::ClonableError,
-    cm_rust::CapabilityTypeName,
-    cm_types::Name,
-    fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
-    moniker::{ChildName, Moniker, MonikerError},
-    router_error::{Explain, RouterError},
-    std::sync::Arc,
-    thiserror::Error,
-};
+use crate::policy::PolicyError;
+use crate::rights::Rights;
+use clonable_error::ClonableError;
+use cm_rust::CapabilityTypeName;
+use cm_types::Name;
+use moniker::{ChildName, Moniker, MonikerError};
+use router_error::{Explain, RouterError};
+use std::sync::Arc;
+use thiserror::Error;
+use {fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -25,6 +24,8 @@ pub enum ComponentInstanceError {
     InstanceNotFound { moniker: Moniker },
     #[error("component manager instance unavailable")]
     ComponentManagerInstanceUnavailable {},
+    #[error("expected a component instance, but got component manager's instance")]
+    ComponentManagerInstanceUnexpected {},
     #[error("malformed url {} for component instance {}", url, moniker)]
     MalformedUrl { url: String, moniker: Moniker },
     #[error("url {} for component {} does not resolve to an absolute url", url, moniker)]
@@ -47,7 +48,10 @@ impl ComponentInstanceError {
             | ComponentInstanceError::InstanceNotFound { .. }
             | ComponentInstanceError::ComponentManagerInstanceUnavailable {}
             | ComponentInstanceError::NoAbsoluteUrl { .. } => zx::Status::NOT_FOUND,
-            ComponentInstanceError::MalformedUrl { .. } => zx::Status::INTERNAL,
+            ComponentInstanceError::MalformedUrl { .. }
+            | ComponentInstanceError::ComponentManagerInstanceUnexpected { .. } => {
+                zx::Status::INTERNAL
+            }
         }
     }
 

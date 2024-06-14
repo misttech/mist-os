@@ -2,24 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_accessibility::{
-        ColorCorrectionMode, ColorTransformConfiguration, ColorTransformHandlerRequest,
-        ColorTransformHandlerRequestStream,
-    },
-    fidl_fuchsia_ui_brightness::{
-        ColorAdjustmentHandlerRequest, ColorAdjustmentHandlerRequestStream, ColorAdjustmentRequest,
-        ColorAdjustmentRequestStream,
-    },
-    fidl_fuchsia_ui_display_color as fidl_color,
-    fidl_fuchsia_ui_policy::{DisplayBacklightRequest, DisplayBacklightRequestStream},
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    futures::stream::TryStreamExt,
-    scene_management::SceneManagerTrait,
-    std::sync::Arc,
-    tracing::{error, info, warn},
+use fidl_fuchsia_accessibility::{
+    ColorCorrectionMode, ColorTransformConfiguration, ColorTransformHandlerRequest,
+    ColorTransformHandlerRequestStream,
 };
+use fidl_fuchsia_ui_brightness::{
+    ColorAdjustmentHandlerRequest, ColorAdjustmentHandlerRequestStream, ColorAdjustmentRequest,
+    ColorAdjustmentRequestStream,
+};
+use fidl_fuchsia_ui_policy::{DisplayBacklightRequest, DisplayBacklightRequestStream};
+use futures::lock::Mutex;
+use futures::stream::TryStreamExt;
+use scene_management::SceneManagerTrait;
+use std::sync::Arc;
+use tracing::{error, info, warn};
+use {fidl_fuchsia_ui_display_color as fidl_color, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const ZERO_OFFSET: [f32; 3] = [0., 0., 0.];
 

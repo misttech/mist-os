@@ -4,7 +4,8 @@
 
 use crate::Task;
 
-use futures::{channel::mpsc, Future, StreamExt};
+use futures::channel::mpsc;
+use futures::{Future, StreamExt};
 
 /// Errors that can be returned by this crate.
 #[derive(Debug, thiserror::Error)]
@@ -95,10 +96,8 @@ impl TaskSink {
 mod tests {
     use super::*;
     use crate::SendExecutor;
-    use std::sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    };
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
 
     // Notifies a channel when dropped, signifying completion of some operation.
     #[derive(Clone)]

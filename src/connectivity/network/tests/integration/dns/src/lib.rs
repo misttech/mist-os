@@ -4,55 +4,46 @@
 
 #![cfg(test)]
 
-use std::{
-    convert::{TryFrom as _, TryInto as _},
-    num::NonZeroU16,
-    pin::pin,
-    str::FromStr as _,
-};
+use std::convert::{TryFrom as _, TryInto as _};
+use std::num::NonZeroU16;
+use std::pin::pin;
+use std::str::FromStr as _;
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcp as net_dhcp;
-use fidl_fuchsia_net_dhcpv6 as net_dhcpv6;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_interfaces as net_interfaces;
-use fidl_fuchsia_net_name as net_name;
-use fidl_fuchsia_testing as ftesting;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
-use fuchsia_zircon as zx;
-
-use futures::{
-    future::{self, FusedFuture, Future, FutureExt as _},
-    stream::{self, StreamExt as _},
-    AsyncReadExt as _, AsyncWriteExt as _,
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as net_dhcp,
+    fidl_fuchsia_net_dhcpv6 as net_dhcpv6, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_interfaces as net_interfaces, fidl_fuchsia_net_name as net_name,
+    fidl_fuchsia_testing as ftesting, fuchsia_zircon as zx,
 };
+
+use futures::future::{self, FusedFuture, Future, FutureExt as _};
+use futures::stream::{self, StreamExt as _};
+use futures::{AsyncReadExt as _, AsyncWriteExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_ip_v6, fidl_subnet, std_ip_v6, std_socket_addr};
 use net_types::ip as net_types_ip;
 use netemul::{InStack, RealmTcpListener as _, RealmUdpSocket as _};
+use netstack_testing_common::constants::ipv6 as ipv6_consts;
+use netstack_testing_common::ndp::send_ra_with_router_lifetime;
+use netstack_testing_common::realms::{
+    KnownServiceProvider, Manager, ManagerConfig, Netstack, TestSandboxExt as _,
+};
 use netstack_testing_common::{
-    constants::ipv6 as ipv6_consts,
-    interfaces,
-    ndp::send_ra_with_router_lifetime,
-    pause_fake_clock,
-    realms::{KnownServiceProvider, Manager, ManagerConfig, Netstack, TestSandboxExt as _},
-    wait_for_component_stopped, Result, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    interfaces, pause_fake_clock, wait_for_component_stopped, Result,
+    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
-use packet::{
-    serialize::{InnerPacketBuilder as _, Serializer as _},
-    ParsablePacket as _,
+use packet::serialize::{InnerPacketBuilder as _, Serializer as _};
+use packet::ParsablePacket as _;
+use packet_formats::ethernet::{
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt as _,
+    ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
-use packet_formats::{
-    ethernet::{
-        EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
-        EthernetIpExt as _, ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    icmp::ndp::options::{NdpOptionBuilder, RecursiveDnsServer},
-    ip::{IpPacket as _, IpProto, Ipv6Proto},
-    ipv6::{Ipv6Packet, Ipv6PacketBuilder},
-    udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs},
-};
+use packet_formats::icmp::ndp::options::{NdpOptionBuilder, RecursiveDnsServer};
+use packet_formats::ip::{IpPacket as _, IpProto, Ipv6Proto};
+use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketBuilder};
+use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use packet_formats_dhcp::v6;
 
 #[netstack_test]
@@ -542,10 +533,8 @@ const EXAMPLE_IPV6_ADDR: fnet::IpAddress = fidl_ip!("2606:2800:220:1:248:1893:25
 
 #[netstack_test]
 async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(name: &str) {
-    use trust_dns_proto::{
-        op::{Message, ResponseCode},
-        rr::RecordType,
-    };
+    use trust_dns_proto::op::{Message, ResponseCode};
+    use trust_dns_proto::rr::RecordType;
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox
@@ -695,10 +684,8 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
 #[netstack_test]
 async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
     use itertools::Itertools as _;
-    use trust_dns_proto::{
-        op::{Message, ResponseCode},
-        rr::RecordType,
-    };
+    use trust_dns_proto::op::{Message, ResponseCode};
+    use trust_dns_proto::rr::RecordType;
 
     #[derive(Debug)]
     struct FallbackTestCase {

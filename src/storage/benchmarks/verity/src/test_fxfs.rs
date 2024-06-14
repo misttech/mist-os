@@ -1,17 +1,17 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_fxfs_test::{TestFxfsAdminRequest, TestFxfsAdminRequestStream},
-    fidl_fuchsia_io as fio,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_fs::directory::open_in_namespace,
-    fuchsia_storage_benchmarks_lib::{block_devices::FvmVolumeFactory, filesystems::fxfs::Fxfs},
-    futures::StreamExt,
-    storage_benchmarks::{CacheClearableFilesystem, Filesystem, FilesystemConfig},
-    vfs::{directory::helper::DirectlyMutable, remote::remote_dir},
-};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_fxfs_test::{TestFxfsAdminRequest, TestFxfsAdminRequestStream};
+use fidl_fuchsia_io as fio;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_fs::directory::open_in_namespace;
+use fuchsia_storage_benchmarks_lib::block_devices::FvmVolumeFactory;
+use fuchsia_storage_benchmarks_lib::filesystems::fxfs::Fxfs;
+use futures::StreamExt;
+use storage_benchmarks::{CacheClearableFilesystem, Filesystem, FilesystemConfig};
+use vfs::directory::helper::DirectlyMutable;
+use vfs::remote::remote_dir;
 
 enum IncomingRequest {
     TestAdmin(TestFxfsAdminRequestStream),

@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context, Result};
-use fastboot::{
-    command::{ClientVariable, Command},
-    reply::Reply,
-    send,
-};
+use fastboot::command::{ClientVariable, Command};
+use fastboot::reply::Reply;
+use fastboot::send;
 use fuchsia_async::{Task, Timer};
 use std::collections::BTreeSet;
 use std::time::Duration;
@@ -391,10 +389,8 @@ mod test {
     use super::*;
     use futures::channel::mpsc::unbounded;
     use pretty_assertions::assert_eq;
-    use std::{
-        collections::{HashMap, VecDeque},
-        sync::{Arc, Mutex},
-    };
+    use std::collections::{HashMap, VecDeque};
+    use std::sync::{Arc, Mutex};
 
     struct TestFastbootUsbTester {
         serial_to_is_fastboot: HashMap<String, bool>,

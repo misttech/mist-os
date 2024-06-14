@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 use crate::config::SshConfig;
 use crate::parse::ParseSshConnectionError;
-use anyhow::Context as _;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context as _, Result};
 use ffx_config::EnvironmentContext;
 use fuchsia_async::TimeoutExt;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::process::Command;
 use std::time::Duration;
-use std::{net::SocketAddr, path::PathBuf, process::Command};
 use tokio::io::AsyncRead;
 
 const SSH_PRIV: &str = "ssh.priv";

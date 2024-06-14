@@ -4,10 +4,10 @@
 
 #![cfg(test)]
 
-use {
-    anyhow::Error, fidl_fuchsia_hwinfo::DeviceMarker, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-};
+use anyhow::Error;
+use fidl_fuchsia_hwinfo::DeviceMarker;
+use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
 
 #[fasync::run_singlethreaded(test)]
 async fn request_device_info() -> Result<(), Error> {

@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    borrow::Cow,
-    cell::{RefCell, RefMut},
-    rc::Rc,
-};
+use std::borrow::Cow;
+use std::cell::{RefCell, RefMut};
+use std::rc::Rc;
 
 use rustc_hash::FxHashMap;
-use surpass::{
-    layout::Layout,
-    painter::{self, CachedTile, Channel, Color, LayerProps, Props, Rect},
-    rasterizer::Rasterizer,
-    Order, TILE_HEIGHT, TILE_WIDTH,
-};
+use surpass::layout::Layout;
+use surpass::painter::{self, CachedTile, Channel, Color, LayerProps, Props, Rect};
+use surpass::rasterizer::Rasterizer;
+use surpass::{Order, TILE_HEIGHT, TILE_WIDTH};
 
-use crate::{
-    buffer::{Buffer, BufferLayerCache},
-    Composition, Layer,
-};
+use crate::buffer::{Buffer, BufferLayerCache};
+use crate::{Composition, Layer};
 
 use crate::small_bit_set::SmallBitSet;
 

@@ -5,10 +5,13 @@
 use anyhow::Result;
 use argh::FromArgs;
 use ffx_command::CliArgsInfo;
-use ffx_config::{environment::ExecutableKind, EnvironmentContext, SdkRoot};
+use ffx_config::environment::ExecutableKind;
+use ffx_config::{EnvironmentContext, SdkRoot};
 use ffx_isolate::{Isolate, SearchContext};
 use serde::Serialize;
-use std::{fs, io::Write, path::PathBuf};
+use std::fs;
+use std::io::Write;
+use std::path::PathBuf;
 
 #[derive(FromArgs)]
 /// CLI tool for generating golden JSON files for

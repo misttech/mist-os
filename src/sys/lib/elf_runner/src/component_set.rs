@@ -3,14 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{ElfComponent, ElfComponentInfo};
-use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 use id::Id;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Weak},
-};
+use std::collections::HashMap;
+use std::sync::{Arc, Weak};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// [`ComponentSet`] tracks all the components executing inside an ELF runner,
 /// and presents an iterator over those components. It does this under the
@@ -166,13 +163,12 @@ mod tests {
     use fuchsia_zircon as zx;
     use futures::FutureExt;
     use moniker::Moniker;
-    use std::{
-        future,
-        sync::atomic::{AtomicUsize, Ordering},
-        task::Poll,
-    };
+    use std::future;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::task::Poll;
 
-    use crate::{runtime_dir::RuntimeDirectory, Job};
+    use crate::runtime_dir::RuntimeDirectory;
+    use crate::Job;
 
     #[test]
     fn test_add_remove_component() {

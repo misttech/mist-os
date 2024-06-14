@@ -9,6 +9,4 @@
 mod package_list;
 
 // Classes used to generate package lists.
-pub use package_list::PackageList;
-pub use package_list::PackageUrlList;
-pub use package_list::WritablePackageList;
+pub use package_list::{PackageList, PackageUrlList, WritablePackageList};

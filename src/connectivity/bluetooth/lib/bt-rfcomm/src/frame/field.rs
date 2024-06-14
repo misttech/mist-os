@@ -4,7 +4,8 @@
 
 use bitfield::bitfield;
 
-use crate::frame::{error::FrameParseError, FrameTypeMarker};
+use crate::frame::error::FrameParseError;
+use crate::frame::FrameTypeMarker;
 use crate::DLCI;
 
 /// The Address field is the first byte in the frame. See GSM 7.10 Section 5.2.1.2.

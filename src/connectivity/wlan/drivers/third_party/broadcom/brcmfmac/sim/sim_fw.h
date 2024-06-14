@@ -243,6 +243,14 @@ class SimFirmware {
   void TriggerFirmwareDisassoc(wlan_ieee80211::ReasonCode reason);
   void TriggerFirmwareDeauth(wlan_ieee80211::ReasonCode reason);
 
+  // Allows simulation of a disassoc ind coming from an unexpected BSS.
+  void TriggerFirmwareDisassocIndFromBssid(wlan_ieee80211::ReasonCode reason,
+                                           const uint8_t bssid[ETH_ALEN]);
+
+  // Allows simulation of a deauth ind coming from an unexpected BSS.
+  void TriggerFirmwareDeauthIndFromBssid(wlan_ieee80211::ReasonCode reason,
+                                         const uint8_t bssid[ETH_ALEN]);
+
   // Firmware iovar accessors
   zx_status_t IovarsSet(uint16_t ifidx, const char* name, const void* value, size_t value_len,
                         bcme_status_t* fw_err);

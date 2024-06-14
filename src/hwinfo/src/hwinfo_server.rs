@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::config::{BoardInfo, DeviceInfo, ProductInfo},
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_hwinfo::{
-        BoardRequest, BoardRequestStream, DeviceRequest, DeviceRequestStream, ProductRequest,
-        ProductRequestStream,
-    },
-    fuchsia_async as fasync,
-    futures::prelude::*,
-    std::sync::{Arc, RwLock},
+use crate::config::{BoardInfo, DeviceInfo, ProductInfo};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_hwinfo::{
+    BoardRequest, BoardRequestStream, DeviceRequest, DeviceRequestStream, ProductRequest,
+    ProductRequestStream,
 };
+use fuchsia_async as fasync;
+use futures::prelude::*;
+use std::sync::{Arc, RwLock};
 
 type DeviceInfoTable = Arc<RwLock<DeviceInfo>>;
 

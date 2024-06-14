@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    io_conformance_util::{test_harness::TestHarness, *},
-};
+use io_conformance_util::test_harness::TestHarness;
+use io_conformance_util::*;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn get_token_with_sufficient_rights() {

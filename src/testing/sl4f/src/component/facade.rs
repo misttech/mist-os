@@ -8,14 +8,15 @@ use crate::component::types::{
 };
 use anyhow::{format_err, Context as _, Error};
 use component_debug::cli::{list_cmd_serialized, show_cmd_serialized, ListFilter};
-use component_events::{events::*, matcher::*};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_decl as fcdecl;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as fsys;
+use component_events::events::*;
+use component_events::matcher::*;
 use fuchsia_component::client;
 use serde_json::{from_value, Value};
 use tracing::info;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcdecl,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+};
 
 // CFv2 components will be launched in the collection with this name.
 static LAUNCHED_COMPONENTS_COLLECTION_NAME: &'static str = "launched_components";

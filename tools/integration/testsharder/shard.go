@@ -63,6 +63,10 @@ type Shard struct {
 	// BootupTimeoutSecs is the timeout in seconds that the provided product
 	// bundle/environment is expected to take to boot up the target.
 	BootupTimeoutSecs int `json:"bootup_timeout_secs,omitempty"`
+
+	// ExpectsSSH specifies whether the test is expected to run against
+	// a product bundle that supports SSH.
+	ExpectsSSH bool `json:"expects_ssh,omitempty"`
 }
 
 // TargetCPU returns the CPU architecture of the target this shard will run against.
@@ -247,6 +251,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 		})
 
 		tests := []Test{}
+		expectsSSH := false
 		for _, spec := range specs {
 			test := Test{Test: spec.Test, Runs: 1}
 			testListEntry, exists := testListEntries[spec.Test.Name]
@@ -260,17 +265,22 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					Tests:             []Test{test},
 					ProductBundle:     spec.ProductBundle,
 					BootupTimeoutSecs: spec.BootupTimeoutSecs,
+					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
 				})
 			} else {
+				if spec.ExpectsSSH {
+					expectsSSH = true
+				}
 				tests = append(tests, test)
 			}
 		}
 		if len(tests) > 0 {
 			shards = append(shards, &Shard{
-				Name:  environmentName(e),
-				Tests: tests,
-				Env:   e,
+				Name:       environmentName(e),
+				Tests:      tests,
+				ExpectsSSH: expectsSSH,
+				Env:        e,
 			})
 		}
 	}

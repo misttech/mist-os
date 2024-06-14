@@ -24,6 +24,8 @@ gidl("conformance_tests_py") {
 }
 
 python_host_test("fuchsia_controller_conformance_tests") {
+  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
+  enable_mypy = false
   libraries = [
     ":fidl_bindings",
     ":fuchsia_controller_py",
@@ -137,6 +139,8 @@ python_c_extension("fuchsia_controller_internal") {
 }
 
 python_library("fuchsia_controller_py") {
+  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
+  enable_mypy = false
   library_name = "fuchsia_controller_py"
   source_root = "python/fuchsia_controller_py"
   library_deps = [
@@ -147,6 +151,8 @@ python_library("fuchsia_controller_py") {
 }
 
 python_library("fidl_bindings") {
+  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
+  enable_mypy = false
   library_name = "fidl"
   source_root = "python/fidl"
   library_deps = [
@@ -166,6 +172,7 @@ python_library("fidl_bindings") {
 }
 
 python_binary("example") {
+  enable_mypy = true
   main_source = "python/example.py"
   deps = [
     ":fidl_bindings",

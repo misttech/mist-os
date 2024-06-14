@@ -4,10 +4,8 @@
 
 use std::path::Path;
 
-use crate::{
-    mapping::{postprocess, preprocess, replace_regex},
-    EnvironmentContext,
-};
+use crate::mapping::{postprocess, preprocess, replace_regex};
+use crate::EnvironmentContext;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;

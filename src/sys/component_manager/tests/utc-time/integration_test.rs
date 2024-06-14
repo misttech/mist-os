@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use component_events::{
-    matcher::*,
-    sequence::{EventSequence, Ordering},
-};
+use component_events::matcher::*;
+use component_events::sequence::{EventSequence, Ordering};
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_io as fio;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::*;
-use futures::{future::BoxFuture, FutureExt, StreamExt};
+use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt};
 use tracing::*;
-use vfs::{
-    directory::entry_container::Directory, execution_scope::ExecutionScope, file::vmo::read_only,
-    pseudo_directory,
-};
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::read_only;
+use vfs::pseudo_directory;
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
 // This value must be kept consistent with the value in maintainer.rs
 const EXPECTED_BACKSTOP_TIME_SEC_STR: &str = "1589910459";

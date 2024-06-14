@@ -5,53 +5,48 @@
 //! The Ethernet protocol.
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, num::NonZeroU32};
+use core::fmt::Debug;
+use core::num::NonZeroU32;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 
 use const_unwrap::const_unwrap_option;
-use net_types::{
-    ethernet::Mac,
-    ip::{GenericOverIp, Ip, IpAddress, IpMarked, Ipv4, Ipv6, Mtu},
-    BroadcastAddress, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
-};
+use log::{error, trace};
+use net_types::ethernet::Mac;
+use net_types::ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6, Mtu};
+use net_types::{BroadcastAddress, MulticastAddr, UnicastAddr, Witness};
+use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult};
+use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
-    sync::{Mutex, RwLock},
     trace_duration, CoreTimerContext, Device, DeviceIdContext, FrameDestination, HandleableTimer,
     LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta,
     ResourceCounterContext, RngContext, SendableFrameMeta, TimerContext, TimerHandler,
     TracingContext, WeakDeviceIdentifier,
 };
-use netstack3_ip::{
-    nud::{
-        LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
-    },
-    IpTypesIpExt, WrapBroadcastMarker,
+use netstack3_ip::nud::{
+    LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
 };
+use netstack3_ip::{IpPacketDestination, IpTypesIpExt, WrapBroadcastMarker};
 use packet::{Buf, BufferMut, Nested, Serializer};
-use packet_formats::{
-    arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
-    ethernet::{
-        EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
-        ETHERNET_HDR_LEN_NO_TAG,
-    },
+use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
+use packet_formats::ethernet::{
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
+    ETHERNET_HDR_LEN_NO_TAG,
 };
-use tracing::trace;
 
-use crate::internal::{
-    arp::{ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId},
-    base::{DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters},
-    id::EthernetDeviceId,
-    queue::{
-        tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
-        DequeueState, TransmitQueueFrameError,
-    },
-    socket::{
-        DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
-        ReceivedFrame,
-    },
-    state::{DeviceStateSpec, IpLinkDeviceState},
+use crate::internal::arp::{ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId};
+use crate::internal::base::{
+    DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters,
 };
+use crate::internal::id::{DeviceId, EthernetDeviceId};
+use crate::internal::queue::tx::{
+    BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState,
+};
+use crate::internal::queue::{DequeueState, TransmitQueueFrameError};
+use crate::internal::socket::{
+    DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
+    ReceivedFrame,
+};
+use crate::internal::state::{DeviceStateSpec, IpLinkDeviceState};
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
@@ -163,7 +158,7 @@ where
         }
         Err(TransmitQueueFrameError::NoQueue(e)) => {
             core_ctx.increment(device_id, |counters| &counters.send_dropped_no_queue);
-            tracing::error!("device {device_id:?} not ready to send frame: {e:?}");
+            error!("device {device_id:?} not ready to send frame: {e:?}");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(s)) => {
@@ -404,47 +399,32 @@ where
 /// serializer. It computes the routing information, serializes
 /// the serializer, and sends the resulting buffer in a new Ethernet
 /// frame.
-pub fn send_ip_frame<BC, CC, A, S>(
+pub fn send_ip_frame<BC, CC, I, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
-    local_addr: SpecifiedAddr<A>,
+    destination: IpPacketDestination<I, &DeviceId<BC>>,
     body: S,
-    broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
     BC: EthernetIpLinkDeviceBindingsContext + LinkResolutionContext<EthernetLinkDevice>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-        + NudHandler<A::Version, EthernetLinkDevice, BC>
+        + NudHandler<I, EthernetLinkDevice, BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
-    A: IpAddress,
+    I: EthernetIpExt + IpTypesIpExt,
     S: Serializer,
     S::Buffer: BufferMut,
-    A::Version: EthernetIpExt + IpTypesIpExt,
 {
-    fn increment_counter<I: Ip>(counters: &DeviceCounters) {
-        let () = I::map_ip(
-            (),
-            |()| counters.send_ipv4_frame.increment(),
-            |()| counters.send_ipv6_frame.increment(),
-        );
-    }
-    core_ctx.with_per_resource_counters(device_id, increment_counter::<A::Version>);
-    core_ctx.with_counters(increment_counter::<A::Version>);
+    core_ctx.increment(device_id, DeviceCounters::send_frame::<I>);
 
-    trace!(
-        "ethernet::send_ip_frame: local_addr = {:?}; device = {:?}; broadcast = {:?}",
-        local_addr,
-        device_id,
-        broadcast
-    );
+    trace!("ethernet::send_ip_frame: destination = {:?}; device = {:?}", destination, device_id);
 
     let body = body.with_size_limit(get_mtu(core_ctx, device_id).get() as usize);
 
-    match broadcast {
-        Some(marker) => {
-            <A::Version as Ip>::map_ip::<_, ()>(
+    match destination {
+        IpPacketDestination::Broadcast(marker) => {
+            I::map_ip::<_, ()>(
                 WrapBroadcastMarker(marker),
                 |WrapBroadcastMarker(())| (),
                 |WrapBroadcastMarker(never)| match never {},
@@ -455,28 +435,26 @@ where
                 device_id,
                 Mac::BROADCAST,
                 body,
-                A::Version::ETHER_TYPE,
+                I::ETHER_TYPE,
             )
         }
-        None => {
-            if let Some(multicast) = MulticastAddr::new(local_addr.get()) {
-                send_as_ethernet_frame_to_dst(
-                    core_ctx,
-                    bindings_ctx,
-                    device_id,
-                    Mac::from(&multicast),
-                    body,
-                    A::Version::ETHER_TYPE,
-                )
-            } else {
-                NudHandler::<A::Version, _, _>::send_ip_packet_to_neighbor(
-                    core_ctx,
-                    bindings_ctx,
-                    device_id,
-                    local_addr,
-                    body,
-                )
-            }
+        IpPacketDestination::Multicast(multicast_ip) => send_as_ethernet_frame_to_dst(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            Mac::from(&multicast_ip),
+            body,
+            I::ETHER_TYPE,
+        ),
+        IpPacketDestination::Neighbor(ip) => NudHandler::<I, _, _>::send_ip_packet_to_neighbor(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            ip,
+            body,
+        ),
+        IpPacketDestination::Loopback(_) => {
+            unreachable!("Loopback packets must be delivered through the loopback device")
         }
     }
     .map_err(Nested::into_inner)
@@ -897,23 +875,24 @@ mod tests {
     use alloc::vec;
 
     use net_types::ip::{Ipv4Addr, Ipv6Addr};
-    use netstack3_base::{
-        testutil::{FakeDeviceId, FakeInstant, FakeWeakDeviceId, TEST_ADDRS_V4},
-        CounterContext, CtxPair, IntoCoreTimerCtx,
-    };
+    use net_types::SpecifiedAddr;
+    use netstack3_base::testutil::{FakeDeviceId, FakeInstant, FakeWeakDeviceId, TEST_ADDRS_V4};
+    use netstack3_base::{CounterContext, CtxPair, IntoCoreTimerCtx};
     use netstack3_ip::nud::{
         self, DelegateNudContext, DynamicNeighborUpdateSource, NeighborApi, UseDelegateNudContext,
     };
     use packet_formats::testutil::parse_ethernet_frame;
 
     use super::*;
-    use crate::internal::{
-        arp::{ArpConfigContext, ArpContext, ArpCounters, ArpNudCtx, ArpSenderContext},
-        base::DeviceSendFrameError,
-        ethernet::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        queue::tx::{TransmitQueueBindingsContext, TransmitQueueCommon, TransmitQueueContext},
-        socket::{Frame, ParseSentFrameError, SentFrame},
+    use crate::internal::arp::{
+        ArpConfigContext, ArpContext, ArpCounters, ArpNudCtx, ArpSenderContext,
     };
+    use crate::internal::base::DeviceSendFrameError;
+    use crate::internal::ethernet::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+    use crate::internal::queue::tx::{
+        TransmitQueueBindingsContext, TransmitQueueCommon, TransmitQueueContext,
+    };
+    use crate::internal::socket::{Frame, ParseSentFrameError, SentFrame};
 
     struct FakeEthernetCtx {
         static_state: StaticEthernetDeviceState,
@@ -1358,9 +1337,8 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 &FakeDeviceId,
-                TEST_ADDRS_V4.remote_ip,
+                IpPacketDestination::<Ipv4, _>::Neighbor(TEST_ADDRS_V4.remote_ip),
                 Buf::new(&mut vec![0; size], ..),
-                None,
             )
             .map_err(|_serializer| ());
             let sent_frames = core_ctx.inner.frames().len();
@@ -1385,9 +1363,8 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &FakeDeviceId,
-            TEST_ADDRS_V4.remote_ip,
+            IpPacketDestination::<Ipv4, _>::Broadcast(()),
             Buf::new(&mut vec![0; 100], ..),
-            /* broadcast */ Some(()),
         )
         .map_err(|_serializer| ())
         .expect("send_ip_frame should succeed");

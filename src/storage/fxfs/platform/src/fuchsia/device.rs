@@ -1,31 +1,28 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::fuchsia::{errors::map_to_status, file::FxFile, node::OpenedNode},
-    anyhow::Error,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_hardware_block as block,
-    fidl_fuchsia_hardware_block_volume::{
-        self as volume, VolumeAndNodeMarker, VolumeAndNodeRequest,
-    },
-    fidl_fuchsia_io as fio,
-    fuchsia_async::{self as fasync, FifoReadable, FifoWritable},
-    fuchsia_zircon as zx,
-    futures::{stream::TryStreamExt, try_join},
-    fxfs::{
-        errors::FxfsError,
-        round::{round_down, round_up},
-    },
-    remote_block_device::{BlockFifoRequest, BlockFifoResponse},
-    rustc_hash::FxHashMap as HashMap,
-    std::{
-        collections::BTreeMap,
-        hash::{Hash, Hasher},
-        sync::Mutex,
-    },
-    vfs::{execution_scope::ExecutionScope, file::File, node::Node},
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::file::FxFile;
+use crate::fuchsia::node::OpenedNode;
+use anyhow::Error;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_hardware_block_volume::{
+    self as volume, VolumeAndNodeMarker, VolumeAndNodeRequest,
 };
+use fuchsia_async::{self as fasync, FifoReadable, FifoWritable};
+use futures::stream::TryStreamExt;
+use futures::try_join;
+use fxfs::errors::FxfsError;
+use fxfs::round::{round_down, round_up};
+use remote_block_device::{BlockFifoRequest, BlockFifoResponse};
+use rustc_hash::FxHashMap as HashMap;
+use std::collections::BTreeMap;
+use std::hash::{Hash, Hasher};
+use std::sync::Mutex;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::File;
+use vfs::node::Node;
+use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 // Multiple Block I/O request may be sent as a group.
 // Notes:
@@ -617,19 +614,17 @@ impl BlockServer {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::fuchsia::testing::{open_file_checked, TestFixture},
-        fidl::endpoints::{ClientEnd, ServerEnd},
-        fidl_fuchsia_device::ControllerMarker,
-        fidl_fuchsia_hardware_block::BlockMarker,
-        fidl_fuchsia_hardware_block_volume::VolumeAndNodeMarker,
-        fidl_fuchsia_io as fio,
-        fs_management::{filesystem::Filesystem, Blobfs},
-        fuchsia_zircon as zx,
-        futures::join,
-        remote_block_device::{BlockClient, RemoteBlockClient, VmoId},
-        rustc_hash::FxHashSet as HashSet,
-    };
+    use crate::fuchsia::testing::{open_file_checked, TestFixture};
+    use fidl::endpoints::{ClientEnd, ServerEnd};
+    use fidl_fuchsia_device::ControllerMarker;
+    use fidl_fuchsia_hardware_block::BlockMarker;
+    use fidl_fuchsia_hardware_block_volume::VolumeAndNodeMarker;
+    use fs_management::filesystem::Filesystem;
+    use fs_management::Blobfs;
+    use futures::join;
+    use remote_block_device::{BlockClient, RemoteBlockClient, VmoId};
+    use rustc_hash::FxHashSet as HashSet;
+    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     #[fuchsia::test(threads = 10)]
     async fn test_block_server() {

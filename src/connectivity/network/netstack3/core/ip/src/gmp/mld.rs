@@ -8,43 +8,37 @@
 //! IGMPv2. One important difference to note is that MLD uses ICMPv6 (IP
 //! Protocol 58) message types, rather than IGMP (IP Protocol 2) message types.
 
-use core::{convert::Infallible as Never, time::Duration};
+use core::convert::Infallible as Never;
+use core::time::Duration;
 
-use net_types::{
-    ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr},
-    LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness,
-};
+use log::{debug, error};
+use net_types::ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr};
+use net_types::{LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness};
 use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer, Instant, WeakDeviceIdentifier};
 use netstack3_filter as filter;
-use packet::{serialize::Serializer, InnerPacketBuilder};
-use packet_formats::{
-    icmp::{
-        mld::{
-            IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, MulticastListenerDone,
-            MulticastListenerReport,
-        },
-        IcmpPacketBuilder, IcmpUnusedCode,
-    },
-    ip::Ipv6Proto,
-    ipv6::{
-        ext_hdrs::{ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData},
-        Ipv6PacketBuilder, Ipv6PacketBuilderWithHbhOptions,
-    },
-    utils::NonZeroDuration,
+use packet::serialize::Serializer;
+use packet::InnerPacketBuilder;
+use packet_formats::icmp::mld::{
+    IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, MulticastListenerDone,
+    MulticastListenerReport,
 };
+use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::ip::Ipv6Proto;
+use packet_formats::ipv6::ext_hdrs::{
+    ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData,
+};
+use packet_formats::ipv6::{Ipv6PacketBuilder, Ipv6PacketBuilderWithHbhOptions};
+use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
-use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
-use crate::internal::{
-    base::IpLayerHandler,
-    device::IpDeviceSendContext,
-    gmp::{
-        gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
-        GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
-        GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
-        ProtocolSpecific, QueryTarget,
-    },
+use crate::internal::base::{IpLayerHandler, IpPacketDestination};
+use crate::internal::device::IpDeviceSendContext;
+use crate::internal::gmp::{
+    gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
+    GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
+    GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
+    ProtocolSpecific, QueryTarget,
 };
 
 /// The bindings types for MLD.
@@ -126,6 +120,10 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
                             body.max_response_delay(),
                         )
                     })
+            }
+            MldPacket::MulticastListenerQueryV2(_msg) => {
+                debug!("TODO(https://fxbug.dev/42071006): Support MLDv2");
+                return;
             }
             MldPacket::MulticastListenerReport(msg) => {
                 let addr = msg.body().group_addr();
@@ -407,46 +405,34 @@ fn send_mld_packet<
             .unwrap(),
         );
 
-    IpLayerHandler::send_ip_frame(
-        core_ctx,
-        bindings_ctx,
-        &device,
-        dst_ip.into_specified(),
-        body,
-        None,
-    )
-    .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
+    let destination = IpPacketDestination::Multicast(dst_ip);
+    IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
+        .map_err(|_| MldError::SendFailure { addr: group_addr.into() })
 }
 
 #[cfg(test)]
 mod tests {
 
     use assert_matches::assert_matches;
-    use net_types::{
-        ethernet::Mac,
-        ip::{Ip as _, IpVersionMarker},
+    use net_types::ethernet::Mac;
+    use net_types::ip::{Ip as _, IpVersionMarker};
+    use netstack3_base::testutil::{
+        assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
+        FakeWeakDeviceId,
     };
-    use netstack3_base::{
-        testutil::{
-            assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
-            FakeWeakDeviceId,
-        },
-        CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext,
-    };
+    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext};
     use netstack3_filter::ProofOfEgressCheck;
     use packet::{BufferMut, ParseBuffer};
-    use packet_formats::icmp::{
-        mld::MulticastListenerQuery, IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet,
-    };
+    use packet_formats::icmp::mld::MulticastListenerQuery;
+    use packet_formats::icmp::{IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet};
 
     use super::*;
-    use crate::internal::{
-        base::{self, testutil::FakeIpDeviceIdCtx, IpLayerPacketMetadata, SendIpPacketMeta},
-        gmp::{
-            GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
-            QueryReceivedActions, QueryReceivedGenericAction,
-        },
-        types::IpTypesIpExt,
+    use crate::internal::base::{
+        self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta,
+    };
+    use crate::internal::gmp::{
+        GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
+        QueryReceivedActions, QueryReceivedGenericAction,
     };
 
     /// Metadata for sending an MLD packet in an IP packet.
@@ -470,7 +456,6 @@ mod tests {
         gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
         mld_enabled: bool,
         ipv6_link_local: Option<LinkLocalUnicastAddr<Ipv6Addr>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
     fn new_context() -> FakeCtxImpl {
@@ -483,15 +468,8 @@ mod tests {
                 ),
                 mld_enabled: true,
                 ipv6_link_local: None,
-                ip_device_id_ctx: Default::default(),
             })
         })
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeMldCtx {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
     }
 
     type FakeCtxImpl = CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl>;
@@ -563,9 +541,8 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtxImpl,
             device: &Self::DeviceId,
-            next_hop: SpecifiedAddr<<Ipv6 as Ip>::Addr>,
+            destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             body: S,
-            broadcast: Option<<Ipv6 as IpTypesIpExt>::BroadcastMarker>,
         ) -> Result<(), S>
         where
             S: Serializer + netstack3_filter::IpPacket<Ipv6>,
@@ -575,9 +552,8 @@ mod tests {
                 self,
                 bindings_ctx,
                 device,
-                next_hop,
+                destination,
                 body,
-                broadcast,
                 IpLayerPacketMetadata::default(),
             )
         }
@@ -588,23 +564,19 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtxImpl,
             device_id: &Self::DeviceId,
-            local_addr: SpecifiedAddr<Ipv6Addr>,
+            destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             body: S,
-            _broadcast: Option<Never>,
             ProofOfEgressCheck { .. }: ProofOfEgressCheck,
         ) -> Result<(), S>
         where
             S: Serializer,
             S::Buffer: BufferMut,
         {
-            self.send_frame(
-                bindings_ctx,
-                MldFrameMetadata::new(
-                    device_id.clone(),
-                    MulticastAddr::new(local_addr.get()).expect("addr should be multicast"),
-                ),
-                body,
-            )
+            let addr = match destination {
+                IpPacketDestination::Multicast(addr) => addr,
+                _ => panic!("destination is not multicast: {:?}", destination),
+            };
+            self.send_frame(bindings_ctx, MldFrameMetadata::new(device_id.clone(), addr), body)
         }
     }
 

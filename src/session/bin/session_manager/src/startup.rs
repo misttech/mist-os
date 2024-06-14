@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::cobalt;
+use fidl::endpoints::{create_proxy, ServerEnd};
+use thiserror::Error;
+use tracing::info;
 use {
-    crate::cobalt,
-    fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession,
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    thiserror::Error,
-    tracing::info,
 };
 
 /// Errors returned by calls startup functions.
@@ -237,15 +237,13 @@ async fn set_session(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{set_session, stop_session, SESSION_CHILD_COLLECTION, SESSION_NAME},
-        anyhow::Error,
-        fidl::endpoints::{create_endpoints, spawn_stream_handler},
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-        lazy_static::lazy_static,
-        session_testing::{spawn_directory_server, spawn_server},
-        test_util::Counter,
-    };
+    use super::{set_session, stop_session, SESSION_CHILD_COLLECTION, SESSION_NAME};
+    use anyhow::Error;
+    use fidl::endpoints::{create_endpoints, spawn_stream_handler};
+    use lazy_static::lazy_static;
+    use session_testing::{spawn_directory_server, spawn_server};
+    use test_util::Counter;
+    use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
     #[fuchsia::test]
     async fn set_session_calls_realm_methods_in_appropriate_order() -> Result<(), Error> {

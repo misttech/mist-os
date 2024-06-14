@@ -7,25 +7,21 @@
 //! This library provides a tree strcture used to store diagnostics data such as inspect and logs,
 //! as well as utilities for reading from it, serializing and deserializing it and testing it.
 
-use {
-    base64::display::Base64Display,
-    fidl_fuchsia_diagnostics::{
-        PropertySelector, Selector, StringSelector, StringSelectorUnknown, SubtreeSelector,
-        TreeSelector,
-    },
-    num_derive::{FromPrimitive, ToPrimitive},
-    num_traits::bounds::Bounded,
-    selectors::ValidateExt,
-    serde::{Deserialize, Serialize},
-    std::{
-        borrow::{Borrow, Cow},
-        cmp::Ordering,
-        collections::BTreeMap,
-        fmt::{Display, Formatter, Result as FmtResult},
-        ops::{Add, AddAssign, MulAssign},
-    },
-    thiserror::Error,
+use base64::display::Base64Display;
+use fidl_fuchsia_diagnostics::{
+    PropertySelector, Selector, StringSelector, StringSelectorUnknown, SubtreeSelector,
+    TreeSelector,
 };
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::bounds::Bounded;
+use selectors::ValidateExt;
+use serde::{Deserialize, Serialize};
+use std::borrow::{Borrow, Cow};
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::ops::{Add, AddAssign, MulAssign};
+use thiserror::Error;
 
 pub mod macros;
 pub mod serialization;

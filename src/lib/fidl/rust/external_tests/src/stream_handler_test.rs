@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints,
-    fidl_test_placeholders::{EchoProxy, EchoRequest},
-};
+use fidl::endpoints;
+use fidl_test_placeholders::{EchoProxy, EchoRequest};
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn test_spawn_local_stream_handler() {

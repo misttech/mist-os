@@ -97,7 +97,7 @@ uint64_t gTicksPerSecond;
 
 }  // anonymous namespace
 
-void platform_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time) {
+void timer_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time) {
   // ASSERT that we are not calling this function twice.  Once set, this ratio
   // may not change.
   DEBUG_ASSERT(gTicksPerSecond == 0);
@@ -107,9 +107,11 @@ void platform_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time) {
   gTicksPerSecond = gTicksToTime.Inverse().Scale(ZX_SEC(1));
 }
 
-const affine::Ratio& platform_get_ticks_to_time_ratio(void) { return gTicksToTime; }
+const affine::Ratio& timer_get_ticks_to_time_ratio(void) { return gTicksToTime; }
 
 zx_time_t current_time(void) { return gTicksToTime.Scale(current_ticks()); }
+
+zx_boot_time_t current_boot_time(void) { return gTicksToTime.Scale(current_boot_ticks()); }
 
 zx_ticks_t ticks_per_second(void) { return gTicksPerSecond; }
 
@@ -366,19 +368,19 @@ bool Timer::Cancel() {
 }
 
 // called at interrupt time to process any pending timers
-void timer_tick(zx_time_t now) {
+void timer_tick() {
   DEBUG_ASSERT(arch_ints_disabled());
 
   CPU_STATS_INC(timer_ints);
 
   cpu_num_t cpu = arch_curr_cpu_num();
-
-  LTRACEF("cpu %u now %" PRIi64 ", sp %p\n", cpu, now, __GET_FRAME());
-
-  percpu::Get(cpu).timer_queue.Tick(now, cpu);
+  percpu::Get(cpu).timer_queue.Tick(cpu);
 }
 
-void TimerQueue::Tick(zx_time_t now, cpu_num_t cpu) {
+void TimerQueue::Tick(cpu_num_t cpu) {
+  zx_time_t now = current_time();
+  LTRACEF("cpu %u now %" PRIi64 ", sp %p\n", cpu, now, __GET_FRAME());
+
   // The platform timer has fired, so no deadline is set.
   next_timer_deadline_ = ZX_TIME_INFINITE;
 
@@ -388,15 +390,27 @@ void TimerQueue::Tick(zx_time_t now, cpu_num_t cpu) {
     Scheduler::TimerTick(SchedTime{now});
   }
 
+  zx_time_t deadline = TickInternal(now, cpu, timer_list_);
+
+  // Set the platform timer to the *soonest* of queue event and preemption timer.
+  if (preempt_timer_deadline_ < deadline) {
+    deadline = preempt_timer_deadline_;
+  }
+  UpdatePlatformTimer(deadline);
+}
+
+template <typename TimestampType>
+TimestampType TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
+                                       fbl::DoublyLinkedList<Timer*>& timer_list) {
   Guard<MonitoredSpinLock, NoIrqSave> guard{TimerLock::Get(), SOURCE_TAG};
 
   for (;;) {
     // See if there's an event to process.
-    if (timer_list_.is_empty()) {
+    if (timer_list.is_empty()) {
       break;
     }
 
-    Timer& timer = timer_list_.front();
+    Timer& timer = timer_list.front();
 
     LTRACEF("next item on timer queue %p at %" PRIi64 " now %" PRIi64 " (%p, arg %p)\n", &timer,
             timer.scheduled_time_, now, timer.callback_, timer.arg_);
@@ -409,7 +423,7 @@ void TimerQueue::Tick(zx_time_t now, cpu_num_t cpu) {
     DEBUG_ASSERT_MSG(timer.magic_ == Timer::kMagic,
                      "ASSERT: timer failed magic check: timer %p, magic 0x%x\n", &timer,
                      (uint)timer.magic_);
-    timer_list_.erase(timer);
+    timer_list.erase(timer);
 
     // Mark the timer busy.
     timer.active_cpu_.store(cpu, ktl::memory_order_relaxed);
@@ -437,20 +451,12 @@ void TimerQueue::Tick(zx_time_t now, cpu_num_t cpu) {
 
   // Get the deadline of the event at the head of the queue (if any).
   zx_time_t deadline = ZX_TIME_INFINITE;
-  if (!timer_list_.is_empty()) {
-    deadline = timer_list_.front().scheduled_time_;
+  if (!timer_list.is_empty()) {
+    deadline = timer_list.front().scheduled_time_;
     // This has to be the case or it would have fired already.
     DEBUG_ASSERT(deadline > now);
   }
-
-  // We're done manipulating the timer queue.
-  guard.Release();
-
-  // Set the platform timer to the *soonest* of queue event and preemption timer.
-  if (preempt_timer_deadline_ < deadline) {
-    deadline = preempt_timer_deadline_;
-  }
-  UpdatePlatformTimer(deadline);
+  return deadline;
 }
 
 zx_status_t Timer::TrylockOrCancel(MonitoredSpinLock* lock) {
@@ -518,26 +524,6 @@ void TimerQueue::TransitionOffCpu(TimerQueue& source) {
   // The old TimerQueue has no tasks left, so reset the deadlines.
   source.preempt_timer_deadline_ = ZX_TIME_INFINITE;
   source.next_timer_deadline_ = ZX_TIME_INFINITE;
-}
-
-void TimerQueue::ThawPercpu(void) {
-  DEBUG_ASSERT(arch_ints_disabled());
-  Guard<MonitoredSpinLock, NoIrqSave> guard{TimerLock::Get(), SOURCE_TAG};
-
-  // Reset next_timer_deadline_ so that UpdatePlatformTimer will reconfigure the timer.
-  next_timer_deadline_ = ZX_TIME_INFINITE;
-  zx_time_t deadline = preempt_timer_deadline_;
-
-  if (!timer_list_.is_empty()) {
-    Timer& t = timer_list_.front();
-    if (t.scheduled_time_ < deadline) {
-      deadline = t.scheduled_time_;
-    }
-  }
-
-  guard.Release();
-
-  UpdatePlatformTimer(deadline);
 }
 
 void TimerQueue::PrintTimerQueues(char* buf, size_t len) {

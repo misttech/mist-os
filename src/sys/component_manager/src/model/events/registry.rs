@@ -2,40 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::CapabilitySource,
-        model::{
-            component::instance::InstanceState,
-            component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance},
-            events::{
-                dispatcher::{EventDispatcher, EventDispatcherScope},
-                stream::EventStream,
-                synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer},
-            },
-            model::Model,
-            routing::RouteSource,
-        },
-    },
-    ::routing::{
-        capability_source::InternalCapability,
-        component_instance::ComponentInstanceInterface,
-        event::EventFilter,
-        mapper::{RouteMapper, RouteSegment},
-        route_event_stream,
-    },
-    async_trait::async_trait,
-    cm_rust::{ChildRef, EventScope, OfferDecl, UseDecl, UseEventStreamDecl},
-    cm_types::Name,
-    errors::{EventsError, ModelError},
-    futures::lock::Mutex,
-    hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration},
-    moniker::{ExtendedMoniker, Moniker},
-    std::{
-        collections::{HashMap, HashSet},
-        sync::{Arc, Weak},
-    },
-};
+use crate::capability::CapabilitySource;
+use crate::model::component::instance::InstanceState;
+use crate::model::component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance};
+use crate::model::events::dispatcher::{EventDispatcher, EventDispatcherScope};
+use crate::model::events::stream::EventStream;
+use crate::model::events::synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer};
+use crate::model::model::Model;
+use crate::model::routing::RouteSource;
+use ::routing::capability_source::InternalCapability;
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::event::EventFilter;
+use ::routing::mapper::{RouteMapper, RouteSegment};
+use ::routing::route_event_stream;
+use async_trait::async_trait;
+use cm_rust::{ChildRef, EventScope, OfferDecl, UseDecl, UseEventStreamDecl};
+use cm_types::Name;
+use errors::{EventsError, ModelError};
+use futures::lock::Mutex;
+use hooks::{Event as ComponentEvent, EventType, HasEventType, Hook, HooksRegistration};
+use moniker::{ExtendedMoniker, Moniker};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Weak};
 
 pub type EventSubscription = ::routing::event::EventSubscription<UseEventStreamDecl>;
 
@@ -409,17 +397,15 @@ impl Hook for EventRegistry {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::testing::test_helpers::*,
-        assert_matches::assert_matches,
-        cm_rust::{Availability, UseSource},
-        fuchsia_zircon as zx,
-        futures::StreamExt,
-        hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload},
-        sandbox::Message,
-        std::str::FromStr,
-    };
+    use super::*;
+    use crate::model::testing::test_helpers::*;
+    use assert_matches::assert_matches;
+    use cm_rust::{Availability, UseSource};
+    use fuchsia_zircon as zx;
+    use futures::StreamExt;
+    use hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload};
+    use sandbox::Message;
+    use std::str::FromStr;
 
     async fn dispatch_capability_requested_event(registry: &EventRegistry) {
         let (_, capability_server_end) = zx::Channel::create();

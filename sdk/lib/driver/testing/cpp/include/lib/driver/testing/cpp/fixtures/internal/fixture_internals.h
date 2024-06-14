@@ -35,9 +35,12 @@ class EnvWrapper {
                   result.status_string());
     outgoing_client_ = std::move(start_args->outgoing_directory_client);
 
-    result = user_env_.Serve(test_environment_.incoming_directory());
-    ZX_ASSERT_MSG(result.is_ok(), "Failed to Serve the user's Environment: %s",
-                  result.status_string());
+    if (!user_env_served_) {
+      result = user_env_.Serve(test_environment_.incoming_directory());
+      ZX_ASSERT_MSG(result.is_ok(), "Failed to Serve the user's Environment: %s",
+                    result.status_string());
+      user_env_served_ = true;
+    }
 
     return std::move(start_args->start_args);
   }
@@ -58,6 +61,7 @@ class EnvWrapper {
 
   // User env should be the last field as it could contain references to the test_environment_.
   EnvironmentType user_env_;
+  bool user_env_served_ = false;
 };
 
 template <typename DriverType, bool DriverOnForeground>

@@ -3,38 +3,32 @@
 // found in the LICENSE file.
 
 use alloc::vec::Vec;
-use core::{
-    num::{NonZeroU16, NonZeroU8},
-    time::Duration,
-};
+use core::num::{NonZeroU16, NonZeroU8};
+use core::time::Duration;
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use net_declare::net_mac;
-use net_types::{
-    ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu},
-    SpecifiedAddr, UnicastAddr, Witness as _,
+use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu};
+use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
+use netstack3_base::testutil::{FakeInstant, TestIpExt};
+use netstack3_base::WorkQueueReport;
+use netstack3_core::device::{
+    DeviceId, DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
+    LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, MaxEthernetFrameSize,
+    TransmitQueueConfiguration,
 };
-use netstack3_base::{testutil::FakeInstant, WorkQueueReport};
-use netstack3_core::{
-    device::{
-        DeviceId, DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
-        LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, MaxEthernetFrameSize,
-        TransmitQueueConfiguration,
-    },
-    error::NotFoundError,
-    for_any_device_id,
-    ip::{
-        AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
-        Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate,
-        Lifetime, SlaacConfiguration,
-    },
-    testutil::{
-        CtxPairExt as _, FakeBindingsCtx, FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
-        IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-    },
-    IpExt,
+use netstack3_core::error::NotFoundError;
+use netstack3_core::ip::{
+    AddIpAddrSubnetError, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
+    Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate, Lifetime,
+    SlaacConfiguration,
 };
+use netstack3_core::testutil::{
+    CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
+};
+use netstack3_core::{for_any_device_id, IpExt};
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use test_case::test_case;
 
 #[test]

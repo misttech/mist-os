@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::package::{deserialize_pkg_index, serialize_pkg_index, PackageIndexContents},
-    anyhow::{Error, Result},
-    byteorder::{LittleEndian, ReadBytesExt},
-    serde::de::{SeqAccess, Visitor},
-    serde::ser::SerializeSeq,
-    serde::{Deserialize, Deserializer, Serialize, Serializer},
-    std::collections::HashMap,
-    std::fmt,
-    std::io::{Cursor, Read, Seek, SeekFrom},
-    thiserror::Error,
-    tracing::trace,
-};
+use crate::package::{deserialize_pkg_index, serialize_pkg_index, PackageIndexContents};
+use anyhow::{Error, Result};
+use byteorder::{LittleEndian, ReadBytesExt};
+use serde::de::{SeqAccess, Visitor};
+use serde::ser::SerializeSeq;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
+use std::fmt;
+use std::io::{Cursor, Read, Seek, SeekFrom};
+use thiserror::Error;
+use tracing::trace;
 
 pub(crate) const BOOTFS_MAGIC: u32 = 0xa56d3ff9;
 
@@ -214,7 +212,8 @@ pub mod test {
 
 #[cfg(test)]
 mod tests {
-    use {super::test::*, super::*};
+    use super::test::*;
+    use super::*;
 
     #[test]
     fn test_bootfs_empty() {

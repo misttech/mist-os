@@ -2,20 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::ScanReason,
-    crate::{
-        client::types::{self, Ssid},
-        telemetry::{
-            TelemetryEvent::{ScanQueueStatistics, ScanRequestFulfillmentTime},
-            TelemetrySender,
-        },
-    },
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
-    futures::channel::oneshot,
-    lazy_static::lazy_static,
-    tracing::warn,
-};
+use super::ScanReason;
+use crate::client::types::{self, Ssid};
+use crate::telemetry::TelemetryEvent::{ScanQueueStatistics, ScanRequestFulfillmentTime};
+use crate::telemetry::TelemetrySender;
+use futures::channel::oneshot;
+use lazy_static::lazy_static;
+use tracing::warn;
+use {fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx};
 
 lazy_static! {
     static ref WILDCARD_SSID: Ssid = Ssid::from_bytes_unchecked("".into());
@@ -169,16 +163,12 @@ impl RequestQueue {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            telemetry::TelemetryEvent,
-            util::testing::{generate_channel, generate_random_channel, generate_ssid},
-        },
-        futures::channel::mpsc,
-        test_case::test_case,
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use crate::telemetry::TelemetryEvent;
+    use crate::util::testing::{generate_channel, generate_random_channel, generate_ssid};
+    use futures::channel::mpsc;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
 
     lazy_static! {
         static ref WILDCARD_STR: String = WILDCARD_SSID.to_string_not_redactable().into();

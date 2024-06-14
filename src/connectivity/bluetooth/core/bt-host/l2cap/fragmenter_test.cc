@@ -369,7 +369,8 @@ TEST(FragmenterTest, TwoFragmentsOffByOne) {
 
 TEST(FragmenterTest, TwoFragmentsExact) {
   StaticByteBuffer payload('T', 'e', 's', 't');
-  BT_DEBUG_ASSERT_MSG(payload.size() % 2 == 0,
+  const bool payload_size_is_even = payload.size() % 2 == 0;
+  BT_DEBUG_ASSERT_MSG(payload_size_is_even,
                       "test payload size should be even");
 
   StaticByteBuffer expected_fragment0(

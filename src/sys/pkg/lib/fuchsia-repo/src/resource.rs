@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{range::ContentRange, repository::Error, util::read_stream_to_end},
-    bytes::Bytes,
-    fidl_fuchsia_pkg_ext::RepositoryConfig,
-    futures::{
-        future::ready,
-        stream::{once, BoxStream, StreamExt},
-    },
-    std::io,
-};
+use crate::range::ContentRange;
+use crate::repository::Error;
+use crate::util::read_stream_to_end;
+use bytes::Bytes;
+use fidl_fuchsia_pkg_ext::RepositoryConfig;
+use futures::future::ready;
+use futures::stream::{once, BoxStream, StreamExt};
+use std::io;
 
 /// [Resource] represents some resource as a stream of [Bytes] as provided from
 /// a repository server.

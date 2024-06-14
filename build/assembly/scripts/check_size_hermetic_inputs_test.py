@@ -44,7 +44,7 @@ class ConvertTest(unittest.TestCase):
             )
         ]
     )
-    def test_run_main(self, budgets, expected_output):
+    def test_run_main(self, budgets: str, expected_output: list[str]) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             input_path = os.path.join(tmpdir, "budgets.json")
             with open(input_path, "w") as file:

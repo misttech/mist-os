@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    chrono::Datelike,
-    handlebars::{handlebars_helper, Handlebars},
-    std::path::{Path, PathBuf},
-    tempfile::TempDir,
-    tracing::info,
-    walkdir::{DirEntry, WalkDir},
-};
+use anyhow::{Error, Result};
+use chrono::Datelike;
+use handlebars::{handlebars_helper, Handlebars};
+use std::path::{Path, PathBuf};
+use tempfile::TempDir;
+use tracing::info;
+use walkdir::{DirEntry, WalkDir};
 
 /// Creates a `TemplateFile` for a handlebars template.
 ///

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::UnalignedView,
-    core::mem::size_of,
-    zerocopy::{ByteSlice, ByteSliceMut, FromBytes, NoCell, Ref, Unaligned},
-};
+use crate::UnalignedView;
+use core::mem::size_of;
+use zerocopy::{ByteSlice, ByteSliceMut, FromBytes, NoCell, Ref, Unaligned};
 
 /// Types that can be converted into a `BufferReader` over a `ByteSlice`.
 ///
@@ -189,10 +187,8 @@ impl<B: ByteSlice> IntoBufferReader<B> for BufferReader<B> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        zerocopy::{AsBytes, FromZeros, NoCell},
-    };
+    use super::*;
+    use zerocopy::{AsBytes, FromZeros, NoCell};
 
     #[repr(C, packed)]
     #[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]

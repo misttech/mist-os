@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Result};
+use driver_tools::args::DriverCommand;
+use fuchsia_component::client;
 use {
-    anyhow::{Context, Result},
-    driver_tools::args::DriverCommand,
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_playground as fdp,
     fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftm,
     fuchsia_async as fasync,
-    fuchsia_component::client,
 };
 
 struct DriverConnector {}

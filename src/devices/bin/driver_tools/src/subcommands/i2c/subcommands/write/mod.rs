@@ -4,12 +4,10 @@
 
 pub mod args;
 
-use {
-    anyhow::{Context, Result},
-    args::WriteCommand,
-    fidl_fuchsia_hardware_i2c as fi2c, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
-    std::io::Write,
-};
+use anyhow::{Context, Result};
+use args::WriteCommand;
+use std::io::Write;
+use {fidl_fuchsia_hardware_i2c as fi2c, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
 
 pub async fn write(
     cmd: &WriteCommand,

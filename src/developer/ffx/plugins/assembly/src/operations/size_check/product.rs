@@ -6,13 +6,13 @@ use crate::operations::size_check::breakdown::{SizeBreakdown, SizeResult};
 use crate::operations::size_check::visualization::generate_visualization;
 use anyhow::{format_err, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image};
-use camino::Utf8Path;
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::{AuthMode, ProductSizeCheckArgs};
 use serde_json::json;
 use std::fs;
 
-use gcs::{client::Client, gs_url::split_gs_url};
+use gcs::client::Client;
+use gcs::gs_url::split_gs_url;
 
 const TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: &str = "Total BlobFS contents";
 const TOTAL_RESOURCES_GERRIT_COMPONENT_NAME: &str = "Platform Resources";

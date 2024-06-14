@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    async_trait::async_trait,
-    blackout_target::{Test, TestServer},
-    std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use anyhow::Result;
+use async_trait::async_trait;
+use blackout_target::{Test, TestServer};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 struct IntegrationTest {
     setup_called: AtomicBool,

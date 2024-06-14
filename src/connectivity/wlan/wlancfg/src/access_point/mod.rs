@@ -2,24 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::mode_management::iface_manager_api::IfaceManagerApi;
+use crate::util::listener;
+use anyhow::{format_err, Error};
+use fidl::epitaph::ChannelEpitaphExt;
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::lock::{Mutex, MutexGuard};
+use futures::sink::SinkExt;
+use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use futures::{select, FutureExt, TryFutureExt};
+use std::sync::Arc;
+use tracing::{error, info, warn};
+use wlan_common::channel::Cbw;
+use wlan_common::RadioConfig;
 use {
-    crate::{mode_management::iface_manager_api::IfaceManagerApi, util::listener},
-    anyhow::{format_err, Error},
-    fidl::epitaph::ChannelEpitaphExt,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
     fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc,
-        future::BoxFuture,
-        lock::{Mutex, MutexGuard},
-        select,
-        sink::SinkExt,
-        stream::{FuturesUnordered, StreamExt, TryStreamExt},
-        FutureExt, TryFutureExt,
-    },
-    std::sync::Arc,
-    tracing::{error, info, warn},
-    wlan_common::{channel::Cbw, RadioConfig},
 };
 
 pub mod state_machine;
@@ -347,21 +346,18 @@ fn log_ap_request(request: &fidl_policy::AccessPointControllerRequest) {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            client::types as client_types,
-            mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan},
-            regulatory_manager::REGION_CODE_LEN,
-        },
-        async_trait::async_trait,
-        fidl::endpoints::{create_proxy, create_request_stream, Proxy},
-        fuchsia_async as fasync,
-        futures::{channel::oneshot, task::Poll},
-        std::pin::pin,
-        std::unimplemented,
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use crate::client::types as client_types;
+    use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan};
+    use crate::regulatory_manager::REGION_CODE_LEN;
+    use async_trait::async_trait;
+    use fidl::endpoints::{create_proxy, create_request_stream, Proxy};
+    use fuchsia_async as fasync;
+    use futures::channel::oneshot;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use std::unimplemented;
+    use wlan_common::assert_variant;
 
     #[derive(Debug)]
     struct FakeIfaceManager {

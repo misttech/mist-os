@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        DirectoryEntry, Error, Index, IndexEntry, DIRECTORY_ENTRY_LEN, DIR_CHUNK_TYPE,
-        DIR_NAMES_CHUNK_TYPE, INDEX_ENTRY_LEN, INDEX_LEN, MAGIC_INDEX_VALUE,
-    },
-    std::{
-        convert::TryInto as _,
-        io::{Read, Seek, SeekFrom},
-    },
-    zerocopy::AsBytes as _,
+use crate::{
+    DirectoryEntry, Error, Index, IndexEntry, DIRECTORY_ENTRY_LEN, DIR_CHUNK_TYPE,
+    DIR_NAMES_CHUNK_TYPE, INDEX_ENTRY_LEN, INDEX_LEN, MAGIC_INDEX_VALUE,
 };
+use std::convert::TryInto as _;
+use std::io::{Read, Seek, SeekFrom};
+use zerocopy::AsBytes as _;
 
 /// A struct to open and read FAR-formatted archive.
 #[derive(Debug)]
@@ -188,9 +184,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::tests::example_archive, assert_matches::assert_matches, std::io::Cursor,
-    };
+    use super::*;
+    use crate::tests::example_archive;
+    use assert_matches::assert_matches;
+    use std::io::Cursor;
 
     #[test]
     fn list() {

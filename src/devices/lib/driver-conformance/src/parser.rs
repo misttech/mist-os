@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    fidl_fuchsia_driver_framework as fdf,
-    serde::Deserialize,
-    std::collections::{HashMap, HashSet},
-    std::str::FromStr,
-};
+use anyhow::{anyhow, Result};
+use fidl_fuchsia_driver_framework as fdf;
+use serde::Deserialize;
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 #[derive(Deserialize, Debug)]
 pub struct PlaceholderEmptyDict {}

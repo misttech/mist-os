@@ -3,13 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Result};
-use std::sync::RwLock;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 
 // Timeout for the config cache.
 pub const CONFIG_CACHE_TIMEOUT: Duration = Duration::from_secs(3);

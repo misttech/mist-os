@@ -2,22 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    aes_gcm_siv::{aead::Aead, Aes256GcmSiv, Key, KeyInit as _, Nonce},
-    anyhow::{Context, Error},
-    fidl_fuchsia_fxfs::{
-        CryptCreateKeyResult, CryptManagementAddWrappingKeyResult,
-        CryptManagementForgetWrappingKeyResult, CryptManagementRequest,
-        CryptManagementRequestStream, CryptManagementSetActiveKeyResult, CryptRequest,
-        CryptRequestStream, CryptUnwrapKeyResult, KeyPurpose,
-    },
-    fuchsia_zircon as zx,
-    futures::stream::TryStreamExt,
-    std::{
-        collections::hash_map::{Entry, HashMap},
-        sync::Mutex,
-    },
+use aes_gcm_siv::aead::Aead;
+use aes_gcm_siv::{Aes256GcmSiv, Key, KeyInit as _, Nonce};
+use anyhow::{Context, Error};
+use fidl_fuchsia_fxfs::{
+    CryptCreateKeyResult, CryptManagementAddWrappingKeyResult,
+    CryptManagementForgetWrappingKeyResult, CryptManagementRequest, CryptManagementRequestStream,
+    CryptManagementSetActiveKeyResult, CryptRequest, CryptRequestStream, CryptUnwrapKeyResult,
+    KeyPurpose,
 };
+use fuchsia_zircon as zx;
+use futures::stream::TryStreamExt;
+use std::collections::hash_map::{Entry, HashMap};
+use std::sync::Mutex;
 
 pub mod log;
 use log::*;
@@ -211,7 +208,8 @@ impl CryptService {
 
 #[cfg(test)]
 mod tests {
-    use {super::CryptService, fidl_fuchsia_fxfs::KeyPurpose};
+    use super::CryptService;
+    use fidl_fuchsia_fxfs::KeyPurpose;
 
     #[test]
     fn wrap_unwrap_key() {

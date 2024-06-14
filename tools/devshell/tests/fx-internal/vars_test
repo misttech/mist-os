@@ -147,71 +147,36 @@ TEST_fx-rbe-enabled-missing-build-dir() {
   BT_EXPECT_FAIL fx-rbe-enabled
 }
 
-TEST_fx-rbe-enabled-deprecated-variable() {
-  local -r BUILD_DIR="out/nondefault-1"
-  _create_build_dir "${BUILD_DIR}"
-  fx-change-build-dir "${BUILD_DIR}"
-  local -r ARGS_FILE="${BT_TEMP_DIR}/${BUILD_DIR}"/args.gn
-  local result
-
-  # Make sure check for deprecated variable name works.
-  echo "enable_rbe = false" > "${ARGS_FILE}"
-  result=$( fx-rbe-enabled 2>&1 )
-  BT_EXPECT_STRING_CONTAINS_SUBSTRING "${result}" "has been renamed"
-}
-
 TEST_fx-rbe-enabled-default-disabled() {
   local -r BUILD_DIR="out/nondefault-2"
   _create_build_dir "${BUILD_DIR}"
   fx-change-build-dir "${BUILD_DIR}"
-  local -r ARGS_FILE="${BT_TEMP_DIR}/${BUILD_DIR}"/args.gn
+  local -r RBE_SETTINGS_FILE="${BT_TEMP_DIR}/${BUILD_DIR}"/rbe_settings.json
 
   # RBE is default disabled.
-  echo "" > "${ARGS_FILE}"
+  echo "" > "${RBE_SETTINGS_FILE}"
   BT_EXPECT_FAIL fx-rbe-enabled
 }
 
-TEST_fx-rbe-enabled-rust-disabled() {
+TEST_fx-rbe-enabled-disabled() {
   local -r BUILD_DIR="out/nondefault-3"
   _create_build_dir "${BUILD_DIR}"
   fx-change-build-dir "${BUILD_DIR}"
-  local -r ARGS_FILE="${BT_TEMP_DIR}/${BUILD_DIR}"/args.gn
+  local -r RBE_SETTINGS_FILE="${BT_TEMP_DIR}/${BUILD_DIR}"/rbe_settings.json
 
-  # RBE for Rust is explicitly disabled.
-  echo "rust_rbe_enable = false" > "${ARGS_FILE}"
+  # RBE is disabled.
+  echo '{ "final": { "needs_reproxy": false }}' > "${RBE_SETTINGS_FILE}"
   BT_EXPECT_FAIL fx-rbe-enabled
 }
 
-TEST_fx-rbe-enabled-rust-enabled() {
+TEST_fx-rbe-enabled-enabled() {
   local -r BUILD_DIR="out/nondefault-4"
   _create_build_dir "${BUILD_DIR}"
   fx-change-build-dir "${BUILD_DIR}"
-  local -r ARGS_FILE="${BT_TEMP_DIR}/${BUILD_DIR}"/args.gn
+  local -r RBE_SETTINGS_FILE="${BT_TEMP_DIR}/${BUILD_DIR}"/rbe_settings.json
 
-  # RBE for Rust is enabled.
-  echo "rust_rbe_enable = true" > "${ARGS_FILE}"
-  BT_EXPECT fx-rbe-enabled
-}
-
-TEST_fx-rbe-enabled-cxx-disabled() {
-  local -r BUILD_DIR="out/nondefault-5"
-  _create_build_dir "${BUILD_DIR}"
-  fx-change-build-dir "${BUILD_DIR}"
-  local -r ARGS_FILE="${BT_TEMP_DIR}/${BUILD_DIR}"/args.gn
-
-  # RBE for C++ is explicitly disabled.
-  echo "cxx_rbe_enable = false" > "${ARGS_FILE}"
-  BT_EXPECT_FAIL fx-rbe-enabled
-}
-
-TEST_fx-rbe-enabled-cxx-enabled() {
-  local -r BUILD_DIR="out/nondefault-6"
-  _create_build_dir "${BUILD_DIR}"
-  fx-change-build-dir "${BUILD_DIR}"
-  local -r ARGS_FILE="${BT_TEMP_DIR}/${BUILD_DIR}"/args.gn
-
-  # RBE for C++ is enabled.
-  echo "cxx_rbe_enable = true" > "${ARGS_FILE}"
+  # RBE is disabled.
+  echo '{ "final": { "needs_reproxy": true }}' > "${RBE_SETTINGS_FILE}"
   BT_EXPECT fx-rbe-enabled
 }
 

@@ -4,10 +4,8 @@
 
 mod launcher;
 
-use {
-    crate::launcher::FuzzComponentLauncher,
-    test_runners_elf_lib::{runner, test_server},
-};
+use crate::launcher::FuzzComponentLauncher;
+use test_runners_elf_lib::{runner, test_server};
 
 type FuzzTestServer = test_server::TestServer<FuzzComponentLauncher>;
 

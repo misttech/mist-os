@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    codegen_lib::{codegen, definition, parser},
-    simplelog::{Config as LogConfig, LevelFilter, SimpleLogger},
-    std::{fs::File, io::Read, path::PathBuf},
-    tracing::info,
-};
+use anyhow::{Context, Result};
+use codegen_lib::{codegen, definition, parser};
+use simplelog::{Config as LogConfig, LevelFilter, SimpleLogger};
+use std::fs::File;
+use std::io::Read;
+use std::path::PathBuf;
+use tracing::info;
 
 // This code just confirms we've correctly linked in the parsers.
 #[derive(argh::FromArgs)]

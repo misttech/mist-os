@@ -4,18 +4,14 @@
 
 pub mod args;
 
-use {
-    anyhow::{Context, Result},
-    args::ListCommand,
-    bind::debugger::debug_dump::dump_bind_rules,
-    fidl_fuchsia_driver_development as fdd,
-    fuchsia_driver_dev::Device,
-    futures::join,
-    std::{
-        collections::{HashMap, HashSet},
-        io::Write,
-    },
-};
+use anyhow::{Context, Result};
+use args::ListCommand;
+use bind::debugger::debug_dump::dump_bind_rules;
+use fidl_fuchsia_driver_development as fdd;
+use fuchsia_driver_dev::Device;
+use futures::join;
+use std::collections::{HashMap, HashSet};
+use std::io::Write;
 
 pub async fn list(
     cmd: ListCommand,
@@ -156,16 +152,12 @@ pub async fn list(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        argh::FromArgs,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_driver_framework as fdf, fuchsia_async as fasync,
-        futures::{
-            future::{Future, FutureExt},
-            stream::StreamExt,
-        },
-    };
+    use super::*;
+    use argh::FromArgs;
+    use fidl::endpoints::ServerEnd;
+    use futures::future::{Future, FutureExt};
+    use futures::stream::StreamExt;
+    use {fidl_fuchsia_driver_framework as fdf, fuchsia_async as fasync};
 
     /// Invokes `list` with `cmd` and runs a mock driver development server that
     /// invokes `on_driver_development_request` whenever it receives a request.

@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use crate::render::generic::{BlendMode, Fill, FillRule, Gradient, GradientType, Order, Style};
-use crate::{
-    color::Color,
-    render::generic::{
-        self, forma::*, Composition as _, Context as _, PathBuilder as _, Raster as _,
-        RasterBuilder as _,
-    },
-    Point, ViewAssistantContext,
+use crate::color::Color;
+use crate::render::generic::forma::*;
+use crate::render::generic::{
+    self, Composition as _, Context as _, PathBuilder as _, Raster as _, RasterBuilder as _,
 };
+pub use crate::render::generic::{BlendMode, Fill, FillRule, Gradient, GradientType, Order, Style};
+use crate::{Point, ViewAssistantContext};
 use anyhow::Error;
 use display_utils::PixelFormat;
-use euclid::{
-    default::{Point2D, Rect, Size2D, Transform2D, Vector2D},
-    point2, size2,
-};
-use std::{io::Read, mem, ops::Add, u32};
+use euclid::default::{Point2D, Rect, Size2D, Transform2D, Vector2D};
+use euclid::{point2, size2};
+use std::io::Read;
+use std::ops::Add;
+use std::{mem, u32};
 /// Rendering context and API start point.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Image {

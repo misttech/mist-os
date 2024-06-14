@@ -7,18 +7,17 @@
 #[cfg(test)]
 mod tests;
 
-use crate::{
-    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
-    execution_scope::ExecutionScope,
-    node::Node,
-    object_request::{ObjectRequestRef, ObjectRequestSend},
-    ProtocolsExt,
-};
-
-use {
-    async_trait::async_trait, fidl::endpoints::RequestStream, fidl_fuchsia_io as fio,
-    fuchsia_async::Channel, fuchsia_zircon_status::Status, futures::future::Future, std::sync::Arc,
-};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::execution_scope::ExecutionScope;
+use crate::node::Node;
+use crate::object_request::{ObjectRequestRef, ObjectRequestSend};
+use crate::ProtocolsExt;
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_io as fio;
+use fuchsia_async::Channel;
+use fuchsia_zircon_status::Status;
+use futures::future::Future;
+use std::sync::Arc;
 
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
@@ -121,7 +120,6 @@ impl DirectoryEntry for Service {
     }
 }
 
-#[async_trait]
 impl Node for Service {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         Ok(fio::NodeAttributes {
@@ -156,7 +154,7 @@ impl Node for Service {
 
 /// Helper to open a service or node as required.
 pub fn serve(
-    service: Arc<impl ServiceLike + ?Sized>,
+    service: Arc<impl ServiceLike>,
     scope: ExecutionScope,
     protocols: &impl ProtocolsExt,
     object_request: ObjectRequestRef<'_>,

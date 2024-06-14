@@ -4,15 +4,11 @@
 
 #![cfg(feature = "serde")]
 
-use {
-    crate::DictionaryValue,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
-    serde::{
-        de::{self, Visitor},
-        Deserialize, Deserializer, Serialize, Serializer,
-    },
-    std::fmt,
-};
+use crate::DictionaryValue;
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
 /// Reflect fidl_fuchsia_sys2::StorageId for serialization/deserialization.
 #[derive(Serialize, Deserialize)]
@@ -182,15 +178,13 @@ impl<'de> Deserialize<'de> for DictionaryValue {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            deserialize_fio_operations, deserialize_opt_fio_operations, serialize_fio_operations,
-            serialize_opt_fio_operations,
-        },
-        fidl_fuchsia_io as fio,
-        serde_json::{Deserializer, Serializer},
-        std::str::from_utf8,
+    use super::{
+        deserialize_fio_operations, deserialize_opt_fio_operations, serialize_fio_operations,
+        serialize_opt_fio_operations,
     };
+    use fidl_fuchsia_io as fio;
+    use serde_json::{Deserializer, Serializer};
+    use std::str::from_utf8;
 
     #[test]
     fn test_deserialize_opt_fio_operations_some() {

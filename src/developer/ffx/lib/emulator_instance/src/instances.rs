@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 use crate::{EmulatorInstanceData, EngineOption, EngineState};
 use anyhow::{anyhow, Context, Result};
-use std::{
-    fs::{create_dir_all, File},
-    path::PathBuf,
-};
+use std::fs::{create_dir_all, File};
+use std::path::PathBuf;
 
 /// The root directory for storing instance specific data. Instances
 /// should create a subdirectory in this directory to store data.
@@ -151,7 +149,8 @@ pub fn write_to_disk(data: &EmulatorInstanceData, instance_directory: &PathBuf) 
 mod tests {
     use super::*;
     use crate::{EmulatorInstanceInfo, EngineType};
-    use std::{fs::remove_file, io::Write};
+    use std::fs::remove_file;
+    use std::io::Write;
     use tempfile::tempdir;
 
     #[test]

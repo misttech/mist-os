@@ -2,23 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        buffer::{BufferFuture, BufferRef, MutableBufferRef},
-        buffer_allocator::{BufferAllocator, BufferSource},
-        Device, DeviceHolder,
-    },
-    anyhow::{ensure, Error},
-    async_trait::async_trait,
-    rand::Rng,
-    std::{
-        ops::Range,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Mutex,
-        },
-    },
-};
+use crate::buffer::{BufferFuture, BufferRef, MutableBufferRef};
+use crate::buffer_allocator::{BufferAllocator, BufferSource};
+use crate::{Device, DeviceHolder};
+use anyhow::{ensure, Error};
+use async_trait::async_trait;
+use rand::Rng;
+use std::ops::Range;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 pub enum Op {
     Read,

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::Client,
-    crate::compositor::Surface,
-    crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
-    anyhow::Error,
-    fuchsia_wayland_core as wl,
-    zcr_secure_output_v1_server_protocol::{
-        ZcrSecureOutputV1, ZcrSecureOutputV1Request, ZcrSecurityV1, ZcrSecurityV1Request,
-    },
+use crate::client::Client;
+use crate::compositor::Surface;
+use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
+use anyhow::Error;
+use fuchsia_wayland_core as wl;
+use zcr_secure_output_v1_server_protocol::{
+    ZcrSecureOutputV1, ZcrSecureOutputV1Request, ZcrSecurityV1, ZcrSecurityV1Request,
 };
 
 /// An implementation of the zcr_secure_output_v1 global.

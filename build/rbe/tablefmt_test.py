@@ -9,7 +9,7 @@ import tablefmt
 
 
 class CreateRowTests(unittest.TestCase):
-    def test_construction(self):
+    def test_construction(self) -> None:
         init = 11
         row = tablefmt.create_row(3, init)
         self.assertEqual(row, [init, init, init])
@@ -21,7 +21,7 @@ class CreateRowTests(unittest.TestCase):
 
 
 class CreateTableTests(unittest.TestCase):
-    def test_construction(self):
+    def test_construction(self) -> None:
         init = 42
         table = tablefmt.create_table(2, 3, init)
         self.assertEqual(table, [[init, init, init], [init, init, init]])
@@ -36,7 +36,7 @@ class CreateTableTests(unittest.TestCase):
 
 
 class HumanReadableSizeTests(unittest.TestCase):
-    def test_formatting(self):
+    def test_formatting(self) -> None:
         test_data = [
             # size, unit, dec, expected
             (0, "", 1, "0.0 "),
@@ -53,43 +53,43 @@ class HumanReadableSizeTests(unittest.TestCase):
 
 
 class AutoSizeColumnWidthsTests(unittest.TestCase):
-    def test_strings(self):
+    def test_strings(self) -> None:
         table = [["foo", "cat", "longcat"], ["bar", "frog", "dog"]]
         widths = tablefmt.auto_size_column_widths(table)
         self.assertEqual(widths, [3, 4, 7])
 
-    def test_integers(self):
+    def test_integers(self) -> None:
         table = [[0, 144, 8128], [496, 6, 28]]
         widths = tablefmt.auto_size_column_widths(table)
         self.assertEqual(widths, [3, 3, 4])
 
 
 class MakeTableHeaderTests(unittest.TestCase):
-    def test_with_title(self):
+    def test_with_title(self) -> None:
         self.assertEqual(
             tablefmt.make_table_header(["arms", "legs"], "title"),
             ["title", "arms", "legs"],
         )
 
-    def test_no_title(self):
+    def test_no_title(self) -> None:
         self.assertEqual(
             tablefmt.make_table_header(["cats", "bears"]), ["", "cats", "bears"]
         )
 
 
 class MakeSeparatorRowTests(unittest.TestCase):
-    def test_with_title_and_fill(self):
+    def test_with_title_and_fill(self) -> None:
         self.assertEqual(
             tablefmt.make_separator_row(2, title="lang", fill="***"),
             ["lang", "***", "***"],
         )
 
-    def test_blank(self):
+    def test_blank(self) -> None:
         self.assertEqual(tablefmt.make_separator_row(3), ["", "", "", ""])
 
 
 class MakeRowFormatterTests(unittest.TestCase):
-    def test_with_separator(self):
+    def test_with_separator(self) -> None:
         self.assertEqual(
             tablefmt.make_row_formatter([">", "^", "<"], [2, 3, 4], " | "),
             "{0:>2} | {1:^3} | {2:<4}",
@@ -97,8 +97,8 @@ class MakeRowFormatterTests(unittest.TestCase):
 
 
 class FormatNumericTableTests(unittest.TestCase):
-    def test_format(self):
-        table = [
+    def test_format(self) -> None:
+        table: list[list[str | int]] = [
             ["Title", "a", "b"],
             ["Alice", 20, 5],
             ["Bob", 101, 2048],

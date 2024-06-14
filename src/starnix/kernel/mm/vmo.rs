@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::mm::PAGE_SIZE;
-use starnix_uapi::{errno, errors::Errno};
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
 
 // TODO: Move this function to somewhere more generic. It doesn't really have
 // anything to do with the memory manager.

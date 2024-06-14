@@ -2,24 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::wlan_policy::types::AccessPointState,
-    anyhow::Error,
-    fidl::endpoints::{create_endpoints, create_proxy},
-    fidl_fuchsia_wlan_common::RequestStatus,
-    fidl_fuchsia_wlan_policy::{
-        AccessPointControllerMarker, AccessPointControllerProxy, AccessPointListenerMarker,
-        AccessPointProviderMarker, AccessPointStateUpdatesMarker,
-        AccessPointStateUpdatesRequestStream, ConnectivityMode, Credential, NetworkConfig,
-        NetworkIdentifier, OperatingBand, OperatingState, SecurityType,
-    },
-    fuchsia_component::client::connect_to_protocol,
-    futures::TryStreamExt,
-    std::{
-        cell::Cell,
-        fmt::{self, Debug},
-    },
+use crate::wlan_policy::types::AccessPointState;
+use anyhow::Error;
+use fidl::endpoints::{create_endpoints, create_proxy};
+use fidl_fuchsia_wlan_common::RequestStatus;
+use fidl_fuchsia_wlan_policy::{
+    AccessPointControllerMarker, AccessPointControllerProxy, AccessPointListenerMarker,
+    AccessPointProviderMarker, AccessPointStateUpdatesMarker, AccessPointStateUpdatesRequestStream,
+    ConnectivityMode, Credential, NetworkConfig, NetworkIdentifier, OperatingBand, OperatingState,
+    SecurityType,
 };
+use fuchsia_component::client::connect_to_protocol;
+use futures::TryStreamExt;
+use std::cell::Cell;
+use std::fmt::{self, Debug};
 
 pub struct WlanApPolicyFacade {
     ap_controller: AccessPointControllerProxy,

@@ -5,8 +5,7 @@
 use async_io::Async;
 use async_net::UdpSocket as AsyncUdpSocket;
 use std::io::Result;
-use std::net::SocketAddr;
-use std::net::UdpSocket as StdUdpSocket;
+use std::net::{SocketAddr, UdpSocket as StdUdpSocket};
 
 #[derive(Debug)]
 pub struct UdpSocket(AsyncUdpSocket);

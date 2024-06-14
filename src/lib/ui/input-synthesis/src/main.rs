@@ -14,18 +14,16 @@
 //! If you can link to Rust code directly, you can use the `input_synthesis`
 //! library directly too, without this complication.
 
-use {
-    anyhow::Result,
-    fidl_test_inputsynthesis::{
-        Error, MouseRequest, MouseRequestStream, TextRequest, TextRequestStream,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
-    input_synthesis::synthesizer::InputDevice,
-    std::time::Duration,
-    tracing::{error, info, warn},
+use anyhow::Result;
+use fidl_test_inputsynthesis::{
+    Error, MouseRequest, MouseRequestStream, TextRequest, TextRequestStream,
 };
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
+use input_synthesis::synthesizer::InputDevice;
+use std::time::Duration;
+use tracing::{error, info, warn};
 
 #[fuchsia::main(logging_tags = ["input-synthesis"])]
 async fn main() -> Result<()> {

@@ -9,39 +9,31 @@ use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 
-use net_types::{
-    ip::{
-        AddrSubnet, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr,
-    },
-    SpecifiedAddr, Witness,
+use net_types::ip::{
+    AddrSubnet, GenericOverIp, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
+use net_types::{SpecifiedAddr, Witness};
 use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer as _};
-use packet_formats::{
-    ethernet::EthernetFrameLengthCheck,
-    icmp::{IcmpIpExt, IcmpUnusedCode},
-    ip::IpPacket,
-    ipv4::{Ipv4OnlyMeta, Ipv4Packet},
-    testutil::{parse_ethernet_frame, parse_ip_packet_in_ethernet_frame},
-};
+use packet_formats::ethernet::EthernetFrameLengthCheck;
+use packet_formats::icmp::{IcmpIpExt, IcmpUnusedCode};
+use packet_formats::ip::IpPacket;
+use packet_formats::ipv4::{Ipv4OnlyMeta, Ipv4Packet};
+use packet_formats::testutil::{parse_ethernet_frame, parse_ip_packet_in_ethernet_frame};
 use test_case::test_case;
 
-use netstack3_base::{socket::SocketIpAddr, EitherDeviceId};
-use netstack3_core::{
-    device::{DeviceId, EthernetLinkDevice},
-    testutil::{
-        set_logger_for_test, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder, TestAddrs,
-        TestIpExt,
-    },
-    IpExt,
+use netstack3_base::socket::SocketIpAddr;
+use netstack3_base::testutil::{set_logger_for_test, TestAddrs, TestIpExt};
+use netstack3_base::EitherDeviceId;
+use netstack3_core::device::{DeviceId, EthernetLinkDevice};
+use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
+use netstack3_core::IpExt;
+use netstack3_ip::socket::{
+    DefaultSendOptions, DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition,
+    IpSockSendError, IpSocketHandler, Mms, MmsError, SendOptions,
 };
 use netstack3_ip::{
-    self as ip, device,
-    socket::{
-        DefaultSendOptions, DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition,
-        IpSockSendError, IpSocketHandler, Mms, MmsError, SendOptions,
-    },
-    AddableEntryEither, AddableMetric, IpDeviceContext, RawMetric, ResolveRouteError,
+    self as ip, device, AddableEntryEither, AddableMetric, IpDeviceContext, RawMetric,
+    ResolveRouteError,
 };
 
 enum AddressType {
@@ -68,7 +60,7 @@ struct NewSocketTestCase {
     expected_result: Result<(), IpSockCreationError>,
 }
 
-trait IpSocketIpExt: Ip + TestIpExt + IcmpIpExt + IpExt + ip::IpExt {
+trait IpSocketIpExt: TestIpExt + IcmpIpExt + IpExt + ip::IpExt {
     fn multicast_addr(host: u8) -> SpecifiedAddr<Self::Addr>;
 }
 
@@ -111,14 +103,14 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
         #[generic_over_ip(I, Ip)]
         struct WrapVecAddrSubnet<I: Ip>(Vec<AddrSubnet<I::Addr>>);
 
-        let WrapVecAddrSubnet(subnets) = I::map_ip(
-            IpInvariant((&mut ctx.core_ctx(), &device)),
-            |IpInvariant((core_ctx, device))| {
+        let WrapVecAddrSubnet(subnets) = I::map_ip_out(
+            (&mut ctx.core_ctx(), &device),
+            |(core_ctx, device)| {
                 ip::device::testutil::with_assigned_ipv4_addr_subnets(core_ctx, device, |addrs| {
                     WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
                 })
             },
-            |IpInvariant((core_ctx, device))| {
+            |(core_ctx, device)| {
                 ip::device::testutil::with_assigned_ipv6_addr_subnets(core_ctx, device, |addrs| {
                     WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
                 })
@@ -138,7 +130,8 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
     }
 }
 
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::Unroutable,
         remote_ip_type: AddressType::Remote,
@@ -205,8 +198,7 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
         device_type: DeviceType::Unspecified,
         expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
     }; "new remote to local")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_new<I: Ip + IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
+fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
     let cfg = I::TEST_ADDRS;
     let proto = I::ICMP_IP_PROTO;
 
@@ -270,13 +262,13 @@ fn test_new<I: Ip + IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
     assert_eq!(res.map(|s| s.definition().clone()), get_expected_result(template));
 }
 
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(AddressType::LocallyOwned, AddressType::LocallyOwned; "local to local")]
 #[test_case(AddressType::Unspecified { can_select: true },
         AddressType::LocallyOwned; "unspecified to local")]
 #[test_case(AddressType::LocallyOwned, AddressType::Remote; "local to remote")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_send_local<I: Ip + IpSocketIpExt + IpExt>(
+fn test_send_local<I: IpSocketIpExt + IpExt>(
     from_addr_type: AddressType,
     to_addr_type: AddressType,
 ) {
@@ -368,9 +360,9 @@ fn test_send_local<I: Ip + IpSocketIpExt + IpExt>(
     assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 1);
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_send<I: IpSocketIpExt + IpExt>() {
     // Test various edge cases of the
     // IpSocketContext::send_ip_packet` method.
 
@@ -506,9 +498,9 @@ fn test_send<I: Ip + IpSocketIpExt + IpExt>() {
     assert_eq!(res, Err(IpSockSendError::Unroutable(ResolveRouteError::Unreachable)));
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
     set_logger_for_test();
 
     #[derive(Copy, Clone, Debug)]
@@ -605,11 +597,11 @@ fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpExt>() {
     }
 }
 
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(true; "remove device")]
 #[test_case(false; "dont remove device")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpExt>(remove_device: bool) {
+fn get_mms_device_removed<I: IpSocketIpExt + IpExt>(remove_device: bool) {
     set_logger_for_test();
 
     let TestAddrs::<I::Addr> { local_ip, remote_ip: _, local_mac, subnet: _, remote_mac: _ } =

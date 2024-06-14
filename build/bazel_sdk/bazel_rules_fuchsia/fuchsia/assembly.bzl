@@ -51,6 +51,7 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_partitions_configuration.bzl",
     _fuchsia_partitions_configuration = "fuchsia_partitions_configuration",
+    _fuchsia_prebuilt_partitions_configuration = "fuchsia_prebuilt_partitions_configuration",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_platform_artifacts.bzl",
@@ -136,6 +137,7 @@ fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
 fuchsia_product = _fuchsia_product
 fuchsia_product_assembly = _fuchsia_product_assembly
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
+fuchsia_prebuilt_partitions_configuration = _fuchsia_prebuilt_partitions_configuration
 fuchsia_product_bundle = _fuchsia_product_bundle
 fuchsia_product_size_check = _fuchsia_product_size_check
 fuchsia_package_size_check = _fuchsia_package_size_check

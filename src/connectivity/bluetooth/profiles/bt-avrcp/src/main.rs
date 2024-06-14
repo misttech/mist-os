@@ -10,7 +10,9 @@ use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::Inspect;
-use futures::{channel::mpsc, stream::StreamExt, FutureExt};
+use futures::channel::mpsc;
+use futures::stream::StreamExt;
+use futures::FutureExt;
 use profile_client::ProfileEvent;
 use tracing::{error, info, warn};
 
@@ -24,11 +26,9 @@ mod profile;
 mod service;
 mod types;
 
-use crate::{
-    metrics::{MetricsNode, METRICS_NODE_NAME},
-    peer_manager::PeerManager,
-    profile::{AvrcpService, AvrcpTargetFeatures},
-};
+use crate::metrics::{MetricsNode, METRICS_NODE_NAME};
+use crate::peer_manager::PeerManager;
+use crate::profile::{AvrcpService, AvrcpTargetFeatures};
 
 fn record_avrcp_capabilities(
     metrics_logger: bt_metrics::MetricsLogger,

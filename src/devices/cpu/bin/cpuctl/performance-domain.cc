@@ -10,7 +10,7 @@
 #include <iostream>
 
 namespace {
-const std::string kDeviceSuffix = "device_protocol";
+const std::string kDeviceSuffix = "device";
 }  // namespace
 
 zx::result<CpuPerformanceDomain> CpuPerformanceDomain::CreateFromPath(const std::string& path) {

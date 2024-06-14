@@ -7,11 +7,9 @@ pub mod read;
 pub mod transact;
 pub mod write;
 
-use {
-    anyhow::{Context as _, Result},
-    fidl_fuchsia_hardware_i2c as fi2c, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
-    std::path::Path,
-};
+use anyhow::{Context as _, Result};
+use std::path::Path;
+use {fidl_fuchsia_hardware_i2c as fi2c, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
 
 fn connect_to_i2c_device(
     device_path: impl AsRef<Path>,

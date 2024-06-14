@@ -6,11 +6,11 @@
 
 use cm_types::{IterablePath, NamespacePath};
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_runner as fcrunner;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_process as fprocess;
 use thiserror::Error;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
+};
 
 #[cfg(target_os = "fuchsia")]
 use std::sync::Arc;
@@ -322,9 +322,8 @@ impl TryFrom<process_builder::NamespaceEntry> for Entry {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use zx::{AsHandleRef, Peered};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     fn ns_path(str: &str) -> NamespacePath {
         str.parse().unwrap()
@@ -361,10 +360,9 @@ mod tests {
     #[cfg(target_os = "fuchsia")]
     #[fasync::run_singlethreaded(test)]
     async fn test_clone() {
-        use vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::vmo::read_only,
-        };
+        use vfs::directory::entry_container::Directory;
+        use vfs::execution_scope::ExecutionScope;
+        use vfs::file::vmo::read_only;
 
         // Set up a directory server.
         let dir = vfs::pseudo_directory! {

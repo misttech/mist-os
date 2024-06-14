@@ -14,13 +14,11 @@ pub mod filesystem;
 pub mod format;
 pub mod partition;
 
-use {
-    fidl_fuchsia_fs_startup::{
-        CompressionAlgorithm, EvictionPolicyOverride, FormatOptions, StartOptions,
-    },
-    fuchsia_zircon as zx,
-    std::sync::Arc,
+use fidl_fuchsia_fs_startup::{
+    CompressionAlgorithm, EvictionPolicyOverride, FormatOptions, StartOptions,
 };
+use fuchsia_zircon as zx;
+use std::sync::Arc;
 
 // Re-export errors as public.
 pub use error::{QueryError, ShutdownError};

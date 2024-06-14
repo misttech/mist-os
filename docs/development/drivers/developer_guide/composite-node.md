@@ -75,7 +75,7 @@ every node in the node topology:
 
 ```
 Name     : i2c-1-56
-Topo Path: sys/platform/05:00:2/aml-i2c/i2c/i2c-1-56
+Topo Path: sys/platform/i2c-0/aml-i2c/i2c/i2c-1-56
 Driver   : fuchsia-boot:///#driver/i2c.so
 Flags    : MUST_ISOLATE | BOUND
 Proto    : ZX_PROTOCOL_I2C (24)

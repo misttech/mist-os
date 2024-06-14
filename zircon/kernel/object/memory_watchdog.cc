@@ -347,7 +347,7 @@ void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
   int iterations = 0;
   do {
     if (iterations++ == 10) {
-      printf("WARNING: %s has iterated %d times, possible bug", __FUNCTION__, iterations);
+      printf("WARNING: %s has iterated %d times, possible bug\n", __FUNCTION__, iterations);
     }
     auto [lower, upper] = FreeMemBoundsForLevel(mem_event_idx_);
     const uint64_t delay_alloc_level =

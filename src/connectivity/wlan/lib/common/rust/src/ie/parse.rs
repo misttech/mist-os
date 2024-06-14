@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*,
-    crate::{
-        buffer_reader::BufferReader,
-        error::{FrameParseError, FrameParseResult},
-        organization::Oui,
-    },
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    paste::paste,
-    zerocopy::{ByteSlice, Ref},
-};
+use super::*;
+use crate::buffer_reader::BufferReader;
+use crate::error::{FrameParseError, FrameParseResult};
+use crate::organization::Oui;
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+use paste::paste;
+use zerocopy::{ByteSlice, Ref};
 
 macro_rules! validate {
     ( $condition:expr, $debug_message:expr ) => {
@@ -234,11 +230,9 @@ pub fn parse_vendor_ie<B: ByteSlice>(raw_body: B) -> FrameParseResult<VendorIe<B
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::assert_variant,
-        zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
-    };
+    use super::*;
+    use crate::assert_variant;
+    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
     #[repr(C)]
     #[derive(AsBytes, FromZeros, FromBytes, NoCell)]

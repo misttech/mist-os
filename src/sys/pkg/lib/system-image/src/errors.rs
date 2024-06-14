@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_hash::ParseHashError,
-    fuchsia_pkg::{PackagePathSegmentError, ParsePackagePathError},
-    std::{io, str::Utf8Error},
-    thiserror::Error,
-};
+use fuchsia_hash::ParseHashError;
+use fuchsia_pkg::{PackagePathSegmentError, ParsePackagePathError};
+use std::io;
+use std::str::Utf8Error;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum PathHashMappingError {

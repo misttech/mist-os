@@ -4,21 +4,19 @@
 
 //! Utilities to run asynchronous tests that use `pseudo-fs` objects.
 
-use crate::{
-    directory::{
-        entry::DirectoryEntry, entry_container::Directory, helper::DirectlyMutable,
-        immutable::Simple,
-    },
-    execution_scope::ExecutionScope,
-    path::Path,
-};
+use crate::directory::entry::DirectoryEntry;
+use crate::directory::entry_container::Directory;
+use crate::directory::helper::DirectlyMutable;
+use crate::directory::immutable::Simple;
+use crate::execution_scope::ExecutionScope;
+use crate::path::Path;
 
-use {
-    fidl::endpoints::{create_proxy, ProtocolMarker},
-    fidl_fuchsia_io as fio,
-    fuchsia_async::TestExecutor,
-    std::{future::Future, pin::Pin, sync::Arc},
-};
+use fidl::endpoints::{create_proxy, ProtocolMarker};
+use fidl_fuchsia_io as fio;
+use fuchsia_async::TestExecutor;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
 
 #[cfg(target_os = "fuchsia")]
 use std::task::Poll;

@@ -2,22 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor},
-    relation::LockBefore,
-    wrap::prelude::*,
-};
-use net_types::{
-    ip::{Ip, Ipv4, Ipv6},
-    NonMappedAddr, SpecifiedAddr,
-};
+use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
+use lock_order::relation::LockBefore;
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::{NonMappedAddr, SpecifiedAddr};
+use netstack3_device::DeviceId;
+use netstack3_filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State};
+use netstack3_ip::{FilterHandlerProvider, IpDeviceStateContext, IpLayerIpExt, IpStateInner};
 
-use crate::{
-    device::DeviceId,
-    filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State},
-    ip::{FilterHandlerProvider, IpDeviceStateContext, IpLayerIpExt, IpStateInner},
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
@@ -34,7 +29,7 @@ impl<'a, I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::Filt
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
     FilterIpContext<I, BC> for CoreCtx<'_, BC, L>
 {
-    type NatCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::FilterState<I>>;
+    type NatCtx<'a> = CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::FilterState<I>>>;
 
     fn with_filter_state_and_nat_ctx<O, F: FnOnce(&State<I, BC>, &mut Self::NatCtx<'_>) -> O>(
         &mut self,
@@ -46,8 +41,8 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterSt
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<I>>> NatContext<I>
-    for CoreCtx<'_, BC, L>
+impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<I>>>
+    NatContext<I, BC> for CoreCtx<'_, BC, L>
 {
     fn get_local_addr_for_remote(
         &mut self,

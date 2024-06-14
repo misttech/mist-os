@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::Error,
-    fuchsia_fs::file::{AsyncGetSize, AsyncReadAt},
-};
+use crate::error::Error;
+use fuchsia_fs::file::{AsyncGetSize, AsyncReadAt};
 
 /// A struct to open and read a FAR-formatted archive asynchronously.
 /// Requires that all paths are valid UTF-8.
@@ -59,10 +57,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fuchsia_async as fasync,
-        fuchsia_fs::file::Adapter, futures::io::Cursor,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use fuchsia_fs::file::Adapter;
+    use futures::io::Cursor;
 
     #[fasync::run_singlethreaded(test)]
     async fn new_rejects_non_utf8_path() {

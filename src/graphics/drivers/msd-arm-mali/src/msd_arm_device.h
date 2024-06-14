@@ -131,8 +131,9 @@ class MsdArmDevice : public msd::Device,
   void DumpStatusToLog();
   magma::Status ProcessTimestampRequest(std::shared_ptr<magma::PlatformBuffer> buffer);
 
-  // Called from the device framework threadpool.
+  // Called from the device framework threadpool. FuchsiaPowerManager::Owner implementation.
   void SetPowerState(bool enabled, PowerStateCallback completer) override;
+  PowerManager* GetPowerManager() override { return power_manager_.get(); }
 
   void RefCycleCounter();
   void DerefCycleCounter();
@@ -259,6 +260,7 @@ class MsdArmDevice : public msd::Device,
   bool ExitProtectedMode() override;
   bool IsInProtectedMode() override;
   void OutputHangMessage(bool hardware_hang) override;
+  void PowerOnGpuForRunnableAtoms() override;
 
   static const uint32_t kMagic = 0x64657669;  //"devi"
   uint64_t magic_;
@@ -332,6 +334,8 @@ class MsdArmDevice : public msd::Device,
   std::unique_ptr<JobScheduler> scheduler_;
   std::unique_ptr<magma::PlatformBusMapper> bus_mapper_;
   uint64_t cycle_counter_refcount_ = 0;
+
+  std::vector<TimeoutSource*> timeout_sources_;
 
   // Collects all callbacks to be called when the power change completes.
   std::vector<PowerStateCallback> callbacks_on_power_change_complete_;

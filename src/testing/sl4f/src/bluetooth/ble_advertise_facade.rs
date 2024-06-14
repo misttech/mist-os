@@ -8,14 +8,14 @@ use fidl_fuchsia_bluetooth_le::{
     AdvertisedPeripheralMarker, AdvertisedPeripheralRequest, AdvertisedPeripheralRequestStream,
     AdvertisingParameters, ConnectionProxy, PeripheralMarker, PeripheralProxy,
 };
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::PeerId;
-use fuchsia_component as app;
 use fuchsia_sync::RwLock;
 use futures::{pin_mut, select, FutureExt, StreamExt};
 use serde_json::Value;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{debug, error, info, warn};
+use {fuchsia_async as fasync, fuchsia_component as app};
 
 // Sl4f-Constants and Ble advertising related functionality
 use crate::bluetooth::types::FacadeArg;

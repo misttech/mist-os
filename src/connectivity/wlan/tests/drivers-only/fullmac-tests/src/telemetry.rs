@@ -1,20 +1,18 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::FullmacDriverFixture, drivers_only_common::sme_helpers,
-    fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_stats as fidl_stats,
-    fullmac_helpers::config::FullmacDriverConfig, rand::Rng, wlan_common::assert_variant,
-};
+use crate::FullmacDriverFixture;
+use drivers_only_common::sme_helpers;
+use fullmac_helpers::config::FullmacDriverConfig;
+use rand::Rng;
+use wlan_common::assert_variant;
+use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_stats as fidl_stats};
 
 #[fuchsia::test]
 async fn test_get_iface_counter_stats() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let telemetry_proxy = sme_helpers::get_telemetry(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let telemetry_proxy = sme_helpers::get_telemetry(&fullmac_driver.generic_sme_proxy).await;
     let telemetry_fut = telemetry_proxy.get_counter_stats();
 
     let driver_counter_stats = fidl_fullmac::WlanFullmacIfaceCounterStats {
@@ -51,12 +49,9 @@ async fn test_get_iface_counter_stats() {
 
 #[fuchsia::test]
 async fn test_get_iface_histogram_stats() {
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(FullmacDriverConfig {
-            ..Default::default()
-        })
-        .await;
-    let telemetry_proxy = sme_helpers::get_telemetry(&generic_sme_proxy).await;
+    let mut fullmac_driver =
+        FullmacDriverFixture::create(FullmacDriverConfig { ..Default::default() }).await;
+    let telemetry_proxy = sme_helpers::get_telemetry(&fullmac_driver.generic_sme_proxy).await;
     let telemetry_fut = telemetry_proxy.get_histogram_stats();
 
     // This contains every combination of hist scope and antenna frequency.

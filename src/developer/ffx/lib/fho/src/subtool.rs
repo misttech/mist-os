@@ -11,10 +11,11 @@ use ffx_command::{
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
+use std::fs::File;
 use std::os::unix::process::ExitStatusExt;
+use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::sync::Arc;
-use std::{fs::File, path::PathBuf};
 
 /// The main trait for defining an ffx tool. This is not intended to be implemented directly
 /// by the user, but instead derived via `#[derive(FfxTool)]`.
@@ -231,7 +232,8 @@ mod tests {
     use super::*;
     // This keeps the macros from having compiler errors.
     use crate as fho;
-    use crate::{testing::*, FhoDetails, Only, SimpleWriter};
+    use crate::testing::*;
+    use crate::{FhoDetails, Only, SimpleWriter};
     use async_trait::async_trait;
     use fho_macro::FfxTool;
 

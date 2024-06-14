@@ -5,20 +5,14 @@
 #[cfg(target_os = "fuchsia")]
 use tracing::{error, warn};
 
-use {
-    super::{
-        config::DiagnosticData,
-        metrics::{
-            fetch::{Fetcher, FileDataFetcher},
-            metric_value::{MetricValue, Problem},
-            MetricState, Metrics, ValueSource,
-        },
-        plugins::{register_plugins, Plugin},
-    },
-    crate::act::{Action, Actions, Alert, Gauge, Snapshot},
-    serde::Serialize,
-    std::collections::HashMap,
-};
+use super::config::DiagnosticData;
+use super::metrics::fetch::{Fetcher, FileDataFetcher};
+use super::metrics::metric_value::{MetricValue, Problem};
+use super::metrics::{MetricState, Metrics, ValueSource};
+use super::plugins::{register_plugins, Plugin};
+use crate::act::{Action, Actions, Alert, Gauge, Snapshot};
+use serde::Serialize;
+use std::collections::HashMap;
 
 /// Provides the [metric_state] context to evaluate [Action]s and results of the [actions].
 #[derive(Clone, Debug, Serialize)]
@@ -185,15 +179,11 @@ impl StructuredActionContext<'_> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            act::{ActionsSchema, Severity},
-            make_metrics,
-            metrics::{ExpressionContext, Metric},
-        },
-        std::cell::RefCell,
-    };
+    use super::*;
+    use crate::act::{ActionsSchema, Severity};
+    use crate::make_metrics;
+    use crate::metrics::{ExpressionContext, Metric};
+    use std::cell::RefCell;
 
     macro_rules! cast {
         ($target: expr, $pat: path) => {{

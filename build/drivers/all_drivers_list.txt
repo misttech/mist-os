@@ -1,8 +1,7 @@
-//examples/drivers/demo-number:driver
 //examples/drivers/driver_test_realm/sample-driver:driver
-//examples/drivers/metadata:forwarder_driver
-//examples/drivers/metadata:retriever_driver
-//examples/drivers/metadata:sender_driver
+//examples/drivers/metadata/forwarder:driver
+//examples/drivers/metadata/retriever:driver
+//examples/drivers/metadata/sender:driver
 //examples/drivers/simple/dfv1:driver
 //examples/drivers/simple/dfv2:driver
 //examples/drivers/skeleton:driver
@@ -113,7 +112,6 @@
 //src/devices/board/drivers/sherlock:sherlock-driver
 //src/devices/board/drivers/sherlock:sherlock-factory-driver
 //src/devices/board/drivers/vim3-devicetree:bazel_package.bazel_build
-//src/devices/board/drivers/vim3:vim3-driver
 //src/devices/bus/drivers/pci/test:pci_fake-driver
 //src/devices/bus/drivers/pci/test:pci_protocol_test_driver-driver
 //src/devices/bus/drivers/pci:bus-pci-driver

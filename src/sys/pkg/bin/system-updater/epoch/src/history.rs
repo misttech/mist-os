@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    epoch::EpochFile,
-    std::io::{BufRead, BufReader},
-    thiserror::Error,
-};
+use epoch::EpochFile;
+use std::io::{BufRead, BufReader};
+use thiserror::Error;
 
 /// Wrapper for parsing epoch history.
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -81,7 +79,9 @@ impl Into<EpochFile> for History {
 
 #[cfg(test)]
 mod test {
-    use {super::*, indoc::indoc, proptest::prelude::*};
+    use super::*;
+    use indoc::indoc;
+    use proptest::prelude::*;
 
     #[test]
     fn success() {

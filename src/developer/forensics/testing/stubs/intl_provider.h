@@ -13,7 +13,7 @@
 #include <string_view>
 
 #include "lib/zx/time.h"
-#include "src/developer/forensics/testing/stubs/fidl_server.h"
+#include "src/developer/forensics/testing/stubs/fidl_server_hlcpp.h"
 
 namespace forensics::stubs {
 

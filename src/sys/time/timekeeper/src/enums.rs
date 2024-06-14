@@ -5,14 +5,12 @@
 //! A collection of enumerations that are used widely across Timekeeper, usually in both
 //! operational and in diagnostics code.
 
-use {
-    crate::rtc::RtcCreationError,
-    time_metrics_registry::{
-        RealTimeClockEventsMigratedMetricDimensionEventType as CobaltRtcEvent,
-        TimeMetricDimensionRole, TimeMetricDimensionTrack,
-        TimekeeperTimeSourceEventsMigratedMetricDimensionEventType as CobaltTimeSourceEvent,
-        TimekeeperTrackEventsMigratedMetricDimensionEventType as CobaltTrackEvent,
-    },
+use crate::rtc::RtcCreationError;
+use time_metrics_registry::{
+    RealTimeClockEventsMigratedMetricDimensionEventType as CobaltRtcEvent, TimeMetricDimensionRole,
+    TimeMetricDimensionTrack,
+    TimekeeperTimeSourceEventsMigratedMetricDimensionEventType as CobaltTimeSourceEvent,
+    TimekeeperTrackEventsMigratedMetricDimensionEventType as CobaltTrackEvent,
 };
 
 /// The state of the userspace UTC clock when Timekeeper was initialized.

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::mac, zerocopy::ByteSlice};
+use crate::mac;
+use zerocopy::ByteSlice;
 
 #[derive(Copy, Clone, PartialOrd, PartialEq, Debug, Ord, Eq)]
 pub enum FrameClass {

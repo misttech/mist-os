@@ -4,85 +4,75 @@
 
 #![cfg(test)]
 
+use std::num::{NonZeroU16, NonZeroU64};
+use std::ops::RangeInclusive;
+use std::os::fd::AsFd;
+use std::pin::pin;
+
 use anyhow::{anyhow, Context as _};
 use assert_matches::assert_matches;
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
+use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
-use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
-use fidl_fuchsia_net_tun as fnet_tun;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_packet as fpacket;
-use fuchsia_async::{
-    self as fasync,
-    net::{DatagramSocket, UdpSocket},
-    DurationExt, TimeoutExt as _,
-};
+use fuchsia_async::net::{DatagramSocket, UdpSocket};
+use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
 use fuchsia_zircon::{self as zx, AsHandleRef as _};
-use futures::{
-    future::{self, join_all, LocalBoxFuture},
-    io::AsyncReadExt as _,
-    io::AsyncWriteExt as _,
-    Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
-};
+use futures::future::{self, LocalBoxFuture};
+use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use futures::{Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{
     fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet,
-    net_subnet_v4, net_subnet_v6, std_ip_v4, std_socket_addr,
+    net_subnet_v4, net_subnet_v6, std_ip, std_ip_v4, std_socket_addr,
 };
-use net_types::{
-    ethernet::Mac,
-    ip::{
-        AddrSubnetEither, Ip, IpAddress as _, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr,
-    },
-    Witness as _,
+use net_types::ethernet::Mac;
+use net_types::ip::{
+    AddrSubnetEither, Ip, IpAddress as _, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
+use net_types::Witness as _;
 use netemul::{
     InterfaceConfig, RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _,
-    TestFakeEndpoint, TestInterface, TestNetwork,
+    TestFakeEndpoint, TestInterface, TestNetwork, TestRealm, TestSandbox,
+};
+use netstack_testing_common::constants::ipv6 as ipv6_consts;
+use netstack_testing_common::interfaces::TestInterfaceExt as _;
+use netstack_testing_common::realms::{
+    KnownServiceProvider, Netstack, Netstack3, NetstackVersion, TestRealmExt, TestSandboxExt as _,
 };
 use netstack_testing_common::{
-    constants::ipv6 as ipv6_consts,
-    devices,
-    interfaces::TestInterfaceExt as _,
-    ndp, ping,
-    realms::{KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _},
-    Result, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    devices, ndp, ping, Result, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
-
 use netstack_testing_macros::netstack_test;
 use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
-use packet_formats::{
-    arp::{ArpOp, ArpPacketBuilder},
-    ethernet::{
-        EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    icmp::{
-        ndp::{
-            options::{NdpOptionBuilder, PrefixInformation},
-            NeighborAdvertisement,
-        },
-        IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode,
-        Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv6DestUnreachableCode, Icmpv6Packet,
-        MessageBody,
-    },
-    igmp::messages::IgmpPacket,
-    ip::{IpProto, Ipv4Proto, Ipv6Proto},
-    ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder},
-    ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder},
+use packet_formats::arp::{ArpOp, ArpPacketBuilder};
+use packet_formats::ethernet::{
+    EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
+use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
+use packet_formats::icmp::ndp::NeighborAdvertisement;
+use packet_formats::icmp::{
+    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode,
+    Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv6DestUnreachableCode, Icmpv6Packet, MessageBody,
+};
+use packet_formats::igmp::messages::IgmpPacket;
+use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
+use packet_formats::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
-use socket2::SockRef;
-use std::{num::NonZeroU64, os::fd::AsFd, pin::pin};
+use socket2::{InterfaceIndexOrAddress, SockRef};
 use test_case::test_case;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_tun as fnet_tun,
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fpacket,
+};
 
 async fn run_udp_socket_test(
     server: &netemul::TestRealm<'_>,
@@ -2313,7 +2303,10 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         };
     assert_eq!(icmp_packet.message().id(), ICMP_ID);
     assert_eq!(icmp_packet.message().seq(), SEQ_NUM);
-    assert_eq!(icmp_packet.body().bytes(), &payload[..]);
+
+    let (inner_header, inner_body) = icmp_packet.body().bytes();
+    assert!(inner_body.is_none());
+    assert_eq!(inner_header, &payload[..]);
 
     // Send the same data again, but with an IPv6 frame type, expect that it'll
     // fail parsing and no response will be generated.
@@ -2385,7 +2378,10 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         };
     assert_eq!(icmp_packet.message().id(), ICMP_ID);
     assert_eq!(icmp_packet.message().seq(), SEQ_NUM);
-    assert_eq!(icmp_packet.body().bytes(), &payload[..]);
+
+    let (inner_header, inner_body) = icmp_packet.body().bytes();
+    assert!(inner_body.is_none());
+    assert_eq!(inner_header, &payload[..]);
 
     // Send the same data again, but with an IPv4 frame type, expect that it'll
     // fail parsing and no response will be generated.
@@ -3203,7 +3199,7 @@ async fn send_to_remote_with_zone<N: Netstack>(name: &str) {
         |networks, multinic, ()| {
             Box::pin(async move {
                 let networks_and_peer_sockets =
-                    join_all(networks.iter().map(|network| async move {
+                    future::join_all(networks.iter().map(|network| async move {
                         let Network { peer_realm, peer_interface, _network, multinic_interface } =
                             network;
                         let Interface { iface: _, ip: peer_ip } = peer_interface;
@@ -3215,7 +3211,7 @@ async fn send_to_remote_with_zone<N: Netstack>(name: &str) {
                 let host_sock = make_socket(&multinic).await;
                 let host_sock = &host_sock;
 
-                let _: Vec<()> = join_all(networks_and_peer_sockets.iter().map(
+                let _: Vec<()> = future::join_all(networks_and_peer_sockets.iter().map(
                     |(multinic_interface, (peer_socket, peer_ip))| async move {
                         let Interface { iface: interface, ip: _ } = multinic_interface;
                         let id: u8 = interface.id().try_into().unwrap();
@@ -3272,7 +3268,7 @@ async fn tcp_communicate_with_remote_with_zone<
         |networks, multinic, ()| {
             Box::pin(async move {
                 let interfaces_and_listeners =
-                    join_all(networks.iter().map(|network| async move {
+                    future::join_all(networks.iter().map(|network| async move {
                         let Network { peer_realm, peer_interface, _network, multinic_interface } =
                             network;
                         let Interface { iface: _, ip: peer_ip } = peer_interface;
@@ -3286,7 +3282,7 @@ async fn tcp_communicate_with_remote_with_zone<
                     }))
                     .await;
 
-                let _: Vec<()> = join_all(interfaces_and_listeners.into_iter().map(
+                let _: Vec<()> = future::join_all(interfaces_and_listeners.into_iter().map(
                     |(multinic_interface, (peer_listener, peer_ip))| async move {
                         let mut host_conn =
                             make_multinic_conn(multinic, multinic_interface, peer_ip).await;
@@ -3787,6 +3783,13 @@ trait MulticastTestIpExt:
 {
     const NETWORKS: [fnet::Subnet; 2];
     const MCAST_ADDR: std::net::SocketAddr;
+
+    fn iface_ip(index: usize) -> std::net::IpAddr {
+        match Self::NETWORKS[index].addr {
+            fnet::IpAddress::Ipv4(addr) => std::net::IpAddr::V4(addr.addr.into()),
+            fnet::IpAddress::Ipv6(addr) => std::net::IpAddr::V6(addr.addr.into()),
+        }
+    }
 }
 
 impl MulticastTestIpExt for Ipv4 {
@@ -3801,6 +3804,28 @@ impl MulticastTestIpExt for Ipv6 {
     const MCAST_ADDR: std::net::SocketAddr = std_socket_addr!("[FF00::1:2]:3513");
 }
 
+struct MulticastTestNetwork<'a> {
+    _net: TestNetwork<'a>,
+    iface: TestInterface<'a>,
+    receiver: TestFakeEndpoint<'a>,
+}
+
+async fn init_multicast_test_networks<'a, I: MulticastTestIpExt>(
+    sandbox: &'a netemul::TestSandbox,
+    client: &netemul::TestRealm<'a>,
+) -> Vec<MulticastTestNetwork<'a>> {
+    future::join_all(I::NETWORKS.iter().enumerate().map(|(i, subnet)| async move {
+        let net =
+            sandbox.create_network(format!("net{i}")).await.expect("failed to create network");
+        let iface =
+            client.join_network(&net, format!("if{i}")).await.expect("failed to join network");
+        iface.add_address_and_subnet_route(subnet.clone()).await.expect("failed to set ip");
+        let receiver = net.create_fake_endpoint().expect("failed to create endpoint");
+        MulticastTestNetwork { _net: net, iface, receiver }
+    }))
+    .await
+}
+
 #[netstack_test]
 #[test_case(0)]
 #[test_case(1)]
@@ -3812,23 +3837,7 @@ async fn multicast_send<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
     let client = sandbox
         .create_netstack_realm::<N, _>(format!("{name}_client"))
         .expect("failed to create client realm");
-
-    struct Network<'a> {
-        _net: TestNetwork<'a>,
-        iface: TestInterface<'a>,
-        receiver: TestFakeEndpoint<'a>,
-    }
-
-    let mut networks: Vec<Network<'_>> = vec![];
-    for i in 0..I::NETWORKS.len() {
-        let net =
-            sandbox.create_network(format!("net{i}")).await.expect("failed to create network");
-        let iface =
-            client.join_network(&net, format!("if{i}")).await.expect("failed to join network");
-        iface.add_address_and_subnet_route(I::NETWORKS[i].clone()).await.expect("failed to set ip");
-        let receiver = net.create_fake_endpoint().expect("failed to create endpoint");
-        networks.push(Network { _net: net, iface, receiver });
-    }
+    let networks = init_multicast_test_networks::<I>(&sandbox, &client).await;
 
     let sock = client
         .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
@@ -3902,4 +3911,522 @@ async fn multicast_send<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
                 .await;
         }
     }
+}
+
+#[netstack_test]
+#[test_case(None, 0, false)]
+#[test_case(Some(true), 0, false)]
+#[test_case(Some(true), 1, true)]
+#[test_case(Some(false), 0, false)]
+#[test_case(Some(false), 1, true)]
+async fn multicast_loop<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
+    name: &str,
+    multicast_loop_value: Option<bool>,
+    target_interface: usize,
+    dual_stack: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+
+    let networks = init_multicast_test_networks::<I>(&sandbox, &client).await;
+
+    // Initialize send socket to send the packet on the `target_interface`.
+    let send_socket = client
+        .datagram_socket(
+            if dual_stack { Ipv6::DOMAIN } else { I::DOMAIN },
+            fposix_socket::DatagramSocketProtocol::Udp,
+        )
+        .await
+        .expect("failed to create UDP socket");
+    if I::VERSION == IpVersion::V6 {
+        // TODO(https://fxbug.dev//346622422): NS3 may bind the socket to a
+        // link-local address. Bind the socket explicitly to workaround that
+        // issue. Remove when the bug is fixed.
+        send_socket
+            .bind(&std::net::SocketAddr::new(I::iface_ip(target_interface), 0).into())
+            .expect("failed to bind UDP socket");
+    }
+
+    match I::VERSION {
+        IpVersion::V4 => {
+            let addr = match I::NETWORKS[target_interface].addr {
+                fnet::IpAddress::Ipv4(a) => a.addr.into(),
+                fnet::IpAddress::Ipv6(_) => unreachable!("NETWORKS expected to be Ipv4"),
+            };
+            send_socket.set_multicast_if_v4(&addr).expect("failed to set IP_MULTICAST_IF");
+            if let Some(value) = multicast_loop_value {
+                send_socket.set_multicast_loop_v4(value).expect("failed to set IP_MULTICAST_LOOP");
+            }
+        }
+        IpVersion::V6 => {
+            let iface_id = networks[target_interface].iface.id().try_into().unwrap();
+            send_socket.set_multicast_if_v6(iface_id).expect("Failed to set IPV6_MULTICAST_LOOP");
+            if let Some(value) = multicast_loop_value {
+                send_socket
+                    .set_multicast_loop_v6(value)
+                    .expect("failed to set IPV6_MULTICAST_LOOP");
+
+                // Set the IPv4 option to the reverse value. It's expected to
+                // have no effect on IPv6 packets. NS2 doesn't implement this
+                // correctly, so we only set this option in NS3.
+                if N::VERSION == NetstackVersion::Netstack3 {
+                    send_socket
+                        .set_multicast_loop_v4(!value)
+                        .expect("failed to set IP_MULTICAST_LOOP");
+                }
+            }
+        }
+    };
+
+    // Create one socket per interface and join the same multicast group from each.
+    let recv_sockets = future::join_all(networks.iter().map(|network| async {
+        let recv_socket = client
+            .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+            .await
+            .expect("failed to create socket");
+        recv_socket
+            .bind_device(Some(
+                network
+                    .iface
+                    .get_interface_name()
+                    .await
+                    .expect("get_interface_name failed")
+                    .as_bytes(),
+            ))
+            .expect("failed to bind socket to an interface");
+        recv_socket.bind(&I::MCAST_ADDR.into()).expect("failed to bind UDP socket");
+
+        let iface_id = network.iface.id().try_into().unwrap();
+        match I::MCAST_ADDR.ip() {
+            std::net::IpAddr::V4(addr_v4) => recv_socket
+                .join_multicast_v4_n(&addr_v4.into(), &InterfaceIndexOrAddress::Index(iface_id))
+                .expect("failed to join multicast group"),
+            std::net::IpAddr::V6(addr_v6) => recv_socket
+                .join_multicast_v6(&addr_v6.into(), iface_id)
+                .expect("failed to join multicast group"),
+        }
+        fasync::net::UdpSocket::from_socket(recv_socket.into()).unwrap()
+    }))
+    .await;
+
+    // IP_MULTICAST_LOOP should be enabled if not set explicitly.
+    let multicast_loop_value = multicast_loop_value.unwrap_or(true);
+
+    let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    assert_eq!(
+        send_socket.send_to(&data, &I::MCAST_ADDR.into()).expect("failed to send multicast packet"),
+        data.len()
+    );
+
+    // Check that the packet is delivered where it's expected.
+    for (i, recv_socket) in recv_sockets.iter().enumerate() {
+        let mut buf = [0u8; 200];
+        let recv_fut = recv_socket.recv_from(&mut buf);
+        let packet_expected = multicast_loop_value && i == target_interface;
+        if packet_expected {
+            let (size, addr) = recv_fut
+                .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || {
+                    Err(std::io::ErrorKind::TimedOut.into())
+                })
+                .await
+                .expect("recv_from failed");
+            assert_eq!(size, data.len());
+            assert_eq!(&buf[..size], &data[..]);
+            assert_eq!(addr.ip(), I::iface_ip(i));
+        } else {
+            recv_fut
+                .map(|output| panic!("unexpected received packet {output:?}"))
+                .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || ())
+                .await;
+        }
+    }
+}
+
+#[netstack_test]
+#[test_case(true)]
+#[test_case(false)]
+async fn multicast_loop_on_loopback_dev<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
+    name: &str,
+    multicast_loop_value: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+
+    let loopback_id: u32 =
+        client.loopback_properties().await.unwrap().unwrap().id.get().try_into().unwrap();
+
+    // Initialize send socket to send the packet on the `target_interface`.
+    let send_socket = client
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create UDP socket");
+    let loopback_ip: std::net::IpAddr = I::LOOPBACK_ADDRESS.to_ip_addr().into();
+    send_socket
+        .bind(&std::net::SocketAddr::new(loopback_ip, 0).into())
+        .expect("failed to bind UDP socket");
+
+    match I::VERSION {
+        IpVersion::V4 => send_socket.set_multicast_loop_v4(multicast_loop_value),
+        IpVersion::V6 => send_socket.set_multicast_loop_v6(multicast_loop_value),
+    }
+    .expect("failed to set IPV6_MULTICAST_LOOP");
+
+    let recv_socket = client
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create socket");
+    recv_socket.bind(&I::MCAST_ADDR.into()).expect("failed to bind UDP socket");
+
+    match I::MCAST_ADDR.ip() {
+        std::net::IpAddr::V4(addr_v4) => recv_socket
+            .join_multicast_v4_n(&addr_v4.into(), &InterfaceIndexOrAddress::Index(loopback_id))
+            .expect("failed to join multicast group"),
+        std::net::IpAddr::V6(addr_v6) => recv_socket
+            .join_multicast_v6(&addr_v6.into(), loopback_id)
+            .expect("failed to join multicast group"),
+    }
+
+    let recv_socket = fasync::net::UdpSocket::from_socket(recv_socket.into()).unwrap();
+
+    let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    assert_eq!(
+        send_socket.send_to(&data, &I::MCAST_ADDR.into()).expect("failed to send multicast packet"),
+        data.len()
+    );
+
+    // `recv_socket` is expected to receive one and only one packet.
+    let mut buf = [0u8; 200];
+    let (size, addr) = recv_socket
+        .recv_from(&mut buf)
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || Err(std::io::ErrorKind::TimedOut.into()))
+        .await
+        .expect("recv_from failed");
+    assert_eq!(size, data.len());
+    assert_eq!(&buf[..size], &data[..]);
+    assert_eq!(addr.ip(), loopback_ip);
+
+    recv_socket
+        .recv_from(&mut buf)
+        .map(|output| panic!("unexpected received duplicate packet {output:?}"))
+        .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || ())
+        .await;
+}
+
+trait RedirectTestIpExt: Ip {
+    const SUBNET: fnet::Subnet;
+    const ADDR: std::net::IpAddr;
+}
+
+impl RedirectTestIpExt for Ipv4 {
+    const SUBNET: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+    const ADDR: std::net::IpAddr = std_ip!("192.0.2.1");
+}
+
+impl RedirectTestIpExt for Ipv6 {
+    const SUBNET: fnet::Subnet = fidl_subnet!("2001:db8::1/64");
+    const ADDR: std::net::IpAddr = std_ip!("2001:db8::1");
+}
+
+struct RedirectTestSetup<'a> {
+    netstack: TestRealm<'a>,
+    _network: TestNetwork<'a>,
+    _interface: TestInterface<'a>,
+    _control: fnet_filter::ControlProxy,
+    _controller: fnet_filter_ext::Controller,
+}
+
+async fn setup_redirect_test<'a>(
+    name: &str,
+    sandbox: &'a TestSandbox,
+    subnet: fnet::Subnet,
+    matcher: fnet_filter_ext::TransportProtocolMatcher,
+    redirect: Option<RangeInclusive<NonZeroU16>>,
+) -> RedirectTestSetup<'a> {
+    use fnet_filter_ext::{
+        Action, Change, Controller, ControllerId, Domain, InstalledNatRoutine, Matchers, Namespace,
+        NamespaceId, NatHook, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
+    };
+
+    let netstack =
+        sandbox.create_netstack_realm::<Netstack3, _>(name.to_owned()).expect("create netstack");
+    let network = sandbox.create_network("net").await.expect("create network");
+    let interface = netstack.join_network(&network, "interface").await.expect("join network");
+    interface.add_address_and_subnet_route(subnet).await.expect("set ip");
+
+    let control =
+        netstack.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller = Controller::new(&control, &ControllerId(String::from("redirect")))
+        .await
+        .expect("create controller");
+    let namespace_id = NamespaceId(String::from("namespace"));
+    let routine_id = RoutineId { namespace: namespace_id.clone(), name: String::from("routine") };
+    let resources = [
+        Resource::Namespace(Namespace { id: namespace_id.clone(), domain: Domain::AllIp }),
+        Resource::Routine(Routine {
+            id: routine_id.clone(),
+            routine_type: RoutineType::Nat(Some(InstalledNatRoutine {
+                hook: NatHook::LocalEgress,
+                priority: 0,
+            })),
+        }),
+        Resource::Rule(Rule {
+            id: RuleId { routine: routine_id.clone(), index: 0 },
+            matchers: Matchers { transport_protocol: Some(matcher), ..Default::default() },
+            action: Action::Redirect { dst_port: redirect },
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(Change::Create).collect())
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    RedirectTestSetup {
+        netstack,
+        _network: network,
+        _interface: interface,
+        _control: control,
+        _controller: controller,
+    }
+}
+
+const LISTEN_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(11111));
+
+struct TestCaseV4 {
+    original_dst: std::net::SocketAddr,
+    matcher: fnet_filter_ext::TransportProtocolMatcher,
+    redirect_dst: Option<RangeInclusive<NonZeroU16>>,
+    expect_redirect: bool,
+}
+
+#[netstack_test]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(Ipv4::ADDR, LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: None,
+        expect_redirect: true,
+    };
+    "redirect to localhost"
+)]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(Ipv4::ADDR, 22222),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: Some(LISTEN_PORT..=LISTEN_PORT),
+        expect_redirect: true,
+    };
+    "redirect to localhost port 11111"
+)]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(std_ip!("127.0.0.1"), LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Udp { src_port: None, dst_port: None },
+        redirect_dst: None,
+        expect_redirect: false,
+    };
+    "no redirect"
+)]
+async fn redirect_original_destination_v4(name: &str, test_case: TestCaseV4) {
+    let TestCaseV4 { original_dst, matcher, redirect_dst, expect_redirect } = test_case;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let setup = setup_redirect_test(name, &sandbox, Ipv4::SUBNET, matcher, redirect_dst).await;
+
+    let server = setup
+        .netstack
+        .stream_socket(Ipv4::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    server
+        .bind(
+            &std::net::SocketAddr::from((Ipv4::LOOPBACK_ADDRESS.to_ip_addr(), LISTEN_PORT.get()))
+                .into(),
+        )
+        .expect("no conflict");
+    server.listen(1).expect("listen on server socket");
+
+    let client = setup
+        .netstack
+        .stream_socket(Ipv4::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    client.connect(&original_dst.into()).expect("connect to server");
+
+    let (server, _addr) = server.accept().expect("accept incoming connection");
+
+    // The original destination should be observable on both the client and server sockets.
+    let verify_original_dst = |socket: &socket2::Socket| {
+        let result = socket.original_dst();
+        if expect_redirect {
+            assert_eq!(
+                result
+                    .expect("get original destination of connection")
+                    .as_socket()
+                    .expect("should be valid socket addr"),
+                original_dst
+            );
+        } else {
+            let error = result.expect_err("socket should have no original destination").kind();
+            assert_eq!(error, std::io::ErrorKind::NotFound);
+        }
+    };
+    verify_original_dst(&client);
+    verify_original_dst(&server);
+}
+
+struct TestCaseV6 {
+    original_dst: std::net::SocketAddr,
+    matcher: fnet_filter_ext::TransportProtocolMatcher,
+    redirect_dst: Option<RangeInclusive<NonZeroU16>>,
+}
+
+#[netstack_test]
+#[test_case(
+    TestCaseV6 {
+        original_dst: std::net::SocketAddr::new(Ipv6::ADDR, LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: None,
+    };
+    "redirect to localhost"
+)]
+#[test_case(
+    TestCaseV6 {
+        original_dst: std::net::SocketAddr::new(Ipv6::ADDR, 22222),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: Some(LISTEN_PORT..=LISTEN_PORT),
+    };
+    "redirect to localhost port 11111"
+)]
+#[test_case(
+    TestCaseV6 {
+        original_dst: std::net::SocketAddr::new(std_ip!("::1"), LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Udp { src_port: None, dst_port: None },
+        redirect_dst: None,
+    };
+    "no redirect"
+)]
+async fn redirect_original_destination_v6(name: &str, test_case: TestCaseV6) {
+    let TestCaseV6 { original_dst, matcher, redirect_dst } = test_case;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let setup = setup_redirect_test(name, &sandbox, Ipv6::SUBNET, matcher, redirect_dst).await;
+
+    let server = setup
+        .netstack
+        .stream_socket(Ipv6::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    server
+        .bind(
+            &std::net::SocketAddr::from((Ipv6::LOOPBACK_ADDRESS.to_ip_addr(), LISTEN_PORT.get()))
+                .into(),
+        )
+        .expect("no conflict");
+    server.listen(1).expect("listen on server socket");
+
+    let client = setup
+        .netstack
+        .stream_socket(Ipv6::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    client.connect(&original_dst.into()).expect("connect to server");
+
+    let (server, _addr) = server.accept().expect("accept incoming connection");
+
+    // Although this connection was redirected, SO_ORIGINAL_DST should return
+    // ENOENT because the original destination was not an IPv4 address.
+    let verify_original_dst = |socket: &socket2::Socket| {
+        let result = socket.original_dst();
+        let error = result.expect_err("socket should have no original destination").kind();
+        assert_eq!(error, std::io::ErrorKind::NotFound);
+    };
+    verify_original_dst(&client);
+    verify_original_dst(&server);
+
+    // TODO(https://fxbug.dev/345465222): exercise SOL_IPV6 - IP6T_SO_ORIGINAL_DST
+    // when it is available and implemented.
+}
+
+#[netstack_test]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(Ipv4::ADDR, LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: None,
+        expect_redirect: true,
+    };
+    "redirect to localhost"
+)]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(Ipv4::ADDR, 22222),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None },
+        redirect_dst: Some(LISTEN_PORT..=LISTEN_PORT),
+        expect_redirect: true,
+    };
+    "redirect to localhost port 11111"
+)]
+#[test_case(
+    TestCaseV4 {
+        original_dst: std::net::SocketAddr::new(std_ip!("127.0.0.1"), LISTEN_PORT.get()),
+        matcher: fnet_filter_ext::TransportProtocolMatcher::Udp { src_port: None, dst_port: None },
+        redirect_dst: None,
+        expect_redirect: false,
+    };
+    "no redirect"
+)]
+async fn redirect_original_destination_dual_stack(name: &str, test_case: TestCaseV4) {
+    let TestCaseV4 { original_dst, matcher, redirect_dst, expect_redirect } = test_case;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let setup = setup_redirect_test(name, &sandbox, Ipv4::SUBNET, matcher, redirect_dst).await;
+
+    let server = setup
+        .netstack
+        .stream_socket(Ipv6::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    server
+        .bind(
+            &std::net::SocketAddr::from((
+                Ipv6::UNSPECIFIED_ADDRESS.to_ip_addr(),
+                LISTEN_PORT.get(),
+            ))
+            .into(),
+        )
+        .expect("no conflict");
+    server.listen(1).expect("listen on server socket");
+
+    let client = setup
+        .netstack
+        .stream_socket(Ipv4::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create socket");
+    client.connect(&original_dst.into()).expect("connect to server");
+
+    let (server, _addr) = server.accept().expect("accept incoming connection");
+
+    // The original destination should be observable on both the client and server sockets.
+    let verify_original_dst = |socket: &socket2::Socket| {
+        let result = socket.original_dst();
+        if expect_redirect {
+            assert_eq!(
+                result
+                    .expect("get original destination of connection")
+                    .as_socket()
+                    .expect("should be valid socket addr"),
+                original_dst
+            );
+        } else {
+            let error = result.expect_err("socket should have no original destination").kind();
+            assert_eq!(error, std::io::ErrorKind::NotFound);
+        }
+    };
+    verify_original_dst(&client);
+    verify_original_dst(&server);
 }

@@ -4,8 +4,10 @@
 
 ///! SELinux security context structures for filesystems.
 use crate::vfs::{FsStr, FsString};
-use starnix_uapi::{error, errors::Errno};
-use std::{collections::HashMap, ops::Deref};
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use std::collections::HashMap;
+use std::ops::Deref;
 
 /// SELinux security context structures for managing the incompatible
 /// `context=[security-context]` and `defcontext=[security-context]` mount options.

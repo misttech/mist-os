@@ -2,28 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    carnelian::{
-        color::Color,
-        make_app_assistant,
-        render::{
-            BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, PathBuilder, Raster,
-            Style,
-        },
-        scene::{
-            facets::Facet,
-            scene::{Scene, SceneBuilder, SceneOrder},
-            LayerGroup,
-        },
-        App, AppAssistant, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr,
-        ViewKey,
-    },
-    chrono::{Local, Timelike},
-    euclid::{point2, size2, vec2, Angle, Transform2D},
-    fuchsia_zircon::Event,
-    std::f32,
+use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::render::{
+    BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, PathBuilder, Raster, Style,
 };
+use carnelian::scene::facets::Facet;
+use carnelian::scene::scene::{Scene, SceneBuilder, SceneOrder};
+use carnelian::scene::LayerGroup;
+use carnelian::{
+    make_app_assistant, App, AppAssistant, Point, Size, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
+};
+use chrono::{Local, Timelike};
+use euclid::{point2, size2, vec2, Angle, Transform2D};
+use fuchsia_zircon::Event;
+use std::f32;
 
 const BACKGROUND_COLOR: Color = Color { r: 235, g: 213, b: 179, a: 255 };
 

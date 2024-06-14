@@ -104,9 +104,11 @@
 
 pub(crate) use lock_order::Unlocked;
 
-use core::{convert::Infallible as Never, marker::PhantomData};
+use core::convert::Infallible as Never;
+use core::marker::PhantomData;
 
-use lock_order::{impl_lock_after, relation::LockAfter};
+use lock_order::impl_lock_after;
+use lock_order::relation::LockAfter;
 use net_types::ip::{Ipv4, Ipv6};
 
 pub struct IcmpAllSocketsSet<I>(PhantomData<I>, Never);

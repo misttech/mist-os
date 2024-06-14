@@ -2,17 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        log::*,
-        lsm_tree::types::ItemRef,
-        object_store::{
-            allocator::{AllocatorKey, AllocatorValue},
-            ObjectDescriptor,
-        },
-    },
-    std::ops::Range,
-};
+use crate::log::*;
+use crate::lsm_tree::types::ItemRef;
+use crate::object_store::allocator::{AllocatorKey, AllocatorValue};
+use crate::object_store::ObjectDescriptor;
+use std::ops::Range;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum FsckIssue {
@@ -224,7 +218,7 @@ impl FsckWarning {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum FsckError {
-    AllocatedBytesMismatch(Vec<(u64, i64)>, Vec<(u64, i64)>),
+    AllocatedBytesMismatch(Vec<(u64, u64)>, Vec<(u64, u64)>),
     AllocatedSizeMismatch(u64, u64, u64, u64),
     AllocationForNonexistentOwner(Allocation),
     AllocationMismatch(Allocation, Allocation),

@@ -5,7 +5,8 @@
 use ffx_ssh::ssh::SshError;
 use ffx_target::Description;
 use rcs::RcsConnection;
-use std::{net::SocketAddr, time::Instant};
+use std::net::SocketAddr;
+use std::time::Instant;
 
 pub trait TryIntoTargetEventInfo: Sized {
     type Error;

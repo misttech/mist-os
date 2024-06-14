@@ -17,7 +17,8 @@
 use anyhow::Context;
 use fidl_fuchsia_examples_calculator::{CalculatorRequest, CalculatorRequestStream};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect::{component, health::Reporter};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
 use futures::prelude::*;
 
 /// Wraps all hosted protocols into a single type that can be matched against

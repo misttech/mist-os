@@ -2,40 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        client::{
-            scan::{self, ScanReason},
-            types::{self, Bss, InternalSavedNetworkData, SecurityType, SecurityTypeDetailed},
-        },
-        config_management::{
-            self, network_config, select_authentication_method,
-            select_subset_potentially_hidden_networks, Credential, SavedNetworksManagerApi,
-        },
-        telemetry::{self, TelemetryEvent, TelemetrySender},
-    },
-    anyhow::format_err,
-    async_trait::async_trait,
-    fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
-    fuchsia_inspect::{Node as InspectNode, StringReference},
-    fuchsia_inspect_contrib::{
-        auto_persist::{self, AutoPersist},
-        inspect_insert,
-        log::WriteInspect,
-        nodes::BoundedListNode as InspectBoundedListNode,
-    },
-    fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        lock::Mutex,
-        select,
-        stream::StreamExt,
-    },
-    std::collections::HashMap,
-    std::{collections::HashSet, sync::Arc},
-    tracing::{debug, error, info, warn},
-    wlan_common::{security::SecurityAuthenticator, sequestered::Sequestered},
+use crate::client::scan::{self, ScanReason};
+use crate::client::types::{
+    self, Bss, InternalSavedNetworkData, SecurityType, SecurityTypeDetailed,
 };
+use crate::config_management::{
+    self, network_config, select_authentication_method, select_subset_potentially_hidden_networks,
+    Credential, SavedNetworksManagerApi,
+};
+use crate::telemetry::{self, TelemetryEvent, TelemetrySender};
+use anyhow::format_err;
+use async_trait::async_trait;
+use fuchsia_inspect::{Node as InspectNode, StringReference};
+use fuchsia_inspect_contrib::auto_persist::{self, AutoPersist};
+use fuchsia_inspect_contrib::inspect_insert;
+use fuchsia_inspect_contrib::log::WriteInspect;
+use fuchsia_inspect_contrib::nodes::BoundedListNode as InspectBoundedListNode;
+use futures::channel::{mpsc, oneshot};
+use futures::lock::Mutex;
+use futures::select;
+use futures::stream::StreamExt;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
+use wlan_common::security::SecurityAuthenticator;
+use wlan_common::sequestered::Sequestered;
+use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub mod bss_selection;
 pub mod network_selection;
@@ -743,33 +735,28 @@ fn record_metrics_on_scan(
 }
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::config_management::network_config::HistoricalListsByBssid;
+    use crate::config_management::{ConnectFailure, FailureReason, SavedNetworksManager};
+    use crate::util::testing::fakes::{FakeSavedNetworksManager, FakeScanRequester};
+    use crate::util::testing::{
+        create_inspect_persistence_channel, generate_channel, generate_random_bss,
+        generate_random_connect_reason, generate_random_scan_result,
+        generate_random_scanned_candidate,
+    };
+    use diagnostics_assertions::{assert_data_tree, AnyNumericProperty};
+    use futures::task::Poll;
+    use ieee80211_testutils::BSSID_REGEX;
+    use lazy_static::lazy_static;
+    use rand::Rng;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::scan::Compatibility;
+    use wlan_common::security::SecurityDescriptor;
+    use wlan_common::{assert_variant, random_fidl_bss_description};
     use {
-        super::*,
-        crate::{
-            config_management::{
-                network_config::HistoricalListsByBssid, ConnectFailure, FailureReason,
-                SavedNetworksManager,
-            },
-            util::testing::{
-                create_inspect_persistence_channel,
-                fakes::{FakeSavedNetworksManager, FakeScanRequester},
-                generate_channel, generate_random_bss, generate_random_connect_reason,
-                generate_random_scan_result, generate_random_scanned_candidate,
-            },
-        },
-        diagnostics_assertions::{assert_data_tree, AnyNumericProperty},
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync, fuchsia_inspect as inspect,
-        futures::task::Poll,
-        ieee80211_testutils::BSSID_REGEX,
-        lazy_static::lazy_static,
-        rand::Rng,
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::{
-            assert_variant, random_fidl_bss_description, scan::Compatibility,
-            security::SecurityDescriptor,
-        },
     };
 
     lazy_static! {
@@ -1004,7 +991,7 @@ mod tests {
 
         // validate the function works
         let results = merge_saved_networks_and_scan_data(
-            &test_values.real_saved_network_manager,
+            &Arc::new(test_values.real_saved_network_manager),
             mock_scan_results,
         )
         .await;

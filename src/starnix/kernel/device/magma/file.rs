@@ -4,18 +4,13 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::{
-    ffi::{
-        create_connection, create_image, device_import, device_release, execute_command,
-        execute_immediate_commands, export_buffer, flush, get_buffer_handle, import_semaphore2,
-        query, read_notification_channel, release_connection,
-    },
-    image_file::ImageFile,
-    image_file::ImageInfo,
-    magma::read_control_and_response,
-    magma::read_magma_command_and_type,
-    magma::StarnixPollItem,
+use crate::ffi::{
+    create_connection, create_image, device_import, device_release, execute_command,
+    execute_immediate_commands, export_buffer, flush, get_buffer_handle, import_semaphore2, query,
+    read_notification_channel, release_connection,
 };
+use crate::image_file::{ImageFile, ImageInfo};
+use crate::magma::{read_control_and_response, read_magma_command_and_type, StarnixPollItem};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
 use magma::{
@@ -135,33 +130,25 @@ use magma::{
     MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_MEMORY_ERROR,
     MAGMA_STATUS_OK, MAGMA_STATUS_TIMED_OUT,
 };
-use starnix_core::{
-    device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
-    fileops_impl_nonseekable,
-    fs::fuchsia::RemoteFileObject,
-    mm::{MemoryAccessorExt, ProtectionFlags},
-    task::CurrentTask,
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, VmoFileObject,
-    },
-};
+use starnix_core::device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
+use starnix_core::fileops_impl_nonseekable;
+use starnix_core::fs::fuchsia::RemoteFileObject;
+use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags};
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
+use starnix_core::vfs::{Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, VmoFileObject};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use starnix_uapi::{
-    device_type::DeviceType,
-    errno, error,
-    errors::Errno,
-    open_flags::OpenFlags,
-    user_address::{UserAddress, UserRef},
-    user_buffer::UserBuffer,
-};
-use std::{
-    collections::HashMap,
-    sync::{Arc, Once},
-};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_buffer::UserBuffer;
+use starnix_uapi::{errno, error};
+use std::collections::HashMap;
+use std::sync::{Arc, Once};
 
 #[derive(Clone)]
 pub enum BufferInfo {

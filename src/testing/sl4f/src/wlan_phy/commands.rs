@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{server::Facade, wlan_phy::facade::WlanPhyFacade};
+use crate::server::Facade;
+use crate::wlan_phy::facade::WlanPhyFacade;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use serde_json::{to_value, Value};

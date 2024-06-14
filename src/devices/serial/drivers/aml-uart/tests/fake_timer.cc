@@ -19,21 +19,10 @@ __EXPORT zx_status_t zx_timer_set(zx_handle_t handle, zx_time_t deadline, zx_dur
   FakeTimer::current_deadline_ = deadline;
   return ZX_OK;
 }
-
-__EXPORT zx_status_t zx_timer_cancel(zx_handle_t handle) {
-  if (handle != FakeTimer::timer_handle_) {
-    return _zx_timer_cancel(handle);
-  }
-
-  FakeTimer::current_deadline_ = 0;
-  FakeTimer::cancel_called_ = true;
-  return ZX_OK;
-}
 }
 
 zx_handle_t FakeTimer::timer_handle_ = ZX_HANDLE_INVALID;
 zx_duration_t FakeTimer::current_deadline_ = 0;
-bool FakeTimer::cancel_called_ = false;
 
 // When |FakeTimer| is instantiated, create the fake timer event that will be used to inject the
 // driver timer by test cases.
@@ -64,7 +53,6 @@ void FakeTimer::FireTimer() {
 void FakeTimer::Clear() {
   timer_handle_ = ZX_HANDLE_INVALID;
   current_deadline_ = 0;
-  cancel_called_ = false;
 }
 
 // Reset the static variables when the |FakeTimer| instance gets destroyed.

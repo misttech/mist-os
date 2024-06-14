@@ -211,7 +211,8 @@ zx_status_t brcmf_check_scan_status(unsigned long scan_status, std::string* out_
   X(CONNECTING_TIMEOUT)           \
   X(AUTHENTICATION_FAILED)        \
   X(ASSOC_REQ_FAILED)             \
-  X(REASSOC_REQ_FAILED)
+  X(REASSOC_REQ_FAILED)           \
+  X(ROAM_INTERRUPTED)
 
 #define X(CONNECT_STATUS) CONNECT_STATUS,
 enum class brcmf_connect_status_t : uint8_t { BRCMF_CONNECT_STATUS_LIST };
@@ -392,11 +393,18 @@ struct brcmf_cfg80211_wowl {
   bool nd_enabled;
 };
 
-enum brcmf_disconnect_mode {
-  BRCMF_DISCONNECT_NONE,
-  BRCMF_DISCONNECT_DEAUTH,
-  BRCMF_DISCONNECT_DISASSOC
-};
+// When SME requests a disconnect, it can be any of these types.
+// Note that a disassociate is always for the current BSS, while deauthenticate
+// can be for the current BSS or (if roaming) for the target BSS.
+// These are bit indices used in the brcmf_cfg80211_info disconnect_request_state field.
+#define BRCMF_DISCONNECT_REQUEST_LIST \
+  X(DEAUTH_CURRENT_BSS)               \
+  X(DEAUTH_TARGET_BSS)                \
+  X(DISASSOC)
+
+#define X(DISCONNECT_REQUEST) DISCONNECT_REQUEST,
+enum class brcmf_disconnect_request_bit_t : uint8_t { BRCMF_DISCONNECT_REQUEST_LIST };
+#undef X
 
 /**
  * struct brcmf_cfg80211_info - dongle private data of cfg80211 interface
@@ -421,7 +429,7 @@ enum brcmf_disconnect_mode {
  * @escan_info: escan information.
  * @escan_timer: Timer for catch scan timeout.
  * @escan_timeout_work: scan timeout worker.
- * @disconnect_mode: indicates type of disconnect requested (BRCMF_DISCONNECT_*)
+ * @disconnect_request_state: keeps track of any in-progress SME-initiated disconnects.
  * @disconnect_timer: timer for disconnection completion.
  * @disconnect_timeout_work: associated work structure for disassociation timer.
  * @connect_timer: timer for firmware response of connect.
@@ -442,7 +450,7 @@ enum brcmf_disconnect_mode {
  * @roam_timeout_work: associated work structure for roam timer.
  * @capability: BSS description capability field.
  * @target_bss_info_buf: BSS description for target BSS during a roam attempt.
- * @target_bssid: BSSID that firmware is attempting to roam to.
+ * @target_bssid: BSSID that firmware is attempting to roam to (if any).
  */
 struct brcmf_cfg80211_info {
   struct brcmf_cfg80211_conf* conf;
@@ -464,7 +472,7 @@ struct brcmf_cfg80211_info {
   struct escan_info escan_info;
   Timer* escan_timer;
   WorkItem escan_timeout_work;
-  uint8_t disconnect_mode;
+  std::atomic<unsigned long> disconnect_request_state;
   Timer* disconnect_timer;
   WorkItem disconnect_timeout_work;
   Timer* connect_timer;
@@ -487,7 +495,8 @@ struct brcmf_cfg80211_info {
   WorkItem roam_timeout_work;
   uint16_t capability;
   uint8_t* target_bss_info_buf;
-  uint8_t target_bssid[ETH_ALEN];
+  // Target BSSID is recorded when a roam attempt starts, and is cleared at end of attempt.
+  std::optional<std::array<uint8_t, ETH_ALEN>> target_bssid;
 };
 
 /**

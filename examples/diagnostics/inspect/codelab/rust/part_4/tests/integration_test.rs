@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    inspect_rust_codelab_testing::{IntegrationTest, TestOptions},
-};
+use anyhow::Error;
+use inspect_rust_codelab_testing::{IntegrationTest, TestOptions};
 
 // [START integration_test]
 #[fuchsia::test]

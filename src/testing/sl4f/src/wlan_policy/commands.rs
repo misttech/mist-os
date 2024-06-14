@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        server::Facade, wlan_policy::ap_facade::WlanApPolicyFacade,
-        wlan_policy::facade::WlanPolicyFacade,
-    },
-    anyhow::{format_err, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    serde_json::{to_value, Value},
-    tracing::*,
-};
+use crate::server::Facade;
+use crate::wlan_policy::ap_facade::WlanApPolicyFacade;
+use crate::wlan_policy::facade::WlanPolicyFacade;
+use anyhow::{format_err, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use serde_json::{to_value, Value};
+use tracing::*;
 
 #[async_trait(?Send)]
 impl Facade for WlanPolicyFacade {

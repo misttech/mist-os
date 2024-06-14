@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{
-        events::{self, Event, EventStream},
-        matcher::{EventMatcher, ExitStatusMatcher},
-        sequence::{self, EventSequence},
-    },
-    fidl_fuchsia_component as fcomponent,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-};
+use component_events::events::{self, Event, EventStream};
+use component_events::matcher::{EventMatcher, ExitStatusMatcher};
+use component_events::sequence::{self, EventSequence};
+use fidl_fuchsia_component as fcomponent;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 
 #[fuchsia::test]
 /// Verifies that when a component has a LogSink in its namespace that the

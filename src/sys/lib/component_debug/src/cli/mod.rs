@@ -20,24 +20,22 @@ pub mod start;
 pub mod stop;
 pub mod storage;
 
-pub use {
-    capability::capability_cmd,
-    collection::{collection_list_cmd, collection_show_cmd},
-    create::create_cmd,
-    destroy::destroy_cmd,
-    doctor::{doctor_cmd_print, doctor_cmd_serialized},
-    explore::explore_cmd,
-    graph::{graph_cmd, GraphFilter, GraphOrientation},
-    list::{list_cmd_print, list_cmd_serialized, ListFilter},
-    reload::reload_cmd,
-    resolve::resolve_cmd,
-    route::{route_cmd_print, route_cmd_serialized},
-    run::run_cmd,
-    show::{show_cmd_print, show_cmd_serialized},
-    start::start_cmd,
-    stop::stop_cmd,
-    storage::{
-        storage_copy_cmd, storage_delete_all_cmd, storage_delete_cmd, storage_list_cmd,
-        storage_make_directory_cmd,
-    },
+pub use capability::capability_cmd;
+pub use collection::{collection_list_cmd, collection_show_cmd};
+pub use create::create_cmd;
+pub use destroy::destroy_cmd;
+pub use doctor::{doctor_cmd_print, doctor_cmd_serialized};
+pub use explore::explore_cmd;
+pub use graph::{graph_cmd, GraphFilter, GraphOrientation};
+pub use list::{list_cmd_print, list_cmd_serialized, ListFilter};
+pub use reload::reload_cmd;
+pub use resolve::resolve_cmd;
+pub use route::{route_cmd_print, route_cmd_serialized};
+pub use run::run_cmd;
+pub use show::{show_cmd_print, show_cmd_serialized};
+pub use start::start_cmd;
+pub use stop::stop_cmd;
+pub use storage::{
+    storage_copy_cmd, storage_delete_all_cmd, storage_delete_cmd, storage_list_cmd,
+    storage_make_directory_cmd,
 };

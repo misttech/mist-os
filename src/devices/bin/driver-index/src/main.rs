@@ -2,29 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::driver_loading_fuzzer::Session;
+use crate::indexer::*;
+use crate::load_driver::*;
+use crate::resolved_driver::ResolvedDriver;
+use anyhow::Context;
+use driver_index_config::Config;
+use fidl_fuchsia_driver_index::{
+    DevelopmentManagerRequest, DevelopmentManagerRequestStream, DriverIndexRequest,
+    DriverIndexRequestStream,
+};
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_zircon::Status;
+use futures::prelude::*;
+use std::collections::HashSet;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use {
-    crate::driver_loading_fuzzer::Session,
-    crate::indexer::*,
-    crate::load_driver::*,
-    crate::resolved_driver::ResolvedDriver,
-    anyhow::Context,
-    driver_index_config::Config,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_framework as fdf,
-    fidl_fuchsia_driver_index::{
-        DevelopmentManagerRequest, DevelopmentManagerRequestStream, DriverIndexRequest,
-        DriverIndexRequestStream,
-    },
-    fidl_fuchsia_driver_registrar as fdr, fuchsia_async as fasync,
-    fuchsia_component::client,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon::Status,
-    futures::prelude::*,
-    std::{
-        collections::HashSet,
-        rc::Rc,
-        sync::{Arc, Mutex},
-    },
+    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_registrar as fdr,
+    fuchsia_async as fasync,
 };
 
 mod composite_node_spec_manager;
@@ -418,22 +416,20 @@ async fn main() -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::composite_node_spec_manager::strip_parents_from_spec;
+    use crate::resolved_driver::DriverPackageType;
+    use bind::compiler::{
+        CompiledBindRules, CompositeBindRules, CompositeNode, Symbol, SymbolicInstruction,
+        SymbolicInstructionInfo,
+    };
+    use bind::interpreter::decode_bind_rules::DecodedRules;
+    use bind::parser::bind_library::ValueType;
+    use fidl::endpoints::{ClientEnd, Proxy};
+    use std::collections::HashMap;
     use {
-        crate::composite_node_spec_manager::strip_parents_from_spec,
-        crate::resolved_driver::DriverPackageType,
-        bind::{
-            compiler::{
-                CompiledBindRules, CompositeBindRules, CompositeNode, Symbol, SymbolicInstruction,
-                SymbolicInstructionInfo,
-            },
-            interpreter::decode_bind_rules::DecodedRules,
-            parser::bind_library::ValueType,
-        },
-        fidl::endpoints::{ClientEnd, Proxy},
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
         fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
         fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
-        std::collections::HashMap,
     };
 
     fn create_driver_info(
@@ -2602,7 +2598,7 @@ mod tests {
             {
                 let mut composite_node_spec_manager =
                     index.composite_node_spec_manager.borrow_mut();
-                composite_node_spec_manager.new_driver_available(ResolvedDriver {
+                composite_node_spec_manager.new_driver_available(&ResolvedDriver {
                     component_url: url.clone(),
                     bind_rules: rules,
                     bind_bytecode: vec![],
@@ -2807,7 +2803,7 @@ mod tests {
             {
                 let mut composite_node_spec_manager =
                     index.composite_node_spec_manager.borrow_mut();
-                composite_node_spec_manager.new_driver_available(ResolvedDriver {
+                composite_node_spec_manager.new_driver_available(&ResolvedDriver {
                     component_url: url.clone(),
                     bind_rules: rules,
                     bind_bytecode: vec![],
@@ -3021,7 +3017,7 @@ mod tests {
             {
                 let mut composite_node_spec_manager =
                     index.composite_node_spec_manager.borrow_mut();
-                composite_node_spec_manager.new_driver_available(ResolvedDriver {
+                composite_node_spec_manager.new_driver_available(&ResolvedDriver {
                     component_url: url.clone(),
                     bind_rules: rules,
                     bind_bytecode: vec![],

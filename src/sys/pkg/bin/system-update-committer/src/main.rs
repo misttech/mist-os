@@ -4,24 +4,26 @@
 
 #![allow(clippy::let_unit_value)]
 
-use {
-    crate::{fidl::FidlServer, metadata::put_metadata_in_happy_state, reboot::wait_and_reboot},
-    anyhow::{anyhow, Context, Error},
-    config::Config,
-    fidl_fuchsia_hardware_power_statecontrol::AdminMarker as PowerStateControlMarker,
-    fidl_fuchsia_paver::PaverMarker,
-    fidl_fuchsia_update_verify::{BlobfsVerifierMarker, NetstackVerifierMarker},
-    fuchsia_async as fasync,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    fuchsia_inspect::{self as finspect, health::Reporter},
-    fuchsia_zircon::{self as zx, HandleBased},
-    futures::{channel::oneshot, prelude::*, stream::FuturesUnordered},
-    std::{
-        sync::Arc,
-        time::{Duration, Instant},
-    },
-    tracing::{error, info, warn},
-};
+use crate::fidl::FidlServer;
+use crate::metadata::put_metadata_in_happy_state;
+use crate::reboot::wait_and_reboot;
+use anyhow::{anyhow, Context, Error};
+use config::Config;
+use fidl_fuchsia_hardware_power_statecontrol::AdminMarker as PowerStateControlMarker;
+use fidl_fuchsia_paver::PaverMarker;
+use fidl_fuchsia_update_verify::{BlobfsVerifierMarker, NetstackVerifierMarker};
+use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::{self as finspect};
+use fuchsia_zircon::{self as zx, HandleBased};
+use futures::channel::oneshot;
+use futures::prelude::*;
+use futures::stream::FuturesUnordered;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tracing::{error, info, warn};
 
 mod config;
 mod fidl;

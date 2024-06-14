@@ -8,12 +8,14 @@ mod id;
 mod parse;
 mod reader;
 
-pub use {constants::*, fields::*, id::*, parse::*, reader::*};
+pub use constants::*;
+pub use fields::*;
+pub use id::*;
+pub use parse::*;
+pub use reader::*;
 
-use {
-    crate::big_endian::BigEndianU16,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned},
-};
+use crate::big_endian::BigEndianU16;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 #[repr(C, packed)]
 #[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]

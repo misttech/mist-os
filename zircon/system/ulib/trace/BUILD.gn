@@ -97,10 +97,6 @@ trace_library("trace") {
   stable = true
   public_deps = [ "//zircon/system/ulib/trace-engine" ]
   deps = [ "//zircon/system/ulib/trace-engine" ]
-  configs += [
-    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-    "//build/config:Wno-conversion",
-  ]
 }
 
 # A special version for programs and shared libraries that can't use
@@ -111,7 +107,4 @@ trace_library("trace-with-static-engine") {
   sdk = "static"
   public_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
   deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }

@@ -4,7 +4,6 @@
 
 import("//sdk/ctf/build/internal/ctf.gni")
 import("//sdk/ctf/build/internal/ctf_releases.gni")
-import("//sdk/ctf/build/internal/platform_version.gni")
 
 # Store accumulated packages.
 all_package_targets = []

@@ -5,7 +5,7 @@
 use fidl::endpoints::ProtocolMarker as _;
 use fidl_fuchsia_net_name::{self as fnet_name, DnsServerWatcherRequestStream};
 
-use tracing::warn;
+use log::warn;
 
 use crate::bindings::Netstack;
 

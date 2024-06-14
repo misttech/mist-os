@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::EditTransactionError,
-    crate::rule::Rule,
-    fidl_fuchsia_pkg_rewrite::{EditTransactionProxy, EngineProxy},
-    fuchsia_zircon_status as zx,
-    std::future::Future,
-};
+use crate::errors::EditTransactionError;
+use crate::rule::Rule;
+use fidl_fuchsia_pkg_rewrite::{EditTransactionProxy, EngineProxy};
+use fuchsia_zircon_status as zx;
+use std::future::Future;
 
 const RETRY_ATTEMPTS: usize = 100;
 
@@ -96,20 +94,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_pkg_rewrite::{
-            EditTransactionRequest, EngineMarker, EngineRequest, RuleIteratorRequest,
-        },
-        fuchsia_async as fasync,
-        futures::TryStreamExt,
-        std::sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc, Mutex,
-        },
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_pkg_rewrite::{
+        EditTransactionRequest, EngineMarker, EngineRequest, RuleIteratorRequest,
     };
+    use fuchsia_async as fasync;
+    use futures::TryStreamExt;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
 
     #[derive(Debug, PartialEq)]
     enum Event {

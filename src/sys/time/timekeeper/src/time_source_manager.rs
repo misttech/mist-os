@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::diagnostics::{Diagnostics, Event},
-    crate::enums::{Role, SampleValidationError, TimeSourceError},
-    crate::time_source::{
-        BoxedPullSource, BoxedPushSource, BoxedPushSourceEventStream, Event as TimeSourceEvent,
-        Sample, TimeSource,
-    },
-    fidl_fuchsia_time_external::{Status, Urgency},
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_zircon as zx,
-    futures::{FutureExt as _, StreamExt as _},
-    std::sync::Arc,
-    tracing::{debug, error, info, warn},
+use crate::diagnostics::{Diagnostics, Event};
+use crate::enums::{Role, SampleValidationError, TimeSourceError};
+use crate::time_source::{
+    BoxedPullSource, BoxedPushSource, BoxedPushSourceEventStream, Event as TimeSourceEvent, Sample,
+    TimeSource,
 };
+use fidl_fuchsia_time_external::{Status, Urgency};
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_zircon as zx;
+use futures::{FutureExt as _, StreamExt as _};
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 
 /// Sets the maximum rate at which Timekeeper is willing to accept new updates from a time source in
 /// order to limit the Timekeeper resource utilization. This value is also used to apply an upper
@@ -438,13 +436,11 @@ impl<D: Diagnostics, M: MonotonicProvider> PullSourceManager<D, M> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::diagnostics::FakeDiagnostics,
-        crate::enums::{SampleValidationError as SVE, TimeSourceError as TSE},
-        crate::time_source::{FakePullTimeSource, FakePushTimeSource},
-        anyhow::anyhow,
-    };
+    use super::*;
+    use crate::diagnostics::FakeDiagnostics;
+    use crate::enums::{SampleValidationError as SVE, TimeSourceError as TSE};
+    use crate::time_source::{FakePullTimeSource, FakePushTimeSource};
+    use anyhow::anyhow;
 
     const BACKSTOP_FACTOR: i64 = 100;
     const TEST_ROLE: Role = Role::Monitor;

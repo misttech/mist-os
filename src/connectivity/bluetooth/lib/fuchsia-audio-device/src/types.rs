@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_hardware_audio::{PcmFormat, SampleFormat},
-    fuchsia_zircon as zx,
-    std::result,
-    thiserror::Error,
-};
+use fidl_fuchsia_hardware_audio::{PcmFormat, SampleFormat};
+use fuchsia_zircon as zx;
+use std::result;
+use thiserror::Error;
 
 /// Result type alias for brevity.
 pub type Result<T> = result::Result<T, Error>;

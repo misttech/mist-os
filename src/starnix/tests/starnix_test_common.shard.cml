@@ -27,12 +27,12 @@
             url: "network-tun#meta/network-tun.cm",
         },
         {
-            name: "fake-power-broker",
-            url: "fake-power-broker#meta/fake-power-broker.cm",
+            name: "power-broker",
+            url: "power-broker#meta/power-broker.cm",
         },
         {
-            name: "fake-system-activity-governor",
-            url: "fake-system-activity-governor#meta/fake-system-activity-governor.cm",
+            name: "system-activity-governor",
+            url: "system-activity-governor#meta/system-activity-governor.cm",
         },
         {
             name: "fake-hrtimer",
@@ -70,15 +70,18 @@
         },
         {
             protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#fake-power-broker",
-            to: [ "#kernel" ],
+            from: "#power-broker",
+            to: [
+                "#kernel",
+                "#system-activity-governor",
+            ],
         },
         {
             protocol: [
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
             ],
-            from: "#fake-system-activity-governor",
+            from: "#system-activity-governor",
             to: [ "#kernel" ],
         },
         {
@@ -140,8 +143,9 @@
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
-                "#fake-system-activity-governor",
                 "#netstack",
+                "#power-broker",
+                "#system-activity-governor",
             ],
         },
         {

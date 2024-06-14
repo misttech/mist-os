@@ -18,6 +18,7 @@ if (is_host) {
   }
 
   python_host_test("merge_policies_test") {
+    enable_mypy = false
     main_source = "merge_policies_test.py"
     sources = [ "merge_policies.py" ]
     main_callable = "main"

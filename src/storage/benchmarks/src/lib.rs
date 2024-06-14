@@ -8,18 +8,15 @@ pub mod filesystem;
 pub mod io_benchmarks;
 pub mod testing;
 
-use {
-    async_trait::async_trait,
-    fuchsiaperf::FuchsiaPerfBenchmarkResult,
-    regex::RegexSet,
-    std::{io::Write, time::Instant},
-    tracing::info,
-};
+use async_trait::async_trait;
+use fuchsiaperf::FuchsiaPerfBenchmarkResult;
+use regex::RegexSet;
+use std::io::Write;
+use std::time::Instant;
+use tracing::info;
 
-pub use crate::{
-    block_device::{BlockDeviceConfig, BlockDeviceFactory},
-    filesystem::{CacheClearableFilesystem, Filesystem, FilesystemConfig},
-};
+pub use crate::block_device::{BlockDeviceConfig, BlockDeviceFactory};
+pub use crate::filesystem::{CacheClearableFilesystem, Filesystem, FilesystemConfig};
 
 /// How long a benchmarked operation took to complete.
 #[derive(Debug)]
@@ -327,7 +324,8 @@ macro_rules! add_benchmarks {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::block_device::PanickingBlockDeviceFactory};
+    use super::*;
+    use crate::block_device::PanickingBlockDeviceFactory;
 
     #[derive(Clone)]
     struct TestBenchmark(&'static str);

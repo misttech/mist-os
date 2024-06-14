@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
-use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use tracing::warn;
+use {
+    fidl_fuchsia_memory_heapdump_client as fheapdump_client,
+    fidl_fuchsia_memory_heapdump_process as fheapdump_process,
+};
 
 mod process;
 mod process_v1;

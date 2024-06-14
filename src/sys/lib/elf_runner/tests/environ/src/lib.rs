@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_elf_test as fet, fuchsia_component::client};
+use fidl_fuchsia_elf_test as fet;
+use fuchsia_component::client;
 
 #[fuchsia::test]
 async fn test_puppet_has_environ_set() {

@@ -111,8 +111,11 @@ bootstrap_eng_platform_aib_names = [
   "bootstrap_eng",
 
   # Kernel args
+  "kernel_oom_reboot_timeout_low",
+  "kernel_oom_behavior_jobkill",
   "kernel_pmm_checker_enabled",
   "kernel_pmm_checker_enabled_auto",
+  "kernel_serial_legacy",
 
   # Power Framework
   "power_framework_testing_sag",
@@ -334,11 +337,15 @@ eng_only_platform_aib_names =
       # Example AIB
       "example_assembly_bundle",
 
+      # Topology test support
+      "topology_test_daemon",
+
       # Driver development support
       "full_package_drivers",
 
       # Audio development/debugging
       "audio_development_support",
+      "intel_hda",
       "video_development_support",
 
       # Sensor data playback support.
@@ -377,6 +384,7 @@ experimental_aib_names = [
   "power_framework",
   "power_framework_sag",
   "power_framework_testing_sag",
+  "topology_test_daemon",
 ]
 
 # Ensure that we do not list any experimental AIBs as required

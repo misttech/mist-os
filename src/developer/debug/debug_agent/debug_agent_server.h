@@ -40,8 +40,9 @@ class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent>,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // DebugAgentObserver implementation. For right now we only care about process starting
-  // notifications.
+  // and exception notifications.
   void OnNotification(const debug_ipc::NotifyProcessStarting& notify) override;
+  void OnNotification(const debug_ipc::NotifyException& notify) override;
 
  private:
   // The test fixture is a friend so that we can access the private methods that are doing all the
@@ -66,6 +67,8 @@ class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent>,
   // returns all currently attached processes.
   GetMatchingProcessesResult GetMatchingProcesses(
       std::optional<fuchsia_debugger::Filter> filter) const;
+
+  std::optional<fidl::ServerBindingRef<fuchsia_debugger::DebugAgent>> binding_ref_;
 
   fxl::WeakPtr<DebugAgent> debug_agent_;
   async_dispatcher_t* dispatcher_;

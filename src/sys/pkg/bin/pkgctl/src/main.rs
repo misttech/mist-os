@@ -4,28 +4,29 @@
 
 #![allow(clippy::let_unit_value)]
 
+use crate::args::{
+    Args, Command, GcCommand, GetHashCommand, OpenCommand, PkgStatusCommand, RepoAddCommand,
+    RepoAddFileCommand, RepoAddSubCommand, RepoAddUrlCommand, RepoCommand, RepoConfigFormat,
+    RepoRemoveCommand, RepoShowCommand, RepoSubCommand, ResolveCommand, RuleClearCommand,
+    RuleCommand, RuleDumpDynamicCommand, RuleListCommand, RuleReplaceCommand,
+    RuleReplaceFileCommand, RuleReplaceJsonCommand, RuleReplaceSubCommand, RuleSubCommand,
+};
+use crate::v1repoconf::{validate_host, SourceConfig};
+use anyhow::{bail, format_err, Context as _};
+use fidl_fuchsia_net_http::{self as http};
+use fidl_fuchsia_pkg_rewrite::EngineMarker;
+use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule as RewriteRule, RuleConfig};
+use fidl_fuchsia_space::ManagerMarker as SpaceManagerMarker;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_url::RepositoryUrl;
+use futures::io::copy;
+use futures::stream::TryStreamExt;
+use std::fs::File;
+use std::io;
+use std::process::exit;
 use {
-    crate::args::{
-        Args, Command, GcCommand, GetHashCommand, OpenCommand, PkgStatusCommand, RepoAddCommand,
-        RepoAddFileCommand, RepoAddSubCommand, RepoAddUrlCommand, RepoCommand, RepoConfigFormat,
-        RepoRemoveCommand, RepoShowCommand, RepoSubCommand, ResolveCommand, RuleClearCommand,
-        RuleCommand, RuleDumpDynamicCommand, RuleListCommand, RuleReplaceCommand,
-        RuleReplaceFileCommand, RuleReplaceJsonCommand, RuleReplaceSubCommand, RuleSubCommand,
-    },
-    crate::v1repoconf::{validate_host, SourceConfig},
-    anyhow::{bail, format_err, Context as _},
-    fidl_fuchsia_net_http::{self as http},
-    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as pkg,
-    fidl_fuchsia_pkg_rewrite::EngineMarker,
-    fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule as RewriteRule, RuleConfig},
-    fidl_fuchsia_space::ManagerMarker as SpaceManagerMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_url::RepositoryUrl,
+    fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
     fuchsia_zircon as zx,
-    futures::io::copy,
-    futures::stream::TryStreamExt,
-    std::{fs::File, io, process::exit},
 };
 
 mod args;

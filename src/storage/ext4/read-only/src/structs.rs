@@ -32,15 +32,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::readers::{Reader, ReaderError},
-    std::{collections::HashMap, fmt, mem::size_of, str},
-    thiserror::Error,
-    zerocopy::{
-        byteorder::little_endian::{U16 as LEU16, U32 as LEU32, U64 as LEU64},
-        ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-    },
-};
+use crate::readers::{Reader, ReaderError};
+use std::collections::HashMap;
+use std::mem::size_of;
+use std::{fmt, str};
+use thiserror::Error;
+use zerocopy::byteorder::little_endian::{U16 as LEU16, U32 as LEU32, U64 as LEU64};
+use zerocopy::{ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 // Block Group 0 Padding
 pub const FIRST_BG_PADDING: u64 = 1024;
@@ -888,14 +886,12 @@ impl ExtentIndex {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::{
-            Extent, ExtentHeader, ExtentIndex, FeatureIncompat, ParseToStruct, SuperBlock,
-            EH_MAGIC, FIRST_BG_PADDING, LEU16, LEU32, LEU64, REQUIRED_FEATURE_INCOMPAT, SB_MAGIC,
-        },
-        crate::readers::VecReader,
-        std::fs,
+    use super::{
+        Extent, ExtentHeader, ExtentIndex, FeatureIncompat, ParseToStruct, SuperBlock, EH_MAGIC,
+        FIRST_BG_PADDING, LEU16, LEU32, LEU64, REQUIRED_FEATURE_INCOMPAT, SB_MAGIC,
     };
+    use crate::readers::VecReader;
+    use std::fs;
 
     impl Default for SuperBlock {
         fn default() -> SuperBlock {

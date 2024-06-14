@@ -370,32 +370,52 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     return;
   }
 
-  fbl::AutoLock lock(controller_->mtx());
-  const fbl::Vector<display::DisplayTiming>* edid_timings;
-  const display_mode_t* mode;
-  controller_->GetPanelConfig(display_id, &edid_timings, &mode);
+  fit::deferred_action tear_down_on_error = fit::defer([this] { TearDown(); });
 
-  if (edid_timings) {
-    for (const display::DisplayTiming& timing : *edid_timings) {
-      const int vertical_field_refresh_rate_centihertz =
-          (timing.vertical_field_refresh_rate_millihertz() + 5) / 10;
-      if (timing.horizontal_active_px ==
-              static_cast<int32_t>(request->mode.horizontal_resolution) &&
-          timing.vertical_active_lines == static_cast<int32_t>(request->mode.vertical_resolution) &&
-          vertical_field_refresh_rate_centihertz ==
-              static_cast<int32_t>(request->mode.refresh_rate_e2)) {
-        Controller::PopulateDisplayMode(timing, &config->pending_.mode);
-        pending_config_valid_ = false;
-        config->display_config_change_ = true;
-        return;
-      }
-    }
-    zxlogf(ERROR, "Invalid display mode");
-  } else {
-    zxlogf(ERROR, "Failed to find edid when setting display mode");
+  fbl::AutoLock lock(controller_->mtx());
+  zx::result<cpp20::span<const DisplayTiming>> display_timings_result =
+      controller_->GetDisplayTimings(display_id);
+  if (display_timings_result.is_error()) {
+    zxlogf(ERROR, "Failed to get display timings for display #%" PRIu64 ": %s", display_id.value(),
+           display_timings_result.status_string());
+    return;
   }
 
-  TearDown();
+  cpp20::span<const DisplayTiming> display_timings = std::move(display_timings_result).value();
+  auto display_timing_it = std::find_if(
+      display_timings.begin(), display_timings.end(),
+      [&mode = request->mode](const DisplayTiming& timing) {
+        const int vertical_field_refresh_rate_centihertz =
+            (timing.vertical_field_refresh_rate_millihertz() + 5) / 10;
+        if (timing.horizontal_active_px != static_cast<int32_t>(mode.horizontal_resolution)) {
+          return false;
+        }
+        if (timing.vertical_active_lines != static_cast<int32_t>(mode.vertical_resolution)) {
+          return false;
+        }
+        if (vertical_field_refresh_rate_centihertz != static_cast<int32_t>(mode.refresh_rate_e2)) {
+          return false;
+        }
+        return true;
+      });
+
+  if (display_timing_it == display_timings.end()) {
+    zxlogf(ERROR, "Display mode not found: (%" PRIu32 " x %" PRIu32 ") @ %" PRIu32 " centihertz",
+           request->mode.horizontal_resolution, request->mode.vertical_resolution,
+           request->mode.refresh_rate_e2);
+    return;
+  }
+
+  if (display_timings.size() == 1) {
+    zxlogf(INFO, "Display has only one timing available. Modeset is skipped.");
+    tear_down_on_error.cancel();
+    return;
+  }
+
+  config->pending_.mode = ToBanjoDisplayMode(*display_timing_it);
+  pending_config_valid_ = false;
+  config->display_config_change_ = true;
+  tear_down_on_error.cancel();
 }
 
 void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView request,
@@ -1156,11 +1176,11 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     }
     config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
 
-    const fbl::Vector<display::DisplayTiming>* edid_timings;
-    const display_mode_t* mode;
-    if (!controller_->GetPanelConfig(config->id, &edid_timings, &mode)) {
-      // This can only happen if the display was already disconnected.
-      zxlogf(WARNING, "No config when adding display");
+    zx::result<cpp20::span<const DisplayTiming>> display_timings_result =
+        controller_->GetDisplayTimings(config->id);
+    if (display_timings_result.is_error()) {
+      zxlogf(WARNING, "Failed to get display timings when processing hotplug: %s",
+             display_timings_result.status_string());
       continue;
     }
 
@@ -1168,12 +1188,9 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     config->current_.layer_list = nullptr;
     config->current_.layer_count = 0;
 
-    if (edid_timings) {
-      Controller::PopulateDisplayMode((*edid_timings)[0], &config->current_.mode);
-    } else {
-      ZX_DEBUG_ASSERT(mode != nullptr);
-      config->current_.mode = *mode;
-    }
+    cpp20::span<const DisplayTiming> display_timings = std::move(display_timings_result).value();
+    ZX_DEBUG_ASSERT(!display_timings.empty());
+    config->current_.mode = ToBanjoDisplayMode(display_timings[0]);
 
     config->current_.cc_flags = 0;
 
@@ -1202,30 +1219,22 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     fhd::wire::Info info;
     info.id = ToFidlDisplayId(config->id);
 
-    const fbl::Vector<display::DisplayTiming>* edid_timings;
-    const display_mode_t* mode;
-    controller_->GetPanelConfig(config->id, &edid_timings, &mode);
+    zx::result<cpp20::span<const DisplayTiming>> display_timings_result =
+        controller_->GetDisplayTimings(config->id);
+    ZX_DEBUG_ASSERT(display_timings_result.is_ok());
+
+    cpp20::span<const DisplayTiming> display_timings = display_timings_result.value();
+    ZX_DEBUG_ASSERT(!display_timings.empty());
+
     std::vector<fhd::wire::Mode> modes;
-    if (edid_timings) {
-      modes.reserve(edid_timings->size());
-      for (const display::DisplayTiming& timing : *edid_timings) {
-        modes.emplace_back(fhd::wire::Mode{
-            .horizontal_resolution = static_cast<uint32_t>(timing.horizontal_active_px),
-            .vertical_resolution = static_cast<uint32_t>(timing.vertical_active_lines),
-            .refresh_rate_e2 =
-                static_cast<uint32_t>((timing.vertical_field_refresh_rate_millihertz() + 5) / 10),
-        });
-      }
-    } else {
-      ZX_DEBUG_ASSERT(mode != nullptr);
-      modes.reserve(1);
-      const int32_t refresh_rate_millihertz =
-          display::ToDisplayTiming(*mode).vertical_field_refresh_rate_millihertz();
-      const int32_t refresh_rate_centihertz = (refresh_rate_millihertz + 5) / 10;
+
+    modes.reserve(display_timings.size());
+    for (const DisplayTiming& timing : display_timings) {
       modes.emplace_back(fhd::wire::Mode{
-          .horizontal_resolution = mode->h_addressable,
-          .vertical_resolution = mode->v_addressable,
-          .refresh_rate_e2 = static_cast<uint32_t>(refresh_rate_centihertz),
+          .horizontal_resolution = static_cast<uint32_t>(timing.horizontal_active_px),
+          .vertical_resolution = static_cast<uint32_t>(timing.vertical_active_lines),
+          .refresh_rate_e2 =
+              static_cast<uint32_t>((timing.vertical_field_refresh_rate_millihertz() + 5) / 10),
       });
     }
     modes_vector.emplace_back(std::move(modes));
@@ -1242,10 +1251,18 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
         controller_->FindDisplayInfo(added_display_id, [&](const DisplayInfo& display_info) {
           info.manufacturer_name =
               fidl::StringView::FromExternal(display_info.GetManufacturerName());
-          info.monitor_name = fidl::StringView::FromExternal(display_info.GetMonitorName());
-          info.monitor_serial = fidl::StringView::FromExternal(display_info.GetMonitorSerial());
-          info.horizontal_size_mm = display_info.GetHorizontalSizeMm();
-          info.vertical_size_mm = display_info.GetVerticalSizeMm();
+          info.monitor_name = fidl::StringView(arena, display_info.GetMonitorName());
+          info.monitor_serial = fidl::StringView(arena, display_info.GetMonitorSerial());
+
+          // The return value of `GetHorizontalSizeMm()` is guaranteed to be
+          // >= 0 and < 2^16 < std::numeric_limits<uint32_t>::max(). So it can
+          // be safely casted to uint32_t.
+          info.horizontal_size_mm = static_cast<uint32_t>(display_info.GetHorizontalSizeMm());
+
+          // The return value of `GetVerticalSizeMm()` is guaranteed to be
+          // >= 0 and < 2^16 < std::numeric_limits<uint32_t>::max(). So it can
+          // be safely casted to uint32_t.
+          info.vertical_size_mm = static_cast<uint32_t>(display_info.GetVerticalSizeMm());
         });
     if (!found_display_info) {
       zxlogf(ERROR, "Failed to get DisplayInfo for display %" PRIu64, added_display_id.value());

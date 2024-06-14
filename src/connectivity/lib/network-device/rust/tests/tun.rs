@@ -5,19 +5,15 @@
 //! Fuchsia netdevice client tun test
 use assert_matches::assert_matches;
 use fidl::endpoints;
-use fidl_fuchsia_hardware_network as netdev;
-use fidl_fuchsia_net_tun as tun;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
-use futures::{
-    future::{Future, FutureExt as _},
-    stream::TryStreamExt as _,
-};
+use futures::future::{Future, FutureExt as _};
+use futures::stream::TryStreamExt as _;
 use netdevice_client::{Client, Error, Port, Session};
-use std::{
-    convert::TryInto as _,
-    io::{Read as _, Write as _},
+use std::convert::TryInto as _;
+use std::io::{Read as _, Write as _};
+use {
+    fidl_fuchsia_hardware_network as netdev, fidl_fuchsia_net_tun as tun, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 const DEFAULT_PORT_ID: u8 = 2;

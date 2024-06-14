@@ -30,6 +30,7 @@ timekeeper_deps = [
   "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
   "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
   "//sdk/fidl/fuchsia.time.external:fuchsia.time.external_rust",
+  "//sdk/fidl/fuchsia.time.test:fuchsia.time.test_rust",
   "//src/lib/cobalt/rust/builders",
   "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
@@ -50,6 +51,8 @@ timekeeper_deps = [
   "//third_party/rust_crates:chrono",
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:lazy_static",
+  "//third_party/rust_crates:serde",
+  "//third_party/rust_crates:serde_json",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
 ]
@@ -68,6 +71,7 @@ timekeeper_sources = [
   "src/main.rs",
   "src/power_topology_integration.rs",
   "src/rtc.rs",
+  "src/rtc_testing.rs",
   "src/time_source.rs",
   "src/time_source_manager.rs",
 ]
@@ -85,6 +89,7 @@ rustc_binary("bin") {
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/test_util",
+    "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:test-case",
   ]
 }

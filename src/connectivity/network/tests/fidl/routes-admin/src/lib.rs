@@ -11,29 +11,26 @@ use std::collections::HashSet;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ProtocolMarker, Proxy as _};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_routes_ext::{
-    self as fnet_routes_ext, admin::FidlRouteAdminIpExt, FidlRouteIpExt, RouteAction,
-};
-use fidl_fuchsia_net_stack as fnet_stack;
+use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext, FidlRouteIpExt, RouteAction};
 use fuchsia_async::TimeoutExt as _;
-use fuchsia_zircon as zx;
-use futures::{future::FutureExt as _, StreamExt};
+use futures::future::FutureExt as _;
+use futures::StreamExt;
 use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
-use net_types::ip::{Ipv4, Ipv6, Subnet};
-use netstack_testing_common::{
-    realms::{Netstack, Netstack3, TestSandboxExt},
-    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
-};
+use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Subnet};
+use netstack_testing_common::realms::{Netstack, Netstack3, TestSandboxExt};
+use netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
 use routes_common::{test_route, TestSetup};
 use std::pin::pin;
 use test_case::{test_case, test_matrix};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
+    fuchsia_zircon as zx,
+};
 
 const METRIC_TRACKS_INTERFACE: fnet_routes::SpecifiedMetric =
     fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty);
@@ -1518,6 +1515,29 @@ async fn add_route_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteI
     assert_ne!(main_table_id, user_table_id);
 }
 
+fn route_set_err_stream<I: FidlRouteAdminIpExt>(
+    route_set: <I::RouteSetMarker as ProtocolMarker>::Proxy,
+) -> futures::stream::BoxStream<'static, fidl::Error> {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct In<I: FidlRouteAdminIpExt>(<I::RouteSetMarker as ProtocolMarker>::Proxy);
+
+    let IpInvariant(err_stream) = net_types::map_ip_twice!(I, In(route_set), |In(route_set)| {
+        IpInvariant(
+            route_set
+                .take_event_stream()
+                .filter_map(|result| async {
+                    match result {
+                        Err(err) => Some(err),
+                        Ok(event) => match event {},
+                    }
+                })
+                .boxed(),
+        )
+    });
+    err_stream
+}
+
 #[netstack_test]
 #[test_matrix(
     [true, false],
@@ -1615,19 +1635,15 @@ async fn route_set_closed_when_table_removed<
     } else {
         // If not detached, or the table is explicitly removed, the route set
         // should be closed.
-        let channel = user_route_set
-            .into_channel()
-            .unwrap_or_else(|_err| panic!("failed to turn a proxy into a channel"));
-        let client = fidl::client::Client::new(channel, I::RouteSetMarker::DEBUG_NAME);
-        let mut event_receiver = client.take_event_receiver();
+        let mut err_stream = route_set_err_stream::<I>(user_route_set);
         assert_matches!(
-            event_receiver.next().await,
-            Some(Err(fidl::Error::ClientChannelClosed {
+            err_stream.next().await,
+            Some(fidl::Error::ClientChannelClosed {
                 status: zx::Status::UNAVAILABLE,
                 protocol_name: _,
-            }))
+            })
         );
-        assert_matches!(event_receiver.next().await, None);
+        assert_matches!(err_stream.next().await, None);
 
         // The route should also be removed by now.
         fnet_routes_ext::wait_for_routes(&mut routes_stream, &mut routes, |routes| {

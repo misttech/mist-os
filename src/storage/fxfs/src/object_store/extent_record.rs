@@ -4,21 +4,15 @@
 
 // TODO(https://fxbug.dev/42178223): need validation after deserialization.
 
-use {
-    crate::{
-        checksum::{Checksums, ChecksumsV32, ChecksumsV37, ChecksumsV38},
-        lsm_tree::types::{OrdLowerBound, OrdUpperBound},
-        serialized_types::{migrate_to_version, Migrate},
-    },
-    bit_vec::BitVec,
-    fprint::TypeFingerprint,
-    serde::{Deserialize, Serialize},
-    std::{
-        cmp::{max, min},
-        hash::Hash,
-        ops::Range,
-    },
-};
+use crate::checksum::{Checksums, ChecksumsV32, ChecksumsV37, ChecksumsV38};
+use crate::lsm_tree::types::{OrdLowerBound, OrdUpperBound};
+use crate::serialized_types::{migrate_to_version, Migrate};
+use bit_vec::BitVec;
+use fprint::TypeFingerprint;
+use serde::{Deserialize, Serialize};
+use std::cmp::{max, min};
+use std::hash::Hash;
+use std::ops::Range;
 
 /// The common case for extents which cover the data payload of some object.
 pub const DEFAULT_DATA_ATTRIBUTE_ID: u64 = 0;
@@ -302,15 +296,11 @@ impl From<ExtentValueV37> for ExtentValueV38 {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{ExtentKey, ExtentMode, ExtentValue},
-        crate::{
-            checksum::Checksums,
-            lsm_tree::types::{OrdLowerBound, OrdUpperBound},
-        },
-        bit_vec::BitVec,
-        std::cmp::Ordering,
-    };
+    use super::{ExtentKey, ExtentMode, ExtentValue};
+    use crate::checksum::Checksums;
+    use crate::lsm_tree::types::{OrdLowerBound, OrdUpperBound};
+    use bit_vec::BitVec;
+    use std::cmp::Ordering;
 
     #[test]
     fn test_extent_cmp() {

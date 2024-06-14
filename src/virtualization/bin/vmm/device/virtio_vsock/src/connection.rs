@@ -2,27 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::connection_states::{
-        ClientInitiated, GuestInitiated, ShutdownForced, StateAction, VsockConnectionState,
-    },
-    crate::wire::{OpType, VirtioVsockFlags, VirtioVsockHeader},
-    anyhow::{anyhow, Error},
-    async_lock::{Mutex, RwLock},
-    fidl::client::QueryResponseFut,
-    fidl_fuchsia_virtualization::HostVsockEndpointConnectResponder,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc::UnboundedSender,
-        future::{AbortHandle, Abortable, Aborted},
-    },
-    std::{mem, rc::Rc},
-    virtio_device::{
-        chain::{ReadableChain, WritableChain},
-        mem::DriverMem,
-        queue::DriverNotify,
-    },
+use crate::connection_states::{
+    ClientInitiated, GuestInitiated, ShutdownForced, StateAction, VsockConnectionState,
 };
+use crate::wire::{OpType, VirtioVsockFlags, VirtioVsockHeader};
+use anyhow::{anyhow, Error};
+use async_lock::{Mutex, RwLock};
+use fidl::client::QueryResponseFut;
+use fidl_fuchsia_virtualization::HostVsockEndpointConnectResponder;
+use futures::channel::mpsc::UnboundedSender;
+use futures::future::{AbortHandle, Abortable, Aborted};
+use std::mem;
+use std::rc::Rc;
+use virtio_device::chain::{ReadableChain, WritableChain};
+use virtio_device::mem::DriverMem;
+use virtio_device::queue::DriverNotify;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct ConnectionCredit {
@@ -350,18 +345,18 @@ impl VsockConnection {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::wire::{LE16, LE32},
-        async_utils::PollExt,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_virtualization::{
-            HostVsockAcceptorMarker, HostVsockEndpointMarker, DEFAULT_GUEST_CID, HOST_CID,
-        },
-        futures::{channel::mpsc, TryStreamExt},
-        std::{io::Read, task::Poll},
-        virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
+    use super::*;
+    use crate::wire::{LE16, LE32};
+    use async_utils::PollExt;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_virtualization::{
+        HostVsockAcceptorMarker, HostVsockEndpointMarker, DEFAULT_GUEST_CID, HOST_CID,
     };
+    use futures::channel::mpsc;
+    use futures::TryStreamExt;
+    use std::io::Read;
+    use std::task::Poll;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
 
     // Helper function to simulate putting a header only packet on the guest's TX queue and
     // forwarding it to the given connection. Use for state transitions without any additional data

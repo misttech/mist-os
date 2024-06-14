@@ -2,58 +2,47 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::builtin::runner::BuiltinRunnerFactory;
+use crate::builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder};
+use crate::model::component::{ComponentInstance, StartReason};
+use crate::model::model::Model;
+use crate::model::testing::echo_service::{EchoProtocol, ECHO_CAPABILITY};
+use crate::model::testing::mocks::*;
+use crate::model::testing::out_dir::OutDir;
+use crate::model::testing::test_helpers::*;
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing_test_helpers::{generate_storage_path, RoutingTestModel, RoutingTestModelBuilder};
+use anyhow::anyhow;
+use async_trait::async_trait;
+use camino::Utf8PathBuf;
+use cm_config::{
+    AllowlistEntry, CapabilityAllowlistKey, ChildPolicyAllowlists, DebugCapabilityAllowlistEntry,
+    DebugCapabilityKey, RuntimeConfig, SecurityPolicy,
+};
+use cm_rust::*;
+use cm_types::{Name, Url};
+use component_id_index::InstanceId;
+use errors::ModelError;
+use fidl::endpoints::{self, create_proxy, ClientEnd, Proxy, ServerEnd};
+use fidl::{self};
+use fidl_fidl_examples_routing_echo::{self as echo};
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use futures::channel::oneshot;
+use futures::prelude::*;
+use hooks::HooksRegistration;
+use moniker::{ChildName, Moniker};
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
+use std::str::FromStr;
+use std::sync::Arc;
+use tempfile::TempDir;
+use vfs::directory::entry::{DirectoryEntry, OpenRequest};
+use vfs::ToObjectRequest;
 use {
-    crate::{
-        builtin::runner::BuiltinRunnerFactory,
-        builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
-        model::{
-            component::{ComponentInstance, StartReason},
-            model::Model,
-            testing::{
-                echo_service::{EchoProtocol, ECHO_CAPABILITY},
-                mocks::*,
-                out_dir::OutDir,
-                test_helpers::*,
-            },
-        },
-    },
-    ::routing::component_instance::ComponentInstanceInterface,
-    ::routing_test_helpers::{generate_storage_path, RoutingTestModel, RoutingTestModelBuilder},
-    anyhow::anyhow,
-    async_trait::async_trait,
-    camino::Utf8PathBuf,
-    cm_config::{
-        AllowlistEntry, CapabilityAllowlistKey, ChildPolicyAllowlists,
-        DebugCapabilityAllowlistEntry, DebugCapabilityKey, RuntimeConfig, SecurityPolicy,
-    },
-    cm_rust::*,
-    cm_types::{Name, Url},
-    component_id_index::InstanceId,
-    errors::ModelError,
-    fidl::{
-        self,
-        endpoints::{self, create_proxy, ClientEnd, Proxy, ServerEnd},
-    },
-    fidl_fidl_examples_routing_echo::{self as echo},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_inspect as inspect, fuchsia_zircon as zx,
-    futures::{channel::oneshot, prelude::*},
-    hooks::HooksRegistration,
-    moniker::{ChildName, Moniker},
-    std::{
-        collections::{HashMap, HashSet},
-        fs,
-        path::Path,
-        str::FromStr,
-        sync::Arc,
-    },
-    tempfile::TempDir,
-    vfs::{
-        directory::entry::{DirectoryEntry, OpenRequest},
-        ToObjectRequest,
-    },
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_inspect as inspect,
+    fuchsia_zircon as zx,
 };
 
 // TODO(https://fxbug.dev/42140194): remove type aliases once the routing_test_helpers lib has a stable
@@ -965,11 +954,9 @@ pub mod capability_util {
     use cm_types::NamespacePath;
     use fuchsia_fs::node::OpenError;
 
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 
     /// Looks up `resolved_url` in the namespace, and attempts to read ${path}/hippo. The file
     /// should contain the string "hello".

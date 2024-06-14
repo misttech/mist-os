@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::config::StreamSink;
+use async_trait::async_trait;
+use cm_logger::scoped::ScopedLogger;
+use cm_types::NamespacePath;
+use fidl::prelude::*;
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_runtime::{HandleInfo, HandleType};
+use futures::StreamExt;
+use lazy_static::lazy_static;
+use namespace::Namespace;
+use once_cell::unsync::OnceCell;
+use socket_parsing::{NewlineChunker, NewlineChunkerError};
+use std::sync::Arc;
+use tracing::{info, warn, Subscriber};
+use zx::HandleBased;
 use {
-    super::config::StreamSink,
-    async_trait::async_trait,
-    cm_logger::scoped::ScopedLogger,
-    cm_types::NamespacePath,
-    fidl::prelude::*,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon as zx,
-    futures::StreamExt,
-    lazy_static::lazy_static,
-    namespace::Namespace,
-    once_cell::unsync::OnceCell,
-    socket_parsing::{NewlineChunker, NewlineChunkerError},
-    std::sync::Arc,
-    tracing::{info, warn, Subscriber},
-    zx::HandleBased,
 };
 
 const STDOUT_FD: i32 = 1;
@@ -165,23 +165,19 @@ impl LogWriter for SyslogWriter {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::tests::{create_fs_with_mock_logsink, MockServiceFs, MockServiceRequest},
-        anyhow::{anyhow, format_err, Context, Error},
-        async_trait::async_trait,
-        diagnostics_message::MonikerWithUrl,
-        fidl_fuchsia_component_runner as fcrunner,
-        fidl_fuchsia_logger::LogSinkRequest,
-        fuchsia_async::Task,
-        fuchsia_zircon as zx,
-        futures::{channel::mpsc, try_join, FutureExt, SinkExt},
-        rand::{
-            distributions::{Alphanumeric, DistString as _},
-            thread_rng,
-        },
-        std::sync::Mutex,
-    };
+    use super::*;
+    use crate::tests::{create_fs_with_mock_logsink, MockServiceFs, MockServiceRequest};
+    use anyhow::{anyhow, format_err, Context, Error};
+    use async_trait::async_trait;
+    use diagnostics_message::MonikerWithUrl;
+    use fidl_fuchsia_logger::LogSinkRequest;
+    use fuchsia_async::Task;
+    use futures::channel::mpsc;
+    use futures::{try_join, FutureExt, SinkExt};
+    use rand::distributions::{Alphanumeric, DistString as _};
+    use rand::thread_rng;
+    use std::sync::Mutex;
+    use {fidl_fuchsia_component_runner as fcrunner, fuchsia_zircon as zx};
 
     #[async_trait]
     impl LogWriter for mpsc::Sender<String> {

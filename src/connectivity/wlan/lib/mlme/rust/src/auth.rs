@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, ensure, Error},
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    wlan_common::mac,
-};
+use anyhow::{bail, ensure, Error};
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+use wlan_common::mac;
 
 pub fn make_open_client_req() -> mac::AuthHdr {
     mac::AuthHdr {
@@ -49,7 +47,8 @@ pub fn validate_ap_resp(auth: &mac::AuthHdr) -> Result<ValidFrame, Error> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, wlan_common::assert_variant};
+    use super::*;
+    use wlan_common::assert_variant;
 
     fn make_valid_auth_resp(frame_type: ValidFrame) -> mac::AuthHdr {
         mac::AuthHdr {

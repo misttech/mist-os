@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::{handle::AsyncChannel, prelude::*},
-    fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
-    fuchsia_async::{self as fasync},
-    fuchsia_runtime::{self as fruntime, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx},
-    futures_util::stream::TryStreamExt,
-    std::process,
-    tracing::{error, info},
-};
+use fidl::handle::AsyncChannel;
+use fidl::prelude::*;
+use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
+use fuchsia_async::{self as fasync};
+use fuchsia_runtime::{self as fruntime, HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx};
+use futures_util::stream::TryStreamExt;
+use std::process;
+use tracing::{error, info};
 
 #[fuchsia::main]
 async fn main() {

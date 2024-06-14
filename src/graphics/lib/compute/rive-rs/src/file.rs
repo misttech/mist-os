@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{any::TypeId, rc::Rc};
+use std::any::TypeId;
+use std::rc::Rc;
 
-use crate::{
-    animation::{KeyedObject, KeyedProperty, LinearAnimation},
-    artboard::Artboard,
-    backboard::Backboard,
-    component::Component,
-    core::{self, BinaryReader, Core, Object},
-    importers::{
-        ArtboardImporter, ImportStack, ImportStackObject, KeyedObjectImporter,
-        KeyedPropertyImporter, LinearAnimationImporter,
-    },
-    runtime_header::RuntimeHeader,
-    status_code::StatusCode,
+use crate::animation::{KeyedObject, KeyedProperty, LinearAnimation};
+use crate::artboard::Artboard;
+use crate::backboard::Backboard;
+use crate::component::Component;
+use crate::core::{self, BinaryReader, Core, Object};
+use crate::importers::{
+    ArtboardImporter, ImportStack, ImportStackObject, KeyedObjectImporter, KeyedPropertyImporter,
+    LinearAnimationImporter,
 };
+use crate::runtime_header::RuntimeHeader;
+use crate::status_code::StatusCode;
 
 /// Major version number supported by the runtime.
 const MAJOR_VERSION: u32 = 7;

@@ -2,41 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::event::action::{self, AuthenticationControl, AuthenticationTap};
+use crate::event::{branch, Handler};
+use anyhow::Error;
+use fidl::endpoints::{create_endpoints, create_proxy};
+use fidl_fuchsia_wlan_common::WlanMacRole;
+use fidl_fuchsia_wlan_tap::{WlanRxInfo, WlantapPhyConfig, WlantapPhyProxy};
+use fuchsia_component::client::connect_to_protocol_at;
+use fuchsia_zircon::prelude::*;
+use ieee80211::{Bssid, MacAddr, Ssid};
+use lazy_static::lazy_static;
+use std::future::Future;
+use std::pin::pin;
+use wlan_common::bss::Protection;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_common::ie::rsn::cipher::{Cipher, CIPHER_CCMP_128, CIPHER_TKIP};
+use wlan_common::ie::rsn::rsne;
+use wlan_common::ie::rsn::suite_filter::DEFAULT_GROUP_MGMT_CIPHER;
+use wlan_common::ie::wpa;
+use wlan_common::{data_writer, mac, mgmt_writer, TimeUnit};
+use wlan_frame_writer::write_frame_with_dynamic_buffer;
+use wlan_rsn::rsna::UpdateSink;
 use {
-    crate::event::{
-        action::{self, AuthenticationControl, AuthenticationTap},
-        branch, Handler,
-    },
-    anyhow::Error,
-    fidl::endpoints::{create_endpoints, create_proxy},
-    fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_common::WlanMacRole,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_softmac as fidl_wlan_softmac,
-    fidl_fuchsia_wlan_tap::{WlanRxInfo, WlantapPhyConfig, WlantapPhyProxy},
-    fuchsia_component::client::connect_to_protocol_at,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_softmac as fidl_wlan_softmac,
     fuchsia_zircon as zx,
-    fuchsia_zircon::prelude::*,
-    ieee80211::{Bssid, MacAddr, Ssid},
-    lazy_static::lazy_static,
-    std::future::Future,
-    std::pin::pin,
-    wlan_common::{
-        bss::Protection,
-        channel::{Cbw, Channel},
-        data_writer,
-        ie::{
-            rsn::{
-                cipher::{Cipher, CIPHER_CCMP_128, CIPHER_TKIP},
-                rsne,
-                suite_filter::DEFAULT_GROUP_MGMT_CIPHER,
-            },
-            wpa,
-        },
-        mac, mgmt_writer, TimeUnit,
-    },
-    wlan_frame_writer::write_frame_with_dynamic_buffer,
-    wlan_rsn::rsna::UpdateSink,
 };
 
 pub mod event;

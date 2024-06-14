@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::crash::CrashReporter;
+use crate::crash::RecoveryError::{WifiConnectionError, WifiConnectionSuccess};
 use crate::ota::controller::SendEvent;
 use crate::ota::state_machine::{Event, Network, Password};
+use crate::send_report;
 use crate::wlan::{create_network_info, WifiConnect, WifiConnectImpl};
-use crate::{
-    crash::{
-        CrashReporter,
-        RecoveryError::{WifiConnectionError, WifiConnectionSuccess},
-    },
-    send_report,
-};
 use anyhow::Error;
 use fuchsia_async::{DurationExt, Task};
 use fuchsia_zircon::Duration;

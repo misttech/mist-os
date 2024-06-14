@@ -30,7 +30,6 @@ rustc_library("package-directory") {
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:static_assertions",
@@ -55,7 +54,6 @@ rustc_library("package-directory") {
   sources = [
     "src/lib.rs",
     "src/meta_as_dir.rs",
-    "src/meta_as_file.rs",
     "src/meta_file.rs",
     "src/meta_subdir.rs",
     "src/non_meta_subdir.rs",

@@ -2,31 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::error::Error;
+use crate::local_component_runner::LocalComponentRunnerBuilder;
+use anyhow::{format_err, Context as _};
+use cm_rust::{
+    Availability, CapabilityDecl, DependencyType, DirectoryDecl, ExposeDecl, ExposeDirectoryDecl,
+    ExposeProtocolDecl, ExposeSource, ExposeTarget, FidlIntoNative, NativeIntoFidl, ProtocolDecl,
+    SourceName, UseDecl, UseProtocolDecl, UseSource,
+};
+use cm_types::{Path, RelativePath};
+use component_events::events::Started;
+use component_events::matcher::EventMatcher;
+use fidl::endpoints::{
+    self, create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd, ServiceMarker,
+};
+use fuchsia_component::client as fclient;
+use futures::future::BoxFuture;
+use futures::{FutureExt, TryFutureExt, TryStreamExt};
+use rand::Rng;
+use std::collections::HashMap;
+use std::fmt::{self, Display, Formatter};
+use tracing::*;
 use {
-    crate::{error::Error, local_component_runner::LocalComponentRunnerBuilder},
-    anyhow::{format_err, Context as _},
-    cm_rust::{
-        Availability, CapabilityDecl, DependencyType, DirectoryDecl, ExposeDecl,
-        ExposeDirectoryDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget, FidlIntoNative,
-        NativeIntoFidl, ProtocolDecl, SourceName, UseDecl, UseProtocolDecl, UseSource,
-    },
-    cm_types::{Path, RelativePath},
-    component_events::{events::Started, matcher::EventMatcher},
-    fidl::endpoints::{
-        self, create_proxy, ClientEnd, DiscoverableProtocolMarker, Proxy, ServerEnd, ServiceMarker,
-    },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_mem as fmem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_component::client as fclient,
     fuchsia_zircon as zx,
-    futures::{future::BoxFuture, FutureExt, TryFutureExt, TryStreamExt},
-    rand::Rng,
-    std::{
-        collections::HashMap,
-        fmt::{self, Display, Formatter},
-    },
-    tracing::*,
 };
 
 pub mod new {
@@ -2199,13 +2200,13 @@ impl ExecutionController {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_component as fcomponent,
-        futures::{channel::mpsc, future::pending, SinkExt, StreamExt},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_component as fcomponent;
+    use futures::channel::mpsc;
+    use futures::future::pending;
+    use futures::{SinkExt, StreamExt};
 
     // To ensure that the expected value of any new member is explicitly
     // specified, avoid using `..Default::default()`. To do this, we must work

@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::manager::DEFAULT_TIMEOUT_IN_SECONDS;
+use anyhow::{Context as _, Result};
+use async_trait::async_trait;
+use fidl::endpoints::ClientEnd;
+use futures::channel::mpsc;
+use futures::{join, pin_mut, select, AsyncWriteExt, FutureExt, SinkExt, StreamExt};
+use std::cell::RefCell;
+use std::collections::LinkedList;
+use std::rc::Rc;
+use test_manager::Artifact;
+use tracing::{info, warn};
 use {
-    crate::manager::DEFAULT_TIMEOUT_IN_SECONDS,
-    anyhow::{Context as _, Result},
-    async_trait::async_trait,
-    fidl::endpoints::ClientEnd,
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_test_manager as test_manager,
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::channel::mpsc,
-    futures::{join, pin_mut, select, AsyncWriteExt, FutureExt, SinkExt, StreamExt},
-    std::cell::RefCell,
-    std::collections::LinkedList,
-    std::rc::Rc,
-    test_manager::Artifact,
-    tracing::{info, warn},
 };
 
 /// Dispatches `test_manager` artifacts to the `ArtifactBridge`s used to forward data to `ffx fuzz`.

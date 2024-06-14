@@ -5,27 +5,29 @@
 mod diagnostics;
 mod metrics;
 
-use {
-    anyhow::{bail, Error},
-    diagnostics::RequestId,
-    diagnostics_reader::{ArchiveReader, Inspect, RetryConfig},
-    fasync::Duration,
-    fidl_fuchsia_diagnostics::{
-        ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker,
-        ClientSelectorConfiguration, DataType, Format, SelectorArgument, StreamMode,
-        StreamParameters,
-    },
-    fidl_fuchsia_test as ftest, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc, lock::Mutex, AsyncWriteExt, SinkExt, StreamExt},
-    lazy_static::lazy_static,
-    metrics::{MetricSet, MetricTypeHint},
-    rust_measure_tape_for_case::Measurable as _,
-    std::{collections::HashSet, fs::File, io::Write, path::PathBuf, time::Instant},
-    tracing::{debug, error, info},
-    zx::sys::ZX_CHANNEL_MAX_MSG_BYTES,
+use anyhow::{bail, Error};
+use diagnostics::RequestId;
+use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use fasync::Duration;
+use fidl_fuchsia_diagnostics::{
+    ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker, ClientSelectorConfiguration,
+    DataType, Format, SelectorArgument, StreamMode, StreamParameters,
 };
+use fuchsia_component::server::ServiceFs;
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::{AsyncWriteExt, SinkExt, StreamExt};
+use lazy_static::lazy_static;
+use metrics::{MetricSet, MetricTypeHint};
+use rust_measure_tape_for_case::Measurable as _;
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
+use std::time::Instant;
+use tracing::{debug, error, info};
+use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
+use {fidl_fuchsia_test as ftest, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 lazy_static! {
     // Ensure that only a single operation is running at a time.

@@ -57,11 +57,16 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
         # This method looks for a possible race between trace event start in Scenic and magma.
         # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
         model = trace_utils.adjust_to_common_process_start(
-            model, [("scenic.cm", ""), ("driver_host.cm", "DeviceThread")]
+            model,
+            _SCENIC_START_EVENT_NAME,
+            category=_EVENT_CATEGORY,
+            type=trace_model.DurationEvent,
         )
 
         all_events: Iterator[trace_model.Event] = model.all_events()
-        scenic_start_events: list[trace_model.Event] = list(
+        # Since `filter_events()` returns an Iterator, make a local copy so we can iterate over the
+        # events more than once.
+        scenic_start_events = list(
             trace_utils.filter_events(
                 all_events,
                 category=_EVENT_CATEGORY,

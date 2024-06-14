@@ -2,24 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::device::{self, IfaceDevice, IfaceMap, NewIface, PhyDevice, PhyMap};
+use crate::watcher_service;
+use anyhow::{Context, Error};
+use core::sync::atomic::AtomicUsize;
+use fidl::endpoints::create_endpoints;
+use fidl::HandleBased;
+use fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest};
+use fuchsia_inspect::Inspector;
+use futures::channel::mpsc;
+use futures::stream::FuturesUnordered;
+use futures::{select, FutureExt, StreamExt, TryStreamExt};
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 use {
-    crate::{
-        device::{self, IfaceDevice, IfaceMap, NewIface, PhyDevice, PhyMap},
-        watcher_service,
-    },
-    anyhow::{Context, Error},
-    core::sync::atomic::AtomicUsize,
-    fidl::{endpoints::create_endpoints, HandleBased},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_dev,
-    fidl_fuchsia_wlan_device_service::{self as fidl_svc, DeviceMonitorRequest},
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_inspect::Inspector,
-    fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc, select, stream::FuturesUnordered, FutureExt, StreamExt, TryStreamExt,
-    },
-    std::sync::{atomic::Ordering, Arc},
-    tracing::{error, info, warn},
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
 };
 
 /// Thread-safe counter for spawned ifaces.
@@ -552,17 +551,17 @@ fn into_status_and_opt<T>(r: Result<T, zx::Status>) -> (zx::Status, Option<T>) {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::device::PhyOwnership,
-        fidl::endpoints::{create_proxy, create_proxy_and_stream, ControlHandle},
-        fidl_fuchsia_wlan_common as fidl_wlan_common, fuchsia_async as fasync,
-        futures::{future::BoxFuture, task::Poll},
-        ieee80211::{MacAddrBytes, NULL_ADDR},
-        std::{convert::Infallible, pin::pin},
-        test_case::test_case,
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use crate::device::PhyOwnership;
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream, ControlHandle};
+    use futures::future::BoxFuture;
+    use futures::task::Poll;
+    use ieee80211::{MacAddrBytes, NULL_ADDR};
+    use std::convert::Infallible;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
+    use {fidl_fuchsia_wlan_common as fidl_wlan_common, fuchsia_async as fasync};
 
     struct TestValues {
         monitor_proxy: fidl_svc::DeviceMonitorProxy,

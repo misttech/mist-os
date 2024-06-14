@@ -14,18 +14,18 @@ import depfile
 
 
 class LexLineTests(unittest.TestCase):
-    def _test_tokens(self, tokens: Sequence[depfile.Token]):
+    def _test_tokens(self, tokens: Sequence[depfile.Token]) -> None:
         text = depfile.unlex(tokens)
         lexed = list(depfile._lex_line(text))
         self.assertEqual(lexed, tokens)
 
-    def test_empty(self):
+    def test_empty(self) -> None:
         self._test_tokens([])
 
-    def test_comment(self):
+    def test_comment(self) -> None:
         self._test_tokens([depfile.Token("#", depfile.TokenType.COMMENT)])
 
-    def test_comment_long(self):
+    def test_comment_long(self) -> None:
         self._test_tokens(
             [
                 depfile.Token(
@@ -34,53 +34,53 @@ class LexLineTests(unittest.TestCase):
             ]
         )
 
-    def test_colon(self):
+    def test_colon(self) -> None:
         self._test_tokens([depfile.Token(":", depfile.TokenType.COLON)])
 
-    def test_colons(self):
+    def test_colons(self) -> None:
         self._test_tokens([depfile.Token(":", depfile.TokenType.COLON)] * 2)
 
-    def test_newline(self):
+    def test_newline(self) -> None:
         self._test_tokens([depfile.Token("\n", depfile.TokenType.NEWLINE)])
 
-    def test_newline_return(self):
+    def test_newline_return(self) -> None:
         self._test_tokens([depfile.Token("\r\n", depfile.TokenType.NEWLINE)])
 
-    def test_newlines(self):
+    def test_newlines(self) -> None:
         self._test_tokens([depfile.Token("\n", depfile.TokenType.NEWLINE)] * 2)
 
-    def test_newline_returns(self):
+    def test_newline_returns(self) -> None:
         self._test_tokens(
             [depfile.Token("\r\n", depfile.TokenType.NEWLINE)] * 2
         )
 
-    def test_space(self):
+    def test_space(self) -> None:
         self._test_tokens([depfile.Token(" ", depfile.TokenType.SPACE)])
 
-    def test_spaces(self):
+    def test_spaces(self) -> None:
         self._test_tokens([depfile.Token("    ", depfile.TokenType.SPACE)])
 
-    def test_tab(self):
+    def test_tab(self) -> None:
         self._test_tokens([depfile.Token("\t", depfile.TokenType.SPACE)])
 
-    def test_tabs(self):
+    def test_tabs(self) -> None:
         self._test_tokens([depfile.Token("\t\t", depfile.TokenType.SPACE)])
 
-    def test_spacetabs(self):
+    def test_spacetabs(self) -> None:
         self._test_tokens(
             [depfile.Token("\t   \t  \t\t ", depfile.TokenType.SPACE)]
         )
 
-    def test_line_continue(self):
+    def test_line_continue(self) -> None:
         self._test_tokens([depfile.Token("\\", depfile.TokenType.LINECONTINUE)])
 
-    def test_escape_slash(self):
+    def test_escape_slash(self) -> None:
         with self.assertRaises(ValueError):  # not handled yet
             self._test_tokens(
                 [depfile.Token("\\\\", depfile.TokenType.ESCAPED)]
             )
 
-    def test_path(self):
+    def test_path(self) -> None:
         for text in (
             "_",
             "a",
@@ -94,7 +94,7 @@ class LexLineTests(unittest.TestCase):
         ):
             self._test_tokens([depfile.Token(text, depfile.TokenType.PATH)])
 
-    def test_dep(self):
+    def test_dep(self) -> None:
         self._test_tokens(
             [
                 depfile.Token("a", depfile.TokenType.PATH),
@@ -108,12 +108,12 @@ class LexLineTests(unittest.TestCase):
 
 
 class LexTests(unittest.TestCase):
-    def _test_lines(self, tokens: Sequence[Sequence[depfile.Token]]):
+    def _test_lines(self, tokens: Sequence[Sequence[depfile.Token]]) -> None:
         lines = [depfile.unlex(t) for t in tokens]
         lexed = list(depfile.lex(lines))
         self.assertEqual(lexed, [s for t in tokens for s in t])
 
-    def test_one_dep(self):
+    def test_one_dep(self) -> None:
         self._test_lines(
             [
                 [
@@ -127,7 +127,7 @@ class LexTests(unittest.TestCase):
             ]
         )
 
-    def test_two_deps(self):
+    def test_two_deps(self) -> None:
         self._test_lines(
             [
                 [
@@ -149,7 +149,7 @@ class LexTests(unittest.TestCase):
 
 
 class TransformPathsTests(unittest.TestCase):
-    def test_identity(self):
+    def test_identity(self) -> None:
         dep_text = """p/r.s: f/g.h
 a/b.o: ../e/d.c
 """
@@ -157,7 +157,7 @@ a/b.o: ../e/d.c
             depfile.transform_paths(dep_text, lambda s: s), dep_text
         )
 
-    def test_transform(self):
+    def test_transform(self) -> None:
         dep_text = """p/r.s: f/g.h
 a/b.o: ../e/d.c
 """
@@ -170,11 +170,11 @@ A/B.O: ../E/D.C
 
 
 class ConsumeLineContinuationsTests(unittest.TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         toks = list(depfile.consume_line_continuations([]))
         self.assertEqual(toks, [])
 
-    def test_continuations(self):
+    def test_continuations(self) -> None:
         toks = list(
             depfile.consume_line_continuations(
                 [
@@ -207,11 +207,11 @@ class ConsumeLineContinuationsTests(unittest.TestCase):
 
 
 class ParseOneDepTests(unittest.TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         dep = depfile._parse_one_dep([])
         self.assertIsNone(dep)
 
-    def test_blank_lines(self):
+    def test_blank_lines(self) -> None:
         dep = depfile._parse_one_dep(
             [
                 depfile.Token("\n", depfile.TokenType.NEWLINE),
@@ -220,7 +220,7 @@ class ParseOneDepTests(unittest.TestCase):
         )
         self.assertIsNone(dep)
 
-    def test_phony(self):
+    def test_phony(self) -> None:
         dep = depfile._parse_one_dep(
             iter(
                 [
@@ -231,10 +231,11 @@ class ParseOneDepTests(unittest.TestCase):
                 ]
             )
         )
+        assert dep is not None
         self.assertEqual(dep.target_paths, [Path("target/thing")])
         self.assertEqual(dep.deps_paths, [])
 
-    def test_dep(self):
+    def test_dep(self) -> None:
         dep = depfile._parse_one_dep(
             iter(
                 [
@@ -247,12 +248,13 @@ class ParseOneDepTests(unittest.TestCase):
                 ]
             )
         )
+        assert dep is not None
         self.assertEqual(dep.target_paths, [Path("target/thing")])
         self.assertEqual(
             dep.deps_paths, [Path("src/dep1.cc"), Path("src/dep2.cc")]
         )
 
-    def test_dep_with_multiple_targets(self):
+    def test_dep_with_multiple_targets(self) -> None:
         dep = depfile._parse_one_dep(
             iter(
                 [
@@ -265,12 +267,13 @@ class ParseOneDepTests(unittest.TestCase):
                 ]
             )
         )
+        assert dep is not None
         self.assertEqual(
             dep.target_paths, [Path("target/thing"), Path("target/thing.d")]
         )
         self.assertEqual(dep.deps_paths, [Path("src/dep.cc")])
 
-    def test_missing_colon(self):
+    def test_missing_colon(self) -> None:
         with self.assertRaises(depfile.ParseError):
             depfile._parse_one_dep(
                 iter(
@@ -282,7 +285,7 @@ class ParseOneDepTests(unittest.TestCase):
                 )
             )
 
-    def test_unexpected_colon(self):
+    def test_unexpected_colon(self) -> None:
         with self.assertRaises(depfile.ParseError):
             depfile._parse_one_dep(
                 iter(
@@ -292,7 +295,7 @@ class ParseOneDepTests(unittest.TestCase):
                 )
             )
 
-    def test_absolute_paths_none(self):
+    def test_absolute_paths_none(self) -> None:
         dep = depfile._parse_one_dep(
             iter(
                 [
@@ -304,9 +307,10 @@ class ParseOneDepTests(unittest.TestCase):
                 ]
             )
         )
+        assert dep is not None
         self.assertEqual(dep.absolute_paths, set())
 
-    def test_absolute_paths_target(self):
+    def test_absolute_paths_target(self) -> None:
         dep = depfile._parse_one_dep(
             iter(
                 [
@@ -318,9 +322,10 @@ class ParseOneDepTests(unittest.TestCase):
                 ]
             )
         )
+        assert dep is not None
         self.assertEqual(dep.absolute_paths, {Path("/target/thing")})
 
-    def test_absolute_paths_dep(self):
+    def test_absolute_paths_dep(self) -> None:
         dep = depfile._parse_one_dep(
             iter(
                 [
@@ -332,19 +337,20 @@ class ParseOneDepTests(unittest.TestCase):
                 ]
             )
         )
+        assert dep is not None
         self.assertEqual(dep.absolute_paths, {Path("/src/dep.cc")})
 
 
 class ParseLinesTestes(unittest.TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         deps = list(depfile.parse_lines([]))
         self.assertEqual(deps, [])
 
-    def test_blank_lines(self):
+    def test_blank_lines(self) -> None:
         deps = list(depfile.parse_lines(["\n", "\r\n", "\n"]))
         self.assertEqual(deps, [])
 
-    def test_comments(self):
+    def test_comments(self) -> None:
         deps = list(
             depfile.parse_lines(
                 [
@@ -357,14 +363,14 @@ class ParseLinesTestes(unittest.TestCase):
         )
         self.assertEqual(deps, [])
 
-    def test_one_dep(self):
+    def test_one_dep(self) -> None:
         deps = list(depfile.parse_lines(["a.out: bb.o\n"]))
         self.assertEqual(len(deps), 1)
         self.assertEqual(deps[0].target_paths, [Path("a.out")])
         self.assertEqual(deps[0].deps_paths, [Path("bb.o")])
         self.assertFalse(deps[0].is_phony)
 
-    def test_one_dep_line_continued(self):
+    def test_one_dep_line_continued(self) -> None:
         deps = list(depfile.parse_lines(["a.out: bb.o \\\n", " cc.o dd.i\n"]))
         self.assertEqual(len(deps), 1)
         self.assertEqual(deps[0].target_paths, [Path("a.out")])
@@ -373,7 +379,7 @@ class ParseLinesTestes(unittest.TestCase):
         )
         self.assertFalse(deps[0].is_phony)
 
-    def test_one_dep_line_continued_with_cr(self):
+    def test_one_dep_line_continued_with_cr(self) -> None:
         deps = list(
             depfile.parse_lines(["a.out: \\\r\n", " \\\r\n", " cc.o dd.i\n"])
         )
@@ -382,7 +388,7 @@ class ParseLinesTestes(unittest.TestCase):
         self.assertEqual(deps[0].deps_paths, [Path("cc.o"), Path("dd.i")])
         self.assertFalse(deps[0].is_phony)
 
-    def test_multiple_deps(self):
+    def test_multiple_deps(self) -> None:
         deps = list(
             depfile.parse_lines(
                 ["a.out: bb.o\n", "z.out :\\\n", "y.h\n", "p.out : \n"]
@@ -404,7 +410,7 @@ class ParseLinesTestes(unittest.TestCase):
 
 
 class AbsolutePathsTests(unittest.TestCase):
-    def test_none_found(self):
+    def test_none_found(self) -> None:
         abspaths = depfile.absolute_paths(
             depfile.parse_lines(
                 ["a.out: bb.o\n", "z.out :\\\n", "y.h\n", "p.out : \n"]
@@ -412,7 +418,7 @@ class AbsolutePathsTests(unittest.TestCase):
         )
         self.assertEqual(abspaths, set())
 
-    def test_some_found(self):
+    def test_some_found(self) -> None:
         abspaths = depfile.absolute_paths(
             depfile.parse_lines(
                 [

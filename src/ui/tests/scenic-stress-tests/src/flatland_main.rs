@@ -10,10 +10,11 @@ mod input_listener;
 mod metrics_discarder;
 mod pointer_state;
 
-use {
-    argh::FromArgs, flatland_environment::FlatlandEnvironment, fuchsia_async as fasync,
-    stress_test::run_test, tracing::Level,
-};
+use argh::FromArgs;
+use flatland_environment::FlatlandEnvironment;
+use fuchsia_async as fasync;
+use stress_test::run_test;
+use tracing::Level;
 
 #[derive(Clone, Debug, FromArgs)]
 /// Creates an instance of scenic and performs stressful operations on it

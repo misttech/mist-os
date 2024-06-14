@@ -2,35 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    async_trait::async_trait,
-    fidl::endpoints::{create_endpoints, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder},
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, HandleBased, Status},
-    fxfs_testing::{close_file_checked, open_file_checked, TestFixture},
-    std::sync::Arc,
-    syncio::{
-        zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t,
-        CreationMode, OpenOptions, SeekOrigin, XattrSetMode, Zxio, ZXIO_ROOT_HASH_LENGTH,
-    },
-    vfs::{
-        directory::{
-            entry::{DirectoryEntry, EntryInfo, OpenRequest},
-            entry_container::Directory,
-        },
-        execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode},
-        node::Node,
-        path::Path,
-        pseudo_directory,
-        remote::RemoteLike,
-        symlink::Symlink,
-        ObjectRequestRef, ToObjectRequest,
-    },
+use assert_matches::assert_matches;
+use fidl::endpoints::{create_endpoints, ServerEnd};
+use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder};
+use fuchsia_zircon::{self as zx, HandleBased, Status};
+use fxfs_testing::{close_file_checked, open_file_checked, TestFixture};
+use std::sync::Arc;
+use syncio::{
+    zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, CreationMode,
+    OpenOptions, SeekOrigin, XattrSetMode, Zxio, ZXIO_ROOT_HASH_LENGTH,
 };
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
+use vfs::node::Node;
+use vfs::path::Path;
+use vfs::remote::RemoteLike;
+use vfs::symlink::Symlink;
+use vfs::{pseudo_directory, ObjectRequestRef, ToObjectRequest};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[fuchsia::test]
 async fn test_symlink() {
@@ -234,7 +225,6 @@ async fn test_read_link_error() {
         }
     }
 
-    #[async_trait]
     impl Node for ErrorSymlink {
         async fn get_attributes(
             &self,
@@ -820,7 +810,6 @@ impl FileIo for AllocateFile {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for AllocateFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         unimplemented!()

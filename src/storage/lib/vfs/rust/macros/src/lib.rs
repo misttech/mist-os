@@ -9,18 +9,13 @@
 #[cfg(test)]
 mod tests;
 
-use {
-    fidl_fuchsia_io as fio,
-    proc_macro2::{Span, TokenStream},
-    quote::{quote, quote_spanned, ToTokens},
-    std::collections::HashSet,
-    syn::{
-        parse::{Parse, ParseStream},
-        parse_quote,
-        spanned::Spanned,
-        Expr, Ident, LitByteStr, LitStr, Path, Token,
-    },
-};
+use fidl_fuchsia_io as fio;
+use proc_macro2::{Span, TokenStream};
+use quote::{quote, quote_spanned, ToTokens};
+use std::collections::HashSet;
+use syn::parse::{Parse, ParseStream};
+use syn::spanned::Spanned;
+use syn::{parse_quote, Expr, Ident, LitByteStr, LitStr, Path, Token};
 
 /// See [//src/storage/lib/vfs/rust:vfs/src/lib.rs] for the documentation for this macro usage.
 //

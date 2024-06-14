@@ -4,10 +4,12 @@
 
 pub mod args;
 
-use {
-    anyhow::Result, args::LspciCommand, fidl_fuchsia_hardware_pci as fhpci, fidl_fuchsia_io as fio,
-    lspci::bridge::Bridge, lspci::device::Device, lspci::Args,
-};
+use anyhow::Result;
+use args::LspciCommand;
+use lspci::bridge::Bridge;
+use lspci::device::Device;
+use lspci::Args;
+use {fidl_fuchsia_hardware_pci as fhpci, fidl_fuchsia_io as fio};
 
 pub async fn lspci(cmd: LspciCommand, dev: &fio::DirectoryProxy) -> Result<()> {
     let (bus, server) = fidl::endpoints::create_proxy::<fhpci::BusMarker>()?;

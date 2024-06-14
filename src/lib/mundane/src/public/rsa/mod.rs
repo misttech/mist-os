@@ -13,9 +13,11 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::marker::PhantomData;
 
 use boringssl::{self, BoringError, CHeapWrapper, CStackWrapper};
-use hash::{inner::Digest, Hasher};
+use hash::inner::Digest;
+use hash::Hasher;
+use public::inner::DerKey;
 use public::rsa::inner::RsaKey;
-use public::{inner::DerKey, DerPrivateKey, DerPublicKey, PrivateKey, PublicKey, Signature};
+use public::{DerPrivateKey, DerPublicKey, PrivateKey, PublicKey, Signature};
 use util::Sealed;
 use Error;
 

@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::rewrite_manager::{CommitError, RewriteManager},
-    anyhow::{anyhow, Error},
-    async_lock::RwLock,
-    fidl_fuchsia_pkg_rewrite::{
-        EditTransactionRequest, EditTransactionRequestStream, EngineRequest, EngineRequestStream,
-        RuleIteratorRequest, RuleIteratorRequestStream,
-    },
-    fidl_fuchsia_pkg_rewrite_ext::Rule,
-    fuchsia_async as fasync,
-    fuchsia_zircon::Status,
-    futures::prelude::*,
-    std::sync::Arc,
-    tracing::{error, info, warn},
+use crate::rewrite_manager::{CommitError, RewriteManager};
+use anyhow::{anyhow, Error};
+use async_lock::RwLock;
+use fidl_fuchsia_pkg_rewrite::{
+    EditTransactionRequest, EditTransactionRequestStream, EngineRequest, EngineRequestStream,
+    RuleIteratorRequest, RuleIteratorRequestStream,
 };
+use fidl_fuchsia_pkg_rewrite_ext::Rule;
+use fuchsia_async as fasync;
+use fuchsia_zircon::Status;
+use futures::prelude::*;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 
 const LIST_CHUNK_SIZE: usize = 100;
 
@@ -179,16 +177,12 @@ impl RewriteService {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::rewrite_manager::{
-            tests::{make_rule_config, temp_path_into_proxy_and_path},
-            RewriteManagerBuilder, Transaction,
-        },
-        fidl::endpoints::{create_proxy, create_proxy_and_stream},
-        fidl_fuchsia_pkg_rewrite::{
-            EditTransactionMarker, EditTransactionProxy, RuleIteratorMarker,
-        },
+    use super::*;
+    use crate::rewrite_manager::tests::{make_rule_config, temp_path_into_proxy_and_path};
+    use crate::rewrite_manager::{RewriteManagerBuilder, Transaction};
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream};
+    use fidl_fuchsia_pkg_rewrite::{
+        EditTransactionMarker, EditTransactionProxy, RuleIteratorMarker,
     };
 
     macro_rules! rule {

@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source},
-    BpfValue, EbpfProgram, EpbfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
-};
+use crate::visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source};
+use crate::{BpfValue, EbpfProgram, EpbfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT};
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
-use std::{
-    mem::MaybeUninit,
-    pin::Pin,
-    sync::atomic::{AtomicU32, AtomicU64, Ordering},
-};
+use std::mem::MaybeUninit;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use zerocopy::AsBytes;
 
 pub fn execute_with_arguments<C: EpbfRunContext>(

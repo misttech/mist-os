@@ -5,9 +5,11 @@
 use paste::paste;
 use starnix_sync::{Locked, Unlocked};
 
-use crate::{arch::syscalls::sys_clone, task::CurrentTask};
+use crate::arch::syscalls::sys_clone;
+use crate::task::CurrentTask;
 use fuchsia_inspect_contrib::profile_duration;
-use starnix_syscalls::{decls::Syscall, SyscallResult};
+use starnix_syscalls::decls::Syscall;
+use starnix_syscalls::SyscallResult;
 use starnix_uapi::errors::Errno;
 
 macro_rules! syscall_match {
@@ -46,72 +48,62 @@ pub fn dispatch_syscall(
     current_task: &mut CurrentTask,
     syscall: &Syscall,
 ) -> Result<SyscallResult, Errno> {
-    use crate::{
-        bpf::syscalls::sys_bpf,
-        mm::syscalls::{
-            sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mincore,
-            sys_mlock, sys_mlockall, sys_mmap, sys_mprotect, sys_mremap, sys_msync, sys_munlock,
-            sys_munmap, sys_process_mrelease, sys_process_vm_readv, sys_process_vm_writev,
-            sys_set_robust_list,
-        },
-        signals::syscalls::{
-            sys_kill, sys_pidfd_send_signal, sys_restart_syscall, sys_rt_sigaction,
-            sys_rt_sigpending, sys_rt_sigprocmask, sys_rt_sigqueueinfo, sys_rt_sigreturn,
-            sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_rt_tgsigqueueinfo, sys_sigaltstack,
-            sys_signalfd4, sys_tgkill, sys_tkill, sys_wait4, sys_waitid,
-        },
-        syscalls::{
-            misc::{
-                sys_getrandom, sys_perf_event_open, sys_personality, sys_reboot, sys_sched_yield,
-                sys_setdomainname, sys_sethostname, sys_sysinfo, sys_uname, sys_unknown,
-            },
-            time::{
-                sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_getitimer,
-                sys_gettimeofday, sys_nanosleep, sys_setitimer, sys_settimeofday, sys_timer_create,
-                sys_timer_delete, sys_timer_getoverrun, sys_timer_gettime, sys_timer_settime,
-                sys_times,
-            },
-        },
-        task::syscalls::{
-            sys_capget, sys_capset, sys_clone3, sys_execve, sys_execveat, sys_exit, sys_exit_group,
-            sys_getcpu, sys_getegid, sys_geteuid, sys_getgid, sys_getgroups, sys_getpgid,
-            sys_getpid, sys_getppid, sys_getpriority, sys_getresgid, sys_getresuid, sys_getrlimit,
-            sys_getrusage, sys_getsid, sys_gettid, sys_getuid, sys_ioprio_set, sys_kcmp, sys_prctl,
-            sys_prlimit64, sys_ptrace, sys_quotactl, sys_sched_get_priority_max,
-            sys_sched_get_priority_min, sys_sched_getaffinity, sys_sched_getparam,
-            sys_sched_getscheduler, sys_sched_setaffinity, sys_sched_setparam,
-            sys_sched_setscheduler, sys_seccomp, sys_set_tid_address, sys_setfsgid, sys_setfsuid,
-            sys_setgid, sys_setgroups, sys_setns, sys_setpgid, sys_setpriority, sys_setregid,
-            sys_setresgid, sys_setresuid, sys_setreuid, sys_setrlimit, sys_setsid, sys_setuid,
-            sys_swapoff, sys_swapon, sys_syslog, sys_unshare, sys_vhangup,
-        },
-        vfs::{
-            socket::syscalls::{
-                sys_accept, sys_accept4, sys_bind, sys_connect, sys_getpeername, sys_getsockname,
-                sys_getsockopt, sys_listen, sys_recvfrom, sys_recvmmsg, sys_recvmsg, sys_sendmmsg,
-                sys_sendmsg, sys_sendto, sys_setsockopt, sys_shutdown, sys_socket, sys_socketpair,
-            },
-            syscalls::{
-                sys_chdir, sys_chroot, sys_close, sys_close_range, sys_copy_file_range, sys_dup,
-                sys_dup3, sys_epoll_create1, sys_epoll_ctl, sys_epoll_pwait, sys_epoll_pwait2,
-                sys_eventfd2, sys_faccessat, sys_faccessat2, sys_fadvise64, sys_fallocate,
-                sys_fchdir, sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fcntl,
-                sys_fdatasync, sys_fgetxattr, sys_flistxattr, sys_flock, sys_fremovexattr,
-                sys_fsetxattr, sys_fstat, sys_fstatfs, sys_fsync, sys_ftruncate, sys_getcwd,
-                sys_getdents64, sys_getxattr, sys_inotify_add_watch, sys_inotify_init1,
-                sys_inotify_rm_watch, sys_io_cancel, sys_io_destroy, sys_io_getevents,
-                sys_io_setup, sys_io_submit, sys_ioctl, sys_lgetxattr, sys_linkat, sys_listxattr,
-                sys_llistxattr, sys_lremovexattr, sys_lseek, sys_lsetxattr, sys_memfd_create,
-                sys_mkdirat, sys_mknodat, sys_mount, sys_newfstatat, sys_openat, sys_openat2,
-                sys_pidfd_getfd, sys_pidfd_open, sys_pipe2, sys_ppoll, sys_pread64, sys_preadv,
-                sys_preadv2, sys_pselect6, sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read,
-                sys_readahead, sys_readlinkat, sys_readv, sys_removexattr, sys_renameat2,
-                sys_sendfile, sys_setxattr, sys_splice, sys_statfs, sys_statx, sys_symlinkat,
-                sys_sync, sys_sync_file_range, sys_syncfs, sys_tee, sys_timerfd_create,
-                sys_timerfd_gettime, sys_timerfd_settime, sys_truncate, sys_umask, sys_umount2,
-                sys_unlinkat, sys_utimensat, sys_vmsplice, sys_write, sys_writev,
-            },
-        },
+    use crate::bpf::syscalls::sys_bpf;
+    use crate::mm::syscalls::{
+        sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mincore,
+        sys_mlock, sys_mlockall, sys_mmap, sys_mprotect, sys_mremap, sys_msync, sys_munlock,
+        sys_munmap, sys_process_mrelease, sys_process_vm_readv, sys_process_vm_writev,
+        sys_set_robust_list,
+    };
+    use crate::signals::syscalls::{
+        sys_kill, sys_pidfd_send_signal, sys_restart_syscall, sys_rt_sigaction, sys_rt_sigpending,
+        sys_rt_sigprocmask, sys_rt_sigqueueinfo, sys_rt_sigreturn, sys_rt_sigsuspend,
+        sys_rt_sigtimedwait, sys_rt_tgsigqueueinfo, sys_sigaltstack, sys_signalfd4, sys_tgkill,
+        sys_tkill, sys_wait4, sys_waitid,
+    };
+    use crate::syscalls::misc::{
+        sys_getrandom, sys_perf_event_open, sys_personality, sys_reboot, sys_sched_yield,
+        sys_setdomainname, sys_sethostname, sys_sysinfo, sys_uname, sys_unknown,
+    };
+    use crate::syscalls::time::{
+        sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_getitimer, sys_gettimeofday,
+        sys_nanosleep, sys_setitimer, sys_settimeofday, sys_timer_create, sys_timer_delete,
+        sys_timer_getoverrun, sys_timer_gettime, sys_timer_settime, sys_times,
+    };
+    use crate::task::syscalls::{
+        sys_capget, sys_capset, sys_clone3, sys_execve, sys_execveat, sys_exit, sys_exit_group,
+        sys_getcpu, sys_getegid, sys_geteuid, sys_getgid, sys_getgroups, sys_getpgid, sys_getpid,
+        sys_getppid, sys_getpriority, sys_getresgid, sys_getresuid, sys_getrlimit, sys_getrusage,
+        sys_getsid, sys_gettid, sys_getuid, sys_ioprio_set, sys_kcmp, sys_prctl, sys_prlimit64,
+        sys_ptrace, sys_quotactl, sys_sched_get_priority_max, sys_sched_get_priority_min,
+        sys_sched_getaffinity, sys_sched_getparam, sys_sched_getscheduler, sys_sched_setaffinity,
+        sys_sched_setparam, sys_sched_setscheduler, sys_seccomp, sys_set_tid_address, sys_setfsgid,
+        sys_setfsuid, sys_setgid, sys_setgroups, sys_setns, sys_setpgid, sys_setpriority,
+        sys_setregid, sys_setresgid, sys_setresuid, sys_setreuid, sys_setrlimit, sys_setsid,
+        sys_setuid, sys_swapoff, sys_swapon, sys_syslog, sys_unshare, sys_vhangup,
+    };
+    use crate::vfs::socket::syscalls::{
+        sys_accept, sys_accept4, sys_bind, sys_connect, sys_getpeername, sys_getsockname,
+        sys_getsockopt, sys_listen, sys_recvfrom, sys_recvmmsg, sys_recvmsg, sys_sendmmsg,
+        sys_sendmsg, sys_sendto, sys_setsockopt, sys_shutdown, sys_socket, sys_socketpair,
+    };
+    use crate::vfs::syscalls::{
+        sys_chdir, sys_chroot, sys_close, sys_close_range, sys_copy_file_range, sys_dup, sys_dup3,
+        sys_epoll_create1, sys_epoll_ctl, sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2,
+        sys_faccessat, sys_faccessat2, sys_fadvise64, sys_fallocate, sys_fchdir, sys_fchmod,
+        sys_fchmodat, sys_fchown, sys_fchownat, sys_fcntl, sys_fdatasync, sys_fgetxattr,
+        sys_flistxattr, sys_flock, sys_fremovexattr, sys_fsetxattr, sys_fstat, sys_fstatfs,
+        sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64, sys_getxattr, sys_inotify_add_watch,
+        sys_inotify_init1, sys_inotify_rm_watch, sys_io_cancel, sys_io_destroy, sys_io_getevents,
+        sys_io_setup, sys_io_submit, sys_ioctl, sys_lgetxattr, sys_linkat, sys_listxattr,
+        sys_llistxattr, sys_lremovexattr, sys_lseek, sys_lsetxattr, sys_memfd_create, sys_mkdirat,
+        sys_mknodat, sys_mount, sys_newfstatat, sys_openat, sys_openat2, sys_pidfd_getfd,
+        sys_pidfd_open, sys_pipe2, sys_ppoll, sys_pread64, sys_preadv, sys_preadv2, sys_pselect6,
+        sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read, sys_readahead, sys_readlinkat,
+        sys_readv, sys_removexattr, sys_renameat2, sys_sendfile, sys_setxattr, sys_splice,
+        sys_statfs, sys_statx, sys_symlinkat, sys_sync, sys_sync_file_range, sys_syncfs, sys_tee,
+        sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime, sys_truncate, sys_umask,
+        sys_umount2, sys_unlinkat, sys_utimensat, sys_vmsplice, sys_write, sys_writev,
     };
 
     #[cfg(target_arch = "aarch64")]

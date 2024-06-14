@@ -31,12 +31,10 @@ impl<L: Diagnostics, R: Diagnostics> Diagnostics for CompositeDiagnostics<L, R> 
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::diagnostics::FakeDiagnostics,
-        crate::enums::{ClockUpdateReason, Role, TimeSourceError, Track},
-        std::sync::Arc,
-    };
+    use super::*;
+    use crate::diagnostics::FakeDiagnostics;
+    use crate::enums::{ClockUpdateReason, Role, TimeSourceError, Track};
+    use std::sync::Arc;
 
     const UPDATE_EVENT: Event =
         Event::UpdateClock { track: Track::Monitor, reason: ClockUpdateReason::TimeStep };

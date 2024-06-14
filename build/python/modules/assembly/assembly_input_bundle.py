@@ -37,6 +37,7 @@ from .package_manifest import BlobEntry, PackageManifest, SubpackageEntry
 __all__ = [
     "AIBCreator",
     "AssemblyInputBundle",
+    "AssemblyInputBundleCreationException",
     "ConfigDataEntries",
     "DriverDetails",
     "PackageDetails",
@@ -403,7 +404,7 @@ class AIBCreator:
 
     package_url_template = "{repository}/{package_name}"
 
-    def __init__(self, outdir: FilePath):
+    def __init__(self, outdir: FilePath) -> None:
         # The directory to create the AIB in.  The manifest will be placed in
         # the root of this dir.
         self.outdir = outdir

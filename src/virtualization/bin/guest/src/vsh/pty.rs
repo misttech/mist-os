@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_hardware_pty as fpty,
-    fuchsia_zircon::{self as zx, HandleBased},
-    std::os::fd::{AsFd, AsRawFd, BorrowedFd},
-};
+use anyhow::{Context, Result};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_hardware_pty as fpty;
+use fuchsia_zircon::{self as zx, HandleBased};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd};
 
 /// This function attempts to determine whether the given `fd` is a pty. If it is a pty then the
 /// corresponding fuchsia.hardware.pty.Device proxy is returned as well as an eventpair for
@@ -135,8 +133,7 @@ mod test {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
     use fuchsia_async as fasync;
-    use futures::FutureExt;
-    use futures::StreamExt;
+    use futures::{FutureExt, StreamExt};
 
     const DEFAULT_WIN_SIZE: fpty::WindowSize = fpty::WindowSize { width: 99, height: 29 };
 

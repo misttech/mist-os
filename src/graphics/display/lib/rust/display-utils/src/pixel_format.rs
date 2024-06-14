@@ -4,9 +4,9 @@
 
 #![allow(non_upper_case_globals)]
 
-use fidl_fuchsia_images2 as images2;
+use std::{fmt, str};
 use thiserror::Error;
-use {fidl_fuchsia_sysmem as sysmem, std::fmt, std::str};
+use {fidl_fuchsia_images2 as images2, fidl_fuchsia_sysmem as sysmem};
 
 /// Pixel format definitions that bridge different versions of sysmem / images2
 /// formats Fuchsia uses for display and GPU drivers' internal image type

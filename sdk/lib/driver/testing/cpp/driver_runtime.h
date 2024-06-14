@@ -11,8 +11,8 @@
 #include <lib/fit/function.h>
 #include <lib/fpromise/bridge.h>
 
-#include <future>
 #include <list>
+#include <set>
 
 namespace fdf_testing {
 
@@ -81,6 +81,15 @@ class DriverRuntime final {
   // It should be the same dispatcher that the dut (driver under test) was created with.
   // If a nullptr is given then there will not be a current dispatcher context after this returns.
   void ShutdownAllDispatchers(fdf_dispatcher_t* dut_initial_dispatcher);
+
+  // Shuts down the foreground dispatcher and runs the given closure afterwards in the context of
+  // the dispatcher. Creates a new foreground dispatcher to replace it.
+  // Returns when the shutdown has completed fully and the new dispatcher is created.
+  void ResetForegroundDispatcher(fit::closure post_shutdown);
+
+  // Shuts down the given dispatcher and runs the given closure afterwards in the context of
+  // the dispatcher. Returns when the shutdown has completed fully.
+  void ShutdownBackgroundDispatcher(fdf_dispatcher_t* dispatcher, fit::closure post_shutdown);
 
   // Runs the foreground dispatcher until it is quit.
   void Run();
@@ -215,8 +224,10 @@ class DriverRuntime final {
   // We will use this ensure calls are being made only on the main thread.
   std::thread::id initial_thread_id;
 
-  fdf_internal::TestSynchronizedDispatcher foreground_dispatcher_;
+  // This is an optional so we can replace it through |ResetForegroundDispatcher|.
+  std::optional<fdf_internal::TestSynchronizedDispatcher> foreground_dispatcher_;
   std::list<fdf_internal::TestSynchronizedDispatcher> background_dispatchers_;
+  std::set<const void*> shutdown_background_dispatcher_owners_;
 
   // We will use this prevent doing ShutdownAllDispatchers multiple times.
   bool is_shutdown_ = false;
@@ -229,7 +240,7 @@ class DriverRuntime final {
 
 template <typename PromiseType>
 typename PromiseType::result_type DriverRuntime::RunPromise(PromiseType promise) {
-  async::Executor e(foreground_dispatcher_.dispatcher());
+  async::Executor e(foreground_dispatcher_->dispatcher());
   cpp17::optional<typename PromiseType::result_type> res;
   e.schedule_task(
       promise.then([&res](typename PromiseType::result_type& v) { res = std::move(v); }));

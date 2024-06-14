@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        io::{Directory, RemoteDirectory},
-        path::RemoteComponentStoragePath,
-    },
-    anyhow::{anyhow, Result},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_sys2::StorageAdminProxy,
-};
+use crate::io::{Directory, RemoteDirectory};
+use crate::path::RemoteComponentStoragePath;
+use anyhow::{anyhow, Result};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_sys2::StorageAdminProxy;
 
 /// Delete a file component's storage.
 ///
@@ -54,10 +50,10 @@ pub async fn delete(storage_admin: StorageAdminProxy, path: String) -> Result<()
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, crate::storage::test::setup_fake_storage_admin, fidl_fuchsia_io as fio,
-        futures::TryStreamExt,
-    };
+    use super::*;
+    use crate::storage::test::setup_fake_storage_admin;
+    use fidl_fuchsia_io as fio;
+    use futures::TryStreamExt;
 
     pub fn dirents(names: Vec<&'static str>) -> Vec<u8> {
         let mut bytes = vec![];

@@ -4,11 +4,9 @@
 
 use rustfix::diagnostics::Diagnostic;
 
-use std::{
-    collections::{HashMap, HashSet},
-    io::BufRead,
-    process::Command,
-};
+use std::collections::{HashMap, HashSet};
+use std::io::BufRead;
+use std::process::Command;
 
 use crate::span::Span;
 

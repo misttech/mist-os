@@ -11,8 +11,10 @@ from pathlib import Path
 from enum import Enum
 import subprocess
 import os
+import re
 
 _CPP_EXTENSIONS = [".cc", ".c", ".cpp"]
+_OPT_PATTERN = re.compile("[\W]+")
 
 
 class Action:
@@ -64,6 +66,15 @@ class CompDBFormatter:
         # of the fuchisa source tree.
         if file_path == ".":
             return "../../"
+
+        # There are actions which are external that reference cc_libraries which
+        # are defined as part of the main workspace, mostly @internal_sdk targets.
+        # The files they reference are mainly in the //sdk directory so we need
+        # to rewrite the path and treat them as local files.
+        # In the future we will likely need to do this for other cc_library targets
+        # that are outside of the SDK directory and will need to find a better solution.
+        if file_path.startswith("sdk/"):
+            return "../../" + file_path
 
         # bazel-out needs to be checked first because it contains external/ paths
         if "bazel-out/" in file_path:
@@ -134,6 +145,17 @@ def collect_actions(action_graph: Sequence[Dict]) -> Sequence[Action]:
     return actions
 
 
+def compilation_mode(args: Sequence[str]) -> str:
+    # sometimes the optimization is escape quoted so we clean it up.
+    opt = _OPT_PATTERN.sub("", args.optimization)
+    if opt == "debug":
+        return "--compilation_mode=dbg"
+    elif opt in ["size", "speed", "profile", "size_lto"]:
+        return "--compilation_mode=opt"
+    else:
+        return "--compilation_mode=fastbuild"
+
+
 def main(argv: Sequence[str]):
     parser = argparse.ArgumentParser(description="Refresh bazel compdb")
 
@@ -144,17 +166,22 @@ def main(argv: Sequence[str]):
     parser.add_argument(
         "--label", required=True, help="The bazel label to query"
     )
+    parser.add_argument(
+        "--optimization", required=True, help="The build level optimization"
+    )
     args = parser.parse_args(argv)
 
-    # TODO: make bazel not print output
     action_graph = json.loads(
         run(
             args.bazel,
             "aquery",
             "mnemonic('CppCompile',deps({label}))".format(label=args.label),
+            compilation_mode(args),
             "--output=jsonproto",
-            "--ui_event_filters=-info",
+            "--ui_event_filters=-info,-warning",
+            "--noshow_loading_progress",
             "--noshow_progress",
+            "--show_result=0",
         )
     )
 

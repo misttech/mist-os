@@ -4,12 +4,10 @@
 
 use nix::unistd::{self, Pid};
 use serde::{Deserialize, Serialize};
-use std::{
-    fs::{remove_file, File, Metadata, OpenOptions},
-    io::{ErrorKind, Write},
-    path::{Path, PathBuf},
-    time::{Duration, Instant, SystemTime},
-};
+use std::fs::{remove_file, File, Metadata, OpenOptions};
+use std::io::{ErrorKind, Write};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant, SystemTime};
 use tracing::{error, info, warn};
 
 /// Opens and controls a lockfile against a specific filename using create-only
@@ -19,7 +17,7 @@ use tracing::{error, info, warn};
 #[derive(Debug)]
 pub struct Lockfile {
     path: PathBuf,
-    handle: File,
+    handle: Option<File>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -154,16 +152,15 @@ impl Lockfile {
             .create_new(true)
             .write(true)
             .open(&lock_path)
-            .and_then(|handle| {
+            .and_then(|mut handle| {
                 // but then once we've got the file, if we write to it and fail somehow
                 // we have to clean up after ourselves, so immediately create the Lockfile
                 // object, that way if we fail to write to it it will clean up after itself
                 // in drop().
                 let path = lock_path.to_owned();
-                let mut lock_file = Self { handle, path };
-                context.write_to(&lock_file.handle)?;
-                lock_file.handle.flush()?;
-                Ok(lock_file)
+                context.write_to(&handle)?;
+                handle.flush()?;
+                Ok(Self { handle: Some(handle), path })
             })
             .map_err(|e| LockfileCreateError::new(lock_path, e))
     }
@@ -242,7 +239,11 @@ impl Lockfile {
     }
 
     /// Explicitly remove the lockfile and consume the lockfile object
-    pub fn unlock(self) -> Result<(), std::io::Error> {
+    pub fn unlock(mut self) -> Result<(), std::io::Error> {
+        // Explicitly close the file handle so that the drop impl won't also try to remove the
+        // lockfile.
+        drop(self.handle.take());
+
         Self::raw_unlock(&self.path)
     }
 
@@ -253,9 +254,14 @@ impl Lockfile {
 
 impl Drop for Lockfile {
     fn drop(&mut self) {
-        if let Err(e) = Self::raw_unlock(&self.path) {
-            // in Drop we can't really do much about this, so just warn about it
-            warn!("Error removing lockfile {name}: {e:#?}", name = self.path.display());
+        // Only delete the lockfile if we haven't been explicitly unlocked.
+        if let Some(handle) = self.handle.take() {
+            drop(handle);
+
+            if let Err(e) = Self::raw_unlock(&self.path) {
+                // in Drop we can't really do much about this, so just warn about it
+                warn!("Error removing lockfile {name}: {e:#?}", name = self.path.display());
+            }
         }
     }
 }
@@ -263,6 +269,7 @@ impl Drop for Lockfile {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::io::{Read, Seek, Write};
 
     #[test]
     fn create_lockfile_works() -> Result<(), anyhow::Error> {
@@ -436,5 +443,54 @@ mod test {
         lock.unlock().expect("Unlock should have succeeded even though lock file was already gone");
 
         Ok(())
+    }
+
+    #[test]
+    fn unlock_does_not_cause_a_race() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let lockfile_path = dir.path().join("lock");
+        let counter_path = dir.path().join("counter");
+
+        std::fs::write(&counter_path, "0").unwrap();
+
+        let thread_count = 128;
+        let mut threads = vec![];
+
+        for _i in 0..thread_count {
+            let lockfile_path = lockfile_path.clone();
+            let counter_path = counter_path.clone();
+
+            let thread = std::thread::spawn(move || {
+                let lockfile = futures::executor::block_on(async {
+                    Lockfile::lock_for(&lockfile_path, Duration::from_secs(10)).await.unwrap()
+                });
+
+                let mut file =
+                    OpenOptions::new().read(true).write(true).open(counter_path).unwrap();
+
+                // Read the contents.
+                let mut contents = String::new();
+                file.read_to_string(&mut contents).unwrap();
+                let counter: u64 = contents.parse().unwrap();
+
+                // Increment the contents.
+                file.rewind().unwrap();
+                file.write_all((counter + 1).to_string().as_bytes()).unwrap();
+
+                // Explicitly release the lock.
+                lockfile.unlock().unwrap();
+            });
+
+            threads.push(thread);
+        }
+
+        for thread in threads {
+            thread.join().unwrap();
+        }
+
+        let contents = std::fs::read_to_string(&counter_path).unwrap();
+        let counter: u64 = contents.parse().unwrap();
+
+        assert_eq!(counter, thread_count);
     }
 }

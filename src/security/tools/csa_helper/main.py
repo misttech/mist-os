@@ -32,7 +32,7 @@ import time
 import helper as color
 
 
-def main(input_args):
+def main(input_args: list[str]) -> int:
     parser = argparse.ArgumentParser(
         description="Runs `fx ninja build` on a set of targets for compile translation units "
         "and determines which files were modified since that change."
@@ -70,7 +70,9 @@ def main(input_args):
     return 0
 
 
-def ninja_build_tu(compdb, ninja_path):
+def ninja_build_tu(
+    compdb: list[dict[str, str]], ninja_path: str
+) -> list[dict[str, str]]:
     """Find build targets that were modified since last build.
 
     Attemps to build all build targets specified, returning the subset
@@ -87,8 +89,8 @@ def ninja_build_tu(compdb, ninja_path):
         that correspond to build targets that had been modified by the
         `ninja` call.
     """
-    files = {}
-    tus = {}
+    files: dict[str, list[str]] = {}
+    tus: dict[str, list[dict[str, str]]] = {}
     # Find all TU targets
     for tu in compdb:
         directory = tu["directory"]
@@ -120,8 +122,8 @@ def ninja_build_tu(compdb, ninja_path):
 
     # Find all TUs that match modified files
     out_tus = []
-    for files in modified_files:
-        for target in files:
+    for _files in modified_files:
+        for target in _files:
             if target in tus:
                 out_tus.extend(tus[target])
             else:
@@ -131,7 +133,9 @@ def ninja_build_tu(compdb, ninja_path):
     return out_tus
 
 
-def process_tu_dir_xargs(directory, build_targets, ninja_path):
+def process_tu_dir_xargs(
+    directory: str, build_targets: list[str], ninja_path: str
+) -> list[str]:
     """Find build targets that were rebuilt.
 
     Takes an input directory (corresponding to the -C option in fx ninja) and
@@ -166,7 +170,8 @@ def process_tu_dir_xargs(directory, build_targets, ninja_path):
             subprocess.run(commands, capture_output=True, check=True)
         except subprocess.CalledProcessError as err:
             print(
-                color.red("Failed with exit code"), color.white(err.returncode)
+                color.red("Failed with exit code"),
+                color.white(str(err.returncode)),
             )
             print(color.red(err.stderr))
             sys.exit("Error in fx ninja.")

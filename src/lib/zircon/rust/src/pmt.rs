@@ -4,8 +4,7 @@
 
 //! Type-safe bindings for Zircon pmt objects.
 
-use crate::ok;
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Status};
+use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Status};
 use fuchsia_zircon_sys as sys;
 use std::mem;
 

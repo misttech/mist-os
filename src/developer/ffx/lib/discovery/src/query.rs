@@ -1,7 +1,8 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{desc::Description, DiscoverySources};
+use crate::desc::Description;
+use crate::DiscoverySources;
 use addr::TargetAddr;
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetInfo, TargetIp, TargetIpPort};
 use fidl_fuchsia_net as net;
@@ -12,6 +13,7 @@ pub enum TargetInfoQuery {
     /// Attempts to match the nodename, falling back to serial (in that order).
     /// TODO(b/299345828): Make this an exact match by default, fall back to substring matching
     NodenameOrSerial(String),
+    Serial(String),
     Addr(SocketAddr),
     First,
 }
@@ -47,6 +49,7 @@ impl TargetInfoQuery {
     }
 
     pub fn match_description(&self, t: &Description) -> bool {
+        tracing::debug!("Matching description {t:?} against query {self:?}");
         match self {
             Self::NodenameOrSerial(arg) => {
                 if let Some(ref nodename) = t.nodename {
@@ -54,8 +57,18 @@ impl TargetInfoQuery {
                         return true;
                     }
                 }
+                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial {
-                    if serial.contains(arg) {
+                    if serial == arg {
+                        return true;
+                    }
+                }
+                false
+            }
+            Self::Serial(arg) => {
+                // Serial numbers require an exact match
+                if let Some(ref serial) = t.serial {
+                    if serial == arg {
                         return true;
                     }
                 }
@@ -78,8 +91,18 @@ impl TargetInfoQuery {
                         return true;
                     }
                 }
+                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial_number {
-                    if serial.contains(arg) {
+                    if serial == arg {
+                        return true;
+                    }
+                }
+                false
+            }
+            Self::Serial(arg) => {
+                // Serial numbers require an exact match
+                if let Some(ref serial) = t.serial_number {
+                    if serial == arg {
                         return true;
                     }
                 }
@@ -113,6 +136,7 @@ impl TargetInfoQuery {
             TargetInfoQuery::Addr(_) => {
                 DiscoverySources::MDNS | DiscoverySources::MANUAL | DiscoverySources::EMULATOR
             }
+            TargetInfoQuery::Serial(_) => DiscoverySources::USB,
             _ => {
                 DiscoverySources::MDNS
                     | DiscoverySources::MANUAL
@@ -146,6 +170,12 @@ impl From<String> for TargetInfoQuery {
         if s == "" {
             return Self::First;
         }
+        if s.starts_with("serial:") {
+            // "serial:" is used when we _know_ something is a serial number,
+            // and want to to preserve that across the client/daemon boundary
+            return Self::Serial(String::from(&s[7..]));
+        }
+
         let (addr, scope, port) = match netext::parse_address_parts(s.as_str()) {
             Ok(r) => r,
             Err(e) => {
@@ -221,6 +251,21 @@ mod test {
             sources,
             DiscoverySources::MDNS | DiscoverySources::MANUAL | DiscoverySources::EMULATOR
         );
+
+        // Serial # should only use USB source
+        let query = TargetInfoQuery::from("serial:abcdef");
+        let sources = query.discovery_sources();
+        assert_eq!(sources, DiscoverySources::USB);
+    }
+
+    #[test]
+    fn test_serial_query() {
+        let serial = "abcdef";
+        let q = TargetInfoQuery::from(format!("serial:{serial}"));
+        match q {
+            TargetInfoQuery::Serial(s) if s == serial => {}
+            _ => panic!("parsing of serial query failed"),
+        }
     }
 
     #[test]

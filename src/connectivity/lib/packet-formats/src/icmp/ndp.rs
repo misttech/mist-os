@@ -8,10 +8,8 @@ use core::num::NonZeroU8;
 use core::time::Duration;
 
 use net_types::ip::{Ipv6, Ipv6Addr};
-use zerocopy::{
-    byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned,
-};
+use zerocopy::byteorder::network_endian::{U16, U32};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned};
 
 use crate::icmp::{IcmpIpExt, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode};
 use crate::utils::NonZeroDuration;

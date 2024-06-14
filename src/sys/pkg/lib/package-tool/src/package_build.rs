@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        args::PackageBuildCommand, to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME,
-        PACKAGE_MANIFEST_NAME,
-    },
-    anyhow::{Context as _, Result},
-    fuchsia_pkg::{
-        PackageBuildManifest, PackageBuilder, SubpackagesBuildManifest,
-        SubpackagesBuildManifestEntry, SubpackagesBuildManifestEntryKind,
-    },
-    std::{
-        collections::BTreeSet,
-        fs::{create_dir_all, File},
-        io::{BufReader, BufWriter, Write},
-    },
-    tempfile::NamedTempFile,
-    tempfile_ext::NamedTempFileExt as _,
+use crate::args::PackageBuildCommand;
+use crate::{to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME, PACKAGE_MANIFEST_NAME};
+use anyhow::{Context as _, Result};
+use fuchsia_pkg::{
+    PackageBuildManifest, PackageBuilder, SubpackagesBuildManifest, SubpackagesBuildManifestEntry,
+    SubpackagesBuildManifestEntryKind,
 };
+use std::collections::BTreeSet;
+use std::fs::{create_dir_all, File};
+use std::io::{BufReader, BufWriter, Write};
+use tempfile::NamedTempFile;
+use tempfile_ext::NamedTempFileExt as _;
 
 const META_FAR_NAME: &str = "meta.far";
 const META_FAR_DEPFILE_NAME: &str = "meta.far.d";
@@ -168,20 +162,16 @@ pub async fn cmd_package_build_with_history(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::convert_to_depfile_filepath,
-        camino::{Utf8Path, Utf8PathBuf},
-        fuchsia_pkg::{MetaPackage, MetaSubpackages},
-        fuchsia_url::RelativePackageUrl,
-        pretty_assertions::assert_eq,
-        std::{
-            collections::BTreeMap,
-            convert::TryInto as _,
-            fs::{read_dir, read_to_string},
-        },
-        version_history::{AbiRevision, ApiLevel, Status, Version, VersionHistory},
-    };
+    use super::*;
+    use crate::convert_to_depfile_filepath;
+    use camino::{Utf8Path, Utf8PathBuf};
+    use fuchsia_pkg::{MetaPackage, MetaSubpackages};
+    use fuchsia_url::RelativePackageUrl;
+    use pretty_assertions::assert_eq;
+    use std::collections::BTreeMap;
+    use std::convert::TryInto as _;
+    use std::fs::{read_dir, read_to_string};
+    use version_history::{AbiRevision, ApiLevel, Status, Version, VersionHistory};
 
     pub const FAKE_VERSION_HISTORY: VersionHistory = VersionHistory::new(&[
         Version {

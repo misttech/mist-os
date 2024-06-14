@@ -100,7 +100,6 @@ set -x
 
 # Disabling debuginfo speeds up the build by about 8%.
 $fx set \
-    --no-goma \
     --args "rustc_prefix = \"$rust_prefix\"" \
     --args "rustc_version_string = \"$version_string\"" \
     --args 'rust_cap_lints = "warn"' \

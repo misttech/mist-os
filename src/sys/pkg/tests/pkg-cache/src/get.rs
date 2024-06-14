@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        blob_written, compress_and_write_blob, get_and_verify_package, get_and_verify_packages,
-        get_missing_blobs, TestEnv,
-    },
-    assert_matches::assert_matches,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker},
-    fidl_fuchsia_pkg_ext::{self as fpkg_ext, BlobId},
-    fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
-    fuchsia_zircon::Status,
-    futures::prelude::*,
+use crate::{
+    blob_written, compress_and_write_blob, get_and_verify_package, get_and_verify_packages,
+    get_missing_blobs, TestEnv,
 };
+use assert_matches::assert_matches;
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker};
+use fidl_fuchsia_pkg_ext::{self as fpkg_ext, BlobId};
+use fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder};
+use fuchsia_zircon::Status;
+use futures::prelude::*;
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn get_multiple_packages_with_no_content_blobs() {

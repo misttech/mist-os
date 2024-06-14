@@ -4,20 +4,15 @@
 
 //! An implementation of a server for a fidl interface.
 
-use {
-    crate::{
-        encoding::{
-            DynamicFlags, EmptyStruct, Encode, Encoder, Flexible, FlexibleType, FrameworkErr,
-            TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
-        },
-        epitaph,
-        handle::HandleDisposition,
-        AsyncChannel, Error, HandleInfo,
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::task::{AtomicWaker, Context},
-    std::sync::atomic::{self, AtomicBool},
+use crate::encoding::{
+    DynamicFlags, EmptyStruct, Encode, Encoder, Flexible, FlexibleType, FrameworkErr,
+    TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
 };
+use crate::handle::HandleDisposition;
+use crate::{epitaph, AsyncChannel, Error, HandleInfo};
+use fuchsia_zircon_status as zx_status;
+use futures::task::{AtomicWaker, Context};
+use std::sync::atomic::{self, AtomicBool};
 
 /// A type used from the innards of server implementations.
 #[derive(Debug)]

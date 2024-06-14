@@ -2,24 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::{
-    core::{Core, Object, ObjectRef, OnAdded, Property, TryFromU64},
-    math::Mat,
-    option_cell::OptionCell,
-    renderer::{StrokeStyle, Style},
-    shapes::{
-        paint::{
-            shape_paint_mutator::ShapePaintMutator,
-            stroke_effect::{self, StrokeEffect},
-            ShapePaint,
-        },
-        path_space::PathSpace,
-        CommandPath, MetricsPath,
-    },
-    RenderPaint, Renderer,
-};
+use crate::core::{Core, Object, ObjectRef, OnAdded, Property, TryFromU64};
+use crate::math::Mat;
+use crate::option_cell::OptionCell;
+use crate::renderer::{StrokeStyle, Style};
+use crate::shapes::paint::shape_paint_mutator::ShapePaintMutator;
+use crate::shapes::paint::stroke_effect::{self, StrokeEffect};
+use crate::shapes::paint::ShapePaint;
+use crate::shapes::path_space::PathSpace;
+use crate::shapes::{CommandPath, MetricsPath};
+use crate::{RenderPaint, Renderer};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StrokeCap {

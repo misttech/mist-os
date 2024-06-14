@@ -4,12 +4,13 @@
 # found in the LICENSE file.
 """Tests for GnLicenseMetadataDB and friends."""
 
-from gn_license_metadata import GnLicenseMetadataDB, GnLabel, GnLicenseMetadata
+from gn_label import GnLabel
+from gn_license_metadata import GnLicenseMetadataDB, GnLicenseMetadata
 import unittest
 
 
 class GnLicenseMetadataDBTest(unittest.TestCase):
-    def test_load_from_list(self):
+    def test_load_from_list(self) -> None:
         fuchsia_source_path = "/absolute/path/to/fuchsia/dir"
 
         input = [

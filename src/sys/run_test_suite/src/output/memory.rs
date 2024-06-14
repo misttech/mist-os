@@ -7,7 +7,10 @@ use crate::output::{
     EntityId, EntityInfo, ReportedOutcome, Reporter, Timestamp,
 };
 use fuchsia_sync::Mutex;
-use std::{collections::HashMap, io::Error, io::Write, path::Path, path::PathBuf, sync::Arc};
+use std::collections::HashMap;
+use std::io::{Error, Write};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// A reporter that acts as a data sink and stores results for inspection in memory.
 ///

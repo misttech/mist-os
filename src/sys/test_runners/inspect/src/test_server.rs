@@ -2,24 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::error::ComponentError;
+use crate::eval::EvaluationContext;
+use crate::spec::{Accessor, ProgramSpec};
+use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use fidl::endpoints::ServerEnd;
+use fuchsia_component::client;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_zircon::{Duration, Status, Time};
+use futures::channel::oneshot;
+use futures::future::{abortable, select, Either};
+use futures::{pin_mut, select, stream, FutureExt, StreamExt, TryStreamExt};
+use std::sync::Arc;
+use tracing::warn;
 use {
-    crate::error::ComponentError,
-    crate::eval::EvaluationContext,
-    crate::spec::{Accessor, ProgramSpec},
-    diagnostics_reader::{ArchiveReader, Inspect, RetryConfig},
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_io as fio, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
-    fuchsia_component::client,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon::{Duration, Status, Time},
-    futures::{
-        channel::oneshot,
-        future::{abortable, select, Either},
-        pin_mut, select, stream, FutureExt, StreamExt, TryStreamExt,
-    },
-    std::sync::Arc,
-    tracing::warn,
 };
 
 const NANOS_IN_SECONDS: f64 = 1_000_000_000.0;

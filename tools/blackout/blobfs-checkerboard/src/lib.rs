@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, blackout_host::TestEnv, ffx_core::ffx_plugin,
-    ffx_storage_blackout_blobfs_checkerboard_args::BlobfsCheckerboardCommand, std::time::Duration,
-};
+use anyhow::Result;
+use blackout_host::TestEnv;
+use ffx_core::ffx_plugin;
+use ffx_storage_blackout_blobfs_checkerboard_args::BlobfsCheckerboardCommand;
+use std::time::Duration;
 
 #[ffx_plugin("storage_dev")]
 pub async fn blobfs_checkerboard(cmd: BlobfsCheckerboardCommand) -> Result<()> {

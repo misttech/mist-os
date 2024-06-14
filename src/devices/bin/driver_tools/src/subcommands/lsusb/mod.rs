@@ -4,7 +4,9 @@
 
 pub mod args;
 
-use {anyhow::Result, args::LsusbCommand, fidl_fuchsia_io as fio};
+use anyhow::Result;
+use args::LsusbCommand;
+use fidl_fuchsia_io as fio;
 
 pub async fn lsusb(cmd: LsusbCommand, dev: &fio::DirectoryProxy) -> Result<()> {
     let (client, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;

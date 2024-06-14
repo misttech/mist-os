@@ -4,11 +4,9 @@
 
 use std::cell::Cell;
 
-use crate::{
-    bones::Weight,
-    core::{Core, ObjectRef, OnAdded, Property},
-    math,
-};
+use crate::bones::Weight;
+use crate::core::{Core, ObjectRef, OnAdded, Property};
+use crate::math;
 
 #[derive(Debug)]
 pub struct CubicWeight {

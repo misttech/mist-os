@@ -5,10 +5,9 @@
 use anyhow::{anyhow, Result};
 use async_net::unix::UnixStream;
 use async_trait::async_trait;
-use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_gpu_agis as agis;
 use protocols::prelude::*;
 use std::path::Path;
+use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_gpu_agis as agis};
 
 #[ffx_protocol]
 #[derive(Default, Debug)]

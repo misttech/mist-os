@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    futures::channel::{mpsc, oneshot},
-    thiserror::Error,
-};
+use anyhow::format_err;
+use futures::channel::{mpsc, oneshot};
+use thiserror::Error;
 
 /// Error types that may be used by the async hanging-get server.
 #[derive(Error, Debug)]

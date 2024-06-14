@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::layout;
-use crate::trampoline;
-use fidl::{
-    endpoints::{ClientEnd, Proxy},
-    HandleBased,
-};
+use crate::{layout, trampoline};
+use fidl::endpoints::{ClientEnd, Proxy};
+use fidl::HandleBased;
 use fidl_fuchsia_dash::LauncherError;
-use fidl_fuchsia_hardware_pty as pty;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_process as fproc;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_runtime::{HandleInfo as HandleId, HandleType};
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc,
+    fuchsia_zircon as zx,
+};
 
 pub mod component;
 pub mod package;

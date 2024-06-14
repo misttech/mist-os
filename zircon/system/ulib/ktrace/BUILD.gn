@@ -16,9 +16,6 @@ zx_library("ktrace") {
     "//zircon/system/ulib/zx",
   ]
   public_deps = [ "//zircon/system/ulib/svc" ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 group("tests") {

@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{format_sources, get_policy, unseal_sources, KeyConsumer},
-    crate::device::Device,
-    anyhow::{anyhow, Context, Error},
-    async_trait::async_trait,
-    device_watcher::recursive_wait_and_open,
-    fidl::endpoints::Proxy as _,
-    fidl_fuchsia_device::ControllerProxy,
-    fidl_fuchsia_hardware_block::BlockProxy,
-    fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerProxy},
-    fidl_fuchsia_hardware_block_volume::VolumeProxy,
-    fidl_fuchsia_io as fio,
-    fs_management::format::DiskFormat,
-    fuchsia_zircon as zx,
-};
+use super::{format_sources, get_policy, unseal_sources, KeyConsumer};
+use crate::device::Device;
+use anyhow::{anyhow, Context, Error};
+use async_trait::async_trait;
+use device_watcher::recursive_wait_and_open;
+use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_device::ControllerProxy;
+use fidl_fuchsia_hardware_block::BlockProxy;
+use fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerProxy};
+use fidl_fuchsia_hardware_block_volume::VolumeProxy;
+use fs_management::format::DiskFormat;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Fetches a FIDL proxy for accessing zxcrypt management protocol for a given Device.
 async fn device_to_device_manager_proxy(device: &dyn Device) -> Result<DeviceManagerProxy, Error> {

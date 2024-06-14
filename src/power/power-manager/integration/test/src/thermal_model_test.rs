@@ -5,17 +5,16 @@
 #[path = "../../../../common/lib/types.rs"]
 mod types;
 
+use named_timer::DeadlineId;
+use power_manager_integration_test_lib::{TestEnv, TestEnvBuilder};
+use test_util::assert_near;
+use tracing::info;
+use types::{Celsius, Farads, Hertz, Nanoseconds, OperatingPoint, Seconds, Volts, Watts};
 use {
     fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, fidl_fuchsia_kernel as fkernel,
     fidl_fuchsia_powermanager_driver_temperaturecontrol as ftemperaturecontrol,
     fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_testing as ftesting, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-    named_timer::DeadlineId,
-    power_manager_integration_test_lib::{TestEnv, TestEnvBuilder},
-    serde_json as json,
-    test_util::assert_near,
-    tracing::info,
-    types::{Celsius, Farads, Hertz, Nanoseconds, OperatingPoint, Seconds, Volts, Watts},
+    fuchsia_zircon as zx, serde_json as json,
 };
 
 const DEADLINE_ID: DeadlineId<'static> = DeadlineId::new("power-manager", "thermal-policy-timer");

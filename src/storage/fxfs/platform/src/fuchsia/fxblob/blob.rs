@@ -5,38 +5,27 @@
 //! This module contains the [`FxBlob`] node type used to represent an immutable blob persisted to
 //! disk which can be read back.
 
-use {
-    crate::fuchsia::{
-        directory::FxDirectory,
-        errors::map_to_status,
-        node::{FxNode, OpenedNode},
-        pager::{
-            default_page_in, MarkDirtyRange, PageInRange, PagerBacked,
-            PagerPacketReceiverRegistration,
-        },
-        volume::FxVolume,
-    },
-    anyhow::{anyhow, ensure, Context, Error},
-    fuchsia_hash::Hash,
-    fuchsia_merkle::{hash_block, MerkleTree},
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Status},
-    futures::try_join,
-    fxfs::{
-        errors::FxfsError,
-        object_handle::{ObjectHandle, ReadObjectHandle},
-        object_store::{DataObjectHandle, ObjectDescriptor},
-        round::{round_down, round_up},
-    },
-    fxfs_macros::ToWeakNode,
-    std::{
-        ops::Range,
-        sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc,
-        },
-    },
-    storage_device::buffer,
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::node::{FxNode, OpenedNode};
+use crate::fuchsia::pager::{
+    default_page_in, MarkDirtyRange, PageInRange, PagerBacked, PagerPacketReceiverRegistration,
 };
+use crate::fuchsia::volume::FxVolume;
+use anyhow::{anyhow, ensure, Context, Error};
+use fuchsia_hash::Hash;
+use fuchsia_merkle::{hash_block, MerkleTree};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Status};
+use futures::try_join;
+use fxfs::errors::FxfsError;
+use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
+use fxfs::object_store::{DataObjectHandle, ObjectDescriptor};
+use fxfs::round::{round_down, round_up};
+use fxfs_macros::ToWeakNode;
+use std::ops::Range;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use storage_device::buffer;
 
 pub const BLOCK_SIZE: u64 = fuchsia_merkle::BLOCK_SIZE as u64;
 
@@ -323,13 +312,11 @@ impl PagerBacked for FxBlob {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
-        assert_matches::assert_matches,
-        delivery_blob::CompressionMode,
-        fuchsia_async as fasync,
-    };
+    use super::*;
+    use crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture};
+    use assert_matches::assert_matches;
+    use delivery_blob::CompressionMode;
+    use fuchsia_async as fasync;
 
     #[fasync::run(10, test)]
     async fn test_empty_blob() {

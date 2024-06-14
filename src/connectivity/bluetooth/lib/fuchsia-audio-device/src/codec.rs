@@ -9,14 +9,13 @@ use fidl_fuchsia_hardware_audio::{
     CodecWatchPlugStateResponder, PlugState,
 };
 use fidl_fuchsia_hardware_audio_signalprocessing::SignalProcessingRequestStream;
-use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 use futures::stream::FusedStream;
 use futures::task::{Context, Poll};
 use futures::{Stream, StreamExt};
 use std::fmt::Debug;
 use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::types::{Error, Result};
 
@@ -277,6 +276,11 @@ impl SoftCodec {
                     // TODO(https://fxbug.dev/323576893): Support the Signal Processing connect.
                     let _ = protocol.close_with_epitaph(zx::Status::NOT_SUPPORTED);
                 }
+                IsBridgeable { responder } => {
+                    let _ = responder.send(false);
+                }
+                // Not supported, deprecated.  Ignore.
+                SetBridgedMode { .. } => {}
                 Reset { responder } => {
                     // TODO(https://fxbug.dev/324247020): Support resetting.
                     responder.control_handle().shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);

@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Error, Result},
-    blobfs_ramdisk::BlobfsRamdisk,
-    fidl::endpoints::{self, ServerEnd},
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg_test::*,
-    fidl_fuchsia_testing_harness::{OperationError, RealmProxy_RequestStream},
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
-    fuchsia_zircon as zx,
-    futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt},
-    realm_proxy::service::serve_with_proxy,
-    tracing::{error, info},
-};
+use anyhow::{bail, Error, Result};
+use blobfs_ramdisk::BlobfsRamdisk;
+use fidl::endpoints::{self, ServerEnd};
+use fidl_fuchsia_pkg_test::*;
+use fidl_fuchsia_testing_harness::{OperationError, RealmProxy_RequestStream};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder};
+use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use realm_proxy::service::serve_with_proxy;
+use tracing::{error, info};
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 // When this feature is enabled, the pkgdir tests will start Fxblob.
 #[cfg(feature = "use_fxblob")]

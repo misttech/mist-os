@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::validators::{new_validator_context_by_name, Validator},
-    anyhow::Error,
-    fidl::endpoints::DiscoverableProtocolMarker,
-    serde::Deserialize,
-    serde_json::value::Value,
-    std::{collections::HashMap, default::Default, io},
-};
+use crate::validators::{new_validator_context_by_name, Validator};
+use anyhow::Error;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use serde::Deserialize;
+use serde_json::value::Value;
+use std::collections::HashMap;
+use std::default::Default;
+use std::io;
 
 /// Type that maps a file to a group of arguments passed to a validator.
 pub type ValidatorFileArgsMap = HashMap<String, Value>;
@@ -139,7 +139,8 @@ impl Default for FactoryConfig {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, serde_json::json};
+    use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_simple_configs() {

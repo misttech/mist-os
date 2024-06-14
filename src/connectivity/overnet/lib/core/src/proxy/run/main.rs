@@ -5,9 +5,11 @@
 //! Main loops (and associated spawn functions) for proxying... handles moving data from one point
 //! to another, and calling into crate::proxy::xfer once a handle transfer is required.
 
+use super::super::handle::ReadValue;
+use super::super::stream::{
+    Frame, StreamReader, StreamReaderBinder, StreamWriter, StreamWriterBinder,
+};
 use super::super::{
-    handle::ReadValue,
-    stream::{Frame, StreamReader, StreamReaderBinder, StreamWriter, StreamWriterBinder},
     Proxy, ProxyTransferInitiationReceiver, Proxyable, ProxyableRW, RemoveFromProxyTable,
     StreamRefSender,
 };
@@ -15,7 +17,8 @@ use crate::labels::{NodeId, TransferKey};
 use crate::peer::{FramedStreamReader, FramedStreamWriter};
 use anyhow::{bail, format_err, Context as _, Error};
 use fuchsia_zircon_status as zx_status;
-use futures::{future::Either, prelude::*};
+use futures::future::Either;
+use futures::prelude::*;
 use std::sync::{Arc, Mutex};
 
 #[cfg(not(target_os = "fuchsia"))]

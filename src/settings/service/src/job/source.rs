@@ -21,16 +21,13 @@ use crate::message::base::{Audience, MessengerType};
 use crate::service::message::{Delegate, Messenger, Signature};
 use crate::trace_guard;
 use core::pin::Pin;
-use fuchsia_async as fasync;
-use fuchsia_trace as ftrace;
-use fuchsia_zircon as zx;
 use futures::lock::Mutex;
-use futures::Stream;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::sync::Arc;
 use thiserror::Error as ThisError;
+use {fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_zircon as zx};
 
 #[derive(Clone)]
 /// [Seeder] properly packages and sends [Job] source streams to a [Job] manager.

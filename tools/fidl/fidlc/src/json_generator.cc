@@ -14,6 +14,8 @@
 
 namespace fidlc {
 
+void JSONGenerator::Generate(Version version) { EmitString(version.ToString()); }
+
 void JSONGenerator::Generate(SourceSpan value) { EmitString(value.data()); }
 
 void JSONGenerator::Generate(NameSpan value) {
@@ -982,8 +984,8 @@ std::ostringstream JSONGenerator::Produce() {
     EmitObjectKey("available");
     GenerateObject([&]() {
       auto position = Position::kFirst;
-      for (auto& [platform, version] : *compilation_->version_selection_) {
-        GenerateObjectMember(platform.name(), version.ToString(), position);
+      for (auto& [platform, versions] : *compilation_->version_selection_) {
+        GenerateObjectMember(platform.name(), versions, position);
         position = Position::kSubsequent;
       };
     });

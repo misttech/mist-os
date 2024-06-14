@@ -2,25 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::recorded_request_stream::RecordedRequestStream;
+use fidl_fuchsia_wlan_mlme::EapolResultCode;
+use ieee80211::MacAddr;
+use std::sync::{Arc, Mutex};
+use wlan_common::ie::rsn::cipher::{CIPHER_BIP_CMAC_128, CIPHER_CCMP_128};
+use wlan_common::ie::rsn::rsne;
+use wlan_common::{assert_variant, bss};
+use wlan_rsn::rsna::{SecAssocUpdate, UpdateSink};
+use wlan_rsn::Authenticator;
+use zerocopy::IntoBytes;
 use {
-    crate::recorded_request_stream::RecordedRequestStream,
     fidl_fuchsia_wlan_common_security as fidl_wlan_security,
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_mlme::EapolResultCode,
-    ieee80211::MacAddr,
-    std::sync::{Arc, Mutex},
-    wlan_common::{
-        assert_variant, bss,
-        ie::rsn::{
-            cipher::{CIPHER_BIP_CMAC_128, CIPHER_CCMP_128},
-            rsne,
-        },
-    },
-    wlan_rsn::{
-        rsna::{SecAssocUpdate, UpdateSink},
-        Authenticator,
-    },
-    zerocopy::IntoBytes,
 };
 
 /// Creates a WPA2 authenticator based on the given parameters.

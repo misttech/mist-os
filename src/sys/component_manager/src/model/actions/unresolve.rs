@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        actions::{shutdown::do_shutdown, Action, ActionKey, ShutdownType},
-        component::instance::InstanceState,
-        component::ComponentInstance,
-    },
-    async_trait::async_trait,
-    errors::{ActionError, UnresolveActionError},
-    hooks::EventPayload,
-    std::sync::Arc,
-};
+use crate::model::actions::shutdown::do_shutdown;
+use crate::model::actions::{Action, ActionKey, ShutdownType};
+use crate::model::component::instance::InstanceState;
+use crate::model::component::ComponentInstance;
+use async_trait::async_trait;
+use errors::{ActionError, UnresolveActionError};
+use hooks::EventPayload;
+use std::sync::Arc;
 
 /// Returns a resolved component to the discovered state. The result is that the component can be
 /// restarted, updating both the code and the manifest with destroying its resources. Unresolve can
@@ -90,24 +87,23 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        crate::model::{
-            actions::test_utils::{is_destroyed, is_discovered, is_resolved, is_shutdown},
-            actions::{ActionsManager, ShutdownAction, ShutdownType, UnresolveAction},
-            component::{ComponentInstance, StartReason},
-            events::{registry::EventSubscription, stream::EventStream},
-            testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
-        },
-        assert_matches::assert_matches,
-        cm_rust::{Availability, UseEventStreamDecl, UseSource},
-        cm_rust_testing::*,
-        cm_types::Name,
-        errors::{ActionError, UnresolveActionError},
-        fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
-        hooks::EventType,
-        moniker::Moniker,
-        std::sync::Arc,
+    use crate::model::actions::test_utils::{
+        is_destroyed, is_discovered, is_resolved, is_shutdown,
     };
+    use crate::model::actions::{ActionsManager, ShutdownAction, ShutdownType, UnresolveAction};
+    use crate::model::component::{ComponentInstance, StartReason};
+    use crate::model::events::registry::EventSubscription;
+    use crate::model::events::stream::EventStream;
+    use crate::model::testing::test_helpers::{component_decl_with_test_runner, ActionsTest};
+    use assert_matches::assert_matches;
+    use cm_rust::{Availability, UseEventStreamDecl, UseSource};
+    use cm_rust_testing::*;
+    use cm_types::Name;
+    use errors::{ActionError, UnresolveActionError};
+    use hooks::EventType;
+    use moniker::Moniker;
+    use std::sync::Arc;
+    use {fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync};
 
     /// Check unresolve for _recursive_ case. The system has a root with the child `a` and `a` has
     /// descendants as shown in the diagram below.

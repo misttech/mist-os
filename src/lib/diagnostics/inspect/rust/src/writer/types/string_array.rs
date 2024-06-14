@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::writer::{
-    private::InspectTypeInternal, ArrayProperty, Inner, InnerValueType, InspectType, State,
-    StringReference,
-};
+use crate::writer::private::InspectTypeInternal;
+use crate::writer::{ArrayProperty, Inner, InnerValueType, InspectType, State, StringReference};
 use inspect_format::BlockIndex;
 
 #[derive(Debug, PartialEq, Eq, Default)]
@@ -91,11 +89,9 @@ impl Drop for StringArrayProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        assert_update_is_atomic,
-        writer::{testing_utils::GetBlockExt, Length},
-        Inspector,
-    };
+    use crate::writer::testing_utils::GetBlockExt;
+    use crate::writer::Length;
+    use crate::{assert_update_is_atomic, Inspector};
     use diagnostics_assertions::assert_json_diff;
 
     impl StringArrayProperty {

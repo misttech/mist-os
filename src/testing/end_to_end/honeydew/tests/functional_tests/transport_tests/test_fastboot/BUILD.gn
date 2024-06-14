@@ -6,6 +6,7 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
+  # Note - Infra does not support putting the NUCs into Fastboot mode
   python_mobly_test("fastboot_test_fc") {
     main_source = "test_fastboot.py"
     libraries = [
@@ -16,10 +17,10 @@ if (is_host) {
     params_source = "params.yaml"
     environments = [ vim3_env ]
   }
+}
 
-  # Group containing all of the Fastboot transport functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [ ":fastboot_test_fc($host_toolchain)" ]
-  }
+# Group containing all of the Fastboot transport functional test cases and its dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [ ":fastboot_test_fc($host_toolchain)" ]
 }

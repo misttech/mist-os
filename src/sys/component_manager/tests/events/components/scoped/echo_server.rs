@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fidl_examples_routing_echo as fecho, fuchsia_component::server::ServiceFs,
-    futures::StreamExt,
-};
+use fidl_fidl_examples_routing_echo as fecho;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
 
 enum ExposedServices {
     Echo(fecho::EchoRequestStream),

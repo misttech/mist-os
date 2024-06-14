@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{child_name::ChildName, moniker::Moniker},
-    schemars::{gen::SchemaGenerator, schema::Schema, schema_for, JsonSchema},
-    serde::{
-        de::{self, Deserializer, Visitor},
-        Deserialize, Serialize, Serializer,
-    },
-    std::fmt,
-};
+use crate::child_name::ChildName;
+use crate::moniker::Moniker;
+use schemars::gen::SchemaGenerator;
+use schemars::schema::Schema;
+use schemars::{schema_for, JsonSchema};
+use serde::de::{self, Deserializer, Visitor};
+use serde::{Deserialize, Serialize, Serializer};
+use std::fmt;
 
 impl Serialize for ChildName {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

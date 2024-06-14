@@ -68,8 +68,7 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
 
     use camino::Utf8Path;
-    use sdk_metadata::ProductBundleV2;
-    use sdk_metadata::Repository;
+    use sdk_metadata::{ProductBundleV2, Repository};
 
     #[test]
     fn test_get_repository() {

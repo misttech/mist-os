@@ -10,10 +10,8 @@ use packet::{
     BufferView, BufferViewMut, FragmentedBytesMut, PacketBuilder, PacketConstraints,
     ParsablePacket, ParseMetadata, SerializeTarget,
 };
-use zerocopy::{
-    byteorder::network_endian::{U16, U32},
-    AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-};
+use zerocopy::byteorder::network_endian::{U16, U32};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 

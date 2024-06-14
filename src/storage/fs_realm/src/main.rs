@@ -2,32 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, format_err, Error};
+use fidl::endpoints::{create_proxy, ClientEnd, DiscoverableProtocolMarker, RequestStream};
+use fidl_fuchsia_device::ControllerMarker;
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
+use fs_management::filesystem::{Filesystem, ServingSingleVolumeFilesystem};
+use fs_management::format::{detect_disk_format, DiskFormat};
+use fs_management::{BlobCompression, Blobfs, F2fs, Fxfs, Minfs};
+use fuchsia_fs::directory::clone_no_describe;
+use fuchsia_runtime::{take_startup_handle, HandleType};
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::{SinkExt, StreamExt, TryStreamExt};
+use std::collections::HashMap;
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::immutable::Simple as PseudoDirectory;
+use vfs::service;
 use {
-    anyhow::{anyhow, format_err, Error},
-    fidl::endpoints::{create_proxy, ClientEnd, DiscoverableProtocolMarker, RequestStream},
-    fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_fs_realm as fs_realm,
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
-    fs_management::{
-        filesystem::{Filesystem, ServingSingleVolumeFilesystem},
-        format::{detect_disk_format, DiskFormat},
-        BlobCompression, Blobfs, F2fs, Fxfs, Minfs,
-    },
-    fuchsia_async as fasync,
-    fuchsia_fs::directory::clone_no_describe,
-    fuchsia_runtime::{take_startup_handle, HandleType},
+    fidl_fuchsia_fs_realm as fs_realm, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon as zx,
-    futures::{channel::mpsc, lock::Mutex, SinkExt, StreamExt, TryStreamExt},
-    std::{collections::HashMap, sync::Arc},
-    vfs::{
-        directory::{
-            entry_container::Directory, helper::DirectlyMutable,
-            immutable::Simple as PseudoDirectory,
-        },
-        service,
-    },
 };
 
 #[derive(Clone)]

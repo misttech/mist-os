@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory},
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_hardware_block_encrypted::DeviceManagerMarker,
-    fidl_fuchsia_io as fio,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_zircon as zx,
-};
+use anyhow::{Context as _, Result};
+use device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory};
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_hardware_block_encrypted::DeviceManagerMarker;
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 const ZXCRYPT_DRIVER_PATH: &str = "zxcrypt.cm";
 
@@ -61,10 +58,10 @@ pub async fn set_up_insecure_zxcrypt(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl_fuchsia_hardware_block::BlockMarker, ramdevice_client::RamdiskClient,
-        test_util::assert_lt,
-    };
+    use super::*;
+    use fidl_fuchsia_hardware_block::BlockMarker;
+    use ramdevice_client::RamdiskClient;
+    use test_util::assert_lt;
 
     const BLOCK_SIZE: u64 = 512;
     const BLOCK_COUNT: u64 = 64 * 1024 * 1024 / BLOCK_SIZE;

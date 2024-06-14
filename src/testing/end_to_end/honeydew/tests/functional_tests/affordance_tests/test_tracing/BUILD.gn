@@ -20,13 +20,18 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
     transport = "fuchsia-controller"
-    environments = [ emu_env ]
+    environments = [
+      # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+      aemu_env,
+      nuc11_env,
+      vim3_env,
+    ]
     deps = [ ":tracing_runtime_deps" ]
   }
+}
 
-  # Group containing all of the Tracing affordance functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [ ":tracing_test_fc($host_toolchain)" ]
-  }
+# Group containing all of the tracing affordance functional test cases and its dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [ ":tracing_test_fc($host_toolchain)" ]
 }

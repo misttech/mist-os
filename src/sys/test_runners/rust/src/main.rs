@@ -4,15 +4,13 @@
 
 mod test_server;
 
-use {
-    fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    test_runners_lib::elf,
-    test_server::TestServer,
-    thiserror::Error,
-    tracing::{error, info, warn},
-};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use test_runners_lib::elf;
+use test_server::TestServer;
+use thiserror::Error;
+use tracing::{error, info, warn};
+use {fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync};
 
 #[fuchsia::main(logging_tags=["rust_test_runner"])]
 async fn main() -> Result<(), anyhow::Error> {

@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
-use std::{
-    marker::PhantomData,
-    mem::{align_of, size_of},
-    sync::{atomic::AtomicU32, atomic::Ordering, Arc},
-};
+use std::marker::PhantomData;
+use std::mem::{align_of, size_of};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 use zerocopy::{AsBytes, NoCell};
 
 /// Declare an instance of [`SeqLock`] by supplying header([`H`]) and value([`T`]) types,

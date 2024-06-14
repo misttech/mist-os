@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use assert_matches::assert_matches;
+use cm_rust::OfferDeclCommon;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fuchsia_component::server as fserver;
+use fuchsia_component_test::new::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+};
+use futures::channel::mpsc;
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use {
-    anyhow::Error,
-    assert_matches::assert_matches,
-    cm_rust::OfferDeclCommon,
-    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::server as fserver,
-    fuchsia_component_test::new::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-    },
-    futures::{channel::mpsc, FutureExt, SinkExt, StreamExt, TryStreamExt},
 };
 
 #[fuchsia::test]

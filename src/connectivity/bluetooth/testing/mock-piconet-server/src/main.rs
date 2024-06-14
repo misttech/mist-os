@@ -9,18 +9,21 @@ use async_utils::stream::{StreamItem, StreamWithEpitaph, Tagged, WithEpitaph, Wi
 use fidl::endpoints::ClientEnd;
 use fidl::prelude::*;
 use fidl_fuchsia_bluetooth::ErrorCode;
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fuchsia_async as fasync;
-use fuchsia_bluetooth::{profile::Psm, types::PeerId};
+use fuchsia_bluetooth::profile::Psm;
+use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
+use futures::channel::mpsc;
+use futures::future::FutureExt;
+use futures::select;
+use futures::sink::SinkExt;
 use futures::stream::{SelectAll, StreamExt};
-use futures::{channel::mpsc, future::FutureExt, select, sink::SinkExt};
-use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use std::pin::pin;
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 mod peer;
 mod profile;

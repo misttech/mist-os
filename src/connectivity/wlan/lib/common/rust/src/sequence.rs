@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {ieee80211::MacAddr, std::collections::HashMap};
+use ieee80211::MacAddr;
+use std::collections::HashMap;
 
 const SEQ_START_NUM: SequenceNum = 1;
 pub type SequenceNum = u32;

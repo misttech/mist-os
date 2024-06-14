@@ -4,7 +4,9 @@
 
 use fuchsia_zircon as zx;
 use rustc_hash::FxHashMap as HashMap;
-use std::{ops::Deref, sync::Arc, u64, usize};
+use std::ops::Deref;
+use std::sync::Arc;
+use std::{u64, usize};
 
 use super::common::EHandle;
 

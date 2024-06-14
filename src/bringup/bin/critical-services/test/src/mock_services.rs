@@ -4,20 +4,22 @@
 
 #![recursion_limit = "512"]
 
+use anyhow::Error;
+use fidl::endpoints::create_proxy;
+use fidl::prelude::*;
+use fuchsia_component::server as fserver;
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use futures::channel::mpsc;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use tracing::{info, warn};
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path as pfsPath;
+use vfs::{pseudo_directory, service};
 use {
-    anyhow::Error,
-    fidl::{endpoints::create_proxy, prelude::*},
     fidl_fuchsia_hardware_input as finput,
     fidl_fuchsia_hardware_power_statecontrol as statecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_test_pwrbtn as test_pwrbtn, fuchsia_async as fasync,
-    fuchsia_component::server as fserver,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
-    futures::{channel::mpsc, StreamExt, TryFutureExt, TryStreamExt},
-    tracing::{info, warn},
-    vfs::{
-        directory::entry_container::Directory, execution_scope::ExecutionScope,
-        path::Path as pfsPath, pseudo_directory, service,
-    },
 };
 
 fn event_handle_rights() -> zx::Rights {

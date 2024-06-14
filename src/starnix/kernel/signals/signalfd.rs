@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    signals::SignalDetail,
-    task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
-    },
-};
+use crate::signals::SignalDetail;
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps};
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
-use starnix_uapi::{
-    errno, error, errors::Errno, open_flags::OpenFlags, signalfd_siginfo, signals::SigSet,
-    vfs::FdEvents, SFD_NONBLOCK,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::signals::SigSet;
+use starnix_uapi::vfs::FdEvents;
+use starnix_uapi::{errno, error, signalfd_siginfo, SFD_NONBLOCK};
 use zerocopy::AsBytes;
 
 pub struct SignalFd {
@@ -54,8 +51,7 @@ impl FileOps for SignalFd {
             while buf.len() + std::mem::size_of::<signalfd_siginfo>() <= data_len {
                 let signal = current_task
                     .write()
-                    .signals
-                    .take_next_where(|sig| mask.has_signal(sig.signal))
+                    .take_signal_with_mask(!mask)
                     .ok_or_else(|| errno!(EAGAIN))?;
                 let mut siginfo = signalfd_siginfo {
                     ssi_signo: signal.signal.number(),
@@ -126,7 +122,7 @@ impl FileOps for SignalFd {
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
         let task_state = current_task.read();
-        Some(task_state.signals.signal_wait.wait_async_fd_events(waiter, events, handler))
+        Some(task_state.wait_on_signal_fd_events(waiter, events, handler))
     }
 
     fn query_events(
@@ -135,7 +131,7 @@ impl FileOps for SignalFd {
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         let mut events = FdEvents::empty();
-        if current_task.read().signals.is_any_allowed_by_mask(!*self.mask.lock()) {
+        if current_task.read().is_any_signal_allowed_by_mask(!*self.mask.lock()) {
             events |= FdEvents::POLLIN;
         }
         Ok(events)

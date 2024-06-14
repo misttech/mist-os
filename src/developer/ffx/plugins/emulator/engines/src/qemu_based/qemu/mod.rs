@@ -18,11 +18,9 @@ use ffx_config::EnvironmentContext;
 use ffx_emulator_common::config::QEMU_TOOL;
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fho::{bug, return_bug, Result};
-use std::{
-    env,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::env;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[derive(Clone, Debug)]
 pub struct QemuEngine {

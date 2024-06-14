@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{MgmtFrame, MgmtSubtype},
-    crate::ie,
-    zerocopy::{ByteSlice, Ref},
-};
+use super::{MgmtFrame, MgmtSubtype};
+use crate::ie;
+use zerocopy::{ByteSlice, Ref};
 
 mod fields;
 mod reason;
 mod status;
 
-pub use {fields::*, reason::*, status::*};
+pub use fields::*;
+pub use reason::*;
+pub use status::*;
 
 /// Frame or frame body distinguished by acknowledgement or lack thereof, namely action frames.
 #[derive(Clone, Copy, Debug)]
@@ -353,7 +353,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::assert_variant, crate::mac::*, crate::TimeUnit};
+    use super::*;
+    use crate::mac::*;
+    use crate::{assert_variant, TimeUnit};
 
     #[test]
     fn mgmt_hdr_len() {

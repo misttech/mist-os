@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_test_manager as ftest_manager,
-    fidl_fuchsia_test_manager::RunOptions,
-    ftest_manager::{CaseStatus, SuiteStatus},
-    fuchsia_async as fasync,
-    maplit::hashset,
-    pretty_assertions::assert_eq,
-    std::collections::{HashMap, HashSet},
-    test_manager_test_lib::{GroupRunEventByTestCase, GroupedRunEvents, RunEvent},
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_test_manager::RunOptions;
+use ftest_manager::{CaseStatus, SuiteStatus};
+use maplit::hashset;
+use pretty_assertions::assert_eq;
+use std::collections::{HashMap, HashSet};
+use test_manager_test_lib::{GroupRunEventByTestCase, GroupedRunEvents, RunEvent};
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 /*
 The only difference between inputs to gunit and gtest framework are the  name of the flags.

@@ -6,8 +6,10 @@
 mod tests {
 
     use crate::model::component::StartReason;
+    use crate::model::testing::routing_test_helpers::*;
+    use cm_rust::*;
+    use cm_rust_testing::*;
     use moniker::Moniker;
-    use {crate::model::testing::routing_test_helpers::*, cm_rust::*, cm_rust_testing::*};
 
     async fn start_component_get_config(
         test: &RoutingTest,

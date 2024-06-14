@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use ieee80211::{Bssid, MacAddrBytes};
+use wlan_common::channel::derive_channel;
+use wlan_common::mac::CapabilityInfo;
+use wlan_common::{ie, TimeUnit};
 use {
-    anyhow::Error,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_softmac as fidl_softmac,
-    ieee80211::{Bssid, MacAddrBytes},
-    wlan_common::{channel::derive_channel, ie, mac::CapabilityInfo, TimeUnit},
 };
 
 /// Given information from beacon or probe response, convert to BssDescription.
@@ -68,7 +70,8 @@ fn get_bss_type(capability_info: CapabilityInfo) -> fidl_common::BssType {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, lazy_static::lazy_static};
+    use super::*;
+    use lazy_static::lazy_static;
 
     lazy_static! {
         static ref BSSID: Bssid = [0x33; 6].into();

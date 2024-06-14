@@ -8,6 +8,7 @@
 #include <fuchsia/ui/display/internal/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/function.h>
+#include <lib/inspect/cpp/inspect.h>
 
 #include <optional>
 
@@ -15,6 +16,7 @@
 #include "src/ui/scenic/lib/display/display.h"
 #include "src/ui/scenic/lib/display/display_coordinator_listener.h"
 #include "src/ui/scenic/lib/display/display_manager.h"
+#include "zircon/system/ulib/inspect/include/lib/inspect/cpp/vmo/types.h"
 
 namespace scenic_impl::display {
 
@@ -23,7 +25,7 @@ namespace scenic_impl::display {
 // display devices through this protocol.
 class DisplayPowerManager : public fuchsia::ui::display::internal::DisplayPower {
  public:
-  explicit DisplayPowerManager(DisplayManager& display_manager);
+  DisplayPowerManager(DisplayManager& display_manager, inspect::Node& parent_node);
 
   // |fuchsia::ui::display::internal::DisplayPower|
   void SetDisplayPower(bool power_on, SetDisplayPowerCallback callback) override;
@@ -32,6 +34,8 @@ class DisplayPowerManager : public fuchsia::ui::display::internal::DisplayPower 
 
  private:
   DisplayManager& display_manager_;
+  inspect::Node inspect_node_;
+  inspect::BoolProperty inspect_display_power_status_;
   fidl::BindingSet<fuchsia::ui::display::internal::DisplayPower> bindings_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(DisplayPowerManager);

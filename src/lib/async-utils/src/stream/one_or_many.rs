@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 
 use futures::stream::{FusedStream, FuturesUnordered, Stream};
 use pin_project::pin_project;

@@ -4,13 +4,9 @@
 
 use std::fmt;
 
-use crate::{
-    math::{self, Mat},
-    shapes::{
-        paint::{BlendMode, Color32, StrokeCap, StrokeJoin},
-        CommandPath, FillRule,
-    },
-};
+use crate::math::{self, Mat};
+use crate::shapes::paint::{BlendMode, Color32, StrokeCap, StrokeJoin};
+use crate::shapes::{CommandPath, FillRule};
 
 #[derive(Clone, Debug, Default)]
 pub struct RenderPaint {

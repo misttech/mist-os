@@ -5,21 +5,20 @@
 use anyhow::{bail, Context, Result};
 use daemonize::daemonize;
 use errors::{ffx_error, FfxError};
-use ffx_config::{logging::LogDirHandling, EnvironmentContext};
+use ffx_config::logging::LogDirHandling;
+use ffx_config::EnvironmentContext;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fuchsia_async::{TimeoutExt, Timer};
 use futures::prelude::*;
 use nix::sys::signal;
-use std::{
-    io::ErrorKind,
-    path::{Path, PathBuf},
-    pin::Pin,
-    process::{Child, Command},
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
+use std::pin::Pin;
+use std::process::{Child, Command};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 mod config;
 mod constants;

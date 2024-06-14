@@ -9,10 +9,8 @@
 use core::hash::Hash;
 
 use fakealloc::collections::HashSet;
-use net_types::{
-    ip::{Ipv6Addr, Subnet},
-    LinkLocalUnicastAddr,
-};
+use net_types::ip::{Ipv6Addr, Subnet};
+use net_types::LinkLocalUnicastAddr;
 use netstack3_base::{
     AnyDevice, CoreTimerContext, DeviceIdContext, ExistsError, HandleableTimer,
     InstantBindingsTypes, LocalTimerHeap, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
@@ -266,35 +264,24 @@ fn invalidate_route<BC: Ipv6RouteDiscoveryBindingsContext, CC: Ipv6DiscoveredRou
 mod tests {
     use alloc::vec::Vec;
 
-    use netstack3_base::IntoCoreTimerCtx;
-    use netstack3_base::{
-        testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant, FakeTimerCtxExt as _,
-            FakeWeakDeviceId,
-        },
-        CtxPair,
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant, FakeTimerCtxExt as _,
+        FakeWeakDeviceId,
     };
+    use netstack3_base::{CtxPair, IntoCoreTimerCtx};
     use packet_formats::utils::NonZeroDuration;
 
     use super::*;
-    use crate::internal::base::{testutil::FakeIpDeviceIdCtx, IPV6_DEFAULT_SUBNET};
+    use crate::internal::base::IPV6_DEFAULT_SUBNET;
 
     #[derive(Default)]
     struct FakeWithDiscoveredRoutesMutCtx {
         route_table: HashSet<Ipv6DiscoveredRoute>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeWithDiscoveredRoutesMutCtx {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
     }
 
     impl DeviceIdContext<AnyDevice> for FakeWithDiscoveredRoutesMutCtx {
-        type DeviceId = <FakeIpDeviceIdCtx<FakeDeviceId> as DeviceIdContext<AnyDevice>>::DeviceId;
-        type WeakDeviceId =
-            <FakeIpDeviceIdCtx<FakeDeviceId> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
+        type DeviceId = FakeDeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
     }
 
     impl<C> Ipv6DiscoveredRoutesContext<C> for FakeWithDiscoveredRoutesMutCtx {
@@ -304,7 +291,7 @@ mod tests {
             FakeDeviceId: &Self::DeviceId,
             route: Ipv6DiscoveredRoute,
         ) -> Result<(), ExistsError> {
-            let Self { route_table, ip_device_id_ctx: _ } = self;
+            let Self { route_table } = self;
             let newly_inserted = route_table.insert(route);
             if newly_inserted {
                 Ok(())
@@ -319,7 +306,7 @@ mod tests {
             FakeDeviceId: &Self::DeviceId,
             route: Ipv6DiscoveredRoute,
         ) {
-            let Self { route_table, ip_device_id_ctx: _ } = self;
+            let Self { route_table } = self;
             let _: bool = route_table.remove(&route);
         }
     }
@@ -327,13 +314,6 @@ mod tests {
     struct FakeIpv6RouteDiscoveryContext {
         state: Ipv6RouteDiscoveryState<FakeBindingsCtxImpl>,
         route_table: FakeWithDiscoveredRoutesMutCtx,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeIpv6RouteDiscoveryContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
     }
 
     type FakeCoreCtxImpl = FakeCoreCtx<FakeIpv6RouteDiscoveryContext, (), FakeDeviceId>;
@@ -382,7 +362,6 @@ mod tests {
                     FakeWeakDeviceId(FakeDeviceId),
                 ),
                 route_table: Default::default(),
-                ip_device_id_ctx: Default::default(),
             })
         })
     }

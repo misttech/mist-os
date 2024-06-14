@@ -7,20 +7,16 @@
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress as _, Ipv4, Ipv4Addr, Subnet},
-    SpecifiedAddr, Witness as _,
-};
+use log::debug;
+use net_types::ip::{GenericOverIp, Ip, IpAddress as _, Ipv4, Ipv4Addr, Subnet};
+use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::{AnyDevice, DeviceIdContext, ExistsError};
 use thiserror::Error;
-use tracing::debug;
 
-use crate::internal::{
-    base::{IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt},
-    types::{
-        AddableEntry, Destination, Entry, EntryAndGeneration, IpTypesIpExt, NextHop, OrderedEntry,
-        RawMetric,
-    },
+use crate::internal::base::{IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt};
+use crate::internal::types::{
+    AddableEntry, Destination, Entry, EntryAndGeneration, IpTypesIpExt, NextHop, OrderedEntry,
+    RawMetric,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
@@ -293,12 +289,11 @@ pub(crate) mod testutil {
 
     use derivative::Derivative;
     use net_types::ip::IpAddress;
-    use netstack3_base::{testutil::FakeCoreCtx, NotFoundError, StrongDeviceIdentifier};
+    use netstack3_base::testutil::FakeCoreCtx;
+    use netstack3_base::{NotFoundError, StrongDeviceIdentifier};
 
-    use crate::internal::{
-        base::{testutil::FakeIpDeviceIdCtx, IpStateContext},
-        types::{AddableMetric, Generation, Metric},
-    };
+    use crate::internal::base::IpStateContext;
+    use crate::internal::types::{AddableMetric, Generation, Metric};
 
     use super::*;
 
@@ -419,25 +414,12 @@ pub(crate) mod testutil {
     #[derivative(Default(bound = ""))]
     pub(crate) struct FakeIpForwardingContext<D> {
         disabled_devices: HashSet<D>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<D>,
     }
 
     impl<D> FakeIpForwardingContext<D> {
         #[cfg(test)]
         pub(crate) fn disabled_devices_mut(&mut self) -> &mut HashSet<D> {
             &mut self.disabled_devices
-        }
-    }
-
-    impl<D> AsRef<FakeIpDeviceIdCtx<D>> for FakeIpForwardingContext<D> {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
-            &self.ip_device_id_ctx
-        }
-    }
-
-    impl<D> AsMut<FakeIpDeviceIdCtx<D>> for FakeIpForwardingContext<D> {
-        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
-            &mut self.ip_device_id_ctx
         }
     }
 
@@ -463,14 +445,15 @@ mod tests {
 
     use ip_test_macro::ip_test;
     use itertools::Itertools;
+    use log::trace;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::ip::{Ipv6, Ipv6Addr};
     use netstack3_base::testutil::{MultipleDevicesId, TestAddrs};
     use test_case::test_case;
-    use tracing::trace;
 
     use super::*;
-    use crate::internal::{forwarding::testutil::FakeIpForwardingCtx, types::Metric};
+    use crate::internal::forwarding::testutil::FakeIpForwardingCtx;
+    use crate::internal::types::Metric;
 
     type FakeCtx = FakeIpForwardingCtx<MultipleDevicesId>;
 
@@ -529,7 +512,7 @@ mod tests {
         }
     }
 
-    fn simple_setup<I: Ip + TestIpExt>() -> (
+    fn simple_setup<I: TestIpExt>() -> (
         ForwardingTable<I, MultipleDevicesId>,
         TestAddrs<I::Addr>,
         SpecifiedAddr<I::Addr>,
@@ -581,8 +564,8 @@ mod tests {
         (table, config, next_hop, next_hop_subnet, device, metric)
     }
 
-    #[ip_test]
-    fn test_simple_add_del<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_simple_add_del<I: TestIpExt>() {
         let (mut table, config, next_hop, next_hop_subnet, device, metric) = simple_setup::<I>();
         assert_eq!(table.iter_table().count(), 3);
 
@@ -611,8 +594,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_simple_lookup<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_simple_lookup<I: TestIpExt>() {
         let (mut table, config, next_hop, _next_hop_subnet, device, metric) = simple_setup::<I>();
         let mut core_ctx = FakeCtx::default();
 
@@ -938,8 +921,8 @@ mod tests {
         assert_eq!(got_lookup_result, expected_lookup_result);
     }
 
-    #[ip_test]
-    fn test_default_route_ip<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_default_route_ip<I: TestIpExt>() {
         let mut core_ctx = FakeCtx::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
         let device0 = MultipleDevicesId::A;
@@ -995,8 +978,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_device_filter_with_varying_prefix_lengths<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_device_filter_with_varying_prefix_lengths<I: TestIpExt>() {
         const MORE_SPECIFIC_SUB_DEVICE: MultipleDevicesId = MultipleDevicesId::A;
         const LESS_SPECIFIC_SUB_DEVICE: MultipleDevicesId = MultipleDevicesId::B;
 
@@ -1079,8 +1062,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_lookup_filter_map<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_lookup_filter_map<I: TestIpExt>() {
         let mut core_ctx = FakeCtx::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
 
@@ -1171,8 +1154,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_multiple_routes_to_subnet_through_different_devices<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_multiple_routes_to_subnet_through_different_devices<I: TestIpExt>() {
         const DEVICE1: MultipleDevicesId = MultipleDevicesId::A;
         const DEVICE2: MultipleDevicesId = MultipleDevicesId::B;
 
@@ -1207,7 +1190,7 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(|core_ctx, device, device_unusable| {
         let disabled_devices = core_ctx.state.disabled_devices_mut();
         if device_unusable {
@@ -1216,9 +1199,7 @@ mod tests {
             let _: bool = disabled_devices.remove(&device);
         }
     }; "device_disabled")]
-    fn test_usable_device<I: Ip + TestIpExt>(
-        set_inactive: fn(&mut FakeCtx, MultipleDevicesId, bool),
-    ) {
+    fn test_usable_device<I: TestIpExt>(set_inactive: fn(&mut FakeCtx, MultipleDevicesId, bool)) {
         const MORE_SPECIFIC_SUB_DEVICE: MultipleDevicesId = MultipleDevicesId::A;
         const LESS_SPECIFIC_SUB_DEVICE: MultipleDevicesId = MultipleDevicesId::B;
 
@@ -1306,8 +1287,8 @@ mod tests {
         assert_eq!(table.lookup(&mut core_ctx, None, *remote), None,);
     }
 
-    #[ip_test]
-    fn test_add_entry_keeps_table_sorted<I: Ip + IpTypesIpExt>() {
+    #[ip_test(I)]
+    fn test_add_entry_keeps_table_sorted<I: IpTypesIpExt>() {
         const DEVICE_A: MultipleDevicesId = MultipleDevicesId::A;
         const DEVICE_B: MultipleDevicesId = MultipleDevicesId::B;
         let (more_specific_sub, less_specific_sub) = I::map_ip(

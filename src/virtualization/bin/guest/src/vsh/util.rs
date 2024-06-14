@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    fuchsia_async as fasync,
-    futures::{AsyncReadExt, AsyncWriteExt},
-};
+use anyhow::{anyhow, Context, Result};
+use fuchsia_async as fasync;
+use futures::{AsyncReadExt, AsyncWriteExt};
 
 /// Default vsock port that vshd listens on.
 pub const VSH_PORT: u32 = 9001;

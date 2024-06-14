@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{commands::types::*, types::Error},
-    argh::{ArgsInfo, FromArgs},
-    async_trait::async_trait,
-    diagnostics_data::{Inspect, InspectData},
-    serde::{Serialize, Serializer},
-    std::{cmp::Ordering, collections::BTreeSet, fmt},
-};
+use crate::commands::types::*;
+use crate::types::Error;
+use argh::{ArgsInfo, FromArgs};
+use async_trait::async_trait;
+use diagnostics_data::{Inspect, InspectData};
+use serde::{Serialize, Serializer};
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
+use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Serialize)]
 pub struct MonikerWithUrl {

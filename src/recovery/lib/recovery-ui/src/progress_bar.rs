@@ -3,34 +3,23 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use carnelian::{
-    color::Color,
-    drawing::{load_font, measure_text_width, FontFace},
-    make_message,
-    scene::{
-        facets::{
-            FacetId, SetColorMessage, SetSizeMessage, SetTextMessage, TextFacetOptions,
-            TextHorizontalAlignment, TextVerticalAlignment,
-        },
-        layout::{Alignment, Stack, StackOptions},
-        scene::{Scene, SceneBuilder},
-    },
-    AppSender, MessageTarget, Point, Size, ViewKey,
+use carnelian::color::Color;
+use carnelian::drawing::{load_font, measure_text_width, FontFace};
+use carnelian::scene::facets::{
+    FacetId, SetColorMessage, SetSizeMessage, SetTextMessage, TextFacetOptions,
+    TextHorizontalAlignment, TextVerticalAlignment,
 };
+use carnelian::scene::layout::{Alignment, Stack, StackOptions};
+use carnelian::scene::scene::{Scene, SceneBuilder};
+use carnelian::{make_message, AppSender, MessageTarget, Point, Size, ViewKey};
 use euclid::size2;
 use fuchsia_async as fasync;
 use fuchsia_zircon::Duration;
-use futures::{
-    channel::mpsc::{channel as pipe, Sender},
-    StreamExt,
-};
-use std::{
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc, Mutex,
-    },
-};
+use futures::channel::mpsc::{channel as pipe, Sender};
+use futures::StreamExt;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 
 const PROGRESS_GRANULARITY: f32 = 1000.0;
 

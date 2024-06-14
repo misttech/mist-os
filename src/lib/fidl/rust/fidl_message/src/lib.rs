@@ -21,14 +21,12 @@
 
 pub use fidl::encoding::{decode_transaction_header, DynamicFlags, TransactionHeader};
 
-use fidl::{
-    encoding::{
-        Decoder, EmptyStruct, Encode, Encoder, Flexible, FlexibleResult, FlexibleResultType,
-        FlexibleType, FrameworkErr, ResultType, TransactionMessage, TransactionMessageType,
-        TypeMarker, ValueTypeMarker,
-    },
-    new_empty, Error, HandleDisposition,
+use fidl::encoding::{
+    Decoder, EmptyStruct, Encode, Encoder, Flexible, FlexibleResult, FlexibleResultType,
+    FlexibleType, FrameworkErr, ResultType, TransactionMessage, TransactionMessageType, TypeMarker,
+    ValueTypeMarker,
 };
+use fidl::{new_empty, Error, HandleDisposition};
 
 /// A trait for types that can be a FIDL request/response body.
 /// This is implemented for `()` and FIDL structs, tables, and unions.

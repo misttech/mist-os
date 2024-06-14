@@ -1,11 +1,9 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{anyhow, format_err, Error},
-    fidl_fuchsia_hardware_audio::*,
-    fidl_fuchsia_hardware_audio_signalprocessing::*,
-};
+use anyhow::{anyhow, format_err, Error};
+use fidl_fuchsia_hardware_audio::*;
+use fidl_fuchsia_hardware_audio_signalprocessing::*;
 
 pub struct SignalInterface {
     /// The proxy if connected.

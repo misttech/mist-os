@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::mac::{
-        Aid, FrameControl, HtControl, MacAddr, OptionalField, Presence, ReasonCode,
-        SequenceControl, StatusCode,
-    },
-    crate::TimeUnit,
-    wlan_bitfield::bitfield,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned},
+use crate::mac::{
+    Aid, FrameControl, HtControl, MacAddr, OptionalField, Presence, ReasonCode, SequenceControl,
+    StatusCode,
 };
+use crate::TimeUnit;
+use wlan_bitfield::bitfield;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 // IEEE Std 802.11-2016, 9.4.1.4
 #[bitfield(

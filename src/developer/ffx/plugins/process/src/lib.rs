@@ -13,8 +13,7 @@ use anyhow::{Context, Result};
 use ffx_config::global_env_context;
 use ffx_process_args::{Args, ProcessCommand, Task};
 use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
-use fidl_fuchsia_buildinfo::BuildInfo;
-use fidl_fuchsia_buildinfo::ProviderProxy;
+use fidl_fuchsia_buildinfo::{BuildInfo, ProviderProxy};
 use fidl_fuchsia_process_explorer::{
     ProcessExplorerGetStackTraceRequest, ProcessExplorerKillTaskRequest, ProcessExplorerProxy,
     QueryProxy,

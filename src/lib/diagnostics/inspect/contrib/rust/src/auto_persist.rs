@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_diagnostics_persist::PersistResult,
-    fuchsia_zircon::{self as zx, prelude::*},
-    futures::{channel::mpsc, Future, StreamExt},
-    injectable_time::{MonotonicTime, TimeSource},
-    std::{
-        ops::{Deref, DerefMut},
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    },
-    tracing::{error, info},
-};
+use fidl_fuchsia_diagnostics_persist::PersistResult;
+use fuchsia_zircon::prelude::*;
+use fuchsia_zircon::{self as zx};
+use futures::channel::mpsc;
+use futures::{Future, StreamExt};
+use injectable_time::{MonotonicTime, TimeSource};
+use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tracing::{error, info};
 
 pub type PersistenceReqSender = mpsc::Sender<String>;
 
@@ -157,15 +153,14 @@ pub fn create_persistence_req_sender(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_diagnostics_persist::DataPersistenceRequest,
-        fuchsia_async as fasync,
-        fuchsia_inspect::Inspector,
-        futures::task::Poll,
-        std::{cell::RefCell, pin::pin},
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_diagnostics_persist::DataPersistenceRequest;
+    use fuchsia_async as fasync;
+    use fuchsia_inspect::Inspector;
+    use futures::task::Poll;
+    use std::cell::RefCell;
+    use std::pin::pin;
 
     #[fuchsia::test]
     fn test_auto_persist() {

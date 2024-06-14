@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*, assert_matches::assert_matches, fidl_fuchsia_update_installer_ext::State,
-    pretty_assertions::assert_eq,
-};
+use super::*;
+use assert_matches::assert_matches;
+use fidl_fuchsia_update_installer_ext::State;
+use pretty_assertions::assert_eq;
 
 #[fasync::run_singlethreaded(test)]
 async fn cancel_update() {

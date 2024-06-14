@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches, fidl_fidl_examples_routing_echo as fecho,
-    fuchsia_component::client, fuchsia_zircon as zx, tracing::info,
-};
+use assert_matches::assert_matches;
+use fuchsia_component::client;
+use tracing::info;
+use {fidl_fidl_examples_routing_echo as fecho, fuchsia_zircon as zx};
 
 #[fuchsia::main]
 async fn main() {

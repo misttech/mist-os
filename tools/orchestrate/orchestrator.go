@@ -199,7 +199,10 @@ func (r *TestOrchestrator) dumpFfxConfig() error {
 			fmt.Printf("logFile.Close: %v\n", err)
 		}
 	}()
-	cmd := r.ffx.Cmd("config", "get")
+	cmd, err := r.ffx.Cmd("config", "get")
+	if err != nil {
+		return fmt.Errorf("ffx.Cmd: %v", err)
+	}
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	return cmd.Run()
@@ -210,28 +213,13 @@ func (r *TestOrchestrator) daemonStart() error {
 	if err != nil {
 		return fmt.Errorf("os.Create: %w", err)
 	}
-	wd, err := os.Getwd()
+	cmd, err := r.ffx.Cmd("daemon", "start")
 	if err != nil {
-		return fmt.Errorf("os.Getwd: %w", err)
+		return fmt.Errorf("ffx.Cmd: %v", err)
 	}
-	cmd := r.ffx.Cmd("daemon", "start")
-	sshDir := filepath.Join(wd, "openssh-portable", "bin")
-	cmd.Env = appendPath(cmd.Env, sshDir)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	return cmd.Start()
-}
-
-func appendPath(environ []string, dirs ...string) []string {
-	result := []string{}
-	for _, e := range environ {
-		if strings.HasPrefix(e, "PATH=") {
-			result = append(result, fmt.Sprintf("%s:%s", e, strings.Join(dirs, ":")))
-		} else {
-			result = append(result, e)
-		}
-	}
-	return result
 }
 
 /* Step 2 - Downloading product bundle. */
@@ -377,7 +365,10 @@ func (r *TestOrchestrator) dumpFfxLog() error {
 		return fmt.Errorf("os.Create: %w", err)
 	}
 	r.targetLogFile = logFile
-	cmd := r.ffx.Cmd("log", "--symbolize", "off")
+	cmd, err := r.ffx.Cmd("log", "--symbolize", "off")
+	if err != nil {
+		return fmt.Errorf("ffx.Cmd: %v", err)
+	}
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	if err := cmd.Start(); err != nil {
@@ -416,13 +407,15 @@ func (r *TestOrchestrator) test(testCmd []string, in *RunInput) error {
 	//  3. Add openssh to PATH.
 	env := os.Environ()
 	if in.IsTarget() {
-		env = r.ffx.ApplyEnv(env)
+		env, err = r.ffx.ApplyEnv(env)
+		if err != nil {
+			return fmt.Errorf("ffx.ApplyEnv: %v", err)
+		}
 		ffxDir := filepath.Dir(filepath.Join(wd, in.Target().FfxPath))
-		if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", ffxDir, os.Getenv("PATH"))); err != nil {
+		if err = os.Setenv("PATH", fmt.Sprintf("%s:%s", ffxDir, os.Getenv("PATH"))); err != nil {
 			return fmt.Errorf("os.Setenv: %w", err)
 		}
-		sshDir := filepath.Join(wd, "openssh-portable", "bin")
-		env = appendPath(env, sshDir, ffxDir)
+		env = utils.AppendPath(env, ffxDir)
 	}
 
 	// Create cmd AFTER setting the PATH so that it will correctly resolve testCmd[0]
@@ -541,7 +534,10 @@ func (r *TestOrchestrator) Symbolize(input, output string) error {
 			fmt.Printf("symbolizedFile.Close: %v\n", err)
 		}
 	}()
-	cmd := r.ffx.Cmd("debug", "symbolize")
+	cmd, err := r.ffx.Cmd("debug", "symbolize")
+	if err != nil {
+		return fmt.Errorf("ffx.Cmd: %v", err)
+	}
 	cmd.Stdin = logFile
 	cmd.Stdout = symbolizedFile
 	cmd.Stderr = symbolizedFile

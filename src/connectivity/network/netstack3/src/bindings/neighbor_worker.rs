@@ -5,38 +5,33 @@
 use std::collections::{HashMap, VecDeque};
 
 use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::IntoExt;
 use fidl_fuchsia_net_neighbor::{
     self as fnet_neighbor, ControllerRequest, ControllerRequestStream, ViewRequest,
     ViewRequestStream,
 };
-use fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext;
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext,
+    fuchsia_zircon as zx,
+};
 
 use assert_matches::assert_matches;
-use futures::{
-    channel::mpsc, task::Poll, Future, SinkExt as _, StreamExt as _, TryFutureExt as _,
-    TryStreamExt as _,
-};
-use net_types::{
-    ethernet::Mac,
-    ip::{IpAddr, IpAddress, Ipv4, Ipv6},
-    SpecifiedAddr, Witness as _,
-};
-use tracing::{error, info, warn};
+use futures::channel::mpsc;
+use futures::task::Poll;
+use futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use log::{error, info, warn};
+use net_types::ethernet::Mac;
+use net_types::ip::{IpAddr, IpAddress, Ipv4, Ipv6};
+use net_types::{SpecifiedAddr, Witness as _};
 
-use crate::bindings::{
-    devices::{BindingId, DeviceIdAndName},
-    BindingsCtx, Ctx, StackTime,
+use crate::bindings::devices::{BindingId, DeviceIdAndName};
+use crate::bindings::{BindingsCtx, Ctx, StackTime};
+use netstack3_core::device::{
+    DeviceId, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
 };
-use netstack3_core::{
-    device::{DeviceId, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId},
-    error::NotFoundError,
-    neighbor,
-    neighbor::{NeighborRemovalError, StaticNeighborInsertionError},
-    IpExt,
-};
+use netstack3_core::error::NotFoundError;
+use netstack3_core::neighbor::{NeighborRemovalError, StaticNeighborInsertionError};
+use netstack3_core::{neighbor, IpExt};
 
 #[derive(Debug)]
 pub(crate) struct Event {
@@ -195,7 +190,7 @@ impl Worker {
                 ))) => {
                     // TODO(https://fxbug.dev/42086008): Add flags to the log indicating if
                     // the neighbor is a default gateway and if it is on-link.
-                    info!(tag = "NUD", "{event}");
+                    info!("{event}");
 
                     let DeviceIdAndName { id: binding_id, name: _ } = *id.bindings_id();
                     let entry = neighbor_state

@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::input_listener;
+use fidl::endpoints::*;
+use fuchsia_component_test::ScopedInstance;
+use futures::StreamExt;
+use rand::prelude::SliceRandom;
+use rand::rngs::SmallRng;
+use rand::Rng;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use tracing::debug;
 use {
-    crate::input_listener,
-    fidl::endpoints::*,
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_composition as flatland,
     fidl_fuchsia_ui_pointer as fpointer, fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync,
-    fuchsia_component_test::ScopedInstance,
     fuchsia_scenic as scenic,
-    futures::StreamExt,
-    rand::{prelude::SliceRandom, rngs::SmallRng, Rng},
-    std::sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    tracing::debug,
 };
 
 pub const DISPLAY_WIDTH: u16 = 1024;

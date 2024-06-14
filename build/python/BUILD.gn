@@ -38,6 +38,11 @@ python_binary("gen_sdk_metadata_and_file_sources") {
   main_source = "gen_sdk_metadata_and_file_sources.py"
 }
 
+python_binary("compress_lacewing_inputs") {
+  enable_mypy = true
+  main_source = "compress_lacewing_inputs.py"
+}
+
 # These tests exercise the build rules we want to test.
 group("tests") {
   testonly = true

@@ -6,11 +6,9 @@ use anyhow::{anyhow, Context, Result};
 use ffx_coverage_args::CoverageCommand;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use glob::glob;
-use std::{
-    fs::File,
-    path::{Path, PathBuf},
-    process::{Command, Stdio},
-};
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use symbol_index::{global_symbol_index_path, SymbolIndex};
 
 // The line found right above build ID in `llvm-profdata show --binary-ids` output.
@@ -287,11 +285,9 @@ fn glob_profraws(test_out_dir: &Path) -> Result<Vec<PathBuf>> {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use std::{
-        fs::{create_dir, set_permissions, Permissions},
-        io::Write,
-        os::unix::fs::PermissionsExt,
-    };
+    use std::fs::{create_dir, set_permissions, Permissions};
+    use std::io::Write;
+    use std::os::unix::fs::PermissionsExt;
     use symbol_index::BuildIdDir;
     use tempfile::TempDir;
 

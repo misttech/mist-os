@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fuchsia_component::server as fserver;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
+};
+use futures::stream::{self as stream, StreamExt, TryStreamExt};
+use futures::TryFutureExt;
+use std::sync::Arc;
+use tracing::{info, subscriber};
 use {
-    anyhow::Error,
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_logger as flogger,
     fuchsia_async as fasync,
-    fuchsia_component::server as fserver,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
-    futures::{
-        stream::{self as stream, StreamExt, TryStreamExt},
-        TryFutureExt,
-    },
-    std::sync::Arc,
-    tracing::{info, subscriber},
 };
 
 async fn echo_server_mock(handles: LocalComponentHandles) -> Result<(), Error> {

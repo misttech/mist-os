@@ -2,50 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        device::{
-            kobject::{Device, DeviceMetadata},
-            DeviceMode,
-        },
-        fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo},
-        mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags},
-        task::CurrentTask,
-        vfs::{
-            buffers::VecOutputBuffer, default_ioctl, fileops_impl_dataless, fileops_impl_seekable,
-            fileops_impl_seekless, FileHandle, FileObject, FileOps, FsNode, FsString, OutputBuffer,
-        },
-    },
-    bitflags::bitflags,
-    fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions},
-    fuchsia_zircon::Vmo,
-    linux_uapi::DM_UUID_LEN,
-    mundane::hash::{Digest, Hasher, Sha256, Sha512},
-    starnix_logging::{log_trace, track_stub},
-    starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked},
-    starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS},
-    starnix_uapi::{
-        device_type::{DeviceType, DEVICE_MAPPER_MAJOR, LOOP_MAJOR},
-        errno, error,
-        errors::Errno,
-        open_flags::OpenFlags,
-        uapi,
-        user_address::{UserCString, UserRef},
-        DM_ACTIVE_PRESENT_FLAG, DM_BUFFER_FULL_FLAG, DM_DEV_ARM_POLL, DM_DEV_CREATE, DM_DEV_REMOVE,
-        DM_DEV_RENAME, DM_DEV_SET_GEOMETRY, DM_DEV_STATUS, DM_DEV_SUSPEND, DM_DEV_WAIT,
-        DM_GET_TARGET_VERSION, DM_IMA_MEASUREMENT_FLAG, DM_INACTIVE_PRESENT_FLAG, DM_LIST_DEVICES,
-        DM_LIST_VERSIONS, DM_MAX_TYPE_NAME, DM_NAME_LEN, DM_NAME_LIST_FLAG_DOESNT_HAVE_UUID,
-        DM_NAME_LIST_FLAG_HAS_UUID, DM_READONLY_FLAG, DM_REMOVE_ALL, DM_STATUS_TABLE_FLAG,
-        DM_SUSPEND_FLAG, DM_TABLE_CLEAR, DM_TABLE_DEPS, DM_TABLE_LOAD, DM_TABLE_STATUS,
-        DM_TARGET_MSG, DM_UEVENT_GENERATED_FLAG, DM_VERSION, DM_VERSION_MAJOR, DM_VERSION_MINOR,
-        DM_VERSION_PATCHLEVEL,
-    },
-    std::{
-        collections::btree_map::{BTreeMap, Entry},
-        ops::Sub,
-        sync::Arc,
-    },
+use crate::device::kobject::{Device, DeviceMetadata};
+use crate::device::DeviceMode;
+use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
+use crate::task::CurrentTask;
+use crate::vfs::buffers::VecOutputBuffer;
+use crate::vfs::{
+    default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless, FileHandle,
+    FileObject, FileOps, FsNode, FsString, OutputBuffer,
 };
+use bitflags::bitflags;
+use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
+use fuchsia_zircon::Vmo;
+use linux_uapi::DM_UUID_LEN;
+use mundane::hash::{Digest, Hasher, Sha256, Sha512};
+use starnix_logging::{log_trace, track_stub};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::device_type::{DeviceType, DEVICE_MAPPER_MAJOR, LOOP_MAJOR};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::{UserCString, UserRef};
+use starnix_uapi::{
+    errno, error, uapi, DM_ACTIVE_PRESENT_FLAG, DM_BUFFER_FULL_FLAG, DM_DEV_ARM_POLL,
+    DM_DEV_CREATE, DM_DEV_REMOVE, DM_DEV_RENAME, DM_DEV_SET_GEOMETRY, DM_DEV_STATUS,
+    DM_DEV_SUSPEND, DM_DEV_WAIT, DM_GET_TARGET_VERSION, DM_IMA_MEASUREMENT_FLAG,
+    DM_INACTIVE_PRESENT_FLAG, DM_LIST_DEVICES, DM_LIST_VERSIONS, DM_MAX_TYPE_NAME, DM_NAME_LEN,
+    DM_NAME_LIST_FLAG_DOESNT_HAVE_UUID, DM_NAME_LIST_FLAG_HAS_UUID, DM_READONLY_FLAG,
+    DM_REMOVE_ALL, DM_STATUS_TABLE_FLAG, DM_SUSPEND_FLAG, DM_TABLE_CLEAR, DM_TABLE_DEPS,
+    DM_TABLE_LOAD, DM_TABLE_STATUS, DM_TARGET_MSG, DM_UEVENT_GENERATED_FLAG, DM_VERSION,
+    DM_VERSION_MAJOR, DM_VERSION_MINOR, DM_VERSION_PATCHLEVEL,
+};
+use std::collections::btree_map::{BTreeMap, Entry};
+use std::ops::Sub;
+use std::sync::Arc;
 
 const SECTOR_SIZE: u64 = 512;
 // The value of the data_size field in the output dm_ioctl struct when no data is returned as per

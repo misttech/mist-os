@@ -6,8 +6,7 @@ use anyhow::{anyhow, Result};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use assembly_images_config::BlobfsLayout;

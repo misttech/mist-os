@@ -1,0 +1,12 @@
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_unstripped_binary",
+)
+
+fuchsia_unstripped_binary(
+    name = "dist",
+    dest = "{{dist_path}}",
+    stripped_file = "{{stripped_file}}",
+    unstripped_file = "{{unstripped_file}}",
+    target_compatible_with = [ "@platforms//os:fuchsia" ],
+)

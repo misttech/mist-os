@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use diagnostics_reader::{ArchiveReader, Logs};
+use fidl_fuchsia_data as fdata;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
+use futures::StreamExt;
 use regex::Regex;
-use {
-    anyhow::Error,
-    diagnostics_reader::{ArchiveReader, Logs},
-    fidl_fuchsia_data as fdata,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-    futures::StreamExt,
-    std::fs::File,
-    std::io::{self, BufRead},
-};
+use std::fs::File;
+use std::io::{self, BufRead};
 
 #[fuchsia::test]
 async fn wisdom_integration_test() -> Result<(), Error> {

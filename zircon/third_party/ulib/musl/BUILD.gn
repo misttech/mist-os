@@ -23,10 +23,9 @@ group("musl_internal") {
     "//zircon/third_party/scudo/*",
   ]
   public_deps = [
-    "//src/zircon/lib/zircon",
-    "//zircon/system/ulib/processargs",
-    "//zircon/system/ulib/runtime",
-    "//zircon/system/ulib/zircon-internal",
+    "//zircon/system/public",
+    "//zircon/system/ulib/runtime:headers",
+    "//zircon/system/ulib/zircon-internal:headers",
   ]
   public_configs = [
     ":headers",

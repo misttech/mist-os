@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    once_cell::sync::Lazy,
-    std::{
-        fs::{create_dir_all, remove_dir_all},
-        path::{Path, PathBuf},
-        process::id,
-        sync::atomic::{AtomicU32, Ordering},
-    },
-    tempfile::TempDir,
-    tracing::warn,
-};
+use anyhow::{anyhow, Context, Result};
+use once_cell::sync::Lazy;
+use std::fs::{create_dir_all, remove_dir_all};
+use std::path::{Path, PathBuf};
+use std::process::id;
+use std::sync::atomic::{AtomicU32, Ordering};
+use tempfile::TempDir;
+use tracing::warn;
 
 static PID: Lazy<u32> = Lazy::new(|| id());
 static NEXT_DIR_ID: AtomicU32 = AtomicU32::new(0);
@@ -77,13 +73,9 @@ impl Drop for TemporaryDirectory {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::tempdir,
-        std::{
-            fs::{metadata, remove_dir_all},
-            path::PathBuf,
-        },
-    };
+    use super::tempdir;
+    use std::fs::{metadata, remove_dir_all};
+    use std::path::PathBuf;
 
     #[fuchsia::test]
     fn tempfile_tempdir_smoke_test() {

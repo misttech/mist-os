@@ -2,29 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::{rsn::Rsna, ClientConfig},
-    anyhow::{format_err, Error},
-    fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_mlme::DeviceInfo,
-    wlan_common::{
-        bss::BssDescription,
-        ie::{
-            self,
-            rsn::rsne::{self, Rsne},
-            wpa::WpaIe,
-        },
-        security::{
-            wep::{self, WepKey},
-            wpa, SecurityAuthenticator,
-        },
-    },
-    wlan_rsn::{
-        auth::{self, psk::ToPsk},
-        nonce::NonceReader,
-        NegotiatedProtection, ProtectionInfo,
-    },
-};
+use crate::client::rsn::Rsna;
+use crate::client::ClientConfig;
+use anyhow::{format_err, Error};
+use fidl_fuchsia_wlan_common as fidl_common;
+use fidl_fuchsia_wlan_mlme::DeviceInfo;
+use wlan_common::bss::BssDescription;
+use wlan_common::ie::rsn::rsne::{self, Rsne};
+use wlan_common::ie::wpa::WpaIe;
+use wlan_common::ie::{self};
+use wlan_common::security::wep::{self, WepKey};
+use wlan_common::security::{wpa, SecurityAuthenticator};
+use wlan_rsn::auth::psk::ToPsk;
+use wlan_rsn::auth::{self};
+use wlan_rsn::nonce::NonceReader;
+use wlan_rsn::{NegotiatedProtection, ProtectionInfo};
 
 #[derive(Debug)]
 pub enum Protection {
@@ -363,22 +355,16 @@ pub(crate) fn build_protection_ie(protection: &Protection) -> Result<Option<Prot
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::client::{self},
-        wlan_common::{
-            assert_variant, fake_bss_description,
-            ie::{
-                fake_ies::fake_wpa_ie,
-                rsn::fake_rsnes::{fake_wpa2_s_rsne, fake_wpa3_s_rsne},
-            },
-            security::{
-                wep::{WEP104_KEY_BYTES, WEP40_KEY_BYTES},
-                wpa::credential::PSK_SIZE_BYTES,
-            },
-            test_utils::fake_features::{fake_security_support, fake_security_support_empty},
-        },
+    use super::*;
+    use crate::client::{self};
+    use wlan_common::ie::fake_ies::fake_wpa_ie;
+    use wlan_common::ie::rsn::fake_rsnes::{fake_wpa2_s_rsne, fake_wpa3_s_rsne};
+    use wlan_common::security::wep::{WEP104_KEY_BYTES, WEP40_KEY_BYTES};
+    use wlan_common::security::wpa::credential::PSK_SIZE_BYTES;
+    use wlan_common::test_utils::fake_features::{
+        fake_security_support, fake_security_support_empty,
     };
+    use wlan_common::{assert_variant, fake_bss_description};
 
     #[test]
     fn rsn_auth_method() {

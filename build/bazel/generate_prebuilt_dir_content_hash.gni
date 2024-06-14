@@ -46,3 +46,22 @@ template("generate_prebuilt_dir_content_hash") {
     }
   }
 }
+
+# Name of the targets in //build/bazel/BUILD.gn that generate content hash
+# files to version prebuilt toolchains.
+prebuilt_content_hash_targets = {
+  python = "prebuilt_python_content_hash"
+  clang = "prebuilt_clang_content_hash"
+}
+
+# Labels to the targets above.
+prebuilt_content_hash_labels = {
+  python = "//build/bazel:${prebuilt_content_hash_targets.python}"
+  clang = "//build/bazel:${prebuilt_content_hash_targets.clang}"
+}
+
+# Output files of the targets above.
+prebuilt_content_hash_files = {
+  python = "$root_build_dir/prebuilt_content_hashes/python.content_hash"
+  clang = "$root_build_dir/prebuilt_content_hashes/clang.content_hash"
+}

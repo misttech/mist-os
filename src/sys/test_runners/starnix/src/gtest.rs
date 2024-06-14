@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{helpers::*, results_parser::*},
-    anyhow::{Context, Error},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_test::{self as ftest, Result_ as TestResult, Status},
-    ftest::CaseListenerProxy,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{io::BufReader, AsyncBufReadExt},
-    gtest_runner_lib::parser::*,
-    std::collections::HashMap,
-    test_runners_lib::cases::TestCaseInfo,
-};
+use crate::helpers::*;
+use crate::results_parser::*;
+use anyhow::{Context, Error};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_test::{self as ftest, Result_ as TestResult, Status};
+use ftest::CaseListenerProxy;
+use futures::io::BufReader;
+use futures::AsyncBufReadExt;
+use gtest_runner_lib::parser::*;
+use std::collections::HashMap;
+use test_runners_lib::cases::TestCaseInfo;
+use {fidl_fuchsia_component_runner as frunner, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
 

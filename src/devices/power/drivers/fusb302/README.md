@@ -108,9 +108,12 @@ This hurdle can be mitigated using the following:
 * When feasible, artificially delay the PD negotiation step that's failing, so
   the backlog of boot-time logs on the serial connection has time to drain.
 * A reliable USB PD sniffer is the only source of clues when the above fail.
-  We recommend [the "Twinkie" design][usb-pd-sniffer-twinkie], produced by the
-  Chromium OS project. It reliably captures CC traffic, and delegates USB PD
-  message decoding to a tool with a correct implementation.
+  We recommend
+  [the CY4500 from Cypress / Infineon Technologies][usb-pd-sniffer-cy4500], or
+  any high-quality implementation of the
+  [the "Twinkie" design][usb-pd-sniffer-twinkie] produced by the Chromium OS
+  project. Both recommendations include hardware that reliably captures CC
+  traffic, and software that correctly implements USB PD message decoding.
 
 ## References
 
@@ -133,4 +136,5 @@ The code contains references to the following documents.
 [vim3-v13-update]: https://www.khadas.com/post/vim3-v13-whats-new
 [vim3-v14-update]: https://www.khadas.com/post/vim3-v14-what-s-new
 [vim3-vin-splicing]: https://forum.khadas.com/t/powering-the-vim3/5202/23
+[usb-pd-sniffer-cy4500]: https://www.infineon.com/cms/en/product/evaluation-boards/cy4500/
 [usb-pd-sniffer-twinkie]: https://www.chromium.org/chromium-os/twinkie/

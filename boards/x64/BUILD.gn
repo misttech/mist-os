@@ -15,11 +15,16 @@ board_configuration("x64") {
     name = "default-board"
   }
 
+  kernel = {
+    serial_mode = "legacy"
+  }
+
   provided_features = [
     "fuchsia::pmm_checker_auto",
     "fuchsia::wlan_softmac",
     "fuchsia::paravirtualization",
     "fuchsia::paver",
+    "fuchsia::intel_hda",
   ]
 
   input_bundles = [
@@ -92,6 +97,11 @@ board_input_bundle("main_bundle") {
 }
 
 board_input_bundle("x64_common") {
+  configuration = {
+    power_manager =
+        "//src/power/power-manager/node_config/base_node_config.json5"
+  }
+
   drivers = [
     {
       package_target = "//src/devices/block/drivers/ahci:package"
@@ -179,22 +189,6 @@ board_input_bundle("x64_common") {
       driver_components = [ "meta/max98927.cm" ]
     },
     {
-      package_target = "//src/media/audio/drivers/intel-hda/codecs/hdmi:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/hdmi-audio-codec.cm" ]
-    },
-    {
-      package_target =
-          "//src/media/audio/drivers/intel-hda/codecs/realtek:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/realtek-audio-codec.cm" ]
-    },
-    {
-      package_target = "//src/media/audio/drivers/intel-hda/controller:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/intel-hda.cm" ]
-    },
-    {
       package_target = "//src/ui/input/drivers/ctaphid:package"
       package_set = "bootfs"
       driver_components = [ "meta/ctaphid.cm" ]
@@ -213,6 +207,21 @@ board_input_bundle("x64_common") {
       package_target = "//src/power/fake-powersource:fake-battery"
       package_set = "base"
       driver_components = [ "meta/fake_battery.cm" ]
+    },
+    {
+      package_target = "//src/devices/acpi/drivers/acpi-battery:acpi-battery"
+      package_set = "base"
+      driver_components = [ "meta/acpi-battery.cm" ]
+    },
+    {
+      package_target = "//src/devices/acpi/drivers/intel-thermal:intel-thermal"
+      package_set = "base"
+      driver_components = [ "meta/intel-thermal.cm" ]
+    },
+    {
+      package_target = "//src/graphics/drivers/msd-intel-gen:msd-intel-gen"
+      package_set = "base"
+      driver_components = [ "meta/libmsd_intel.cm" ]
     },
   ]
 
@@ -235,11 +244,6 @@ board_input_bundle("x64_common") {
           "//src/graphics/display/drivers/simple:simple-intel-package"
       package_set = "bootfs"
       driver_components = [ "meta/simple.intel.cm" ]
-    },
-    {
-      package_target = "//src/media/audio/drivers/intel-hda/codecs/qemu:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/qemu-audio-codec.cm" ]
     },
     {
       package_target = "//zircon/third_party/dev/ethernet/e1000:package"

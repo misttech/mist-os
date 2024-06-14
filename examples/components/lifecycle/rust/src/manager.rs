@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fidl_examples_routing_echo::EchoMarker, fuchsia_component::client, tracing::info};
+use fidl_fidl_examples_routing_echo::EchoMarker;
+use fuchsia_component::client;
+use tracing::info;
 
 // [START imports]
 use fidl_fuchsia_component::{BinderMarker, CreateChildArgs, RealmMarker};

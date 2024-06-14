@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::MetaSubpackagesError,
-    fuchsia_merkle::Hash,
-    fuchsia_url::RelativePackageUrl,
-    serde::{ser::Serializer, Deserialize, Serialize},
-    std::{
-        collections::{BTreeMap, HashMap},
-        io,
-    },
-};
+use crate::errors::MetaSubpackagesError;
+use fuchsia_merkle::Hash;
+use fuchsia_url::RelativePackageUrl;
+use serde::ser::Serializer;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
+use std::io;
 
 /// A `MetaSubpackages` represents the "meta/fuchsia.pkg/subpackages" file of a Fuchsia
 /// archive file of a Fuchsia package. It validates that all subpackage names
@@ -105,10 +102,12 @@ impl Serialize for MetaSubpackagesV1 {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::test::*, fuchsia_url::test::random_relative_package_url, maplit::hashmap,
-        proptest::prelude::*, serde_json::json,
-    };
+    use super::*;
+    use crate::test::*;
+    use fuchsia_url::test::random_relative_package_url;
+    use maplit::hashmap;
+    use proptest::prelude::*;
+    use serde_json::json;
 
     fn zeros_hash() -> Hash {
         "0000000000000000000000000000000000000000000000000000000000000000".parse().unwrap()

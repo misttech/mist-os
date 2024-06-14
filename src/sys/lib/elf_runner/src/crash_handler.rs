@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::crash_info::{ComponentCrashInfo, CrashRecords},
-    crate::error::ExceptionError,
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::TryStreamExt,
-    moniker::Moniker,
-    tracing::error,
-};
+use crate::crash_info::{ComponentCrashInfo, CrashRecords};
+use crate::error::ExceptionError;
+use fuchsia_async as fasync;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::TryStreamExt;
+use moniker::Moniker;
+use tracing::error;
 
 // Registers with the job to catch exceptions raised by it. Whenever we see an exception from this
 // job, record that the crash happened, and inform zircon that it should proceed to the next crash
@@ -78,15 +76,12 @@ async fn record_exception(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::{Context as _, Error},
-        fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
-        fuchsia_component::client as fclient,
-        fuchsia_runtime as fruntime,
-        fuchsia_zircon::HandleBased,
-        std::sync::Arc,
-    };
+    use super::*;
+    use anyhow::{Context as _, Error};
+    use fuchsia_component::client as fclient;
+    use fuchsia_zircon::HandleBased;
+    use std::sync::Arc;
+    use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_runtime as fruntime};
 
     #[fuchsia::test]
     async fn crash_test() -> Result<(), Error> {

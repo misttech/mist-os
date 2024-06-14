@@ -4,14 +4,17 @@
 
 #include "src/ui/scenic/lib/flatland/renderer/cpu_renderer.h"
 
+#include <fuchsia/images2/cpp/fidl.h>
+#include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <cmath>
 #include <cstdint>
 #include <optional>
 
-#include "fuchsia/sysmem/cpp/fidl.h"
-#include "fuchsia/ui/composition/cpp/fidl.h"
+#include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
@@ -169,10 +172,37 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
     // This should be extended to other cases later.
     auto image = images[0];
     auto image_id = image.identifier;
-    FX_DCHECK(image_id != allocation::kInvalidId);
+
+    ImageRect rectangle = rectangles[0];
+    uint32_t rectangle_width = static_cast<uint32_t>(rectangle.extent.x);
+    uint32_t rectangle_height = static_cast<uint32_t>(rectangle.extent.y);
+
+    // |allocation::kInvalidImageId| indicates solid fill color. Create and fill vmo for common ops.
+    if (image_id == allocation::kInvalidImageId) {
+      image.width = rectangle_width;
+      image.height = rectangle_height;
+      const auto kBytesPerPixel = 4;
+      fuchsia::sysmem2::ImageFormatConstraints constraints;
+      *constraints.mutable_pixel_format() = fuchsia::images2::PixelFormat::R8G8B8A8;
+      *constraints.mutable_max_size() = {.width = rectangle_width, .height = rectangle_height};
+      *constraints.mutable_bytes_per_row_divisor() = 1;
+      *constraints.mutable_min_bytes_per_row() = rectangle_width * kBytesPerPixel;
+      zx::vmo solid_fill_vmo;
+      zx::vmo::create(kBytesPerPixel * rectangle_width * rectangle_height, 0, &solid_fill_vmo);
+      MapHostPointer(solid_fill_vmo, flatland::HostPointerAccessMode::kWriteOnly,
+                     [&image](uint8_t* vmo_ptr, uint32_t num_bytes) {
+                       for (uint32_t i = 0; i < num_bytes; ++i) {
+                         vmo_ptr[i] =
+                             static_cast<uint8_t>(255 * image.multiply_color[i % kBytesPerPixel]);
+                       }
+                     });
+      image_map_[allocation::kInvalidImageId] =
+          std::make_pair(std::move(solid_fill_vmo), std::move(constraints));
+    }
 
     const auto& image_map_itr_ = image_map_.find(image_id);
-    FX_DCHECK(image_map_itr_ != image_map_.end());
+    // Dereferencing the end marker later is UB, so better fail right here.
+    FX_CHECK(image_map_itr_ != image_map_.end()) << "not found image_id: " << image_id;
     const auto& image_constraints = image_map_itr_->second.second;
 
     // Make sure the image conforms to the constraints of the collection.
@@ -193,10 +223,7 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
 
     // The rectangle, image, and render_target should be compatible, e.g. the image dimensions are
     // equal to the rectangle dimensions and less than or equal to the render target dimensions.
-    ImageRect rectangle = rectangles[0];
     FX_DCHECK(rectangle.orientation == fuchsia::ui::composition::Orientation::CCW_0_DEGREES);
-    uint32_t rectangle_width = static_cast<uint32_t>(rectangle.extent.x);
-    uint32_t rectangle_height = static_cast<uint32_t>(rectangle.extent.y);
     FX_DCHECK(rectangle_width <= render_target.width);
     FX_DCHECK(rectangle_height <= render_target.height);
     FX_DCHECK(rectangle_width == image.width);

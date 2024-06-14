@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input_device, crate::keyboard_binding, async_trait::async_trait,
-    futures::channel::mpsc::UnboundedSender,
-};
+use crate::{input_device, keyboard_binding};
+use async_trait::async_trait;
+use futures::channel::mpsc::UnboundedSender;
 
 /// A fake [`InputDeviceBinding`] for testing.
 pub struct FakeInputDeviceBinding {

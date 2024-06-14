@@ -4,10 +4,10 @@
 
 mod registry;
 
-use {
-    fidl_fuchsia_fuzzer as fuzz, fuchsia_component::server::ServiceFs, futures::StreamExt,
-    std::rc::Rc,
-};
+use fidl_fuchsia_fuzzer as fuzz;
+use fuchsia_component::server::ServiceFs;
+use futures::StreamExt;
+use std::rc::Rc;
 
 enum IncomingService {
     FuzzRegistry(fuzz::RegistryRequestStream),

@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        descriptor::EventDescriptor,
-        events::{Event, EventStream, ExitStatus},
-    },
-    anyhow::Error,
-    fidl_fuchsia_component as fcomponent,
-    moniker::Moniker,
-    regex::RegexSet,
-    std::{fmt, str::FromStr},
-    thiserror::Error,
-};
+use crate::descriptor::EventDescriptor;
+use crate::events::{Event, EventStream, ExitStatus};
+use anyhow::Error;
+use fidl_fuchsia_component as fcomponent;
+use moniker::Moniker;
+use regex::RegexSet;
+use std::fmt;
+use std::str::FromStr;
+use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum FieldMatcherError {

@@ -5,28 +5,20 @@
 use anyhow::Error;
 use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
 use fidl::endpoints::ProtocolMarker;
-use fidl_fuchsia_net_debug as fdebug;
-use fidl_fuchsia_net_dhcp as fdhcp;
-use fidl_fuchsia_net_filter as ffilter;
-use fidl_fuchsia_net_filter_deprecated as ffilter_deprecated;
-use fidl_fuchsia_net_interfaces as finterfaces;
-use fidl_fuchsia_net_name as fname;
-use fidl_fuchsia_net_neighbor as fneighbor;
-use fidl_fuchsia_net_root as froot;
-use fidl_fuchsia_net_routes as froutes;
-use fidl_fuchsia_net_stack as fstack;
-use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
-use fidl_fuchsia_sys2 as fsys;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol_at_path;
 use tracing::{Level, Subscriber};
-use tracing_subscriber::{
-    fmt::{
-        format::{self, FormatEvent, FormatFields},
-        FmtContext,
-    },
-    prelude::*,
-    registry::LookupSpan,
+use tracing_subscriber::fmt::format::{self, FormatEvent, FormatFields};
+use tracing_subscriber::fmt::FmtContext;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::registry::LookupSpan;
+use {
+    fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
+    fidl_fuchsia_net_filter as ffilter, fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
+    fidl_fuchsia_net_interfaces as finterfaces, fidl_fuchsia_net_name as fname,
+    fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_root as froot,
+    fidl_fuchsia_net_routes as froutes, fidl_fuchsia_net_stack as fstack,
+    fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fidl_fuchsia_sys2 as fsys,
+    fuchsia_async as fasync,
 };
 
 const LOG_LEVEL: Level = Level::INFO;

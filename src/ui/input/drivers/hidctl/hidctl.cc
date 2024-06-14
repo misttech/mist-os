@@ -255,14 +255,14 @@ void HidDevice::HandleData(async_dispatcher_t* dispatcher, async::WaitBase* wait
     return;
   }
 
-  if (signal->trigger & ZX_SOCKET_READABLE) {
+  if (signal->observed & ZX_SOCKET_READABLE) {
     status = Recv(buf_.data(), mtu_);
     if (status != ZX_OK) {
       DdkAsyncRemove();
       return;
     }
   }
-  if (signal->trigger & ZX_SOCKET_PEER_CLOSED) {
+  if (signal->observed & ZX_SOCKET_PEER_CLOSED) {
     zxlogf(DEBUG, "hidctl: socket closed (peer)");
     DdkAsyncRemove();
     return;

@@ -5,15 +5,13 @@
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_fuchsia_component::BinderMarker;
-use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_metrics_test::MetricEventLoggerQuerierMarker;
 use fidl_fuchsia_mockrebootcontroller::MockRebootControllerMarker;
 use fidl_fuchsia_samplertestcontroller::SamplerTestControllerMarker;
-use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_to_protocol_at, connect_to_protocol_at_path};
-use fuchsia_zircon as zx;
 use realm_client::InstalledNamespace;
 use utils::{Event, EventVerifier};
+use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 mod test_topology;
 mod utils;

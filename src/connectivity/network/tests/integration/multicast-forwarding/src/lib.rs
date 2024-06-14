@@ -8,10 +8,6 @@ use assert_matches::assert_matches;
 use async_trait::async_trait;
 use derivative::Derivative;
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_multicast_admin as fnet_multicast_admin;
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon::{self as zx};
 use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
@@ -19,14 +15,17 @@ use maplit::hashmap;
 use net_declare::{fidl_ip, fidl_subnet};
 use net_types::ip::{IpAddr, IpVersion};
 use netemul::RealmUdpSocket as _;
-use netstack_testing_common::{
-    interfaces,
-    realms::{Netstack, TestSandboxExt as _},
-};
+use netstack_testing_common::interfaces;
+use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use std::collections::HashMap;
 use test_case::test_case;
 use test_util::assert_gt;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
+};
 
 type UnicastSourceAndMulticastDestination = IpAddr<
     fnet_multicast_admin::Ipv4UnicastSourceAndMulticastDestination,

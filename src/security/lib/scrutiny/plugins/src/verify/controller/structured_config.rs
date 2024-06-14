@@ -9,14 +9,12 @@ use config_value_file::field::config_value_from_json_value;
 use scrutiny::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{
-    collections::{BTreeMap, HashSet},
-    fmt::Write,
-    fs::File,
-    io::BufReader,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashSet};
+use std::fmt::Write;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 /// A controller to extract all of the configuration values in a given build's component topology.
 #[derive(Default)]

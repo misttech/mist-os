@@ -8,15 +8,13 @@ use channel_config::{ChannelConfig, ChannelConfigs};
 use eager_package_config::omaha_client::{EagerPackageConfig, EagerPackageConfigs};
 use fidl_fuchsia_boot::{ArgumentsMarker, ArgumentsProxy};
 use fidl_fuchsia_pkg::{self as fpkg, CupMarker, CupProxy, GetInfoError};
-use omaha_client::{
-    common::App,
-    configuration::{Config, Updater},
-    protocol::{request::OS, Cohort},
-    version::Version,
-};
+use omaha_client::common::App;
+use omaha_client::configuration::{Config, Updater};
+use omaha_client::protocol::request::OS;
+use omaha_client::protocol::Cohort;
+use omaha_client::version::Version;
 use std::collections::HashMap;
-use std::fs;
-use std::io;
+use std::{fs, io};
 use tracing::{error, info, warn};
 
 // TODO: This is not 0.0.0.0 because that would cause state machine to not start. We should find a
@@ -330,13 +328,11 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_url::UnpinnedAbsolutePackageUrl;
     use futures::prelude::*;
-    use omaha_client::{
-        app_set::AppSet,
-        cup_ecdsa::{
-            test_support::{make_default_public_key_for_test, make_default_public_keys_for_test},
-            PublicKeyAndId, PublicKeys,
-        },
+    use omaha_client::app_set::AppSet;
+    use omaha_client::cup_ecdsa::test_support::{
+        make_default_public_key_for_test, make_default_public_keys_for_test,
     };
+    use omaha_client::cup_ecdsa::{PublicKeyAndId, PublicKeys};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_get_config() {

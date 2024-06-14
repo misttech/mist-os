@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::PackageBuildManifestError,
-    fuchsia_url::validate_resource_path,
-    serde::{Deserialize, Serialize},
-    std::{
-        collections::{btree_map, BTreeMap, HashSet},
-        fs,
-        io::{self, Read},
-        path::Path,
-    },
-    walkdir::WalkDir,
-};
+use crate::errors::PackageBuildManifestError;
+use fuchsia_url::validate_resource_path;
+use serde::{Deserialize, Serialize};
+use std::collections::{btree_map, BTreeMap, HashSet};
+use std::fs;
+use std::io::{self, Read};
+use std::path::Path;
+use walkdir::WalkDir;
 
 /// A `PackageBuildManifest` lists the files that should be included in a Fuchsia package. Both
 /// `external_contents` and `far_contents` are maps from package resource paths in the to-be-created

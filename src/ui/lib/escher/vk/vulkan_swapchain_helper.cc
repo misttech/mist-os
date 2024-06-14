@@ -16,6 +16,10 @@ namespace escher {
 VulkanSwapchainHelper::VulkanSwapchainHelper(VulkanSwapchain swapchain, vk::Device device,
                                              vk::Queue queue)
     : swapchain_(swapchain), device_(device), queue_(queue) {
+  FX_DCHECK(swapchain_.swapchain);
+  FX_DCHECK(swapchain_.images.size() > 0);
+  FX_DCHECK(device_);
+  FX_DCHECK(queue_);
   for (size_t i = 0; i < swapchain_.images.size(); ++i) {
     image_available_semaphores_.push_back(Semaphore::New(device_));
     render_finished_semaphores_.push_back(Semaphore::New(device_));
@@ -25,8 +29,13 @@ VulkanSwapchainHelper::VulkanSwapchainHelper(VulkanSwapchain swapchain, vk::Devi
 VulkanSwapchainHelper::~VulkanSwapchainHelper() {}
 
 void VulkanSwapchainHelper::DrawFrame(DrawFrameCallback draw_callback) {
+  TRACE_DURATION("gfx", "escher::VulkanSwapchain::DrawFrame");
+
   auto& image_available_semaphore = image_available_semaphores_[next_semaphore_index_];
   auto& render_finished_semaphore = render_finished_semaphores_[next_semaphore_index_];
+
+  FX_DCHECK(image_available_semaphore->vk_semaphore());
+  FX_DCHECK(render_finished_semaphore->vk_semaphore());
 
   uint32_t swapchain_index;
   {
@@ -70,8 +79,11 @@ void VulkanSwapchainHelper::DrawFrame(DrawFrameCallback draw_callback) {
 
   // Render the scene.  The Renderer will wait for acquireNextImageKHR() to
   // signal the semaphore.
-  auto& color_image_out = swapchain_.images[swapchain_index];
-  draw_callback(color_image_out, image_available_semaphore, render_finished_semaphore);
+  {
+    TRACE_DURATION("gfx", "escher::VulkanSwapchain::DrawCallback");
+    auto& color_image_out = swapchain_.images[swapchain_index];
+    draw_callback(color_image_out, image_available_semaphore, render_finished_semaphore);
+  }
 
   // When the image is completely rendered, present it.
   TRACE_DURATION("gfx", "escher::VulkanSwapchain::Present");

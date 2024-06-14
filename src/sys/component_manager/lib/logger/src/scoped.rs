@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    diagnostics_log::{PublishError, Publisher, PublisherOptions},
-    fidl_fuchsia_logger as flogger,
-    thiserror::Error,
-};
+use diagnostics_log::{PublishError, Publisher, PublisherOptions};
+use fidl_fuchsia_logger as flogger;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ScopedLoggerError {

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::actor_runner::ActorRunner, async_trait::async_trait, std::fmt::Debug};
+use crate::actor_runner::ActorRunner;
+use async_trait::async_trait;
+use std::fmt::Debug;
 
 /// Every stress test must implement this trait exactly once and pass it
 /// to run_test(). The test loop uses these methods to drive the stress test.

@@ -10,14 +10,14 @@ use crate::node::Node;
 use crate::types::{Milliseconds, Nanoseconds};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use fidl_fuchsia_kernel as fstats;
 use fuchsia_inspect::{self as inspect};
-use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use serde_derive::Deserialize;
-use serde_json as json;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use {fidl_fuchsia_kernel as fstats, serde_json as json};
 
 /// Node: CpuStatsHandler
 ///

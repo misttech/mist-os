@@ -2,49 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        checksum::{fletcher64, Checksum, Checksums},
-        errors::FxfsError,
-        log::*,
-        lsm_tree::types::{Item, ItemRef, LayerIterator},
-        object_handle::ObjectHandle,
-        object_store::{
-            extent_record::{ExtentKey, ExtentMode, ExtentValue},
-            object_manager::ObjectManager,
-            object_record::{
-                AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectItem,
-                ObjectKey, ObjectKeyData, ObjectValue, Timestamp,
-            },
-            transaction::{
-                lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation,
-                Options, ReadGuard, Transaction,
-            },
-            HandleOptions, HandleOwner, ObjectStore, TrimMode, TrimResult,
-        },
-        range::RangeExt,
-        round::{round_down, round_up},
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    assert_matches::assert_matches,
-    fidl_fuchsia_io as fio,
-    futures::{
-        stream::{FuturesOrdered, FuturesUnordered},
-        try_join, TryStreamExt,
-    },
-    fxfs_crypto::{KeyPurpose, WrappedKeys, XtsCipherSet},
-    fxfs_trace::trace,
-    std::{
-        cmp::min,
-        future::Future,
-        ops::{Bound, Range},
-        sync::{
-            atomic::{self, AtomicBool, Ordering},
-            Arc,
-        },
-    },
-    storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef},
+use crate::checksum::{fletcher64, Checksum, Checksums};
+use crate::errors::FxfsError;
+use crate::log::*;
+use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+use crate::object_handle::ObjectHandle;
+use crate::object_store::extent_record::{ExtentKey, ExtentMode, ExtentValue};
+use crate::object_store::object_manager::ObjectManager;
+use crate::object_store::object_record::{
+    AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectItem, ObjectKey,
+    ObjectKeyData, ObjectValue, Timestamp,
 };
+use crate::object_store::transaction::{
+    lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
+    ReadGuard, Transaction,
+};
+use crate::object_store::{HandleOptions, HandleOwner, ObjectStore, TrimMode, TrimResult};
+use crate::range::RangeExt;
+use crate::round::{round_down, round_up};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use assert_matches::assert_matches;
+use fidl_fuchsia_io as fio;
+use futures::stream::{FuturesOrdered, FuturesUnordered};
+use futures::{try_join, TryStreamExt};
+use fxfs_crypto::{KeyPurpose, WrappedKeys, XtsCipherSet};
+use fxfs_trace::trace;
+use std::cmp::min;
+use std::future::Future;
+use std::ops::{Bound, Range};
+use std::sync::atomic::{self, AtomicBool, Ordering};
+use std::sync::Arc;
+use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
 
 /// Maximum size for an extended attribute name.
 pub const MAX_XATTR_NAME_SIZE: usize = 255;
@@ -1459,25 +1447,21 @@ pub struct NeedsTrim(pub bool);
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{
-            errors::FxfsError,
-            filesystem::{FxFilesystem, OpenFxFilesystem},
-            object_handle::ObjectHandle,
-            object_store::{
-                data_object_handle::WRITE_ATTR_BATCH_SIZE,
-                transaction::{lock_keys, Mutation, Options},
-                AttributeKey, DataObjectHandle, Directory, HandleOptions, LockKey, ObjectKey,
-                ObjectStore, ObjectValue, SetExtendedAttributeMode, StoreObjectHandle,
-                FSVERITY_MERKLE_ATTRIBUTE_ID,
-            },
-        },
-        fuchsia_async as fasync,
-        futures::join,
-        fxfs_insecure_crypto::InsecureCrypt,
-        std::sync::Arc,
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+    use crate::errors::FxfsError;
+    use crate::filesystem::{FxFilesystem, OpenFxFilesystem};
+    use crate::object_handle::ObjectHandle;
+    use crate::object_store::data_object_handle::WRITE_ATTR_BATCH_SIZE;
+    use crate::object_store::transaction::{lock_keys, Mutation, Options};
+    use crate::object_store::{
+        AttributeKey, DataObjectHandle, Directory, HandleOptions, LockKey, ObjectKey, ObjectStore,
+        ObjectValue, SetExtendedAttributeMode, StoreObjectHandle, FSVERITY_MERKLE_ATTRIBUTE_ID,
     };
+    use fuchsia_async as fasync;
+    use futures::join;
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use std::sync::Arc;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
     const TEST_OBJECT_NAME: &str = "foo";

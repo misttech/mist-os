@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    packet_encoding::{Decodable, Encodable},
-    std::u8,
-};
+use packet_encoding::{Decodable, Encodable};
+use std::u8;
 
 use crate::packets::player_application_settings::PlayerApplicationSettingAttributeId;
 use crate::packets::{

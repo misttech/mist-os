@@ -6,39 +6,37 @@
 
 ############# STEPS FOR ADDING LACEWING SELF TEST TO INFRA - START #############
 # 1. Identify which all <PRODUCT>.<BOARD> you like to run this test on
-# 2. For each of the <PRODUCT>.<BOARD> there is a Test group and Package group
-#    defined below. Accordingly update each of <PRODUCT>.<BOARD> Infra Test and
-#    Package group where you like to run the test
-#    Note: Update the Package group only if your test depends on any packages
+# 2. For each of the <PRODUCT>.<BOARD> there is a Test group defined below.
+#    Accordingly update each of <PRODUCT>.<BOARD> Infra Test group where you
+#    like to run the test
 ############## STEPS FOR ADDING LACEWING SELF TEST TO INFRA - END ##############
 
-# Infra Test and Package groups:
-# For every <PRODUCT>.<BOARD> that we plans to run the tests on, below test
-# and package groups are created:
-#     Test groups
-#         <PRODUCT>.<BOARD>
-#             Stable (Tests that passed for at least 200+ consecutive runs)
-#                 Tests that require SL4F transport, if any
-#                 Tests that does not require SL4F transport
-#             Unstable (Tests that are yet to pass 200 consecutive runs)
-#                 Tests that require SL4F transport, if any
-#                 Tests that does not require SL4F transport
-#             Staging (Stable test group + Unstable test group)
-#                 Tests that require SL4F transport, if any
-#                 Tests that does not require SL4F transport
-#     Package groups
-#         <PRODUCT>.<BOARD>
-#             Stable (Packages needed for Stable test groups)
-#                 Packages needed for SL4F test groups, if any
-#                 Packages needed for non-SL4F test groups
-#             Unstable (Packages needed for Stable test groups)
-#                 Packages needed for SL4F test groups, if any
-#                 Packages needed for non-SL4F test groups
-# Exception: Instead of `x64` board, we will use `nuc` and `emulator`.
-
+# Infra Test groups:
+# For every <PRODUCT>.<BOARD> that we plan to run the tests on, below test
+# groups are created:
+#
+# <PRODUCT>.<BOARD>
+#     Stable (Tests that passed for at least 200+ consecutive runs)
+#         Tests that require SL4F transport, if any
+#         Tests that does not require SL4F transport
+#     Unstable (Tests that are yet to pass 200 consecutive runs)
+#         Tests that require SL4F transport, if any
+#         Tests that does not require SL4F transport
+#
+# Note: Each entry in test group should refer to a test case along with its
+# dependencies (if any). For example,
+#   * `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:test_session`
+#     is a group that contains
+#     `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:session_test_fc`
+#      test and its dependencies
+#     `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:packages`.
+#     So include this group name (not the test name)
+#   * `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_rtc:rtc_test_fc`
+#     is a test and it does not have any dependencies. So you can include this test name directly
+#
 # Note - Except in `Staging` groups, please refrain from referencing one group
-# in another one (such as including `core_emulator_stable_tests` in
-# `workbench_emulator_stable_tests`) as it is not guaranteed that every single
+# in another one (such as including `core_x64_stable_tests` in
+# `workbench_x64_stable_tests`) as it is not guaranteed that every single
 # test case supported by <product-#1>.<board-#1> is supported by other
 # <product-#2>.<board-#2>
 
@@ -54,70 +52,79 @@ template("group_with_no_dir_target_deps") {
 
 ############################# Test groups - Start ##############################
 
-# core.emulator
-group_with_no_dir_target_deps("core_emulator_stable_sl4f_tests") {
+# core.x64
+group_with_no_dir_target_deps("core_x64_stable_sl4f_tests") {
+  testonly = true
+  public_deps = [ "examples/test_soft_reboot:test_soft_reboot_fc_preferred" ]
+}
+
+group_with_no_dir_target_deps("core_x64_stable_tests") {
+  testonly = true
+  public_deps = [
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "honeydew/tests/functional_tests:core_x64_stable_tests",
+  ]
+}
+
+group_with_no_dir_target_deps("core_x64_unstable_sl4f_tests") {
   testonly = true
   public_deps = []
 }
 
-group_with_no_dir_target_deps("core_emulator_stable_tests") {
+group_with_no_dir_target_deps("core_x64_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:core_emulator_stable_tests",
+    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "honeydew/tests/functional_tests:core_x64_unstable_tests",
   ]
 }
 
-group_with_no_dir_target_deps("core_emulator_unstable_sl4f_tests") {
+group("core_x64_staging_sl4f_tests") {
   testonly = true
   public_deps = [
-    "examples/test_soft_reboot:soft_reboot_test_fc_preferred($host_toolchain)",
+    ":core_x64_stable_sl4f_tests",
+    ":core_x64_unstable_sl4f_tests",
   ]
 }
 
-group_with_no_dir_target_deps("core_emulator_unstable_tests") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:core_emulator_unstable_tests" ]
-}
-
-group("core_emulator_staging_sl4f_tests") {
+group("core_x64_staging_tests") {
   testonly = true
   public_deps = [
-    ":core_emulator_stable_sl4f_tests",
-    ":core_emulator_unstable_sl4f_tests",
+    ":core_x64_stable_tests",
+    ":core_x64_unstable_tests",
   ]
 }
 
-group("core_emulator_staging_tests") {
+# workbench.x64
+group_with_no_dir_target_deps("workbench_x64_stable_tests") {
   testonly = true
   public_deps = [
-    ":core_emulator_stable_tests",
-    ":core_emulator_unstable_tests",
-  ]
-}
-
-# workbench.emulator
-group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
-  testonly = true
-  public_deps = [
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:workbench_emulator_stable_tests",
+    "honeydew/tests/functional_tests:workbench_x64_stable_tests",
   ]
 }
 
-group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_emulator_unstable_tests" ]
-}
-
-group("workbench_emulator_staging_tests") {
+group_with_no_dir_target_deps("workbench_x64_unstable_tests") {
   testonly = true
   public_deps = [
-    ":workbench_emulator_stable_tests",
-    ":workbench_emulator_unstable_tests",
+    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "honeydew/tests/functional_tests:workbench_x64_unstable_tests",
+  ]
+}
+
+group("workbench_x64_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":workbench_x64_stable_tests",
+    ":workbench_x64_unstable_tests",
   ]
 }
 
@@ -125,15 +132,21 @@ group("workbench_emulator_staging_tests") {
 group_with_no_dir_target_deps("core_vim3_stable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_stable_tests",
   ]
 }
 
 group_with_no_dir_target_deps("core_vim3_unstable_tests") {
   testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_vim3_unstable_tests" ]
+  public_deps = [
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "honeydew/tests/functional_tests:core_vim3_unstable_tests",
+  ]
 }
 
 group("core_vim3_staging_tests") {
@@ -148,18 +161,21 @@ group("core_vim3_staging_tests") {
 group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
     "honeydew/tests/functional_tests:workbench_vim3_stable_tests",
   ]
 }
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_vim3_unstable_tests" ]
+  public_deps = [
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "honeydew/tests/functional_tests:workbench_vim3_unstable_tests",
+  ]
 }
 
 group("workbench_vim3_staging_tests") {
@@ -167,51 +183,6 @@ group("workbench_vim3_staging_tests") {
   public_deps = [
     ":workbench_vim3_stable_tests",
     ":workbench_vim3_unstable_tests",
-  ]
-}
-
-# core.nuc
-group_with_no_dir_target_deps("core_nuc_stable_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:core_nuc_stable_tests",
-  ]
-}
-
-group_with_no_dir_target_deps("core_nuc_unstable_tests") {
-  testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_nuc_unstable_tests" ]
-}
-
-group("core_nuc_staging_tests") {
-  testonly = true
-  public_deps = [
-    ":core_nuc_stable_tests",
-    ":core_nuc_unstable_tests",
-  ]
-}
-
-# workbench.nuc
-group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
-  testonly = true
-  public_deps = [
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "honeydew/tests/functional_tests:workbench_nuc_stable_tests",
-  ]
-}
-
-group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_nuc_unstable_tests" ]
-}
-
-group("workbench_nuc_staging_tests") {
-  testonly = true
-  public_deps = [
-    ":workbench_nuc_stable_tests",
-    ":workbench_nuc_unstable_tests",
   ]
 }
 
@@ -226,8 +197,13 @@ group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
 group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_idle_suspend_auto_resume_fc($host_toolchain)",
+    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_vim3_unstable_tests",
   ]
 }
@@ -242,77 +218,73 @@ group("starnix_vim3_staging_tests") {
 
 ############################## Test groups - End ###############################
 
+# TODO(https://fxbug.dev/338091602): Everything below this line will be deleted
 ############################ Package groups - Start ############################
-# core.emulator
-group_with_no_dir_target_deps("core_emulator_stable_sl4f_packages") {
+# core.x64
+group("core_x64_stable_sl4f_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ ":core_x64_stable_sl4f_tests" ]
 }
 
-group_with_no_dir_target_deps("core_emulator_stable_packages") {
+group("core_x64_stable_packages") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:core_emulator_stable_packages" ]
+  public_deps = [ ":core_x64_stable_tests" ]
 }
 
-group_with_no_dir_target_deps("core_emulator_unstable_sl4f_packages") {
+group("core_x64_unstable_sl4f_packages") {
   testonly = true
-  public_deps = [ "honeydew:sl4f_packages" ]
+  public_deps = [ ":core_x64_unstable_sl4f_tests" ]
 }
 
-group_with_no_dir_target_deps("core_emulator_unstable_packages") {
+group("core_x64_unstable_packages") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:core_emulator_unstable_packages" ]
+  public_deps = [ ":core_x64_unstable_tests" ]
 }
 
-group("core_emulator_staging_sl4f_packages") {
+group("core_x64_staging_sl4f_packages") {
   testonly = true
   public_deps = [
-    ":core_emulator_stable_sl4f_packages",
-    ":core_emulator_unstable_sl4f_packages",
+    ":core_x64_stable_sl4f_packages",
+    ":core_x64_unstable_sl4f_packages",
   ]
 }
 
-group("core_emulator_staging_packages") {
+group("core_x64_staging_packages") {
   testonly = true
   public_deps = [
-    ":core_emulator_stable_packages",
-    ":core_emulator_unstable_packages",
+    ":core_x64_stable_packages",
+    ":core_x64_unstable_packages",
   ]
 }
 
-# workbench.emulator
-group_with_no_dir_target_deps("workbench_emulator_stable_packages") {
+# workbench.x64
+group("workbench_x64_stable_packages") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_emulator_stable_packages" ]
+  public_deps = [ ":workbench_x64_stable_tests" ]
 }
 
-group_with_no_dir_target_deps("workbench_emulator_unstable_packages") {
+group("workbench_x64_unstable_packages") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_emulator_unstable_packages" ]
+  public_deps = [ ":workbench_x64_unstable_tests" ]
 }
 
-group("workbench_emulator_staging_packages") {
+group("workbench_x64_staging_packages") {
   testonly = true
   public_deps = [
-    ":workbench_emulator_stable_packages",
-    ":workbench_emulator_unstable_packages",
+    ":workbench_x64_stable_packages",
+    ":workbench_x64_unstable_packages",
   ]
 }
 
 # core.vim3
-group_with_no_dir_target_deps("core_vim3_stable_packages") {
+group("core_vim3_stable_packages") {
   testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_vim3_stable_packages" ]
+  public_deps = [ ":core_vim3_stable_tests" ]
 }
 
-group_with_no_dir_target_deps("core_vim3_unstable_packages") {
+group("core_vim3_unstable_packages") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:core_vim3_unstable_packages" ]
+  public_deps = [ ":core_vim3_unstable_tests" ]
 }
 
 group("core_vim3_staging_packages") {
@@ -324,16 +296,14 @@ group("core_vim3_staging_packages") {
 }
 
 # workbench.vim3
-group_with_no_dir_target_deps("workbench_vim3_stable_packages") {
+group("workbench_vim3_stable_packages") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_vim3_stable_packages" ]
+  public_deps = [ ":workbench_vim3_stable_tests" ]
 }
 
-group_with_no_dir_target_deps("workbench_vim3_unstable_packages") {
+group("workbench_vim3_unstable_packages") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_vim3_unstable_packages" ]
+  public_deps = [ ":workbench_vim3_unstable_tests" ]
 }
 
 group("workbench_vim3_staging_packages") {
@@ -344,59 +314,17 @@ group("workbench_vim3_staging_packages") {
   ]
 }
 
-# core.nuc
-group_with_no_dir_target_deps("core_nuc_stable_packages") {
-  testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_nuc_stable_packages" ]
-}
-
-group_with_no_dir_target_deps("core_nuc_unstable_packages") {
-  testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_nuc_unstable_packages" ]
-}
-
-group("core_nuc_staging_packages") {
-  testonly = true
-  public_deps = [
-    ":core_nuc_stable_packages",
-    ":core_nuc_unstable_packages",
-  ]
-}
-
-# workbench.nuc
-group_with_no_dir_target_deps("workbench_nuc_stable_packages") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_nuc_stable_packages" ]
-}
-
-group_with_no_dir_target_deps("workbench_nuc_unstable_packages") {
-  testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_nuc_unstable_packages" ]
-}
-
-group("workbench_nuc_staging_packages") {
-  testonly = true
-  public_deps = [
-    ":workbench_nuc_stable_packages",
-    ":workbench_nuc_unstable_packages",
-  ]
-}
-
 # starnix.vim3
 # Note: This will be run on internal builder, hence using `starnix` here instead
 # of internal `<PRODUCT>` name.
-group_with_no_dir_target_deps("starnix_vim3_stable_packages") {
+group("starnix_vim3_stable_packages") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:starnix_vim3_stable_packages" ]
+  public_deps = [ ":starnix_vim3_stable_tests" ]
 }
 
-group_with_no_dir_target_deps("starnix_vim3_unstable_packages") {
+group("starnix_vim3_unstable_packages") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:starnix_vim3_unstable_packages" ]
+  public_deps = [ ":starnix_vim3_unstable_tests" ]
 }
 
 group("starnix_vim3_staging_packages") {

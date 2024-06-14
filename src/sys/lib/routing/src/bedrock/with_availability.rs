@@ -68,6 +68,7 @@ mod tests {
             .route(Request {
                 availability: Availability::Optional,
                 target: FakeComponentToken::new(),
+                debug: false,
             })
             .await
             .unwrap();
@@ -87,6 +88,7 @@ mod tests {
             .route(Request {
                 availability: Availability::Required,
                 target: FakeComponentToken::new(),
+                debug: false,
             })
             .await
             .unwrap_err();

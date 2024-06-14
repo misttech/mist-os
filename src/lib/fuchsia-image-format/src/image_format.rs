@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::format_err;
-use anyhow::{anyhow, Error};
-use fidl_fuchsia_images2 as fimages2;
+use anyhow::{anyhow, format_err, Error};
 use fidl_fuchsia_math::{RectU, SizeU};
-use fidl_fuchsia_sysmem as fsysmem;
-use fidl_fuchsia_sysmem2 as fsysmem2;
+use {
+    fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem as fsysmem,
+    fidl_fuchsia_sysmem2 as fsysmem2,
+};
 
 use super::linux_drm::DRM_FORMAT_MOD_LINEAR;
 use super::round_up_to_increment;

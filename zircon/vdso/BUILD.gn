@@ -106,7 +106,10 @@ fidl("zx") {
 zither_golden_files("ifs") {
   fidl = ":zx"
   backend = "zircon_ifs"
-  sources = [ "//src/zircon/lib/zircon/zircon.ifs" ]
+  sources = [
+    "//src/zircon/lib/zircon/libzircon.json",
+    "//src/zircon/lib/zircon/zircon.ifs",
+  ]
 }
 
 # TODO(https://fxbug.dev/42128146): Consumption of this header in assembly should be

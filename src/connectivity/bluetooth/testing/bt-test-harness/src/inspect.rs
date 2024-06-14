@@ -2,31 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    diagnostics_reader::{ArchiveReader, ComponentSelector, DiagnosticsHierarchy, Inspect},
-    fidl_fuchsia_bluetooth_sys::{AccessMarker, AccessProxy},
-    fuchsia_async::DurationExt,
-    fuchsia_bluetooth::expectation::{
-        asynchronous::{
-            expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
-        },
-        Predicate,
-    },
-    fuchsia_zircon::Duration,
-    futures::{future::BoxFuture, FutureExt},
-    std::{
-        ops::{Deref, DerefMut},
-        sync::Arc,
-    },
-    test_harness::{SharedState, TestHarness},
+use anyhow::{Context, Error};
+use diagnostics_reader::{ArchiveReader, ComponentSelector, DiagnosticsHierarchy, Inspect};
+use fidl_fuchsia_bluetooth_sys::{AccessMarker, AccessProxy};
+use fuchsia_async::DurationExt;
+use fuchsia_bluetooth::expectation::asynchronous::{
+    expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
 };
+use fuchsia_bluetooth::expectation::Predicate;
+use fuchsia_zircon::Duration;
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use test_harness::{SharedState, TestHarness};
 
-use crate::{
-    core_realm::{CoreRealm, SHARED_STATE_INDEX},
-    host_watcher::ActivatedFakeHost,
-    timeout_duration,
-};
+use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
+use crate::host_watcher::ActivatedFakeHost;
+use crate::timeout_duration;
 
 // Controls the rate at which to snapshot the inspect tree (i.e. update InspectState). Arbitrarily
 // set to snapshot the inspect tree every 1 second.

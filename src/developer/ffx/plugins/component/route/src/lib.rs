@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use component_debug::{cli, route::RouteReport};
+use component_debug::cli;
+use component_debug::route::RouteReport;
 use errors::FfxError;
 use ffx_component::rcs;
 use ffx_component_route_args::RouteCommand;

@@ -7,25 +7,21 @@ use core::num::NonZeroU16;
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
-use net_types::{
-    ip::{Ip, Ipv4, Ipv6},
-    ZonedAddr,
-};
+use net_types::ZonedAddr;
 use packet::Buf;
 use test_case::test_case;
 
-use netstack3_core::{
-    testutil::{set_logger_for_test, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder, TestIpExt},
-    IpExt,
-};
+use netstack3_base::testutil::{set_logger_for_test, TestIpExt};
+use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder};
+use netstack3_core::IpExt;
 
 const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
 
-#[ip_test]
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
 #[test_case(true; "bind to device")]
 #[test_case(false; "no bind to device")]
-#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn loopback_bind_to_device<I: Ip + IpExt + TestIpExt>(bind_to_device: bool) {
+fn loopback_bind_to_device<I: IpExt + TestIpExt>(bind_to_device: bool) {
     set_logger_for_test();
     const HELLO: &'static [u8] = b"Hello";
     let (mut ctx, local_device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS).build();

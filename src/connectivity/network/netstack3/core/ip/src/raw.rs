@@ -4,37 +4,39 @@
 
 //! Facilities backing raw IP sockets.
 
-use alloc::collections::{btree_map::Entry, BTreeMap, HashMap};
+use alloc::collections::btree_map::Entry;
+use alloc::collections::{BTreeMap, HashMap};
 use core::fmt::Debug;
+use core::num::NonZeroU8;
 use derivative::Derivative;
-use net_types::{
-    ip::{Ip, IpVersionMarker},
-    SpecifiedAddr, ZonedAddr,
+use log::debug;
+use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
+use net_types::{SpecifiedAddr, ZonedAddr};
+use netstack3_base::socket::{
+    DualStackIpExt, DualStackRemoteIp, SocketIpAddr, SocketZonedAddrExt as _,
 };
+use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    socket::{DualStackIpExt, DualStackRemoteIp, SocketZonedAddrExt as _},
-    sync::{PrimaryRc, StrongRc, WeakRc},
     AnyDevice, ContextPair, DeviceIdContext, ReferenceNotifiers, ReferenceNotifiersExt as _,
     RemoveResourceResultWithContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
     ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
-use packet::BufferMut;
+use packet::{BufferMut, SliceBufViewMut};
+use packet_formats::icmp;
 use packet_formats::ip::IpPacket;
-use tracing::debug;
 use zerocopy::ByteSlice;
 
-use crate::{
-    internal::{
-        base::IpExt,
-        raw::{
-            protocol::RawIpSocketProtocol,
-            state::{RawIpSocketLockedState, RawIpSocketState},
-        },
-    },
-    socket::{DefaultSendOptions, IpSockCreateAndSendError, IpSocketHandler},
-};
+use crate::internal::base::IpExt;
+use crate::internal::raw::filter::RawIpSocketIcmpFilter;
+use crate::internal::raw::protocol::RawIpSocketProtocol;
+use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
+use crate::internal::socket::{SendOneShotIpPacketError, SocketHopLimits};
+use crate::socket::{IpSockCreateAndSendError, IpSocketHandler, SendOptions};
+use crate::DEFAULT_HOP_LIMITS;
 
+mod checksum;
+pub(crate) mod filter;
 pub(crate) mod protocol;
 pub(crate) mod state;
 
@@ -97,6 +99,11 @@ where
             PrimaryRawIpSocketId(PrimaryRc::new(RawIpSocketState::new(protocol, external_state)));
         let strong = self.core_ctx().with_socket_map_mut(|socket_map| socket_map.insert(socket));
         debug!("created raw IP socket {strong:?}, on protocol {protocol:?}");
+
+        if protocol.requires_system_checksums() {
+            self.core_ctx().with_locked_state_mut(&strong, |state| state.system_checksums = true)
+        }
+
         strong
     }
 
@@ -136,7 +143,7 @@ where
                 <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
             >,
         >,
-        body: B,
+        mut body: B,
     ) -> Result<(), RawIpSocketSendToError> {
         match id.protocol() {
             RawIpSocketProtocol::Raw => return Err(RawIpSocketSendToError::ProtocolRaw),
@@ -156,26 +163,52 @@ where
         };
         let protocol = id.protocol().proto();
 
-        // TODO(https://fxbug.dev/337818855): Use the socket's send options.
-        let options = DefaultSendOptions::default();
-
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_locked_state_and_socket_handler(id, |state, core_ctx| {
-            let device = state.bound_device.clone();
-            let (remote_ip, device) =
-                remote_ip.resolve_addr_with_device(device).map_err(RawIpSocketSendToError::Zone)?;
+            let RawIpSocketLockedState {
+                bound_device,
+                icmp_filter: _,
+                hop_limits,
+                system_checksums,
+            } = state;
+            let (remote_ip, device) = remote_ip
+                .resolve_addr_with_device(bound_device.clone())
+                .map_err(RawIpSocketSendToError::Zone)?;
+            let send_options = RawIpSocketSendOptions { hop_limits: &hop_limits };
+
+            let build_packet_fn =
+                |src_ip: SocketIpAddr<I::Addr>| -> Result<RawIpBody<_, _>, RawIpSocketSendToError> {
+                    if *system_checksums {
+                        let buf = SliceBufViewMut::new(body.as_mut());
+                        if !checksum::populate_checksum::<I, _>(
+                            src_ip.addr(),
+                            remote_ip.addr(),
+                            protocol,
+                            buf,
+                        ) {
+                            return Err(RawIpSocketSendToError::InvalidBody);
+                        }
+                    }
+                    Ok(RawIpBody::new(protocol, src_ip.addr(), remote_ip.addr(), body))
+                };
+
             core_ctx
-                .send_oneshot_ip_packet(
+                .send_oneshot_ip_packet_with_fallible_serializer(
                     bindings_ctx,
                     device.as_ref().map(|d| d.as_ref()),
                     local_ip,
                     remote_ip,
                     protocol,
-                    &options,
-                    |src_ip| RawIpBody::new(protocol, src_ip.addr(), remote_ip.addr(), body),
+                    &send_options,
+                    build_packet_fn,
                     None,
                 )
-                .map_err(RawIpSocketSendToError::Ip)
+                .map_err(|e| match e {
+                    SendOneShotIpPacketError::CreateAndSendError { err } => {
+                        RawIpSocketSendToError::Ip(err)
+                    }
+                    SendOneShotIpPacketError::SerializeError(err) => err,
+                })
         })
     }
 
@@ -207,6 +240,80 @@ where
     ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
         self.core_ctx().with_locked_state(id, |state| state.bound_device.clone())
     }
+
+    /// Sets the socket's ICMP filter, returning the original value.
+    ///
+    /// Note, if the socket's protocol is not compatible (e.g. ICMPv4 for an
+    /// IPv4 socket, or ICMPv6 for an IPv6 socket), an error is returned.
+    pub fn set_icmp_filter(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+        filter: Option<RawIpSocketIcmpFilter<I>>,
+    ) -> Result<Option<RawIpSocketIcmpFilter<I>>, RawIpSocketIcmpFilterError> {
+        debug!("setting ICMP Filter on {id:?}: {filter:?}");
+        if !id.protocol().is_icmp() {
+            return Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp);
+        }
+        Ok(self
+            .core_ctx()
+            .with_locked_state_mut(id, |state| core::mem::replace(&mut state.icmp_filter, filter)))
+    }
+
+    /// Gets the socket's ICMP
+    ///
+    /// Note, if the socket's protocol is not compatible (e.g. ICMPv4 for an
+    /// IPv4 socket, or ICMPv6 for an IPv6 socket), an error is returned.
+    pub fn get_icmp_filter(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+    ) -> Result<Option<RawIpSocketIcmpFilter<I>>, RawIpSocketIcmpFilterError> {
+        if !id.protocol().is_icmp() {
+            return Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp);
+        }
+        Ok(self.core_ctx().with_locked_state(id, |state| state.icmp_filter.clone()))
+    }
+
+    /// Sets the socket's unicast hop limit, returning the original value.
+    ///
+    /// If `None` is provided, the hop limit will be restored to the system
+    /// default.
+    pub fn set_unicast_hop_limit(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+        new_limit: Option<NonZeroU8>,
+    ) -> Option<NonZeroU8> {
+        self.core_ctx().with_locked_state_mut(id, |state| {
+            core::mem::replace(&mut state.hop_limits.unicast, new_limit)
+        })
+    }
+
+    /// Gets the socket's unicast hop limit, or the system default, if unset.
+    pub fn get_unicast_hop_limit(&mut self, id: &RawIpApiSocketId<I, C>) -> NonZeroU8 {
+        self.core_ctx().with_locked_state(id, |state| {
+            state.hop_limits.get_limits_with_defaults(&DEFAULT_HOP_LIMITS).unicast
+        })
+    }
+
+    /// Sets the socket's multicast hop limit, returning the original value.
+    ///
+    /// If `None` is provided, the hop limit will be restored to the system
+    /// default.
+    pub fn set_multicast_hop_limit(
+        &mut self,
+        id: &RawIpApiSocketId<I, C>,
+        new_limit: Option<NonZeroU8>,
+    ) -> Option<NonZeroU8> {
+        self.core_ctx().with_locked_state_mut(id, |state| {
+            core::mem::replace(&mut state.hop_limits.multicast, new_limit)
+        })
+    }
+
+    /// Gets the socket's multicast hop limit, or the system default, if unset.
+    pub fn get_multicast_hop_limit(&mut self, id: &RawIpApiSocketId<I, C>) -> NonZeroU8 {
+        self.core_ctx().with_locked_state(id, |state| {
+            state.hop_limits.get_limits_with_defaults(&DEFAULT_HOP_LIMITS).multicast
+        })
+    }
 }
 
 /// Errors that may occur when calling [`RawIpSocketApi::send_to`].
@@ -219,10 +326,21 @@ pub enum RawIpSocketSendToError {
     /// The provided remote_ip was an IPv4-mapped-IPv6 address. Dual stack
     /// operations are not supported on raw IP sockets.
     MappedRemoteIp,
+    /// The provided packet body was invalid, and could not be sent. Typically
+    /// originates when the stack is asked to inspect the packet body, e.g. to
+    /// compute and populate the checksum value.
+    InvalidBody,
     /// There was an error when resolving the remote_ip's zone.
     Zone(ZonedAddressError),
     /// The IP layer failed to send the packet.
     Ip(IpSockCreateAndSendError),
+}
+
+/// Errors that may occur getting/setting the ICMP filter for a raw IP socket.
+#[derive(Debug, PartialEq)]
+pub enum RawIpSocketIcmpFilterError {
+    /// The socket's protocol does not allow ICMP filters.
+    ProtocolNotIcmp,
 }
 
 /// The owner of socket state.
@@ -240,8 +358,9 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> Debug
 }
 
 /// Reference to the state of a live socket.
-#[derive(Derivative)]
+#[derive(Derivative, GenericOverIp)]
 #[derivative(Clone(bound = ""), Eq(bound = ""), Hash(bound = ""), PartialEq(bound = ""))]
+#[generic_over_ip(I, Ip)]
 pub struct RawIpSocketId<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>(
     StrongRc<RawIpSocketState<I, D, BT>>,
 );
@@ -493,38 +612,96 @@ where
 
 /// Returns 'True' if the given packet should be delivered to the given socket.
 fn should_deliver_to_socket<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
-    _packet: &I::Packet<B>,
+    packet: &I::Packet<B>,
     device: &D,
     socket: &RawIpSocketLockedState<I, D::Weak>,
 ) -> bool {
-    // TODO(https://fxbug.dev/337816586): Check ICMPv6 Filters.
-    let RawIpSocketLockedState { bound_device, _marker } = socket;
-    bound_device.as_ref().map_or(true, |bound_device| bound_device == device)
+    let RawIpSocketLockedState { bound_device, icmp_filter, hop_limits: _, system_checksums } =
+        socket;
+    // Verify the received device matches the socket's bound device, if any.
+    if bound_device.as_ref().is_some_and(|bound_device| bound_device != device) {
+        return false;
+    }
+
+    // Verify the inner message's checksum, if requested.
+    // NB: The checksum was not previously validated by the IP layer, because
+    // packets are delivered to raw sockets before the IP layer attempts to
+    // parse the inner message.
+    if *system_checksums && !checksum::has_valid_checksum::<I, B>(packet) {
+        return false;
+    }
+
+    // Verify the packet passes the socket's icmp_filter, if any.
+    if icmp_filter.as_ref().is_some_and(|icmp_filter| {
+        // NB: If the socket has an icmp_filter, its protocol must be ICMP.
+        // That means the packet must be ICMP, because we're considering
+        // delivering it to this socket.
+        debug_assert!(RawIpSocketProtocol::<I>::new(packet.proto()).is_icmp());
+        match icmp::peek_message_type(packet.body()) {
+            // NB: The peek call above will fail if 1) the body doesn't have
+            // enough bytes to be an ICMP header, or if 2) the message_type from
+            // the header is unrecognized. In either case, don't deliver the
+            // packet. This is consistent with Linux in the first case, but not
+            // the second (e.g. linux *will* deliver the packet if it has an
+            // invalid ICMP message type). This divergence is not expected to be
+            // problematic for clients, and as such it is kept for the improved
+            // type safety when operating on a known to be valid ICMP message
+            // type.
+            Err(_) => true,
+            Ok(message_type) => !icmp_filter.allows_type(message_type),
+        }
+    }) {
+        return false;
+    }
+
+    true
+}
+
+/// An implementation of [`SendOptions`] for raw IP sockets.
+struct RawIpSocketSendOptions<'a, I: Ip> {
+    hop_limits: &'a SocketHopLimits<I>,
+}
+
+impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
+    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+        self.hop_limits.hop_limit_for_dst(destination)
+    }
+
+    fn multicast_loop(&self) -> bool {
+        // TODO(https://fxbug.dev/344645667): Support IP_MULTICAST_LOOP.
+        false
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    use alloc::{rc::Rc, vec, vec::Vec};
+    use alloc::rc::Rc;
+    use alloc::vec;
+    use alloc::vec::Vec;
     use assert_matches::assert_matches;
-    use core::{cell::RefCell, convert::Infallible as Never, marker::PhantomData};
+    use core::cell::RefCell;
+    use core::convert::Infallible as Never;
+    use core::marker::PhantomData;
     use ip_test_macro::ip_test;
     use net_types::ip::{IpVersion, Ipv4, Ipv6};
-    use netstack3_base::{
-        sync::{DynDebugReferences, Mutex},
-        testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt},
-        ContextProvider, CtxPair,
+    use netstack3_base::sync::{DynDebugReferences, Mutex};
+    use netstack3_base::testutil::{
+        FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt,
     };
+    use netstack3_base::{ContextProvider, CtxPair};
     use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
-    use packet_formats::ip::{IpPacketBuilder, IpProto, IpProtoExt};
+    use packet_formats::icmp::{
+        IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode, Icmpv6MessageType,
+    };
+    use packet_formats::ip::{IpPacketBuilder, IpProto, IpProtoExt, Ipv6Proto};
+    use packet_formats::ipv6::Ipv6Packet;
     use test_case::test_case;
 
-    use crate::{
-        internal::{base::testutil::FakeIpDeviceIdCtx, socket::testutil::FakeIpSocketCtx},
-        socket::testutil::FakeDeviceConfig,
-        SendIpPacketMeta,
-    };
+    use crate::internal::socket::testutil::{FakeIpSocketCtx, InnerFakeIpSocketCtx};
+    use crate::socket::testutil::FakeDeviceConfig;
+    use crate::{SendIpPacketMeta, DEFAULT_HOP_LIMITS};
 
     #[derive(Derivative, Debug)]
     #[derivative(Default(bound = ""))]
@@ -552,28 +729,14 @@ mod test {
         // as the outer `FakeCoreCtx` is mutably borrowed (Required to implement
         // `RawIpSocketMapContext::with_socket_map_and_state_ctx`).
         socket_map: Rc<RefCell<RawIpSocketMap<I, D::Weak, FakeBindingsCtx<D>>>>,
-        /// An inner fake implementation of `DeviceIdContext`.
-        device_id_ctx: FakeIpDeviceIdCtx<D>,
         /// An inner fake implementation of `IpSocketHandler`. By implementing
-        /// `AsRef` and `AsMut` below, the `FakeCoreCtx` will be eligible for a
-        /// blanket impl of `IpSocketHandler`.
+        /// `InnerFakeIpSocketCtx` below, the `FakeCoreCtx` will be eligible for
+        /// a blanket impl of `IpSocketHandler`.
         ip_socket_ctx: FakeIpSocketCtx<I, D>,
     }
 
-    impl<I: IpExt, D: FakeStrongDeviceId> AsRef<FakeIpDeviceIdCtx<D>> for FakeCoreCtxState<I, D> {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
-            &self.device_id_ctx
-        }
-    }
-
-    impl<I: IpExt, D: FakeStrongDeviceId> AsRef<FakeIpSocketCtx<I, D>> for FakeCoreCtxState<I, D> {
-        fn as_ref(&self) -> &FakeIpSocketCtx<I, D> {
-            &self.ip_socket_ctx
-        }
-    }
-
-    impl<I: IpExt, D: FakeStrongDeviceId> AsMut<FakeIpSocketCtx<I, D>> for FakeCoreCtxState<I, D> {
-        fn as_mut(&mut self) -> &mut FakeIpSocketCtx<I, D> {
+    impl<I: IpExt, D: FakeStrongDeviceId> InnerFakeIpSocketCtx<I, D> for FakeCoreCtxState<I, D> {
+        fn fake_ip_socket_ctx_mut(&mut self) -> &mut FakeIpSocketCtx<I, D> {
             &mut self.ip_socket_ctx
         }
     }
@@ -698,7 +861,6 @@ mod test {
             });
         let state = FakeCoreCtxState {
             socket_map: Default::default(),
-            device_id_ctx: Default::default(),
             ip_socket_ctx: FakeIpSocketCtx::new(device_configs),
         };
 
@@ -709,13 +871,16 @@ mod test {
     const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
     /// Constructs a buffer containing an IP packet with sensible defaults.
-    fn new_ip_packet_buf<I: IpExt>(ip_body: &[u8], proto: I::Proto) -> impl AsRef<[u8]> {
+    fn new_ip_packet_buf<I: IpExt + TestIpExt>(
+        ip_body: &[u8],
+        proto: I::Proto,
+    ) -> impl AsRef<[u8]> {
         const TTL: u8 = 255;
         ip_body
             .into_serializer()
             .encapsulate(I::PacketBuilder::new(
-                *I::LOOPBACK_ADDRESS,
-                *I::LOOPBACK_ADDRESS,
+                *I::TEST_ADDRS.local_ip,
+                *I::TEST_ADDRS.remote_ip,
                 TTL,
                 proto,
             ))
@@ -723,17 +888,33 @@ mod test {
             .unwrap()
     }
 
-    #[ip_test]
+    /// Construct a buffer containing an ICMP message with sensible defaults.
+    fn new_icmp_message_buf<I: IpExt + TestIpExt, M: IcmpMessage<I> + Debug>(
+        message: M,
+        code: M::Code,
+    ) -> impl AsRef<[u8]> {
+        [].into_serializer()
+            .encapsulate(IcmpPacketBuilder::new(
+                *I::TEST_ADDRS.local_ip,
+                *I::TEST_ADDRS.remote_ip,
+                code,
+                message,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+    }
+
+    #[ip_test(I)]
     #[test_case(IpProto::Udp; "UDP")]
     #[test_case(IpProto::Reserved; "IPPROTO_RAW")]
-    fn create_and_close<I: Ip + IpExt + DualStackIpExt + TestIpExt>(proto: IpProto) {
+    fn create_and_close<I: IpExt + DualStackIpExt + TestIpExt>(proto: IpProto) {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(proto.into()), Default::default());
         let FakeExternalSocketState { received_packets: _ } = api.close(sock).into_removed();
     }
 
-    #[ip_test]
-    fn set_device<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn set_device<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
 
@@ -749,8 +930,66 @@ mod test {
         assert_eq!(api.get_device(&sock), None);
     }
 
-    #[ip_test]
-    fn receive_ip_packet<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn set_icmp_filter<I: IpExt + DualStackIpExt + TestIpExt>() {
+        let filter1 = RawIpSocketIcmpFilter::<I>::new([123; 32]);
+        let filter2 = RawIpSocketIcmpFilter::<I>::new([234; 32]);
+        let mut api = new_raw_ip_socket_api::<I>();
+
+        let sock = api.create(RawIpSocketProtocol::new(I::ICMP_IP_PROTO), Default::default());
+        assert_eq!(api.get_icmp_filter(&sock), Ok(None));
+        assert_eq!(api.set_icmp_filter(&sock, Some(filter1.clone())), Ok(None));
+        assert_eq!(api.get_icmp_filter(&sock), Ok(Some(filter1.clone())));
+        assert_eq!(api.set_icmp_filter(&sock, Some(filter2.clone())), Ok(Some(filter1.clone())));
+        assert_eq!(api.get_icmp_filter(&sock), Ok(Some(filter2.clone())));
+        assert_eq!(api.set_icmp_filter(&sock, None), Ok(Some(filter2)));
+        assert_eq!(api.get_icmp_filter(&sock), Ok(None));
+
+        // Sockets created with a non ICMP protocol cannot set an ICMP filter.
+        let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
+        assert_eq!(
+            api.set_icmp_filter(&sock, Some(filter1)),
+            Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp)
+        );
+        assert_eq!(api.get_icmp_filter(&sock), Err(RawIpSocketIcmpFilterError::ProtocolNotIcmp));
+    }
+
+    #[ip_test(I)]
+    fn set_unicast_hop_limits<I: IpExt + DualStackIpExt + TestIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
+
+        let limit1 = NonZeroU8::new(1).unwrap();
+        let limit2 = NonZeroU8::new(2).unwrap();
+
+        assert_eq!(api.get_unicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.unicast);
+        assert_eq!(api.set_unicast_hop_limit(&sock, Some(limit1)), None);
+        assert_eq!(api.get_unicast_hop_limit(&sock), limit1);
+        assert_eq!(api.set_unicast_hop_limit(&sock, Some(limit2)), Some(limit1));
+        assert_eq!(api.get_unicast_hop_limit(&sock), limit2);
+        assert_eq!(api.set_unicast_hop_limit(&sock, None), Some(limit2));
+        assert_eq!(api.get_unicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.unicast);
+    }
+
+    #[ip_test(I)]
+    fn set_multicast_hop_limit<I: IpExt + DualStackIpExt + TestIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
+
+        let limit1 = NonZeroU8::new(1).unwrap();
+        let limit2 = NonZeroU8::new(2).unwrap();
+
+        assert_eq!(api.get_multicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.multicast);
+        assert_eq!(api.set_multicast_hop_limit(&sock, Some(limit1)), None);
+        assert_eq!(api.get_multicast_hop_limit(&sock), limit1);
+        assert_eq!(api.set_multicast_hop_limit(&sock, Some(limit2)), Some(limit1));
+        assert_eq!(api.get_multicast_hop_limit(&sock), limit2);
+        assert_eq!(api.set_multicast_hop_limit(&sock, None), Some(limit2));
+        assert_eq!(api.get_multicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.multicast);
+    }
+
+    #[ip_test(I)]
+    fn receive_ip_packet<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
 
         // Create two sockets with the right protocol, and one socket with the
@@ -779,19 +1018,20 @@ mod test {
             api.close(wrong_sock).into_removed();
 
         // Expect delivery to the two right sockets, but not the wrong socket.
-        for ReceivedIpPacket { data, device } in
-            [sock1_packets.lock().pop().unwrap(), sock2_packets.lock().pop().unwrap()]
-        {
+        for packets in [sock1_packets, sock2_packets] {
+            let lock_guard = packets.lock();
+            let ReceivedIpPacket { data, device } =
+                assert_matches!(&lock_guard[..], [packet] => packet);
             assert_eq!(&data[..], buf.as_ref());
-            assert_eq!(device, DEVICE);
+            assert_eq!(*device, DEVICE);
         }
-        assert_eq!(wrong_sock_packets.lock().pop(), None);
+        assert_matches!(&wrong_sock_packets.lock()[..], []);
     }
 
     // Verify that sockets created with `RawIpSocketProtocol::Raw` cannot
     // receive packets
-    #[ip_test]
-    fn cannot_receive_ip_packet_with_proto_raw<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn cannot_receive_ip_packet_with_proto_raw<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::Raw, Default::default());
 
@@ -812,14 +1052,14 @@ mod test {
         }
 
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
-        assert_eq!(received_packets.lock().pop(), None);
+        assert_matches!(&received_packets.lock()[..], []);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(MultipleDevicesId::A, None, true; "no_bound_device")]
     #[test_case(MultipleDevicesId::A, Some(MultipleDevicesId::A), true; "bound_same_device")]
     #[test_case(MultipleDevicesId::A, Some(MultipleDevicesId::B), false; "bound_diff_device")]
-    fn receive_ip_packet_with_bound_device<I: Ip + IpExt + DualStackIpExt + TestIpExt>(
+    fn receive_ip_packet_with_bound_device<I: IpExt + DualStackIpExt + TestIpExt>(
         send_dev: MultipleDevicesId,
         bound_dev: Option<MultipleDevicesId>,
         should_deliver: bool,
@@ -842,23 +1082,105 @@ mod test {
         // Verify the packet was/wasn't received, as expected.
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
         if should_deliver {
-            let ReceivedIpPacket { data, device } = received_packets.lock().pop().unwrap();
+            let lock_guard = received_packets.lock();
+            let ReceivedIpPacket { data, device } =
+                assert_matches!(&lock_guard[..], [packet] => packet);
             assert_eq!(&data[..], buf.as_ref());
-            assert_eq!(device, send_dev);
+            assert_eq!(*device, send_dev);
         } else {
-            assert_eq!(received_packets.lock().pop(), None);
+            assert_matches!(&received_packets.lock()[..], []);
         }
     }
 
-    #[ip_test]
-    #[test_case(Some(MultipleDevicesId::A); "bound_to_dev")]
-    #[test_case(None; "not_bound_to_dev")]
-    fn send_to<I: Ip + IpExt + DualStackIpExt + TestIpExt>(bound_dev: Option<MultipleDevicesId>) {
+    #[ip_test(I)]
+    // NB: Don't bother testing for individual ICMP codes. The `filter` sub
+    // module already covers that extensively.
+    #[test_case(None, true; "no_filter")]
+    #[test_case(Some(RawIpSocketIcmpFilter::<I>::ALLOW_ALL), true; "allow_all")]
+    #[test_case(Some(RawIpSocketIcmpFilter::<I>::DENY_ALL), false; "deny_all")]
+    fn receive_ip_packet_with_icmp_filter<I: IpExt + DualStackIpExt + TestIpExt>(
+        filter: Option<RawIpSocketIcmpFilter<I>>,
+        should_deliver: bool,
+    ) {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let sock = api.create(RawIpSocketProtocol::new(I::ICMP_IP_PROTO), Default::default());
+
+        assert_matches!(api.set_icmp_filter(&sock, filter), Ok(None));
+
+        // Deliver an arbitrary ICMP message.
+        let icmp_body = new_icmp_message_buf::<I, _>(IcmpEchoReply::new(0, 0), IcmpUnusedCode);
+        let buf = new_ip_packet_buf::<I>(icmp_body.as_ref(), I::ICMP_IP_PROTO);
+        let mut buf_ref = buf.as_ref();
+        let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
+        {
+            let (core_ctx, bindings_ctx) = api.ctx.contexts();
+            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &MultipleDevicesId::A);
+        }
+
+        // Verify the packet was/wasn't received, as expected.
+        let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
+        if should_deliver {
+            let lock_guard = received_packets.lock();
+            let ReceivedIpPacket { data, device: _ } =
+                assert_matches!(&lock_guard[..], [packet] => packet);
+            assert_eq!(&data[..], buf.as_ref());
+        } else {
+            assert_matches!(&received_packets.lock()[..], []);
+        }
+    }
+
+    // Verify that ICMPv6 messages with an invalid checksum won't be received.
+    // Note that the successful delivery case is tested by
+    // `receive_ip_packet_with_icmp_filter`.
+    #[test]
+    fn do_not_receive_icmpv6_packet_with_bad_checksum() {
+        let mut api = new_raw_ip_socket_api::<Ipv6>();
+        let sock = api.create(RawIpSocketProtocol::new(Ipv6Proto::Icmpv6), Default::default());
+
+        // Use a valid ICMP message, but intentionally corrupt the checksum.
+        // The checksum is present at bytes 2 & 3.
+        let mut icmp_body =
+            new_icmp_message_buf::<Ipv6, _>(IcmpEchoReply::new(0, 0), IcmpUnusedCode)
+                .as_ref()
+                .to_vec();
+        const CORRUPT_CHECKSUM: [u8; 2] = [123, 234];
+        assert_ne!(
+            packet_formats::testutil::overwrite_icmpv6_checksum(
+                icmp_body.as_mut(),
+                CORRUPT_CHECKSUM
+            )
+            .expect("parse should succeed"),
+            CORRUPT_CHECKSUM
+        );
+
+        let buf = new_ip_packet_buf::<Ipv6>(icmp_body.as_ref(), Ipv6Proto::Icmpv6);
+        let mut buf_ref = buf.as_ref();
+        let packet = buf_ref.parse::<Ipv6Packet<_>>().expect("parse should succeed");
+        {
+            let (core_ctx, bindings_ctx) = api.ctx.contexts();
+            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &MultipleDevicesId::A);
+        }
+
+        // Verify the packet wasn't received.
+        let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
+        assert_matches!(&received_packets.lock()[..], []);
+    }
+
+    #[ip_test(I)]
+    #[test_case(None, None; "default_send")]
+    #[test_case(Some(MultipleDevicesId::A), None; "with_bound_dev")]
+    #[test_case(None, Some(123); "with_hop_limit")]
+    fn send_to<I: IpExt + DualStackIpExt + TestIpExt>(
+        bound_dev: Option<MultipleDevicesId>,
+        hop_limit: Option<u8>,
+    ) {
         const PROTO: IpProto = IpProto::Udp;
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(PROTO.into()), Default::default());
 
         assert_eq!(api.set_device(&sock, bound_dev.as_ref()), None);
+        let hop_limit = hop_limit.and_then(NonZeroU8::new);
+        assert_eq!(api.set_unicast_hop_limit(&sock, hop_limit), None);
 
         let remote_ip = ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip);
         assert_matches!(&api.ctx.core_ctx().take_frames()[..], []);
@@ -875,11 +1197,11 @@ mod test {
         }
         assert_eq!(*proto, <I as IpProtoExt>::Proto::from(PROTO));
         assert_eq!(*mtu, None);
-        assert_eq!(*ttl, None);
+        assert_eq!(*ttl, hop_limit);
     }
 
-    #[ip_test]
-    fn send_to_disallows_raw_protocol<I: Ip + IpExt + DualStackIpExt + TestIpExt>() {
+    #[ip_test(I)]
+    fn send_to_disallows_raw_protocol<I: IpExt + DualStackIpExt + TestIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::Raw, Default::default());
         assert_matches!(
@@ -896,6 +1218,57 @@ mod test {
         assert_matches!(
             api.send_to(&sock, Some(mapped_remote_ip), Buf::new(IP_BODY.to_vec(), ..)),
             Err(RawIpSocketSendToError::MappedRemoteIp)
+        );
+    }
+
+    // Verify that packets sent on ICMPv6 raw IP sockets have their checksum
+    // automatically populated by the netstack.
+    #[test]
+    fn icmpv6_send_to_generates_checksum() {
+        let mut api = new_raw_ip_socket_api::<Ipv6>();
+        let sock = api.create(RawIpSocketProtocol::new(Ipv6Proto::Icmpv6), Default::default());
+
+        // Use a valid ICMP body, but intentionally corrupt the checksum.
+        // The checksum is present at bytes 2 & 3.
+        let icmp_body_with_checksum =
+            new_icmp_message_buf::<Ipv6, _>(IcmpEchoReply::new(0, 0), IcmpUnusedCode)
+                .as_ref()
+                .to_vec();
+        const CORRUPT_CHECKSUM: [u8; 2] = [123, 234];
+        let mut icmp_body_without_checksum = icmp_body_with_checksum.clone();
+        assert_ne!(
+            packet_formats::testutil::overwrite_icmpv6_checksum(
+                icmp_body_without_checksum.as_mut(),
+                CORRUPT_CHECKSUM,
+            )
+            .expect("parse should succeed"),
+            CORRUPT_CHECKSUM
+        );
+
+        // Send the buffer that has the corrupt checksum.
+        let remote_ip = ZonedAddr::Unzoned(Ipv6::TEST_ADDRS.remote_ip);
+        assert_matches!(&api.ctx.core_ctx().take_frames()[..], []);
+        api.send_to(&sock, Some(remote_ip), Buf::new(icmp_body_without_checksum.to_vec(), ..))
+            .expect("send should succeed");
+
+        // Observe that the checksum is populated.
+        let frames = api.core_ctx().take_frames();
+        let (_send_ip_packet_meta, data) = assert_matches!( &frames[..], [packet] => packet);
+        assert_eq!(&data[..], icmp_body_with_checksum);
+    }
+
+    // Verify that invalid ICMPv6 packets cannot be sent on raw IP sockets.
+    #[test_case(Icmpv6MessageType::DestUnreachable.into(), 4; "header-too-short")]
+    #[test_case(0, 8; "message-type-zero-not-supported")]
+    fn icmpv6_send_to_invalid_body(message_type: u8, header_len: usize) {
+        let mut body = vec![0; header_len];
+        body[0] = message_type;
+        let mut api = new_raw_ip_socket_api::<Ipv6>();
+        let sock = api.create(RawIpSocketProtocol::new(Ipv6Proto::Icmpv6), Default::default());
+        let remote_ip = ZonedAddr::Unzoned(Ipv6::TEST_ADDRS.remote_ip);
+        assert_matches!(
+            api.send_to(&sock, Some(remote_ip), Buf::new(body, ..)),
+            Err(RawIpSocketSendToError::InvalidBody)
         );
     }
 }

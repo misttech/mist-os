@@ -2,28 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_zircon::DurationNum,
-    ieee80211::Bssid,
-    lazy_static::lazy_static,
-    std::pin::pin,
-    wlan_common::{
-        bss::Protection,
-        buffer_reader::BufferReader,
-        channel::{Cbw, Channel},
-        mac,
-    },
-    wlan_hw_sim::{
-        connect_or_timeout, default_wlantap_config_client,
-        event::{
-            self,
-            buffered::{Buffered, DataFrame},
-        },
-        loop_until_iface_is_found, netdevice_helper, rx_wlan_data_frame, test_utils, AP_SSID,
-        CLIENT_MAC_ADDR, ETH_DST_MAC,
-    },
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_zircon::DurationNum;
+use ieee80211::Bssid;
+use lazy_static::lazy_static;
+use std::pin::pin;
+use wlan_common::bss::Protection;
+use wlan_common::buffer_reader::BufferReader;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_common::mac;
+use wlan_hw_sim::event::buffered::{Buffered, DataFrame};
+use wlan_hw_sim::event::{self};
+use wlan_hw_sim::{
+    connect_or_timeout, default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper,
+    rx_wlan_data_frame, test_utils, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
 };
 
 lazy_static! {

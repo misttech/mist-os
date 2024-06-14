@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{
-        events::{Destroyed, Event, EventStream, Started},
-        matcher::EventMatcher,
-    },
-    fuchsia_component_test::ScopedInstance,
-};
+use component_events::events::{Destroyed, Event, EventStream, Started};
+use component_events::matcher::EventMatcher;
+use fuchsia_component_test::ScopedInstance;
 
 #[fuchsia::main(logging_tags = ["async_reporter"])]
 async fn main() {

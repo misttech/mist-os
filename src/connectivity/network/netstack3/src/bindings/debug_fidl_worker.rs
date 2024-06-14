@@ -5,13 +5,15 @@
 //! A Netstack3 worker to serve fuchsia.net.debug.Interfaces API requests.
 
 use fidl::endpoints::{ProtocolMarker as _, ServerEnd};
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net_debug as fnet_debug;
-use fuchsia_zircon as zx;
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
-use tracing::{debug, error, warn};
+use log::{debug, error, warn};
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug,
+    fuchsia_zircon as zx,
+};
 
-use crate::bindings::{devices::BindingId, DeviceIdExt as _, DeviceSpecificInfo};
+use crate::bindings::devices::BindingId;
+use crate::bindings::{DeviceIdExt as _, DeviceSpecificInfo};
 
 // Serve a stream of fuchsia.net.debug.Interfaces API requests for a single
 // channel (e.g. a single client connection).
@@ -19,7 +21,7 @@ pub(crate) async fn serve_interfaces(
     bindings_ctx: &crate::bindings::BindingsCtx,
     rs: fnet_debug::InterfacesRequestStream,
 ) -> Result<(), fidl::Error> {
-    debug!(protocol = fnet_debug::InterfacesMarker::DEBUG_NAME, "serving");
+    debug!("serving {}", fnet_debug::InterfacesMarker::DEBUG_NAME);
     rs.try_for_each(|req| async {
         match req {
             fnet_debug::InterfacesRequest::GetPort { id, port, control_handle: _ } => {
@@ -45,12 +47,12 @@ fn handle_get_port(
         DeviceSpecificInfo::PureIp(info) => Ok(&info.netdevice.handler),
     });
     match port_handler {
-        Ok(port_handler) => port_handler.connect_port(port).unwrap_or_else(
-            |e: netdevice_client::Error| warn!(err = ?e, "failed to connect to port"),
-        ),
+        Ok(port_handler) => port_handler
+            .connect_port(port)
+            .unwrap_or_else(|e: netdevice_client::Error| warn!("failed to connect to port: {e:?}")),
         Err(epitaph) => {
             port.close_with_epitaph(epitaph)
-                .unwrap_or_else(|e| warn!(err = ?e, "failed to send epitaph"));
+                .unwrap_or_else(|e| warn!("failed to send epitaph: {e:?}"));
         }
     }
 }
@@ -155,7 +157,7 @@ impl DiagnosticsHandler {
             })
         })
         .await
-        .unwrap_or_else(|e: fidl::Error| error!(err = ?e, "error operating diagnostics stream"));
+        .unwrap_or_else(|e: fidl::Error| error!("error operating diagnostics stream: {e:?}"));
     }
 }
 

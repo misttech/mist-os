@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {event_listener::Event, fidl_fuchsia_fuzzer as fuzz, std::cell::RefCell, std::rc::Rc};
+use event_listener::Event;
+use fidl_fuchsia_fuzzer as fuzz;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Wrapper for `fuchsia.fuzzer.Options` that can be awaited on until set.
 ///
@@ -84,10 +87,9 @@ impl AsyncOptions {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::AsyncOptions, fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync,
-        fuchsia_zircon as zx, futures::join,
-    };
+    use super::AsyncOptions;
+    use futures::join;
+    use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fuchsia::test]
     async fn test_async_options_set_all() {

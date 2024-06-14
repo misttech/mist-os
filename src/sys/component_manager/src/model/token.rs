@@ -4,10 +4,8 @@
 
 use fuchsia_zircon as zx;
 use moniker::Moniker;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use zx::{AsHandleRef, HandleBased, Koid};
 
 use super::context::ModelContext;

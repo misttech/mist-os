@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{id::Id, proxies::player::Player, Result};
+use crate::id::Id;
+use crate::proxies::player::Player;
+use crate::Result;
 use anyhow::Context as _;
 use fidl_fuchsia_media_sessions2::*;
 use fuchsia_inspect as inspect;
-use futures::{channel::mpsc, channel::oneshot, prelude::*};
+use futures::channel::{mpsc, oneshot};
+use futures::prelude::*;
 use std::sync::Arc;
 use tracing::warn;
 

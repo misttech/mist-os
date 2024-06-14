@@ -69,9 +69,7 @@ mod tests {
     use fidl_fuchsia_examples_calculator::{
         CalculatorMarker, CalculatorRequest, CalculatorRequestStream,
     };
-    use futures::FutureExt;
-    use futures::StreamExt;
-    use futures::TryStreamExt;
+    use futures::{FutureExt, StreamExt, TryStreamExt};
 
     // A fake of the calculator service.
     async fn calculator_fake(stream: CalculatorRequestStream) -> anyhow::Result<()> {

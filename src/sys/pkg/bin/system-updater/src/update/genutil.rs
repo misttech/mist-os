@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_generator::{Generator, GeneratorState},
-    futures::{
-        prelude::*,
-        ready,
-        stream::FusedStream,
-        task::{Context, Poll},
-    },
-    pin_project::pin_project,
-    std::pin::Pin,
-};
+use async_generator::{Generator, GeneratorState};
+use futures::prelude::*;
+use futures::ready;
+use futures::stream::FusedStream;
+use futures::task::{Context, Poll};
+use pin_project::pin_project;
+use std::pin::Pin;
 
 /// Extension utility combinators for [`async_generator::Generator`].
 pub trait GeneratorExt<I, R>
@@ -124,7 +120,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, futures::channel::oneshot};
+    use super::*;
+    use futures::channel::oneshot;
     #[allow(clippy::bool_assert_comparison)]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn when_done_handles_empty_generator() {

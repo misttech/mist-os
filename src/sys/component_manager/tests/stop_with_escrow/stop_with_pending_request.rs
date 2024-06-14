@@ -4,13 +4,13 @@
 
 use fidl::endpoints::{RequestStream, ServerEnd};
 use fidl_fidl_test_components::TriggerRequestStream;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_process_lifecycle as flifecycle;
-use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_process_lifecycle as flifecycle, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 /// See the `stop_with_pending_request` test case.
 #[fuchsia::main]

@@ -69,6 +69,18 @@ pub trait NetworkInterface: Send + Sync {
     //       `Driver::on_prop_value_is`, which is also synchronous.
     fn remove_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error>;
 
+    /// Adds the forward entry to the interface per subnet info.
+    // TODO(https://fxbug.dev/42143339): Consider making this method async. This method is
+    //       currently synchronous so that it can be used directly from
+    //       `Driver::on_prop_value_is`, which is also synchronous.
+    fn add_forwarding_entry(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error>;
+
+    /// Removes the forward entry to the interface per subnet info.
+    // TODO(https://fxbug.dev/42143339): Consider making this method async. This method is
+    //       currently synchronous so that it can be used directly from
+    //       `Driver::on_prop_value_is`, which is also synchronous.
+    fn remove_forwarding_entry(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error>;
+
     /// Indicates to the net stack that this subnet is accessible through this interface.
     // TODO(https://fxbug.dev/42143339): Consider making this method async. This method is
     //       currently synchronous so that it can be used directly from
@@ -172,6 +184,16 @@ impl NetworkInterface for DummyNetworkInterface {
 
     fn remove_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
         info!("Address Removed: {:?}", addr);
+        Ok(())
+    }
+
+    fn add_forwarding_entry(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
+        info!("Forward Entry Added: {:?}", addr);
+        Ok(())
+    }
+
+    fn remove_forwarding_entry(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
+        info!("Forward Entry Removed: {:?}", addr);
         Ok(())
     }
 

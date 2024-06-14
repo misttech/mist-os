@@ -4,12 +4,11 @@
 
 // This actor has one action that never returns.
 
-use {
-    anyhow::Result,
-    futures::{future::pending, future::BoxFuture, FutureExt},
-    rand::rngs::SmallRng,
-    stress_test_actor::{actor_loop, Action},
-};
+use anyhow::Result;
+use futures::future::{pending, BoxFuture};
+use futures::FutureExt;
+use rand::rngs::SmallRng;
+use stress_test_actor::{actor_loop, Action};
 
 #[fuchsia::main(logging = false)]
 pub async fn main() -> Result<()> {

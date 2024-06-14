@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_io as fio, fuchsia_hash::Hash, thiserror::Error};
+use fidl_fuchsia_io as fio;
+use fuchsia_hash::Hash;
+use thiserror::Error;
 
 /// An error encountered while extracting the package hash.
 #[derive(Debug, Error)]
@@ -29,14 +31,13 @@ pub(crate) async fn hash(proxy: &fio::DirectoryProxy) -> Result<Hash, HashError>
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        fuchsia_fs::directory::open_in_namespace,
-        std::{fs::File, io::Write as _},
-        tempfile::tempdir,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use fuchsia_fs::directory::open_in_namespace;
+    use std::fs::File;
+    use std::io::Write as _;
+    use tempfile::tempdir;
 
     #[fasync::run_singlethreaded(test)]
     async fn open_error() {

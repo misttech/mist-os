@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::TestEnv,
-    fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_async as fasync,
-    futures::{channel::mpsc, StreamExt, TryStreamExt},
-    tracing::*,
-};
+use crate::TestEnv;
+use futures::channel::mpsc;
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
+use {fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_async as fasync};
 
 /// Convenience type for interacting with the Power Manager's RebootWatcher service.
 pub struct RebootWatcherClient {

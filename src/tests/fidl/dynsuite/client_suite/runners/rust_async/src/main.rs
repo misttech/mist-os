@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::Proxy,
-    fidl_fidl_clientsuite::{
-        AjarTargetEvent, AjarTargetEventReport, BindingsProperties, ClosedTargetEvent,
-        ClosedTargetEventReport, Empty, EmptyResultClassification,
-        EmptyResultWithErrorClassification, IoStyle, NonEmptyPayload, NonEmptyResultClassification,
-        NonEmptyResultWithErrorClassification, OpenTargetEvent, OpenTargetEventReport,
-        RunnerRequest, RunnerRequestStream, TableResultClassification, Test,
-        UnionResultClassification, UnknownEvent, CLIENT_SUITE_VERSION,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::{prelude::*, TryStreamExt},
-    rust_util::{classify_error, method_name},
+use fidl::endpoints::Proxy;
+use fidl_fidl_clientsuite::{
+    AjarTargetEvent, AjarTargetEventReport, BindingsProperties, ClosedTargetEvent,
+    ClosedTargetEventReport, Empty, EmptyResultClassification, EmptyResultWithErrorClassification,
+    IoStyle, NonEmptyPayload, NonEmptyResultClassification, NonEmptyResultWithErrorClassification,
+    OpenTargetEvent, OpenTargetEventReport, RunnerRequest, RunnerRequestStream,
+    TableResultClassification, Test, UnionResultClassification, UnknownEvent, CLIENT_SUITE_VERSION,
 };
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use futures::TryStreamExt;
+use rust_util::{classify_error, method_name};
 
 const DISABLED_TESTS: &[Test] = &[
     // No disabled tests!

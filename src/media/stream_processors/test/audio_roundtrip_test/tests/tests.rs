@@ -9,7 +9,8 @@ use audio_roundtrip_test_lib::test_suite::*;
 use fidl_fuchsia_media::*;
 use fuchsia_async as fasync;
 use roundtrip_test_data::*;
-use std::{fs, rc::Rc};
+use std::fs;
+use std::rc::Rc;
 use stream_processor_test::*;
 
 const CVSD_TEST_FILE: &str = "/pkg/data/test_s16le64000mono.cvsd";

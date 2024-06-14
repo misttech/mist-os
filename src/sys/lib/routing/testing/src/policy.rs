@@ -2,29 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    assert_matches::assert_matches,
-    async_trait::async_trait,
-    cm_config::{
-        AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey, CapabilityAllowlistSource,
-        ChildPolicyAllowlists, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
-        JobPolicyAllowlists, SecurityPolicy,
-    },
-    cm_rust::{CapabilityTypeName, ProtocolDecl, StorageDecl, StorageDirectorySource},
-    cm_types::Name,
-    fidl_fuchsia_component_decl as fdecl,
-    moniker::{ExtendedMoniker, Moniker},
-    routing::{
-        capability_source::{CapabilitySource, ComponentCapability, InternalCapability},
-        component_instance::ComponentInstanceInterface,
-        policy::GlobalPolicyChecker,
-    },
-    std::{
-        collections::{HashMap, HashSet},
-        sync::{Arc, Weak},
-    },
+use anyhow::Error;
+use assert_matches::assert_matches;
+use async_trait::async_trait;
+use cm_config::{
+    AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey, CapabilityAllowlistSource,
+    ChildPolicyAllowlists, DebugCapabilityAllowlistEntry, DebugCapabilityKey, JobPolicyAllowlists,
+    SecurityPolicy,
 };
+use cm_rust::{CapabilityTypeName, ProtocolDecl, StorageDecl, StorageDirectorySource};
+use cm_types::Name;
+use fidl_fuchsia_component_decl as fdecl;
+use moniker::{ExtendedMoniker, Moniker};
+use routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
+use routing::component_instance::ComponentInstanceInterface;
+use routing::policy::GlobalPolicyChecker;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Weak};
 
 /// These GlobalPolicyChecker tests are run under multiple contexts, e.g. both on Fuchsia under
 /// component_manager and on the build host under cm_fidl_analyzer. This macro helps ensure that all

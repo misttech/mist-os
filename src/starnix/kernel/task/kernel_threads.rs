@@ -2,26 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    dynamic_thread_spawner::DynamicThreadSpawner,
-    task::{CurrentTask, Kernel, Task, ThreadGroup},
-};
+use crate::dynamic_thread_spawner::DynamicThreadSpawner;
+use crate::task::{CurrentTask, Kernel, Task, ThreadGroup};
 use fragile::Fragile;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use pin_project::pin_project;
 use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::{errno, error, errors::Errno, ownership::WeakRef};
-use std::{
-    cell::RefCell,
-    cell::RefMut,
-    ffi::CString,
-    future::Future,
-    pin::Pin,
-    sync::{Arc, Weak},
-    task::{Context, Poll},
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::{errno, error};
+use std::cell::{RefCell, RefMut};
+use std::ffi::CString;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
+use std::task::{Context, Poll};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// The threads that the kernel runs internally.
 ///

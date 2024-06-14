@@ -2,40 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Context as _;
+use async_trait::async_trait;
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_test::{
+    self as ftest, Invocation, Result_ as TestResult, RunListenerProxy, Status,
+};
+use futures::future::{abortable, join, AbortHandle, FutureExt as _};
+use futures::lock::Mutex;
+use futures::prelude::*;
+use futures::TryStreamExt;
+use gtest_runner_lib::parser::*;
+use lazy_static::lazy_static;
+use namespace::NamespaceError;
+use std::num::NonZeroUsize;
+use std::str::from_utf8;
+use std::sync::{Arc, Weak};
+use test_runners_lib::cases::TestCaseInfo;
+use test_runners_lib::elf::{
+    Component, ComponentError, EnumeratedTestCases, FidlError, KernelError,
+    MemoizedFutureContainer, PinnedFuture, SuiteServer,
+};
+use test_runners_lib::errors::*;
+use test_runners_lib::launch;
+use test_runners_lib::logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter};
+use tracing::{debug, error, info, warn};
 use {
-    anyhow::Context as _,
-    async_trait::async_trait,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc,
-    fidl_fuchsia_test::{
-        self as ftest, Invocation, Result_ as TestResult, RunListenerProxy, Status,
-    },
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{
-        future::{abortable, join, AbortHandle, FutureExt as _},
-        lock::Mutex,
-        prelude::*,
-        TryStreamExt,
-    },
-    gtest_runner_lib::parser::*,
-    lazy_static::lazy_static,
-    namespace::NamespaceError,
-    std::{
-        num::NonZeroUsize,
-        str::from_utf8,
-        sync::{Arc, Weak},
-    },
-    test_runners_lib::{
-        cases::TestCaseInfo,
-        elf::{
-            Component, ComponentError, EnumeratedTestCases, FidlError, KernelError,
-            MemoizedFutureContainer, PinnedFuture, SuiteServer,
-        },
-        errors::*,
-        launch,
-        logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter},
-    },
-    tracing::{debug, error, info, warn},
+    fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
@@ -601,19 +595,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        assert_matches::assert_matches,
-        fidl_fuchsia_test::{RunListenerMarker, RunOptions, SuiteMarker},
-        pretty_assertions::assert_eq,
-        std::fs,
-        test_runners_test_lib::{
-            assert_event_ord, collect_listener_event, names_to_invocation, test_component,
-            ListenerEvent,
-        },
-        uuid::Uuid,
+    use super::*;
+    use anyhow::Error;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_test::{RunListenerMarker, RunOptions, SuiteMarker};
+    use pretty_assertions::assert_eq;
+    use std::fs;
+    use test_runners_test_lib::{
+        assert_event_ord, collect_listener_event, names_to_invocation, test_component,
+        ListenerEvent,
     };
+    use uuid::Uuid;
 
     #[cfg(feature = "gtest")]
     macro_rules! test_bin_name {

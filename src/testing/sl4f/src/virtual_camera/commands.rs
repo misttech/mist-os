@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::server::Facade;
-use crate::virtual_camera::{facade::VirtualCameraFacade, types::VirtualCameraMethod};
+use crate::virtual_camera::facade::VirtualCameraFacade;
+use crate::virtual_camera::types::VirtualCameraMethod;
 use anyhow::Error;
 use async_trait::async_trait;
 use serde_json::Value;

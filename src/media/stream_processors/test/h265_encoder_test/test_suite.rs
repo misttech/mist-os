@@ -5,14 +5,13 @@
 use anyhow::format_err;
 use async_trait::async_trait;
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_sysmem as sysmem;
-use fuchsia_zircon as zx;
 use std::io::Write;
 use std::rc::Rc;
 use stream_processor_encoder_factory::*;
 use stream_processor_test::*;
 use tracing::info;
 use video_frame_stream::*;
+use {fidl_fuchsia_sysmem as sysmem, fuchsia_zircon as zx};
 
 use crate::h265::*;
 

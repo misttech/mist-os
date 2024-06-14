@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    core::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    futures::stream::{FusedStream, Stream, TryStream},
-    pin_project::pin_project,
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use futures::stream::{FusedStream, Stream, TryStream};
+use pin_project::pin_project;
 
 /// A stream that selects items from a [`Stream`] of [`Stream`]s.
 ///
@@ -217,16 +213,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            FlattenUnordered, FlattenUnorderedExt as _, TryFlattenUnordered,
-            TryFlattenUnorderedExt as _,
-        },
-        futures::{
-            channel::mpsc, stream::FusedStream, FutureExt as _, Stream, StreamExt as _,
-            TryStreamExt as _,
-        },
+    use super::{
+        FlattenUnordered, FlattenUnorderedExt as _, TryFlattenUnordered,
+        TryFlattenUnorderedExt as _,
     };
+    use futures::channel::mpsc;
+    use futures::stream::FusedStream;
+    use futures::{FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 
     enum FlattenUnorderedMarker {}
     enum TryFlattenUnorderedMarker {}

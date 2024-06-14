@@ -398,6 +398,49 @@ pub trait Ip:
         v4: impl FnOnce(<In as GenericOverIp<Ipv4>>::Type) -> <Out as GenericOverIp<Ipv4>>::Type,
         v6: impl FnOnce(<In as GenericOverIp<Ipv6>>::Type) -> <Out as GenericOverIp<Ipv6>>::Type,
     ) -> Out;
+
+    /// Apply one of the given functions to the input and return the result.
+    ///
+    /// This is similar to `map_ip`, except only the input type is required to
+    /// be [`GenericOverIp`], while the output type is invariant. This allows
+    /// callers to more conveniently write this use case without having to wrap
+    /// the result in a type like [`IpInvariant`].
+    fn map_ip_in<
+        In: GenericOverIp<Self, Type = In> + GenericOverIp<Ipv4> + GenericOverIp<Ipv6>,
+        Out,
+    >(
+        input: In,
+        v4: impl FnOnce(<In as GenericOverIp<Ipv4>>::Type) -> Out,
+        v6: impl FnOnce(<In as GenericOverIp<Ipv6>>::Type) -> Out,
+    ) -> Out {
+        Self::map_ip::<_, IpInvariant<_>>(
+            input,
+            |input| IpInvariant(v4(input)),
+            |input| IpInvariant(v6(input)),
+        )
+        .into_inner()
+    }
+
+    /// Apply one of the given functions to the input and return the result.
+    ///
+    /// This is similar to `map_ip`, except only the output type is required to
+    /// be [`GenericOverIp`], while the input type is invariant. This allows
+    /// callers to more conveniently write this use case without having to wrap
+    /// the input in a type like [`IpInvariant`].
+    fn map_ip_out<
+        In,
+        Out: GenericOverIp<Self, Type = Out> + GenericOverIp<Ipv4> + GenericOverIp<Ipv6>,
+    >(
+        input: In,
+        v4: impl FnOnce(In) -> <Out as GenericOverIp<Ipv4>>::Type,
+        v6: impl FnOnce(In) -> <Out as GenericOverIp<Ipv6>>::Type,
+    ) -> Out {
+        Self::map_ip(
+            IpInvariant(input),
+            |IpInvariant(input)| v4(input),
+            |IpInvariant(input)| v6(input),
+        )
+    }
 }
 
 /// Invokes `I::map_ip`, passing the same function body as both arguments.

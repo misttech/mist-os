@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_test_manager::RunOptions,
-    fuchsia_async as fasync,
-    test_manager_test_lib::RunEvent,
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_test_manager::RunOptions;
+use fuchsia_async as fasync;
+use test_manager_test_lib::RunEvent;
 
 pub async fn run_test(
     test_url: &str,

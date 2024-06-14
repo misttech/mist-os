@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::terminal::Terminal,
-    anyhow::{Context as _, Error},
-    fidl::endpoints::{RequestStream, ServerEnd},
-    fidl_fuchsia_hardware_pty::DeviceMarker,
-    fidl_fuchsia_virtualconsole::{SessionManagerRequest, SessionManagerRequestStream},
-    fuchsia_async as fasync,
-    futures::{io::AsyncReadExt, prelude::*},
-    pty::ServerPty,
-    std::{cell::RefCell, rc::Rc},
-    term_model::{ansi::Processor, event::EventListener},
-};
+use crate::terminal::Terminal;
+use anyhow::{Context as _, Error};
+use fidl::endpoints::{RequestStream, ServerEnd};
+use fidl_fuchsia_hardware_pty::DeviceMarker;
+use fidl_fuchsia_virtualconsole::{SessionManagerRequest, SessionManagerRequestStream};
+use fuchsia_async as fasync;
+use futures::io::AsyncReadExt;
+use futures::prelude::*;
+use pty::ServerPty;
+use std::cell::RefCell;
+use std::rc::Rc;
+use term_model::ansi::Processor;
+use term_model::event::EventListener;
 
 const BYTE_BUFFER_MAX_SIZE: usize = 128;
 
@@ -139,7 +140,10 @@ impl SessionManager {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::colors::ColorScheme, fuchsia_async as fasync, term_model::event::Event};
+    use super::*;
+    use crate::colors::ColorScheme;
+    use fuchsia_async as fasync;
+    use term_model::event::Event;
 
     #[derive(Default)]
     struct TestListener;

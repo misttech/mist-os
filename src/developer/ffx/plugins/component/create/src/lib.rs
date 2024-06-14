@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use component_debug::{cli::create_cmd, config::resolve_raw_config_overrides};
+use component_debug::cli::create_cmd;
+use component_debug::config::resolve_raw_config_overrides;
 use errors::{ffx_error, FfxError};
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_create_args::CreateComponentCommand;

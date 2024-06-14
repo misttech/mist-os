@@ -118,8 +118,7 @@ impl DocCompiler {
 
 #[cfg(test)]
 mod test {
-    use crate::source::Location;
-    use crate::source::Source;
+    use crate::source::{Location, Source};
     use crate::DocCompiler;
     use std::rc::Rc;
 

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    async_trait::async_trait,
-    ffx_session_drop_power_lease_args::SessionDropPowerLeaseCommand,
-    fho::{moniker, user_error, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_session_power::HandoffProxy,
-};
+use anyhow::Result;
+use async_trait::async_trait;
+use ffx_session_drop_power_lease_args::SessionDropPowerLeaseCommand;
+use fho::{moniker, user_error, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_session_power::HandoffProxy;
 
 #[derive(FfxTool)]
 pub struct DropPowerLeaseTool {
@@ -46,7 +44,8 @@ pub async fn drop_power_lease_impl<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl_fuchsia_session_power::HandoffRequest};
+    use super::*;
+    use fidl_fuchsia_session_power::HandoffRequest;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_drop_power_lease() {

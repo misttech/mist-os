@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{
-        CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, ThreadGroup, WaitCanceler,
-        Waiter,
-    },
-    vfs::{fileops_impl_dataless, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps},
+use crate::task::{
+    CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, ThreadGroup, WaitCanceler, Waiter,
+};
+use crate::vfs::{
+    fileops_impl_dataless, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
 };
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use starnix_uapi::{errors::Errno, open_flags::OpenFlags, pid_t, vfs::FdEvents};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::pid_t;
+use starnix_uapi::vfs::FdEvents;
 use std::sync::Arc;
 
 pub struct PidFdFileObject {

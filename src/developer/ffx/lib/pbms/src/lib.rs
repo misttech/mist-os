@@ -19,25 +19,19 @@
 //! These FMS entry names are suitable to present to the user. E.g. the name of
 //! a product bundle is also the name of the product bundle metadata entry.
 
-use crate::{
-    gcs::string_from_gcs,
-    pbms::{local_path_helper, path_from_file_url, GS_SCHEME},
-};
+use crate::gcs::string_from_gcs;
+use crate::pbms::{local_path_helper, path_from_file_url, GS_SCHEME};
 use ::gcs::client::{Client, FileProgress, ProgressResult};
 use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use errors::ffx_bail;
 use hyper::{Body, Method, Request};
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-pub use crate::{
-    gcs::{handle_new_access_token, list_from_gcs},
-    pbms::{get_product_dir, get_storage_dir},
-    transfer_manifest::transfer_download,
-};
+pub use crate::gcs::{handle_new_access_token, list_from_gcs};
+pub use crate::pbms::{get_product_dir, get_storage_dir};
+pub use crate::transfer_manifest::transfer_download;
 pub use sdk_metadata::{LoadedProductBundle, ProductBundle};
 
 mod gcs;
@@ -297,7 +291,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_config::{environment::test_init_in_tree, ConfigLevel};
+    use ffx_config::environment::test_init_in_tree;
+    use ffx_config::ConfigLevel;
     use std::fs::File;
     use tempfile::TempDir;
 

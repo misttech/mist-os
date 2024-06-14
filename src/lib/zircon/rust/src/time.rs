@@ -4,11 +4,9 @@
 
 //! Type-safe bindings for Zircon timer objects.
 
-use crate::ok;
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Status};
+use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Status};
 use fuchsia_zircon_sys as sys;
-use std::ops;
-use std::time as stdtime;
+use std::{ops, time as stdtime};
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]

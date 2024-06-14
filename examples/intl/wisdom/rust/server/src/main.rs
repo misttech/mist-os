@@ -4,12 +4,10 @@
 
 pub(crate) mod wisdom_server_impl;
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_examples_intl_wisdom as fwisdom, fuchsia_async as fasync,
-    fuchsia_component::server,
-    futures::{StreamExt, TryStreamExt},
-};
+use anyhow::{Context as _, Error};
+use fuchsia_component::server;
+use futures::{StreamExt, TryStreamExt};
+use {fidl_fuchsia_examples_intl_wisdom as fwisdom, fuchsia_async as fasync};
 
 fn main() -> Result<(), Error> {
     // [START loader_example]

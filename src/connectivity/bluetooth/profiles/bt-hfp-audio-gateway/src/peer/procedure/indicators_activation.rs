@@ -4,9 +4,9 @@
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
-use crate::peer::{
-    indicators::AgIndicatorsReporting, service_level_connection::SlcState, update::AgUpdate,
-};
+use crate::peer::indicators::AgIndicatorsReporting;
+use crate::peer::service_level_connection::SlcState;
+use crate::peer::update::AgUpdate;
 use at_commands as at;
 
 /// The Hf may request to enable or disable indicators via this procedure. Defined in

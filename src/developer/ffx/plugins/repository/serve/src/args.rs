@@ -6,10 +6,8 @@ use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
 use fidl_fuchsia_developer_ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
-use std::{
-    net::{Ipv6Addr, SocketAddr},
-    path::PathBuf,
-};
+use std::net::{Ipv6Addr, SocketAddr};
+use std::path::PathBuf;
 
 // TODO(b/295560556): Expand to handle multiple repositories.
 #[ffx_command()]

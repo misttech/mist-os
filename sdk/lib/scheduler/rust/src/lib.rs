@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_scheduler::{
-        RoleManagerMarker, RoleManagerSetRoleRequest, RoleManagerSynchronousProxy, RoleName,
-        RoleTarget,
-    },
-    fuchsia_component::client::connect_to_protocol_sync,
-    fuchsia_sync::RwLock,
-    fuchsia_zircon::{HandleBased, Rights, Status, Thread, Time},
-    std::sync::Arc,
+use anyhow::{Context, Error};
+use fidl_fuchsia_scheduler::{
+    RoleManagerMarker, RoleManagerSetRoleRequest, RoleManagerSynchronousProxy, RoleName, RoleTarget,
 };
+use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_sync::RwLock;
+use fuchsia_zircon::{HandleBased, Rights, Status, Thread, Time};
+use std::sync::Arc;
 
 static ROLE_MANAGER: RwLock<Option<Arc<RoleManagerSynchronousProxy>>> = RwLock::new(None);
 

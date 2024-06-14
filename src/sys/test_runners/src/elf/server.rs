@@ -5,28 +5,20 @@
 //! Shared traits and methods to be used in test suite servers for tests that are executed as ELF
 //! components.
 
-use {
-    crate::{
-        cases::TestCaseInfo,
-        elf::Component,
-        errors::{EnumerationError, RunTestError},
-    },
-    async_trait::async_trait,
-    fidl_fuchsia_test as ftest, fuchsia_async as fasync, fuchsia_zircon as zx,
-    fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
-    futures::{
-        future::{AbortHandle, Shared},
-        lock::Mutex,
-        prelude::*,
-    },
-    rust_measure_tape_for_case::Measurable as _,
-    std::{
-        pin::Pin,
-        sync::{Arc, Weak},
-    },
-    thiserror::Error,
-    tracing::{error, warn},
-};
+use crate::cases::TestCaseInfo;
+use crate::elf::Component;
+use crate::errors::{EnumerationError, RunTestError};
+use async_trait::async_trait;
+use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
+use futures::future::{AbortHandle, Shared};
+use futures::lock::Mutex;
+use futures::prelude::*;
+use rust_measure_tape_for_case::Measurable as _;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
+use thiserror::Error;
+use tracing::{error, warn};
+use {fidl_fuchsia_test as ftest, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// A pinned, boxed future whose output is `Result<T, E>`.
 pub type PinnedFuture<T, E> = Pin<Box<dyn Future<Output = Result<T, E>> + Send>>;

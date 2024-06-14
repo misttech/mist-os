@@ -42,7 +42,7 @@ void riscv64_init_percpu() {
   riscv64_csr_write(RISCV64_CSR_SSTATUS, 0);
 
   // enable software interrupts and external interrupts, disable everything else
-  riscv64_csr_write(RISCV64_CSR_SIE, RISCV64_CSR_SIE_SIE | RISCV64_CSR_SIE_EIE);
+  riscv64_csr_write(RISCV64_CSR_SIE, RISCV64_CSR_SIE_SSIE | RISCV64_CSR_SIE_SEIE);
 
   // enable all of the counters
   riscv64_csr_write(RISCV64_CSR_SCOUNTEREN, RISCV64_CSR_SCOUNTEREN_CY | RISCV64_CSR_SCOUNTEREN_TM |
@@ -103,4 +103,4 @@ void arch_late_init_percpu() {
   mp_set_curr_cpu_online(true);
 }
 
-void arch_idle_enter(zx_duration_t max_latency) { __wfi(); }
+void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) { __wfi(); }

@@ -2,24 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    regex::{Regex, RegexSetBuilder},
-    std::{fs::File, path::PathBuf},
-    storage_benchmarks::{
-        add_benchmarks,
-        block_device::PanickingBlockDeviceFactory,
-        directory_benchmarks::{
-            DirectoryTreeStructure, GitStatus, OpenDeeplyNestedFile, OpenFile, StatPath,
-            WalkDirectoryTreeWarm,
-        },
-        filesystem::MountedFilesystem,
-        io_benchmarks::{
-            ReadRandomWarm, ReadSequentialWarm, WriteRandomCold, WriteRandomWarm,
-            WriteSequentialCold, WriteSequentialWarm,
-        },
-        BenchmarkSet,
-    },
+use regex::{Regex, RegexSetBuilder};
+use std::fs::File;
+use std::path::PathBuf;
+use storage_benchmarks::block_device::PanickingBlockDeviceFactory;
+use storage_benchmarks::directory_benchmarks::{
+    DirectoryTreeStructure, GitStatus, OpenDeeplyNestedFile, OpenFile, StatPath,
+    WalkDirectoryTreeWarm,
 };
+use storage_benchmarks::filesystem::MountedFilesystem;
+use storage_benchmarks::io_benchmarks::{
+    ReadRandomWarm, ReadSequentialWarm, WriteRandomCold, WriteRandomWarm, WriteSequentialCold,
+    WriteSequentialWarm,
+};
+use storage_benchmarks::{add_benchmarks, BenchmarkSet};
 
 /// Fuchsia Filesystem Benchmarks
 #[derive(argh::FromArgs)]

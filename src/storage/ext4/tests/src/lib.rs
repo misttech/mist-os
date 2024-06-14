@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    ext4_metadata::{Metadata, NodeInfo, Symlink, ROOT_INODE_NUM},
-    std::collections::BTreeMap,
-};
+use assert_matches::assert_matches;
+use ext4_metadata::{Metadata, NodeInfo, Symlink, ROOT_INODE_NUM};
+use std::collections::BTreeMap;
 
 // To generate the test image:
 //

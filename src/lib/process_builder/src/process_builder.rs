@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{elf_load, elf_parse, process_args, util},
-    anyhow::{anyhow, Context},
-    fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc,
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, AsHandleRef, DurationNum, HandleBased},
-    futures::prelude::*,
-    std::ffi::{CStr, CString},
-    std::iter,
-    std::mem,
-    thiserror::Error,
-    tracing::warn,
-};
+use crate::{elf_load, elf_parse, process_args, util};
+use anyhow::{anyhow, Context};
+use fidl::endpoints::{ClientEnd, Proxy};
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_runtime::{HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum, HandleBased};
+use futures::prelude::*;
+use std::ffi::{CStr, CString};
+use std::{iter, mem};
+use thiserror::Error;
+use tracing::warn;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc};
 
 /// Error type returned by ProcessBuilder methods.
 #[derive(Error, Debug)]
@@ -946,21 +943,19 @@ impl Drop for ReservationVmar {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        assert_matches::assert_matches,
-        fidl::{endpoints::ServerEnd, prelude::*},
-        fidl_fuchsia_io as fio,
-        fidl_test_processbuilder::{UtilMarker, UtilProxy},
-        fuchsia_async as fasync,
-        lazy_static::lazy_static,
-        vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::vmo::read_only, pseudo_directory,
-        },
-        zerocopy::Ref,
-    };
+    use super::*;
+    use anyhow::Error;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::ServerEnd;
+    use fidl::prelude::*;
+    use fidl_test_processbuilder::{UtilMarker, UtilProxy};
+    use lazy_static::lazy_static;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::read_only;
+    use vfs::pseudo_directory;
+    use zerocopy::Ref;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     extern "C" {
         fn dl_clone_loader_service(handle: *mut zx::sys::zx_handle_t) -> zx::sys::zx_status_t;

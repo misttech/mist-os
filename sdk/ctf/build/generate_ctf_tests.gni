@@ -29,6 +29,11 @@
 #      The API level validated by this test.
 #      Type: int
 #
+#    test_component_names (optional)
+#      Optional list of component names that are meant to be run directly
+#      as tests from the package.
+#      Type: list[string] (optional)
+#
 # See generate_pkgdir-tests for an example.
 
 import("//sdk/ctf/build/internal/fuchsia_package_with_test.gni")
@@ -240,13 +245,20 @@ template("generate_fuchsia-hwinfo-tests") {
 
 template("generate_pkgdir-tests") {
   forward_variables_from(invoker, [ "test_info" ])
-  fuchsia_package_with_test(target_name) {
-    subpackages = [
-      test_info.target_label,
-      "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
-    ]
-    test_component = "//src/sys/pkg/tests/pkgdir:test-root"
-    test_component_name = "test-root.cm"
+  if (defined(invoker.api_level) && invoker.api_level == "15") {
+    # TODO(https://fxbug.dev/335307425): Remove this when F15 is no longer supported.
+    not_needed([ "test_info" ])
+    group(target_name) {
+    }
+  } else {
+    fuchsia_package_with_test(target_name) {
+      subpackages = [
+        test_info.target_label,
+        "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
+      ]
+      test_component = "//src/sys/pkg/tests/pkgdir:test-root"
+      test_component_name = "test-root.cm"
+    }
   }
 }
 
@@ -419,6 +431,70 @@ template("generate_media-button-test-suite") {
   }
 }
 
+# This template has the same input as other generate_* templates,
+# but it handles the common operation of treating an input
+# package + test_component_names as a group of pre-packaged tests.
+#
+# We cannot change the name of the downloaded package, but we can
+# subpackage it in a new test component with a generated manifest.
+template("pre_packaged_test_with_names") {
+  test_info = invoker.test_info
+  package_name = test_info.name
+  assert(defined(test_info.test_component_names),
+         "Expected test_component_names for a pre-packaged test.")
+  test_component_names = test_info.test_component_names
+
+  generated_components = []
+
+  foreach(test_name, test_component_names) {
+    # Generate a simple manifest for this test that offers all diagnostics
+    # capabilities and simply exposes the test suite itself.
+    generated_manifest = "${test_name}_generated_manifest"
+    fuchsia_test_component_manifest(generated_manifest) {
+      metadata = {
+        test_component_manifest_cml = [
+          {
+            include = [
+              "//sdk/lib/syslog/offer.shard.cml",
+              "//sdk/lib/inspect/offer.shard.cml",
+            ]
+            children = [
+              {
+                name = "test"
+                url = "${package_name}#meta/${test_name}.cm"
+              },
+            ]
+            expose = [
+              {
+                protocol = "fuchsia.test.Suite"
+                from = "#test"
+              },
+            ]
+          },
+        ]
+      }
+      visibility = [ ":*" ]
+    }
+    manifest = get_target_outputs(":$generated_manifest")
+    manifest = manifest[0]
+    generated_component = "${test_name}_generated_component"
+    fuchsia_test_component(generated_component) {
+      component_name = test_name
+      manifest = manifest
+      deps = [ ":$generated_manifest" ]
+    }
+    generated_components += [ ":$generated_component" ]
+  }
+
+  # Package our wrapper component, and subpackage the test within
+  # the new package.
+  fuchsia_test_package(target_name) {
+    package_name = target_name
+    test_components = generated_components
+    subpackages = [ test_info.target_label ]
+  }
+}
+
 # Expands a prebuilt CTF test into a runnable fuchsia package.
 #
 # This template is called several times with every combination of ctf_test and
@@ -458,6 +534,9 @@ template("generate_ctf_test") {
       name = prebuilt_package.package_name
       target_label = prebuilt_package_label
       target_api_level = api_level
+      if (defined(prebuilt_package.test_component_names)) {
+        test_component_names = prebuilt_package.test_component_names
+      }
     }
   }
 }

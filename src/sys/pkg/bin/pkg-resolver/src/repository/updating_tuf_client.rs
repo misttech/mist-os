@@ -2,39 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        clock, error, inspect_util, metrics_util::tuf_error_as_update_tuf_client_event_code,
-        repository::filesystem_repository::RWRepository, TCP_KEEPALIVE_TIMEOUT,
-    },
-    anyhow::anyhow,
-    cobalt_sw_delivery_registry as metrics,
-    fidl_contrib::protocol_connector::ProtocolSender,
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg_ext::MirrorConfig,
-    fuchsia_async::{self as fasync, TimeoutExt as _},
-    fuchsia_cobalt_builders::MetricEventExt as _,
-    fuchsia_inspect::{self as inspect, Property},
-    fuchsia_inspect_contrib::inspectable::InspectableDebugString,
-    fuchsia_zircon as zx,
-    futures::{
-        future::{AbortHandle, Abortable, FutureExt as _, TryFutureExt as _},
-        lock::Mutex as AsyncMutex,
-        stream::StreamExt,
-    },
-    http_uri_ext::HttpUriExt as _,
-    std::{
-        sync::{Arc, Weak},
-        time::Duration,
-    },
-    tracing::info,
-    tuf::{
-        error::Error as TufError,
-        metadata::{Metadata, TargetDescription, TargetPath},
-        pouf::Pouf1,
-        repository::{RepositoryProvider, RepositoryStorageProvider},
-    },
-};
+use crate::metrics_util::tuf_error_as_update_tuf_client_event_code;
+use crate::repository::filesystem_repository::RWRepository;
+use crate::{clock, error, inspect_util, TCP_KEEPALIVE_TIMEOUT};
+use anyhow::anyhow;
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_fuchsia_metrics::MetricEvent;
+use fidl_fuchsia_pkg_ext::MirrorConfig;
+use fuchsia_async::{self as fasync, TimeoutExt as _};
+use fuchsia_cobalt_builders::MetricEventExt as _;
+use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_inspect_contrib::inspectable::InspectableDebugString;
+use futures::future::{AbortHandle, Abortable, FutureExt as _, TryFutureExt as _};
+use futures::lock::Mutex as AsyncMutex;
+use futures::stream::StreamExt;
+use http_uri_ext::HttpUriExt as _;
+use std::sync::{Arc, Weak};
+use std::time::Duration;
+use tracing::info;
+use tuf::error::Error as TufError;
+use tuf::metadata::{Metadata, TargetDescription, TargetPath};
+use tuf::pouf::Pouf1;
+use tuf::repository::{RepositoryProvider, RepositoryStorageProvider};
+use {cobalt_sw_delivery_registry as metrics, fuchsia_zircon as zx};
 
 type TufClient = tuf::client::Client<
     Pouf1,

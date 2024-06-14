@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_sync::Mutex,
-    lru_cache::LruCache,
-    rustls::{
-        internal::msgs::{
-            codec::{Codec, Reader},
-            enums::{NamedGroup, ProtocolVersion},
-            persist::ClientSessionValue,
-        },
-        StoresClientSessions,
-    },
-    std::{collections::VecDeque, fmt::Debug, sync::Arc},
-};
+use fuchsia_sync::Mutex;
+use lru_cache::LruCache;
+use rustls::internal::msgs::codec::{Codec, Reader};
+use rustls::internal::msgs::enums::{NamedGroup, ProtocolVersion};
+use rustls::internal::msgs::persist::ClientSessionValue;
+use rustls::StoresClientSessions;
+use std::collections::VecDeque;
+use std::fmt::Debug;
+use std::sync::Arc;
 
 // BoundedStack implements a stack that produces and consumes from the back, and evicts from the
 // front when full.
@@ -145,21 +141,15 @@ impl StoresClientSessions for C4CapableSessionCache {
 
 #[cfg(test)]
 mod test {
-    use {
-        crate::C4CapableSessionCache,
-        assert_matches::assert_matches,
-        rand::{thread_rng, Rng},
-        rustls::{
-            internal::msgs::{
-                codec::{Codec, Reader},
-                enums::{CipherSuite, ProtocolVersion},
-                handshake::SessionID,
-                persist::{ClientSessionKey, ClientSessionValue},
-            },
-            StoresClientSessions,
-        },
-        webpki::DNSNameRef,
-    };
+    use crate::C4CapableSessionCache;
+    use assert_matches::assert_matches;
+    use rand::{thread_rng, Rng};
+    use rustls::internal::msgs::codec::{Codec, Reader};
+    use rustls::internal::msgs::enums::{CipherSuite, ProtocolVersion};
+    use rustls::internal::msgs::handshake::SessionID;
+    use rustls::internal::msgs::persist::{ClientSessionKey, ClientSessionValue};
+    use rustls::StoresClientSessions;
+    use webpki::DNSNameRef;
 
     enum KeyType {
         ForKX,

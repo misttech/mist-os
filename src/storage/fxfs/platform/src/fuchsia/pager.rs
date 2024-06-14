@@ -2,37 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        epochs::{Epochs, RefGuard},
-        errors::map_to_status,
-        node::FxNode,
-        profile::Recorder,
-    },
-    anyhow::Error,
-    bitflags::bitflags,
-    fuchsia_async as fasync,
-    fuchsia_zircon::{
-        self as zx,
-        sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ},
-        AsHandleRef, PacketContents, PagerPacket, SignalPacket,
-    },
-    fxfs::{
-        log::*,
-        range::RangeExt,
-        round::{round_down, round_up},
-    },
-    once_cell::sync::Lazy,
-    std::{
-        future::Future,
-        marker::PhantomData,
-        mem::MaybeUninit,
-        ops::Range,
-        sync::{Arc, Mutex, MutexGuard, Weak},
-    },
-    storage_device::buffer,
-    vfs::execution_scope::ExecutionScope,
-};
+use crate::fuchsia::epochs::{Epochs, RefGuard};
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::node::FxNode;
+use crate::fuchsia::profile::Recorder;
+use anyhow::Error;
+use bitflags::bitflags;
+use fuchsia_async as fasync;
+use fuchsia_zircon::sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ};
+use fuchsia_zircon::{self as zx, AsHandleRef, PacketContents, PagerPacket, SignalPacket};
+use fxfs::log::*;
+use fxfs::range::RangeExt;
+use fxfs::round::{round_down, round_up};
+use once_cell::sync::Lazy;
+use std::future::Future;
+use std::marker::PhantomData;
+use std::mem::MaybeUninit;
+use std::ops::Range;
+use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use storage_device::buffer;
+use vfs::execution_scope::ExecutionScope;
 
 fn watch_for_zero_children(file: &impl PagerBacked) -> Result<(), zx::Status> {
     file.vmo().as_handle_ref().wait_async_handle(
@@ -825,7 +814,10 @@ impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRangeChunksIter<T, U> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, futures::channel::mpsc, futures::StreamExt, fxfs_macros::ToWeakNode};
+    use super::*;
+    use futures::channel::mpsc;
+    use futures::StreamExt;
+    use fxfs_macros::ToWeakNode;
 
     #[derive(ToWeakNode)]
     struct MockFile {

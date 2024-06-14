@@ -24,7 +24,6 @@ class FakeTimer {
 
   static zx_handle_t timer_handle_;
   static zx_time_t current_deadline_;
-  static bool cancel_called_;
 };
 
 #endif  // SRC_DEVICES_SERIAL_DRIVERS_AML_UART_TESTS_FAKE_TIMER_H_

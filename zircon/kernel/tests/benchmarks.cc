@@ -23,6 +23,7 @@
 #include <kernel/brwlock.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
+#include <kernel/scheduler.h>
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <ktl/type_traits.h>
@@ -44,7 +45,7 @@ namespace {
 // calling CPU has become unresponsive (the lockup detector only monitors active CPUs).
 class InactiveCpuGuard {
  public:
-  InactiveCpuGuard() : was_active_(mp_is_cpu_active(arch_curr_cpu_num())) {
+  InactiveCpuGuard() : was_active_(Scheduler::PeekIsActive(arch_curr_cpu_num())) {
     if (was_active_) {
       Scheduler::SetCurrCpuActive(false);
     }
@@ -73,7 +74,7 @@ __NO_INLINE static void bench_cycles_per_second() {
     const zx_ticks_t after_ticks = current_ticks();
     const uint64_t after_cycles = arch::Cycles();
     const zx_duration_t delta_time =
-        platform_get_ticks_to_time_ratio().Scale(after_ticks - before_ticks);
+        timer_get_ticks_to_time_ratio().Scale(after_ticks - before_ticks);
     const uint64_t delta_cycles = after_cycles - before_cycles;
     printf("%" PRIu64 " cycles per second (%" PRIu64 " cycles in %" PRId64 " ns)\n",
            (delta_cycles * ZX_SEC(1) / delta_time), delta_cycles, delta_time);

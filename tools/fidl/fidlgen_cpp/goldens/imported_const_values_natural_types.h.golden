@@ -106,7 +106,7 @@ inline MyStruct& MyStruct::__reserved(uint8_t value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_importedconstvalues::MyStruct> : public std::true_type {};
+struct IsFidlType<::test_importedconstvalues::MyStruct> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_importedconstvalues::MyStruct> {
@@ -118,7 +118,7 @@ struct TypeTraits<::test_importedconstvalues::MyStruct> {
 };
 
 template <>
-struct IsStruct<::test_importedconstvalues::MyStruct> : public std::true_type {};
+struct IsStruct<::test_importedconstvalues::MyStruct> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_importedconstvalues::MyStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final

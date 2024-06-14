@@ -26,7 +26,9 @@ mod tests {
     use crate::qemu_based::qemu::QemuEngine;
     use crate::FemuEngine;
     use emulator_instance::{EmulatorInstanceData, EngineState, EngineType};
-    use std::{fs::File, io::Write, path::PathBuf};
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::PathBuf;
     use tempfile::tempdir;
 
     #[fuchsia::test]

@@ -34,11 +34,14 @@ foreach(test, tests) {
   }
 }
 
-filter_deprecated_tests = [
-  "nat",
-  "tcp",
-  "udp",
-]
+filter_deprecated_tests = []
+if (target_cpu != "riscv64") {
+  filter_deprecated_tests += [
+    "nat",
+    "tcp",
+    "udp",
+  ]
+}
 
 foreach(test, filter_deprecated_tests) {
   name = "netstack-${test}-filter-deprecated-fidl-test"

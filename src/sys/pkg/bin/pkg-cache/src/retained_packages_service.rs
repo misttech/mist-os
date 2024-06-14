@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{index::set_retained_index, PackageIndex},
-    anyhow::Error,
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_pkg::{
-        BlobIdIteratorMarker, RetainedPackagesRequest, RetainedPackagesRequestStream,
-    },
-    futures::TryStreamExt,
-    std::{collections::HashSet, sync::Arc},
+use crate::index::set_retained_index;
+use crate::PackageIndex;
+use anyhow::Error;
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_pkg::{
+    BlobIdIteratorMarker, RetainedPackagesRequest, RetainedPackagesRequestStream,
 };
+use futures::TryStreamExt;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 pub async fn serve(
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
@@ -60,13 +60,11 @@ async fn collect_blob_ids(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_pkg_ext::{serve_fidl_iterator_from_slice, BlobId},
-        fuchsia_hash::Hash,
-        futures::Future,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_pkg_ext::{serve_fidl_iterator_from_slice, BlobId};
+    use fuchsia_hash::Hash;
+    use futures::Future;
 
     const ZEROES_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
     const ONES_HASH: &str = "1111111111111111111111111111111111111111111111111111111111111111";

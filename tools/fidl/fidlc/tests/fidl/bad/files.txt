@@ -173,8 +173,6 @@ fi-0178.test.fidl
 fi-0179.test.fidl
 fi-0180.test.fidl
 fi-0181.test.fidl
-fi-0182.test.fidl
-fi-0183.test.fidl
 fi-0184.noformat.test.fidl
 fi-0185.noformat.test.fidl
 fi-0186.noformat.test.fidl

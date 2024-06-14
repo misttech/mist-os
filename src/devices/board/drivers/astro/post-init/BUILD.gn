@@ -10,10 +10,10 @@ driver_bind_rules("astro-post-init-bind") {
   rules = "post-init.bind"
   tests = "post-init-bind-test.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
     "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.gpio",
   ]
 }
 

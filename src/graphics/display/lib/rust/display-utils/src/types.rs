@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{error::Result, pixel_format::PixelFormat};
-use {
-    fidl_fuchsia_hardware_display::{
-        BufferCollectionId as FidlBufferCollectionId, BufferId as FidlBufferId,
-        EventId as FidlEventId, ImageId as FidlImageId, Info, LayerId as FidlLayerId,
-    },
-    fidl_fuchsia_hardware_display_types::{DisplayId as FidlDisplayId, INVALID_DISP_ID},
-    fuchsia_async::OnSignals,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    std::fmt,
+use crate::error::Result;
+use crate::pixel_format::PixelFormat;
+use fidl_fuchsia_hardware_display::{
+    BufferCollectionId as FidlBufferCollectionId, BufferId as FidlBufferId, EventId as FidlEventId,
+    ImageId as FidlImageId, Info, LayerId as FidlLayerId,
 };
+use fidl_fuchsia_hardware_display_types::{DisplayId as FidlDisplayId, INVALID_DISP_ID};
+use fuchsia_async::OnSignals;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use std::fmt;
 
 /// Strongly typed wrapper around a display ID.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

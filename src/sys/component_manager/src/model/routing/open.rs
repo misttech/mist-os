@@ -2,33 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::{CapabilityProvider, CapabilitySource},
-        model::{
-            component::{ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance},
-            routing::{
-                providers::{
-                    DefaultComponentCapabilityProvider, DirectoryEntryCapabilityProvider,
-                    NamespaceCapabilityProvider,
-                },
-                service::{
-                    AnonymizedAggregateServiceDir, AnonymizedServiceRoute,
-                    FilteredAggregateServiceProvider,
-                },
-                RouteSource,
-            },
-            start::Start,
-            storage::{self, BackingDirectoryInfo},
-        },
-    },
-    ::routing::component_instance::ComponentInstanceInterface,
-    errors::{CapabilityProviderError, ModelError, OpenError},
-    fidl_fuchsia_io as fio,
-    moniker::ExtendedMoniker,
-    std::sync::Arc,
-    vfs::{directory::entry::OpenRequest, remote::remote_dir},
+use crate::capability::{CapabilityProvider, CapabilitySource};
+use crate::model::component::{
+    ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance,
 };
+use crate::model::routing::providers::{
+    DefaultComponentCapabilityProvider, DirectoryEntryCapabilityProvider,
+    NamespaceCapabilityProvider,
+};
+use crate::model::routing::service::{
+    AnonymizedAggregateServiceDir, AnonymizedServiceRoute, FilteredAggregateServiceProvider,
+};
+use crate::model::routing::RouteSource;
+use crate::model::start::Start;
+use crate::model::storage::{self, BackingDirectoryInfo};
+use ::routing::component_instance::ComponentInstanceInterface;
+use errors::{CapabilityProviderError, ModelError, OpenError};
+use fidl_fuchsia_io as fio;
+use moniker::ExtendedMoniker;
+use std::sync::Arc;
+use vfs::directory::entry::OpenRequest;
+use vfs::remote::remote_dir;
 
 /// A request to open a capability at its source.
 pub enum CapabilityOpenRequest<'a> {

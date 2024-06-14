@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        doctor::{create_tables, validate_routes, RouteReport},
-        query::get_cml_moniker_from_query,
-    },
-    anyhow::Result,
-    fidl_fuchsia_sys2 as fsys,
-    moniker::Moniker,
-};
+use crate::doctor::{create_tables, validate_routes, RouteReport};
+use crate::query::get_cml_moniker_from_query;
+use anyhow::Result;
+use fidl_fuchsia_sys2 as fsys;
+use moniker::Moniker;
 
 pub async fn doctor_cmd_print<W: std::io::Write>(
     query: String,

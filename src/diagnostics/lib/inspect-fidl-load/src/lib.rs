@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_inspect_deprecated::{InspectProxy, MetricValue, PropertyValue},
-    fuchsia_async as fasync,
-    fuchsia_inspect::reader::{DiagnosticsHierarchy, Property},
-    fuchsia_zircon as zx,
-};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_inspect_deprecated::{InspectProxy, MetricValue, PropertyValue};
+use fuchsia_inspect::reader::{DiagnosticsHierarchy, Property};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Loads an inspect node hierarchy in the given path.
 pub async fn load_hierarchy_from_path(path: &str) -> Result<DiagnosticsHierarchy, Error> {
@@ -84,17 +81,15 @@ async fn read_node(proxy: InspectProxy) -> Result<PartialNodeHierarchy, Error> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_inspect_deprecated::{
-            InspectMarker, InspectRequest, InspectRequestStream, Metric, Object, Property,
-        },
-        futures::{TryFutureExt, TryStreamExt},
-        lazy_static::lazy_static,
-        maplit::{hashmap, hashset},
-        std::collections::{HashMap, HashSet},
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_inspect_deprecated::{
+        InspectMarker, InspectRequest, InspectRequestStream, Metric, Object, Property,
     };
+    use futures::{TryFutureExt, TryStreamExt};
+    use lazy_static::lazy_static;
+    use maplit::{hashmap, hashset};
+    use std::collections::{HashMap, HashSet};
 
     #[fuchsia::test]
     async fn test_load_hierarchy() -> Result<(), Error> {

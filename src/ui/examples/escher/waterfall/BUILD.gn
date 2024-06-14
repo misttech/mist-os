@@ -12,14 +12,11 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
     sources = [ "//src/ui/examples/escher/common/null_executable.cc" ]
   }
 } else {
-  vulkan_executable("waterfall") {
+  vulkan_executable("waterfall_on_fb") {
     sources = [ "waterfall_main.cc" ]
-
     deps = [
-      ":waterfall_demo",
-      "//src/lib/vulkan",
-      "//src/ui/examples/escher/common",
-      "//third_party/glm",
+      ":waterfall_base",
+      "//src/ui/examples/escher/common:common_on_fb",
     ]
 
     include_dirs = [
@@ -27,14 +24,41 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
       "//src/ui/lib/escher",
     ]
 
-    if (is_fuchsia) {
-      deps += [ "//zircon/system/ulib/trace" ]
+    if (is_host) {
+      testonly = true
+      deps +=
+          [ "//src/ui/lib/escher/shaders:host_shader_data($host_toolchain)" ]
     }
+  }
+
+  vulkan_executable("waterfall_on_scenic") {
+    sources = [ "waterfall_main.cc" ]
+    deps = [
+      ":waterfall_base",
+      "//src/ui/examples/escher/common:common_on_scenic",
+    ]
+
+    include_dirs = [
+      "//lib",
+      "//src/ui/lib/escher",
+    ]
 
     if (is_host) {
       testonly = true
       deps +=
           [ "//src/ui/lib/escher/shaders:host_shader_data($host_toolchain)" ]
+    }
+  }
+
+  group("waterfall_base") {
+    public_deps = [
+      ":waterfall_demo",
+      "//src/lib/vulkan",
+      "//third_party/glm",
+    ]
+
+    if (is_fuchsia) {
+      public_deps += [ "//zircon/system/ulib/trace" ]
     }
   }
 }

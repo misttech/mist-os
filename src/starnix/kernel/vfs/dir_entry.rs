@@ -2,29 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        path, CheckAccessReason, FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr,
-        FsString, MountInfo, Mounts, NamespaceNode, UnlinkKind,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::{
+    path, CheckAccessReason, FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr,
+    FsString, MountInfo, Mounts, NamespaceNode, UnlinkKind,
 };
 use bitflags::bitflags;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, RwLock, RwLockWriteGuard};
-use starnix_uapi::{
-    auth::FsCred,
-    errno, error,
-    errors::{Errno, ENOENT},
-    file_mode::{Access, FileMode},
-    inotify_mask::InotifyMask,
-    open_flags::OpenFlags,
-    NAME_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE, RENAME_WHITEOUT,
-};
-use std::{
-    collections::{btree_map::Entry, BTreeMap},
-    fmt,
-    sync::{Arc, Weak},
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::errors::{Errno, ENOENT};
+use starnix_uapi::file_mode::{Access, FileMode};
+use starnix_uapi::inotify_mask::InotifyMask;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{errno, error, NAME_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE, RENAME_WHITEOUT};
+use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
+use std::fmt;
+use std::sync::{Arc, Weak};
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

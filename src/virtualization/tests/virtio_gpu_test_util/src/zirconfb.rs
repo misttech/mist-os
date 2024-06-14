@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::framebuffer::{DetectResult, DisplayInfo, Framebuffer},
-    anyhow::Error,
-    fidl::endpoints,
-    fidl_fuchsia_hardware_display::{
-        CoordinatorEvent, CoordinatorMarker, CoordinatorSynchronousProxy, Info,
-        ProviderSynchronousProxy,
-    },
-    fuchsia_zircon as zx,
-    serde_json::json,
+use crate::framebuffer::{DetectResult, DisplayInfo, Framebuffer};
+use anyhow::Error;
+use fidl::endpoints;
+use fidl_fuchsia_hardware_display::{
+    CoordinatorEvent, CoordinatorMarker, CoordinatorSynchronousProxy, Info,
+    ProviderSynchronousProxy,
 };
+use fuchsia_zircon as zx;
+use serde_json::json;
 
 const DEVICE_PATH: &'static str = "/dev/class/display-coordinator/000";
 

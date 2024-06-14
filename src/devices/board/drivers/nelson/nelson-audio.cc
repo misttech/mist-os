@@ -112,7 +112,8 @@ const std::vector<fdf::NodeProperty> kOutI2cProps = std::vector{
 };
 
 const std::vector<fdf::BindRule> kFaultGpioRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_AUDIO_SOC_FAULT_L)),
 };
 const std::vector<fdf::NodeProperty> kFaultGpioProps = std::vector{

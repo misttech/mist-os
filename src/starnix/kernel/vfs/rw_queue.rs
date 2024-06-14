@@ -6,9 +6,9 @@ use crate::task::CurrentTask;
 use starnix_uapi::errors::Errno;
 
 use fuchsia_zircon as zx;
-use starnix_sync::InterruptibleEvent;
-use starnix_sync::Mutex;
-use std::{collections::VecDeque, sync::Arc};
+use starnix_sync::{InterruptibleEvent, Mutex};
+use std::collections::VecDeque;
+use std::sync::Arc;
 
 use lock_api as _;
 
@@ -277,15 +277,12 @@ mod tracer {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{task::Kernel, testing::*};
-    use std::{
-        future::Future,
-        pin::Pin,
-        sync::{
-            atomic::{AtomicUsize, Ordering},
-            Barrier,
-        },
-    };
+    use crate::task::Kernel;
+    use crate::testing::*;
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Barrier;
 
     #[::fuchsia::test]
     fn test_remove_from_queue() {

@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::collection::{Component, Components},
-    anyhow::Result,
-    regex::Regex,
-    scrutiny::{
-        model::controller::{DataController, HintDataType},
-        model::model::*,
-    },
-    scrutiny_utils::usage::UsageBuilder,
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::sync::Arc,
-};
+use crate::core::collection::{Component, Components};
+use anyhow::Result;
+use regex::Regex;
+use scrutiny::model::controller::{DataController, HintDataType};
+use scrutiny::model::model::*;
+use scrutiny_utils::usage::UsageBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize)]
 pub struct ComponentSearchRequest {

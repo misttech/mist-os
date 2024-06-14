@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        cfg::{cfg_to_gn_conditional, target_to_gn_conditional},
-        target::GnTarget,
-        types::*,
-        BinaryRenderOptions, CombinedTargetCfg, GlobalTargetCfgs, GroupVisibility, RuleRenaming,
-    },
-    anyhow::{Context, Result},
-    cargo_metadata::Package,
-    std::borrow::Cow,
-    std::collections::BTreeMap,
-    std::fmt::Display,
-    std::io::{self, Write},
-    std::path::Path,
-    walkdir::WalkDir,
+use crate::cfg::{cfg_to_gn_conditional, target_to_gn_conditional};
+use crate::target::GnTarget;
+use crate::types::*;
+use crate::{
+    BinaryRenderOptions, CombinedTargetCfg, GlobalTargetCfgs, GroupVisibility, RuleRenaming,
 };
+use anyhow::{Context, Result};
+use cargo_metadata::Package;
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::fmt::Display;
+use std::io::{self, Write};
+use std::path::Path;
+use walkdir::WalkDir;
 
 /// Utility to add a version suffix to a GN target name.
 pub fn add_version_suffix(prefix: &str, version: &impl ToString) -> String {

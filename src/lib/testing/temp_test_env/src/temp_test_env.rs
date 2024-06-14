@@ -4,18 +4,14 @@
 
 //! Helpers for writing test cases.
 
-use {
-    anyhow::{Context, Result},
-    std::{
-        ffi::OsString,
-        fs::{create_dir_all, metadata, set_permissions, OpenOptions},
-        io::Write,
-        os::unix::fs::PermissionsExt,
-        path::PathBuf,
-        process,
-    },
-    tempfile::TempDir,
-};
+use anyhow::{Context, Result};
+use std::ffi::OsString;
+use std::fs::{create_dir_all, metadata, set_permissions, OpenOptions};
+use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
+use std::process;
+use tempfile::TempDir;
 
 const USER_READ_EXECUTE: u32 = 0o500;
 
@@ -178,7 +174,9 @@ pub fn which(cmd: &str) -> Result<PathBuf> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, serial_test::serial, std::process::Command};
+    use super::*;
+    use serial_test::serial;
+    use std::process::Command;
 
     #[test]
     #[serial]

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{Header, IeSummaryIter, IeType},
-    anyhow::format_err,
-    std::{collections::BTreeMap, mem::size_of, ops::Range},
-};
+use super::{Header, IeSummaryIter, IeType};
+use anyhow::format_err;
+use std::collections::BTreeMap;
+use std::mem::size_of;
+use std::ops::Range;
 
 const IES_MERGER_BUFFER_LIMIT: usize = 10000;
 

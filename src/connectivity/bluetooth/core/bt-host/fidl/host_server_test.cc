@@ -717,8 +717,8 @@ TEST_F(HostServerPairingTest, InitiatePairingLeDefault) {
   NewPairingTest(fsys::InputCapability::KEYBOARD, fsys::OutputCapability::DISPLAY);
 
   bool pairing_request_sent = false;
-  // This test only checks that PairingState kicks off an LE pairing feature exchange correctly, as
-  // the call to Pair is only responsible for starting pairing, not for completing it.
+  // This test only checks that SecureSimplePairingState kicks off an LE pairing feature exchange
+  // correctly, as the call to Pair is only responsible for starting pairing, not for completing it.
   auto expect_default_bytebuffer = [&pairing_request_sent, kExpected](bt::ByteBufferPtr sent) {
     ASSERT_TRUE(sent);
     ASSERT_EQ(*sent, kExpected);
@@ -752,8 +752,8 @@ TEST_F(HostServerPairingTest, InitiatePairingLeEncrypted) {
   );
 
   bool pairing_request_sent = false;
-  // This test only checks that PairingState kicks off an LE pairing feature exchange correctly, as
-  // the call to Pair is only responsible for starting pairing, not for completing it.
+  // This test only checks that SecureSimplePairingState kicks off an LE pairing feature exchange
+  // correctly, as the call to Pair is only responsible for starting pairing, not for completing it.
   auto expect_default_bytebuffer = [&pairing_request_sent, kExpected](bt::ByteBufferPtr sent) {
     ASSERT_TRUE(sent);
     ASSERT_EQ(*sent, kExpected);
@@ -790,8 +790,8 @@ TEST_F(HostServerPairingTest, InitiatePairingNonBondableLe) {
   NewPairingTest(fsys::InputCapability::KEYBOARD, fsys::OutputCapability::DISPLAY);
 
   bool pairing_request_sent = false;
-  // This test only checks that PairingState kicks off an LE pairing feature exchange correctly, as
-  // the call to Pair is only responsible for starting pairing, not for completing it.
+  // This test only checks that SecureSimplePairingState kicks off an LE pairing feature exchange
+  // correctly, as the call to Pair is only responsible for starting pairing, not for completing it.
   auto expect_default_bytebuffer = [&pairing_request_sent, kExpected](bt::ByteBufferPtr sent) {
     ASSERT_TRUE(sent);
     ASSERT_EQ(*sent, kExpected);

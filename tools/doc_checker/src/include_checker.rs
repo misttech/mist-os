@@ -5,19 +5,15 @@
 //! include_checker implements the `DocCheck` trait  used to perform checks on the
 //! files included using the << >> element.
 
-use {
-    crate::{
-        checker::{DocCheck, DocCheckError},
-        md_element::Element,
-        DocCheckerArgs,
-    },
-    anyhow::Result,
-    async_trait::async_trait,
-    lazy_static::lazy_static,
-    pulldown_cmark::Tag,
-    regex::Regex,
-    std::path::PathBuf,
-};
+use crate::checker::{DocCheck, DocCheckError};
+use crate::md_element::Element;
+use crate::DocCheckerArgs;
+use anyhow::Result;
+use async_trait::async_trait;
+use lazy_static::lazy_static;
+use pulldown_cmark::Tag;
+use regex::Regex;
+use std::path::PathBuf;
 
 // path_help is a wrapper to allow mocking path checks
 // exists. and is_dir.

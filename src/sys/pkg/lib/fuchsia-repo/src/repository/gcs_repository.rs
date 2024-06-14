@@ -8,30 +8,24 @@
 //! - [Package](https://fuchsia.dev/fuchsia-src/concepts/packages/package?hl=en)
 //! - [TUF](https://theupdateframework.io/)
 
-use {
-    crate::{
-        range::{ContentLength, Range},
-        repository::{Error, RepoProvider, RepositorySpec},
-        resource::Resource,
-        util::file_stream,
-    },
-    anyhow::{anyhow, Context as _},
-    futures::{future::BoxFuture, AsyncRead, FutureExt as _, TryStreamExt as _},
-    hyper::{header::CONTENT_LENGTH, Body, Response, StatusCode},
-    std::{
-        collections::BTreeSet,
-        fmt::Debug,
-        io::{self, Seek as _, SeekFrom, Write as _},
-        time::SystemTime,
-    },
-    tempfile::SpooledTempFile,
-    tuf::{
-        metadata::{MetadataPath, MetadataVersion, TargetPath},
-        pouf::Pouf1,
-        repository::RepositoryProvider as TufRepositoryProvider,
-    },
-    url::Url,
-};
+use crate::range::{ContentLength, Range};
+use crate::repository::{Error, RepoProvider, RepositorySpec};
+use crate::resource::Resource;
+use crate::util::file_stream;
+use anyhow::{anyhow, Context as _};
+use futures::future::BoxFuture;
+use futures::{AsyncRead, FutureExt as _, TryStreamExt as _};
+use hyper::header::CONTENT_LENGTH;
+use hyper::{Body, Response, StatusCode};
+use std::collections::BTreeSet;
+use std::fmt::Debug;
+use std::io::{self, Seek as _, SeekFrom, Write as _};
+use std::time::SystemTime;
+use tempfile::SpooledTempFile;
+use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
+use tuf::pouf::Pouf1;
+use tuf::repository::RepositoryProvider as TufRepositoryProvider;
+use url::Url;
 
 const X_GOOG_STORED_CONTENT_LENGTH: &str = "x-goog-stored-content-length";
 const UNKNOWN_CONTENT_LEN_BUF_SIZE: usize = 8_196;
@@ -320,20 +314,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            repository::{
-                repo_tests::{self, TestEnv as _},
-                FileSystemRepository,
-            },
-            test_utils::make_repo_dir,
-            util::CHUNK_SIZE,
-        },
-        assert_matches::assert_matches,
-        camino::{Utf8Path, Utf8PathBuf},
-        std::fs::File,
-    };
+    use super::*;
+    use crate::repository::repo_tests::{self, TestEnv as _};
+    use crate::repository::FileSystemRepository;
+    use crate::test_utils::make_repo_dir;
+    use crate::util::CHUNK_SIZE;
+    use assert_matches::assert_matches;
+    use camino::{Utf8Path, Utf8PathBuf};
+    use std::fs::File;
 
     #[derive(Debug)]
     struct MockGcsClient {

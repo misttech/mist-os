@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_ui_app as ui_app, fidl_fuchsia_ui_views as ui_views,
-    fidl_fuchsia_ui_views::ViewRef,
-    scene_management::{DisplayMetrics, InjectorViewportSubscriber, SceneManagerTrait},
-    std::cell::Cell,
-};
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl_fuchsia_ui_views::ViewRef;
+use scene_management::{DisplayMetrics, InjectorViewportSubscriber, SceneManagerTrait};
+use std::cell::Cell;
+use {fidl_fuchsia_ui_app as ui_app, fidl_fuchsia_ui_views as ui_views};
 
 pub struct MockSceneManager {
     was_present_root_view_called: Cell<bool>,

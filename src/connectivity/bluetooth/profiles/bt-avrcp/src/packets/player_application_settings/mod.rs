@@ -11,10 +11,11 @@ pub mod get_value_text;
 pub mod list_settings;
 pub mod set_current_settings;
 
-pub use self::{
-    get_attribute_text::*, get_current_settings::*, get_value_text::*, list_settings::*,
-    set_current_settings::*,
-};
+pub use self::get_attribute_text::*;
+pub use self::get_current_settings::*;
+pub use self::get_value_text::*;
+pub use self::list_settings::*;
+pub use self::set_current_settings::*;
 use crate::packets::Error;
 
 decodable_enum! {

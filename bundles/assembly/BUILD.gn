@@ -5,6 +5,7 @@
 import("//build/assembly/assembly_input_bundle.gni")
 import("//build/assembly/assembly_resources_directory.gni")
 import("//build/assembly/kernel_aib.gni")
+import("//build/assembly/platform_artifacts.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/config/clang/clang.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
@@ -58,7 +59,7 @@ assert(is_fuchsia,
        "Assembly Input Bundles can only be in the Fuchsia toolchain")
 
 # All of the platform assembly input bundles.
-group("assembly") {
+platform_artifacts("assembly") {
   testonly = true
 
   # eng_platform_aib_labels come from //bundles/assembly/platform_aibs.gni.
@@ -436,6 +437,7 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/thermal/bin/temperature-cli:bootfs",
     "//src/devices/thermal/bin/thermal-cli:bootfs",
     "//src/devices/usb/bin/lsusb:bootfs",
+    "//src/devices/pci/bin:bootfs",
     "//src/media/audio/tools/audio-driver-ctl:bootfs",
     "//src/security/bin/syscall-check:bootfs",
     "//src/sys/tools/package:bootfs",
@@ -637,7 +639,6 @@ assembly_input_bundle("kernel_args_user") {
     "kernel.enable-debugging-syscalls=false",
     "kernel.enable-serial-syscalls=false",
     "netsvc.disable=true",
-    "kernel.serial=none",
   ]
 }
 
@@ -1237,10 +1238,14 @@ assembly_input_bundle("core_realm_eng") {
     # Always include 'ls'
     "ls",
 
-    # These are used by Chromium test infrastructure, and needs to always be
+    # These are used by Chromium test infrastructure, and need to always be
     # available.
     "cat",
     "sha1sum",
+
+    # These are used by vendor test infrastructure, and need to always be
+    # available.
+    "grep",
 
     # These are used by test infrastructure, and always need to be available.
     "mkdir",
@@ -1945,7 +1950,6 @@ assembly_input_bundle("detect_user") {
 # These AIBs are opaque groups of inputs that are common to many products, but
 # have not been organized into specific features yet.
 assembly_input_bundle("input_group_one") {
-  kernel_cmdline = [ "kernel.oom.behavior=reboot" ]
   base_packages = [ "//src/sys/cache_manager" ]
 }
 
@@ -3227,6 +3231,33 @@ assembly_input_bundle("audio_development_support") {
   ]
 }
 
+assembly_input_bundle("intel_hda") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/media/audio/drivers/intel-hda/codecs/hdmi:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/hdmi-audio-codec.cm" ]
+    },
+    {
+      package_target =
+          "//src/media/audio/drivers/intel-hda/codecs/realtek:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/realtek-audio-codec.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/intel-hda/controller:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/intel-hda.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/intel-hda/codecs/qemu:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/qemu-audio-codec.cm" ]
+    },
+  ]
+  bootfs_files_labels = [ "//src/media/audio/bin/ihda:bootfs" ]
+}
+
 assembly_input_bundle("video_development_support") {
   testonly = true
   cache_packages = [ "//src/media/codec/examples:encode-file" ]
@@ -3485,6 +3516,27 @@ assembly_input_bundle("battery_manager") {
           shards = [
             "//src/power/battery-manager/meta/battery_manager.core_shard.cml",
           ]
+        },
+      ]
+    },
+  ]
+}
+
+# TopologyTestDaemon support
+#
+# feature_set_levels: all
+# build-types: eng
+#
+assembly_input_bundle("topology_test_daemon") {
+  testonly = true
+  base_packages = [ "//src/power/topology-test-daemon:package" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/power/topology-test-daemon/meta/topology-test-daemon.core_shard.cml" ]
         },
       ]
     },
@@ -3876,6 +3928,21 @@ assembly_resources_directory("resources") {
     "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
   ]
   deps = [ "//src/lib/icu/tzdata:revision" ]
+}
+
+# Sets a low timeout for rebooting when the device runs out-of-memory.
+assembly_input_bundle("kernel_oom_reboot_timeout_low") {
+  kernel_cmdline = [ "kernel.oom.reboot-timeout-ms=8000" ]
+}
+
+# Enables jobkilling when the device runs out-of-memory.
+assembly_input_bundle("kernel_oom_behavior_jobkill") {
+  kernel_cmdline = [ "kernel.oom.behavior=jobkill" ]
+}
+
+# Enables log output to legacy serial console.
+assembly_input_bundle("kernel_serial_legacy") {
+  kernel_cmdline = [ "kernel.serial=legacy" ]
 }
 
 # Enables in kernel compression of anonymous memory with some common configuration options.

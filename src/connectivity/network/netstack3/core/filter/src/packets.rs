@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::{convert::Infallible as Never, num::NonZeroU16};
+use core::convert::Infallible as Never;
+use core::num::NonZeroU16;
 
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::{
@@ -10,28 +11,23 @@ use packet::{
     GrowBufferMut, InnerSerializer, Nested, PacketConstraints, ParsablePacket, ParseBuffer,
     ParseMetadata, ReusableBuffer, SerializeError, Serializer, SliceBufViewMut,
 };
-use packet_formats::{
-    icmp::{
-        self,
-        mld::{MulticastListenerDone, MulticastListenerReport},
-        ndp::{
-            options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
-            RouterSolicitation,
-        },
-        IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw,
-        IcmpPacketTypeRaw as _, IcmpTimeExceeded, Icmpv4MessageType, Icmpv4PacketRaw,
-        Icmpv4ParameterProblem, Icmpv4TimestampReply, Icmpv6MessageType, Icmpv6PacketRaw,
-        Icmpv6PacketTooBig, Icmpv6ParameterProblem,
-    },
-    igmp::{self, IgmpPacketBuilder},
-    ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto},
-    ipv4::{Ipv4Packet, Ipv4PacketRaw},
-    ipv6::{Ipv6Packet, Ipv6PacketRaw},
-    tcp::{
-        TcpParseArgs, TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions, TcpSegmentRaw,
-    },
-    udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs},
+use packet_formats::icmp::mld::{MulticastListenerDone, MulticastListenerReport};
+use packet_formats::icmp::ndp::options::NdpOptionBuilder;
+use packet_formats::icmp::ndp::{NeighborAdvertisement, NeighborSolicitation, RouterSolicitation};
+use packet_formats::icmp::{
+    self, IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw,
+    IcmpPacketTypeRaw as _, IcmpTimeExceeded, Icmpv4MessageType, Icmpv4PacketRaw,
+    Icmpv4ParameterProblem, Icmpv4TimestampReply, Icmpv6MessageType, Icmpv6PacketRaw,
+    Icmpv6PacketTooBig, Icmpv6ParameterProblem,
 };
+use packet_formats::igmp::{self, IgmpPacketBuilder};
+use packet_formats::ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::{Ipv4Packet, Ipv4PacketRaw};
+use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketRaw};
+use packet_formats::tcp::{
+    TcpParseArgs, TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions, TcpSegmentRaw,
+};
+use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs};
 use zerocopy::ByteSliceMut;
 
 /// An IP packet that provides header inspection.
@@ -1663,10 +1659,10 @@ pub mod testutil {
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeTcpSegment {
             fn proto() -> I::Proto {
-                I::map_ip(
-                    IpInvariant(()),
-                    |IpInvariant(())| Ipv4Proto::Proto(IpProto::Tcp),
-                    |IpInvariant(())| Ipv6Proto::Proto(IpProto::Tcp),
+                I::map_ip_out(
+                    (),
+                    |()| Ipv4Proto::Proto(IpProto::Tcp),
+                    |()| Ipv6Proto::Proto(IpProto::Tcp),
                 )
             }
         }
@@ -1718,10 +1714,10 @@ pub mod testutil {
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeUdpPacket {
             fn proto() -> I::Proto {
-                I::map_ip(
-                    IpInvariant(()),
-                    |IpInvariant(())| Ipv4Proto::Proto(IpProto::Udp),
-                    |IpInvariant(())| Ipv6Proto::Proto(IpProto::Udp),
+                I::map_ip_out(
+                    (),
+                    |()| Ipv4Proto::Proto(IpProto::Udp),
+                    |()| Ipv6Proto::Proto(IpProto::Udp),
                 )
             }
         }
@@ -1772,11 +1768,7 @@ pub mod testutil {
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeIcmpEchoRequest {
             fn proto() -> I::Proto {
-                I::map_ip(
-                    IpInvariant(()),
-                    |IpInvariant(())| Ipv4Proto::Icmp,
-                    |IpInvariant(())| Ipv6Proto::Icmpv6,
-                )
+                I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
             }
         }
 
@@ -1866,7 +1858,8 @@ mod tests {
     use packet_formats::icmp::IcmpUnusedCode;
     use test_case::test_case;
 
-    use super::{testutil::internal::TestIpExt, *};
+    use super::testutil::internal::TestIpExt;
+    use super::*;
 
     const SRC_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(11111));
     const DST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
@@ -2013,11 +2006,11 @@ mod tests {
         }
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn update_pseudo_header_address_updates_checksum<I: Ip + TestIpExt, P: Protocol>(_proto: P) {
+    fn update_pseudo_header_address_updates_checksum<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut buf = P::make_packet::<I>(I::SRC_IP, I::DST_IP);
         let view = SliceBufViewMut::new(&mut buf);
 
@@ -2039,12 +2032,12 @@ mod tests {
         assert_eq!(equivalent, buf);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp, true, true)]
     #[test_case(Tcp, true, true)]
     #[test_case(IcmpEchoRequest, true, false)]
     #[test_case(IcmpEchoReply, false, true)]
-    fn parsed_packet_update_src_dst_port_updates_checksum<I: Ip + TestIpExt, P: Protocol>(
+    fn parsed_packet_update_src_dst_port_updates_checksum<I: TestIpExt, P: Protocol>(
         _proto: P,
         update_src_port: bool,
         update_dst_port: bool,
@@ -2083,10 +2076,10 @@ mod tests {
         assert_eq!(equivalent, buf);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
-    fn serializer_update_src_dst_port_updates_checksum<I: Ip + TestIpExt, P: Protocol>(_proto: P) {
+    fn serializer_update_src_dst_port_updates_checksum<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut serializer =
             P::make_serializer_with_ports::<I>(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT);
         let mut packet =
@@ -2101,8 +2094,8 @@ mod tests {
         assert_eq!(equivalent, serializer);
     }
 
-    #[ip_test]
-    fn icmp_echo_request_update_id_port_updates_checksum<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn icmp_echo_request_update_id_port_updates_checksum<I: TestIpExt>() {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
@@ -2124,8 +2117,8 @@ mod tests {
         assert_eq!(equivalent, serializer);
     }
 
-    #[ip_test]
-    fn icmp_echo_reply_update_id_port_updates_checksum<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn icmp_echo_reply_update_id_port_updates_checksum<I: TestIpExt>() {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
@@ -2170,9 +2163,9 @@ mod tests {
         packet.set_src_port(SRC_PORT_2);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[should_panic]
-    fn icmp_echo_request_set_dst_port_panics<I: Ip + TestIpExt>() {
+    fn icmp_echo_request_set_dst_port_panics<I: TestIpExt>() {
         let mut serializer = IcmpEchoRequest::make_serializer::<I>(I::SRC_IP, I::DST_IP);
         let Some(packet) = serializer.transport_packet_mut() else {
             // We expect this method to always return Some, and this test is expected to
@@ -2183,9 +2176,9 @@ mod tests {
         packet.set_dst_port(SRC_PORT_2);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[should_panic]
-    fn icmp_echo_reply_set_src_port_panics<I: Ip + TestIpExt>() {
+    fn icmp_echo_reply_set_src_port_panics<I: TestIpExt>() {
         let mut serializer = IcmpEchoReply::make_serializer::<I>(I::SRC_IP, I::DST_IP);
         let Some(packet) = serializer.transport_packet_mut() else {
             // We expect this method to always return Some, and this test is expected to
@@ -2204,11 +2197,11 @@ mod tests {
             .unwrap_b()
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn ip_packet_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(_proto: P)
+    fn ip_packet_set_src_dst_addr_updates_checksums<I: TestIpExt, P: Protocol>(_proto: P)
     where
         for<'a> I::Packet<&'a mut [u8]>: IpPacket<I>,
     {
@@ -2225,13 +2218,11 @@ mod tests {
         assert_eq!(equivalent, buf);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn forwarded_packet_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(
-        _proto: P,
-    ) {
+    fn forwarded_packet_set_src_dst_addr_updates_checksums<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut buffer = ip_packet::<I, P>(I::SRC_IP, I::DST_IP);
         let meta = buffer.parse::<I::Packet<_>>().expect("parse IP packet").parse_metadata();
         let mut packet =
@@ -2247,11 +2238,11 @@ mod tests {
         assert_eq!(equivalent, packet);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn tx_packet_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(_proto: P) {
+    fn tx_packet_set_src_dst_addr_updates_checksums<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut body = P::make_serializer::<I>(I::SRC_IP, I::DST_IP);
         let mut packet = TxPacket::<I, _>::new(I::SRC_IP, I::DST_IP, P::proto::<I>(), &mut body);
         packet.set_src_addr(I::SRC_IP_2);
@@ -2264,13 +2255,11 @@ mod tests {
         assert_eq!(equivalent, packet);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Udp)]
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
-    fn nested_serializer_set_src_dst_addr_updates_checksums<I: Ip + TestIpExt, P: Protocol>(
-        _proto: P,
-    ) {
+    fn nested_serializer_set_src_dst_addr_updates_checksums<I: TestIpExt, P: Protocol>(_proto: P) {
         let mut packet = P::make_serializer::<I>(I::SRC_IP, I::DST_IP).encapsulate(
             I::PacketBuilder::new(I::SRC_IP, I::DST_IP, /* ttl */ u8::MAX, P::proto::<I>()),
         );

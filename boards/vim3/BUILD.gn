@@ -10,7 +10,7 @@ assert(current_toolchain == default_toolchain,
 assert(current_cpu == "arm64",
        "The vim3 board can only be defined in an arm64 toolchain.")
 
-_base = {
+board_configuration("vim3") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::fan",
@@ -21,10 +21,28 @@ _base = {
   ]
 
   input_bundles = [
+    ":devicetree_board_driver",
     ":main_bundle",
     ":vulkan_arm_mali",
     ":rtc_driver",
   ]
+
+  devicetree = "//src/devices/board/drivers/vim3-devicetree:vim3"
+
+  platform = {
+    connectivity = {
+      network = {
+        # Prefer using the built-in NIC to the CDC-ether interface.
+        # TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
+        # netdevice migration.
+        netsvc_interface = "/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device"
+      }
+    }
+    development_support = {
+      # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
+      enable_debug_access_port_for_soc = "amlogic-a311d"
+    }
+  }
 
   filesystems = {
     vbmeta = {
@@ -62,46 +80,6 @@ _base = {
   kernel = {
     contiguous_physical_pages = true
   }
-}
-
-board_configuration("vim3") {
-  forward_variables_from(_base, "*")
-  platform = {
-    connectivity = {
-      network = {
-        # Prefer using the built-in NIC to the CDC-ether interface.
-        # TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
-        # netdevice migration.
-        netsvc_interface =
-            "/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device"
-      }
-    }
-    development_support = {
-      # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
-      enable_debug_access_port_for_soc = "amlogic-a311d"
-    }
-  }
-  input_bundles += [ ":board_driver" ]
-}
-
-board_configuration("vim3-devicetree") {
-  forward_variables_from(_base, "*")
-  platform = {
-    connectivity = {
-      network = {
-        # Prefer using the built-in NIC to the CDC-ether interface.
-        # TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
-        # netdevice migration.
-        netsvc_interface = "/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device"
-      }
-    }
-    development_support = {
-      # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
-      enable_debug_access_port_for_soc = "amlogic-a311d"
-    }
-  }
-  input_bundles += [ ":devicetree_board_driver" ]
-  devicetree = "//src/devices/board/drivers/vim3-devicetree:vim3"
 }
 
 board_input_bundle("main_bundle") {
@@ -285,16 +263,6 @@ board_input_bundle("main_bundle") {
 
     # Base drivers
     {
-      package_target = "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3"
-      package_set = "base"
-      driver_components = [ "meta/brcmfmac.cm" ]
-    },
-    {
-      package_target = "//src/connectivity/bluetooth/hci/vendor/broadcom"
-      package_set = "base"
-      driver_components = [ "meta/bt-hci-broadcom.cm" ]
-    },
-    {
       package_target = "//src/graphics/drivers/msd-arm-mali:msd-arm-mali"
       package_set = "base"
       driver_components = [ "meta/msd_arm.cm" ]
@@ -317,17 +285,17 @@ board_input_bundle("main_bundle") {
   ]
 }
 
-board_input_bundle("board_driver") {
-  configuration = {
-    power_manager =
-        "//src/power/power-manager/node_config/vim3_node_config.json5"
-    thermal = "//src/power/power-manager/thermal_config/vim3.json5"
-  }
+board_input_bundle("broadcom_drivers") {
   drivers = [
     {
-      package_target = "//src/devices/board/drivers/vim3:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/vim3.cm" ]
+      package_target = "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3"
+      package_set = "base"
+      driver_components = [ "meta/brcmfmac.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/bluetooth/hci/vendor/broadcom"
+      package_set = "base"
+      driver_components = [ "meta/bt-hci-broadcom.cm" ]
     },
   ]
 }

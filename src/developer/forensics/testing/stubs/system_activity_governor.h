@@ -9,14 +9,11 @@
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <string>
-
-#include "lib/fidl/cpp/wire/internal/transport.h"
+#include "src/developer/forensics/testing/stubs/fidl_server.h"
 
 namespace forensics::stubs {
 
-class SystemActivityGovernor
-    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
+class SystemActivityGovernor : public FidlServer<fuchsia_power_system::ActivityGovernor> {
  public:
   SystemActivityGovernor(fidl::ServerEnd<fuchsia_power_system::ActivityGovernor> server_end,
                          async_dispatcher_t* dispatcher)
@@ -26,22 +23,12 @@ class SystemActivityGovernor
 
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
 
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
-  }
-
  private:
   fidl::ServerBinding<fuchsia_power_system::ActivityGovernor> binding_;
 };
 
 class SystemActivityGovernorNoPowerElements
-    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
+    : public FidlServer<fuchsia_power_system::ActivityGovernor> {
  public:
   SystemActivityGovernorNoPowerElements(
       fidl::ServerEnd<fuchsia_power_system::ActivityGovernor> server_end,
@@ -55,22 +42,11 @@ class SystemActivityGovernorNoPowerElements
 
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
 
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
-  }
-
  private:
   fidl::ServerBinding<fuchsia_power_system::ActivityGovernor> binding_;
 };
 
-class SystemActivityGovernorNoTokens
-    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
+class SystemActivityGovernorNoTokens : public FidlServer<fuchsia_power_system::ActivityGovernor> {
  public:
   SystemActivityGovernorNoTokens(fidl::ServerEnd<fuchsia_power_system::ActivityGovernor> server_end,
                                  async_dispatcher_t* dispatcher)
@@ -81,22 +57,12 @@ class SystemActivityGovernorNoTokens
 
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
 
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
-  }
-
  private:
   fidl::ServerBinding<fuchsia_power_system::ActivityGovernor> binding_;
 };
 
 class SystemActivityGovernorClosesConnection
-    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
+    : public FidlServer<fuchsia_power_system::ActivityGovernor> {
  public:
   SystemActivityGovernorClosesConnection(
       fidl::ServerEnd<fuchsia_power_system::ActivityGovernor> server_end,
@@ -109,16 +75,6 @@ class SystemActivityGovernorClosesConnection
   }
 
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
-  }
 
  private:
   fidl::ServerBinding<fuchsia_power_system::ActivityGovernor> binding_;

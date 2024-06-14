@@ -2,22 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fuzzer::{Fuzzer, FuzzerState};
+use anyhow::{Context as _, Error, Result};
+use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker, ServerEnd};
+use futures::channel::mpsc;
+use futures::StreamExt;
+use fuzz::RegistryProxy;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use test_manager::{
+    RunBuilderMarker, RunControllerMarker, RunControllerProxy, RunOptions, SuiteControllerMarker,
+    SuiteControllerProxy,
+};
+use tracing::warn;
+use url::Url;
 use {
-    crate::fuzzer::{Fuzzer, FuzzerState},
-    anyhow::{Context as _, Error, Result},
-    fidl::endpoints::{create_proxy, DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager, fuchsia_zircon as zx,
-    futures::channel::mpsc,
-    futures::StreamExt,
-    fuzz::RegistryProxy,
-    std::cell::RefCell,
-    std::collections::HashMap,
-    test_manager::{
-        RunBuilderMarker, RunControllerMarker, RunControllerProxy, RunOptions,
-        SuiteControllerMarker, SuiteControllerProxy,
-    },
-    tracing::warn,
-    url::Url,
 };
 
 // If this much time elapses from a test suite's start without it connecting to the fuzz-registry,
@@ -228,16 +228,14 @@ fn warn_internal<T>(e: Error) -> zx::Status {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test_support::{connect_to_manager, read_async, serve_test_realm, TestRealm},
-        fidl::endpoints::{create_endpoints, Proxy},
-        fidl_fuchsia_fuzzer as fuzz,
-        futures::join,
-        std::rc::Rc,
-        test_manager::LaunchError,
-        zx::AsHandleRef,
-    };
+    use super::*;
+    use crate::test_support::{connect_to_manager, read_async, serve_test_realm, TestRealm};
+    use fidl::endpoints::{create_endpoints, Proxy};
+    use fidl_fuchsia_fuzzer as fuzz;
+    use futures::join;
+    use std::rc::Rc;
+    use test_manager::LaunchError;
+    use zx::AsHandleRef;
 
     static FOO_URL: &str = "fuchsia-pkg://fuchsia.com/fuzz-manager-unittests#meta/foo.cm";
     static BAR_URL: &str = "fuchsia-pkg://fuchsia.com/fuzz-manager-unittests#meta/bar.cm";

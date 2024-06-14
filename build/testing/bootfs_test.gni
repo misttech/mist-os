@@ -54,5 +54,6 @@ template("bootfs_test") {
                              "isolated",
                            ])
     build_rule = "bootfs_test"
+    expects_ssh = false
   }
 }

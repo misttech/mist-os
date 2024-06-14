@@ -9,8 +9,10 @@ pub(crate) mod state;
 pub mod types;
 mod utils;
 
+pub use error::Error;
 pub(crate) use state::State;
-pub use {error::Error, types::*, utils::*};
+pub use types::*;
+pub use utils::*;
 
 #[doc(hidden)]
 pub use heap::Heap;

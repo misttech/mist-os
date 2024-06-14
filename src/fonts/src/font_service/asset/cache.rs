@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::asset::{Asset, AssetId},
-    fuchsia_inspect::{self as finspect, NumericProperty},
-    std::collections::VecDeque,
-};
+use super::asset::{Asset, AssetId};
+use fuchsia_inspect::{self as finspect, NumericProperty};
+use std::collections::VecDeque;
 
 /// An LRU cache for `Buffer`s, bounded by the total size of cached VMOs.
 ///
@@ -152,10 +150,9 @@ impl AssetCacheInspectData {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, diagnostics_assertions::assert_data_tree, fidl_fuchsia_mem as mem,
-        fuchsia_zircon as zx,
-    };
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use {fidl_fuchsia_mem as mem, fuchsia_zircon as zx};
 
     /// Creates a `Cache` with some mocked assets.
     fn mock_cache() -> Cache {

@@ -19,6 +19,7 @@
 #include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 
@@ -103,11 +104,28 @@ int IdlePowerThread::Run(void* arg) {
         Thread::Current::Reschedule();
       }
     } else {
-      ktrace::Scope trace =
-          KTRACE_CPU_BEGIN_SCOPE_ENABLE(kEnableRunloopTracing, "kernel:sched", "idle");
-      //  TODO(eieio): Use scheduler and timer states to determine latency requirements.
-      const zx_duration_t max_latency = 0;
-      arch_idle_enter(max_latency);
+      // Disable preemption and interrupts, then make one last check to be sure
+      // that we don't have any pending preemptions, or pending power state
+      // transitions, before falling into our idle state.
+      //
+      // Preemption is guaranteed to stay disabled for the duration of the idle
+      // state, but interrupt *may* be re-enabled while the CPU waits in its idle
+      // state.  So, while it is guaranteed that no other threads can run on
+      // this CPU while we are in our idle state, it is possible that we may
+      // have processed any number of interrupts before the method returns.
+      AutoPreemptDisabler preempt_disabled;
+      InterruptDisableGuard interrupt_disable;
+      const StateMachine ipt_state = this_idle_power_thread.state_.load(ktl::memory_order_acquire);
+      const bool preempts_pending =
+          Thread::Current::Get()->preemption_state().preempts_pending() != 0;
+
+      if (!preempts_pending && (ipt_state.target == ipt_state.current)) {
+        ktrace::Scope trace =
+            KTRACE_CPU_BEGIN_SCOPE_ENABLE(kEnableRunloopTracing, "kernel:sched", "idle");
+        //  TODO(eieio): Use scheduler and timer states to determine latency requirements.
+        const zx_duration_t max_latency = 0;
+        ArchIdlePowerThread::EnterIdleState(max_latency);
+      }
     }
   }
 }
@@ -209,7 +227,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
 
   // Keep track of which non-boot CPUs to resume.
   const cpu_mask_t cpus_active_before_suspend =
-      mp_get_active_mask() & ~cpu_num_to_mask(BOOT_CPU_ID);
+      Scheduler::PeekActiveMask() & ~cpu_num_to_mask(BOOT_CPU_ID);
   dprintf(INFO, "Active non-boot CPUs before suspend: %#x\n", cpus_active_before_suspend);
 
   // Suspend all of the active CPUs besides the boot CPU.

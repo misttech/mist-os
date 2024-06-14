@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use byteorder::{LittleEndian, WriteBytesExt};
-use fidl::endpoints::ControlHandle;
-use fidl::endpoints::RequestStream;
-use fidl::endpoints::ServerEnd;
-use fidl::endpoints::{create_endpoints, create_proxy};
+use fidl::endpoints::{create_endpoints, create_proxy, ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_decl::{
     Capability, Component, Expose, ExposeProtocol, ParentRef, Protocol, Ref, SelfRef,
 };
@@ -19,8 +16,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 /// Builder struct for `RealmQueryResult`/

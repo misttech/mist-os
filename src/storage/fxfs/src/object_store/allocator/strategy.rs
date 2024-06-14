@@ -16,15 +16,11 @@
 //!
 //! Strategies should be concerned only with selecting which free regions of disk to hand out.
 
-use {
-    crate::object_store::FxfsError,
-    anyhow::{Context, Error},
-    std::{
-        collections::{btree_map, BTreeMap, BTreeSet},
-        fmt::Debug,
-        ops::Range,
-    },
-};
+use crate::object_store::FxfsError;
+use anyhow::{Context, Error};
+use std::collections::{btree_map, BTreeMap, BTreeSet};
+use std::fmt::Debug;
+use std::ops::Range;
 
 /// Holds the offsets of extents of a given length.
 #[derive(Debug, Default)]

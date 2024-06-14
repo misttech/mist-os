@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_component_tests::{ShutdownerRequest, ShutdownerRequestStream},
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_component_tests::{ShutdownerRequest, ShutdownerRequestStream};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
 
 async fn run_server(stream: ShutdownerRequestStream) -> Result<(), Error> {
     stream

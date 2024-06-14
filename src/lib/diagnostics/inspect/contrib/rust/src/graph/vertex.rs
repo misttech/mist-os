@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    events::GraphObjectEventTracker, types::VertexMarker, Edge, Metadata, VertexGraphMetadata,
-    VertexId,
-};
+use super::events::GraphObjectEventTracker;
+use super::types::VertexMarker;
+use super::{Edge, Metadata, VertexGraphMetadata, VertexId};
 use fuchsia_inspect as inspect;
-use std::{
-    collections::BTreeMap,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// A vertex of the graph. When this is dropped, all the outgoing edges and metadata fields will
 /// removed from Inspect.

@@ -7,33 +7,32 @@
 // this file are from https://tools.ietf.org/html/rfc793#section-3.9 if not
 // specified otherwise.
 
-use core::{
-    convert::{Infallible, TryFrom as _},
-    fmt::Debug,
-    num::{NonZeroU32, NonZeroU8, NonZeroUsize, TryFromIntError},
-    time::Duration,
-};
+use core::convert::{Infallible, TryFrom as _};
+use core::fmt::Debug;
+use core::num::{NonZeroU32, NonZeroU8, NonZeroUsize, TryFromIntError};
+use core::time::Duration;
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
+use log::error;
 use netstack3_base::Instant;
 use netstack3_ip::icmp::IcmpErrorCode;
 use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
 
-use crate::internal::{
-    base::{
-        BufferSizes, ConnectionError, Control, KeepAlive, Mss, OptionalBufferSizes, SocketOptions,
-        TcpCountersInner,
-    },
-    buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
-    congestion::CongestionControl,
-    rtt::Estimator,
-    segment::{Options, Payload, Segment},
-    seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize},
+use crate::internal::base::{
+    BufferSizes, ConnectionError, Control, KeepAlive, Mss, OptionalBufferSizes, SocketOptions,
+    TcpCountersInner,
 };
+use crate::internal::buffer::{
+    Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload,
+};
+use crate::internal::congestion::CongestionControl;
+use crate::internal::rtt::Estimator;
+use crate::internal::segment::{Options, Payload, Segment};
+use crate::internal::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-81):
 /// MSL
@@ -831,7 +830,7 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
         let BufferLimits { capacity, len } = buffer.limits();
         // `unused_window` is RCV.WND as described above.
         let unused_window = WindowSize::from_u32(u32::try_from(*rcv_wup + *last_wnd - rcv_nxt).unwrap_or_else(|_: TryFromIntError| {
-            tracing::error!(
+            error!(
                 "we received more bytes than we advertised, rcv_nxt: {:?}, rcv_wup: {:?}, last_wnd: {:?}",
                 rcv_nxt, rcv_wup, last_wnd
             );
@@ -2902,26 +2901,22 @@ pub(super) enum CloseReason<I: Instant> {
 #[cfg(test)]
 mod test {
     use alloc::vec;
-    use core::{fmt::Debug, num::NonZeroU16, time::Duration};
+    use core::fmt::Debug;
+    use core::num::NonZeroU16;
+    use core::time::Duration;
 
     use assert_matches::assert_matches;
     use net_types::ip::Ipv4;
-    use netstack3_base::{
-        testutil::{FakeInstant, FakeInstantCtx},
-        InstantContext as _,
-    };
+    use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
+    use netstack3_base::InstantContext as _;
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::{
-        base::{
-            testutil::{
-                DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE,
-            },
-            DEFAULT_FIN_WAIT2_TIMEOUT,
-        },
-        buffer::{Buffer, RingBuffer},
+    use crate::internal::base::testutil::{
+        DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE,
     };
+    use crate::internal::base::DEFAULT_FIN_WAIT2_TIMEOUT;
+    use crate::internal::buffer::{Buffer, RingBuffer};
 
     const ISS_1: SeqNum = SeqNum::new(100);
     const ISS_2: SeqNum = SeqNum::new(300);

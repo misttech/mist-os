@@ -29,57 +29,42 @@ pub use store_object_handle::{
     EXTENDED_ATTRIBUTE_RANGE_START,
 };
 
-use {
-    crate::{
-        errors::FxfsError,
-        filesystem::{
-            ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions, MAX_FILE_SIZE,
-        },
-        log::*,
-        lsm_tree::{
-            cache::{NullCache, ObjectCache},
-            types::{Item, ItemRef, LayerIterator},
-            LSMTree,
-        },
-        object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
-        object_store::{
-            allocator::Allocator,
-            graveyard::Graveyard,
-            journal::{JournalCheckpoint, JournaledTransaction},
-            key_manager::KeyManager,
-            transaction::{
-                lock_keys, AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation,
-                Options, Transaction,
-            },
-        },
-        range::RangeExt,
-        round::round_up,
-        serialized_types::{migrate_to_version, Migrate, Version, Versioned, VersionedLatest},
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    assert_matches::assert_matches,
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fprint::TypeFingerprint,
-    fuchsia_inspect::ArrayProperty,
-    fxfs_crypto::{
-        ff1::Ff1, Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeyV32, WrappedKeys,
-    },
-    once_cell::sync::OnceCell,
-    scopeguard::ScopeGuard,
-    serde::{Deserialize, Serialize},
-    std::{
-        collections::VecDeque,
-        fmt,
-        ops::Bound,
-        sync::{
-            atomic::{AtomicBool, AtomicU64, Ordering},
-            Arc, Mutex, OnceLock, Weak,
-        },
-    },
-    storage_device::Device,
-    uuid::Uuid,
+use crate::errors::FxfsError;
+use crate::filesystem::{
+    ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions, MAX_FILE_SIZE,
 };
+use crate::log::*;
+use crate::lsm_tree::cache::{NullCache, ObjectCache};
+use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+use crate::lsm_tree::LSMTree;
+use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
+use crate::object_store::allocator::Allocator;
+use crate::object_store::graveyard::Graveyard;
+use crate::object_store::journal::{JournalCheckpoint, JournaledTransaction};
+use crate::object_store::key_manager::KeyManager;
+use crate::object_store::transaction::{
+    lock_keys, AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation, Options,
+    Transaction,
+};
+use crate::range::RangeExt;
+use crate::round::round_up;
+use crate::serialized_types::{migrate_to_version, Migrate, Version, Versioned, VersionedLatest};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_io as fio;
+use fprint::TypeFingerprint;
+use fuchsia_inspect::ArrayProperty;
+use fxfs_crypto::ff1::Ff1;
+use fxfs_crypto::{Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeyV32, WrappedKeys};
+use once_cell::sync::OnceCell;
+use scopeguard::ScopeGuard;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::ops::Bound;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
+use storage_device::Device;
+use uuid::Uuid;
 
 pub use extent_record::{
     ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
@@ -118,8 +103,8 @@ pub struct StoreInfoV36 {
     /// then get committed in an arbitrary order (or not at all).
     last_object_id: u64,
 
-    /// Object ids for layers.  TODO(https://fxbug.dev/42178036): need a layer of indirection here so we can
-    /// support snapshots.
+    /// Object ids for layers.  TODO(https://fxbug.dev/42178036): need a layer of indirection here
+    /// so we can support snapshots.
     pub layers: Vec<u64>,
 
     /// The object ID for the root directory.
@@ -128,7 +113,8 @@ pub struct StoreInfoV36 {
     /// The object ID for the graveyard.
     graveyard_directory_object_id: u64,
 
-    /// The number of live objects in the store.
+    /// The number of live objects in the store.  This should *not* be trusted; it can be invalid
+    /// due to filesystem inconsistencies.
     object_count: u64,
 
     /// The (wrapped) key that encrypted mutations should use.
@@ -259,8 +245,8 @@ impl EncryptedMutations {
         transactions: Vec<JournaledTransaction>,
     ) -> Self {
         let mut this = Self::default();
-        for JournaledTransaction { checkpoint, mutations, .. } in transactions {
-            for (object_id, mutation) in mutations {
+        for JournaledTransaction { checkpoint, non_root_mutations, .. } in transactions {
+            for (object_id, mutation) in non_root_mutations {
                 if store_object_id == object_id {
                     if let Mutation::EncryptedObjectStore(data) = mutation {
                         this.push(&checkpoint, data);
@@ -294,106 +280,6 @@ impl EncryptedMutations {
             }
         }
         self.transactions.push((checkpoint.clone(), 1));
-    }
-}
-
-// Whilst we are replaying the store, we need to keep track of changes to StoreInfo that arise from
-// mutations in the journal stream that don't include all the fields in StoreInfo.  After replay has
-// finished, we load the full store information and merge it with the deltas here.
-// NOTE: While changing this struct, make sure to also update fsck::Fsck::check_child_store if
-// needed, which currently doesn't bother replaying this information.
-#[derive(Debug, Default)]
-struct ReplayInfo {
-    object_count_delta: i64,
-    internal_directory_object_id: Option<u64>,
-}
-
-impl ReplayInfo {
-    fn new() -> VecDeque<ReplayInfo> {
-        let mut info = VecDeque::new();
-        info.push_back(ReplayInfo::default());
-        info
-    }
-}
-
-#[derive(Debug)]
-enum StoreOrReplayInfo {
-    Info(StoreInfo),
-
-    // When we flush a store, we take a snapshot of store information when we begin flushing, and
-    // that snapshot gets committed when we end flushing.  In the intervening period, we need to
-    // record any changes made to store information.  If during replay we don't get around to ending
-    // the flush, we need to hang on to the deltas that were applied before we started flushing.
-    // This is why the information is stored in a VecDeque.  The frontmost element is always the
-    // most recent.
-    Replay(VecDeque<ReplayInfo>),
-
-    // Used when a store is locked.
-    Locked,
-}
-
-impl StoreOrReplayInfo {
-    fn info(&self) -> Option<&StoreInfo> {
-        match self {
-            StoreOrReplayInfo::Info(info) => Some(info),
-            _ => None,
-        }
-    }
-
-    fn info_mut(&mut self) -> Option<&mut StoreInfo> {
-        match self {
-            StoreOrReplayInfo::Info(info) => Some(info),
-            _ => None,
-        }
-    }
-
-    fn replay_info_mut(&mut self) -> Option<&mut VecDeque<ReplayInfo>> {
-        match self {
-            StoreOrReplayInfo::Replay(info) => Some(info),
-            _ => None,
-        }
-    }
-
-    fn adjust_object_count(&mut self, delta: i64) {
-        match self {
-            StoreOrReplayInfo::Info(StoreInfo { object_count, .. }) => {
-                if delta < 0 {
-                    *object_count = object_count.saturating_sub(-delta as u64);
-                } else {
-                    *object_count = object_count.saturating_add(delta as u64);
-                }
-            }
-            StoreOrReplayInfo::Replay(replay_info) => {
-                replay_info.front_mut().unwrap().object_count_delta += delta;
-            }
-            StoreOrReplayInfo::Locked => unreachable!(),
-        }
-    }
-
-    fn set_internal_dir(&mut self, dir_id: u64) {
-        match self {
-            StoreOrReplayInfo::Info(StoreInfo { internal_directory_object_id, .. }) => {
-                *internal_directory_object_id = dir_id;
-            }
-            StoreOrReplayInfo::Replay(replay_info) => {
-                replay_info.front_mut().unwrap().internal_directory_object_id = Some(dir_id);
-            }
-            StoreOrReplayInfo::Locked => unreachable!(),
-        }
-    }
-
-    fn begin_flush(&mut self) {
-        if let StoreOrReplayInfo::Replay(replay_info) = self {
-            // Push a new record on the front keeping the old one.  We'll remove the old one when
-            // `end_flush` is called.
-            replay_info.push_front(ReplayInfo::default());
-        }
-    }
-
-    fn end_flush(&mut self) {
-        if let StoreOrReplayInfo::Replay(replay_info) = self {
-            replay_info.truncate(1);
-        }
     }
 }
 
@@ -477,7 +363,7 @@ pub struct ObjectStore {
     block_size: u64,
     filesystem: Weak<FxFilesystem>,
     // Lock ordering: This must be taken before `lock_state`.
-    store_info: Mutex<StoreOrReplayInfo>,
+    store_info: Mutex<Option<StoreInfo>>,
     tree: LSMTree<ObjectKey, ObjectValue>,
 
     // When replaying the journal, the store cannot read StoreInfo until the whole journal
@@ -543,10 +429,7 @@ impl ObjectStore {
             device,
             block_size,
             filesystem: Arc::downgrade(&filesystem),
-            store_info: Mutex::new(match store_info {
-                Some(info) => StoreOrReplayInfo::Info(info),
-                None => StoreOrReplayInfo::Replay(ReplayInfo::new()),
-            }),
+            store_info: Mutex::new(store_info),
             tree: LSMTree::new(merge::merge, object_cache),
             store_info_handle: OnceCell::new(),
             mutations_cipher: Mutex::new(mutations_cipher),
@@ -590,7 +473,7 @@ impl ObjectStore {
             device,
             block_size,
             filesystem: Weak::<FxFilesystem>::new(),
-            store_info: Mutex::new(StoreOrReplayInfo::Info(StoreInfo::default())),
+            store_info: Mutex::new(Some(StoreInfo::default())),
             tree: LSMTree::new(merge::merge, Box::new(NullCache {})),
             store_info_handle: OnceCell::new(),
             mutations_cipher: Mutex::new(None),
@@ -697,7 +580,7 @@ impl ObjectStore {
 
             let serialized_info = {
                 let mut store_info = self.store_info.lock().unwrap();
-                let store_info = store_info.info_mut().unwrap();
+                let store_info = store_info.as_mut().unwrap();
 
                 store_info.graveyard_directory_object_id = graveyard_directory_object_id;
                 store_info.root_directory_object_id = root_directory.object_id();
@@ -797,11 +680,11 @@ impl ObjectStore {
     }
 
     pub fn root_directory_object_id(&self) -> u64 {
-        self.store_info.lock().unwrap().info().unwrap().root_directory_object_id
+        self.store_info.lock().unwrap().as_ref().unwrap().root_directory_object_id
     }
 
     pub fn graveyard_directory_object_id(&self) -> u64 {
-        self.store_info.lock().unwrap().info().unwrap().graveyard_directory_object_id
+        self.store_info.lock().unwrap().as_ref().unwrap().graveyard_directory_object_id
     }
 
     fn set_graveyard_directory_object_id(&self, oid: u64) {
@@ -811,7 +694,7 @@ impl ObjectStore {
                     .store_info
                     .lock()
                     .unwrap()
-                    .info_mut()
+                    .as_mut()
                     .unwrap()
                     .graveyard_directory_object_id,
                 oid
@@ -821,7 +704,7 @@ impl ObjectStore {
     }
 
     pub fn object_count(&self) -> u64 {
-        self.store_info.lock().unwrap().info().unwrap().object_count
+        self.store_info.lock().unwrap().as_ref().unwrap().object_count
     }
 
     /// Returns the crypt object for the store. Returns None if the store is unencrypted. This will
@@ -853,7 +736,7 @@ impl ObjectStore {
                 Options::default(),
             )
             .await?;
-        let obj_id = self.store_info.lock().unwrap().info().unwrap().internal_directory_object_id;
+        let obj_id = self.store_info.lock().unwrap().as_ref().unwrap().internal_directory_object_id;
         if obj_id != INVALID_OBJECT_ID {
             return Ok(obj_id);
         }
@@ -1418,14 +1301,14 @@ impl ObjectStore {
     /// referenced externally.
     pub fn parent_objects(&self) -> Vec<u64> {
         assert!(self.store_info_handle.get().is_some());
-        self.store_info.lock().unwrap().info().unwrap().parent_objects()
+        self.store_info.lock().unwrap().as_ref().unwrap().parent_objects()
     }
 
     /// Returns root objects for this store.
     pub fn root_objects(&self) -> Vec<u64> {
         let mut objects = Vec::new();
         let store_info = self.store_info.lock().unwrap();
-        let info = store_info.info().unwrap();
+        let info = store_info.as_ref().unwrap();
         if info.root_directory_object_id != INVALID_OBJECT_ID {
             objects.push(info.root_directory_object_id);
         }
@@ -1439,7 +1322,7 @@ impl ObjectStore {
     }
 
     pub fn store_info(&self) -> Option<StoreInfo> {
-        self.store_info.lock().unwrap().info().cloned()
+        self.store_info.lock().unwrap().as_ref().cloned()
     }
 
     /// Returns None if called during journal replay.
@@ -1447,103 +1330,73 @@ impl ObjectStore {
         self.store_info_handle.get().map(|h| h.object_id())
     }
 
-    /// Called when replay for a store has completed.
-    async fn on_replay_complete(&self) -> Result<(), Error> {
-        if self.parent_store.is_none() || self.store_info_handle.get().is_some() {
-            return Ok(());
-        }
+    /// Called to open a store, before replay of this store's mutations.
+    async fn open(
+        parent_store: &Arc<ObjectStore>,
+        store_object_id: u64,
+        object_cache: Box<dyn ObjectCache<ObjectKey, ObjectValue>>,
+    ) -> Result<Arc<ObjectStore>, Error> {
+        let handle =
+            ObjectStore::open_object(parent_store, store_object_id, HandleOptions::default(), None)
+                .await?;
 
-        let parent_store = self.parent_store.as_ref().unwrap();
-        let handle = ObjectStore::open_object(
-            &parent_store,
-            self.store_object_id,
-            HandleOptions::default(),
-            None,
-        )
-        .await?;
+        let info = load_store_info(parent_store, store_object_id).await?;
+        let is_encrypted = info.mutations_key.is_some();
 
-        let object_tree_layer_object_ids;
-        let encrypted;
-
-        {
-            let mut info = self.load_store_info().await?;
-
-            if info.object_id_key.is_none() {
-                self.update_last_object_id(info.last_object_id);
-            }
-
-            // Merge the replay information.
-            let mut store_info = self.store_info.lock().unwrap();
-
-            // The frontmost element of the replay information is the most recent so we must apply
-            // that last.
-            for replay_info in store_info.replay_info_mut().unwrap().iter_mut().rev() {
-                if replay_info.object_count_delta < 0 {
-                    info.object_count =
-                        info.object_count.saturating_sub(-replay_info.object_count_delta as u64);
-                } else {
-                    info.object_count =
-                        info.object_count.saturating_add(replay_info.object_count_delta as u64);
-                }
-                if let Some(dir_id) = replay_info.internal_directory_object_id {
-                    info.internal_directory_object_id = dir_id;
-                }
-            }
-
-            object_tree_layer_object_ids = info.layers.clone();
-            encrypted = if info.mutations_key.is_some() {
-                Some(info.encrypted_mutations_object_id)
-            } else {
-                None
-            };
-
-            if encrypted.is_some() {
-                *store_info = StoreOrReplayInfo::Locked;
-            } else {
-                *store_info = StoreOrReplayInfo::Info(info);
-            }
-        }
-
-        if encrypted.is_some() {
-            *self.lock_state.lock().unwrap() = LockState::Locked;
-        } else {
-            *self.lock_state.lock().unwrap() = LockState::Unencrypted;
-        }
+        let mut total_layer_size = 0;
+        let last_object_id;
 
         // TODO(https://fxbug.dev/42178043): the layer size here could be bad and cause overflow.
 
         // If the store is encrypted, we can't open the object tree layers now, but we need to
         // compute the size of the layers.
-        let total_size: u64 = if let Some(encrypted_mutations_object_id) = encrypted {
-            let mut size = 0;
-            let parent_store = self.parent_store.as_ref().unwrap();
-            for oid in object_tree_layer_object_ids.into_iter() {
-                size += parent_store.get_file_size(oid).await?;
+        if is_encrypted {
+            for &oid in &info.layers {
+                total_layer_size += parent_store.get_file_size(oid).await?;
             }
-            if encrypted_mutations_object_id != INVALID_OBJECT_ID {
-                size += layer_size_from_encrypted_mutations_size(
-                    parent_store.get_file_size(encrypted_mutations_object_id).await?,
+            if info.encrypted_mutations_object_id != INVALID_OBJECT_ID {
+                total_layer_size += layer_size_from_encrypted_mutations_size(
+                    parent_store.get_file_size(info.encrypted_mutations_object_id).await?,
                 );
             }
-            size
+            last_object_id = LastObjectId::default();
         } else {
-            let object_layers = self.open_layers(object_tree_layer_object_ids, None).await?;
-            let size: u64 = object_layers.iter().map(|h| h.get_size()).sum();
-            self.tree
+            last_object_id = LastObjectId { id: info.last_object_id, cipher: None };
+        }
+
+        let fs = parent_store.filesystem();
+
+        let store = ObjectStore::new(
+            Some(parent_store.clone()),
+            store_object_id,
+            fs.clone(),
+            if is_encrypted { None } else { Some(info) },
+            object_cache,
+            None,
+            if is_encrypted { LockState::Locked } else { LockState::Unencrypted },
+            last_object_id,
+        );
+
+        assert!(store.store_info_handle.set(handle).is_ok(), "Failed to set store_info_handle!");
+
+        if !is_encrypted {
+            let object_tree_layer_object_ids =
+                store.store_info.lock().unwrap().as_ref().unwrap().layers.clone();
+            let object_layers = store.open_layers(object_tree_layer_object_ids, None).await?;
+            total_layer_size = object_layers.iter().map(|h| h.get_size()).sum();
+            store
+                .tree
                 .append_layers(object_layers)
                 .await
                 .context("Failed to read object store layers")?;
-            *self.lock_state.lock().unwrap() = LockState::Unencrypted;
-            size
-        };
+        }
 
-        assert!(self.store_info_handle.set(handle).is_ok(), "Failed to set store_info_handle!");
-        self.filesystem().object_manager().update_reservation(
-            self.store_object_id,
-            tree::reservation_amount_from_layer_size(total_size),
+        fs.object_manager().update_reservation(
+            store_object_id,
+            tree::reservation_amount_from_layer_size(total_layer_size),
         );
 
-        Ok(())
+        Ok(store)
     }
 
     async fn load_store_info(&self) -> Result<StoreInfo, Error> {
@@ -1686,12 +1539,12 @@ impl ObjectStore {
         mutations.extend(&journaled);
 
         let _ = std::mem::replace(&mut *self.lock_state.lock().unwrap(), LockState::Unlocking);
-        *self.store_info.lock().unwrap() = StoreOrReplayInfo::Info(store_info);
+        *self.store_info.lock().unwrap() = Some(store_info);
 
         // If we fail, clean up.
         let clean_up = scopeguard::guard((), |_| {
             *self.lock_state.lock().unwrap() = LockState::Locked;
-            *self.store_info.lock().unwrap() = StoreOrReplayInfo::Locked;
+            *self.store_info.lock().unwrap() = None;
             // Make sure we don't leave unencrypted data lying around in memory.
             self.tree.reset();
         });
@@ -1765,7 +1618,7 @@ impl ObjectStore {
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.store_info.lock().unwrap().info().unwrap().mutations_key.is_some()
+        self.store_info.lock().unwrap().as_ref().unwrap().mutations_key.is_some()
     }
 
     // Locks a store.  This assumes no other concurrent access to the store (other than flushing
@@ -1801,7 +1654,7 @@ impl ObjectStore {
             LockState::Locked
         };
         self.key_manager.clear();
-        *self.store_info.lock().unwrap() = StoreOrReplayInfo::Locked;
+        *self.store_info.lock().unwrap() = None;
         self.tree.reset();
 
         sync_result
@@ -1812,7 +1665,7 @@ impl ObjectStore {
     // and will be replayed next time the store is unlocked.
     pub fn lock_read_only(&self) {
         *self.lock_state.lock().unwrap() = LockState::Locked;
-        *self.store_info.lock().unwrap() = StoreOrReplayInfo::Locked;
+        *self.store_info.lock().unwrap() = None;
         self.tree.reset();
     }
 
@@ -1876,7 +1729,7 @@ impl ObjectStore {
         let buf = {
             let serialized_info = {
                 let mut store_info = self.store_info.lock().unwrap();
-                let store_info = store_info.info_mut().unwrap();
+                let store_info = store_info.as_mut().unwrap();
                 store_info.object_id_key = Some(object_id_wrapped);
                 let mut serialized_info = Vec::new();
                 store_info.serialize_with_version(&mut serialized_info)?;
@@ -2015,7 +1868,7 @@ impl ObjectStore {
         // end up writing the wrong wrapped key.
         let mut cipher = self.mutations_cipher.lock().unwrap();
         *cipher = Some(StreamCipher::new(&unwrapped_key, 0));
-        self.store_info.lock().unwrap().info_mut().unwrap().mutations_key = Some(wrapped_key);
+        self.store_info.lock().unwrap().as_mut().unwrap().mutations_key = Some(wrapped_key);
         // mutations_cipher_offset is updated by flush.
         Ok(())
     }
@@ -2118,19 +1971,25 @@ impl JournalingObject for ObjectStore {
         context: &ApplyContext<'_, '_>,
         _assoc_obj: AssocObj<'_>,
     ) -> Result<(), Error> {
-        if context.mode.is_live() {
-            let lock_state = self.lock_state.lock().unwrap();
-            match &*lock_state {
-                LockState::Locked | LockState::Locking => {
-                    assert_matches!(mutation, Mutation::BeginFlush | Mutation::EndFlush)
-                }
-                LockState::Invalid
-                | LockState::Unlocking
-                | LockState::Unencrypted
-                | LockState::Unlocked(_)
-                | LockState::UnlockedReadOnly(..) => {}
-                _ => panic!("Unexpected lock state: {:?}", &*lock_state),
+        match &*self.lock_state.lock().unwrap() {
+            LockState::Locked | LockState::Locking => {
+                ensure!(
+                    matches!(mutation, Mutation::BeginFlush | Mutation::EndFlush)
+                        || matches!(
+                            mutation,
+                            Mutation::EncryptedObjectStore(_) | Mutation::UpdateMutationsKey(_)
+                                if context.mode.is_replay()
+                        ),
+                    anyhow!(FxfsError::Inconsistent)
+                        .context(format!("Unexpected mutation for encrypted store: {mutation:?}"))
+                );
             }
+            LockState::Invalid
+            | LockState::Unlocking
+            | LockState::Unencrypted
+            | LockState::Unlocked(_)
+            | LockState::UnlockedReadOnly(..) => {}
+            lock_state @ _ => panic!("Unexpected lock state: {lock_state:?}"),
         }
         match mutation {
             Mutation::ObjectStore(ObjectStoreMutation { mut item, op }) => {
@@ -2140,7 +1999,11 @@ impl JournalingObject for ObjectStore {
                         // If we are inserting an object record for the first time, it signifies the
                         // birth of the object so we need to adjust the object count.
                         if matches!(item.value, ObjectValue::Object { .. }) {
-                            self.store_info.lock().unwrap().adjust_object_count(1);
+                            {
+                                let info = &mut self.store_info.lock().unwrap();
+                                let object_count = &mut info.as_mut().unwrap().object_count;
+                                *object_count = object_count.saturating_add(1);
+                            }
                             if context.mode.is_replay() {
                                 self.update_last_object_id(item.key.object_id);
                             }
@@ -2152,7 +2015,9 @@ impl JournalingObject for ObjectStore {
                     }
                     Operation::Merge => {
                         if item.is_tombstone() {
-                            self.store_info.lock().unwrap().adjust_object_count(-1);
+                            let info = &mut self.store_info.lock().unwrap();
+                            let object_count = &mut info.as_mut().unwrap().object_count;
+                            *object_count = object_count.saturating_sub(1);
                         }
                         let lower_bound = item.key.key_for_merge_into();
                         self.tree.merge_into(item, &lower_bound);
@@ -2162,15 +2027,8 @@ impl JournalingObject for ObjectStore {
             Mutation::BeginFlush => {
                 ensure!(self.parent_store.is_some(), FxfsError::Inconsistent);
                 self.tree.seal();
-                self.store_info.lock().unwrap().begin_flush();
             }
-            Mutation::EndFlush => {
-                ensure!(self.parent_store.is_some(), FxfsError::Inconsistent);
-                if context.mode.is_replay() {
-                    self.tree.reset_immutable_layers();
-                    self.store_info.lock().unwrap().end_flush();
-                }
-            }
+            Mutation::EndFlush => ensure!(self.parent_store.is_some(), FxfsError::Inconsistent),
             Mutation::EncryptedObjectStore(_) | Mutation::UpdateMutationsKey(_) => {
                 // We will process these during Self::unlock.
                 ensure!(
@@ -2180,7 +2038,8 @@ impl JournalingObject for ObjectStore {
             }
             Mutation::CreateInternalDir(object_id) => {
                 ensure!(object_id != INVALID_OBJECT_ID, FxfsError::Inconsistent);
-                self.store_info.lock().unwrap().set_internal_dir(object_id);
+                self.store_info.lock().unwrap().as_mut().unwrap().internal_directory_object_id =
+                    object_id;
             }
             _ => bail!("unexpected mutation: {:?}", mutation),
         }
@@ -2225,7 +2084,7 @@ impl JournalingObject for ObjectStore {
                             self.store_info
                                 .lock()
                                 .unwrap()
-                                .info()
+                                .as_ref()
                                 .unwrap()
                                 .mutations_key
                                 .as_ref()
@@ -2334,38 +2193,35 @@ pub async fn load_store_info(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            StoreInfo, DEFAULT_DATA_ATTRIBUTE_ID, FSVERITY_MERKLE_ATTRIBUTE_ID,
-            MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK,
-        },
-        crate::{
-            errors::FxfsError,
-            filesystem::{FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions},
-            fsck::fsck,
-            lsm_tree::types::{Item, ItemRef, LayerIterator},
-            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
-            object_store::{
-                directory::Directory,
-                object_record::{AttributeKey, ObjectKey, ObjectKind, ObjectValue},
-                transaction::{lock_keys, Options},
-                volume::root_volume,
-                FsverityMetadata, HandleOptions, LockKey, Mutation, ObjectStore, RootDigest,
-            },
-            serialized_types::VersionedLatest,
-        },
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        futures::join,
-        fxfs_crypto::{Crypt, WrappedKey, WrappedKeyBytes, WRAPPED_KEY_SIZE},
-        fxfs_insecure_crypto::InsecureCrypt,
-        std::{
-            ops::Bound,
-            sync::{Arc, Mutex},
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+    use super::{
+        StoreInfo, DEFAULT_DATA_ATTRIBUTE_ID, FSVERITY_MERKLE_ATTRIBUTE_ID,
+        MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK,
     };
+    use crate::errors::FxfsError;
+    use crate::filesystem::{FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions};
+    use crate::fsck::fsck;
+    use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+    use crate::object_handle::{
+        ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID,
+    };
+    use crate::object_store::directory::Directory;
+    use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectKind, ObjectValue};
+    use crate::object_store::transaction::{lock_keys, Options};
+    use crate::object_store::volume::root_volume;
+    use crate::object_store::{
+        FsverityMetadata, HandleOptions, LockKey, Mutation, ObjectStore, RootDigest,
+    };
+    use crate::serialized_types::VersionedLatest;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use futures::join;
+    use fxfs_crypto::{Crypt, WrappedKey, WrappedKeyBytes, WRAPPED_KEY_SIZE};
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use std::ops::Bound;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
 

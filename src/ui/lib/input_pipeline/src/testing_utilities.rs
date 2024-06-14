@@ -4,20 +4,19 @@
 
 #![cfg(test)]
 
+use crate::utils::Position;
+use crate::{
+    consumer_controls_binding, input_device, input_handler, keyboard_binding, mouse_binding,
+    touch_binding,
+};
+use assert_matches::assert_matches;
+use futures::FutureExt as _;
+use maplit::hashmap;
+use std::collections::{HashMap, HashSet};
 use {
-    crate::utils::Position,
-    crate::{
-        consumer_controls_binding, input_device, input_handler, keyboard_binding, mouse_binding,
-        touch_binding,
-    },
-    assert_matches::assert_matches,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
     fidl_fuchsia_ui_input3 as fidl_ui_input3, fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fuchsia_zircon as zx,
-    futures::FutureExt as _,
-    maplit::hashmap,
-    std::collections::HashMap,
-    std::collections::HashSet,
 };
 
 pub use diagnostics_assertions;

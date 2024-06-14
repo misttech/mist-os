@@ -32,34 +32,27 @@
 // the mutex, and having a single asynchronous thread that is dedicated to converting
 // incoming Callbacks to signaling registered events.
 
-use {
-    crate::{addr, port},
-    anyhow::{format_err, Context as _},
-    fidl::endpoints,
-    fidl_fuchsia_hardware_vsock::{
-        CallbacksMarker, CallbacksRequest, CallbacksRequestStream, DeviceProxy,
-    },
-    fidl_fuchsia_vsock::{
-        AcceptorProxy, ConnectionRequest, ConnectionRequestStream, ConnectionTransport,
-        ConnectorRequest, ConnectorRequestStream,
-    },
-    fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        future, select, Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
-    },
-    std::{
-        collections::HashMap,
-        convert::Infallible,
-        ops::Deref,
-        pin::Pin,
-        sync::Arc,
-        task::{Context, Poll},
-    },
-    thiserror::Error,
+use crate::{addr, port};
+use anyhow::{format_err, Context as _};
+use fidl::endpoints;
+use fidl_fuchsia_hardware_vsock::{
+    CallbacksMarker, CallbacksRequest, CallbacksRequestStream, DeviceProxy,
 };
+use fidl_fuchsia_vsock::{
+    AcceptorProxy, ConnectionRequest, ConnectionRequestStream, ConnectionTransport,
+    ConnectorRequest, ConnectorRequestStream,
+};
+use fuchsia_sync::Mutex;
+use futures::channel::{mpsc, oneshot};
+use futures::{future, select, Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
+use std::collections::HashMap;
+use std::convert::Infallible;
+use std::ops::Deref;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use thiserror::Error;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum EventType {

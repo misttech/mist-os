@@ -2,48 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{num::NonZeroU16, ops::ControlFlow};
+use std::num::NonZeroU16;
+use std::ops::ControlFlow;
 
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fpsocket;
-use fidl_fuchsia_posix_socket_packet as fppacket;
-
-use fidl::{
-    endpoints::{ProtocolMarker as _, RequestStream as _},
-    Peered as _,
+use {
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fpsocket,
+    fidl_fuchsia_posix_socket_packet as fppacket,
 };
+
+use fidl::endpoints::{ProtocolMarker as _, RequestStream as _};
+use fidl::Peered as _;
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::StreamExt as _;
-use net_types::{ethernet::Mac, ip::IpVersion};
-use netstack3_core::{
-    device::{
-        DeviceId, EthernetLinkDevice, LoopbackDevice, PureIpDevice, PureIpHeaderParams,
-        WeakDeviceId,
-    },
-    device_socket::{
-        DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-        EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceivedFrame,
-        SendFrameError, SentFrame, SocketId, SocketInfo, TargetDevice,
-    },
-    sync::Mutex,
+use log::{error, warn};
+use net_types::ethernet::Mac;
+use net_types::ip::IpVersion;
+use netstack3_core::device::{
+    DeviceId, EthernetLinkDevice, LoopbackDevice, PureIpDevice, PureIpHeaderParams, WeakDeviceId,
 };
+use netstack3_core::device_socket::{
+    DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
+    EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceivedFrame,
+    SendFrameError, SentFrame, SocketId, SocketInfo, TargetDevice,
+};
+use netstack3_core::sync::Mutex;
 use packet::Buf;
 use packet_formats::ethernet::EtherType;
-use tracing::error;
 
-use crate::bindings::{
-    devices::BindingId,
-    socket::{
-        queue::{BodyLen, MessageQueue},
-        worker::{self, CloseResponder, SocketWorker},
-        IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
-    },
-    util::{
-        DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryFromFidl,
-        TryIntoCoreWithContext as _, TryIntoFidlWithContext,
-    },
-    BindingsCtx, Ctx,
+use crate::bindings::devices::BindingId;
+use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
+use crate::bindings::socket::{IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
+use crate::bindings::util::{
+    DeviceNotFoundError, IntoCore as _, IntoFidl as _, ResultExt as _, TryFromFidl,
+    TryIntoCoreWithContext as _, TryIntoFidlWithContext,
 };
+use crate::bindings::{BindingsCtx, Ctx};
 
 /// State held in the bindings context for a single socket.
 #[derive(Debug)]
@@ -91,10 +85,7 @@ pub(crate) async fn serve(
                 Ok(req) => req,
                 Err(e) => {
                     if !e.is_closed() {
-                        tracing::error!(
-                            "{} request error {e:?}",
-                            fppacket::ProviderMarker::DEBUG_NAME
-                        );
+                        error!("{} request error {e:?}", fppacket::ProviderMarker::DEBUG_NAME);
                     }
                     return;
                 }
@@ -113,9 +104,7 @@ pub(crate) async fn serve(
                         (),
                         spawner.clone(),
                     ));
-                    responder
-                        .send(Ok(client))
-                        .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    responder.send(Ok(client)).unwrap_or_log("failed to respond");
                 }
             }
         })
@@ -438,28 +427,6 @@ impl<'a> RequestHandler<'a> {
         self,
         request: fppacket::SocketRequest,
     ) -> ControlFlow<fppacket::SocketCloseResponder, Option<fppacket::SocketRequestStream>> {
-        // On Error, logs the `Errno` with additional debugging context.
-        //
-        // The provided result is passed through unchanged.
-        //
-        // Implemented as a macro to avoid erasing the callsite information.
-        macro_rules! maybe_log_error {
-            ($operation:expr, $result:expr) => {
-                match $result {
-                    Ok(val) => Ok(val),
-                    Err(errno) => {
-                        crate::bindings::socket::log_errno!(
-                            errno,
-                            "packet socket failed to handle {}: {:?}",
-                            $operation,
-                            errno
-                        );
-                        Err(errno)
-                    }
-                }
-            };
-        }
-
         match request {
             fppacket::SocketRequest::Clone2 { request, control_handle: _ } => {
                 let channel = fidl::AsyncChannel::from_channel(request.into_channel());
@@ -472,7 +439,7 @@ impl<'a> RequestHandler<'a> {
             fppacket::SocketRequest::Query { responder } => {
                 responder
                     .send(fppacket::SOCKET_PROTOCOL_NAME.as_bytes())
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fppacket::SocketRequest::SetReuseAddress { value: _, responder } => {
                 respond_not_supported!("packet::SetReuseAddress", responder)
@@ -498,12 +465,10 @@ impl<'a> RequestHandler<'a> {
             fppacket::SocketRequest::SetReceiveBuffer { value_bytes, responder } => {
                 responder
                     .send(Ok(self.set_receive_buffer(value_bytes)))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fppacket::SocketRequest::GetReceiveBuffer { responder } => {
-                responder
-                    .send(Ok(self.receive_buffer()))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Ok(self.receive_buffer())).unwrap_or_log("failed to respond");
             }
             fppacket::SocketRequest::SetKeepAlive { value: _, responder } => {
                 respond_not_supported!("packet::SetKeepAlive", responder)
@@ -557,19 +522,17 @@ impl<'a> RequestHandler<'a> {
                 respond_not_supported!("packet::GetTimestamp", responder)
             }
             fppacket::SocketRequest::Describe { responder } => {
-                responder
-                    .send(self.describe())
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(self.describe()).unwrap_or_log("failed to respond");
             }
             fppacket::SocketRequest::Bind { protocol, bound_interface_id, responder } => responder
-                .send(maybe_log_error!("bind", self.bind(protocol, bound_interface_id)))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+                .send(self.bind(protocol, bound_interface_id).log_error("packet::Bind"))
+                .unwrap_or_log("failed to respond"),
             fppacket::SocketRequest::GetInfo { responder } => responder
-                .send(match maybe_log_error!("get_info", self.get_info()) {
+                .send(match self.get_info().log_error("packet::GetInfo") {
                     Ok((kind, ref protocol, ref iface)) => Ok((kind, protocol.as_ref(), iface)),
                     Err(e) => Err(e),
                 })
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+                .unwrap_or_log("failed to respond"),
             fppacket::SocketRequest::RecvMsg {
                 want_packet_info,
                 data_len,
@@ -580,7 +543,9 @@ impl<'a> RequestHandler<'a> {
                 let params = RecvMsgParams { want_packet_info, data_len, want_control, flags };
                 responder
                     .send(
-                        match maybe_log_error!("receive", self.receive())
+                        match self
+                            .receive()
+                            .log_error("packet::RecvMsg")
                             .map(|r| params.apply_to(r))
                         {
                             Ok((ref packet_info, ref data, ref control, truncated)) => {
@@ -589,7 +554,7 @@ impl<'a> RequestHandler<'a> {
                             Err(e) => Err(e),
                         },
                     )
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                    .unwrap_or_log("failed to respond")
             }
             fppacket::SocketRequest::SendMsg { packet_info, data, control, flags, responder } => {
                 let result = if ![
@@ -601,24 +566,24 @@ impl<'a> RequestHandler<'a> {
                 ]
                 .contains(&control)
                 {
-                    tracing::warn!("unsupported control data: {:?}", control);
+                    warn!("unsupported control data: {:?}", control);
                     Err(fposix::Errno::Eopnotsupp)
                 } else if flags != fpsocket::SendMsgFlags::empty() {
-                    tracing::warn!("unsupported control flags: {:?}", flags);
+                    warn!("unsupported control flags: {:?}", flags);
                     Err(fposix::Errno::Eopnotsupp)
                 } else {
                     self.send_msg(packet_info, data)
                 };
                 responder
-                    .send(maybe_log_error!("sendmsg", result))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .send(result.log_error("packet::SendMsg"))
+                    .unwrap_or_log("failed to respond");
             }
-            fppacket::SocketRequest::SetMark { domain: _, mark: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetMark { domain: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            fppacket::SocketRequest::SetMark { domain: _, mark: _, responder } => {
+                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
+            }
+            fppacket::SocketRequest::GetMark { domain: _, responder } => {
+                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
+            }
         }
         ControlFlow::Continue(None)
     }

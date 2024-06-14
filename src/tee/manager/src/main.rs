@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use anyhow::Error;
 use fidl_fuchsia_tee::ApplicationRequestStream;
 use fuchsia_async as fasync;
-use fuchsia_component::{
-    client::{connect_to_protocol, connect_to_protocol_at_dir_root},
-    server::ServiceFs,
-};
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root};
+use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
 use serde::Deserialize;
 

@@ -4,14 +4,13 @@
 
 use fidl::endpoints::ControlHandle;
 use fidl::Error::ClientChannelClosed;
-use fidl_fuchsia_memory_attribution as fattribution;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
+use {fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx};
 
 /// Function of this type returns a vector of attribution updates, and is used
 /// as the type of the callback in [AttributionServer::new].
@@ -356,9 +355,8 @@ mod tests {
 
     use super::*;
     use fidl::endpoints::RequestStream;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use futures::TryStreamExt;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     /// Tests that the ELF runner can tell us about the resources used by the component it runs.
     #[test]

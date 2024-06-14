@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    errors::{errno, error, Errno},
-    open_flags::OpenFlags,
-    uapi,
-};
+use crate::errors::{errno, error, Errno};
+use crate::open_flags::OpenFlags;
+use crate::uapi;
 use bstr::BStr;
 use std::ops;
 

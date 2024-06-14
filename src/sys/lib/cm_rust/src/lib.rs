@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use cm_rust_derive::{
+    ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl, OfferDeclCommon,
+    OfferDeclCommonNoAvailability, UseDeclCommon,
+};
+use cm_types::{AllowedOffers, BorrowedSeparatedPath, LongName, Name, Path, RelativePath, Url};
+use from_enum::FromEnum;
+use std::collections::{BTreeMap, HashMap};
+use std::fmt;
+use std::hash::Hash;
+use thiserror::Error;
 use {
-    cm_rust_derive::{
-        ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl, OfferDeclCommon,
-        OfferDeclCommonNoAvailability, UseDeclCommon,
-    },
-    cm_types::{AllowedOffers, BorrowedSeparatedPath, LongName, Name, Path, RelativePath, Url},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess,
-    from_enum::FromEnum,
-    std::collections::{BTreeMap, HashMap},
-    std::fmt,
-    std::hash::Hash,
-    thiserror::Error,
 };
 
 #[cfg(feature = "serde")]
@@ -2723,7 +2723,9 @@ pub enum Error {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, difference::Changeset, fidl_fuchsia_component_decl as fdecl};
+    use super::*;
+    use difference::Changeset;
+    use fidl_fuchsia_component_decl as fdecl;
 
     fn offer_source_static_child(name: &str) -> OfferSource {
         OfferSource::Child(ChildRef { name: name.parse().unwrap(), collection: None })

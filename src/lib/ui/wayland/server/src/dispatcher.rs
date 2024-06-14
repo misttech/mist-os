@@ -2,30 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        alpha_compositing::*, aura_shell::*, compositor::*, data_device_manager::*, display::*,
-        linux_dmabuf::*, object::*, output::*, pointer_constraints::*, registry::*,
-        relative_pointer::*, seat::*, secure_output::*, shm::*, subcompositor::*, viewporter::*,
-        xdg_shell::*,
-    },
-    anyhow::{Error, Result},
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    std::io::Read,
-    std::sync::Arc,
-    wayland_server_protocol::{
-        WlCompositor, WlDataDeviceManager, WlOutput, WlSeat, WlShm, WlSubcompositor,
-    },
-    wp_viewporter_server_protocol::WpViewporter,
-    xdg_shell_server_protocol::XdgWmBase,
-    zaura_shell_server_protocol::ZauraShell,
-    zcr_alpha_compositing_v1_server_protocol::ZcrAlphaCompositingV1,
-    zcr_secure_output_v1_server_protocol::ZcrSecureOutputV1,
-    zwp_linux_dmabuf_v1_server_protocol::ZwpLinuxDmabufV1,
-    zwp_pointer_constraints_v1_server_protocol::ZwpPointerConstraintsV1,
-    zwp_relative_pointer_v1_server_protocol::ZwpRelativePointerManagerV1,
+use crate::alpha_compositing::*;
+use crate::aura_shell::*;
+use crate::compositor::*;
+use crate::data_device_manager::*;
+use crate::display::*;
+use crate::linux_dmabuf::*;
+use crate::object::*;
+use crate::output::*;
+use crate::pointer_constraints::*;
+use crate::registry::*;
+use crate::relative_pointer::*;
+use crate::seat::*;
+use crate::secure_output::*;
+use crate::shm::*;
+use crate::subcompositor::*;
+use crate::viewporter::*;
+use crate::xdg_shell::*;
+use anyhow::{Error, Result};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon as zx;
+use std::io::Read;
+use std::sync::Arc;
+use wayland_server_protocol::{
+    WlCompositor, WlDataDeviceManager, WlOutput, WlSeat, WlShm, WlSubcompositor,
 };
+use wp_viewporter_server_protocol::WpViewporter;
+use xdg_shell_server_protocol::XdgWmBase;
+use zaura_shell_server_protocol::ZauraShell;
+use zcr_alpha_compositing_v1_server_protocol::ZcrAlphaCompositingV1;
+use zcr_secure_output_v1_server_protocol::ZcrSecureOutputV1;
+use zwp_linux_dmabuf_v1_server_protocol::ZwpLinuxDmabufV1;
+use zwp_pointer_constraints_v1_server_protocol::ZwpPointerConstraintsV1;
+use zwp_relative_pointer_v1_server_protocol::ZwpRelativePointerManagerV1;
 
 /// Produces a VMO out of the contents of the file with the given filename.
 fn read_file_into_vmo(filename: &str) -> Result<zx::Vmo> {

@@ -8,5 +8,4 @@
 
 mod named_file_map;
 
-pub use named_file_map::NamedFileMap;
-pub use named_file_map::SourceMerklePair;
+pub use named_file_map::{NamedFileMap, SourceMerklePair};

@@ -11,7 +11,7 @@ toc:
   path: /docs/development/api/README.md
 - title: "Fuchsia API evolution guidelines"
   path: /docs/development/api/evolution.md
-- title: "Rubrics"
+- title: "Guidelines"
   section:
   - title: "API documentation readability rubric"
     path: /docs/development/api/documentation.md
@@ -19,7 +19,7 @@ toc:
     path: /docs/development/api/bind_lib.md
   - title: "C library readability rubric"
     path: /docs/development/api/c.md
-  - title: "Command-line tools rubric"
+  - title: "Command-line tool guidelines"
     path: /docs/development/api/cli.md
   - title: "CLI tool help requirements"
     path: /docs/development/api/cli_help.md
@@ -29,7 +29,7 @@ toc:
     path: /docs/development/api/fidl.md
   - title: "Go rubric"
     path: /docs/development/api/go.md
-  - title: "Rust  rubric"
+  - title: "Rust rubric"
     path: /docs/development/api/rust.md
   - title: "Zircon system interface rubric"
     path: /docs/development/api/system.md

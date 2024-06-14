@@ -74,8 +74,7 @@ mod test {
     use crate::ota::state_machine::{Event, OtaStatus, State};
     use anyhow::Error;
     use async_trait::async_trait;
-    use futures::channel::mpsc;
-    use futures::channel::oneshot;
+    use futures::channel::{mpsc, oneshot};
     use ota_lib::OtaManager;
     use std::sync::{Arc, Mutex};
 

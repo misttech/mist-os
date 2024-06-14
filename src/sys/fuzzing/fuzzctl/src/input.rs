@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::util::digest_path,
-    crate::writer::{OutputSink, Writer},
-    anyhow::{bail, Context as _, Result},
-    fidl_fuchsia_fuzzer::Input as FidlInput,
-    futures::{AsyncReadExt, AsyncWriteExt},
-    std::fs,
-    std::path::{Path, PathBuf},
-};
+use crate::util::digest_path;
+use crate::writer::{OutputSink, Writer};
+use anyhow::{bail, Context as _, Result};
+use fidl_fuchsia_fuzzer::Input as FidlInput;
+use futures::{AsyncReadExt, AsyncWriteExt};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Represents an `Input` that can send or read data from an associated `FidlInput`.
 #[derive(Debug)]
@@ -153,17 +151,15 @@ pub async fn save_input<P: AsRef<Path>>(fidl_input: FidlInput, out_dir: P) -> Re
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{save_input, Input},
-        crate::util::digest_path,
-        anyhow::Result,
-        fidl_fuchsia_fuzzer::Input as FidlInput,
-        fuchsia_fuzzctl::InputPair,
-        fuchsia_fuzzctl_test::{verify_saved, Test},
-        futures::{join, AsyncReadExt},
-        std::fs::File,
-        std::io::Write,
-    };
+    use super::{save_input, Input};
+    use crate::util::digest_path;
+    use anyhow::Result;
+    use fidl_fuchsia_fuzzer::Input as FidlInput;
+    use fuchsia_fuzzctl::InputPair;
+    use fuchsia_fuzzctl_test::{verify_saved, Test};
+    use futures::{join, AsyncReadExt};
+    use std::fs::File;
+    use std::io::Write;
 
     #[fuchsia::test]
     fn test_from_str() -> Result<()> {

@@ -26,6 +26,10 @@ type TestSpec struct {
 	// BootupTimeout is the timeout in seconds that the test expects the provided
 	// product bundle and environment it's run against to take to boot up.
 	BootupTimeoutSecs int `json:"bootup_timeout_secs,omitempty"`
+
+	// ExpectsSSH specifies whether the test is expected to run against
+	// a product bundle that supports SSH.
+	ExpectsSSH bool `json:"expects_ssh,omitempty"`
 }
 
 // Test encapsulates details about a particular test.

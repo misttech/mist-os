@@ -4,36 +4,31 @@
 
 //! Implements fuchsia.fxfs/BlobWriter for writing delivery blobs.
 
-use {
-    crate::fuchsia::{
-        directory::FxDirectory, errors::map_to_status, fxblob::BlobDirectory, node::FxNode,
-        volume::FxVolume,
-    },
-    anyhow::{Context as _, Error},
-    delivery_blob::{
-        compression::{decode_archive, ChunkInfo, ChunkedDecompressor},
-        Type1Blob,
-    },
-    fidl_fuchsia_fxfs::{BlobWriterRequest, BlobWriterRequestStream},
-    fuchsia_hash::Hash,
-    fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
-    fuchsia_zircon::{self as zx, HandleBased as _, Status},
-    futures::{try_join, TryStreamExt as _},
-    fxfs::{
-        errors::FxfsError,
-        object_handle::{ObjectHandle, WriteObjectHandle},
-        object_store::{
-            directory::{replace_child_with_object, ReplacedChild},
-            transaction::{lock_keys, LockKey},
-            DataObjectHandle, HandleOptions, ObjectDescriptor, ObjectStore, Timestamp,
-            BLOB_MERKLE_ATTRIBUTE_ID,
-        },
-        round::{round_down, round_up},
-        serialized_types::BlobMetadata,
-    },
-    lazy_static::lazy_static,
-    std::sync::Arc,
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::fxblob::BlobDirectory;
+use crate::fuchsia::node::FxNode;
+use crate::fuchsia::volume::FxVolume;
+use anyhow::{Context as _, Error};
+use delivery_blob::compression::{decode_archive, ChunkInfo, ChunkedDecompressor};
+use delivery_blob::Type1Blob;
+use fidl_fuchsia_fxfs::{BlobWriterRequest, BlobWriterRequestStream};
+use fuchsia_hash::Hash;
+use fuchsia_merkle::{MerkleTree, MerkleTreeBuilder};
+use fuchsia_zircon::{self as zx, HandleBased as _, Status};
+use futures::{try_join, TryStreamExt as _};
+use fxfs::errors::FxfsError;
+use fxfs::object_handle::{ObjectHandle, WriteObjectHandle};
+use fxfs::object_store::directory::{replace_child_with_object, ReplacedChild};
+use fxfs::object_store::transaction::{lock_keys, LockKey};
+use fxfs::object_store::{
+    DataObjectHandle, HandleOptions, ObjectDescriptor, ObjectStore, Timestamp,
+    BLOB_MERKLE_ATTRIBUTE_ID,
 };
+use fxfs::round::{round_down, round_up};
+use fxfs::serialized_types::BlobMetadata;
+use lazy_static::lazy_static;
+use std::sync::Arc;
 
 lazy_static! {
     static ref RING_BUFFER_SIZE: u64 = 64 * (zx::system_get_page_size() as u64);
@@ -579,16 +574,14 @@ fn parse_seek_table(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
-        core::ops::Range,
-        delivery_blob::CompressionMode,
-        fidl_fuchsia_fxfs::CreateBlobError,
-        fidl_fuchsia_io::UnlinkOptions,
-        fuchsia_async as fasync,
-        rand::{thread_rng, Rng},
-    };
+    use super::*;
+    use crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture};
+    use core::ops::Range;
+    use delivery_blob::CompressionMode;
+    use fidl_fuchsia_fxfs::CreateBlobError;
+    use fidl_fuchsia_io::UnlinkOptions;
+    use fuchsia_async as fasync;
+    use rand::{thread_rng, Rng};
 
     fn generate_list_of_writes(compressed_data_len: u64) -> Vec<Range<u64>> {
         let mut list_of_writes = vec![];

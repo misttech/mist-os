@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    drawing::DisplayRotation,
-    geometry::{IntPoint, IntSize},
-};
+use crate::drawing::DisplayRotation;
+use crate::geometry::{IntPoint, IntSize};
 use euclid::size2;
 use fidl_fuchsia_input_report as hid_input_report;
 
@@ -81,13 +79,9 @@ mod device_id_tests {
 
 mod input_report_tests {
     use super::*;
-    use crate::{
-        app::strategies::framebuffer::AutoRepeatTimer,
-        input::{
-            consumer_control, keyboard, report::InputReportHandler, report::TouchScale, DeviceId,
-            EventType,
-        },
-    };
+    use crate::app::strategies::framebuffer::AutoRepeatTimer;
+    use crate::input::report::{InputReportHandler, TouchScale};
+    use crate::input::{consumer_control, keyboard, DeviceId, EventType};
     use itertools::assert_equal;
 
     struct TestAutoRepeatContext;
@@ -180,7 +174,8 @@ mod input_report_tests {
 
 mod input_tests {
     use super::*;
-    use crate::input::{key3::KeyboardInputHandler, keyboard, EventType};
+    use crate::input::key3::KeyboardInputHandler;
+    use crate::input::{keyboard, EventType};
     use itertools::assert_equal;
 
     #[test]
@@ -239,10 +234,8 @@ mod input_tests {
 
 mod test_data {
     pub fn consumer_control_input_reports() -> Vec<fidl_fuchsia_input_report::InputReport> {
-        use fidl_fuchsia_input_report::{
-            ConsumerControlButton::{VolumeDown, VolumeUp},
-            ConsumerControlInputReport, InputReport,
-        };
+        use fidl_fuchsia_input_report::ConsumerControlButton::{VolumeDown, VolumeUp};
+        use fidl_fuchsia_input_report::{ConsumerControlInputReport, InputReport};
         vec![
             InputReport {
                 event_time: Some(66268999833),
@@ -299,10 +292,8 @@ mod test_data {
         ]
     }
     pub fn hello_world_keyboard_reports() -> Vec<fidl_fuchsia_input_report::InputReport> {
-        use {
-            fidl_fuchsia_input::Key::*,
-            fidl_fuchsia_input_report::{InputReport, KeyboardInputReport},
-        };
+        use fidl_fuchsia_input::Key::*;
+        use fidl_fuchsia_input_report::{InputReport, KeyboardInputReport};
         vec![
             InputReport {
                 event_time: Some(85446402710730),
@@ -673,10 +664,8 @@ mod test_data {
 
     pub fn hello_world_input_events() -> Vec<fidl_fuchsia_ui_input3::KeyEvent> {
         use fidl_fuchsia_input::Key::*;
-        use fidl_fuchsia_ui_input3::{
-            KeyEvent,
-            KeyEventType::{Pressed, Released},
-        };
+        use fidl_fuchsia_ui_input3::KeyEvent;
+        use fidl_fuchsia_ui_input3::KeyEventType::{Pressed, Released};
         vec![
             KeyEvent {
                 timestamp: Some(3264387612285),
@@ -865,10 +854,8 @@ mod test_data {
 
     pub fn control_r_events() -> Vec<fidl_fuchsia_ui_input3::KeyEvent> {
         use fidl_fuchsia_input::Key::*;
-        use fidl_fuchsia_ui_input3::{
-            KeyEvent,
-            KeyEventType::{Pressed, Released},
-        };
+        use fidl_fuchsia_ui_input3::KeyEvent;
+        use fidl_fuchsia_ui_input3::KeyEventType::{Pressed, Released};
         vec![
             KeyEvent {
                 timestamp: Some(4453530520711),

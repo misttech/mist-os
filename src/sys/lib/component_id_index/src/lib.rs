@@ -4,15 +4,13 @@
 
 // This library must remain platform-agnostic because it used by a host tool and within Fuchsia.
 
-use {
-    anyhow::Context,
-    camino::{Utf8Path, Utf8PathBuf},
-    clonable_error::ClonableError,
-    fidl_fuchsia_component_internal as fcomponent_internal,
-    moniker::Moniker,
-    std::collections::{HashMap, HashSet},
-    thiserror::Error,
-};
+use anyhow::Context;
+use camino::{Utf8Path, Utf8PathBuf};
+use clonable_error::ClonableError;
+use fidl_fuchsia_component_internal as fcomponent_internal;
+use moniker::Moniker;
+use std::collections::{HashMap, HashSet};
+use thiserror::Error;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

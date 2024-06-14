@@ -2,39 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::pointerinjector_config::{
+    InjectorViewportChangeFn, InjectorViewportHangingGet, InjectorViewportPublisher,
+    InjectorViewportSpec, InjectorViewportSubscriber,
+};
+use crate::{DisplayMetrics, ViewingDistance};
+use anyhow::{Context, Error, Result};
+use async_trait::async_trait;
+use async_utils::hanging_get::server as hanging_get;
+use fidl::endpoints::{create_proxy, Proxy};
+use fidl_fuchsia_ui_composition::{self as ui_comp, ContentId, TransformId};
+use fidl_fuchsia_ui_pointerinjector_configuration::{
+    SetupRequest as PointerInjectorConfigurationSetupRequest,
+    SetupRequestStream as PointerInjectorConfigurationSetupRequestStream,
+};
+use flatland_frame_scheduling_lib::*;
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::channel::oneshot;
+use futures::prelude::*;
+use input_pipeline::Size;
+use std::collections::VecDeque;
+use std::ffi::CStr;
+use std::process;
+use std::sync::{Arc, Weak};
+use tracing::{error, info, warn};
 use {
-    crate::pointerinjector_config::{
-        InjectorViewportChangeFn, InjectorViewportHangingGet, InjectorViewportPublisher,
-        InjectorViewportSpec, InjectorViewportSubscriber,
-    },
-    crate::{DisplayMetrics, ViewingDistance},
-    anyhow::{Context, Error, Result},
-    async_trait::async_trait,
-    async_utils::hanging_get::server as hanging_get,
-    fidl::endpoints::{create_proxy, Proxy},
     fidl_fuchsia_accessibility_scene as a11y_scene, fidl_fuchsia_math as math,
-    fidl_fuchsia_ui_app as ui_app,
-    fidl_fuchsia_ui_composition::{self as ui_comp, ContentId, TransformId},
-    fidl_fuchsia_ui_display_singleton as singleton_display,
-    fidl_fuchsia_ui_pointerinjector_configuration::{
-        SetupRequest as PointerInjectorConfigurationSetupRequest,
-        SetupRequestStream as PointerInjectorConfigurationSetupRequestStream,
-    },
-    fidl_fuchsia_ui_views as ui_views,
-    flatland_frame_scheduling_lib::*,
-    fuchsia_async as fasync, fuchsia_scenic as scenic,
-    fuchsia_sync::Mutex,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
-    futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    futures::channel::oneshot,
-    futures::prelude::*,
-    input_pipeline::Size,
-    math as fmath,
-    std::collections::VecDeque,
-    std::ffi::CStr,
-    std::process,
-    std::sync::{Arc, Weak},
-    tracing::{error, info, warn},
+    fidl_fuchsia_ui_app as ui_app, fidl_fuchsia_ui_display_singleton as singleton_display,
+    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync, fuchsia_scenic as scenic,
+    fuchsia_trace as trace, fuchsia_zircon as zx, math as fmath,
 };
 
 /// Presentation messages.

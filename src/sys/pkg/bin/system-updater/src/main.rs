@@ -5,19 +5,15 @@
 #![allow(clippy::let_unit_value)]
 #![allow(clippy::too_many_arguments)]
 
-use {
-    crate::{
-        fidl::{FidlServer, UpdateStateNotifier},
-        install_manager::start_install_manager,
-        update::{NamespaceEnvironmentConnector, RealUpdater, UpdateHistory},
-    },
-    anyhow::anyhow,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_sync::Mutex,
-    std::sync::Arc,
-    tracing::{error, info},
-};
+use crate::fidl::{FidlServer, UpdateStateNotifier};
+use crate::install_manager::start_install_manager;
+use crate::update::{NamespaceEnvironmentConnector, RealUpdater, UpdateHistory};
+use anyhow::anyhow;
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_sync::Mutex;
+use std::sync::Arc;
+use tracing::{error, info};
 
 mod fidl;
 mod install_manager;

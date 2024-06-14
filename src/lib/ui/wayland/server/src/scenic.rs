@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_ui_composition::{ContentId, FlatlandProxy, PresentArgs, TransformId},
-    fuchsia_trace as ftrace, fuchsia_zircon as zx,
-    std::sync::atomic::{AtomicUsize, Ordering},
-    std::{cell::RefCell, rc::Rc},
-};
+use fidl_fuchsia_ui_composition::{ContentId, FlatlandProxy, PresentArgs, TransformId};
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
 
 pub type FlatlandInstanceId = usize;
 

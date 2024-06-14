@@ -5,12 +5,10 @@
 //! Convenience functions for accessing directories of a component instance
 //! and opening protocols that exist in them.
 
-use {
-    fidl::endpoints::{create_proxy, ProtocolMarker},
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    moniker::Moniker,
-    thiserror::Error,
-};
+use fidl::endpoints::{create_proxy, ProtocolMarker};
+use moniker::Moniker;
+use thiserror::Error;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 /// Errors that can be returned from opening a component instance directory.
 #[derive(Debug, Error)]
@@ -187,14 +185,12 @@ pub async fn open_in_instance_dir(
 #[cfg(test)]
 mod tests {
     use fidl::endpoints::spawn_stream_handler;
-    use fidl_fuchsia_io as fio;
-    use fidl_fuchsia_sys2 as fsys;
     use moniker::Moniker;
+    use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
-    use super::OpenDirType;
     use super::{
         connect_to_instance_protocol_at_path, open_instance_dir_root_readable,
-        open_instance_subdir_readable,
+        open_instance_subdir_readable, OpenDirType,
     };
 
     #[fuchsia::test]

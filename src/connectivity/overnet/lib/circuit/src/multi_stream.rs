@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use crate::error::{Error, Result};
-use crate::stream;
-use crate::{Node, Quality};
+use crate::{stream, Node, Quality};
 
 use futures::channel::mpsc::{channel, Receiver, Sender, UnboundedSender};
 use futures::channel::oneshot;

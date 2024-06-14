@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 
 use mundane::hash::{Digest, Hasher, Sha256};
-use ring::{rand, rand::SecureRandom};
+use ring::rand;
+use ring::rand::SecureRandom;
 use serde::Deserialize;
 
 use thiserror::Error;
-use zerocopy::{
-    byteorder::big_endian::{U32 as BigEndianU32, U64 as BigEndianU64},
-    AsBytes, NoCell,
-};
+use zerocopy::byteorder::big_endian::{U32 as BigEndianU32, U64 as BigEndianU64};
+use zerocopy::{AsBytes, NoCell};
 
 pub mod builder;
 

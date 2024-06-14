@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::platform::PlatformServices, anyhow::Error,
-    fidl_fuchsia_virtualization::LinuxManagerProxy, fuchsia_zircon_status as zx_status,
-    guest_cli_args as arguments, std::fmt,
-};
+use crate::platform::PlatformServices;
+use anyhow::Error;
+use fidl_fuchsia_virtualization::LinuxManagerProxy;
+use std::fmt;
+use {fuchsia_zircon_status as zx_status, guest_cli_args as arguments};
 
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WipeResult {
@@ -63,11 +63,12 @@ async fn do_wipe(proxy: LinuxManagerProxy) -> Result<WipeResult, Error> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, crate::platform::FuchsiaPlatformServices,
-        fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_virtualization::LinuxManagerMarker,
-        fuchsia_async as fasync, futures::StreamExt,
-    };
+    use super::*;
+    use crate::platform::FuchsiaPlatformServices;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_virtualization::LinuxManagerMarker;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
 
     fn serve_mock_manager(response: zx_status::Status) -> LinuxManagerProxy {
         let (proxy, mut stream) = create_proxy_and_stream::<LinuxManagerMarker>()

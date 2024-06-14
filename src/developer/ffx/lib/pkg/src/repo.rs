@@ -2,40 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::config as pkg_config,
-    crate::metrics,
-    crate::tunnel::TunnelManager,
-    async_lock::RwLock,
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_developer_ffx_ext::{
-        RepositoryError, RepositoryRegistrationAliasConflictMode, RepositoryTarget,
-    },
-    fidl_fuchsia_pkg::RepositoryManagerProxy,
-    fidl_fuchsia_pkg_rewrite::EngineProxy,
-    fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule},
-    fuchsia_async as fasync,
-    fuchsia_hyper::{new_https_client, HttpsClient},
-    fuchsia_repo::{
-        manager::RepositoryManager,
-        repo_client::RepoClient,
-        repository::{
-            self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider, RepositorySpec,
-        },
-        server::RepositoryServer,
-    },
-    fuchsia_url::RepositoryUrl,
-    fuchsia_zircon_status::Status,
-    futures::FutureExt as _,
-    protocols::prelude::Context,
-    std::{
-        collections::{BTreeSet, HashSet},
-        net::SocketAddr,
-        sync::Arc,
-        time::Duration,
-    },
-    url::Url,
+use crate::tunnel::TunnelManager;
+use crate::{config as pkg_config, metrics};
+use async_lock::RwLock;
+use fidl_fuchsia_developer_ffx_ext::{
+    RepositoryError, RepositoryRegistrationAliasConflictMode, RepositoryTarget,
 };
+use fidl_fuchsia_pkg::RepositoryManagerProxy;
+use fidl_fuchsia_pkg_rewrite::EngineProxy;
+use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
+use fuchsia_hyper::{new_https_client, HttpsClient};
+use fuchsia_repo::manager::RepositoryManager;
+use fuchsia_repo::repo_client::RepoClient;
+use fuchsia_repo::repository::{
+    self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider, RepositorySpec,
+};
+use fuchsia_repo::server::RepositoryServer;
+use fuchsia_url::RepositoryUrl;
+use fuchsia_zircon_status::Status;
+use futures::FutureExt as _;
+use protocols::prelude::Context;
+use std::collections::{BTreeSet, HashSet};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
+use url::Url;
+use {fidl_fuchsia_developer_ffx as ffx, fuchsia_async as fasync};
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -549,7 +541,10 @@ pub fn create_repo_host(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, std::fs, std::net::Ipv4Addr};
+    use super::*;
+    use assert_matches::assert_matches;
+    use std::fs;
+    use std::net::Ipv4Addr;
 
     const EMPTY_REPO_PATH: &str =
         concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_lib_pkg/empty-repo");

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, format_err, Error},
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_hardware_audio::*,
-    fidl_fuchsia_io as fio,
-    futures::TryFutureExt,
-    std::path::{Path, PathBuf},
-};
+use anyhow::{anyhow, format_err, Error};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_hardware_audio::*;
+use fidl_fuchsia_io as fio;
+use futures::TryFutureExt;
+use std::path::{Path, PathBuf};
 
 pub struct DaiInterface {
     /// The proxy to the devfs "/dev".
@@ -86,11 +84,15 @@ impl DaiInterface {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::config::Config, crate::configurator::Configurator,
-        crate::discover::find_dais, crate::testing::tests::get_dev_proxy, anyhow::Context,
-        anyhow::Result, async_trait::async_trait, futures::lock::Mutex, std::sync::Arc,
-    };
+    use super::*;
+    use crate::config::Config;
+    use crate::configurator::Configurator;
+    use crate::discover::find_dais;
+    use crate::testing::tests::get_dev_proxy;
+    use anyhow::{Context, Result};
+    use async_trait::async_trait;
+    use futures::lock::Mutex;
+    use std::sync::Arc;
 
     pub struct TestConfigurator {}
 

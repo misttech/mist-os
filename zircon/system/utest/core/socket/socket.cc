@@ -898,15 +898,24 @@ TEST(SocketTest, WriteFromPartialBadBuffer) {
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(kVmoSize, 0, &vmo));
 
-  zx_vaddr_t addr;
-
-  ASSERT_OK(
-      zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, kVmoSize, &addr));
+  // Create a VMAR to put our mapping in so we can ensure an unmapped guard page on either side so
+  // that our out of bounds access reliably fails.
+  zx::vmar vmar;
+  zx_vaddr_t vmar_addr;
+  const size_t kMappingSize = kVmoSize + 2 * zx_system_get_page_size();
+  ASSERT_OK(zx::vmar::root_self()->allocate(
+      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0, kMappingSize, &vmar,
+      &vmar_addr));
 
   auto unmap = fit::defer([&]() {
-    // Cleanup the mapping we created.
-    zx::vmar::root_self()->unmap(addr, kVmoSize);
+    // Cleanup the VMAR and any mappings we created.
+    zx::vmar::root_self()->unmap(vmar_addr, kMappingSize);
   });
+
+  zx_vaddr_t addr;
+
+  ASSERT_OK(vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC, zx_system_get_page_size(),
+                     vmo, 0, kVmoSize, &addr));
 
   void* buffer = reinterpret_cast<void*>(addr);
   ASSERT_NE(nullptr, buffer);

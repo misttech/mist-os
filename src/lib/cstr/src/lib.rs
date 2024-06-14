@@ -36,7 +36,8 @@ macro_rules! cstr {
 
 #[cfg(test)]
 mod tests {
-    use {super::cstr, std::ffi};
+    use super::cstr;
+    use std::ffi;
 
     #[test]
     fn cstr() {

@@ -14,6 +14,7 @@ import("//build/config/lto/config.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/goma.gni")
+import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
@@ -443,6 +444,13 @@ config("optimize_debug") {
   rustflags = [ "-Copt-level=1" ]
 }
 
+# This is the default optimization level for "fastbuild" builds.
+config("optimize_minimal") {
+  cflags = [ "-O1" ]
+  ldflags = cflags
+  rustflags = [ "-Copt-level=1" ]
+}
+
 config("optimize_default") {
   cflags = [ "-O2" ]
   ldflags = cflags
@@ -479,7 +487,7 @@ config("optimize_size") {
   configs = [ ":linker_string_merging" ]
 }
 
-# This is the default optimization level for "non-debug" builds.
+# This is the default optimization level for "release" builds.
 config("optimize_size_lto") {
   if (zircon_toolchain != false) {
     configs = [ ":optimize_default" ]
@@ -1104,10 +1112,7 @@ config("Wno-conversion") {
     "//vendor/*",
     "//zircon/system/ulib/c/*",
     "//zircon/system/ulib/image-format:*",
-    "//zircon/system/ulib/ktrace:*",
     "//zircon/system/ulib/tftp:*",
-    "//zircon/system/ulib/trace:*",
-    "//zircon/system/ulib/trace-engine:*",
     "//zircon/third_party/dev/ethernet/e1000:*",
     "//zircon/third_party/lib/jitterentropy",
     "//zircon/third_party/uapp/dash:*",
@@ -1498,4 +1503,12 @@ config("no-tlsdesc") {
 # warns for deprecated std::errc constants.
 config("Wno-deprecated-pragma") {
   cflags = [ "-Wno-deprecated-pragma" ]
+}
+
+# Adding this config directly to a linking target ensures that any deps on
+# ifs_shared_library() `.as-needed` targets don't bring link stubs into the
+# link.  This should be used for a relocatable link, along with a metadata
+# collection across ifs_shared_library_ldscript as an input linker script.
+config("ifs-as-needed") {
+  lib_dirs = [ ifs_shared_library_as_needed_dir ]
 }

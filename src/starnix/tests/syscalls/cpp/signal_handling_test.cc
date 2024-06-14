@@ -15,9 +15,18 @@
 #include <climits>
 #include <csignal>
 #include <cstdint>
+#include <functional>
+#include <latch>
+#include <optional>
+#include <thread>
 
 #include <gtest/gtest.h>
+#include <linux/futex.h>
 
+#include "src/lib/files/file.h"
+#include "src/lib/fxl/strings/split_string.h"
+#include "src/lib/fxl/strings/string_number_conversions.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 namespace {
@@ -693,6 +702,271 @@ TEST(SignalHandling, RealTimeSignals) {
   EXPECT_EQ(siginfo._sifields._rt.si_sigval.sival_int, 3);
 
   sigprocmask(SIG_SETMASK, &old_mask, nullptr);
+}
+
+// Fork into processes that exit right away every 10ms.
+// Will wait until `start` is ready, and will iterate until `done` is true.
+void spam_processes(std::atomic<bool> &done, std::latch &start) {
+  timespec ts;
+  ts.tv_sec = 0;
+  ts.tv_nsec = 10 * 1000000;
+  start.wait();
+
+  while (!done) {
+    pid_t pid = fork();
+    if (pid == 0) {
+      _exit(0);
+    }
+    nanosleep(&ts, nullptr);
+  }
+}
+
+sigset_t block_sigchld(void) {
+  sigset_t block, old_sigmask;
+  sigemptyset(&block);
+  sigaddset(&block, SIGCHLD);
+  SAFE_SYSCALL(pthread_sigmask(SIG_BLOCK, &block, &old_sigmask));
+
+  return old_sigmask;
+}
+
+TEST(SignalHandling, SIGCHLDDeliveredToOnlyThreadNotBlockingIt) {
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([&] {
+    std::atomic<bool> done = false;
+    std::latch start(1);
+
+    auto old_mask = block_sigchld();
+
+    std::thread spawner([&done, &start]() {
+      auto old_mask = block_sigchld();
+      spam_processes(done, start);
+      SAFE_SYSCALL(pthread_sigmask(SIG_SETMASK, &old_mask, nullptr));
+    });
+
+    std::thread waiter([&done, &start]() {
+      sigset_t child_mask = {};
+      sigaddset(&child_mask, SIGCHLD);
+      start.count_down();
+
+      // wait for a SIGCHLD, 1 second.
+      timespec ts;
+      ts.tv_sec = 1;
+      ts.tv_nsec = 0;
+      int ret = static_cast<int>(TEMP_FAILURE_RETRY(sigtimedwait(&child_mask, nullptr, &ts)));
+      EXPECT_EQ(ret, SIGCHLD);
+      done = true;
+    });
+
+    waiter.join();
+    spawner.join();
+    SAFE_SYSCALL(pthread_sigmask(SIG_SETMASK, &old_mask, nullptr));
+  });
+}
+
+std::optional<std::string> ReadStatusField(pid_t pid, std::string field) {
+  std::string contents, path = fxl::StringPrintf("/proc/%ld/status", static_cast<long>(pid));
+  if (!files::ReadFileToString(path, &contents)) {
+    return std::nullopt;
+  }
+
+  std::vector<std::string_view> lines =
+      fxl::SplitString(contents, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+
+  for (auto line : lines) {
+    auto key_and_value =
+        fxl::SplitString(line, ": ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    if (key_and_value.size() >= 2 && key_and_value[0] == field) {
+      return std::string(key_and_value[1]);
+    }
+  }
+  return std::nullopt;
+}
+
+TEST(SignalHandling, SIGCHLDIsUnblockedDuringSigTimedWait) {
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([&] {
+    ASSERT_TRUE(ReadStatusField(gettid(), "SigBlk").has_value());
+    auto old_mask = block_sigchld();
+
+    std::latch ready(1);
+    std::atomic<pid_t> background_tid = 0;
+
+    auto signal_in_bitmask = [](uint64_t mask, int signal) {
+      // signals start at 1, so the first element in the bitmask corresponds to
+      // signal 1 == SIGHUP.
+      return (mask & (1 << (signal - 1))) != 0;
+    };
+
+    std::thread background([&]() {
+      background_tid = gettid();
+
+      block_sigchld();
+
+      auto sigblk_hex = ReadStatusField(background_tid, "SigBlk");
+      ASSERT_NE(sigblk_hex, std::nullopt);
+
+      uint64_t sigblk;
+      ASSERT_TRUE(fxl::StringToNumberWithError(sigblk_hex.value(), &sigblk, fxl::Base::k16));
+      EXPECT_TRUE(signal_in_bitmask(sigblk, SIGCHLD));
+
+      sigset_t child_mask = {};
+      sigaddset(&child_mask, SIGCHLD);
+
+      timespec ts;
+      ts.tv_sec = 1;
+      ts.tv_nsec = 0;
+
+      ready.count_down();
+      TEMP_FAILURE_RETRY(sigtimedwait(&child_mask, nullptr, &ts));
+    });
+
+    ready.wait();
+
+    timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 100 * 1000000;  // 100ms
+    nanosleep(&ts, nullptr);
+
+    auto sigblk_hex = ReadStatusField(background_tid, "SigBlk");
+    ASSERT_NE(sigblk_hex, std::nullopt);
+
+    uint64_t sigblk;
+    ASSERT_TRUE(fxl::StringToNumberWithError(sigblk_hex.value(), &sigblk, fxl::Base::k16));
+    EXPECT_FALSE(signal_in_bitmask(sigblk, SIGCHLD));
+
+    background.join();
+    SAFE_SYSCALL(pthread_sigmask(SIG_SETMASK, &old_mask, nullptr));
+  });
+}
+
+TEST(SignalHandling, ExitSignalIsAProcessSignal) {
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([&] {
+    ASSERT_TRUE(ReadStatusField(gettid(), "SigPnd").has_value());
+    ASSERT_TRUE(ReadStatusField(gettid(), "ShdPnd").has_value());
+    auto old_mask = block_sigchld();
+
+    auto signal_in_bitmask = [](uint64_t mask, int signal) {
+      // signals start at 1, so the first element in the bitmask corresponds to
+      // signal 1 == SIGHUP.
+      return (mask & (1 << (signal - 1))) != 0;
+    };
+
+    std::latch sigchld_blocked(1);
+    std::latch fork_done(1);
+    std::latch test_done(1);
+
+    std::thread background([&]() {
+      auto old_mask = block_sigchld();
+
+      sigchld_blocked.count_down();
+      fork_done.wait();
+
+      sigset_t pending;
+      SAFE_SYSCALL(sigpending(&pending));
+      EXPECT_TRUE(sigismember(&pending, SIGCHLD));
+
+      auto thread_pending_hex = ReadStatusField(gettid(), "SigPnd");
+      auto process_pending_hex = ReadStatusField(gettid(), "ShdPnd");
+      ASSERT_NE(thread_pending_hex, std::nullopt);
+      ASSERT_NE(process_pending_hex, std::nullopt);
+
+      uint64_t thread_pending, process_pending;
+      ASSERT_TRUE(fxl::StringToNumberWithError(thread_pending_hex.value(), &thread_pending,
+                                               fxl::Base::k16));
+      ASSERT_TRUE(fxl::StringToNumberWithError(process_pending_hex.value(), &process_pending,
+                                               fxl::Base::k16));
+
+      EXPECT_FALSE(signal_in_bitmask(thread_pending, SIGCHLD));
+      EXPECT_TRUE(signal_in_bitmask(process_pending, SIGCHLD));
+
+      test_done.wait();
+      SAFE_SYSCALL(pthread_sigmask(SIG_SETMASK, &old_mask, nullptr));
+    });
+
+    sigchld_blocked.wait();
+    pid_t pid = vfork();
+    if (pid == 0) {
+      _exit(0);
+    }
+
+    int status;
+    SAFE_SYSCALL(waitpid(pid, &status, 0));
+    EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+
+    sigset_t pending;
+    SAFE_SYSCALL(sigpending(&pending));
+    EXPECT_TRUE(sigismember(&pending, SIGCHLD));
+
+    fork_done.count_down();
+
+    auto thread_pending_hex = ReadStatusField(gettid(), "SigPnd");
+    auto process_pending_hex = ReadStatusField(gettid(), "ShdPnd");
+    ASSERT_NE(thread_pending_hex, std::nullopt);
+    ASSERT_NE(process_pending_hex, std::nullopt);
+
+    uint64_t thread_pending, process_pending;
+    ASSERT_TRUE(
+        fxl::StringToNumberWithError(thread_pending_hex.value(), &thread_pending, fxl::Base::k16));
+    ASSERT_TRUE(fxl::StringToNumberWithError(process_pending_hex.value(), &process_pending,
+                                             fxl::Base::k16));
+
+    EXPECT_FALSE(signal_in_bitmask(thread_pending, SIGCHLD));
+    EXPECT_TRUE(signal_in_bitmask(process_pending, SIGCHLD));
+
+    test_done.count_down();
+    background.join();
+    SAFE_SYSCALL(pthread_sigmask(SIG_SETMASK, &old_mask, nullptr));
+  });
+}
+
+void empty_signal_handler(int, siginfo_t *, void *) {}
+
+TEST(SignalHandling, FutexIsInterruptedBySignalHandler) {
+  test_helper::ForkHelper helper;
+
+  auto futex_wait = [](std::atomic<uint32_t> *uaddr, uint32_t value) -> long {
+    return syscall(SYS_futex, uaddr, FUTEX_WAIT, value, 0, 0, nullptr);
+  };
+
+  auto sleep_ms = [](size_t millis) {
+    constexpr size_t kMillisToMicros = 1000;
+    return usleep(static_cast<useconds_t>(millis * kMillisToMicros));
+  };
+
+  helper.RunInForkedProcess([&]() {
+    struct sigaction sig_action = {};
+    sig_action.sa_sigaction = empty_signal_handler;
+    sig_action.sa_flags = SA_SIGINFO;
+    SAFE_SYSCALL(sigaction(SIGUSR1, &sig_action, nullptr));
+
+    std::atomic<bool> done = false;
+    std::atomic<uint32_t> futex_word = 0;
+
+    std::thread t([&done, &sleep_ms]() {
+      sigset_t block_mask, old_mask;
+      sigemptyset(&block_mask);
+      sigaddset(&block_mask, SIGUSR1);
+
+      SAFE_SYSCALL(pthread_sigmask(SIG_BLOCK, &block_mask, &old_mask));
+
+      // We need to wait for the main thread to be in the futex wait.
+      while (!done) {
+        kill(getpid(), SIGUSR1);
+        sleep_ms(100);
+      }
+    });
+
+    long res = futex_wait(&futex_word, 0);
+    EXPECT_EQ(res, -1);
+    EXPECT_EQ(errno, EINTR);
+    done = true;
+    t.join();
+  });
 }
 
 }  // namespace

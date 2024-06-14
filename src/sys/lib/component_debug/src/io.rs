@@ -5,24 +5,18 @@
 // TODO(https://fxbug.dev/42144933): Migrate to the new library that substitutes io_utils and fuchsia_fs::directory.
 // Ask for host-side support on the new library (fxr/467217).
 
-use {
-    anyhow::{anyhow, format_err, Error, Result},
-    async_trait::async_trait,
-    fidl::endpoints::{create_endpoints, ClientEnd},
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::directory::readdir,
-    fuchsia_fs::directory::DirEntry,
-    fuchsia_fs::{
-        directory::{clone_no_describe, open_directory_no_describe, open_file_no_describe},
-        file::{close, read, read_to_string, write},
-    },
-    fuchsia_zircon_status::Status,
-    futures::lock::Mutex,
-    std::{
-        env, fs,
-        path::{Path, PathBuf},
-    },
+use anyhow::{anyhow, format_err, Error, Result};
+use async_trait::async_trait;
+use fidl::endpoints::{create_endpoints, ClientEnd};
+use fidl_fuchsia_io as fio;
+use fuchsia_fs::directory::{
+    clone_no_describe, open_directory_no_describe, open_file_no_describe, readdir, DirEntry,
 };
+use fuchsia_fs::file::{close, read, read_to_string, write};
+use fuchsia_zircon_status::Status;
+use futures::lock::Mutex;
+use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 pub enum DirentKind {
     File,

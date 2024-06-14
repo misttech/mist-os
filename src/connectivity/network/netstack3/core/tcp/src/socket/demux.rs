@@ -6,50 +6,51 @@
 //! state machine.
 
 use alloc::collections::hash_map;
-use core::{fmt::Debug, num::NonZeroU16};
+use core::fmt::Debug;
+use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
+use log::{debug, error, warn};
 use net_types::SpecifiedAddr;
+use netstack3_base::socket::{
+    AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
+    ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
+};
 use netstack3_base::{
-    socket::{
-        AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
-        ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
-    },
     trace_duration, BidirectionalConverter as _, CounterContext, CtxPair, EitherDeviceId,
     NotFoundError, StrongDeviceIdentifier as _, WeakDeviceIdentifier,
 };
 use netstack3_filter::TransportPacketSerializer;
+use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
-    socket::{IpSockCreationError, MmsError},
-    IpTransportContext, TransparentLocalDelivery, TransportIpContext, TransportReceiveError,
+    BaseTransportIpContext, IpTransportContext, TransparentLocalDelivery, TransportIpContext,
+    TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
-use packet_formats::{
-    error::ParseError,
-    ip::{IpExt, IpProto},
-    tcp::{
-        TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
-        TcpSegmentBuilderWithOptions,
-    },
+use packet_formats::error::ParseError;
+use packet_formats::ip::{IpExt, IpProto};
+use packet_formats::tcp::{
+    TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
+    TcpSegmentBuilderWithOptions,
 };
 use thiserror::Error;
-use tracing::{debug, error, warn};
 
-use crate::internal::{
-    base::{BufferSizes, ConnectionError, Control, Mss, SocketOptions, TcpCounters},
-    buffer::SendPayload,
-    segment::{Options, Segment},
-    seqnum::{SeqNum, UnscaledWindowSize},
-    socket::{
-        self, isn::IsnGenerator, AsThisStack as _, BoundSocketState, Connection, DemuxState,
-        DeviceIpSocketHandler, DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack,
-        HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState, MaybeDualStack,
-        MaybeListener, PrimaryRc, TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext,
-        TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpPortSpec, TcpSocketId,
-        TcpSocketSetEntry, TcpSocketState, TcpSocketStateInner,
-    },
-    state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
+use crate::internal::base::{
+    BufferSizes, ConnectionError, Control, Mss, SocketOptions, TcpCounters,
 };
+use crate::internal::buffer::SendPayload;
+use crate::internal::segment::{Options, Segment};
+use crate::internal::seqnum::{SeqNum, UnscaledWindowSize};
+use crate::internal::socket::isn::IsnGenerator;
+use crate::internal::socket::{
+    self, AsThisStack as _, BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler,
+    DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack, HandshakeStatus, Listener,
+    ListenerAddrState, ListenerSharingState, MaybeDualStack, MaybeListener, PrimaryRc, TcpApi,
+    TcpBindingsContext, TcpBindingsTypes, TcpContext, TcpDemuxContext, TcpDualStackContext,
+    TcpIpTransportContext, TcpPortSpec, TcpSocketId, TcpSocketSetEntry, TcpSocketState,
+    TcpSocketStateInner,
+};
+use crate::internal::state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait};
 
 impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for BT {
     type ActiveOpen = BT::ListenerNotifierOrProvidedBuffers;
@@ -620,7 +621,7 @@ where
     let mut confirm_reachable = || {
         let remote_ip = *ip_sock.remote_ip();
         let device = ip_sock.device().and_then(|weak| weak.upgrade());
-        <DC as TransportIpContext<WireI, _>>::confirm_reachable_with_destination(
+        <DC as BaseTransportIpContext<WireI, _>>::confirm_reachable_with_destination(
             core_ctx,
             bindings_ctx,
             remote_ip.into(),
@@ -1136,7 +1137,6 @@ where
 mod test {
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, Ipv4, Ipv6};
     use netstack3_base::testutil::TestIpExt;
     use packet::ParseBuffer as _;
     use test_case::test_case;
@@ -1167,13 +1167,13 @@ mod test {
         }
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }).into(), &[]; "syn")]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(const_unwrap_option(NonZeroU16::new(1440 as u16)))), window_scale: None }).into(), &[]; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)).into(), &[]; "ack")]
     #[test_case(Segment::with_fake_data(false), Segment::FAKE_DATA; "contiguous data")]
     #[test_case(Segment::with_fake_data(true), Segment::FAKE_DATA; "split data")]
-    fn tcp_serialize_segment<I: Ip + TestIpExt>(
+    fn tcp_serialize_segment<I: TestIpExt>(
         segment: Segment<SendPayload<'_>>,
         expected_body: &[u8],
     ) {

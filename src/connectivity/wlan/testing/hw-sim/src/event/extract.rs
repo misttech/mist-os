@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_tap as fidl_tap,
-    std::{
-        fmt::{self, Debug, Formatter},
-        marker::PhantomData,
-    },
-    wlan_common::channel::Channel,
-};
+use fidl_fuchsia_wlan_tap as fidl_tap;
+use std::fmt::{self, Debug, Formatter};
+use std::marker::PhantomData;
+use wlan_common::channel::Channel;
 
 use crate::event::{Handled, Handler};
 

@@ -2,26 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        guest_ethernet::{
-            GuestEthernetContext, GuestEthernetInterface, GuestEthernetNewResult, RxPacket,
-        },
-        wire,
-    },
-    anyhow::{anyhow, Error},
-    fidl_fuchsia_net::MacAddress,
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc::UnboundedReceiver, StreamExt},
-    machina_virtio_device::{GuestMem, WrappedDescChainStream},
-    std::{cell::RefCell, io::Write, pin::Pin},
-    virtio_device::{
-        chain::{ReadableChain, Remaining, WritableChain},
-        mem::{DeviceRange, DriverMem},
-        queue::DriverNotify,
-    },
-    zerocopy::AsBytes,
+use crate::guest_ethernet::{
+    GuestEthernetContext, GuestEthernetInterface, GuestEthernetNewResult, RxPacket,
 };
+use crate::wire;
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_net::MacAddress;
+use fuchsia_zircon as zx;
+use futures::channel::mpsc::UnboundedReceiver;
+use futures::StreamExt;
+use machina_virtio_device::{GuestMem, WrappedDescChainStream};
+use std::cell::RefCell;
+use std::io::Write;
+use std::pin::Pin;
+use virtio_device::chain::{ReadableChain, Remaining, WritableChain};
+use virtio_device::mem::{DeviceRange, DriverMem};
+use virtio_device::queue::DriverNotify;
+use zerocopy::AsBytes;
 
 pub struct NetDevice<T: GuestEthernetInterface> {
     // Safe wrapper around the C++ FFI for interacting with the netstack.
@@ -285,16 +282,15 @@ impl<T: GuestEthernetInterface> NetDevice<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        async_utils::PollExt,
-        fuchsia_async as fasync,
-        futures::channel::mpsc::{self, UnboundedSender},
-        rand::{distributions::Standard, Rng},
-        std::collections::VecDeque,
-        virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
-        zerocopy::FromBytes,
-    };
+    use super::*;
+    use async_utils::PollExt;
+    use fuchsia_async as fasync;
+    use futures::channel::mpsc::{self, UnboundedSender};
+    use rand::distributions::Standard;
+    use rand::Rng;
+    use std::collections::VecDeque;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
+    use zerocopy::FromBytes;
 
     struct TestGuestEthernet {
         status_tx: UnboundedSender<zx::Status>,

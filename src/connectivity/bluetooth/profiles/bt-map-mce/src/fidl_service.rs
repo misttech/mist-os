@@ -8,7 +8,8 @@ use fidl_fuchsia_bluetooth_map::{
     MessagingClientMarker, MessagingClientRequest, MessagingClientRequestStream,
 };
 use fuchsia_component::server::{ServiceFs, ServiceObj};
-use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
+use futures::channel::mpsc::Sender;
+use futures::{SinkExt, StreamExt};
 use tracing::{trace, warn};
 
 use crate::messaging_client::WatchAccessorRequest;

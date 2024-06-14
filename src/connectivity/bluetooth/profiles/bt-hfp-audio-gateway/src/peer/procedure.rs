@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use at_commands as at;
-use fuchsia_inspect as inspect;
 use fuchsia_inspect_contrib::nodes::NodeExt;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use thiserror::Error;
 use tracing::warn;
+use {at_commands as at, fuchsia_inspect as inspect};
 
-use crate::peer::{
-    service_level_connection::{Command, SlcState},
-    slc_request::SlcRequest,
-    update::AgUpdate,
-};
+use crate::peer::service_level_connection::{Command, SlcState};
+use crate::peer::slc_request::SlcRequest;
+use crate::peer::update::AgUpdate;
 
 /// Defines the implementation of the Answer Procedure.
 pub mod answer;

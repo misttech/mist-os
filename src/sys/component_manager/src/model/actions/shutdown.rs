@@ -2,32 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        actions::{Action, ActionKey, ActionsManager},
-        component::instance::{InstanceState, ResolvedInstanceState},
-        component::ComponentInstance,
-    },
-    async_trait::async_trait,
-    cm_rust::{
-        CapabilityDecl, ChildRef, CollectionDecl, DependencyType, DictionaryDecl, DictionarySource,
-        EnvironmentDecl, ExposeDecl, OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl,
-        OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
-        OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon,
-        RegistrationSource, SourcePath, StorageDecl, StorageDirectorySource, UseConfigurationDecl,
-        UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl,
-        UseServiceDecl, UseSource, UseStorageDecl,
-    },
-    cm_types::{IterablePath, Name},
-    errors::ActionError,
-    futures::future::select_all,
-    moniker::ChildName,
-    std::collections::{HashMap, HashSet},
-    std::fmt,
-    std::iter,
-    std::sync::Arc,
-    tracing::*,
+use crate::model::actions::{Action, ActionKey, ActionsManager};
+use crate::model::component::instance::{InstanceState, ResolvedInstanceState};
+use crate::model::component::ComponentInstance;
+use async_trait::async_trait;
+use cm_rust::{
+    CapabilityDecl, ChildRef, CollectionDecl, DependencyType, DictionaryDecl, DictionarySource,
+    EnvironmentDecl, ExposeDecl, OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl,
+    OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl,
+    OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon, RegistrationSource,
+    SourcePath, StorageDecl, StorageDirectorySource, UseConfigurationDecl, UseDecl,
+    UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
+    UseSource, UseStorageDecl,
 };
+use cm_types::{IterablePath, Name};
+use errors::ActionError;
+use futures::future::select_all;
+use moniker::ChildName;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use std::{fmt, iter};
+use tracing::*;
 
 /// Shuts down all component instances in this component (stops them and guarantees they will never
 /// be started again).
@@ -908,30 +903,27 @@ fn find_environment_sources(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::model::actions::test_utils::MockAction;
+    use crate::model::actions::StopAction;
+    use crate::model::component::StartReason;
+    use crate::model::testing::test_helpers::{
+        component_decl_with_test_runner, execution_is_shut_down, has_child, ActionsTest,
+        ComponentInfo,
+    };
+    use crate::model::testing::test_hook::Lifecycle;
+    use async_utils::PollExt;
+    use cm_rust::{ComponentDecl, DependencyType, ExposeSource, ExposeTarget};
+    use cm_rust_testing::*;
+    use cm_types::AllowedOffers;
+    use errors::StopActionError;
+    use maplit::{btreeset, hashmap, hashset};
+    use moniker::Moniker;
+    use std::collections::BTreeSet;
+    use test_case::test_case;
     use {
-        super::*,
-        crate::model::{
-            actions::{test_utils::MockAction, StopAction},
-            component::StartReason,
-            testing::{
-                test_helpers::{
-                    component_decl_with_test_runner, execution_is_shut_down, has_child,
-                    ActionsTest, ComponentInfo,
-                },
-                test_hook::Lifecycle,
-            },
-        },
-        async_utils::PollExt,
-        cm_rust::{ComponentDecl, DependencyType, ExposeSource, ExposeTarget},
-        cm_rust_testing::*,
-        cm_types::AllowedOffers,
-        errors::StopActionError,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         fuchsia_async as fasync,
-        maplit::{btreeset, hashmap, hashset},
-        moniker::Moniker,
-        std::collections::BTreeSet,
-        test_case::test_case,
     };
 
     /// Implementation of `super::Component` based on a `ComponentDecl` and

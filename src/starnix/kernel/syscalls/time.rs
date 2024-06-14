@@ -2,32 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::MemoryAccessorExt,
-    signals::{RunState, SignalEvent},
-    task::{ClockId, CurrentTask, TimerId},
-    time::utc::utc_now,
-};
+use crate::mm::MemoryAccessorExt;
+use crate::signals::{RunState, SignalEvent};
+use crate::task::{ClockId, CurrentTask, TimerId};
+use crate::time::utc::utc_now;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon::{
     Task, {self as zx},
 };
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{InterruptibleEvent, WakeReason};
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{InterruptibleEvent, Locked, Unlocked, WakeReason};
+use starnix_uapi::errors::{Errno, EINTR};
+use starnix_uapi::time::{
+    duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
+    timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
+};
+use starnix_uapi::user_address::UserRef;
 use starnix_uapi::{
-    errno, error,
-    errors::{Errno, EINTR},
-    from_status_like_fdio, itimerspec, itimerval, pid_t, sigevent,
-    time::{
-        duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
-        timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
-    },
-    timespec, timeval, timezone, tms, uapi,
-    user_address::UserRef,
-    CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
-    CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
-    CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
+    errno, error, from_status_like_fdio, itimerspec, itimerval, pid_t, sigevent, timespec, timeval,
+    timezone, tms, uapi, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC,
+    CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME,
+    CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS,
+    TIMER_ABSTIME,
 };
 
 pub fn sys_clock_getres(
@@ -507,9 +503,12 @@ pub fn sys_times(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{mm::PAGE_SIZE, testing::*, time::utc::UtcClockOverrideGuard};
+    use crate::mm::PAGE_SIZE;
+    use crate::testing::*;
+    use crate::time::utc::UtcClockOverrideGuard;
     use fuchsia_zircon::HandleBased;
-    use starnix_uapi::{ownership::TempRef, signals, user_address::UserAddress};
+    use starnix_uapi::signals;
+    use starnix_uapi::user_address::UserAddress;
     use test_util::{assert_geq, assert_leq};
 
     #[::fuchsia::test]
@@ -521,7 +520,7 @@ mod test {
             move || {
                 let task = task.upgrade().expect("task must be alive");
                 // Wait until the task is in nanosleep, and interrupt it.
-                while !task.read().signals.run_state.is_blocked() {
+                while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
                 task.interrupt();
@@ -603,16 +602,7 @@ mod test {
                 interruption_target.sleep();
                 if let Some(thread_group) = thread_group.upgrade() {
                     let signal = signals::SIGALRM;
-                    let signal_target = thread_group
-                        .read()
-                        .get_signal_target(signal.into())
-                        .map(TempRef::into_static);
-                    if let Some(task) = signal_target {
-                        crate::signals::send_standard_signal(
-                            &task,
-                            crate::signals::SignalInfo::default(signal),
-                        );
-                    }
+                    thread_group.write().send_signal(crate::signals::SignalInfo::default(signal));
                 }
             })
             .unwrap();

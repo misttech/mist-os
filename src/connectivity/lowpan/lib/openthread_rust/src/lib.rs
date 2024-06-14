@@ -31,29 +31,15 @@ pub type OtMessageBox<'a> = ot::Box<ot::Message<'a>>;
 pub mod prelude {
     #![allow(unused_imports)]
 
-    pub use crate::{ot, otsys};
-    pub use crate::{OtBox, OtInstanceBox, OtMessageBox};
-    pub use ot::BackboneRouter as _;
-    pub use ot::BorderRouter as _;
-    pub use ot::Boxable as _;
-    pub use ot::Dnssd as _;
-    pub use ot::DnssdExt as _;
-    pub use ot::IntoOtError as _;
-    pub use ot::Ip6 as _;
-    pub use ot::Link as _;
-    pub use ot::MessageBuffer as _;
-    pub use ot::OtCastable as _;
-    pub use ot::Reset as _;
-    pub use ot::SrpServer as _;
-    pub use ot::State as _;
-    pub use ot::Tasklets as _;
-    pub use ot::Thread as _;
-    pub use ot::Udp as _;
-    pub use ot::Uptime as _;
+    pub use crate::{ot, otsys, OtBox, OtInstanceBox, OtMessageBox};
+    pub use ot::{
+        BackboneRouter as _, BorderRouter as _, Boxable as _, Dnssd as _, DnssdExt as _,
+        IntoOtError as _, Ip6 as _, Link as _, MessageBuffer as _, OtCastable as _, Reset as _,
+        SrpServer as _, State as _, Tasklets as _, Thread as _, Udp as _, Uptime as _,
+    };
 
     pub use ot::TaskletsStreamExt as _;
-    pub use std::convert::TryFrom as _;
-    pub use std::convert::TryInto as _;
+    pub use std::convert::{TryFrom as _, TryInto as _};
 }
 
 // Internal prelude namespace for internal crate use only.
@@ -65,15 +51,14 @@ pub(crate) mod prelude_internal {
     pub use crate::impl_ot_castable;
     pub use crate::otsys::*;
     pub use crate::prelude::*;
-    pub use core::convert::TryFrom;
-    pub use core::convert::TryInto;
+    pub use core::convert::{TryFrom, TryInto};
     pub use futures::prelude::*;
     pub use num::FromPrimitive as _;
     pub(crate) use ot::ascii_dump;
-    pub use ot::Result;
+    pub use ot::types::*;
     pub use ot::{
-        types::*, BackboneRouter, BorderRouter, Boxable, Error, Instance, InstanceInterface, Ip6,
-        Link, Message, MessageBuffer, Platform, SrpServer, Tasklets, Thread,
+        BackboneRouter, BorderRouter, Boxable, Error, Instance, InstanceInterface, Ip6, Link,
+        Message, MessageBuffer, Platform, Result, SrpServer, Tasklets, Thread,
     };
     pub use static_assertions as sa;
     pub use std::ffi::{CStr, CString};

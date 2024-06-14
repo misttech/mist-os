@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::media_buttons;
-use crate::agent::Invocation;
-use crate::agent::Lifespan;
-use crate::agent::{Context, Payload};
+use crate::agent::{media_buttons, Context, Invocation, Lifespan, Payload};
 use crate::event::{self, Event};
 use crate::input::MediaButtons;
 use crate::message::base::{Audience, MessengerType};

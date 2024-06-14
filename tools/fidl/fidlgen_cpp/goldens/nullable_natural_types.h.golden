@@ -912,7 +912,7 @@ inline StructWithNullableUnion& StructWithNullableUnion::val(::fidl::Box<::test_
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_nullable::StructWithNullableString> : public std::true_type {};
+struct IsFidlType<::test_nullable::StructWithNullableString> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::StructWithNullableString> {
@@ -924,14 +924,14 @@ struct TypeTraits<::test_nullable::StructWithNullableString> {
 };
 
 template <>
-struct IsStruct<::test_nullable::StructWithNullableString> : public std::true_type {};
+struct IsStruct<::test_nullable::StructWithNullableString> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableString, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableString, 16> {};
 
 template <>
-struct IsFidlType<::test_nullable::StructWithNullableVector> : public std::true_type {};
+struct IsFidlType<::test_nullable::StructWithNullableVector> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::StructWithNullableVector> {
@@ -943,7 +943,7 @@ struct TypeTraits<::test_nullable::StructWithNullableVector> {
 };
 
 template <>
-struct IsStruct<::test_nullable::StructWithNullableVector> : public std::true_type {};
+struct IsStruct<::test_nullable::StructWithNullableVector> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableVector, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -952,9 +952,9 @@ struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableVector, 
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_nullable::StructWithNullableHandle> : public std::true_type {};
+struct IsResource<::test_nullable::StructWithNullableHandle> : public std::true_type{};
 template <>
-struct IsFidlType<::test_nullable::StructWithNullableHandle> : public std::true_type {};
+struct IsFidlType<::test_nullable::StructWithNullableHandle> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::StructWithNullableHandle> {
@@ -966,7 +966,7 @@ struct TypeTraits<::test_nullable::StructWithNullableHandle> {
 };
 
 template <>
-struct IsStruct<::test_nullable::StructWithNullableHandle> : public std::true_type {};
+struct IsStruct<::test_nullable::StructWithNullableHandle> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableHandle, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -975,7 +975,7 @@ struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableHandle, 
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::test_nullable::SimpleProtocolAddRequest> : public std::true_type {};
+struct IsFidlType<::test_nullable::SimpleProtocolAddRequest> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::SimpleProtocolAddRequest> {
@@ -987,14 +987,14 @@ struct TypeTraits<::test_nullable::SimpleProtocolAddRequest> {
 };
 
 template <>
-struct IsStruct<::test_nullable::SimpleProtocolAddRequest> : public std::true_type {};
+struct IsStruct<::test_nullable::SimpleProtocolAddRequest> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::SimpleProtocolAddRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::SimpleProtocolAddRequest, 8> {};
 
 template <>
-struct IsFidlType<::test_nullable::SimpleProtocolAddResponse> : public std::true_type {};
+struct IsFidlType<::test_nullable::SimpleProtocolAddResponse> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::SimpleProtocolAddResponse> {
@@ -1006,7 +1006,7 @@ struct TypeTraits<::test_nullable::SimpleProtocolAddResponse> {
 };
 
 template <>
-struct IsStruct<::test_nullable::SimpleProtocolAddResponse> : public std::true_type {};
+struct IsStruct<::test_nullable::SimpleProtocolAddResponse> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::SimpleProtocolAddResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -1015,9 +1015,9 @@ struct internal::NaturalCodingTraits<::test_nullable::SimpleProtocolAddResponse,
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_nullable::StructWithNullableProtocol> : public std::true_type {};
+struct IsResource<::test_nullable::StructWithNullableProtocol> : public std::true_type{};
 template <>
-struct IsFidlType<::test_nullable::StructWithNullableProtocol> : public std::true_type {};
+struct IsFidlType<::test_nullable::StructWithNullableProtocol> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::StructWithNullableProtocol> {
@@ -1029,7 +1029,7 @@ struct TypeTraits<::test_nullable::StructWithNullableProtocol> {
 };
 
 template <>
-struct IsStruct<::test_nullable::StructWithNullableProtocol> : public std::true_type {};
+struct IsStruct<::test_nullable::StructWithNullableProtocol> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableProtocol, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -1040,9 +1040,9 @@ struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableProtocol
 #ifdef __Fuchsia__
 
 template <>
-struct IsResource<::test_nullable::StructWithNullableRequest> : public std::true_type {};
+struct IsResource<::test_nullable::StructWithNullableRequest> : public std::true_type{};
 template <>
-struct IsFidlType<::test_nullable::StructWithNullableRequest> : public std::true_type {};
+struct IsFidlType<::test_nullable::StructWithNullableRequest> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::StructWithNullableRequest> {
@@ -1054,7 +1054,7 @@ struct TypeTraits<::test_nullable::StructWithNullableRequest> {
 };
 
 template <>
-struct IsStruct<::test_nullable::StructWithNullableRequest> : public std::true_type {};
+struct IsStruct<::test_nullable::StructWithNullableRequest> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
@@ -1063,7 +1063,7 @@ struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableRequest,
 #endif  // __Fuchsia__
 
 template <>
-struct IsFidlType<::test_nullable::Int32Wrapper> : public std::true_type {};
+struct IsFidlType<::test_nullable::Int32Wrapper> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::Int32Wrapper> {
@@ -1075,14 +1075,14 @@ struct TypeTraits<::test_nullable::Int32Wrapper> {
 };
 
 template <>
-struct IsStruct<::test_nullable::Int32Wrapper> : public std::true_type {};
+struct IsStruct<::test_nullable::Int32Wrapper> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::Int32Wrapper, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::Int32Wrapper, 4> {};
 
 template <>
-struct IsFidlType<::test_nullable::StructWithNullableStruct> : public std::true_type {};
+struct IsFidlType<::test_nullable::StructWithNullableStruct> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::StructWithNullableStruct> {
@@ -1094,14 +1094,14 @@ struct TypeTraits<::test_nullable::StructWithNullableStruct> {
 };
 
 template <>
-struct IsStruct<::test_nullable::StructWithNullableStruct> : public std::true_type {};
+struct IsStruct<::test_nullable::StructWithNullableStruct> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableStruct, 8> {};
 
 template <>
-struct IsFidlType<::test_nullable::StructWithNullableUnion> : public std::true_type {};
+struct IsFidlType<::test_nullable::StructWithNullableUnion> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::StructWithNullableUnion> {
@@ -1113,14 +1113,14 @@ struct TypeTraits<::test_nullable::StructWithNullableUnion> {
 };
 
 template <>
-struct IsStruct<::test_nullable::StructWithNullableUnion> : public std::true_type {};
+struct IsStruct<::test_nullable::StructWithNullableUnion> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableUnion, 16> {};
 
 template <>
-struct IsFidlType<::test_nullable::SimpleUnion> : public std::true_type {};
+struct IsFidlType<::test_nullable::SimpleUnion> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_nullable::SimpleUnion> {
@@ -1132,7 +1132,7 @@ struct TypeTraits<::test_nullable::SimpleUnion> {
 };
 
 template <>
-struct IsUnion<::test_nullable::SimpleUnion> : public std::true_type {};
+struct IsUnion<::test_nullable::SimpleUnion> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::SimpleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final

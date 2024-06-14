@@ -3,22 +3,23 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use diagnostics_assertions::tree_assertion;
+use diagnostics_assertions::{tree_assertion, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::create_endpoints;
-use fidl_fuchsia_hardware_suspend as fhsuspend;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
-use fidl_fuchsia_power_suspend as fsuspend;
-use fidl_fuchsia_power_system as fsystem;
-use fidl_test_suspendcontrol as tsc;
-use fidl_test_systemactivitygovernor as ftest;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, HandleBased};
-use futures::{channel::mpsc, StreamExt};
+use futures::channel::mpsc;
+use futures::StreamExt;
 use power_broker_client::PowerElementContext;
 use realm_proxy_client::RealmProxyClient;
-use std::{collections::HashMap, time::Instant};
+use std::collections::HashMap;
+use std::time::Instant;
+use {
+    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_suspend as fsuspend,
+    fidl_fuchsia_power_system as fsystem, fidl_test_suspendcontrol as tsc,
+    fidl_test_systemactivitygovernor as ftest, fuchsia_async as fasync,
+};
 
 const REALM_FACTORY_CHILD_NAME: &str = "test_realm_factory";
 
@@ -200,6 +201,8 @@ async fn lease(controller: &PowerElementContext, level: u8) -> Result<fbroker::L
     Ok(lease_control)
 }
 
+const MACRO_LOOP_EXIT: bool = false; // useful in development; prevent hangs from inspect mismatch
+
 macro_rules! block_until_inspect_matches {
     ($sag_moniker:expr, $($tree:tt)+) => {{
         let mut reader = ArchiveReader::new();
@@ -208,7 +211,7 @@ macro_rules! block_until_inspect_matches {
             .select_all_for_moniker(&format!("{}/{}", REALM_FACTORY_CHILD_NAME, $sag_moniker))
             .with_minimum_schema_count(1);
 
-        for i in 0.. {
+        for i in 1.. {
             let Ok(data) = reader
                 .snapshot::<Inspect>()
                 .await?
@@ -225,6 +228,9 @@ macro_rules! block_until_inspect_matches {
                 Err(error) => {
                     if i == 10 {
                         tracing::warn!(?error, "Still awaiting inspect match after 10 tries");
+                    }
+                    if MACRO_LOOP_EXIT && i == 50 {  // upper bound, so test terminates on mismatch
+                        return Err(error.into())
                     }
                 }
             }
@@ -278,6 +284,8 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
             },
+            suspend_events: {
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -330,6 +338,15 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 last_time_in_suspend: 2u64,
                 last_time_in_suspend_operations: 1u64,
             },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -367,6 +384,15 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 last_time_in_suspend: 2u64,
                 last_time_in_suspend_operations: 1u64,
             },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -377,7 +403,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
-            suspend_duration: Some(2i64),
+            suspend_duration: Some(3i64),
             suspend_overhead: Some(1i64),
             ..Default::default()
         }))
@@ -389,7 +415,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     assert_eq!(Some(2), current_stats.success_count);
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(Some(2), current_stats.last_time_in_suspend);
+    assert_eq!(Some(3), current_stats.last_time_in_suspend);
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -416,8 +442,24 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 success_count: 2u64,
                 fail_count: 0u64,
                 last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
+                last_time_in_suspend: 3u64,
                 last_time_in_suspend_operations: 1u64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+                "2": {
+                    suspended: AnyProperty,
+                },
+                "3": {
+                    resumed: AnyProperty,
+                    duration: 3u64,
+                },
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
@@ -496,6 +538,15 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 last_time_in_suspend: 2u64,
                 last_time_in_suspend_operations: 1u64,
             },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -506,7 +557,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
-            suspend_duration: Some(2i64),
+            suspend_duration: Some(3i64),
             suspend_overhead: Some(1i64),
             ..Default::default()
         }))
@@ -539,8 +590,24 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 success_count: 2u64,
                 fail_count: 0u64,
                 last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
+                last_time_in_suspend: 3u64,
                 last_time_in_suspend_operations: 1u64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+                "2": {
+                    suspended: AnyProperty,
+                },
+                "3": {
+                    resumed: AnyProperty,
+                    duration: 3u64,
+                },
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
@@ -619,6 +686,15 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                 last_time_in_suspend: 2u64,
                 last_time_in_suspend_operations: 1u64,
             },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -629,7 +705,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
-            suspend_duration: Some(2i64),
+            suspend_duration: Some(3i64),
             suspend_overhead: Some(1i64),
             ..Default::default()
         }))
@@ -662,8 +738,24 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                 success_count: 2u64,
                 fail_count: 0u64,
                 last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
+                last_time_in_suspend: 3u64,
                 last_time_in_suspend_operations: 1u64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+                "2": {
+                    suspended: AnyProperty,
+                },
+                "3": {
+                    resumed: AnyProperty,
+                    duration: 3u64,
+                },
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
@@ -727,6 +819,8 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                     last_failed_error: 0u64,
                     last_time_in_suspend: -1i64,
                     last_time_in_suspend_operations: -1i64,
+                },
+                suspend_events: {
                 },
                 "fuchsia.inspect.Health": contains {
                     status: "OK",
@@ -794,6 +888,8 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
             },
+            suspend_events: {
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -844,6 +940,15 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                 last_failed_error: 0u64,
                 last_time_in_suspend: 1000u64,
                 last_time_in_suspend_operations: 50u64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 1000u64,
+                },
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
@@ -910,6 +1015,8 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
             },
+            suspend_events: {
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -952,6 +1059,14 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 last_failed_error: 7u64,
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    suspend_failed: AnyProperty,
+                },
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
@@ -1075,6 +1190,15 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 last_time_in_suspend: 2u64,
                 last_time_in_suspend_operations: 1u64,
             },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1178,6 +1302,15 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 last_time_in_suspend: 2u64,
                 last_time_in_suspend_operations: 1u64,
             },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1193,7 +1326,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
-            suspend_duration: Some(2i64),
+            suspend_duration: Some(3i64),
             suspend_overhead: Some(1i64),
             ..Default::default()
         }))
@@ -1227,8 +1360,24 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 success_count: 2u64,
                 fail_count: 0u64,
                 last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
+                last_time_in_suspend: 3u64,
                 last_time_in_suspend_operations: 1u64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
+                "2": {
+                    suspended: AnyProperty,
+                },
+                "3": {
+                    resumed: AnyProperty,
+                    duration: 3u64,
+                },
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
@@ -1332,6 +1481,14 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
                 last_failed_error: 0u64,
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    suspend_failed: AnyProperty,
+                },
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
@@ -1483,6 +1640,8 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
             },
+            suspend_events: {
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1521,6 +1680,11 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 last_failed_error: 0u64,
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                }
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",

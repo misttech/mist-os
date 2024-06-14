@@ -2,44 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        checksum::Checksum,
-        debug_assert_not_too_long,
-        filesystem::TxnGuard,
-        log::*,
-        lsm_tree::types::Item,
-        object_handle::INVALID_OBJECT_ID,
-        object_store::{
-            allocator::{AllocatorItem, Reservation},
-            object_manager::{reserved_space_from_journal_usage, ObjectManager},
-            object_record::{
-                ObjectItem, ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectKey,
-                ObjectKeyData, ObjectValue, ProjectProperty,
-            },
-        },
-        serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
-    },
-    anyhow::Error,
-    either::{Either, Left, Right},
-    fprint::TypeFingerprint,
-    futures::{future::poll_fn, pin_mut},
-    fxfs_crypto::{WrappedKey, WrappedKeyV32},
-    rustc_hash::FxHashMap as HashMap,
-    scopeguard::ScopeGuard,
-    serde::{Deserialize, Serialize},
-    std::{
-        cell::UnsafeCell,
-        cmp::Ordering,
-        collections::{hash_map::Entry, BTreeSet},
-        fmt,
-        marker::PhantomPinned,
-        mem,
-        ops::{Deref, DerefMut, Range},
-        sync::Mutex,
-        task::{Poll, Waker},
-    },
+use crate::checksum::Checksum;
+use crate::debug_assert_not_too_long;
+use crate::filesystem::TxnGuard;
+use crate::log::*;
+use crate::lsm_tree::types::Item;
+use crate::object_handle::INVALID_OBJECT_ID;
+use crate::object_store::allocator::{AllocatorItem, Reservation};
+use crate::object_store::object_manager::{reserved_space_from_journal_usage, ObjectManager};
+use crate::object_store::object_record::{
+    ObjectItem, ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectKey,
+    ObjectKeyData, ObjectValue, ProjectProperty,
 };
+use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
+use anyhow::Error;
+use either::{Either, Left, Right};
+use fprint::TypeFingerprint;
+use futures::future::poll_fn;
+use futures::pin_mut;
+use fxfs_crypto::{WrappedKey, WrappedKeyV32};
+use rustc_hash::FxHashMap as HashMap;
+use scopeguard::ScopeGuard;
+use serde::{Deserialize, Serialize};
+use std::cell::UnsafeCell;
+use std::cmp::Ordering;
+use std::collections::hash_map::Entry;
+use std::collections::BTreeSet;
+use std::marker::PhantomPinned;
+use std::ops::{Deref, DerefMut, Range};
+use std::sync::Mutex;
+use std::task::{Poll, Waker};
+use std::{fmt, mem};
 
 /// This allows for special handling of certain transactions such as deletes and the
 /// extension of Journal extents. For most other use cases it is appropriate to use
@@ -1502,17 +1495,18 @@ impl fmt::Debug for WriteGuard<'_> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{LockKey, LockKeys, LockManager, LockState, Mutation, Options},
-        crate::filesystem::FxFilesystem,
-        fuchsia_async as fasync,
-        futures::{
-            channel::oneshot::channel, future::FutureExt, join, pin_mut, stream::FuturesUnordered,
-            StreamExt,
-        },
-        std::{sync::Mutex, task::Poll, time::Duration},
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-    };
+    use super::{LockKey, LockKeys, LockManager, LockState, Mutation, Options};
+    use crate::filesystem::FxFilesystem;
+    use fuchsia_async as fasync;
+    use futures::channel::oneshot::channel;
+    use futures::future::FutureExt;
+    use futures::stream::FuturesUnordered;
+    use futures::{join, pin_mut, StreamExt};
+    use std::sync::Mutex;
+    use std::task::Poll;
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     #[fuchsia::test]
     async fn test_simple() {

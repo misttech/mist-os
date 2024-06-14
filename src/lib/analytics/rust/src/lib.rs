@@ -7,14 +7,11 @@ mod ga4_metrics_service;
 mod metrics_state;
 mod notice;
 
-use {
-    anyhow::{bail, Result},
-    futures::lock::Mutex,
-    std::collections::BTreeMap,
-    std::path::PathBuf,
-    std::sync::Arc,
-    std::sync::OnceLock,
-};
+use anyhow::{bail, Result};
+use futures::lock::Mutex;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::sync::{Arc, OnceLock};
 
 use std::ops::DerefMut;
 

@@ -2,17 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs,
-    serde::Deserialize,
-    serde::Serialize,
-    std::{
-        collections::HashMap,
-        io::{self, Write},
-        path::PathBuf,
-        process::Command,
-    },
-};
+use argh::FromArgs;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BuildTarget {
@@ -271,13 +266,11 @@ fn get_target_products(products_str: Option<&String>) -> Vec<BuildTarget> {
 #[cfg(test)]
 mod test {
 
-    use {
-        super::{
-            get_target_products, get_target_sets, group_by_feature, BuildTarget, ComponentManifest,
-            ManifestContent,
-        },
-        std::collections::HashMap,
+    use super::{
+        get_target_products, get_target_sets, group_by_feature, BuildTarget, ComponentManifest,
+        ManifestContent,
     };
+    use std::collections::HashMap;
 
     #[test]
     fn test_feature_grouping() {

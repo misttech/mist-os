@@ -7,10 +7,8 @@ use anyhow::ensure;
 use ieee80211::MacAddr;
 use mundane::hash::Sha256;
 use std::cmp::{max, min};
-use wlan_common::ie::rsn::{
-    akm::{self, Akm},
-    cipher::Cipher,
-};
+use wlan_common::ie::rsn::akm::{self, Akm};
+use wlan_common::ie::rsn::cipher::Cipher;
 use wlan_sae::hmac_utils;
 
 /// A PTK is derived from a PMK and provides access to the PTK's key-hierarchy which yields a KEK,
@@ -107,10 +105,8 @@ impl Ptk {
 mod tests {
     use super::*;
     use hex::FromHex;
-    use wlan_common::ie::rsn::{
-        akm::PSK,
-        cipher::{CCMP_128, TKIP},
-    };
+    use wlan_common::ie::rsn::akm::PSK;
+    use wlan_common::ie::rsn::cipher::{CCMP_128, TKIP};
 
     struct TestData {
         pmk: Vec<u8>,

@@ -5,12 +5,10 @@
 //! Wrappers around the installer state machine to track progress and ensure the installer can only
 //! make valid state transitions.
 
-use {
-    async_generator::Yield,
-    fidl_fuchsia_update_installer_ext::{
-        FetchFailureReason, PrepareFailureReason, Progress, StageFailureReason, State, UpdateInfo,
-        UpdateInfoAndProgress,
-    },
+use async_generator::Yield;
+use fidl_fuchsia_update_installer_ext::{
+    FetchFailureReason, PrepareFailureReason, Progress, StageFailureReason, State, UpdateInfo,
+    UpdateInfoAndProgress,
 };
 
 /// Tracks a numeric goal and the current progress towards that goal, ensuring progress can only go
@@ -220,7 +218,8 @@ impl WaitToReboot {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, futures::prelude::*};
+    use super::*;
+    use futures::prelude::*;
 
     #[test]
     fn progress_no_goal_is_done() {

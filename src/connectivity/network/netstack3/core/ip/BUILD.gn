@@ -13,9 +13,6 @@ rustc_library_with_features("netstack3-ip") {
   sources = [
     "src/api.rs",
     "src/base.rs",
-    "src/datagram.rs",
-    "src/datagram/spec_context.rs",
-    "src/datagram/uninstantiable.rs",
     "src/device.rs",
     "src/device/api.rs",
     "src/device/config.rs",
@@ -32,11 +29,12 @@ rustc_library_with_features("netstack3-ip") {
     "src/gmp/igmp.rs",
     "src/gmp/mld.rs",
     "src/icmp.rs",
-    "src/icmp/socket.rs",
     "src/ipv6.rs",
     "src/lib.rs",
     "src/path_mtu.rs",
     "src/raw.rs",
+    "src/raw/checksum.rs",
+    "src/raw/filter.rs",
     "src/raw/protocol.rs",
     "src/raw/state.rs",
     "src/reassembly.rs",
@@ -49,7 +47,6 @@ rustc_library_with_features("netstack3-ip") {
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/lib/explicit",
     "//src/connectivity/network/netstack3/core/lock-order",
-    "//src/connectivity/network/netstack3/core/macros:netstack3-macros",
     "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
@@ -57,18 +54,16 @@ rustc_library_with_features("netstack3-ip") {
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:either",
     "//third_party/rust_crates:hmac",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:ref-cast",
     "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
 
     # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
     "//src/connectivity/network/netstack3/core/fakestd",
   ]
-
-  _testutils_deps = []
 
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
 
@@ -89,7 +84,6 @@ rustc_library_with_features("netstack3-ip") {
         "testutils",
         "instrumented",
       ]
-      deps += _testutils_deps
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-testutils",
@@ -99,7 +93,6 @@ rustc_library_with_features("netstack3-ip") {
       target_name = "netstack3-ip-benchmarks"
       testonly = true
       features = [ "testutils" ]
-      deps += _testutils_deps
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-benchmarks",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-benchmarks",
@@ -122,7 +115,6 @@ rustc_library_with_features("netstack3-ip") {
         "//third_party/rust_crates:itertools",
         "//third_party/rust_crates:test-case",
       ]
-      test_deps += _testutils_deps
     },
   ]
   if (is_host) {
@@ -134,7 +126,6 @@ rustc_library_with_features("netstack3-ip") {
           "instrumented",
         ]
         testonly = true
-        deps += _testutils_deps
         deps += [
           "//src/connectivity/network/netstack3/core/base:netstack3-base-loom",
           "//src/connectivity/network/netstack3/core/filter:netstack3-filter-loom",

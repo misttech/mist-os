@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::TestEnv, mock_reboot::RebootReason};
+use crate::TestEnv;
+use mock_reboot::RebootReason;
 
 #[fuchsia::test]
 async fn reboots_on_startup_failure() {

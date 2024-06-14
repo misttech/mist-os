@@ -7,13 +7,11 @@ mod guest_ethernet;
 mod interface;
 mod wire;
 
-use {
-    anyhow::{anyhow, Error},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization_hardware::VirtioNetRequestStream,
-    fuchsia_component::server,
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-};
+use anyhow::{anyhow, Error};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization_hardware::VirtioNetRequestStream;
+use fuchsia_component::server;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 
 async fn run_virtio_net(
     context: &guest_ethernet::GuestEthernetContext,

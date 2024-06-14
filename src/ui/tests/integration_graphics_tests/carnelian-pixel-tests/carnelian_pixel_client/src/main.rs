@@ -3,16 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use carnelian::app::Config;
+use carnelian::color::Color;
+use carnelian::drawing::path_for_rectangle;
+use carnelian::render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, Style};
+use carnelian::scene::facets::Facet;
+use carnelian::scene::scene::{Scene, SceneBuilder, SceneOrder};
+use carnelian::scene::LayerGroup;
 use carnelian::{
-    app::Config,
-    color::Color,
-    drawing::path_for_rectangle,
-    render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, Style},
-    scene::{
-        facets::Facet,
-        scene::{Scene, SceneBuilder, SceneOrder},
-        LayerGroup,
-    },
     App, AppAssistant, AppAssistantPtr, AppSender, AssistantCreatorFunc, Coord, LocalBoxFuture,
     Rect, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };

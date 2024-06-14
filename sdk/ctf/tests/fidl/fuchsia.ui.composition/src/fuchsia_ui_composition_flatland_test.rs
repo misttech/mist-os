@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl_fuchsia_testing_harness as harness;
-use fidl_fuchsia_ui_composition as flatland;
-use fidl_fuchsia_ui_test_context as ui_test_context;
 use flatland::PresentArgs;
 use fuchsia_component::client;
 use futures::StreamExt;
+use {
+    fidl_fuchsia_testing_harness as harness, fidl_fuchsia_ui_composition as flatland,
+    fidl_fuchsia_ui_test_context as ui_test_context,
+};
 
 const TRANSFORM_ID: flatland::TransformId = flatland::TransformId { value: 3 };
 

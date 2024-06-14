@@ -4,12 +4,10 @@
 
 //! Utility functions for fuchsia.io files.
 
-use {
-    crate::node::{CloseError, OpenError},
-    fidl::{persist, unpersist, Persistable},
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    thiserror::Error,
-};
+use crate::node::{CloseError, OpenError};
+use fidl::{persist, unpersist, Persistable};
+use thiserror::Error;
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 mod async_reader;
 pub use async_reader::AsyncReader;
@@ -408,21 +406,18 @@ pub(crate) async fn read_file_with_on_open_event(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{directory, OpenFlags},
-        assert_matches::assert_matches,
-        fidl_fidl_test_schema::{DataTable1, DataTable2},
-        fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx, HandleBased as _},
-        std::{path::Path, sync::Arc},
-        tempfile::TempDir,
-        vfs::{
-            execution_scope::ExecutionScope,
-            file::vmo::{read_only, VmoFile},
-            ToObjectRequest,
-        },
-    };
+    use super::*;
+    use crate::{directory, OpenFlags};
+    use assert_matches::assert_matches;
+    use fidl_fidl_test_schema::{DataTable1, DataTable2};
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::{self as zx, HandleBased as _};
+    use std::path::Path;
+    use std::sync::Arc;
+    use tempfile::TempDir;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::{read_only, VmoFile};
+    use vfs::ToObjectRequest;
 
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 

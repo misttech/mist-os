@@ -63,6 +63,7 @@ source_set("src") {
     "registers.h",
     "string_printf.cc",
     "string_printf.h",
+    "timeout_source.h",
     "types.h",
   ]
 

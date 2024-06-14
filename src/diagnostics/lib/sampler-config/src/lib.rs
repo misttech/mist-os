@@ -6,18 +6,17 @@
 mod selector_list;
 mod string_list;
 
-use {
-    anyhow::{bail, Context as _, Error},
-    fuchsia_inspect as inspect,
-    futures::FutureExt,
-    glob::{GlobError, Paths},
-    serde::{de::DeserializeOwned, Deserialize},
-    std::fs,
-    std::path::{Path, PathBuf},
-    std::sync::{Arc, Mutex},
-    string_list::StringList,
-    tracing::warn,
-};
+use anyhow::{bail, Context as _, Error};
+use fuchsia_inspect as inspect;
+use futures::FutureExt;
+use glob::{GlobError, Paths};
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use string_list::StringList;
+use tracing::warn;
 
 pub use selector_list::{ParsedSelector, SelectorList};
 

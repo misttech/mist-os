@@ -4,23 +4,16 @@
 
 use fuchsia_zircon as zx;
 
-use crate::{
-    arch::registers::RegisterState,
-    mm::vmo::round_up_to_increment,
-    signals::{SignalInfo, SignalState},
-    task::{CurrentTask, Task},
-};
-use extended_pstate::{
-    riscv64::{RiscvVectorCsrs, NUM_V_REGISTERS, VLEN},
-    ExtendedPstateState,
-};
+use crate::arch::registers::RegisterState;
+use crate::mm::vmo::round_up_to_increment;
+use crate::signals::{SignalInfo, SignalState};
+use crate::task::{CurrentTask, Task};
+use extended_pstate::riscv64::{RiscvVectorCsrs, NUM_V_REGISTERS, VLEN};
+use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
-use starnix_uapi::{
-    self as uapi, error,
-    errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
-    sigaction, sigaltstack, sigcontext, siginfo_t, ucontext,
-    user_address::UserAddress,
-};
+use starnix_uapi::errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK};
+use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::{self as uapi, error, sigaction, sigaltstack, sigcontext, siginfo_t, ucontext};
 
 /// The size of the red zone.
 // TODO(https://fxbug.dev/42072654): Determine whether or not this is the correct red zone size for riscv64.

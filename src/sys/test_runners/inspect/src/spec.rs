@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::ComponentError, fidl_fuchsia_data as fdata, selectors::VerboseError,
-    std::collections::BTreeMap,
-};
+use crate::error::ComponentError;
+use fidl_fuchsia_data as fdata;
+use selectors::VerboseError;
+use std::collections::BTreeMap;
 
 #[derive(Debug)]
 pub(crate) struct ProgramSpec {

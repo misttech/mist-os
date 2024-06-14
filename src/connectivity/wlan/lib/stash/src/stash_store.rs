@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::Store,
-    anyhow::{bail, format_err, Context, Error},
-    async_trait::async_trait,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_stash as fidl_stash,
-    std::collections::HashMap,
-    wlan_stash_constants::{
-        NetworkIdentifier, PersistentData, NODE_SEPARATOR, POLICY_DATA_KEY, POLICY_STASH_PREFIX,
-    },
+use anyhow::{bail, format_err, Context, Error};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_stash as fidl_stash;
+use std::collections::HashMap;
+use wlan_stash_constants::{
+    NetworkIdentifier, PersistentData, NODE_SEPARATOR, POLICY_DATA_KEY, POLICY_STASH_PREFIX,
 };
 
 struct StashNode {
@@ -69,6 +65,7 @@ impl StashNode {
     }
 
     async fn children(&self) -> Result<Vec<Self>, Error> {
+        tracing::info!("DEBUG TRACE stash.children was called");
         let (local, remote) = fidl::endpoints::create_proxy::<_>()?;
         let () = self.stash.list_prefix(&self.key, remote)?;
 
@@ -78,7 +75,7 @@ impl StashNode {
             let key_list = local.get_next().await.map_err(|e| {
                 match e {
                     fidl::Error::ClientChannelClosed { status, .. } => {
-                        format_err!("Failed to get stash data from closed channel: {}. Any networks saved this boot will probably not be persisted", status)
+                        format_err!("Failed to get stash data from closed channel: {}. Any networks saved this boot will not be persisted in stash", status)
                     }
                     _ => format_err!(e)
                 }
@@ -101,11 +98,13 @@ impl StashNode {
         self.key.clone()
     }
 
+    #[cfg(test)]
     fn write_val(&mut self, field: &str, value: fidl_stash::Value) -> Result<(), Error> {
         self.stash.set_value(&format!("{}{}", self.key, field), value)?;
         Ok(())
     }
 
+    #[cfg(test)]
     fn write_str(&mut self, field: &str, s: String) -> Result<(), Error> {
         self.write_val(field, fidl_stash::Value::Stringval(s))
     }
@@ -122,22 +121,25 @@ impl StashStore {
         id: &str,
         proxy: fidl_stash::SecureStoreProxy,
     ) -> Result<Self, Error> {
-        // Try and read from Stash
         proxy.identify(id).context("failed to identify client to store")?;
         let (store_proxy, accessor_server) =
             create_proxy().context("failed to create accessor proxy")?;
+        tracing::info!("TRACE DEBUG call create accessor");
         proxy.create_accessor(false, accessor_server).context("failed to create accessor")?;
+        tracing::info!("TRACE DEBUG done with call create accessor");
 
         Ok(Self::new(store_proxy, POLICY_STASH_PREFIX))
     }
 
     /// Make string value of NetworkIdentifier that will be the key for a config in the stash.
+    #[cfg(test)]
     fn serialize_key(id: &NetworkIdentifier) -> Result<String, serde_json::error::Error> {
         serde_json::to_string(id)
     }
 
     /// Write the persisting values (not including network ID) of a network config to the provided
     /// stash node.
+    #[cfg(test)]
     fn write_config(node: &mut StashNode, persistent_data: &PersistentData) -> Result<(), Error> {
         let data_str = serde_json::to_string(&persistent_data).map_err(|e| format_err!("{}", e))?;
         node.write_str(POLICY_DATA_KEY, data_str)
@@ -172,20 +174,18 @@ impl StashStore {
         let data: PersistentData = serde_json::from_str(data).map_err(|e| format_err!("{}", e))?;
         Ok(data)
     }
-}
 
-#[async_trait]
-impl Store for StashStore {
-    async fn flush(&self) -> Result<(), Error> {
+    pub async fn flush(&self) -> Result<(), Error> {
         self.0.stash.flush().await?.map_err(|e| format_err!("failed to flush changes: {:?}", e))
     }
 
-    async fn delete_store(&mut self) -> Result<(), Error> {
+    pub async fn delete_store(&mut self) -> Result<(), Error> {
         self.0.delete()?;
         self.flush().await
     }
 
-    async fn write(
+    #[cfg(test)]
+    pub async fn write(
         &self,
         id: &NetworkIdentifier,
         network_configs: &[PersistentData],
@@ -211,7 +211,8 @@ impl Store for StashStore {
         Ok(())
     }
 
-    async fn load(&self) -> Result<HashMap<NetworkIdentifier, Vec<PersistentData>>, Error> {
+    pub async fn load(&self) -> Result<HashMap<NetworkIdentifier, Vec<PersistentData>>, Error> {
+        tracing::info!("DEBUG TRACE stash.load was called");
         // get all the children nodes of root, which represent the unique identifiers,
         let id_nodes = self.0.children().await?;
 
@@ -252,12 +253,10 @@ impl Store for StashStore {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::tests::{network_id, new_stash_id},
-        fuchsia_component::client::connect_to_protocol,
-        wlan_stash_constants::{Credential, SecurityType},
-    };
+    use super::*;
+    use crate::tests::{network_id, rand_string};
+    use fuchsia_component::client::connect_to_protocol;
+    use wlan_stash_constants::{Credential, SecurityType};
 
     fn new_stash_store(id: &str) -> fidl_stash::StoreAccessorProxy {
         let store_client = connect_to_protocol::<fidl_stash::StoreMarker>()
@@ -403,7 +402,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn load_stash_ignore_bad_values() {
-        let stash = new_stash(&new_stash_id()).await;
+        let stash = new_stash(&rand_string()).await;
 
         // write bad value directly to StashNode
         let some_net_id = network_id("foo", SecurityType::Wpa2);
@@ -420,7 +419,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn write_to_correct_stash_node() {
-        let stash = new_stash(&new_stash_id()).await;
+        let stash = new_stash(&rand_string()).await;
 
         let net_id = network_id("foo", SecurityType::Wpa2);
         let credential = Credential::Password(b"password".to_vec());

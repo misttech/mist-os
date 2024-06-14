@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 pub use macros::*;
 
-use {
-    std::collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    std::ops::Range,
-};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::ops::Range;
 
 /// A TypeFingerprint is able to return a string that represents the layout of a type.
 /// It is intended to capture any structure that will affect serialization via Serde.

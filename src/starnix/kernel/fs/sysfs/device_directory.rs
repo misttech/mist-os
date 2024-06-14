@@ -2,23 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::kobject::{Device, KObjectBased, KObjectHandle, UEventFsNode},
-    fs::sysfs::SysfsOps,
-    task::CurrentTask,
-    vfs::{
-        buffers::InputBuffer, fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly,
-        fs_node_impl_not_dir, BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf,
-        DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        StubEmptyFile, VecDirectory, VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
-    },
+use crate::device::kobject::{Device, KObjectBased, KObjectHandle, UEventFsNode};
+use crate::fs::sysfs::SysfsOps;
+use crate::task::CurrentTask;
+use crate::vfs::buffers::InputBuffer;
+use crate::vfs::{
+    fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
+    BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject,
+    FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, StubEmptyFile, VecDirectory,
+    VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
 };
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
-use starnix_uapi::{
-    auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::mode,
-    open_flags::OpenFlags,
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{errno, error};
 use std::sync::Weak;
 
 pub trait DeviceSysfsOps: SysfsOps {

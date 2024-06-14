@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mapping::{postprocess, preprocess, replace_regex as replace},
-    EnvironmentContext,
-};
+use crate::mapping::{postprocess, preprocess, replace_regex as replace};
+use crate::EnvironmentContext;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
@@ -33,7 +31,8 @@ pub(crate) fn home(_ctx: &EnvironmentContext, value: Value) -> Option<Value> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{environment::ExecutableKind, ConfigMap};
+    use crate::environment::ExecutableKind;
+    use crate::ConfigMap;
 
     fn home_dir(default: &str) -> String {
         home::home_dir().map_or(default.to_string(), |home_path| {

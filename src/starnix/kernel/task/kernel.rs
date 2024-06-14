@@ -2,45 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::{
-        android::bootloader_message_store::AndroidBootloaderMessageStore,
-        device_mapper::DeviceMapperRegistry,
-        framebuffer::{AspectRatio, Framebuffer},
-        loop_device::LoopDeviceRegistry,
-        remote_block_device::RemoteBlockDeviceRegistry,
-        sync_fence_registry::SyncFenceRegistry,
-        BinderDevice, DeviceMode, DeviceRegistry,
-    },
-    fs::proc::SystemLimits,
-    mm::{FutexTable, SharedFutexKey},
-    power::SuspendResumeManagerHandle,
-    task::{
-        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
-        HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
-        StopState, Syslog, UtsNamespace, UtsNamespaceHandle,
-    },
-    vdso::vdso_loader::Vdso,
-    vfs::{
-        fuse::FuseCtlFs,
-        socket::{
-            GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
-            SocketAddress,
-        },
-        DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString, Mounts,
-    },
+use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
+use crate::device::device_mapper::DeviceMapperRegistry;
+use crate::device::framebuffer::{AspectRatio, Framebuffer};
+use crate::device::loop_device::LoopDeviceRegistry;
+use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
+use crate::device::sync_fence_registry::SyncFenceRegistry;
+use crate::device::{BinderDevice, DeviceMode, DeviceRegistry};
+use crate::fs::proc::SystemLimits;
+use crate::memory_attribution::MemoryAttributionManager;
+use crate::mm::{FutexTable, SharedFutexKey};
+use crate::power::SuspendResumeManagerHandle;
+use crate::task::{
+    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
+    HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
+    StopState, Syslog, UtsNamespace, UtsNamespaceHandle,
+};
+use crate::vdso::vdso_loader::Vdso;
+use crate::vfs::fuse::FuseCtlFs;
+use crate::vfs::socket::{
+    GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
+    SocketAddress,
+};
+use crate::vfs::{
+    DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString, Mounts,
 };
 use bstr::BString;
-use fidl::{
-    endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker, Proxy},
-    AsHandleRef,
+use fidl::endpoints::{
+    create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker, Proxy,
 };
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use futures::FutureExt;
-use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
+use netlink::interfaces::InterfacesHandler;
+use netlink::{Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use selinux::security_server::SecurityServer;
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
@@ -49,21 +43,22 @@ use starnix_sync::{
     DeviceOpen, KernelIpTables, KernelSwapFiles, LockBefore, Locked, OrderedMutex, OrderedRwLock,
     RwLock,
 };
-use starnix_uapi::{
-    device_type::DeviceType, errno, errors::Errno, from_status_like_fdio, open_flags::OpenFlags,
-};
-use std::{
-    collections::BTreeMap,
-    sync::{
-        atomic::{AtomicU16, AtomicU8},
-        Arc, Weak,
-    },
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{errno, from_status_like_fdio};
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU16, AtomicU8};
+use std::sync::{Arc, Weak};
+use zx::AsHandleRef;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct KernelFeatures {
     pub bpf_v2: bool,
-    pub log_dump_on_exit: bool,
 }
 
 /// The shared, mutable state for the entire Starnix kernel.
@@ -79,7 +74,7 @@ pub struct Kernel {
     /// The kernel threads running on behalf of this kernel.
     pub kthreads: KernelThreads,
 
-    /// The feaures enabled for this kernel.
+    /// The features enabled for this kernel.
     pub features: KernelFeatures,
 
     /// The processes and threads running in this kernel, organized by pid_t.
@@ -246,6 +241,9 @@ pub struct Kernel {
 
     /// The manager for creating and managing high-resolution timers.
     pub hrtimer_manager: HrTimerManagerHandle,
+
+    /// The manager for monitoring and reporting resources used by the kernel.
+    pub memory_attribution_manager: MemoryAttributionManager,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -370,6 +368,7 @@ impl Kernel {
             syslog: Default::default(),
             mounts: Mounts::new(),
             hrtimer_manager: HrTimerManager::new(),
+            memory_attribution_manager: MemoryAttributionManager::new(kernel.clone()),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
@@ -501,6 +500,13 @@ impl Kernel {
         }
 
         inspector
+    }
+
+    pub fn new_memory_attribution_observer(
+        &self,
+        control_handle: fattribution::ProviderControlHandle,
+    ) -> attribution::Observer {
+        self.memory_attribution_manager.new_observer(control_handle)
     }
 }
 

@@ -4,10 +4,8 @@
 
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fidl_examples_routing_echo::EchoMarker;
-use fidl_fuchsia_component_decl as fcdecl;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::*;
+use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {
     let iterator = query.get_resolved_declaration(moniker).await.unwrap().unwrap();

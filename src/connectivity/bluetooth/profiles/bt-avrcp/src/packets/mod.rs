@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bt_avctp::AvcCommandType,
-    fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
-    packet_encoding::{decodable_enum, Decodable, Encodable},
-    std::result,
-    thiserror::Error,
-    tracing::{debug, info, warn},
-};
+use bt_avctp::AvcCommandType;
+use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
+use packet_encoding::{decodable_enum, Decodable, Encodable};
+use std::result;
+use thiserror::Error;
+use tracing::{debug, info, warn};
 
 mod browsing;
 mod continuation;
@@ -23,12 +21,17 @@ pub mod player_application_settings;
 mod rejected;
 mod set_absolute_volume;
 
-pub use {
-    self::browsing::*, self::continuation::*, self::get_capabilities::*,
-    self::get_element_attributes::*, self::get_play_status::*, self::inform_battery_status::*,
-    self::notification::*, self::play_item::*, self::player_application_settings::*,
-    self::rejected::*, self::set_absolute_volume::*,
-};
+pub use self::browsing::*;
+pub use self::continuation::*;
+pub use self::get_capabilities::*;
+pub use self::get_element_attributes::*;
+pub use self::get_play_status::*;
+pub use self::inform_battery_status::*;
+pub use self::notification::*;
+pub use self::play_item::*;
+pub use self::player_application_settings::*;
+pub use self::rejected::*;
+pub use self::set_absolute_volume::*;
 
 /// The error types for packet parsing.
 #[derive(Error, Debug, PartialEq)]

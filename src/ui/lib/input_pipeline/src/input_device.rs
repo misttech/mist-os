@@ -2,29 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{
+    consumer_controls_binding, keyboard_binding, light_sensor_binding, metrics, mouse_binding,
+    touch_binding,
+};
+use anyhow::{format_err, Error};
+use async_trait::async_trait;
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_input_report::{InputDeviceMarker, InputReport};
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::{
+    ExponentialHistogramParams, HistogramProperty as _, NumericProperty, Property,
+};
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::stream::StreamExt;
+use metrics_registry::*;
+use std::path::PathBuf;
 use {
-    crate::{
-        consumer_controls_binding, keyboard_binding, light_sensor_binding, metrics, mouse_binding,
-        touch_binding,
-    },
-    anyhow::{format_err, Error},
-    async_trait::async_trait,
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_input_report as fidl_input_report,
-    fidl_fuchsia_input_report::{InputDeviceMarker, InputReport},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_inspect::health::Reporter,
-    fuchsia_inspect::{
-        ExponentialHistogramParams, HistogramProperty as _, NumericProperty, Property,
-    },
-    fuchsia_trace as ftrace, fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc::{UnboundedReceiver, UnboundedSender},
-        stream::StreamExt,
-    },
-    metrics_registry::*,
-    std::path::PathBuf,
+    fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio,
+    fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_zircon as zx,
 };
 
 pub use input_device_constants::InputDeviceType;
@@ -579,11 +576,14 @@ impl InputEvent {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, diagnostics_assertions::AnyProperty,
-        fidl::endpoints::spawn_stream_handler, fuchsia_zircon as zx, pretty_assertions::assert_eq,
-        std::convert::TryFrom as _, test_case::test_case,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::AnyProperty;
+    use fidl::endpoints::spawn_stream_handler;
+    use fuchsia_zircon as zx;
+    use pretty_assertions::assert_eq;
+    use std::convert::TryFrom as _;
+    use test_case::test_case;
 
     #[test]
     fn max_event_time() {

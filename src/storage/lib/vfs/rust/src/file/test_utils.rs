@@ -4,12 +4,13 @@
 
 //! Common utilities used by pseudo-file related tests.
 
-use crate::{
-    directory::entry::DirectoryEntry,
-    test_utils::run::{self, AsyncServerClientTestParams},
-};
+use crate::directory::entry::DirectoryEntry;
+use crate::test_utils::run::{self, AsyncServerClientTestParams};
 
-use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, futures::Future, std::sync::Arc};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use futures::Future;
+use std::sync::Arc;
 
 pub use run::{run_client, test_client};
 

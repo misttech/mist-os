@@ -10,14 +10,17 @@ void BindNodeSet::StartNextBindProcess() {
   if (is_bind_ongoing_) {
     CompleteOngoingBind();
   }
+
   new_orphaned_nodes_ = orphaned_nodes_;
   is_bind_ongoing_ = true;
+  NotifyBindState();
 }
 
 void BindNodeSet::EndBindProcess() {
   ZX_ASSERT(is_bind_ongoing_);
   CompleteOngoingBind();
   is_bind_ongoing_ = false;
+  NotifyBindState();
 }
 
 void BindNodeSet::CompleteOngoingBind() {
@@ -28,6 +31,12 @@ void BindNodeSet::CompleteOngoingBind() {
     multibind_nodes_.emplace(path, node_weak);
   }
   new_multibind_nodes_ = {};
+}
+
+void BindNodeSet::NotifyBindState() {
+  if (on_bind_state_changed_) {
+    on_bind_state_changed_();
+  }
 }
 
 void BindNodeSet::AddOrphanedNode(Node& node) {

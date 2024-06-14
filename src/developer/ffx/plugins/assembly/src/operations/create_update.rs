@@ -14,12 +14,9 @@ use ffx_assembly_args::CreateUpdateArgs;
 use fuchsia_pkg::PackageManifest;
 use fuchsia_url::RepositoryUrl;
 use std::collections::BTreeSet;
-use std::fs::File;
 
 pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
-    let mut file = File::open(&args.partitions)
-        .with_context(|| format!("Failed to open: {}", args.partitions))?;
-    let partitions = PartitionsConfig::from_reader(&mut file)
+    let partitions = PartitionsConfig::try_load_from(args.partitions)
         .context("Failed to parse the partitions config")?;
     let epoch: EpochFile = EpochFile::Version1 { epoch: args.epoch };
 

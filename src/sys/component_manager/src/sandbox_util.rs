@@ -2,35 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        component::{ComponentInstance, WeakComponentInstance},
-        routing::router_ext::{RouterExt, WeakComponentTokenExt},
-    },
-    ::routing::{
-        capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
-        error::RoutingError, policy::GlobalPolicyChecker,
-    },
-    async_trait::async_trait,
-    cm_util::WeakTaskGroup,
-    fidl::{
-        endpoints::{ProtocolMarker, RequestStream},
-        epitaph::ChannelEpitaphExt,
-        AsyncChannel,
-    },
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::{future::BoxFuture, FutureExt},
-    router_error::RouterError,
-    sandbox::{Capability, Connectable, Connector, Message, Open, Request, Routable, Router},
-    std::{fmt::Debug, sync::Arc},
-    tracing::warn,
-    vfs::{
-        directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
-        execution_scope::ExecutionScope,
-        path::Path,
-        ToObjectRequest,
-    },
+use crate::model::component::{
+    ComponentInstance, ExtendedInstance, WeakComponentInstance, WeakExtendedInstance,
 };
+use crate::model::routing::router_ext::{RouterExt, WeakComponentTokenExt};
+use ::routing::capability_source::CapabilitySource;
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::error::{ComponentInstanceError, RoutingError};
+use ::routing::policy::GlobalPolicyChecker;
+use async_trait::async_trait;
+use cm_util::WeakTaskGroup;
+use fidl::endpoints::{ProtocolMarker, RequestStream};
+use fidl::epitaph::ChannelEpitaphExt;
+use fidl::AsyncChannel;
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use router_error::RouterError;
+use sandbox::{
+    Capability, Connectable, Connector, Message, Open, Request, Routable, Router,
+    WeakComponentToken,
+};
+use std::fmt::Debug;
+use std::sync::Arc;
+use tracing::warn;
+use vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest};
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::ToObjectRequest;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
     let channel = AsyncChannel::from_channel(channel);
@@ -40,6 +39,7 @@ pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::Requ
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
 /// handle each new message from the receiver.
 pub struct LaunchTaskOnReceive {
+    source: WeakComponentToken,
     task_to_launch: Arc<
         dyn Fn(zx::Channel, WeakComponentInstance) -> BoxFuture<'static, Result<(), anyhow::Error>>
             + Sync
@@ -60,8 +60,13 @@ impl std::fmt::Debug for LaunchTaskOnReceive {
     }
 }
 
+fn cm_unexpected() -> RouterError {
+    RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
+}
+
 impl LaunchTaskOnReceive {
     pub fn new(
+        source: WeakExtendedInstance,
         task_group: WeakTaskGroup,
         task_name: impl Into<String>,
         policy: Option<(GlobalPolicyChecker, CapabilitySource<ComponentInstance>)>,
@@ -75,7 +80,13 @@ impl LaunchTaskOnReceive {
                 + 'static,
         >,
     ) -> Self {
-        Self { task_to_launch, task_group, policy, task_name: task_name.into() }
+        Self {
+            source: WeakComponentToken::new(source),
+            task_to_launch,
+            task_group,
+            policy,
+            task_name: task_name.into(),
+        }
     }
 
     pub fn into_sender(self: Arc<Self>, target: WeakComponentInstance) -> Connector {
@@ -103,7 +114,15 @@ impl LaunchTaskOnReceive {
         #[async_trait]
         impl Routable for LaunchTaskRouter {
             async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                Ok(self.inner.clone().into_sender(request.target.to_instance()).into())
+                let WeakExtendedInstance::Component(target) = request.target.to_instance() else {
+                    return Err(cm_unexpected());
+                };
+                let cap = self.inner.clone().into_sender(target).into();
+                if !request.debug {
+                    Ok(cap)
+                } else {
+                    Ok(Capability::Component(self.inner.source.clone()))
+                }
             }
         }
         Router::new(LaunchTaskRouter { inner: Arc::new(self) })
@@ -139,6 +158,7 @@ impl LaunchTaskOnReceive {
     ) -> LaunchTaskOnReceive {
         let weak_component = WeakComponentInstance::new(component);
         LaunchTaskOnReceive::new(
+            WeakExtendedInstance::Component(weak_component.clone()),
             component.nonblocking_task_group().as_weak(),
             "framework hook dispatcher",
             Some((component.context.policy().clone(), capability_source.clone())),
@@ -182,7 +202,7 @@ impl LaunchTaskOnReceive {
 
 /// Porcelain methods on [`Routable`] objects.
 pub trait RoutableExt: Routable {
-    /// Returns a router that resolves with a [`sandbox::Sender`] that watches for
+    /// Returns a router that resolves with a [`sandbox::Connector`] that watches for
     /// the channel to be readable, then delegates to the current router. The wait
     /// is performed in the provided `scope`.
     fn on_readable(self, scope: ExecutionScope, entry_type: fio::DirentType) -> Router;
@@ -200,8 +220,15 @@ impl<T: Routable + 'static> RoutableExt for T {
         #[async_trait]
         impl Routable for OnReadableRouter {
             async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                let target =
-                    request.target.clone().to_instance().upgrade().map_err(RoutingError::from)?;
+                if request.debug {
+                    return self.router.route(request).await;
+                }
+
+                let ExtendedInstance::Component(target) =
+                    request.target.clone().to_instance().upgrade().map_err(RoutingError::from)?
+                else {
+                    return Err(cm_unexpected());
+                };
                 let entry = self.router.clone().into_directory_entry(
                     request,
                     self.entry_type,
@@ -274,17 +301,21 @@ impl<T: Routable + 'static> RoutableExt for T {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::model::{context::ModelContext, environment::Environment};
+    use crate::model::context::ModelContext;
+    use crate::model::environment::Environment;
 
     use super::*;
     use assert_matches::assert_matches;
     use cm_rust::Availability;
     use cm_types::RelativePath;
     use fuchsia_async::TestExecutor;
+    use moniker::Moniker;
     use router_error::DowncastErrorForTest;
     use routing::{DictExt, LazyGet};
-    use sandbox::{Data, Dict, Receiver, WeakComponentToken};
-    use std::{pin::pin, sync::Weak, task::Poll};
+    use sandbox::{Data, Dict, Receiver, RemotableCapability, WeakComponentToken};
+    use std::pin::pin;
+    use std::sync::Weak;
+    use std::task::Poll;
 
     #[fuchsia::test]
     async fn get_capability() {
@@ -366,10 +397,14 @@ pub mod tests {
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentToken::invalid(),
+                    debug: false,
                 },
             )
             .await;
-        assert_matches!(cap, Ok(Some(Capability::Data(Data::String(str)))) if str == "hello");
+        assert_matches!(
+            cap,
+            Ok(Some(Capability::Data(Data::String(str)))) if str == "hello"
+        );
     }
 
     #[fuchsia::test]
@@ -383,6 +418,7 @@ pub mod tests {
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentToken::invalid(),
+                    debug: false,
                 },
             )
             .await;
@@ -405,6 +441,7 @@ pub mod tests {
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentToken::invalid(),
+                    debug: false,
                 },
             )
             .await;
@@ -425,6 +462,7 @@ pub mod tests {
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentToken::invalid(),
+                    debug: false,
                 },
             )
             .await;
@@ -436,6 +474,7 @@ pub mod tests {
                 Request {
                     availability: Availability::Required,
                     target: WeakComponentToken::invalid(),
+                    debug: false,
                 },
             )
             .await;
@@ -488,7 +527,8 @@ pub mod tests {
         let capability = router
             .route(Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new(component.as_weak()),
+                target: WeakComponentToken::new_component(component.as_weak()),
+                debug: false,
             })
             .await
             .unwrap();
@@ -539,7 +579,8 @@ pub mod tests {
         let capability = router
             .route(Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new(component.as_weak()),
+                target: WeakComponentToken::new_component(component.as_weak()),
+                debug: false,
             })
             .await
             .unwrap();
@@ -570,6 +611,48 @@ pub mod tests {
     }
 
     #[fuchsia::test]
+    async fn router_on_readable_debug() {
+        let scope = ExecutionScope::new();
+
+        let source_moniker: Moniker = "source".try_into().unwrap();
+        let mut source = WeakComponentInstance::invalid();
+        source.moniker = source_moniker;
+        let source = WeakExtendedInstance::Component(source);
+        let source2 = source.clone();
+        let debug_router = Router::new(move |router: Request| {
+            let source2 = source2.clone();
+            async move {
+                assert!(router.debug);
+                let res: Result<Capability, RouterError> =
+                    Ok(Capability::Component(WeakComponentToken::new(source2.clone())));
+                res
+            }
+            .boxed()
+        });
+        let router = debug_router.clone().on_readable(scope.clone(), fio::DirentType::Service);
+
+        let target = ComponentInstance::new_root(
+            Environment::empty(),
+            Arc::new(ModelContext::new_for_test()),
+            Weak::new(),
+            "test:///target".parse().unwrap(),
+        )
+        .await;
+        let capability = router
+            .route(Request {
+                availability: Availability::Required,
+                target: WeakComponentToken::new_component(target.as_weak()),
+                debug: true,
+            })
+            .await
+            .unwrap();
+        assert_matches!(
+            capability,
+            Capability::Component(c) if c.moniker() == source.extended_moniker()
+        );
+    }
+
+    #[fuchsia::test]
     async fn lazy_get() {
         let source = Capability::Data(Data::String("hello".to_string()));
         let dict1 = Dict::new();
@@ -585,6 +668,7 @@ pub mod tests {
             .route(Request {
                 availability: Availability::Optional,
                 target: WeakComponentToken::invalid(),
+                debug: false,
             })
             .await
             .unwrap();
@@ -623,6 +707,7 @@ pub mod tests {
             .route(Request {
                 availability: Availability::Optional,
                 target: WeakComponentToken::invalid(),
+                debug: false,
             })
             .await
             .unwrap();

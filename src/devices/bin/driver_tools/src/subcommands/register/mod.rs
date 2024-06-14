@@ -4,13 +4,11 @@
 
 pub mod args;
 
-use {
-    anyhow::{format_err, Result},
-    args::RegisterCommand,
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_registrar as fdr,
-    fuchsia_zircon_status::Status,
-    std::io::Write,
-};
+use anyhow::{format_err, Result};
+use args::RegisterCommand;
+use fuchsia_zircon_status::Status;
+use std::io::Write;
+use {fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_registrar as fdr};
 
 pub async fn register(
     cmd: RegisterCommand,

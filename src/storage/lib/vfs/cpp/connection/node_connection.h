@@ -10,6 +10,7 @@
 #endif
 
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <zircon/availability.h>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
@@ -34,8 +35,8 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   zx::result<> WithRepresentation(
       fit::callback<zx::result<>(fuchsia_io::wire::Representation)> handler,
       std::optional<fuchsia_io::NodeAttributesQuery> query) const final;
-  zx::result<> WithNodeInfoDeprecated(
-      fit::callback<void(fuchsia_io::wire::NodeInfoDeprecated)> handler) const final;
+  zx_status_t WithNodeInfoDeprecated(
+      fit::callback<zx_status_t(fuchsia_io::wire::NodeInfoDeprecated)> handler) const final;
 
   //
   // |fuchsia.io/Node| operations.

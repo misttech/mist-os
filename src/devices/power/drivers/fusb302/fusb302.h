@@ -44,7 +44,9 @@ class Fusb302 : public fidl::WireServer<fuchsia_hardware_powersource::Source> {
         identity_(i2c_, inspect_.GetRoot().CreateChild("Identity")),
         sensors_(i2c_, inspect_.GetRoot().CreateChild("Sensors")),
         fifos_(i2c_),
-        protocol_(fifos_),
+        // GoodCrcGenerationMode::kSoftware is not fast enough for meeting the
+        // reaction time mandated by the USB PD specification.
+        protocol_(GoodCrcGenerationMode::kAssumed, fifos_),
         signals_(i2c_, sensors_, protocol_),
         controls_(i2c_, sensors_, inspect_.GetRoot().CreateChild("Controls")),
         sink_policy_({.min_voltage_mv = 5'000, .max_voltage_mv = 12'000, .max_power_mw = 24'000}),

@@ -27,12 +27,16 @@ def _fuchsia_task_test_enumerated_components_impl(ctx, make_fuchsia_task):
         package_archive,
         "--match-component-name",
         ctx.attr.component_name_filter,
+        "--retries",
+        str(ctx.attr.retries),
     ]
     if ctx.attr.test_realm:
         args += [
             "--realm",
             ctx.attr.test_realm,
         ]
+    if ctx.attr.disable_retries_on_failure:
+        args.append("--disable-retries-on-failure")
     return make_fuchsia_task(
         ctx.attr._test_enumerated_components_tool,
         args,
@@ -67,6 +71,14 @@ def _fuchsia_task_test_enumerated_components_impl(ctx, make_fuchsia_task):
         ),
         "test_realm": attr.string(
             doc = "Specify --realm to `ffx test run`.",
+        ),
+        "retries": attr.int(
+            doc = "Specify an additional amount of test attempts per test failure.",
+        ),
+        "disable_retries_on_failure": attr.bool(
+            doc = """Turns off test retrying for all tests once a test actually fails by reaching the `--retries` cap.
+
+            Useful for preventing an excessive amount of test retries for real caught regressions.""",
         ),
         "_test_enumerated_components_tool": attr.label(
             doc = "The tool used to enumerate and test all components",

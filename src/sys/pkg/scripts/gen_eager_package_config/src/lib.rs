@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context as _,
-    argh::FromArgs,
-    channel_config::{ChannelConfig, ChannelConfigs},
-    eager_package_config::omaha_client::EagerPackageConfig as OmahaConfig,
-    eager_package_config::omaha_client::EagerPackageConfigs as OmahaConfigs,
-    eager_package_config::omaha_client::EagerPackageConfigsJson as OmahaConfigsJson,
-    eager_package_config::omaha_client::OmahaServer,
-    eager_package_config::pkg_resolver::EagerPackageConfig as ResolverConfig,
-    eager_package_config::pkg_resolver::EagerPackageConfigs as ResolverConfigs,
-    fuchsia_url::UnpinnedAbsolutePackageUrl,
-    omaha_client::cup_ecdsa::PublicKeys,
-    omaha_client::version::Version,
-    serde::{Deserialize, Deserializer, Serialize, Serializer},
-    std::collections::{BTreeMap, HashSet},
+use anyhow::Context as _;
+use argh::FromArgs;
+use channel_config::{ChannelConfig, ChannelConfigs};
+use eager_package_config::omaha_client::{
+    EagerPackageConfig as OmahaConfig, EagerPackageConfigs as OmahaConfigs,
+    EagerPackageConfigsJson as OmahaConfigsJson, OmahaServer,
 };
+use eager_package_config::pkg_resolver::{
+    EagerPackageConfig as ResolverConfig, EagerPackageConfigs as ResolverConfigs,
+};
+use fuchsia_url::UnpinnedAbsolutePackageUrl;
+use omaha_client::cup_ecdsa::PublicKeys;
+use omaha_client::version::Version;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Eq, FromArgs, PartialEq)]
 #[argh(description = "gen_eager_package_config arguments")]

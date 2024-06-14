@@ -4,9 +4,12 @@
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
-use crate::peer::{service_level_connection::SlcState, slc_request::SlcRequest, update::AgUpdate};
+use crate::peer::service_level_connection::SlcState;
+use crate::peer::slc_request::SlcRequest;
+use crate::peer::update::AgUpdate;
 
-use {at_commands as at, tracing::info};
+use at_commands as at;
+use tracing::info;
 
 /// The maximum number of characters of a long alphanumeric name.
 /// Defined in HFP v1.9, Section 4.8.

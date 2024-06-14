@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {std::process::Command, tempfile::TempDir};
+use std::process::Command;
+use tempfile::TempDir;
 
 const FFX_TOOL_PATH: &str = env!("FFX_TOOL_PATH");
 const BLOBFS_PATH: &str = env!("BLOBFS_PATH");

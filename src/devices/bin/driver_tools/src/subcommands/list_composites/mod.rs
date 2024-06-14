@@ -4,13 +4,13 @@
 
 pub mod args;
 
+use crate::common::write_node_properties;
+use anyhow::{Context, Result};
+use args::ListCompositesCommand;
+use std::io::Write;
 use {
-    crate::common::write_node_properties,
-    anyhow::{Context, Result},
-    args::ListCompositesCommand,
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
     fidl_fuchsia_driver_legacy as fdl,
-    std::io::Write,
 };
 
 pub async fn list_composites(
@@ -181,10 +181,10 @@ fn write_parent_nodes_info(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl_fuchsia_driver_legacy::BindInstruction, fuchsia_async as fasync,
-        std::io::Error,
-    };
+    use super::*;
+    use fidl_fuchsia_driver_legacy::BindInstruction;
+    use fuchsia_async as fasync;
+    use std::io::Error;
 
     pub struct TestWriteBuffer {
         pub content: String,

@@ -190,7 +190,9 @@ class Fastboot(fastboot_interface.Fastboot):
             errors.FastbootCommandError: If failed to check the fastboot mode.
         """
         try:
-            target_info: dict[str, Any] = self._get_target_info()
+            target_info: dict[
+                str, Any
+            ] = self._ffx_transport.get_target_info_from_target_list()
         except errors.FfxCommandError as err:
             raise errors.FastbootCommandError(
                 f"Failed to check if {self._device_name} is in fastboot mode "
@@ -341,7 +343,9 @@ class Fastboot(fastboot_interface.Fastboot):
             return
 
         try:
-            target: dict[str, Any] = self._get_target_info()
+            target: dict[
+                str, Any
+            ] = self._ffx_transport.get_target_info_from_target_list()
 
             # USB based fastboot connection
             if target.get("serial", _NO_SERIAL) != _NO_SERIAL:
@@ -352,7 +356,7 @@ class Fastboot(fastboot_interface.Fastboot):
 
                 self._wait_for_valid_tcp_address()
 
-                target = self._get_target_info()
+                target = self._ffx_transport.get_target_info_from_target_list()
                 target_address: str = target["addresses"][0]
                 tcp_address: str = f"tcp:{target_address}"
 
@@ -367,22 +371,6 @@ class Fastboot(fastboot_interface.Fastboot):
                 f"Failed to get the fastboot node id of '{self._device_name}'"
             ) from err
 
-    def _get_target_info(self) -> dict[str, Any]:
-        """Return the target information
-
-        Returns:
-            target information
-
-        Raises:
-            errors.FfxCommandError: If target is not connected to host.
-        """
-        for target in self._ffx_transport.get_target_list():
-            if target["nodename"] == self._device_name:
-                return target
-        raise errors.FfxCommandError(
-            f"'{self._device_name}' is not connected to host"
-        )
-
     def _is_a_single_ip_address(self) -> bool:
         """Returns True if "address" field of `ffx target show` has one ip
         address, false otherwise.
@@ -394,7 +382,9 @@ class Fastboot(fastboot_interface.Fastboot):
         Raises:
             errors.FfxCommandError: If target is not connected to host.
         """
-        target: dict[str, Any] = self._get_target_info()
+        target: dict[
+            str, Any
+        ] = self._ffx_transport.get_target_info_from_target_list()
         return len(target["addresses"]) == 1
 
     def _wait_for_valid_tcp_address(

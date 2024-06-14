@@ -2,20 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::extent_record::{ExtentKey, ExtentValue},
-    super::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty},
-    crate::{
-        log::*,
-        lsm_tree::{
-            merge::{
-                ItemOp::{Discard, Keep, Replace},
-                MergeLayerIterator, MergeResult,
-            },
-            types::Item,
-        },
-    },
-};
+use super::extent_record::{ExtentKey, ExtentValue};
+use super::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty};
+use crate::log::*;
+use crate::lsm_tree::merge::ItemOp::{Discard, Keep, Replace};
+use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
+use crate::lsm_tree::types::Item;
 
 fn merge_extents(
     object_id: u64,
@@ -268,21 +260,15 @@ pub fn merge(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::merge,
-        crate::{
-            checksum::Checksums,
-            lsm_tree::{
-                cache::NullCache,
-                types::{Item, LayerIterator, MergeableKey, Value},
-                LSMTree,
-            },
-            object_store::extent_record::ExtentValue,
-            object_store::object_record::{AttributeKey, ObjectKey, ObjectValue, Timestamp},
-        },
-        anyhow::Error,
-        std::ops::Bound,
-    };
+    use super::merge;
+    use crate::checksum::Checksums;
+    use crate::lsm_tree::cache::NullCache;
+    use crate::lsm_tree::types::{Item, LayerIterator, MergeableKey, Value};
+    use crate::lsm_tree::LSMTree;
+    use crate::object_store::extent_record::ExtentValue;
+    use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectValue, Timestamp};
+    use anyhow::Error;
+    use std::ops::Bound;
 
     async fn test_merge<K: MergeableKey, V: Value + PartialEq>(
         tree: &LSMTree<K, V>,

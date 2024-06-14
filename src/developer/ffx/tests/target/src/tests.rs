@@ -6,10 +6,8 @@ use ffx_isolate::Isolate;
 use ffx_testing::{emulator_fixture, Emu, TestContext};
 use fixture::fixture;
 use fuchsia_async as _;
-use futures::{
-    io::{AsyncBufReadExt, AsyncReadExt, BufReader},
-    AsyncRead, AsyncWrite, AsyncWriteExt, Stream, StreamExt,
-};
+use futures::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+use futures::{AsyncRead, AsyncWrite, AsyncWriteExt, Stream, StreamExt};
 use std::time::Duration;
 
 /// Test `ffx target flash` by bringing up an emulator in fastboot.

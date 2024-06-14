@@ -4,8 +4,8 @@
 
 use std::str::{CharIndices, Chars};
 
+use nom::error::{ErrorKind, ParseError};
 use nom::{
-    error::{ErrorKind, ParseError},
     AsBytes, Compare, CompareResult, Err, IResult, InputIter, InputLength, InputTake,
     InputTakeAtPosition, Needed, Offset, ParseTo, Slice,
 };

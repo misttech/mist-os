@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_debugdata::PublisherMarker,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
-    std::thread::sleep,
-    std::time::Duration,
-    zx::{AsHandleRef, HandleBased},
-};
+use fidl_fuchsia_debugdata::PublisherMarker;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon as zx;
+use std::thread::sleep;
+use std::time::Duration;
+use zx::{AsHandleRef, HandleBased};
 
 #[fuchsia::test]
 async fn can_connect_to_publisher_service() {

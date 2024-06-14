@@ -3,25 +3,26 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use carnelian::{
-    color::Color,
-    drawing::{path_for_circle, path_for_polygon, path_for_rectangle, path_for_rounded_rectangle},
-    geometry::{Corners, IntPoint},
-    input::{self},
-    make_app_assistant,
-    render::{BlendMode, Context as RenderContext, Fill, FillRule, Raster, Style},
-    scene::{
-        facets::{FacetId, RasterFacet},
-        scene::{Scene, SceneBuilder},
-    },
-    App, AppAssistant, Coord, Point, Rect, Size, ViewAssistant, ViewAssistantContext,
-    ViewAssistantPtr, ViewKey,
+use carnelian::color::Color;
+use carnelian::drawing::{
+    path_for_circle, path_for_polygon, path_for_rectangle, path_for_rounded_rectangle,
 };
-use euclid::{default::Vector2D, point2, size2, vec2};
+use carnelian::geometry::{Corners, IntPoint};
+use carnelian::input::{self};
+use carnelian::render::{BlendMode, Context as RenderContext, Fill, FillRule, Raster, Style};
+use carnelian::scene::facets::{FacetId, RasterFacet};
+use carnelian::scene::scene::{Scene, SceneBuilder};
+use carnelian::{
+    make_app_assistant, App, AppAssistant, Coord, Point, Rect, Size, ViewAssistant,
+    ViewAssistantContext, ViewAssistantPtr, ViewKey,
+};
+use euclid::default::Vector2D;
+use euclid::{point2, size2, vec2};
 use fuchsia_trace::duration;
 use fuchsia_zircon::Event;
 use rand::{thread_rng, Rng};
-use std::{collections::HashMap, mem};
+use std::collections::HashMap;
+use std::mem;
 
 fn make_bounds(context: &ViewAssistantContext) -> Rect {
     Rect::from_size(context.size)

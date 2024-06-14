@@ -5,10 +5,8 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 use anyhow::{Context, Error};
-use fidl_fuchsia_io;
-use fidl_fuchsia_tee;
 use fuchsia_component::client::{connect_to_protocol_at, connect_to_protocol_at_path};
-use fuchsia_fs;
+use {fidl_fuchsia_io, fidl_fuchsia_tee, fuchsia_fs};
 
 #[fuchsia::test]
 async fn connect_noop_ta() -> Result<(), Error> {

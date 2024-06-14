@@ -5,12 +5,10 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 
-use std::{
-    fmt,
-    fs::File,
-    io::{self, BufRead, BufReader},
-    path::{Path, PathBuf},
-};
+use std::fmt;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug)]
 pub struct Owners {

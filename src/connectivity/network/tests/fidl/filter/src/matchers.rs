@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![cfg(test)]
+use std::fmt::Debug;
+use std::num::NonZeroU64;
+use std::ops::RangeInclusive;
 
-use std::{fmt::Debug, num::NonZeroU64, ops::RangeInclusive};
-
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::{
     AddressMatcher, AddressMatcherType, DeviceClass, InterfaceMatcher, Matchers, PortMatcher,
     TransportProtocolMatcher,
 };
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use net_types::ip::{Ip, IpInvariant};
+use {
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+};
 
 use crate::ip_hooks::{
     IcmpSocket, Interfaces, IrrelevantToTest, Ports, SocketType, Subnets, TcpSocket, UdpSocket,

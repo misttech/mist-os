@@ -38,17 +38,15 @@ impl Cache {
 
 #[cfg(test)]
 pub(crate) mod for_tests {
-    use {
-        super::*,
-        anyhow::Context as _,
-        blobfs_ramdisk::BlobfsRamdisk,
-        fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fuchsia_async as fasync,
-        fuchsia_component_test::{
-            Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
-        },
-        futures::prelude::*,
-        std::sync::Arc,
+    use super::*;
+    use anyhow::Context as _;
+    use blobfs_ramdisk::BlobfsRamdisk;
+    use fuchsia_component_test::{
+        Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
     };
+    use futures::prelude::*;
+    use std::sync::Arc;
+    use {fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fuchsia_async as fasync};
 
     pub struct CacheForTest {
         pub blobfs: blobfs_ramdisk::BlobfsRamdisk,

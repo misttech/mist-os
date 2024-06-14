@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error},
-    argh::FromArgs,
-    component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType},
-    fidl_fuchsia_fs_realm::ControllerMarker,
-    fidl_fuchsia_sys2::RealmQueryMarker,
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_zircon as zx,
-    std::path::Path,
-};
+use anyhow::{anyhow, Context, Error};
+use argh::FromArgs;
+use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
+use fidl_fuchsia_fs_realm::ControllerMarker;
+use fidl_fuchsia_sys2::RealmQueryMarker;
+use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_zircon as zx;
+use std::path::Path;
 
 #[derive(FromArgs)]
 #[argh(description = "A utility for unmounting a filesystem instance running on a block device.")]

@@ -4,13 +4,9 @@
 
 #![deny(warnings)]
 
-use {
-    argh::FromArgs,
-    std::{
-        io::{Error, ErrorKind},
-        mem, thread,
-    },
-};
+use argh::FromArgs;
+use std::io::{Error, ErrorKind};
+use std::{mem, thread};
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Top-level command.

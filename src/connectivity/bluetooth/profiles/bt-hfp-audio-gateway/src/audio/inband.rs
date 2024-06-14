@@ -3,17 +3,19 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fidl_fuchsia_media as media;
-use fuchsia_async as fasync;
 use fuchsia_audio_codec::{StreamProcessor, StreamProcessorOutputStream};
-use fuchsia_audio_device::{stream_config::SoftStreamConfig, AudioFrameSink, AudioFrameStream};
+use fuchsia_audio_device::stream_config::SoftStreamConfig;
+use fuchsia_audio_device::{AudioFrameSink, AudioFrameStream};
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
-use fuchsia_zircon as zx;
-use futures::{task::Context, AsyncWriteExt, FutureExt, StreamExt};
+use futures::task::Context;
+use futures::{AsyncWriteExt, FutureExt, StreamExt};
 use media::AudioDeviceEnumeratorProxy;
 use std::pin::pin;
 use tracing::{error, info, warn};
+use {
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_media as media, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 use crate::audio::{AudioControl, AudioError};
 use crate::sco_connector::ScoConnection;

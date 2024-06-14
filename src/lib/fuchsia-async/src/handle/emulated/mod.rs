@@ -9,8 +9,6 @@ pub mod socket;
 
 use crate::invoke_for_handle_types;
 use bitflags::bitflags;
-use fuchsia_zircon_status as zx_status;
-use fuchsia_zircon_types as zx_types;
 use futures::channel::oneshot;
 use futures::ready;
 use futures::task::noop_waker_ref;
@@ -22,10 +20,10 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use zx_status::Status;
+use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
 
 /// Invalid handle value
 const INVALID_HANDLE: u32 = 0;

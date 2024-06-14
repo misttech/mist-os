@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::mode_management::iface_manager_api::IfaceManagerApi,
-    anyhow::{Context, Error},
-    fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherProxy,
-    futures::{channel::oneshot, lock::Mutex},
-    std::sync::Arc,
-    tracing::{info, warn},
-};
+use crate::mode_management::iface_manager_api::IfaceManagerApi;
+use anyhow::{Context, Error};
+use fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherProxy;
+use futures::channel::oneshot;
+use futures::lock::Mutex;
+use std::sync::Arc;
+use tracing::{info, warn};
 
 pub struct RegulatoryManager<I: IfaceManagerApi + ?Sized> {
     regulatory_service: RegulatoryRegionWatcherProxy,
@@ -75,31 +74,25 @@ impl<I: IfaceManagerApi + ?Sized> RegulatoryManager<I> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Arc, IfaceManagerApi, Mutex, RegulatoryManager},
-        crate::{
-            access_point::{state_machine as ap_fsm, types as ap_types},
-            client::types as client_types,
-            mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan},
-            regulatory_manager::REGION_CODE_LEN,
-        },
-        anyhow::{format_err, Error},
-        async_trait::async_trait,
-        fidl::endpoints::create_proxy,
-        fidl_fuchsia_location_namedplace::{
-            RegulatoryRegionWatcherMarker, RegulatoryRegionWatcherRequest,
-            RegulatoryRegionWatcherRequestStream,
-        },
-        fuchsia_async as fasync,
-        futures::{
-            channel::{mpsc, oneshot},
-            stream::{self, Stream, StreamExt},
-            task::Poll,
-        },
-        std::pin::pin,
-        std::unimplemented,
-        wlan_common::assert_variant,
+    use super::{Arc, IfaceManagerApi, Mutex, RegulatoryManager};
+    use crate::access_point::{state_machine as ap_fsm, types as ap_types};
+    use crate::client::types as client_types;
+    use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan};
+    use crate::regulatory_manager::REGION_CODE_LEN;
+    use anyhow::{format_err, Error};
+    use async_trait::async_trait;
+    use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_location_namedplace::{
+        RegulatoryRegionWatcherMarker, RegulatoryRegionWatcherRequest,
+        RegulatoryRegionWatcherRequestStream,
     };
+    use fuchsia_async as fasync;
+    use futures::channel::{mpsc, oneshot};
+    use futures::stream::{self, Stream, StreamExt};
+    use futures::task::Poll;
+    use std::pin::pin;
+    use std::unimplemented;
+    use wlan_common::assert_variant;
 
     /// Holds all of the boilerplate required for testing RegulatoryManager.
     struct TestContext<S: Stream<Item = Result<(), Error>> + Send + Unpin> {

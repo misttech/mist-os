@@ -15,18 +15,21 @@ mod symbols;
 
 pub use security_context::{SecurityContext, SecurityContextError};
 
-use {
-    anyhow::Context as _,
-    error::{NewSecurityContextError, ParseError, QueryError},
-    index::PolicyIndex,
-    metadata::HandleUnknown,
-    parsed_policy::ParsedPolicy,
-    parser::ByValue,
-    parser::{ByRef, ParseStrategy},
-    selinux_common::{self as sc, ClassPermission as _, FileClass, ObjectClass},
-    std::{fmt::Debug, marker::PhantomData, num::NonZeroU32, ops::Deref},
-    zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned},
-};
+use anyhow::Context as _;
+use error::{NewSecurityContextError, ParseError, QueryError};
+use index::PolicyIndex;
+use metadata::HandleUnknown;
+use parsed_policy::ParsedPolicy;
+use parser::{ByRef, ByValue, ParseStrategy};
+use selinux_common::{self as sc, FileClass, ObjectClass};
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::num::NonZeroU32;
+use std::ops::Deref;
+use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
+
+#[cfg(feature = "selinux_policy_test_api")]
+use selinux_common::ClassPermission as _;
 
 /// Maximum SELinux policy version supported by this implementation.
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
@@ -167,7 +170,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// Returns the [`SecurityContext`] defined by this policy for the specified
     /// well-known (or "initial") Id.
     pub fn initial_context(&self, id: sc::InitialSid) -> security_context::SecurityContext {
-        self.0.initial_context(id).unwrap()
+        self.0.initial_context(id)
     }
 
     /// Returns a [`SecurityContext`] with fields parsed from the supplied Security Context string.
@@ -227,6 +230,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// # Panics
     /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
     /// ensures that all such Ids have corresponding definitions.
+    #[cfg(feature = "selinux_policy_test_api")]
     pub fn is_explicitly_allowed(
         &self,
         source_type: TypeId,
@@ -252,6 +256,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// # Panics
     /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
     /// ensures that all such Ids have corresponding definitions.
+    #[cfg(feature = "selinux_policy_test_api")]
     pub fn is_explicitly_allowed_custom(
         &self,
         source_type: TypeId,

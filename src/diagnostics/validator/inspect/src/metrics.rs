@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fuchsia_inspect::reader::snapshot::ScannedBlock,
-    inspect_format::{BlockType, PropertyFormat},
-    serde::Serialize,
-    std::collections::HashMap,
-};
+use anyhow::Error;
+use fuchsia_inspect::reader::snapshot::ScannedBlock;
+use inspect_format::{BlockType, PropertyFormat};
+use serde::Serialize;
+use std::collections::HashMap;
 
 // Blocks such as Node, Extent, and Name may or may not be part of the Inspect tree. We want to
 // count each case separately. Also, Extent blocks can't be fully analyzed when first scanned,
@@ -193,12 +191,11 @@ impl Metrics {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{data, puppet, results::Results},
-        anyhow::{bail, format_err},
-        inspect_format::{constants, ArrayFormat, Block, BlockIndex, HeaderFields, PayloadFields},
-    };
+    use super::*;
+    use crate::results::Results;
+    use crate::{data, puppet};
+    use anyhow::{bail, format_err};
+    use inspect_format::{constants, ArrayFormat, Block, BlockIndex, HeaderFields, PayloadFields};
 
     #[fuchsia::test]
     async fn metrics_work() -> Result<(), Error> {

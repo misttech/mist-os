@@ -2,21 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_fuzzer as fuzzer, fidl_fuchsia_process as fproc,
-    fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon as zx,
-    test_runners_elf_lib::launcher::ComponentLauncher,
-    test_runners_lib::{
-        elf::{Component, KernelError},
-        errors::*,
-        launch,
-        logs::LoggerStream,
-    },
-    zx::HandleBased,
-};
+use async_trait::async_trait;
+use fidl::endpoints::Proxy;
+use fuchsia_runtime::{HandleInfo, HandleType};
+use test_runners_elf_lib::launcher::ComponentLauncher;
+use test_runners_lib::elf::{Component, KernelError};
+use test_runners_lib::errors::*;
+use test_runners_lib::launch;
+use test_runners_lib::logs::LoggerStream;
+use zx::HandleBased;
+use {fidl_fuchsia_fuzzer as fuzzer, fidl_fuchsia_process as fproc, fuchsia_zircon as zx};
 
 #[derive(Default)]
 pub struct FuzzComponentLauncher {}

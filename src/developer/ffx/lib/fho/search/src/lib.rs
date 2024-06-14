@@ -10,13 +10,11 @@ use ffx_config::{EnvironmentContext, Sdk, SelectMode};
 use fho_metadata::FhoToolMetadata;
 use serde_json::Value;
 
-use std::{
-    collections::HashMap,
-    fs::File,
-    os::unix::process::CommandExt,
-    path::{Path, PathBuf},
-    process::ExitStatus,
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::os::unix::process::CommandExt;
+use std::path::{Path, PathBuf};
+use std::process::ExitStatus;
 
 /// The config key for holding subtool search paths.
 pub const FFX_SUBTOOL_PATHS_CONFIG: &str = "ffx.subtool-search-paths";
@@ -296,7 +294,8 @@ mod tests {
     use ffx_command::Ffx;
     use fho_metadata::{FhoDetails, Only};
     use serde_json::json;
-    use std::{collections::HashSet, io::Write};
+    use std::collections::HashSet;
+    use std::io::Write;
 
     enum MockMetadata<'a> {
         Valid(FhoToolMetadata),

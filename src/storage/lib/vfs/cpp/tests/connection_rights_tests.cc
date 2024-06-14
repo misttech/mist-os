@@ -183,8 +183,8 @@ TEST(ConnectionRightsTest, GetBackingMemoryWithServe2) {
       ASSERT_TRUE(open_result.is_ok(), "%s", open_result.status_string());
 
       auto file = fidl::Endpoints<fio::File>::Create();
-      auto serve_result =
-          vfs->Serve2(*std::move(open_result), test_case.rights, file.server.channel(), nullptr);
+      auto serve_result = vfs->Serve2(*std::move(open_result), test_case.rights,
+                                      file.server.TakeChannel(), nullptr);
       ASSERT_TRUE(serve_result.is_ok(), "%s", serve_result.status_string());
       // Call FileGetBuffer on the channel with the testcase's request flags. Check that we get the
       // expected result.

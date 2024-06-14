@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Error};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use futures::{StreamExt, TryStreamExt};
 use {
-    anyhow::{Context, Error},
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    futures::{StreamExt, TryStreamExt},
 };
 
 #[fuchsia::main]

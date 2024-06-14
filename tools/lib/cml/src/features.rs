@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::error::Error;
-use std::{fmt, str::FromStr};
+use std::fmt;
+use std::str::FromStr;
 
 /// Represents the set of features a CML file is compiled with. This struct can be
 /// used to check whether a feature used in CML is enabled.
@@ -96,7 +97,8 @@ impl fmt::Display for Feature {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn feature_is_parsed() {

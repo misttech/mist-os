@@ -4,10 +4,8 @@
 
 use async_helpers::maybe_stream::MaybeStream;
 use async_utils::stream::FutureMap;
-use core::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ControlHandle, Proxy, RequestStream};
 use fidl_fuchsia_bluetooth_le::{
@@ -15,7 +13,8 @@ use fidl_fuchsia_bluetooth_le::{
     AdvertisingData, AdvertisingModeHint, AdvertisingParameters, ConnectionOptions,
     PeripheralError, PeripheralMarker, PeripheralProxy, ServiceData,
 };
-use fuchsia_bluetooth::types::{le::Peer, PeerId, Uuid};
+use fuchsia_bluetooth::types::le::Peer;
+use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::stream::{FusedStream, Stream, StreamExt};

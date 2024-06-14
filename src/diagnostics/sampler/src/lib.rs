@@ -1,17 +1,18 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use anyhow::{Context, Error};
+use argh::FromArgs;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::{self as inspect};
+use futures::{StreamExt, TryStreamExt};
+use sampler_component_config::Config as ComponentConfig;
+use tracing::{info, warn};
 use {
-    anyhow::{Context, Error},
-    argh::FromArgs,
     fidl_fuchsia_hardware_power_statecontrol as reboot, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::{self as inspect, health::Reporter},
-    futures::{StreamExt, TryStreamExt},
-    sampler_component_config::Config as ComponentConfig,
     sampler_config as config,
-    tracing::{info, warn},
 };
 
 mod diagnostics;

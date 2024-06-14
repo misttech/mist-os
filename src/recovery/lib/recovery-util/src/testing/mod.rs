@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file
 
-use {
-    anyhow::Error,
-    fuchsia_async as fasync,
-    futures::prelude::*,
-    std::{cell::RefCell, fmt::Debug, sync::RwLock},
-};
+use anyhow::Error;
+use fuchsia_async as fasync;
+use futures::prelude::*;
+use std::cell::RefCell;
+use std::fmt::Debug;
+use std::sync::RwLock;
 pub struct SimpleCallRecorder<T>(RwLock<Vec<T>>);
 impl<T: Clone> SimpleCallRecorder<T> {
     pub fn new() -> Self {

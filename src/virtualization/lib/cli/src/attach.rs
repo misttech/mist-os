@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::platform::{GuestConsole, PlatformServices, Stdio},
-    anyhow::{anyhow, Error},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_virtualization::{GuestMarker, GuestProxy, GuestStatus},
-    fuchsia_async as fasync, guest_cli_args as arguments,
-    std::fmt,
-};
+use crate::platform::{GuestConsole, PlatformServices, Stdio};
+use anyhow::{anyhow, Error};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_virtualization::{GuestMarker, GuestProxy, GuestStatus};
+use std::fmt;
+use {fuchsia_async as fasync, guest_cli_args as arguments};
 
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AttachResult {
@@ -100,13 +98,12 @@ async fn attach_serial(guest: GuestProxy) -> Result<(), Error> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl::{endpoints::create_proxy_and_stream, Socket},
-        fidl_fuchsia_virtualization::GuestError,
-        futures::future::join,
-        futures::StreamExt,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::Socket;
+    use fidl_fuchsia_virtualization::GuestError;
+    use futures::future::join;
+    use futures::StreamExt;
 
     #[fasync::run_until_stalled(test)]
     async fn launch_invalid_console_returns_error() {

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant},
-    proc_macro2::TokenStream,
-    quote::{quote, quote_spanned},
-    syn::{parse_macro_input, Ident, Type},
-};
+use darling::{ast, FromDeriveInput, FromField, FromMeta, FromVariant};
+use proc_macro2::TokenStream;
+use quote::{quote, quote_spanned};
+use syn::{parse_macro_input, Ident, Type};
 
 const PATHS_DELIM: &str = ",";
 

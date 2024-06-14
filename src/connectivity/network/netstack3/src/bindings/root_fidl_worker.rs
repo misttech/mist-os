@@ -6,20 +6,18 @@
 
 use async_utils::channel::TrySend as _;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _, ServerEnd};
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_root as fnet_root;
-use fuchsia_zircon as zx;
 use futures::TryStreamExt as _;
+use log::debug;
 use net_types::ip::{Ipv4, Ipv6};
-use tracing::{debug, error};
-
-use crate::bindings::{
-    devices::{BindingId, DeviceSpecificInfo, LOOPBACK_MAC},
-    interfaces_admin,
-    routes::admin::{serve_route_set, GlobalRouteSet},
-    util::{IntoFidl as _, TaskWaitGroupSpawner},
-    DeviceIdExt as _, Netstack,
+use {
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fidl_fuchsia_net_root as fnet_root,
+    fuchsia_zircon as zx,
 };
+
+use crate::bindings::devices::{BindingId, DeviceSpecificInfo, LOOPBACK_MAC};
+use crate::bindings::routes::admin::{serve_route_set, GlobalRouteSet};
+use crate::bindings::util::{IntoFidl as _, ResultExt as _, TaskWaitGroupSpawner};
+use crate::bindings::{interfaces_admin, DeviceIdExt as _, Netstack};
 
 // Serve a stream of fuchsia.net.root.Interfaces API requests for a single
 // channel (e.g. a single client connection).
@@ -27,7 +25,7 @@ pub(crate) async fn serve_interfaces(
     ns: Netstack,
     rs: fnet_root::InterfacesRequestStream,
 ) -> Result<(), fidl::Error> {
-    debug!(protocol = fnet_root::InterfacesMarker::DEBUG_NAME, "serving");
+    debug!("serving {}", fnet_root::InterfacesMarker::DEBUG_NAME);
     rs.try_for_each(|req| async {
         match req {
             fnet_root::InterfacesRequest::GetAdmin { id, control, control_handle: _ } => {
@@ -36,7 +34,7 @@ pub(crate) async fn serve_interfaces(
             fnet_root::InterfacesRequest::GetMac { id, responder } => {
                 responder
                     .send(handle_get_mac(&ns, id).as_ref().map(Option::as_deref).map_err(|e| *e))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
         }
         Ok(())
@@ -49,7 +47,7 @@ async fn handle_get_admin(
     interface_id: u64,
     control: ServerEnd<fnet_interfaces_admin::ControlMarker>,
 ) {
-    debug!(interface_id, "handling fuchsia.net.root.Interfaces::GetAdmin");
+    debug!("handling fuchsia.net.root.Interfaces::GetAdmin for {interface_id}");
     let core_id =
         BindingId::new(interface_id).and_then(|id| ns.ctx.bindings_ctx().devices.get_core_id(id));
     let core_id = match core_id {
@@ -57,7 +55,7 @@ async fn handle_get_admin(
         None => {
             control
                 .close_with_epitaph(zx::Status::NOT_FOUND)
-                .unwrap_or_else(|e| error!(err = ?e, "failed to send epitaph"));
+                .unwrap_or_log("failed to send epitaph");
             return;
         }
     };
@@ -73,7 +71,7 @@ async fn handle_get_admin(
 }
 
 fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_root::InterfacesGetMacResult {
-    debug!(interface_id, "handling fuchsia.net.root.Interfaces::GetMac");
+    debug!("handling fuchsia.net.root.Interfaces::GetMac for {interface_id}");
     BindingId::new(interface_id)
         .and_then(|id| ns.ctx.bindings_ctx().devices.get_core_id(id))
         .ok_or(fnet_root::InterfacesGetMacError::NotFound)

@@ -8,15 +8,11 @@
 //! **WARNING**: Use caution when making changes to this file. All format changes for a given
 //! delivery blob type **must** be backwards compatible, or a new type must be used.
 
-use {
-    bitflags::bitflags,
-    crc::Hasher32 as _,
-    static_assertions::const_assert_eq,
-    zerocopy::{
-        byteorder::{LE, U32, U64},
-        AsBytes, FromBytes, FromZeros, NoCell, Unaligned,
-    },
-};
+use bitflags::bitflags;
+use crc::Hasher32 as _;
+use static_assertions::const_assert_eq;
+use zerocopy::byteorder::{LE, U32, U64};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 use crate::{DeliveryBlobError, DeliveryBlobHeader, DeliveryBlobType, Type1Blob};
 
@@ -148,7 +144,8 @@ impl SerializedType1Blob {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::CompressionMode};
+    use super::*;
+    use crate::CompressionMode;
 
     const TEST_DATA: &[u8] = &[1, 2, 3, 4];
 

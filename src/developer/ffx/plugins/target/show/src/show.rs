@@ -7,7 +7,8 @@ use compat_info::CompatibilityState;
 use ffx_target_show_args::TargetShow;
 use schemars::JsonSchema;
 use serde::Serialize;
-use std::{default::Default, io::Write};
+use std::default::Default;
+use std::io::Write;
 use termion::{color, style};
 
 /// Store, organize, and display hierarchical show information. Output may be

@@ -407,9 +407,8 @@ impl<I: wl::Interface, R: RequestReceiver<I>> MessageReceiver for RequestDispatc
 mod tests {
     use super::*;
 
-    use fuchsia_async as fasync;
     use fuchsia_wayland_core::IntoMessage;
-    use fuchsia_zircon as zx;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     use crate::display::Display;
     use crate::registry::RegistryBuilder;

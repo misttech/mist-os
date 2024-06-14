@@ -612,8 +612,8 @@ func (t *QEMU) Wait(ctx context.Context) error {
 }
 
 // Config returns fields describing the target.
-func (t *QEMU) TestConfig(netboot bool) (any, error) {
-	return TargetInfo(t, netboot, nil)
+func (t *QEMU) TestConfig(expectsSSH bool) (any, error) {
+	return TargetInfo(t, expectsSSH, nil)
 }
 
 func normalizeFile(path string) (string, error) {

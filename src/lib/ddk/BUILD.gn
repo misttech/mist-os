@@ -387,7 +387,6 @@ sdk_static_library("ddk") {
     "//src/ui/input/drivers/pc-ps2:*",
     "//src/ui/input/drivers/usb-hid:*",
     "//src/ui/input/lib/hid-input-report:*",
-    "//src/ui/input/testing/mock-hidbus-ifc:*",
     "//src/ui/input/tests/hid:*",
     "//src/ui/light/drivers/aml-light:*",
     "//src/ui/tools/print-input-report:*",
@@ -471,7 +470,6 @@ library_headers("ddk-deprecated-binding-headers") {
   headers = [ "lib/ddk/binding.h" ]
   public_deps = [ ":ddk" ]
   visibility = [
-    "//src/devices/bin/driver_manager:*",
     "//src/devices/board/drivers/astro:*",
     "//src/devices/board/drivers/integration-test:*",
     "//src/devices/board/drivers/nelson:*",
@@ -481,7 +479,6 @@ library_headers("ddk-deprecated-binding-headers") {
     "//src/devices/board/drivers/x86/*",
     "//src/devices/board/lib/acpi/*",
     "//src/devices/bus/drivers/pci:*",
-    "//src/devices/bus/drivers/platform:*",
     "//src/devices/bus/drivers/platform/test:*",
     "//src/devices/tests/libdriver-integration-test:*",
     "//src/lib/ddk/tests:*",

@@ -4,14 +4,12 @@
 
 use std::cell::Cell;
 
-use crate::{
-    bones::{Bone, Skin},
-    component::Component,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    math::Mat,
-    option_cell::OptionCell,
-    status_code::StatusCode,
-};
+use crate::bones::{Bone, Skin};
+use crate::component::Component;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::math::Mat;
+use crate::option_cell::OptionCell;
+use crate::status_code::StatusCode;
 
 #[derive(Debug)]
 pub struct Tendon {

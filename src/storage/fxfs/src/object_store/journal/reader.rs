@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        checksum::{fletcher64, Checksum},
-        object_store::journal::{JournalCheckpoint, JournalHandle, BLOCK_SIZE, RESET_XOR},
-        serialized_types::{Version, Versioned, VersionedLatest},
-    },
-    anyhow::{bail, Context, Error},
-    byteorder::{ByteOrder, LittleEndian},
-};
+use crate::checksum::{fletcher64, Checksum};
+use crate::object_store::journal::{JournalCheckpoint, JournalHandle, BLOCK_SIZE, RESET_XOR};
+use crate::serialized_types::{Version, Versioned, VersionedLatest};
+use anyhow::{bail, Context, Error};
+use byteorder::{ByteOrder, LittleEndian};
 
 /// JournalReader supports reading from a journal file which consist of blocks that have a trailing
 /// fletcher64 checksum in the last 8 bytes of each block.  The checksum takes the check-sum of the
@@ -288,18 +284,14 @@ pub enum ReadResult<T> {
 mod tests {
     // The following tests use JournalWriter to test our reader implementation. This works so long
     // as JournalWriter doesn't use JournalReader to test its implementation.
-    use {
-        super::{JournalReader, ReadResult, BLOCK_SIZE},
-        crate::{
-            object_handle::{ObjectHandle, WriteObjectHandle},
-            object_store::journal::{
-                writer::JournalWriter, Checksum, JournalCheckpoint, RESET_XOR,
-            },
-            serialized_types::{Version, VersionedLatest, LATEST_VERSION},
-            testing::fake_object::{FakeObject, FakeObjectHandle},
-        },
-        std::{io::Write, sync::Arc},
-    };
+    use super::{JournalReader, ReadResult, BLOCK_SIZE};
+    use crate::object_handle::{ObjectHandle, WriteObjectHandle};
+    use crate::object_store::journal::writer::JournalWriter;
+    use crate::object_store::journal::{Checksum, JournalCheckpoint, RESET_XOR};
+    use crate::serialized_types::{Version, VersionedLatest, LATEST_VERSION};
+    use crate::testing::fake_object::{FakeObject, FakeObjectHandle};
+    use std::io::Write;
+    use std::sync::Arc;
 
     async fn write_items<T: VersionedLatest + std::fmt::Debug>(
         handle: FakeObjectHandle,

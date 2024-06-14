@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        io::{Directory, RemoteDirectory},
-        path::RemoteComponentStoragePath,
-    },
-    anyhow::{anyhow, bail, Result},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_sys2::StorageAdminProxy,
-};
+use crate::io::{Directory, RemoteDirectory};
+use crate::path::RemoteComponentStoragePath;
+use anyhow::{anyhow, bail, Result};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_sys2::StorageAdminProxy;
 
 /// Create a new directory in a component's storage.
 ///
@@ -49,12 +45,10 @@ pub async fn make_directory(storage_admin: StorageAdminProxy, path: String) -> R
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::storage::test::{node_to_directory, setup_fake_storage_admin},
-        fidl_fuchsia_io as fio,
-        futures::TryStreamExt,
-    };
+    use super::*;
+    use crate::storage::test::{node_to_directory, setup_fake_storage_admin};
+    use fidl_fuchsia_io as fio;
+    use futures::TryStreamExt;
 
     // TODO(xbhatnag): Replace this mock with something more robust like VFS.
     // Currently VFS is not cross-platform.

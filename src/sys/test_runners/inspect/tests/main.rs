@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    diagnostics_data::{hierarchy, Data, DiagnosticsHierarchy, InspectHandleName, Property},
-    fake_archive_accessor::FakeArchiveAccessor,
-    fidl_fuchsia_test_manager as ftest_manager,
-    ftest_manager::{CaseStatus, RunOptions, SuiteStatus},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-    futures::prelude::*,
-    paste::paste,
-    pretty_assertions::assert_eq,
-    std::collections::BTreeSet,
-    test_manager_test_lib::{GroupRunEventByTestCase, RunEvent},
-};
+use anyhow::{Context as _, Error};
+use diagnostics_data::{hierarchy, Data, DiagnosticsHierarchy, InspectHandleName, Property};
+use fake_archive_accessor::FakeArchiveAccessor;
+use ftest_manager::{CaseStatus, RunOptions, SuiteStatus};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
+use futures::prelude::*;
+use paste::paste;
+use pretty_assertions::assert_eq;
+use std::collections::BTreeSet;
+use test_manager_test_lib::{GroupRunEventByTestCase, RunEvent};
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 #[derive(Debug)]
 struct IntegrationCaseStatus {

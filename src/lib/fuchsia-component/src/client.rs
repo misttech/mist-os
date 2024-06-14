@@ -4,19 +4,19 @@
 
 //! Tools for starting or connecting to existing Fuchsia applications and services.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints::{
-        DiscoverableProtocolMarker, MemberOpener, ProtocolMarker, ServerEnd, ServiceMarker,
-        ServiceProxy,
-    },
-    fidl_fuchsia_component::{RealmMarker, RealmProxy},
-    fidl_fuchsia_component_decl::ChildRef,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{borrow::Borrow, marker::PhantomData},
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints::{
+    DiscoverableProtocolMarker, MemberOpener, ProtocolMarker, ServerEnd, ServiceMarker,
+    ServiceProxy,
 };
+use fidl_fuchsia_component::{RealmMarker, RealmProxy};
+use fidl_fuchsia_component_decl::ChildRef;
+use std::borrow::Borrow;
+use std::marker::PhantomData;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
-use crate::{directory::AsRefDirectory, DEFAULT_SERVICE_INSTANCE};
+use crate::directory::AsRefDirectory;
+use crate::DEFAULT_SERVICE_INSTANCE;
 
 /// Path to the service directory in an application's root namespace.
 const SVC_DIR: &'static str = "/svc";
@@ -402,7 +402,8 @@ pub fn realm() -> Result<RealmProxy, Error> {
 pub mod test_util {
     use super::*;
     use std::sync::Arc;
-    use vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope};
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
 
     #[cfg(test)]
     pub fn run_directory_server(dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
@@ -421,14 +422,13 @@ pub mod test_util {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_component_client_test::{
-            ServiceAMarker, ServiceAProxy, ServiceBMarker, ServiceBProxy,
-        },
-        fuchsia_async as fasync,
-        vfs::{file::vmo::read_only, pseudo_directory},
+    use super::*;
+    use fidl_fuchsia_component_client_test::{
+        ServiceAMarker, ServiceAProxy, ServiceBMarker, ServiceBProxy,
     };
+    use fuchsia_async as fasync;
+    use vfs::file::vmo::read_only;
+    use vfs::pseudo_directory;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_svc_connector_svc_does_not_exist() -> Result<(), Error> {

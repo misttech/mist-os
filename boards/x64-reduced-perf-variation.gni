@@ -34,4 +34,4 @@
 
 import("x64.gni")
 
-board_bootfs_labels += [ "//boards/kernel_cmdline:x64-reduced-perf-variation" ]
+board_bootfs_labels = [ "//boards/kernel_cmdline:x64-reduced-perf-variation" ]

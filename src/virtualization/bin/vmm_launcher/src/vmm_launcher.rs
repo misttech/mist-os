@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_component::{CreateChildArgs, RealmProxy};
+use fidl_fuchsia_virtualization::GuestLifecycleMarker;
+use fuchsia_component::client;
+use futures::stream::Stream;
+use futures::StreamExt;
 use {
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component::{CreateChildArgs, RealmProxy},
     fidl_fuchsia_component_decl as cdecl, fidl_fuchsia_io as fio,
-    fidl_fuchsia_virtualization::GuestLifecycleMarker,
-    fuchsia_component::client,
     fuchsia_zircon_status as zx_status,
-    futures::{stream::Stream, StreamExt},
 };
 
 fn send_epitaph<T>(server_end: ServerEnd<T>, epitaph: zx_status::Status) {

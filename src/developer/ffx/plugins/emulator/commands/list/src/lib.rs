@@ -9,7 +9,8 @@ use emulator_instance::{
 use ffx_emulator_list_args::ListCommand;
 use fho::{bug, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO, TryFromEnv, TryFromEnvWith};
 use serde::Serialize;
-use std::{marker::PhantomData, path::PathBuf};
+use std::marker::PhantomData;
+use std::path::PathBuf;
 
 // TODO(https://fxbug.dev/42176105): Update this error message once shut down is more robust.
 const BROKEN_MESSAGE: &str = r#"

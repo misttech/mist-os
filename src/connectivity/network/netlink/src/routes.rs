@@ -5,54 +5,50 @@
 //! A module for managing RTM_ROUTE information by receiving RTM_ROUTE
 //! Netlink messages and maintaining route table state from Netstack.
 
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    fmt::Debug,
-    hash::{Hash, Hasher},
-    num::{NonZeroU32, NonZeroU64},
-};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
+use std::num::{NonZeroU32, NonZeroU64};
 
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_interfaces_admin::{
     self as fnet_interfaces_admin, ProofOfInterfaceAuthorization,
 };
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_admin::RouteSetError;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
+use {
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+};
 
 use derivative::Derivative;
-use futures::{channel::oneshot, StreamExt as _};
+use futures::channel::oneshot;
+use futures::StreamExt as _;
 use itertools::Itertools as _;
 use linux_uapi::{
     rt_class_t_RT_TABLE_COMPAT, rt_class_t_RT_TABLE_MAIN, rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
     rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
 };
-use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Subnet},
-    SpecifiedAddr, SpecifiedAddress as _, Witness as _,
-};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Subnet};
+use net_types::{SpecifiedAddr, SpecifiedAddress as _, Witness as _};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
-use netlink_packet_route::{
-    route::{
-        RouteAddress, RouteAttribute, RouteHeader, RouteMessage, RouteProtocol, RouteScope,
-        RouteType,
-    },
-    AddressFamily, RouteNetlinkMessage,
+use netlink_packet_route::route::{
+    RouteAddress, RouteAttribute, RouteHeader, RouteMessage, RouteProtocol, RouteScope, RouteType,
 };
-use netlink_packet_utils::{nla::Nla, DecodeError};
+use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
+use netlink_packet_utils::nla::Nla;
+use netlink_packet_utils::DecodeError;
 
-use crate::{
-    client::{ClientTable, InternalClient},
-    errors::WorkerInitializationError,
-    logging::{log_debug, log_error, log_warn},
-    messaging::Sender,
-    multicast_groups::ModernGroup,
-    netlink_packet::{errno::Errno, UNSPECIFIED_SEQUENCE_NUMBER},
-    protocol_family::{route::NetlinkRoute, ProtocolFamily},
-    util::respond_to_completer,
-};
+use crate::client::{ClientTable, InternalClient};
+use crate::errors::WorkerInitializationError;
+use crate::logging::{log_debug, log_error, log_warn};
+use crate::messaging::Sender;
+use crate::multicast_groups::ModernGroup;
+use crate::netlink_packet::errno::Errno;
+use crate::netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER;
+use crate::protocol_family::route::NetlinkRoute;
+use crate::protocol_family::ProtocolFamily;
+use crate::util::respond_to_completer;
 
 // TODO(https://fxbug.dev/336382905): Remove special constant and rely on table
 // ids provided by the Netstack.
@@ -432,13 +428,13 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             proof: ProofOfInterfaceAuthorization,
         }
 
-        let IpInvariant(authorize_fut) = I::map_ip(
+        let authorize_fut = I::map_ip_in(
             AuthorizeInputs::<'_, I> { route_set_proxy, proof },
             |AuthorizeInputs { route_set_proxy, proof }| {
-                IpInvariant(route_set_proxy.authenticate_for_interface(proof))
+                route_set_proxy.authenticate_for_interface(proof)
             },
             |AuthorizeInputs { route_set_proxy, proof }| {
-                IpInvariant(route_set_proxy.authenticate_for_interface(proof))
+                route_set_proxy.authenticate_for_interface(proof)
             },
         );
 
@@ -1505,30 +1501,26 @@ mod tests {
     use super::*;
 
     use fidl::endpoints::{ControlHandle, RequestStream};
-    use fidl_fuchsia_net_routes as fnet_routes;
-    use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
+    use ip_test_macro::ip_test;
+    use {
+        fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    };
 
     use assert_matches::assert_matches;
-    use futures::{
-        channel::mpsc,
-        future::{Future, FutureExt as _},
-        stream::BoxStream,
-        SinkExt as _, Stream,
-    };
+    use futures::channel::mpsc;
+    use futures::future::{Future, FutureExt as _};
+    use futures::stream::BoxStream;
+    use futures::{SinkExt as _, Stream};
     use linux_uapi::rtnetlink_groups_RTNLGRP_LINK;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-    use net_types::{
-        ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-        SpecifiedAddr,
-    };
+    use net_types::ip::{GenericOverIp, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_types::SpecifiedAddr;
     use netlink_packet_core::NetlinkPayload;
     use std::pin::pin;
     use test_case::test_case;
 
-    use crate::{
-        interfaces::testutil::FakeInterfacesHandler,
-        messaging::testutil::{FakeSender, SentMessage},
-    };
+    use crate::interfaces::testutil::FakeInterfacesHandler;
+    use crate::messaging::testutil::{FakeSender, SentMessage};
 
     const V4_DFLT: Subnet<Ipv4Addr> = net_subnet_v4!("0.0.0.0/0");
     const V4_SUB1: Subnet<Ipv4Addr> = net_subnet_v4!("192.0.2.0/32");
@@ -1646,29 +1638,17 @@ mod tests {
         nlas
     }
 
-    // TODO(https://g-issues.fuchsia.dev/issues/42084902): Update to use
-    // `ip_test` when async is supported.
+    #[ip_test(I)]
     #[test_case(RouteTableKey::Unmanaged)]
     #[test_case(MANAGED_ROUTE_TABLE)]
     #[fuchsia::test]
-    async fn test_handle_route_watcher_event_v4(table: RouteTableKey) {
-        handle_route_watcher_event_helper::<Ipv4>(V4_SUB1, V4_NEXTHOP1, table).await;
-    }
-
-    #[test_case(RouteTableKey::Unmanaged)]
-    #[test_case(MANAGED_ROUTE_TABLE)]
-    #[fuchsia::test]
-    async fn test_handle_route_watcher_event_v6(table: RouteTableKey) {
-        handle_route_watcher_event_helper::<Ipv6>(V6_SUB1, V6_NEXTHOP1, table).await;
-    }
-
-    async fn handle_route_watcher_event_helper<
-        I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    async fn handles_route_watcher_event<
+        I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
     >(
-        subnet: Subnet<I::Addr>,
-        next_hop: I::Addr,
         table: RouteTableKey,
     ) {
+        let (subnet, next_hop) =
+            I::map_ip((), |()| (V4_SUB1, V4_NEXTHOP1), |()| (V6_SUB1, V6_NEXTHOP1));
         let installed_route1: fnet_routes_ext::InstalledRoute<I> =
             create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1);
         let installed_route2: fnet_routes_ext::InstalledRoute<I> =
@@ -1859,24 +1839,13 @@ mod tests {
         assert_eq!(&wrong_sink.take_messages()[..], &[]);
     }
 
-    // TODO(https://g-issues.fuchsia.dev/issues/42084902): Update to use
-    // `ip_test` when async is supported.
+    #[ip_test(I, test = false)]
     #[fuchsia::test]
-    async fn test_handle_route_watcher_event_two_routesets_v4() {
-        handle_route_watcher_event_two_routesets_helper::<Ipv4>(V4_SUB1, V4_NEXTHOP1).await;
-    }
-
-    #[fuchsia::test]
-    async fn test_handle_route_watcher_event_two_routesets_v6() {
-        handle_route_watcher_event_two_routesets_helper::<Ipv6>(V6_SUB1, V6_NEXTHOP1).await;
-    }
-
-    async fn handle_route_watcher_event_two_routesets_helper<
+    async fn handle_route_watcher_event_two_routesets<
         I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-    >(
-        subnet: Subnet<I::Addr>,
-        next_hop: I::Addr,
-    ) {
+    >() {
+        let (subnet, next_hop) =
+            I::map_ip((), |()| (V4_SUB1, V4_NEXTHOP1), |()| (V6_SUB1, V6_NEXTHOP1));
         let installed_route1: fnet_routes_ext::InstalledRoute<I> =
             create_installed_route(subnet, Some(next_hop), DEV1.into(), METRIC1);
         let installed_route2: fnet_routes_ext::InstalledRoute<I> =
@@ -2189,9 +2158,9 @@ mod tests {
         );
 
         let (StateStreamWrapper(state_stream), IpInvariant(routes_state_background_work)) =
-            I::map_ip(
-                IpInvariant((v4_routes_state, v6_routes_state)),
-                |IpInvariant((main_state, other_state))| {
+            I::map_ip_out(
+                (v4_routes_state, v6_routes_state),
+                |(main_state, other_state)| {
                     let main_stream = main_state.into_stream().expect("into stream");
                     (
                         StateStreamWrapper(main_stream.boxed_local()),
@@ -2201,7 +2170,7 @@ mod tests {
                         ),
                     )
                 },
-                |IpInvariant((other_state, main_state))| {
+                |(other_state, main_state)| {
                     let main_stream = main_state.into_stream().expect("into stream");
                     (
                         StateStreamWrapper(main_stream.boxed_local()),

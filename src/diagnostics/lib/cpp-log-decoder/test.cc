@@ -26,7 +26,7 @@ TEST(LogDecoder, DecodesCorrectly) {
   syslog_runtime::WriteKeyValue(&buffer, "tag", "some tag");
   syslog_runtime::WriteKeyValue(&buffer, "tag", "some other tag");
   syslog_runtime::WriteKeyValue(&buffer, "user property", 5.2);
-  syslog_runtime::FlushRecord(&buffer);
+  buffer.Flush();
   uint8_t data[2048];
   size_t processed = 0;
   our_socket.read(0, data, sizeof(data), &processed);

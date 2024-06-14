@@ -3,26 +3,18 @@
 // found in the LICENSE file.
 
 use super::super::timer::TimerHeap;
-use super::{
-    common::{with_local_timer_heap, EHandle, Executor, ExecutorTime, MAIN_TASK_ID},
-    time::Time,
-    ScopeRef,
-};
+use super::common::{with_local_timer_heap, EHandle, Executor, ExecutorTime, MAIN_TASK_ID};
+use super::time::Time;
+use super::ScopeRef;
 use crate::atomic_future::AtomicFuture;
-use futures::{
-    future::{self, Either},
-    task::AtomicWaker,
-};
-use std::{
-    fmt,
-    future::{poll_fn, Future},
-    pin::pin,
-    sync::{
-        atomic::{AtomicBool, AtomicI64, Ordering},
-        Arc,
-    },
-    task::{Context, Poll},
-};
+use futures::future::{self, Either};
+use futures::task::AtomicWaker;
+use std::fmt;
+use std::future::{poll_fn, Future};
+use std::pin::pin;
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::Arc;
+use std::task::{Context, Poll};
 
 /// A single-threaded port-based executor for Fuchsia OS.
 ///
@@ -399,14 +391,13 @@ fn with_data<R>(f: impl Fn(&mut UntilStalledData) -> R) -> R {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{handle::on_signals::OnSignals, Interval, Timer};
+    use crate::handle::on_signals::OnSignals;
+    use crate::{Interval, Timer};
     use assert_matches::assert_matches;
     use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum};
     use futures::StreamExt;
-    use std::{
-        cell::{Cell, RefCell},
-        task::Waker,
-    };
+    use std::cell::{Cell, RefCell};
+    use std::task::Waker;
 
     fn spawn(future: impl Future<Output = ()> + Send + 'static) {
         crate::EHandle::local().spawn_detached(future);

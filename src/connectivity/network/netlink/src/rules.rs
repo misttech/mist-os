@@ -6,10 +6,8 @@
 //! Supports the following NETLINK_ROUTE requests: RTM_GETRULE, RTM_SETRULE, &
 //! RTM_DELRULE.
 
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Mutex},
-};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 
 use derivative::Derivative;
 use either::Either;
@@ -18,17 +16,14 @@ use linux_uapi::{
 };
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
-use netlink_packet_route::{
-    rule::{RuleAction, RuleAttribute, RuleMessage},
-    AddressFamily, RouteNetlinkMessage,
-};
+use netlink_packet_route::rule::{RuleAction, RuleAttribute, RuleMessage};
+use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 
-use crate::{
-    client::InternalClient,
-    messaging::Sender,
-    netlink_packet::errno::Errno,
-    protocol_family::{route::NetlinkRoute, ProtocolFamily},
-};
+use crate::client::InternalClient;
+use crate::messaging::Sender;
+use crate::netlink_packet::errno::Errno;
+use crate::protocol_family::route::NetlinkRoute;
+use crate::protocol_family::ProtocolFamily;
 
 // The priorities of the default rules installed on Linux.
 const LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY: u32 = 0;

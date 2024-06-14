@@ -2,28 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::vec::Vec;
-use core::{
-    cmp::Ordering,
-    fmt::Debug,
-    hash::Hash,
-    num::{NonZeroU16, NonZeroU32, NonZeroU8},
-    sync::atomic::{self, AtomicU16},
-};
+use core::cmp::Ordering;
+use core::fmt::Debug;
+use core::hash::Hash;
+use core::marker::PhantomData;
+use core::num::{NonZeroU16, NonZeroU32, NonZeroU8};
+use core::sync::atomic::{self, AtomicU16};
 
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use net_types::{
-    ip::{
-        GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
-    },
-    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
+use log::{debug, error, trace};
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
 };
+use net_types::{MulticastAddr, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness};
+use netstack3_base::socket::SocketIpAddrExt as _;
+use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    socket::SocketIpAddrExt as _,
-    sync::{Mutex, RwLock},
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier as _,
     EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector, InstantContext,
     NestedIntoCoreTimerCtx, NotFoundError, RngContext, StrongDeviceIdentifier, TimerContext,
@@ -31,49 +28,41 @@ use netstack3_base::{
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
-    FilterHandler as _, FilterIpMetadata, FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket,
-    NestedWithInnerIpPacket, TransportPacketSerializer,
+    FilterHandler as _, FilterIpContext, FilterIpMetadata, FilterTimerId, ForwardedPacket,
+    IngressVerdict, IpPacket, NatType, NestedWithInnerIpPacket, TransportPacketSerializer, Tuple,
 };
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
-use packet_formats::{
-    error::IpParseError,
-    ip::{IpPacket as _, IpPacketBuilder as _, IpProtoExt},
-    ipv4::{Ipv4FragmentType, Ipv4Packet},
-    ipv6::Ipv6Packet,
-};
+use packet_formats::error::IpParseError;
+use packet_formats::ip::{IpPacket as _, IpPacketBuilder as _, IpProtoExt};
+use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Packet};
+use packet_formats::ipv6::Ipv6Packet;
 use thiserror::Error;
-use tracing::{debug, error, trace};
 
-use crate::internal::{
-    device::{
-        self,
-        slaac::SlaacCounters,
-        state::{
-            IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
-        },
-        IpAddressId as _, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt,
-        IpDeviceSendContext,
-    },
-    forwarding::{ForwardingTable, IpForwardingDeviceContext},
-    gmp::GmpQueryHandler,
-    icmp::{
-        IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, Icmpv4Error,
-        Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State,
-        Icmpv6StateBuilder,
-    },
-    ipv6,
-    ipv6::Ipv6PacketAction,
-    path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId},
-    raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes},
-    reassembly::{
-        FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
-        IpPacketFragmentCache,
-    },
-    socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler},
-    types::{
-        self, Destination, IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr,
-        WrapBroadcastMarker,
-    },
+use crate::internal::device::slaac::SlaacCounters;
+use crate::internal::device::state::{
+    IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
+};
+use crate::internal::device::{
+    self, IpAddressId as _, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt,
+    IpDeviceSendContext,
+};
+use crate::internal::forwarding::{ForwardingTable, IpForwardingDeviceContext};
+use crate::internal::gmp::GmpQueryHandler;
+use crate::internal::icmp::{
+    IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, Icmpv4Error, Icmpv4ErrorKind,
+    Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
+};
+use crate::internal::ipv6;
+use crate::internal::ipv6::Ipv6PacketAction;
+use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
+use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
+use crate::internal::reassembly::{
+    FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
+    IpPacketFragmentCache,
+};
+use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
+use crate::internal::types::{
+    self, Destination, IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
 };
 
 /// Default IPv4 TTL.
@@ -170,7 +159,7 @@ pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + IpTypesIpExt + IpProtoE
     /// [`IpTransportContext::receive_ip_packet`].
     ///
     /// For IPv4, this is `Ipv4Addr`. For IPv6, this is [`Ipv6SourceAddr`].
-    type RecvSrcAddr: Into<Self::Addr>;
+    type RecvSrcAddr: Into<Self::Addr> + TryFrom<Self::Addr, Error: Debug> + Copy + Clone;
     /// The length of an IP header without any IP options.
     const IP_HEADER_LENGTH: NonZeroU32;
     /// The maximum payload size an IP payload can have.
@@ -273,25 +262,23 @@ impl<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I
     }
 }
 
-/// The execution context provided by the IP layer to transport layer protocols.
-pub trait TransportIpContext<I: IpExt, BC>:
-    DeviceIdContext<AnyDevice> + IpSocketHandler<I, BC>
-{
-    /// The iterator returned by
-    /// [`TransportIpContext::get_devices_with-assigned_addr`].
-    type DevicesWithAddrIter<'s>: Iterator<Item = Self::DeviceId>
-    where
-        Self: 's;
+/// The base execution context provided by the IP layer to transport layer
+/// protocols.
+pub trait BaseTransportIpContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
+    /// The iterator given to
+    /// [`BaseTransportIpContext::with_devices_with_assigned_addr`].
+    type DevicesWithAddrIter<'s>: Iterator<Item = Self::DeviceId>;
 
     /// Is this one of our local addresses, and is it in the assigned state?
     ///
-    /// Returns an iterator over all the local interfaces for which `addr` is an
-    /// associated address, and, for IPv6, for which it is in the "assigned"
-    /// state.
-    fn get_devices_with_assigned_addr(
+    /// Calls `cb` with an iterator over all the local interfaces for which
+    /// `addr` is an associated address, and, for IPv6, for which it is in the
+    /// "assigned" state.
+    fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
         &mut self,
         addr: SpecifiedAddr<I::Addr>,
-    ) -> Self::DevicesWithAddrIter<'_>;
+        cb: F,
+    ) -> O;
 
     /// Get default hop limits.
     ///
@@ -310,6 +297,25 @@ pub trait TransportIpContext<I: IpExt, BC>:
         dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     );
+
+    /// Gets the original destination for the tracked connection indexed by
+    /// `tuple`, which includes the source and destination addresses and
+    /// transport-layer ports as well as the transport protocol number.
+    fn get_original_destination(&mut self, tuple: &Tuple<I>) -> Option<(I::Addr, u16)>;
+}
+
+/// A marker trait for the traits required by the transport layer from the IP
+/// layer.
+pub trait TransportIpContext<I: IpExt, BC>:
+    BaseTransportIpContext<I, BC> + IpSocketHandler<I, BC>
+{
+}
+
+impl<I, CC, BC> TransportIpContext<I, BC> for CC
+where
+    I: IpExt,
+    CC: BaseTransportIpContext<I, BC> + IpSocketHandler<I, BC>,
+{
 }
 
 /// Abstraction over the ability to join and leave multicast groups.
@@ -364,27 +370,41 @@ pub trait MulticastMembershipHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
 /// of `TransportIpContext` given the other requirements are met.
 pub trait UseTransportIpContextBlanket {}
 
-#[netstack3_macros::instantiate_ip_impl_block(I)]
+/// An iterator supporting the blanket implementation of
+/// [`BaseTransportIpContext::with_devices_with_assigned_addr`].
+pub struct AssignedAddressDeviceIterator<Iter, I, D>(Iter, PhantomData<(I, D)>);
+
+impl<Iter, I, D> Iterator for AssignedAddressDeviceIterator<Iter, I, D>
+where
+    Iter: Iterator<Item = (D, I::AddressStatus)>,
+    I: IpLayerIpExt,
+{
+    type Item = D;
+    fn next(&mut self) -> Option<D> {
+        let Self(iter, PhantomData) = self;
+        iter.by_ref().find_map(|(device, state)| is_unicast_assigned::<I>(&state).then_some(device))
+    }
+}
+
 impl<
-        I: IpExt,
-        BC,
+        I: IpLayerIpExt,
+        BC: FilterBindingsContext,
         CC: IpDeviceContext<I, BC>
             + IpSocketHandler<I, BC>
             + IpStateContext<I, BC>
+            + FilterIpContext<I, BC>
             + UseTransportIpContextBlanket,
-    > TransportIpContext<I, BC> for CC
+    > BaseTransportIpContext<I, BC> for CC
 {
-    type DevicesWithAddrIter<'s> = <Vec<CC::DeviceId> as IntoIterator>::IntoIter where CC: 's;
+    type DevicesWithAddrIter<'s> =
+        AssignedAddressDeviceIterator<CC::DeviceAndAddressStatusIter<'s>, I, CC::DeviceId>;
 
-    fn get_devices_with_assigned_addr(
+    fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
         &mut self,
-        addr: SpecifiedAddr<<I as Ip>::Addr>,
-    ) -> Self::DevicesWithAddrIter<'_> {
-        self.with_address_statuses(addr, |it| {
-            it.filter_map(|(device, state)| is_unicast_assigned::<I>(&state).then_some(device))
-                .collect::<Vec<_>>()
-        })
-        .into_iter()
+        addr: SpecifiedAddr<I::Addr>,
+        cb: F,
+    ) -> O {
+        self.with_address_statuses(addr, |it| cb(AssignedAddressDeviceIterator(it, PhantomData)))
     }
 
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
@@ -400,7 +420,7 @@ impl<
     fn confirm_reachable_with_destination(
         &mut self,
         bindings_ctx: &mut BC,
-        dst: SpecifiedAddr<<I as Ip>::Addr>,
+        dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     ) {
         match self
@@ -414,7 +434,7 @@ impl<
                         I::map_ip::<_, ()>(
                             WrapBroadcastMarker(marker),
                             |WrapBroadcastMarker(())| {
-                                tracing::debug!(
+                                debug!(
                                     "can't confirm {dst:?}@{device:?} as reachable: \
                                                  dst is a broadcast address"
                                 );
@@ -427,9 +447,24 @@ impl<
                 self.confirm_reachable(bindings_ctx, &device, neighbor);
             }
             None => {
-                tracing::debug!("can't confirm {dst:?}@{device:?} as reachable: no route");
+                debug!("can't confirm {dst:?}@{device:?} as reachable: no route");
             }
         }
+    }
+
+    fn get_original_destination(&mut self, tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
+        self.with_filter_state(|state| {
+            let conn = state.conntrack.get_connection(&tuple)?;
+
+            // If NAT has not been configured for the connection, return None.
+            let _: NatType = conn.external_data().nat_type()?;
+
+            // The tuple marking the original direction of the connection is
+            // never modified by NAT. This means it can be used to recover the
+            // destination before NAT was performed.
+            let original = conn.original_tuple();
+            Some((original.dst_addr, original.dst_port_or_id))
+        })
     }
 }
 
@@ -666,17 +701,15 @@ pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, BC> {
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
     /// The iterator provided to [`IpDeviceContext::with_address_statuses`].
-    type DeviceAndAddressStatusIter<'a, 's>: Iterator<Item = (Self::DeviceId, I::AddressStatus)>
-    where
-        Self: IpDeviceContext<I, BC> + 's;
+    type DeviceAndAddressStatusIter<'a>: Iterator<Item = (Self::DeviceId, I::AddressStatus)>;
 
     /// Provides access to the status of an address.
     ///
     /// Calls the provided callback with an iterator over the devices for which
     /// the address is assigned and the status of the assignment for each
     /// device.
-    fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
-        &'a mut self,
+    fn with_address_statuses<F: FnOnce(Self::DeviceAndAddressStatusIter<'_>) -> R, R>(
+        &mut self,
         addr: SpecifiedAddr<I::Addr>,
         cb: F,
     ) -> R;
@@ -1034,6 +1067,10 @@ impl<
     {
         send_ip_packet_from_device(self, bindings_ctx, meta.into(), body, packet_metadata)
     }
+
+    fn get_loopback_device(&mut self) -> Option<Self::DeviceId> {
+        device::IpDeviceConfigurationContext::<I, _>::loopback_id(self)
+    }
 }
 
 /// The IP context providing dispatch to the available transport protocols.
@@ -1170,7 +1207,7 @@ pub struct Ipv4State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     /// The common inner IP layer state.
     pub inner: IpStateInner<Ipv4, StrongDeviceId, BT>,
     /// The ICMP state.
-    pub icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
+    pub icmp: Icmpv4State<BT>,
     /// The atomic counter providing IPv4 packet identifiers.
     pub next_packet_id: AtomicU16,
 }
@@ -1197,7 +1234,7 @@ pub struct Ipv6State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     /// The common inner IP layer state.
     pub inner: IpStateInner<Ipv6, StrongDeviceId, BT>,
     /// ICMPv6 state.
-    pub icmp: Icmpv6State<StrongDeviceId::Weak, BT>,
+    pub icmp: Icmpv6State<BT>,
     /// Stateless address autoconfiguration counters.
     pub slaac_counters: SlaacCounters,
 }
@@ -1752,9 +1789,8 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    next_hop: SpecifiedAddr<I::Addr>,
+    destination: IpPacketDestination<I, &CC::DeviceId>,
     mut body: S,
-    broadcast: Option<I::BroadcastMarker>,
     mut packet_metadata: IpLayerPacketMetadata<I, BC>,
 ) -> Result<(), S>
 where
@@ -1779,7 +1815,7 @@ where
     }
 
     packet_metadata.acknowledge_drop();
-    core_ctx.send_ip_frame(bindings_ctx, device, next_hop, body, broadcast, proof)
+    core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof)
 }
 
 /// Drop a packet and undo the effects of parsing it.
@@ -2032,13 +2068,14 @@ pub fn receive_ipv4_packet<
         _ => return, // TODO(joshlf): Do something with ICMP here?
     };
 
-    let dst_ip = match SpecifiedAddr::new(packet.dst_ip()) {
-        Some(ip) => ip,
-        None => {
-            core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
-            debug!("receive_ipv4_packet: Received packet with unspecified destination IP address; dropping");
-            return;
-        }
+    // We verify this later by actually creating the `SpecifiedAddr` witness
+    // type after the INGRESS filtering hook, but we keep this check here as an
+    // optimization to return early if the packet has an unspecified
+    // destination.
+    if !packet.dst_ip().is_specified() {
+        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
+        debug!("receive_ipv4_packet: Received packet with unspecified destination IP; dropping");
+        return;
     };
 
     // TODO(ghanan): Act upon options.
@@ -2058,7 +2095,7 @@ pub fn receive_ipv4_packet<
 
             let Some(addr) = SpecifiedAddr::new(addr) else {
                 core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
-                debug!("receive_ipv4_packet: Received packet with unspecified destination IP address; dropping");
+                debug!("cannot perform transparent delivery to unspecified destination; dropping");
                 return;
             };
 
@@ -2083,6 +2120,12 @@ pub fn receive_ipv4_packet<
     // Drop the filter handler since it holds a mutable borrow of `core_ctx`, which
     // we need below.
     drop(filter);
+
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
+        debug!("receive_ipv4_packet: Received packet with unspecified destination IP; dropping");
+        return;
+    };
 
     match receive_ipv4_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {
@@ -2114,11 +2157,7 @@ pub fn receive_ipv4_packet<
             );
         }
         ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
-            let (next_hop, broadcast) = match next_hop {
-                NextHop::RemoteAsNeighbor => (dst_ip, None),
-                NextHop::Gateway(gateway) => (gateway, None),
-                NextHop::Broadcast(marker) => (dst_ip, Some(marker)),
-            };
+            let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
             let ttl = packet.ttl();
             if ttl > 1 {
                 trace!("receive_ipv4_packet: forwarding");
@@ -2144,9 +2183,8 @@ pub fn receive_ipv4_packet<
                     core_ctx,
                     bindings_ctx,
                     &dst_device,
-                    next_hop,
+                    destination,
                     packet,
-                    broadcast,
                     packet_metadata,
                 ) {
                     Ok(()) => (),
@@ -2312,25 +2350,21 @@ pub fn receive_ipv6_packet<
 
     // TODO(ghanan): Act upon extension headers.
 
-    let src_ip = match packet.src_ipv6() {
-        Some(ip) => ip,
-        None => {
-            debug!(
-                "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
-                packet.src_ip()
-            );
-            core_ctx
-                .increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
-            return;
-        }
+    // We verify these properties later by actually creating the corresponding
+    // witness types after the INGRESS filtering hook, but we keep these checks
+    // here as an optimization to return early and save some work.
+    if packet.src_ipv6().is_none() {
+        debug!(
+            "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
+            packet.src_ip()
+        );
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
+        return;
     };
-    let dst_ip = match SpecifiedAddr::new(packet.dst_ip()) {
-        Some(ip) => ip,
-        None => {
-            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
-            debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
-            return;
-        }
+    if !packet.dst_ip().is_specified() {
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
+        debug!("receive_ipv6_packet: Received packet with unspecified destination IP; dropping");
+        return;
     };
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
@@ -2348,7 +2382,7 @@ pub fn receive_ipv6_packet<
 
             let Some(addr) = SpecifiedAddr::new(addr) else {
                 core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
-                debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
+                debug!("cannot perform transparent delivery to unspecified destination; dropping");
                 return;
             };
 
@@ -2373,6 +2407,20 @@ pub fn receive_ipv6_packet<
     // Drop the filter handler since it holds a mutable borrow of `core_ctx`, which
     // we need below.
     drop(filter);
+
+    let Some(src_ip) = packet.src_ipv6() else {
+        debug!(
+            "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
+            packet.src_ip()
+        );
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
+        return;
+    };
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
+        debug!("receive_ipv6_packet: Received packet with unspecified destination IP; dropping");
+        return;
+    };
 
     match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {
@@ -2491,11 +2539,7 @@ pub fn receive_ipv6_packet<
                     filter::Verdict::Accept => {}
                 }
 
-                let next_hop = match next_hop {
-                    NextHop::RemoteAsNeighbor => dst_ip,
-                    NextHop::Gateway(gateway) => gateway,
-                    NextHop::Broadcast(never) => match never {},
-                };
+                let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
                 packet.set_ttl(ttl - 1);
                 let (src, dst, proto, meta) = packet.into_metadata();
                 let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
@@ -2504,9 +2548,8 @@ pub fn receive_ipv6_packet<
                     core_ctx,
                     bindings_ctx,
                     &dst_device,
-                    next_hop,
+                    destination,
                     packet,
-                    None,
                     packet_metadata,
                 ) {
                     // TODO(https://fxbug.dev/42167236): Encode the MTU error more
@@ -2838,6 +2881,44 @@ fn lookup_route_table<
     core_ctx.with_ip_routing_table(|core_ctx, table| table.lookup(core_ctx, device, dst_ip))
 }
 
+/// Packed destination passed to [`IpDeviceSendContext::send_ip_frame`].
+#[derive(Debug, Derivative)]
+#[derivative(Eq(bound = "D: Eq"), PartialEq(bound = "D: PartialEq"))]
+pub enum IpPacketDestination<I: IpTypesIpExt, D> {
+    /// Broadcast packet.
+    Broadcast(I::BroadcastMarker),
+
+    /// Multicast packet to the specified IP.
+    Multicast(MulticastAddr<I::Addr>),
+
+    /// Send packet to the neighbor with the specified IP (the receiving
+    /// node is either a router or the final recipient of the packet).
+    Neighbor(SpecifiedAddr<I::Addr>),
+
+    /// Loopback the packet to the specified device. Can be used only when
+    /// sending to the loopback device.
+    Loopback(D),
+}
+
+impl<I: IpTypesIpExt, D> IpPacketDestination<I, D> {
+    /// Creates `IpPacketDestination` for IP address.
+    pub fn from_addr(addr: SpecifiedAddr<I::Addr>) -> Self {
+        match MulticastAddr::new(addr.into_addr()) {
+            Some(mc_addr) => Self::Multicast(mc_addr),
+            None => Self::Neighbor(addr),
+        }
+    }
+
+    /// Create `IpPacketDestination` from `NextHop`.
+    pub fn from_next_hop(next_hop: NextHop<I::Addr>, dst_ip: SpecifiedAddr<I::Addr>) -> Self {
+        match next_hop {
+            NextHop::RemoteAsNeighbor => Self::from_addr(dst_ip),
+            NextHop::Gateway(gateway) => Self::Neighbor(gateway),
+            NextHop::Broadcast(marker) => Self::Broadcast(marker),
+        }
+    }
+}
+
 /// The metadata associated with an outgoing IP packet.
 #[derive(Debug)]
 pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt + IpTypesIpExt, D, Src> {
@@ -2850,11 +2931,8 @@ pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt + IpTypesIpExt, D, Src>
     /// The destination address of the packet.
     pub dst_ip: SpecifiedAddr<I::Addr>,
 
-    /// The next-hop node that the packet should be sent to.
-    pub next_hop: SpecifiedAddr<I::Addr>,
-
-    /// Whether the destination is a broadcast address.
-    pub broadcast: Option<I::BroadcastMarker>,
+    /// The destination for the send operation.
+    pub destination: IpPacketDestination<I, D>,
 
     /// The upper-layer protocol held in the packet's payload.
     pub proto: I::Proto,
@@ -2875,22 +2953,13 @@ impl<I: packet_formats::ip::IpExt + IpTypesIpExt, D>
     for SendIpPacketMeta<I, D, Option<SpecifiedAddr<I::Addr>>>
 {
     fn from(
-        SendIpPacketMeta { device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<
+        SendIpPacketMeta { device, src_ip, dst_ip, destination, proto, ttl, mtu }: SendIpPacketMeta<
             I,
             D,
             SpecifiedAddr<I::Addr>,
         >,
     ) -> SendIpPacketMeta<I, D, Option<SpecifiedAddr<I::Addr>>> {
-        SendIpPacketMeta {
-            device,
-            src_ip: Some(src_ip),
-            dst_ip,
-            broadcast,
-            next_hop,
-            proto,
-            ttl,
-            mtu,
-        }
+        SendIpPacketMeta { device, src_ip: Some(src_ip), dst_ip, destination, proto, ttl, mtu }
     }
 }
 
@@ -2922,9 +2991,8 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        next_hop: SpecifiedAddr<I::Addr>,
+        destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-        broadcast: Option<I::BroadcastMarker>,
     ) -> Result<(), S>
     where
         S: Serializer + IpPacket<I>,
@@ -2954,9 +3022,8 @@ impl<
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        next_hop: SpecifiedAddr<I::Addr>,
+        destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-        broadcast: Option<I::BroadcastMarker>,
     ) -> Result<(), S>
     where
         S: Serializer + IpPacket<I>,
@@ -2966,9 +3033,8 @@ impl<
             self,
             bindings_ctx,
             device,
-            next_hop,
+            destination,
             body,
-            broadcast,
             IpLayerPacketMetadata::default(),
         )
     }
@@ -2998,7 +3064,7 @@ where
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
 {
-    let SendIpPacketMeta { device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu } = meta;
+    let SendIpPacketMeta { device, src_ip, dst_ip, destination, proto, ttl, mtu } = meta;
     let next_packet_id = gen_ip_packet_id(core_ctx);
     let ttl = ttl.unwrap_or_else(|| core_ctx.get_hop_limit(device)).get();
     let src_ip = src_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.get());
@@ -3029,18 +3095,20 @@ where
 
     if let Some(mtu) = mtu {
         let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu as usize));
-        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast, packet_metadata)
+        send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
             .map_err(|ser| ser.into_inner().into_inner())
     } else {
-        send_ip_frame(core_ctx, bindings_ctx, device, next_hop, body, broadcast, packet_metadata)
+        send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
             .map_err(|ser| ser.into_inner())
     }
 }
 
 /// Abstracts access to a [`filter::FilterHandler`] for core contexts.
-pub trait FilterHandlerProvider<I: packet_formats::ip::IpExt, BC: FilterBindingsContext> {
+pub trait FilterHandlerProvider<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes>:
+    DeviceIdContext<AnyDevice, DeviceId: filter::InterfaceProperties<BT::DeviceClass>>
+{
     /// The filter handler.
-    type Handler<'a>: filter::FilterHandler<I, BC>
+    type Handler<'a>: filter::FilterHandler<I, BT, DeviceId = Self::DeviceId>
     where
         Self: 'a;
 
@@ -3052,14 +3120,8 @@ pub trait FilterHandlerProvider<I: packet_formats::ip::IpExt, BC: FilterBindings
 pub(crate) mod testutil {
     use super::*;
 
-    use core::marker::PhantomData;
-
-    use derivative::Derivative;
-    use net_types::ip::IpInvariant;
-    use netstack3_base::{
-        testutil::{FakeCoreCtx, FakeInstant, FakeStrongDeviceId, FakeWeakDeviceId},
-        RngContext, SendFrameContext, SendableFrameMeta,
-    };
+    use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId};
+    use netstack3_base::{SendFrameContext, SendableFrameMeta};
 
     /// A [`SendIpPacketMeta`] for dual stack contextx.
     #[derive(Debug, GenericOverIp)]
@@ -3080,12 +3142,7 @@ pub(crate) mod testutil {
                 SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>,
             );
             use DualStackSendIpPacketMeta::*;
-            let IpInvariant(dual_stack) = I::map_ip(
-                Wrap(value),
-                |Wrap(value)| IpInvariant(V4(value)),
-                |Wrap(value)| IpInvariant(V6(value)),
-            );
-            dual_stack
+            I::map_ip_in(Wrap(value), |Wrap(value)| V4(value), |Wrap(value)| V6(value))
         }
     }
 
@@ -3147,58 +3204,16 @@ pub(crate) mod testutil {
         }
     }
 
-    #[derive(Derivative)]
-    #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpDeviceIdCtx<D>(PhantomData<D>);
-
-    impl<DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeIpDeviceIdCtx<DeviceId> {
-        type DeviceId = DeviceId;
-        type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
-    }
-
-    impl<
-            I: Ip,
-            BC: RngContext + InstantContext<Instant = FakeInstant>,
-            D: FakeStrongDeviceId,
-            State: MulticastMembershipHandler<I, BC, DeviceId = D>,
-            Meta,
-        > MulticastMembershipHandler<I, BC> for FakeCoreCtx<State, Meta, D>
+    impl<I, BC, S, Meta, DeviceId> FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
     where
-        Self: DeviceIdContext<AnyDevice, DeviceId = D>,
+        I: packet_formats::ip::IpExt,
+        BC: FilterBindingsContext,
+        DeviceId: FakeStrongDeviceId + filter::InterfaceProperties<BC::DeviceClass>,
     {
-        fn join_multicast_group(
-            &mut self,
-            bindings_ctx: &mut BC,
-            device: &Self::DeviceId,
-            addr: MulticastAddr<<I as Ip>::Addr>,
-        ) {
-            self.state.join_multicast_group(bindings_ctx, device, addr)
-        }
-
-        fn leave_multicast_group(
-            &mut self,
-            bindings_ctx: &mut BC,
-            device: &Self::DeviceId,
-            addr: MulticastAddr<<I as Ip>::Addr>,
-        ) {
-            self.state.leave_multicast_group(bindings_ctx, device, addr)
-        }
-
-        fn select_device_for_multicast_group(
-            &mut self,
-            addr: MulticastAddr<<I as Ip>::Addr>,
-        ) -> Result<Self::DeviceId, ResolveRouteError> {
-            self.state.select_device_for_multicast_group(addr)
-        }
-    }
-
-    impl<I: packet_formats::ip::IpExt, BC: FilterBindingsContext, S, Meta, DeviceId>
-        FilterHandlerProvider<I, BC> for FakeCoreCtx<S, Meta, DeviceId>
-    {
-        type Handler<'a> = filter::testutil::NoopImpl where Self: 'a;
+        type Handler<'a> = filter::testutil::NoopImpl<DeviceId> where Self: 'a;
 
         fn filter_handler(&mut self) -> Self::Handler<'_> {
-            filter::testutil::NoopImpl
+            filter::testutil::NoopImpl::default()
         }
     }
 }

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_elf_test as fet, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::{StreamExt, TryStreamExt},
-    std::env,
-};
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use std::env;
+use {fidl_fuchsia_elf_test as fet, fuchsia_async as fasync};
 
 #[fuchsia::main]
 async fn main() {

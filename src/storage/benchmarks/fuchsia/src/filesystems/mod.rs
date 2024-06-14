@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    delivery_blob::{CompressionMode, Type1Blob},
-    fidl_fuchsia_fxfs::MountOptions,
-    fidl_fuchsia_io as fio,
-    fs_management::{
-        filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
-        FSConfig,
-    },
-    fuchsia_merkle::Hash,
-    fuchsia_zircon as zx,
-    std::path::Path,
-    storage_benchmarks::{block_device::BlockDevice, CacheClearableFilesystem, Filesystem},
-};
+use async_trait::async_trait;
+use delivery_blob::{CompressionMode, Type1Blob};
+use fidl_fuchsia_fxfs::MountOptions;
+use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
+use fs_management::FSConfig;
+use fuchsia_merkle::Hash;
+use std::path::Path;
+use storage_benchmarks::block_device::BlockDevice;
+use storage_benchmarks::{CacheClearableFilesystem, Filesystem};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 mod blobfs;
 mod f2fs;
@@ -27,15 +23,13 @@ mod pkgdir;
 #[cfg(test)]
 mod testing;
 
-pub use {
-    blobfs::Blobfs,
-    f2fs::F2fs,
-    fxblob::Fxblob,
-    fxfs::Fxfs,
-    memfs::Memfs,
-    minfs::Minfs,
-    pkgdir::{PkgDirInstance, PkgDirTest},
-};
+pub use blobfs::Blobfs;
+pub use f2fs::F2fs;
+pub use fxblob::Fxblob;
+pub use fxfs::Fxfs;
+pub use memfs::Memfs;
+pub use minfs::Minfs;
+pub use pkgdir::{PkgDirInstance, PkgDirTest};
 
 const MOUNT_PATH: &str = "/benchmark";
 

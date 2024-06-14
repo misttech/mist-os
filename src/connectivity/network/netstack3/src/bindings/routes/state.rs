@@ -4,39 +4,32 @@
 
 //! FIDL Worker for the `fuchsia.net.routes` suite of protocols.
 
-use std::{collections::HashSet, pin::pin};
+use std::collections::HashSet;
+use std::pin::pin;
 
 use async_utils::event::Event;
 use either::Either;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::mpsc, channel::oneshot, future::FusedFuture as _, FutureExt, StreamExt as _,
-    TryStream, TryStreamExt as _,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::future::FusedFuture as _;
+use futures::{FutureExt, StreamExt as _, TryStream, TryStreamExt as _};
 use itertools::Itertools as _;
-use net_types::{
-    ethernet::Mac,
-    ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv6},
-    SpecifiedAddr,
-};
-use netstack3_core::{
-    device::{DeviceId, EthernetDeviceId, EthernetLinkDevice},
-    error::AddressResolutionFailed,
-    neighbor::{LinkResolutionContext, LinkResolutionResult},
-    routes::{NextHop, ResolvedRoute, WrapBroadcastMarker},
-};
+use log::{debug, error, info, warn};
+use net_types::ethernet::Mac;
+use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, Ipv4, Ipv6};
+use net_types::SpecifiedAddr;
+use netstack3_core::device::{DeviceId, EthernetDeviceId, EthernetLinkDevice};
+use netstack3_core::error::AddressResolutionFailed;
+use netstack3_core::neighbor::{LinkResolutionContext, LinkResolutionResult};
+use netstack3_core::routes::{NextHop, ResolvedRoute, WrapBroadcastMarker};
 use thiserror::Error;
-use tracing::{debug, error, info, warn};
-
-use crate::bindings::{
-    routes,
-    util::{ConversionContext as _, IntoCore as _, IntoFidl as _},
-    BindingsCtx, Ctx, IpExt,
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,
 };
+
+use crate::bindings::util::{ConversionContext as _, IntoCore as _, IntoFidl as _, ResultExt as _};
+use crate::bindings::{routes, BindingsCtx, Ctx, IpExt};
 
 // The maximum number of events a client for the `fuchsia.net.routes/Watcher`
 // is allowed to have queued. Clients will be dropped if they exceed this limit.
@@ -77,7 +70,7 @@ pub(crate) async fn serve_state(rs: fnet_routes::StateRequestStream, ctx: Ctx) {
                 let result = resolve(destination, ctx.clone()).await;
                 responder
                     .send(result.as_ref().map_err(|e| e.into_raw()))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
                 Ok(())
             }
             fnet_routes::StateRequest::GetRouteTableName { table_id: _, responder: _ } => {
@@ -336,7 +329,7 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
             <<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::RequestStream as TryStream>::Ok,
         events: Vec<fnet_routes_ext::Event<I>>,
     }
-    let IpInvariant(result) = I::map_ip::<Inputs<I>, _>(
+    let result = I::map_ip_in::<Inputs<I>, _>(
         Inputs { req, events },
         |Inputs { req, events }| match req {
             fnet_routes::WatcherV4Request::Watch { responder } => {
@@ -350,7 +343,7 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
                         })
                     })
                     .collect::<Vec<_>>();
-                IpInvariant(responder.send(&events))
+                responder.send(&events)
             }
         },
         |Inputs { req, events }| match req {
@@ -365,7 +358,7 @@ fn respond_to_watch_request<I: fnet_routes_ext::FidlRouteIpExt>(
                         })
                     })
                     .collect::<Vec<_>>();
-                IpInvariant(responder.send(&events))
+                responder.send(&events)
             }
         },
     );
@@ -623,7 +616,7 @@ mod tests {
 
     // Tests that `RouteUpdateDispatcher` returns an error when it receives a
     // `RouteRemoved` update for a non-existent route.
-    #[ip_test]
+    #[ip_test(I)]
     fn dispatcher_fails_to_remove_non_existent<I: Ip>() {
         let route = arbitrary_route_on_interface::<I>(1);
         assert_eq!(
@@ -635,7 +628,7 @@ mod tests {
 
     // Tests that `RouteUpdateDispatcher` returns an error when it receives an
     // `AddRoute` update for an already existing route.
-    #[ip_test]
+    #[ip_test(I)]
     fn dispatcher_fails_to_add_existing<I: Ip>() {
         let mut dispatcher = RouteUpdateDispatcherInner::default();
         let route = arbitrary_route_on_interface::<I>(1);
@@ -648,7 +641,7 @@ mod tests {
 
     // Tests the basic functionality of the `RouteUpdateDispatcher`,
     // `RouteWatcherSink`, and `RouteWatcher`.
-    #[ip_test]
+    #[ip_test(I)]
     fn notify_dispatch_watch<I: Ip>() {
         let mut dispatcher = RouteUpdateDispatcherInner::default();
 
@@ -694,7 +687,7 @@ mod tests {
 
     // Tests that a `RouteWatcher` is canceled if it exceeds
     // `MAX_PENDING_EVENTS` in its queue.
-    #[ip_test]
+    #[ip_test(I)]
     fn cancel_watcher_with_too_many_pending_events<I: Ip>() {
         // Helper function to drain the watcher of a specific number of events,
         // which may be spread across multiple batches of size
@@ -746,7 +739,7 @@ mod tests {
         assert_eq!(watcher2.canceled.wait().now_or_never(), Some(()));
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     fn watcher_respects_interest<I: Ip>() {
         let mut dispatcher = RouteUpdateDispatcherInner::default();
         let main_table_id = routes::main_table_id::<I>();

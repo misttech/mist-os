@@ -4,11 +4,11 @@
 
 use anyhow::{bail, Context};
 use itertools::Itertools;
-use serde::{
-    de::{Error, Unexpected},
-    Deserialize, Deserializer, Serialize,
-};
-use std::{array::TryFromSliceError, collections::BTreeMap, fmt};
+use serde::de::{Error, Unexpected};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::array::TryFromSliceError;
+use std::collections::BTreeMap;
+use std::fmt;
 
 const VERSION_HISTORY_BYTES: &[u8] = version_history_data::VERSION_HISTORY;
 const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history-22rnd667.json";

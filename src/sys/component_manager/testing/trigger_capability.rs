@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fidl_test_components as ftest, fuchsia_async as fasync,
-    futures::{channel::*, lock::Mutex, sink::SinkExt, StreamExt},
-    std::sync::Arc,
-};
+use anyhow::Error;
+use futures::channel::*;
+use futures::lock::Mutex;
+use futures::sink::SinkExt;
+use futures::StreamExt;
+use std::sync::Arc;
+use {fidl_fidl_test_components as ftest, fuchsia_async as fasync};
 
 #[must_use = "invoke resume() otherwise the client will be halted indefinitely!"]
 pub struct Trigger {

@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{CurrentTask, Kernel},
-    vfs::{
-        fs_node_impl_not_dir, CacheMode, FileHandle, FileObject, FileOps, FileSystem,
-        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
-    },
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::{
+    fs_node_impl_not_dir, CacheMode, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
 };
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_uapi::{
-    error, errors::Errno, file_mode::FileMode, ino_t, open_flags::OpenFlags, statfs,
-    vfs::default_statfs, ANON_INODE_FS_MAGIC,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::{error, ino_t, statfs, ANON_INODE_FS_MAGIC};
 use std::sync::Arc;
 
 pub struct Anon;

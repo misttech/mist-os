@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    diagnostics_data::{Data, Logs, Severity},
-    diagnostics_reader::ArchiveReader,
-    fidl_fuchsia_component as fcomponent,
-    fuchsia_async::{Duration, TestExecutor, Timer},
-    fuchsia_component_test::ScopedInstance,
-    futures::StreamExt,
-    test_case::test_case,
-};
+use assert_matches::assert_matches;
+use diagnostics_data::{Data, Logs, Severity};
+use diagnostics_reader::ArchiveReader;
+use fidl_fuchsia_component as fcomponent;
+use fuchsia_async::{Duration, TestExecutor, Timer};
+use fuchsia_component_test::ScopedInstance;
+use futures::StreamExt;
+use test_case::test_case;
 
 const COLLECTION_NAME: &str = "puppets";
 

@@ -57,7 +57,10 @@ impl IpProtoExt for Ipv6 {
 /// packet parsing and serialization.
 pub trait IpExt: EthernetIpExt + IcmpIpExt {
     /// An IP packet type for this IP version.
-    type Packet<B: ByteSlice>: IpPacket<B, Self, Builder = Self::PacketBuilder>;
+    type Packet<B: ByteSlice>: IpPacket<B, Self, Builder = Self::PacketBuilder>
+        + GenericOverIp<Self, Type = Self::Packet<B>>
+        + GenericOverIp<Ipv4, Type = Ipv4Packet<B>>
+        + GenericOverIp<Ipv6, Type = Ipv6Packet<B>>;
     /// An IP packet builder type for the IP version.
     type PacketBuilder: IpPacketBuilder<Self> + Eq;
 }

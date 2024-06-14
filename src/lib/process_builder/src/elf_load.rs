@@ -4,13 +4,10 @@
 
 //! Utilities for loading ELF files into an existing address space.
 
-use {
-    crate::elf_parse as elf,
-    crate::util,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    std::ffi::{CStr, CString},
-    thiserror::Error,
-};
+use crate::{elf_parse as elf, util};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use std::ffi::{CStr, CString};
+use thiserror::Error;
 
 /// Possible errors that can occur during ELF loading.
 #[derive(Error, Debug)]
@@ -315,10 +312,14 @@ fn elf_to_vmar_perm_flags(elf_flags: &elf::SegmentFlags) -> zx::VmarFlags {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::elf_parse, anyhow::Error, assert_matches::assert_matches,
-        fidl::HandleBased, lazy_static::lazy_static, std::cell::RefCell, std::mem::size_of,
-    };
+    use super::*;
+    use crate::elf_parse;
+    use anyhow::Error;
+    use assert_matches::assert_matches;
+    use fidl::HandleBased;
+    use lazy_static::lazy_static;
+    use std::cell::RefCell;
+    use std::mem::size_of;
 
     #[test]
     fn test_vmo_name_with_prefix() -> Result<(), Error> {

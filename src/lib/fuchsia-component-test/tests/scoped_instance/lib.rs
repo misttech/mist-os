@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{events::*, matcher::*},
-    fidl_fuchsia_component as fcomponent,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-    test_case::test_case,
-};
+use component_events::events::*;
+use component_events::matcher::*;
+use fidl_fuchsia_component as fcomponent;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
+use test_case::test_case;
 
 #[test_case("#meta/realm_with_wait.cm"; "wait")]
 #[test_case("#meta/realm.cm"; "no_wait")]

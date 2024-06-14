@@ -1,11 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    argh::{ArgsInfo, FromArgs},
-    async_trait::async_trait,
-    fho::{deferred, moniker, FfxMain, FfxTool, Result, SimpleWriter},
-};
+use argh::{ArgsInfo, FromArgs};
+use async_trait::async_trait;
+use fho::{deferred, moniker, FfxMain, FfxTool, Result, SimpleWriter};
 
 mod fxfs;
 

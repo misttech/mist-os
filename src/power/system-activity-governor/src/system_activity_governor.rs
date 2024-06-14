@@ -6,26 +6,28 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
 use fidl::endpoints::{create_endpoints, Proxy};
-use fidl_fuchsia_hardware_suspend as fhsuspend;
-use fidl_fuchsia_power_broker as fbroker;
-use fidl_fuchsia_power_suspend as fsuspend;
+use fidl_fuchsia_hardware_suspend::{
+    self as fhsuspend, SuspenderSuspendResponse as SuspendResponse,
+};
 use fidl_fuchsia_power_system::{
     self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
     WakeHandlingLevel,
 };
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect::{ArrayProperty, Property};
-use fuchsia_zircon::{self as zx, HandleBased};
-use futures::{
-    channel::mpsc::{self, Receiver, Sender},
-    lock::Mutex,
-    prelude::*,
+use fuchsia_inspect::{
+    ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
 };
+use fuchsia_inspect_contrib::nodes::BoundedListNode as IRingBuffer;
+use fuchsia_zircon::{self as zx, HandleBased};
+use futures::channel::mpsc::{self, Receiver, Sender};
+use futures::lock::Mutex;
+use futures::prelude::*;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
-use std::{
-    cell::{OnceCell, RefCell},
-    rc::Rc,
+use std::cell::{OnceCell, RefCell};
+use std::rc::Rc;
+use {
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
+    fuchsia_async as fasync,
 };
 
 type NotifyFn = Box<dyn Fn(&fsuspend::SuspendStats, fsuspend::StatsWatchResponder) -> bool>;
@@ -88,6 +90,7 @@ struct ExecutionStateManager {
     inner: Mutex<ExecutionStateManagerInner>,
     /// SuspendResumeListener object to notify of suspend/resume.
     suspend_resume_listener: OnceCell<Rc<dyn SuspendResumeListener>>,
+    _inspect_node: RefCell<IRingBuffer>,
 }
 
 impl ExecutionStateManager {
@@ -95,6 +98,7 @@ impl ExecutionStateManager {
     fn new(
         execution_state: PowerElementContext,
         suspender: Option<fhsuspend::SuspenderProxy>,
+        inspect: INode,
     ) -> Self {
         Self {
             passive_dependency_token: execution_state.passive_dependency_token(),
@@ -105,6 +109,7 @@ impl ExecutionStateManager {
                 suspend_allowed: false,
             }),
             suspend_resume_listener: OnceCell::new(),
+            _inspect_node: RefCell::new(IRingBuffer::new(inspect, 128)),
         }
     }
 
@@ -179,6 +184,9 @@ impl ExecutionStateManager {
                 return;
             }
 
+            self._inspect_node.borrow_mut().add_entry(|node| {
+                node.record_int("suspended", zx::Time::get_monotonic().into_nanos());
+            });
             // LINT.IfChange
             tracing::info!("Suspending");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
@@ -199,6 +207,17 @@ impl ExecutionStateManager {
             };
             tracing::info!(?response, "Resuming");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
+            self._inspect_node.borrow_mut().add_entry(|node| {
+                let time = zx::Time::get_monotonic().into_nanos();
+                if let Some(Ok(Ok(SuspendResponse { suspend_duration: Some(duration), .. }))) =
+                    response
+                {
+                    node.record_int("resumed", time);
+                    node.record_int("duration", duration);
+                } else {
+                    node.record_int("suspend_failed", time);
+                }
+            });
 
             listener.suspend_stats().update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
                 let stats = stats_opt.as_mut().expect("stats is uninitialized");
@@ -226,6 +245,8 @@ impl ExecutionStateManager {
                     }
                     None => {
                         tracing::warn!("No suspender available, suspend was a no-op");
+                        stats.fail_count = stats.fail_count.map(|c| c + 1);
+                        stats.last_failed_error = Some(zx::sys::ZX_ERR_NOT_SUPPORTED);
                     }
                 }
                 true
@@ -252,23 +273,23 @@ struct SuspendStatsManager {
     /// The publisher used to push changes to suspend stats.
     stats_publisher: StatsPublisher,
     /// The inspect node for suspend stats.
-    inspect_node: fuchsia_inspect::Node,
+    inspect_node: INode,
     /// The inspect node that contains the number of successful suspend attempts.
-    success_count_node: fuchsia_inspect::UintProperty,
+    success_count_node: IUint,
     /// The inspect node that contains the number of failed suspend attempts.
-    fail_count_node: fuchsia_inspect::UintProperty,
+    fail_count_node: IUint,
     /// The inspect node that contains the error code of the last failed suspend attempt.
-    last_failed_error_node: fuchsia_inspect::IntProperty,
+    last_failed_error_node: IInt,
     /// The inspect node that contains the duration the platform spent in suspension in the last
     /// attempt.
-    last_time_in_suspend_node: fuchsia_inspect::IntProperty,
+    last_time_in_suspend_node: IInt,
     /// The inspect node that contains the duration the platform spent transitioning to a suspended
     /// state in the last attempt.
-    last_time_in_suspend_operations_node: fuchsia_inspect::IntProperty,
+    last_time_in_suspend_operations_node: IInt,
 }
 
 impl SuspendStatsManager {
-    fn new(inspect_node: fuchsia_inspect::Node) -> Self {
+    fn new(inspect_node: INode) -> Self {
         let stats = fsuspend::SuspendStats {
             success_count: Some(0),
             fail_count: Some(0),
@@ -347,7 +368,7 @@ impl SuspendStatsManager {
 /// APIs.
 pub struct SystemActivityGovernor {
     /// The root inspect node for system-activity-governor.
-    inspect_root: fuchsia_inspect::Node,
+    inspect_root: INode,
     /// The context used to manage the application activity power element.
     application_activity: PowerElementContext,
     /// The context used to manage the full wake handling power element.
@@ -374,7 +395,7 @@ pub struct SystemActivityGovernor {
 impl SystemActivityGovernor {
     pub async fn new(
         topology: &fbroker::TopologyProxy,
-        inspect_root: fuchsia_inspect::Node,
+        inspect_root: INode,
         suspender: Option<fhsuspend::SuspenderProxy>,
     ) -> Result<Rc<Self>> {
         let mut element_power_level_names: Vec<fbroker::ElementPowerLevelNames> = Vec::new();
@@ -520,6 +541,11 @@ impl SystemActivityGovernor {
         };
 
         let suspend_stats = SuspendStatsManager::new(inspect_root.create_child("suspend_stats"));
+        let execution_state_manager = Rc::new(ExecutionStateManager::new(
+            execution_state,
+            suspender,
+            inspect_root.create_child("suspend_events"),
+        ));
 
         Ok(Rc::new(Self {
             inspect_root,
@@ -529,10 +555,7 @@ impl SystemActivityGovernor {
             resume_latency_ctx,
             suspend_stats,
             listeners: RefCell::new(Vec::new()),
-            execution_state_manager: Rc::new(ExecutionStateManager::new(
-                execution_state,
-                suspender,
-            )),
+            execution_state_manager,
             boot_control,
             element_power_level_names,
         }))
@@ -603,7 +626,7 @@ impl SystemActivityGovernor {
 
     fn run_execution_state(
         self: &Rc<Self>,
-        inspect_node: &fuchsia_inspect::Node,
+        inspect_node: &INode,
         execution_state_suspend_signaller: Sender<()>,
     ) {
         let execution_state_node = inspect_node.create_child("execution_state");
@@ -613,12 +636,6 @@ impl SystemActivityGovernor {
             let sag = sag.clone();
             let element_name = sag.execution_state_manager.name().await;
             let required_level = sag.execution_state_manager.required_level_proxy().await;
-
-            // Since the initial value sent to RequiredLevel.Watch is acquired on creation of
-            // execution_state, it will always be 0.
-            // Clear the initial value to remove the starting 0 power level.
-            // TODO(b/339092750): Remove this when the most up-to-date required level is returned.
-            let _ = required_level.watch().await;
 
             run_power_element(
                 &element_name,
@@ -647,8 +664,8 @@ impl SystemActivityGovernor {
 
     fn run_application_activity(
         self: &Rc<Self>,
-        inspect_node: &fuchsia_inspect::Node,
-        root_node: &fuchsia_inspect::Node,
+        inspect_node: &INode,
+        root_node: &INode,
         boot_control_lease: fidl::endpoints::ClientEnd<fbroker::LeaseControlMarker>,
     ) {
         let application_activity_node = inspect_node.create_child("application_activity");
@@ -703,7 +720,7 @@ impl SystemActivityGovernor {
         .detach();
     }
 
-    fn run_full_wake_handling(self: &Rc<Self>, inspect_node: &fuchsia_inspect::Node) {
+    fn run_full_wake_handling(self: &Rc<Self>, inspect_node: &INode) {
         let full_wake_handling_node = inspect_node.create_child("full_wake_handling");
         let this = self.clone();
 
@@ -720,7 +737,7 @@ impl SystemActivityGovernor {
         .detach();
     }
 
-    fn run_wake_handling(self: &Rc<Self>, inspect_node: &fuchsia_inspect::Node) {
+    fn run_wake_handling(self: &Rc<Self>, inspect_node: &INode) {
         let wake_handling_node = inspect_node.create_child("wake_handling");
         let this = self.clone();
 
@@ -737,7 +754,7 @@ impl SystemActivityGovernor {
         .detach();
     }
 
-    fn run_execution_resume_latency(self: &Rc<Self>, inspect_node: &fuchsia_inspect::Node) {
+    fn run_execution_resume_latency(self: &Rc<Self>, inspect_node: &INode) {
         if let Some(resume_latency_ctx) = &self.resume_latency_ctx {
             let initial_level = 0;
             resume_latency_ctx.clone().run(
@@ -1024,7 +1041,7 @@ impl ResumeLatencyContext {
         self: Rc<Self>,
         execution_state_manager: Rc<ExecutionStateManager>,
         initial_level: u8,
-        execution_resume_latency_node: fuchsia_inspect::Node,
+        execution_resume_latency_node: INode,
     ) {
         let resume_latencies_node = execution_resume_latency_node
             .create_int_array("resume_latencies", self.resume_latencies.len());

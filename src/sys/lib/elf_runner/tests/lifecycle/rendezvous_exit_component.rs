@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fidl_test_components as test_protocol, fuchsia_component::server::ServiceFs,
-    futures_util::StreamExt, tracing::info,
-};
+use fidl_fidl_test_components as test_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures_util::StreamExt;
+use tracing::info;
 
 enum Protocols {
     Trigger(test_protocol::TriggerRequestStream),

@@ -5,14 +5,17 @@
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_bind_library",
+    "fuchsia_cc_binary",
     "fuchsia_cc_driver",
     "fuchsia_component_manifest",
     "fuchsia_driver_bind_bytecode",
     "fuchsia_driver_component",
+    "fuchsia_driver_tool",
     "fuchsia_package",
     "fuchsia_structured_config_cpp_elf_lib",
     "fuchsia_structured_config_values",
 )
+load("//test_utils:make_file.bzl", "make_file")
 
 fuchsia_bind_library(
     name = "test.driver.bind",
@@ -70,6 +73,22 @@ fuchsia_structured_config_values(
     },
 )
 
+make_file(
+    name = "cc_tool_main",
+    content = "int main() { return 0; } \n",
+    filename = "main.cc",
+)
+
+fuchsia_cc_binary(
+    name = "ctl",
+    srcs = [":cc_tool_main"],
+)
+
+fuchsia_driver_tool(
+    name = "tool",
+    binary = ":ctl",
+)
+
 fuchsia_package(
     name = "pkg",
     package_name = "test_driver",
@@ -78,5 +97,8 @@ fuchsia_package(
     ],
     fuchsia_api_level = "HEAD",
     resources = [":sc-values"],
+    tools = [
+        ":tool",
+    ],
     visibility = ["//visibility:public"],
 )

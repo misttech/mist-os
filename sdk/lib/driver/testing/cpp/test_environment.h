@@ -49,6 +49,7 @@ class TestEnvironment final {
   static const char kTestEnvironmentThreadSafetyDescription[];
   fdf_dispatcher_t* dispatcher_;
   fdf::OutgoingDirectory incoming_directory_server_;
+  bool logsink_added_ = false;
   async::synchronization_checker checker_;
 };
 

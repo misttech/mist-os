@@ -2,17 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    ieee80211::Bssid,
-    std::{
-        collections::{HashMap, VecDeque},
-        sync::Arc,
-    },
-    wlan_common::bss::BssDescription,
-};
+use fuchsia_sync::Mutex;
+use ieee80211::Bssid;
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
+use wlan_common::bss::BssDescription;
+use {fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Only connect failures that were RECENT_CONNECT_FAILURE_WINDOW from now would
 /// contribute to score penalty.
@@ -115,10 +110,10 @@ impl BssScorerInner {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon::DurationNum,
-        wlan_common::fake_bss_description,
-    };
+    use super::*;
+    use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+    use fuchsia_zircon::DurationNum;
+    use wlan_common::fake_bss_description;
 
     const BSSID: [u8; 6] = [1, 3, 3, 7, 4, 2];
 

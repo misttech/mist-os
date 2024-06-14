@@ -1,15 +1,17 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::prelude_internal::*;
+use anyhow::Error;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_net_interfaces::*;
 use fuchsia_async::net::DatagramSocket;
 use fuchsia_component::client::connect_to_protocol;
+use futures::stream::BoxStream;
 use socket2::{Domain, Protocol};
 use std::collections::HashSet;
 use std::num::NonZeroU64;
 use tracing::{debug, info};
-use {crate::prelude_internal::*, anyhow::Error, futures::stream::BoxStream};
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
 pub struct BackboneNetworkChanged;

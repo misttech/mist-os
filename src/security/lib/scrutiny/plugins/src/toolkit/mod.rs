@@ -4,15 +4,16 @@
 
 mod controller;
 
-use {
-    crate::toolkit::controller::{
-        blobfs::BlobFsExtractController, far::FarMetaExtractController, fvm::FvmExtractController,
-        zbi::ZbiExtractController, zbi_bootfs::ZbiExtractBootfsPackageIndex,
-        zbi_bootfs::ZbiListBootfsController, zbi_cmdline::ZbiExtractCmdlineController,
-    },
-    scrutiny::prelude::*,
-    std::sync::Arc,
+use crate::toolkit::controller::blobfs::BlobFsExtractController;
+use crate::toolkit::controller::far::FarMetaExtractController;
+use crate::toolkit::controller::fvm::FvmExtractController;
+use crate::toolkit::controller::zbi::ZbiExtractController;
+use crate::toolkit::controller::zbi_bootfs::{
+    ZbiExtractBootfsPackageIndex, ZbiListBootfsController,
 };
+use crate::toolkit::controller::zbi_cmdline::ZbiExtractCmdlineController;
+use scrutiny::prelude::*;
+use std::sync::Arc;
 
 plugin!(
     ToolkitPlugin,
@@ -35,14 +36,12 @@ plugin!(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::toolkit::controller::{
-            fvm::FvmExtractRequest, zbi::ZbiExtractRequest, zbi_cmdline::ZbiExtractCmdlineRequest,
-        },
-        scrutiny_testing::fake::*,
-        tempfile::tempdir,
-    };
+    use super::*;
+    use crate::toolkit::controller::fvm::FvmExtractRequest;
+    use crate::toolkit::controller::zbi::ZbiExtractRequest;
+    use crate::toolkit::controller::zbi_cmdline::ZbiExtractCmdlineRequest;
+    use scrutiny_testing::fake::*;
+    use tempfile::tempdir;
 
     #[test]
     fn test_zbi_extractor_empty_zbi() {

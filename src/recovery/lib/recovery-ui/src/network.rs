@@ -11,18 +11,19 @@ use crate::constants::constants::{
     TITLE_COLOR, TITLE_SMALL_FONT_SIZE,
 };
 use anyhow::Error;
+use carnelian::drawing::{load_font, FontFace};
+use carnelian::render::rive::load_rive;
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::{
+    RiveFacet, TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment,
+};
+use carnelian::scene::layout::{
+    Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize,
+};
+use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    drawing::{load_font, FontFace},
-    input, make_message,
-    render::{rive::load_rive, Context as RenderContext},
-    scene::{
-        facets::{RiveFacet, TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment},
-        layout::{
-            Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize,
-        },
-        scene::{Scene, SceneBuilder},
-    },
-    AppSender, Message, MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext, ViewKey,
+    input, make_message, AppSender, Message, MessageTarget, Point, Size, ViewAssistant,
+    ViewAssistantContext, ViewKey,
 };
 use euclid::{size2, Size2D, UnknownUnit};
 use fidl_fuchsia_wlan_policy::SecurityType;

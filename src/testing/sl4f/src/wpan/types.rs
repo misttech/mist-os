@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_lowpan::MacAddress;
-use fidl_fuchsia_lowpan_device::ConnectivityState as lowpan_ConnectivityState;
-use fidl_fuchsia_lowpan_device::DeviceState;
-use fidl_fuchsia_lowpan_device::Role as lowpan_RoleState;
+use fidl_fuchsia_lowpan_device::{
+    ConnectivityState as lowpan_ConnectivityState, DeviceState, Role as lowpan_RoleState,
+};
 use fidl_fuchsia_lowpan_test::{
     MacAddressFilterItem, MacAddressFilterMode, MacAddressFilterSettings, NeighborInfo,
 };

@@ -98,19 +98,19 @@ class TraceModelTest(unittest.TestCase):
 
         for event in sliced_model.all_events():
             if isinstance(event, trace_model.DurationEvent):
-                for child in event.child_durations:
-                    self.assertIsNotNone(child)
-                    self.assertNotEqual(child.name, sentinel_name)
-                for child in event.child_flows:
-                    self.assertIsNotNone(child)
-                    self.assertNotEqual(child.name, sentinel_name)
+                for child_duration in event.child_durations:
+                    self.assertIsNotNone(child_duration)
+                    self.assertNotEqual(child_duration.name, sentinel_name)
+                for child_flow in event.child_flows:
+                    self.assertIsNotNone(child_flow)
+                    self.assertNotEqual(child_flow.name, sentinel_name)
             elif isinstance(event, trace_model.FlowEvent):
-                previous_flow_name: str = (
+                previous_flow_name: str | None = (
                     event.previous_flow.name
                     if event.previous_flow is not None
                     else None
                 )
-                next_flow_name: str = (
+                next_flow_name: str | None = (
                     event.next_flow.name
                     if event.next_flow is not None
                     else None

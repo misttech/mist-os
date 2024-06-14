@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::DiscoverableProtocolMarker as _,
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
-    futures::stream::TryStreamExt as _,
-    mock_metrics::MockMetricEventLoggerFactory,
-    std::sync::Arc,
-    tracing::info,
-    vfs::directory::{entry_container::Directory as _, helper::DirectlyMutable as _},
-};
+use fidl::endpoints::DiscoverableProtocolMarker as _;
+use futures::stream::TryStreamExt as _;
+use mock_metrics::MockMetricEventLoggerFactory;
+use std::sync::Arc;
+use tracing::info;
+use vfs::directory::entry_container::Directory as _;
+use vfs::directory::helper::DirectlyMutable as _;
+use {fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics};
 
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";
 static PKGFS_BOOT_ARG_VALUE_PREFIX: &'static str = "bin/pkgsvr+";

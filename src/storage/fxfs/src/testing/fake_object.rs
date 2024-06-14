@@ -2,23 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
-        object_store::journal::JournalHandle,
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    std::{
-        cmp::min,
-        ops::Range,
-        sync::{Arc, Mutex},
-    },
-    storage_device::{
-        buffer::{BufferFuture, BufferRef, MutableBufferRef},
-        buffer_allocator::{BufferAllocator, BufferSource},
-    },
-};
+use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
+use crate::object_store::journal::JournalHandle;
+use anyhow::Error;
+use async_trait::async_trait;
+use std::cmp::min;
+use std::ops::Range;
+use std::sync::{Arc, Mutex};
+use storage_device::buffer::{BufferFuture, BufferRef, MutableBufferRef};
+use storage_device::buffer_allocator::{BufferAllocator, BufferSource};
 
 pub struct FakeObject {
     buf: Mutex<Vec<u8>>,
@@ -113,10 +105,10 @@ impl WriteObjectHandle for FakeObjectHandle {
 }
 
 impl JournalHandle for FakeObjectHandle {
-    fn start_offset(&self) -> Option<u64> {
+    fn end_offset(&self) -> Option<u64> {
         None
     }
-    fn push_extent(&mut self, _device_range: Range<u64>) {
+    fn push_extent(&mut self, _added_offset: u64, _device_range: Range<u64>) {
         // NOP
     }
     fn discard_extents(&mut self, _discard_offset: u64) {

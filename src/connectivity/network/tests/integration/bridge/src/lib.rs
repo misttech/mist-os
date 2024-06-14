@@ -4,7 +4,8 @@
 
 #![cfg(test)]
 
-use std::{collections::HashMap, convert::TryFrom as _};
+use std::collections::HashMap;
+use std::convert::TryFrom as _;
 
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 
@@ -13,10 +14,9 @@ use assert_matches::assert_matches;
 use futures::{SinkExt as _, StreamExt as _, TryFutureExt as _};
 use net_declare::{fidl_subnet, std_socket_addr_v4};
 use net_types::ip::Ipv4;
+use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_common::{
-    interfaces, ping as ping_helper,
-    realms::{Netstack, TestSandboxExt as _},
-    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+    interfaces, ping as ping_helper, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;

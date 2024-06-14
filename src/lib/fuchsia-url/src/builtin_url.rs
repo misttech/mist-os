@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use crate::{
-    errors::ParseError,
-    parse::{validate_package_path_segment, validate_resource_path},
-};
+pub use crate::errors::ParseError;
+pub use crate::parse::{validate_package_path_segment, validate_resource_path};
 use crate::{Scheme, UrlParts};
 
 pub const SCHEME: &str = "fuchsia-builtin";

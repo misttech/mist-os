@@ -2,17 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        data::Data,
-        puppet, results,
-        trials::{self, Step},
-        PUPPET_MONIKER,
-    },
-    anyhow::{bail, Error},
-    diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
-    fidl_diagnostics_validate as validate,
-};
+use super::data::Data;
+use super::trials::{self, Step};
+use super::{puppet, results, PUPPET_MONIKER};
+use anyhow::{bail, Error};
+use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
+use fidl_diagnostics_validate as validate;
 
 pub async fn run_all_trials() -> results::Results {
     let trial_set = trials::real_trials();
@@ -295,10 +290,11 @@ async fn try_compare<ActionType: std::fmt::Debug>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::trials::tests::trial_with_action, crate::trials::Trial, crate::*,
-        fidl_diagnostics_validate::*,
-    };
+    use super::*;
+    use crate::trials::tests::trial_with_action;
+    use crate::trials::Trial;
+    use crate::*;
+    use fidl_diagnostics_validate::*;
 
     #[fuchsia::test]
     async fn unimplemented_works() {

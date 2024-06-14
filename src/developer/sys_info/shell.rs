@@ -6,10 +6,9 @@ use anyhow::{Context, Error};
 use argh::FromArgs;
 use fidl_fuchsia_sysinfo::{InterruptControllerInfo, SysInfoMarker, SysInfoProxy};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
-use futures as _;
 use std::fmt::Debug;
 use std::io::Write;
+use {fuchsia_zircon as zx, futures as _};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum SystemInfo {

@@ -6,17 +6,15 @@
 // fuchsia-mirror/src/diagnostics/archivist/src/accessor.rs
 // Unlike the original, it does not spawn tasks; it's fully synchronous.
 
-use {
-    super::archivist_server::{AccessorServer, ServerError},
-    anyhow::{bail, Error},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_diagnostics as diagnostics,
-    fidl_fuchsia_diagnostics::{
-        self, ClientSelectorConfiguration, DataType, Format, Selector, SelectorArgument, StreamMode,
-    },
-    selectors::VerboseError,
-    tracing::warn,
+use super::archivist_server::{AccessorServer, ServerError};
+use anyhow::{bail, Error};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_diagnostics as diagnostics;
+use fidl_fuchsia_diagnostics::{
+    self, ClientSelectorConfiguration, DataType, Format, Selector, SelectorArgument, StreamMode,
 };
+use selectors::VerboseError;
+use tracing::warn;
 
 /// ArchiveAccessor serves an incoming connection from a client to an Archivist
 /// instance, through which the client may make Reader requests to get Inspect

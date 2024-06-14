@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    diagnostics_data::{Data, Logs},
-    example_tester::{
-        assert_filtered_logs_eq_to_golden, logs_to_str, run_test, Client, Proxy, Server, TestKind,
-    },
-    fidl::prelude::*,
-    fuchsia_async as fasync,
-    fuchsia_component_test::{ChildRef, RealmBuilder},
+use anyhow::Error;
+use diagnostics_data::{Data, Logs};
+use example_tester::{
+    assert_filtered_logs_eq_to_golden, logs_to_str, run_test, Client, Proxy, Server, TestKind,
 };
+use fidl::prelude::*;
+use fuchsia_async as fasync;
+use fuchsia_component_test::{ChildRef, RealmBuilder};
 
 // Tests the framework for a single component running locally. This is useful for testing things
 // like local logging and persistent FIDL.

@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Error, Result};
+use fidl::endpoints::{create_endpoints, DiscoverableProtocolMarker};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::channel::mpsc;
+use futures::prelude::*;
+use futures::{StreamExt, TryStreamExt};
+use realm_client::{extend_namespace, InstalledNamespace};
+use tracing::info;
 use {
-    anyhow::{Error, Result},
-    fidl::endpoints::{create_endpoints, DiscoverableProtocolMarker},
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_driver_testing as ftest, fidl_fuchsia_io as fio,
-    fidl_fuchsia_nodegroup_test as ft, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    futures::{channel::mpsc, StreamExt, TryStreamExt},
-    realm_client::{extend_namespace, InstalledNamespace},
-    tracing::info,
+    fidl_fuchsia_nodegroup_test as ft, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 async fn run_waiter_server(mut stream: ft::WaiterRequestStream, mut sender: mpsc::Sender<()>) {

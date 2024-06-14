@@ -11,7 +11,7 @@
 #include <memory>
 
 #include "src/developer/forensics/testing/stubs/cobalt_logger.h"
-#include "src/developer/forensics/testing/stubs/fidl_server.h"
+#include "src/developer/forensics/testing/stubs/fidl_server_hlcpp.h"
 #include "src/developer/forensics/utils/cobalt/event.h"
 
 namespace forensics {

@@ -3,17 +3,18 @@
 // found in the LICENSE file.
 
 use attribution::{AttributionServer, AttributionServerHandle};
-use fidl::endpoints::RequestStream;
-use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker};
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_memory_attribution as fattribution;
-use fuchsia_async as fasync;
+use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker, RequestStream};
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::TryStreamExt;
 use std::sync::Arc;
 use zx::AsHandleRef;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
+    fuchsia_async as fasync,
+};
 
-use crate::{component::ElfComponentInfo, ComponentSet};
+use crate::component::ElfComponentInfo;
+use crate::ComponentSet;
 
 pub struct MemoryReporter {
     server: AttributionServerHandle,
@@ -128,12 +129,12 @@ mod tests {
     use super::*;
     use crate::tests::{lifecycle_startinfo, new_elf_runner_for_test};
     use cm_config::SecurityPolicy;
-    use fidl_fuchsia_component_runner as fcrunner;
-    use fidl_fuchsia_io as fio;
-    use fuchsia_async as fasync;
     use futures::FutureExt;
     use moniker::Moniker;
     use routing::policy::ScopedPolicyChecker;
+    use {
+        fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    };
 
     /// Test that the ELF runner can tell us about the resources used by the component it runs.
     #[test]

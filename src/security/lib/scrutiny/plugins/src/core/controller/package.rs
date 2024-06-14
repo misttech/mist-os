@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::collection::Packages,
-    anyhow::{anyhow, Context, Result},
-    fuchsia_url::AbsolutePackageUrl,
-    scrutiny::{model::controller::DataController, model::model::DataModel},
-    scrutiny_utils::{url::from_pkg_url_parts, usage::UsageBuilder},
-    serde_json::value::Value,
-    std::sync::Arc,
-};
+use crate::core::collection::Packages;
+use anyhow::{anyhow, Context, Result};
+use fuchsia_url::AbsolutePackageUrl;
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::url::from_pkg_url_parts;
+use scrutiny_utils::usage::UsageBuilder;
+use serde_json::value::Value;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct PackagesGraphController {}
@@ -80,16 +80,15 @@ impl DataController for PackageUrlListController {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{PackageUrlListController, PackagesGraphController},
-        crate::core::collection::{Package, Packages},
-        fuchsia_merkle::HASH_SIZE,
-        fuchsia_url::{PackageName, PackageVariant},
-        scrutiny::model::controller::DataController,
-        scrutiny_testing::fake::fake_data_model,
-        serde_json::json,
-        std::{collections::HashMap, str::FromStr},
-    };
+    use super::{PackageUrlListController, PackagesGraphController};
+    use crate::core::collection::{Package, Packages};
+    use fuchsia_merkle::HASH_SIZE;
+    use fuchsia_url::{PackageName, PackageVariant};
+    use scrutiny::model::controller::DataController;
+    use scrutiny_testing::fake::fake_data_model;
+    use serde_json::json;
+    use std::collections::HashMap;
+    use std::str::FromStr;
 
     static ZERO_MERKLE: [u8; HASH_SIZE] = [0; HASH_SIZE];
 

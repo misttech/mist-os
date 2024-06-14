@@ -2,33 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        component_model::{BuildAnalyzerModelError, Child},
-        environment::EnvironmentForAnalyzer,
-    },
-    async_trait::async_trait,
-    cm_config::RuntimeConfig,
-    cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl},
-    cm_types::{Name, Url},
-    config_encoder::ConfigFields,
-    moniker::{ChildName, Moniker},
-    routing::{
-        capability_source::{BuiltinCapabilities, NamespaceCapabilities},
-        component_instance::{
-            ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
-            TopInstanceInterface, WeakExtendedInstanceInterface,
-        },
-        environment::RunnerRegistry,
-        error::ComponentInstanceError,
-        policy::GlobalPolicyChecker,
-        resolving::{ComponentAddress, ComponentResolutionContext},
-    },
-    std::{
-        collections::HashMap,
-        sync::{Arc, RwLock},
-    },
+use crate::component_model::{BuildAnalyzerModelError, Child};
+use crate::environment::EnvironmentForAnalyzer;
+use async_trait::async_trait;
+use cm_config::RuntimeConfig;
+use cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl};
+use cm_types::{Name, Url};
+use config_encoder::ConfigFields;
+use moniker::{ChildName, Moniker};
+use routing::capability_source::{BuiltinCapabilities, NamespaceCapabilities};
+use routing::component_instance::{
+    ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
+    TopInstanceInterface, WeakExtendedInstanceInterface,
 };
+use routing::environment::RunnerRegistry;
+use routing::error::ComponentInstanceError;
+use routing::policy::GlobalPolicyChecker;
+use routing::resolving::{ComponentAddress, ComponentResolutionContext};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 /// A representation of a v2 component instance.
 #[derive(Debug)]
@@ -268,7 +260,9 @@ impl TopInstanceInterface for TopInstanceForAnalyzer {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, cm_rust_testing::ComponentDeclBuilder, futures::FutureExt};
+    use super::*;
+    use cm_rust_testing::ComponentDeclBuilder;
+    use futures::FutureExt;
 
     // Spot-checks that `ComponentInstanceForAnalyzer`'s implementation of the `ComponentInstanceInterface`
     // trait method `lock_resolved_state()` returns immediately. In addition, updates to that method should

@@ -4,16 +4,14 @@
 
 //! Common types for dealing with ip table entries.
 
-use core::{
-    convert::Infallible as Never,
-    fmt::{Debug, Display, Formatter},
-    hash::Hash,
-};
+use core::convert::Infallible as Never;
+use core::fmt::{Debug, Display, Formatter};
+use core::hash::Hash;
 
-use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither},
-    SpecifiedAddr,
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither,
 };
+use net_types::SpecifiedAddr;
 use netstack3_base::socket::SocketIpAddr;
 
 /// The priority of a forwarding entry. Lower metrics are preferred.
@@ -385,23 +383,6 @@ where
     A::Version: IpTypesIpExt,
 {
     type Type = NextHop<NewIp::Addr>;
-}
-
-impl<A> NextHop<A>
-where
-    A: IpAddress,
-    A::Version: IpTypesIpExt,
-{
-    pub(crate) fn into_next_hop_and_broadcast_marker(
-        self,
-        remote_ip: SpecifiedAddr<A>,
-    ) -> (SpecifiedAddr<A>, Option<<A::Version as IpTypesIpExt>::BroadcastMarker>) {
-        match self {
-            NextHop::RemoteAsNeighbor => (remote_ip, None),
-            NextHop::Gateway(gateway) => (gateway, None),
-            NextHop::Broadcast(marker) => (remote_ip, Some(marker)),
-        }
-    }
 }
 
 /// An IP Address that witnesses properties needed to be routed.

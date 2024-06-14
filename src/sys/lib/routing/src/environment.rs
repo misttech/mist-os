@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        component_instance::{
-            ComponentInstanceInterface, ExtendedInstanceInterface, WeakExtendedInstanceInterface,
-        },
-        error::ComponentInstanceError,
-    },
-    cm_rust::{RegistrationDeclCommon, RegistrationSource, RunnerRegistration, SourceName},
-    cm_types::{Name, Url},
-    fidl_fuchsia_component_decl as fdecl,
-    std::{collections::HashMap, sync::Arc},
+use crate::component_instance::{
+    ComponentInstanceInterface, ExtendedInstanceInterface, WeakExtendedInstanceInterface,
 };
+use crate::error::ComponentInstanceError;
+use cm_rust::{RegistrationDeclCommon, RegistrationSource, RunnerRegistration, SourceName};
+use cm_types::{Name, Url};
+use fidl_fuchsia_component_decl as fdecl;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

@@ -5,13 +5,16 @@
 use component_id_index::{Index, InstanceId};
 use fidl::persist;
 use fidl_fuchsia_component_internal::ComponentIdIndex;
-use fidl_fuchsia_hardware_power_statecontrol as reboot;
-use fidl_fuchsia_mockrebootcontroller as controller;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{channel::mpsc, lock::Mutex, SinkExt, StreamExt, TryStreamExt};
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::{SinkExt, StreamExt, TryStreamExt};
 use moniker::Moniker;
-use std::{str::FromStr, sync::Arc};
+use std::str::FromStr;
+use std::sync::Arc;
+use {
+    fidl_fuchsia_hardware_power_statecontrol as reboot,
+    fidl_fuchsia_mockrebootcontroller as controller, fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 /// Test data for moniker <-> ID file.
 /// This will be sent to Sampler as though it were coming from Product Assembly.

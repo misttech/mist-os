@@ -5,11 +5,10 @@
 use crate::test_topology;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Data, Logs, RetryConfig};
-use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
-use fuchsia_async as fasync;
 use futures::StreamExt;
+use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
 
 const HELLO_WORLD: &str = "Hello, world!";
 

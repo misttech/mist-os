@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::anyhow,
-    serde::Deserialize,
-    std::{
-        fs::File,
-        io::{BufReader, Read},
-    },
-    thiserror::Error,
-    tracing::{error, info},
-};
+use anyhow::anyhow;
+use serde::Deserialize;
+use std::fs::File;
+use std::io::{BufReader, Read};
+use thiserror::Error;
+use tracing::{error, info};
 
 /// Static service configuration options.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -98,7 +94,9 @@ enum ConfigLoadError {
 #[cfg(test)]
 #[allow(clippy::bool_assert_comparison)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, serde_json::json};
+    use super::*;
+    use assert_matches::assert_matches;
+    use serde_json::json;
 
     fn verify_load_dyn(input: serde_json::Value, expected: Config) {
         assert_eq!(

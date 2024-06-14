@@ -6,9 +6,8 @@
 //!
 //! See [KeymapHandler] for details.
 
-use crate::input_device;
 use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
-use crate::keyboard_binding;
+use crate::{input_device, keyboard_binding};
 use async_trait::async_trait;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon as zx;
@@ -125,13 +124,14 @@ impl KeymapHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{consumer_controls_binding, input_handler::InputHandler, testing_utilities};
-    use fidl_fuchsia_input as finput;
-    use fidl_fuchsia_ui_input3 as finput3;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
+    use crate::input_handler::InputHandler;
+    use crate::{consumer_controls_binding, testing_utilities};
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
+    use {
+        fidl_fuchsia_input as finput, fidl_fuchsia_ui_input3 as finput3, fuchsia_async as fasync,
+        fuchsia_zircon as zx,
+    };
 
     // A mod-specific version of `testing_utilities::create_keyboard_event`.
     fn create_unhandled_keyboard_event(

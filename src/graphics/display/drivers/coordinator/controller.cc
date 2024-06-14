@@ -59,24 +59,10 @@
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/graphics/display/lib/edid/timings.h"
-#include "src/lib/async-watchdog/watchdog.h"
 
 namespace fidl_display = fuchsia_hardware_display;
 
-namespace {
-
-// Use the same default watchdog timeout as scenic, which may help ensure watchdog logs/errors
-// happen close together and can be correlated.
-constexpr uint64_t kWatchdogWarningIntervalMs = 15000;
-constexpr uint64_t kWatchdogTimeoutMs = 45000;
-
-}  // namespace
-
 namespace display {
-
-void Controller::PopulateDisplayMode(const display::DisplayTiming& timing, display_mode_t* mode) {
-  *mode = display::ToBanjoDisplayMode(timing);
-}
 
 void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   if (!info->edid.has_value()) {
@@ -679,27 +665,22 @@ void Controller::OnClientDead(ClientProxy* client) {
       [client](std::unique_ptr<ClientProxy>& list_client) { return list_client.get() == client; });
 }
 
-bool Controller::GetPanelConfig(DisplayId display_id,
-                                const fbl::Vector<display::DisplayTiming>** timings,
-                                const display_mode_t** mode) {
+zx::result<cpp20::span<const DisplayTiming>> Controller::GetDisplayTimings(DisplayId display_id) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   if (unbinding_) {
-    return false;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
   for (auto& display : displays_) {
     if (display.id == display_id) {
       if (display.edid.has_value()) {
-        *timings = &display.edid->timings;
-        *mode = nullptr;
-      } else {
-        ZX_DEBUG_ASSERT(display.mode.has_value());
-        *timings = nullptr;
-        *mode = &*display.mode;
+        return zx::ok(cpp20::span(display.edid->timings));
       }
-      return true;
+
+      ZX_DEBUG_ASSERT(display.mode.has_value());
+      return zx::ok(cpp20::span(&*display.mode, 1));
     }
   }
-  return false;
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelFormats(
@@ -882,18 +863,6 @@ zx::result<std::unique_ptr<Controller>> Controller::Create(
 }
 
 zx::result<> Controller::Initialize() {
-  fbl::AllocChecker alloc_checker;
-  watchdog_ = fbl::make_unique_checked<async_watchdog::Watchdog>(
-      &alloc_checker, "display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
-      client_dispatcher_->async_dispatcher());
-  if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for Watchdog");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  supports_capture_ = engine_driver_client_->IsCaptureSupported();
-  zxlogf(INFO, "Display capture is%s supported", supports_capture_ ? "" : " not");
-
   zx::result<> vsync_monitor_init_result = vsync_monitor_.Initialize();
   if (vsync_monitor_init_result.is_error()) {
     // VsyncMonitor::Init() logged the error.
@@ -904,6 +873,9 @@ zx::result<> Controller::Initialize() {
       .ops = &display_controller_interface_protocol_ops_,
       .ctx = this,
   });
+
+  supports_capture_ = engine_driver_client_->IsCaptureSupported();
+  zxlogf(INFO, "Display capture is%s supported", supports_capture_ ? "" : " not");
 
   return zx::ok();
 }

@@ -5,37 +5,36 @@
 mod config;
 mod validators;
 
+use anyhow::{format_err, Error};
+use config::{Config, ConfigContext, FactoryConfig};
+use fidl::endpoints::{create_proxy, ProtocolMarker, Request, RequestStream, ServerEnd};
+use fidl_fuchsia_boot::FactoryItemsMarker;
+use fidl_fuchsia_factory::{
+    AlphaFactoryStoreProviderMarker, AlphaFactoryStoreProviderRequest,
+    AlphaFactoryStoreProviderRequestStream, CastCredentialsFactoryStoreProviderMarker,
+    CastCredentialsFactoryStoreProviderRequest, CastCredentialsFactoryStoreProviderRequestStream,
+    MiscFactoryStoreProviderMarker, MiscFactoryStoreProviderRequest,
+    MiscFactoryStoreProviderRequestStream, PlayReadyFactoryStoreProviderMarker,
+    PlayReadyFactoryStoreProviderRequest, PlayReadyFactoryStoreProviderRequestStream,
+    WeaveFactoryStoreProviderMarker, WeaveFactoryStoreProviderRequest,
+    WeaveFactoryStoreProviderRequestStream, WidevineFactoryStoreProviderMarker,
+    WidevineFactoryStoreProviderRequest, WidevineFactoryStoreProviderRequestStream,
+};
+use fidl_fuchsia_storage_ext4::{MountVmoResult, Server_Marker};
+use fuchsia_bootfs::BootfsParser;
+use fuchsia_component::server::ServiceFs;
+use futures::lock::Mutex;
+use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use remote_block_device::BlockClient as _;
+use std::io;
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::{self};
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::read_only;
+use vfs::tree_builder::TreeBuilder;
 use {
-    anyhow::{format_err, Error},
-    config::{Config, ConfigContext, FactoryConfig},
-    fidl::endpoints::{create_proxy, ProtocolMarker, Request, RequestStream, ServerEnd},
-    fidl_fuchsia_boot::FactoryItemsMarker,
-    fidl_fuchsia_factory::{
-        AlphaFactoryStoreProviderMarker, AlphaFactoryStoreProviderRequest,
-        AlphaFactoryStoreProviderRequestStream, CastCredentialsFactoryStoreProviderMarker,
-        CastCredentialsFactoryStoreProviderRequest,
-        CastCredentialsFactoryStoreProviderRequestStream, MiscFactoryStoreProviderMarker,
-        MiscFactoryStoreProviderRequest, MiscFactoryStoreProviderRequestStream,
-        PlayReadyFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderRequest,
-        PlayReadyFactoryStoreProviderRequestStream, WeaveFactoryStoreProviderMarker,
-        WeaveFactoryStoreProviderRequest, WeaveFactoryStoreProviderRequestStream,
-        WidevineFactoryStoreProviderMarker, WidevineFactoryStoreProviderRequest,
-        WidevineFactoryStoreProviderRequestStream,
-    },
-    fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio,
-    fidl_fuchsia_storage_ext4::{MountVmoResult, Server_Marker},
-    fuchsia_bootfs::BootfsParser,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon as zx,
-    futures::{lock::Mutex, StreamExt as _, TryFutureExt as _, TryStreamExt as _},
-    remote_block_device::BlockClient as _,
-    std::{io, sync::Arc},
-    vfs::{
-        directory::{self, entry_container::Directory},
-        execution_scope::ExecutionScope,
-        file::vmo::read_only,
-        tree_builder::TreeBuilder,
-    },
+    fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
 };
 
 const CONCURRENT_LIMIT: usize = 10_000;
@@ -427,9 +426,10 @@ async fn main() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl::endpoints::create_endpoints, fuchsia_async as fasync, vfs::pseudo_directory,
-    };
+    use super::*;
+    use fidl::endpoints::create_endpoints;
+    use fuchsia_async as fasync;
+    use vfs::pseudo_directory;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_open_factory_verity() {

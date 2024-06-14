@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::additional_boot_args::collection::AdditionalBootConfigCollection,
-    anyhow::{Context, Result},
-    scrutiny::{model::controller::DataController, model::model::*},
-    scrutiny_utils::usage::UsageBuilder,
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::sync::Arc,
-};
+use crate::additional_boot_args::collection::AdditionalBootConfigCollection;
+use anyhow::{Context, Result};
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::*;
+use scrutiny_utils::usage::UsageBuilder;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize)]
 pub struct ExtractAdditionalBootConfigRequest;

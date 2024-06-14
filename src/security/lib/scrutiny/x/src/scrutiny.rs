@@ -2,20 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::api;
-use super::api::Bootfs as _;
-use super::api::BootfsError;
-use super::api::System as _;
-use super::blob::BlobDirectoryError;
-use super::blob::BlobOpenError;
-use super::blob::BlobSet;
-use super::blob::CompositeBlobSet;
+use super::api::{Bootfs as _, BootfsError, System as _};
+use super::blob::{BlobDirectoryError, BlobOpenError, BlobSet, CompositeBlobSet};
 use super::hash::Hash;
-use super::package::Error as PackageError;
-use super::package::Package;
-use super::product_bundle as pb;
-use super::system::Error as SystemError;
-use super::system::System;
+use super::package::{Error as PackageError, Package};
+use super::system::{Error as SystemError, System};
+use super::{api, product_bundle as pb};
 use cm_rust::ComponentDecl;
 use fuchsia_url::AbsolutePackageUrl;
 use std::rc::Rc;

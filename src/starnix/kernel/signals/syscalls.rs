@@ -4,36 +4,32 @@
 
 pub use super::signal_handling::sys_restart_syscall;
 use super::signalfd::SignalFd;
-use crate::{
-    mm::{MemoryAccessor, MemoryAccessorExt},
-    security,
-    signals::{
-        restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
-        SI_HEADER_SIZE,
-    },
-    task::{
-        CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
-        WaitResult, Waiter,
-    },
-    vfs::{FdFlags, FdNumber},
+use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::security;
+use crate::signals::{
+    restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
+    SI_HEADER_SIZE,
 };
+use crate::task::{
+    CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup, WaitResult,
+    Waiter,
+};
+use crate::vfs::{FdFlags, FdNumber};
 use fuchsia_zircon as zx;
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
+use starnix_uapi::errors::{Errno, ErrnoResultExt, EINTR, ETIMEDOUT};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
+use starnix_uapi::time::{duration_from_timespec, timeval_from_duration};
+use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    errno, error,
-    errors::{Errno, ErrnoResultExt, EINTR, ETIMEDOUT},
-    open_flags::OpenFlags,
-    ownership::{TempRef, WeakRef},
-    pid_t, rusage, sigaction, sigaltstack,
-    signals::{sigaltstack_contains_pointer, SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
-    time::{duration_from_timespec, timeval_from_duration},
-    timespec,
-    user_address::{UserAddress, UserRef},
-    MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK,
-    SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED,
-    WEXITED, WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
+    errno, error, pid_t, rusage, sigaction, sigaltstack, timespec, MINSIGSTKSZ, P_ALL, P_PGID,
+    P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE,
+    SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG,
+    WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
 };
 use static_assertions::const_assert_eq;
 use std::sync::Arc;
@@ -94,7 +90,7 @@ pub fn sys_rt_sigpending(
         return error!(EINVAL);
     }
 
-    let signals = current_task.read().signals.pending();
+    let signals = current_task.read().pending_signals();
     current_task.write_object(set, &signals)?;
     Ok(())
 }
@@ -123,8 +119,7 @@ pub fn sys_rt_sigprocmask(
     }
 
     let mut state = current_task.write();
-    let signal_state = &mut state.signals;
-    let signal_mask = signal_state.mask();
+    let signal_mask = state.signal_mask();
     // If old_set is not null, store the previous value in old_set.
     if !user_old_set.is_null() {
         current_task.write_object(user_old_set, &signal_mask)?;
@@ -142,7 +137,7 @@ pub fn sys_rt_sigprocmask(
         // Arguments have already been verified, this should never match.
         _ => return error!(EINVAL),
     };
-    signal_state.set_mask(signal_mask);
+    state.set_signal_mask(signal_mask);
 
     Ok(())
 }
@@ -153,17 +148,9 @@ pub fn sys_sigaltstack(
     user_ss: UserRef<sigaltstack>,
     user_old_ss: UserRef<sigaltstack>,
 ) -> Result<(), Errno> {
+    let stack_pointer_register = current_task.thread_state.registers.stack_pointer_register();
     let mut state = current_task.write();
-    let signal_state = &mut state.signals;
-    let on_signal_stack = signal_state
-        .alt_stack
-        .map(|signal_stack| {
-            sigaltstack_contains_pointer(
-                &signal_stack,
-                current_task.thread_state.registers.stack_pointer_register(),
-            )
-        })
-        .unwrap_or(false);
+    let on_signal_stack = state.on_signal_stack(stack_pointer_register);
 
     let mut ss = sigaltstack::default();
     if !user_ss.is_null() {
@@ -180,7 +167,7 @@ pub fn sys_sigaltstack(
     }
 
     if !user_old_ss.is_null() {
-        let mut old_ss = match signal_state.alt_stack {
+        let mut old_ss = match state.sigaltstack() {
             Some(old_ss) => old_ss,
             None => sigaltstack { ss_flags: SS_DISABLE as i32, ..sigaltstack::default() },
         };
@@ -192,9 +179,9 @@ pub fn sys_sigaltstack(
 
     if !user_ss.is_null() {
         if ss.ss_flags & (SS_DISABLE as i32) != 0 {
-            signal_state.alt_stack = None;
+            state.set_sigaltstack(None);
         } else {
-            signal_state.alt_stack = Some(ss);
+            state.set_sigaltstack(Some(ss));
         }
     }
 
@@ -246,21 +233,22 @@ pub fn sys_rt_sigtimedwait(
 
     let signal_info = loop {
         let waiter;
+
         {
-            let signals = &mut current_task.write().signals;
+            let mut task_state = current_task.write();
             // If one of the signals in set is already pending for the calling thread,
             // sigwaitinfo() will return immediately.
-            if let Some(signal) = signals.take_next_where(|sig| unblock.has_signal(sig.signal)) {
+            if let Some(signal) = task_state.take_signal_with_mask(!unblock) {
                 break signal;
             }
 
             waiter = Waiter::new();
-            signals.signal_wait.wait_async(&waiter);
+            task_state.wait_on_signal(&waiter);
         }
 
         // A new signal is enqueued when it's masked in the SignalState. So we need to invert
         // the SigSet to block them.
-        let tmp_mask = current_task.read().signals.mask() & !unblock;
+        let tmp_mask = current_task.read().signal_mask() & !unblock;
 
         // Wait for a timeout or a new signal.
         let waiter_result = current_task.wait_with_temporary_mask(tmp_mask, |current_task| {
@@ -268,14 +256,12 @@ pub fn sys_rt_sigtimedwait(
         });
 
         // Restore mask after timeout or get a new signal.
-        current_task.write().signals.restore_mask();
+        current_task.write().restore_signal_mask();
 
         if let Err(e) = waiter_result {
             if e == EINTR {
                 // Check if EINTR was returned for a signal we were waiting for.
-                let signals = &mut current_task.write().signals;
-                if let Some(signal) = signals.take_next_where(|sig| unblock.has_signal(sig.signal))
-                {
+                if let Some(signal) = current_task.write().take_signal_with_mask(!unblock) {
                     break signal;
                 }
             } else if e == ETIMEDOUT {
@@ -410,21 +396,7 @@ pub fn sys_kill(
                 }
             };
 
-            let target_thread_group_lock = target_thread_group.read();
-            let target = match target_thread_group_lock.get_signal_target(unchecked_signal) {
-                Some(task) => task,
-
-                // The task is a zombine by now, so the signal can be dropped.
-                None => return Ok(()),
-            };
-
-            let target = TempRef::into_static(target);
-            std::mem::drop(target_thread_group_lock);
-
-            if !current_task.can_signal(&target, unchecked_signal) {
-                return error!(EPERM);
-            }
-            send_unchecked_signal(current_task, &target, unchecked_signal, SI_USER as i32)?;
+            target_thread_group.send_signal_unchecked(current_task, unchecked_signal)?;
         }
         pid if pid == -1 => {
             // "If pid equals -1, then sig is sent to every process for which
@@ -528,7 +500,7 @@ pub fn sys_rt_sigreturn(
     Ok(current_task.thread_state.registers.return_register().into())
 }
 
-fn read_siginfo(
+pub fn read_siginfo(
     current_task: &CurrentTask,
     signal: Signal,
     siginfo_ref: UserAddress,
@@ -555,13 +527,8 @@ pub fn sys_rt_sigqueueinfo(
     siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
     let weak_task = current_task.kernel().pids.read().get_task(tgid);
-    let thread_group = Task::from_weak(&weak_task)?.thread_group.clone();
-    let target = thread_group
-        .read()
-        .get_signal_target(unchecked_signal)
-        .map(TempRef::into_static)
-        .ok_or_else(|| errno!(ESRCH))?;
-    send_unchecked_signal_info(current_task, &target, unchecked_signal, siginfo_ref)
+    let task = &Task::from_weak(&weak_task)?;
+    task.thread_group.send_signal_unchecked_with_info(current_task, unchecked_signal, siginfo_ref)
 }
 
 pub fn sys_rt_tgsigqueueinfo(
@@ -625,17 +592,7 @@ where
     // This loop keeps track of whether a signal was sent, so that "on
     // success (at least one signal was sent), zero is returned."
     for thread_group in thread_groups {
-        let target = thread_group
-            .read()
-            .get_signal_target(unchecked_signal)
-            .map(TempRef::into_static)
-            .ok_or_else(|| errno!(ESRCH))?;
-        if !current_task.can_signal(&target, unchecked_signal) {
-            last_error = errno!(EPERM);
-            continue;
-        }
-
-        match send_unchecked_signal(current_task, &target, unchecked_signal, SI_USER as i32) {
+        match thread_group.send_signal_unchecked(current_task, unchecked_signal) {
             Ok(_) => sent_signal = true,
             Err(errno) => last_error = errno,
         }
@@ -905,21 +862,19 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        mm::{vmo::round_up_to_system_page_size, PAGE_SIZE},
-        signals::{send_standard_signal, testing::dequeue_signal_for_test},
-        task::{ExitStatus, ProcessExitInfo},
-        testing::*,
+    use crate::mm::vmo::round_up_to_system_page_size;
+    use crate::mm::PAGE_SIZE;
+    use crate::signals::send_standard_signal;
+    use crate::signals::testing::dequeue_signal_for_test;
+    use crate::task::{ExitStatus, ProcessExitInfo};
+    use crate::testing::*;
+    use starnix_uapi::auth::Credentials;
+    use starnix_uapi::errors::ERESTARTSYS;
+    use starnix_uapi::signals::{
+        SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
+        SIGUSR1,
     };
-    use starnix_uapi::{
-        auth::Credentials,
-        errors::ERESTARTSYS,
-        signals::{
-            SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
-            SIGUSR1,
-        },
-        uaddr, uid_t, SI_QUEUE,
-    };
+    use starnix_uapi::{uaddr, uid_t, SI_QUEUE};
     use zerocopy::AsBytes;
 
     #[cfg(target_arch = "x86_64")]
@@ -1143,7 +1098,7 @@ mod tests {
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let original_mask = SigSet::from(SIGTRAP);
         {
-            current_task.write().signals.set_mask(original_mask);
+            current_task.write().set_signal_mask(original_mask);
         }
 
         let set = UserRef::<SigSet>::default();
@@ -1177,7 +1132,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let original_mask = SigSet::from(SIGTRAP);
         {
-            current_task.write().signals.set_mask(original_mask);
+            current_task.write().set_signal_mask(original_mask);
         }
 
         let set = UserRef::<SigSet>::default();
@@ -1195,7 +1150,7 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(current_task.read().signals.mask(), original_mask);
+        assert_eq!(current_task.read().signal_mask(), original_mask);
     }
 
     /// Calling rt_sigprocmask with SIG_SETMASK should set the mask to the provided set.
@@ -1209,7 +1164,7 @@ mod tests {
 
         let original_mask = SigSet::from(SIGTRAP);
         {
-            current_task.write().signals.set_mask(original_mask);
+            current_task.write().set_signal_mask(original_mask);
         }
 
         let new_mask = SigSet::from(SIGIO);
@@ -1233,7 +1188,7 @@ mod tests {
 
         let old_mask = current_task.read_object(old_set).expect("failed to read mask");
         assert_eq!(old_mask, original_mask);
-        assert_eq!(current_task.read().signals.mask(), new_mask);
+        assert_eq!(current_task.read().signal_mask(), new_mask);
     }
 
     /// Calling st_sigprocmask with a how of SIG_BLOCK should add to the existing set.
@@ -1247,7 +1202,7 @@ mod tests {
 
         let original_mask = SigSet::from(SIGTRAP);
         {
-            current_task.write().signals.set_mask(original_mask);
+            current_task.write().set_signal_mask(original_mask);
         }
 
         let new_mask = SigSet::from(SIGIO);
@@ -1271,7 +1226,7 @@ mod tests {
 
         let old_mask = current_task.read_object(old_set).expect("failed to read mask");
         assert_eq!(old_mask, original_mask);
-        assert_eq!(current_task.read().signals.mask(), new_mask | original_mask);
+        assert_eq!(current_task.read().signal_mask(), new_mask | original_mask);
     }
 
     /// Calling st_sigprocmask with a how of SIG_UNBLOCK should remove from the existing set.
@@ -1285,7 +1240,7 @@ mod tests {
 
         let original_mask = SigSet::from(SIGTRAP) | SigSet::from(SIGIO);
         {
-            current_task.write().signals.set_mask(original_mask);
+            current_task.write().set_signal_mask(original_mask);
         }
 
         let new_mask = SigSet::from(SIGTRAP);
@@ -1309,7 +1264,7 @@ mod tests {
 
         let old_mask = current_task.read_object(old_set).expect("failed to read mask");
         assert_eq!(old_mask, original_mask);
-        assert_eq!(current_task.read().signals.mask(), SIGIO.into());
+        assert_eq!(current_task.read().signal_mask(), SIGIO.into());
     }
 
     /// It's ok to call sigprocmask to unblock a signal that is not set.
@@ -1323,7 +1278,7 @@ mod tests {
 
         let original_mask = SigSet::from(SIGIO);
         {
-            current_task.write().signals.set_mask(original_mask);
+            current_task.write().set_signal_mask(original_mask);
         }
 
         let new_mask = SigSet::from(SIGTRAP);
@@ -1347,7 +1302,7 @@ mod tests {
 
         let old_mask = current_task.read_object(old_set).expect("failed to read mask");
         assert_eq!(old_mask, original_mask);
-        assert_eq!(current_task.read().signals.mask(), original_mask);
+        assert_eq!(current_task.read().signal_mask(), original_mask);
     }
 
     /// It's not possible to block SIGKILL or SIGSTOP.
@@ -1361,7 +1316,7 @@ mod tests {
 
         let original_mask = SigSet::from(SIGIO);
         {
-            current_task.write().signals.set_mask(original_mask);
+            current_task.write().set_signal_mask(original_mask);
         }
 
         let new_mask = UNBLOCKABLE_SIGNALS;
@@ -1385,7 +1340,7 @@ mod tests {
 
         let old_mask = current_task.read_object(old_set).expect("failed to read mask");
         assert_eq!(old_mask, original_mask);
-        assert_eq!(current_task.read().signals.mask(), original_mask);
+        assert_eq!(current_task.read().signal_mask(), original_mask);
     }
 
     #[::fuchsia::test]
@@ -1509,9 +1464,9 @@ mod tests {
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&mut locked, &task1, 0, SIGINT.into()), Ok(()));
-        assert_eq!(task1.read().signals.queued_count(SIGINT), 1);
-        assert_eq!(task2.read().signals.queued_count(SIGINT), 1);
-        assert_eq!(init_task.read().signals.queued_count(SIGINT), 0);
+        assert_eq!(task1.read().queued_signal_count(SIGINT), 1);
+        assert_eq!(task2.read().queued_signal_count(SIGINT), 1);
+        assert_eq!(init_task.read().queued_signal_count(SIGINT), 0);
     }
 
     /// A task should be able to signal a thread group.
@@ -1523,9 +1478,9 @@ mod tests {
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&mut locked, &task1, -task1.id, SIGINT.into()), Ok(()));
-        assert_eq!(task1.read().signals.queued_count(SIGINT), 1);
-        assert_eq!(task2.read().signals.queued_count(SIGINT), 1);
-        assert_eq!(init_task.read().signals.queued_count(SIGINT), 0);
+        assert_eq!(task1.read().queued_signal_count(SIGINT), 1);
+        assert_eq!(task2.read().queued_signal_count(SIGINT), 1);
+        assert_eq!(init_task.read().queued_signal_count(SIGINT), 0);
     }
 
     /// A task should be able to signal everything but init and itself.
@@ -1537,9 +1492,9 @@ mod tests {
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&mut locked, &task1, -1, SIGINT.into()), Ok(()));
-        assert_eq!(task1.read().signals.queued_count(SIGINT), 0);
-        assert_eq!(task2.read().signals.queued_count(SIGINT), 1);
-        assert_eq!(init_task.read().signals.queued_count(SIGINT), 0);
+        assert_eq!(task1.read().queued_signal_count(SIGINT), 0);
+        assert_eq!(task2.read().queued_signal_count(SIGINT), 1);
+        assert_eq!(init_task.read().queued_signal_count(SIGINT), 0);
     }
 
     /// A task should not be able to signal a nonexistent task.
@@ -1561,7 +1516,7 @@ mod tests {
 
         assert!(!task1.can_signal(&task2, SIGINT.into()));
         assert_eq!(sys_kill(&mut locked, &task2, task1.id, SIGINT.into()), error!(EPERM));
-        assert_eq!(task1.read().signals.queued_count(SIGINT), 0);
+        assert_eq!(task1.read().queued_signal_count(SIGINT), 0);
     }
 
     /// A task should not be able to signal a task owned by another uid in a thead group.
@@ -1576,7 +1531,7 @@ mod tests {
 
         assert!(!task2.can_signal(&task1, SIGINT.into()));
         assert_eq!(sys_kill(&mut locked, &task2, -task1.id, SIGINT.into()), error!(EPERM));
-        assert_eq!(task1.read().signals.queued_count(SIGINT), 0);
+        assert_eq!(task1.read().queued_signal_count(SIGINT), 0);
     }
 
     /// A task should not be able to send an invalid signal.
@@ -1615,11 +1570,11 @@ mod tests {
             Ok(())
         );
         assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGIO.into()), Ok(()));
-        assert_eq!(current_task.read().signals.queued_count(SIGIO), 1);
+        assert_eq!(current_task.read().queued_signal_count(SIGIO), 1);
 
         // A second signal should not increment the number of pending signals.
         assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGIO.into()), Ok(()));
-        assert_eq!(current_task.read().signals.queued_count(SIGIO), 1);
+        assert_eq!(current_task.read().queued_signal_count(SIGIO), 1);
     }
 
     /// More than one instance of a real-time signal can be blocked.
@@ -1647,11 +1602,11 @@ mod tests {
             Ok(())
         );
         assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGRTMIN.into()), Ok(()));
-        assert_eq!(current_task.read().signals.queued_count(starnix_uapi::signals::SIGRTMIN), 1);
+        assert_eq!(current_task.read().queued_signal_count(starnix_uapi::signals::SIGRTMIN), 1);
 
         // A second signal should increment the number of pending signals.
         assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGRTMIN.into()), Ok(()));
-        assert_eq!(current_task.read().signals.queued_count(starnix_uapi::signals::SIGRTMIN), 2);
+        assert_eq!(current_task.read().queued_signal_count(starnix_uapi::signals::SIGRTMIN), 2);
     }
 
     #[::fuchsia::test]
@@ -1666,7 +1621,7 @@ mod tests {
             // Wait for the init task to be suspended.
             let mut suspended = false;
             while !suspended {
-                suspended = init_task_temp.read().signals.run_state.is_blocked();
+                suspended = init_task_temp.read().is_blocked();
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
 
@@ -1676,7 +1631,7 @@ mod tests {
 
             // Wait for the sigsuspend to complete.
             rx.recv().expect("receive");
-            assert!(!init_task_temp.read().signals.run_state.is_blocked());
+            assert!(!init_task_temp.read().is_blocked());
         });
 
         let addr = map_memory(&init_task, UserAddress::default(), *PAGE_SIZE);
@@ -1835,7 +1790,7 @@ mod tests {
                 let task = task.upgrade().expect("task must be alive");
                 let child: AutoReleasableTask = child.into();
                 // Wait for the main thread to be blocked on waiting for a child.
-                while !task.read().signals.run_state.is_blocked() {
+                while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
                 child.thread_group.exit(ExitStatus::Exit(0), None);
@@ -2024,7 +1979,7 @@ mod tests {
         let second_current = create_task(&mut locked, &kernel, "second task");
         let second_pid = second_current.get_pid();
         let second_tid = second_current.get_tid();
-        assert_eq!(second_current.read().signals.queued_count(SIGIO), 0);
+        assert_eq!(second_current.read().queued_signal_count(SIGIO), 0);
 
         assert_eq!(
             sys_rt_tgsigqueueinfo(
@@ -2037,10 +1992,17 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(second_current.read().signals.queued_count(SIGIO), 1);
+        assert_eq!(second_current.read().queued_signal_count(SIGIO), 1);
 
-        let queued_signal =
-            second_current.write().signals.take_next_where(|sig| sig.signal == SIGIO);
+        let signal = SignalInfo {
+            code: SI_USER as i32,
+            detail: SignalDetail::Kill {
+                pid: current_task.thread_group.leader,
+                uid: current_task.creds().uid,
+            },
+            ..SignalInfo::default(SIGIO)
+        };
+        let queued_signal = second_current.write().take_specific_signal(signal);
         if let Some(sig) = queued_signal {
             assert_eq!(sig.signal, SIGIO);
             assert_eq!(sig.errno, 0);

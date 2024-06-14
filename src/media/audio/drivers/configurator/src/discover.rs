@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{codec::CodecInterface, configurator::Configurator, dai::DaiInterface},
-    anyhow::{anyhow, Error},
-    fidl_fuchsia_io as fio,
-    futures::{lock::Mutex, TryStreamExt},
-    std::{path::Path, sync::Arc},
-};
+use crate::codec::CodecInterface;
+use crate::configurator::Configurator;
+use crate::dai::DaiInterface;
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_io as fio;
+use futures::lock::Mutex;
+use futures::TryStreamExt;
+use std::path::Path;
+use std::sync::Arc;
 
 /// Finds any codec devices and calls the `process_new_codec` Configurator callback.
 /// If `break_count` is non-zero then once `break_count` codecs are found return.
@@ -108,14 +110,10 @@ pub async fn find_dais<T: Configurator>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            config::Config,
-            testing::tests::{get_dev_proxy, NullConfigurator},
-        },
-        anyhow::Result,
-    };
+    use super::*;
+    use crate::config::Config;
+    use crate::testing::tests::{get_dev_proxy, NullConfigurator};
+    use anyhow::Result;
 
     #[fuchsia_async::run_singlethreaded(test)]
     #[ignore]

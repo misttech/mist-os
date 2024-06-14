@@ -3,19 +3,15 @@
 // found in the LICENSE file.
 
 use fidl::prelude::*;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net_tun as fnet_tun;
-use fidl_fuchsia_netemul_network as fnetemul_network;
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_mac, std_ip_v6};
-use net_types::{ip::Ipv6, Witness as _};
+use net_types::ip::Ipv6;
+use net_types::Witness as _;
 use netemul::RealmUdpSocket as _;
-use netstack_testing_common::{
-    interfaces::TestInterfaceExt as _,
-    realms::{Netstack2, TestSandboxExt as _},
-};
+use netstack_testing_common::interfaces::TestInterfaceExt as _;
+use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use netsvc_proto::{debuglog, netboot, tftp};
 use packet::{
@@ -26,7 +22,12 @@ use std::borrow::Cow;
 use std::convert::{TryFrom as _, TryInto as _};
 use std::num::NonZeroU16;
 use test_case::test_case;
-use zerocopy::{byteorder::native_endian::U32, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::byteorder::native_endian::U32;
+use zerocopy::{FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_tun as fnet_tun,
+    fidl_fuchsia_netemul_network as fnetemul_network,
+};
 
 const NETSVC_URL: &str = "#meta/netsvc.cm";
 const NETSVC_NAME: &str = "netsvc";

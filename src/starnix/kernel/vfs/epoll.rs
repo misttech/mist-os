@@ -2,30 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{
-        CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
-        WaitQueue, Waiter,
-    },
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps, WeakFileHandle,
-    },
+use crate::power::{WakeLease, WakeLeaseInterlockOps};
+use crate::task::{
+    CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
+    WaitQueue, Waiter,
 };
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps, WeakFileHandle};
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
-use starnix_uapi::{
-    errno, error,
-    errors::{Errno, EBADF, EINTR, ETIMEDOUT},
-    open_flags::OpenFlags,
-    vfs::{EpollEvent, FdEvents},
-};
-use std::{
-    collections::{hash_map::Entry, HashMap, VecDeque},
-    sync::Arc,
-};
+use starnix_uapi::errors::{Errno, EBADF, EINTR, ETIMEDOUT};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::{EpollEvent, FdEvents};
+use starnix_uapi::{errno, error};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 
 /// Maximum depth of epoll instances monitoring one another.
 /// From https://man7.org/linux/man-pages/man2/epoll_ctl.2.html
@@ -41,6 +35,9 @@ struct WaitObject {
     events: FdEvents,
     data: u64,
     wait_canceler: Option<WaitCanceler>,
+    // TODO(https://fxbug.dev/325469447): Revisit after the decision of handling wakelocks is made.
+    /// The wake lease to prevent system suspending wile processing the event.
+    wake_lease: WakeLease,
 }
 
 impl WaitObject {
@@ -214,6 +211,7 @@ impl EpollFileObject {
                     events: epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR,
                     data: epoll_event.data(),
                     wait_canceler: None,
+                    wake_lease: Default::default(),
                 });
                 self.wait_on_file(current_task, key, wait_object)
             }
@@ -237,6 +235,14 @@ impl EpollFileObject {
                     wait_canceler.cancel();
                 }
                 wait_object.events = epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR;
+                // If the new epoll event doesn't include EPOLLWAKEUP, we need to take down the
+                // wake lease. This ensures that the system doesn't stay awake unnecessarily when
+                // the event no longer requires it to be awake.
+                if wait_object.events.contains(FdEvents::EPOLLWAKEUP)
+                    && !epoll_event.events().contains(FdEvents::EPOLLWAKEUP)
+                {
+                    wait_object.wake_lease.take_lease();
+                }
                 self.wait_on_file(current_task, key, wait_object)
             }
             Entry::Vacant(_) => error!(ENOENT),
@@ -383,6 +389,8 @@ impl EpollFileObject {
             for to_wait in rearm_list.iter() {
                 // TODO handle interrupts here
                 let w = state.wait_objects.get_mut(&to_wait.key).unwrap();
+                // Drop the wake lease
+                w.wake_lease.take_lease();
                 self.wait_on_file(current_task, to_wait.key, w)?;
             }
         }
@@ -413,9 +421,15 @@ impl EpollFileObject {
                         Err(err) => log_warn!("Unexpected wait result {:#?}", err),
                         _ => {}
                     }
-                } else {
-                    state.rearm_list.push(pending_event.clone());
+                    continue;
                 }
+                // When this is the first time epoll_wait on this epoll fd, create and
+                // hold a wake lease until the next epoll_wait.
+                if wait.events.contains(FdEvents::EPOLLWAKEUP) {
+                    wait.wake_lease.activate()?;
+                }
+
+                state.rearm_list.push(pending_event.clone());
             }
         }
 
@@ -425,6 +439,15 @@ impl EpollFileObject {
         }
 
         Ok(result)
+    }
+
+    /// Drop the wake lease associated with the `file`.
+    pub fn drop_lease(&self, file: &FileHandle) {
+        let mut guard = self.state.lock();
+        let key = as_epoll_key(file).into();
+        if let Entry::Occupied(entry) = guard.wait_objects.entry(key) {
+            entry.get().wake_lease.take_lease();
+        }
     }
 }
 
@@ -483,17 +506,13 @@ impl FileOps for EpollFileObject {
 #[cfg(test)]
 mod tests {
     use super::{EpollFileObject, EventHandler, OpenFlags};
-    use crate::{
-        fs::fuchsia::create_fuchsia_pipe,
-        task::Waiter,
-        testing::{create_kernel_and_task, create_kernel_task_and_unlocked, create_task},
-        vfs::{
-            buffers::{VecInputBuffer, VecOutputBuffer},
-            eventfd::{new_eventfd, EventFdType},
-            pipe::new_pipe,
-            socket::{SocketDomain, SocketType, UnixSocket},
-        },
-    };
+    use crate::fs::fuchsia::create_fuchsia_pipe;
+    use crate::task::Waiter;
+    use crate::testing::{create_kernel_and_task, create_kernel_task_and_unlocked, create_task};
+    use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::eventfd::{new_eventfd, EventFdType};
+    use crate::vfs::pipe::new_pipe;
+    use crate::vfs::socket::{SocketDomain, SocketType, UnixSocket};
     use fuchsia_zircon::{
         HandleBased, {self as zx},
     };

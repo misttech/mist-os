@@ -203,7 +203,11 @@ func (r *Repository) UncompressedBlobPath(ctx context.Context, merkle build.Merk
 }
 
 func (r *Repository) OpenUncompressedBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
-	return r.blobStore.OpenBlob(ctx, nil, merkle)
+	file, err := r.blobStore.OpenBlob(ctx, nil, merkle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open uncompressed blob for merkle %q from TUF: %w", merkle, err)
+	}
+	return file, nil
 }
 
 func (r *Repository) OpenUpdatePackage(ctx context.Context, path string) (*UpdatePackage, error) {
@@ -216,11 +220,20 @@ func (r *Repository) OpenUpdatePackage(ctx context.Context, path string) (*Updat
 }
 
 func (r *Repository) OpenBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
-	return r.blobStore.OpenBlob(ctx, r.deliveryBlobType, merkle)
+	file, err := r.blobStore.OpenBlob(ctx, r.deliveryBlobType, merkle)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open blob for merkle %q type %d from TUF: %w", merkle, r.deliveryBlobType, err)
+	}
+	return file, nil
 }
 
 func (r *Repository) BlobSize(ctx context.Context, merkle build.MerkleRoot) (uint64, error) {
-	return r.blobStore.BlobSize(ctx, r.deliveryBlobType, merkle)
+	size, err := r.blobStore.BlobSize(ctx, r.deliveryBlobType, merkle)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get blob size for merkle %q type %d from TUF: %w", merkle, r.deliveryBlobType, err)
+	}
+	return size, nil
+
 }
 
 func (r *Repository) AlignedBlobSize(ctx context.Context, merkle build.MerkleRoot) (uint64, error) {

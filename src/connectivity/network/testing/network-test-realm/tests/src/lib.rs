@@ -4,34 +4,30 @@
 
 #![cfg(test)]
 
-use std::{borrow::Cow, collections::HashMap};
+use std::borrow::Cow;
+use std::collections::HashMap;
 
 use anyhow::Result;
 use component_events::events::EventStream;
 use derivative::Derivative;
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
-use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_test_realm as fntr;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet};
-use netstack_testing_common::{
-    interfaces::TestInterfaceExt as _,
-    packets,
-    realms::{KnownServiceProvider, Netstack2, TestSandboxExt as _},
-};
+use netstack_testing_common::interfaces::TestInterfaceExt as _;
+use netstack_testing_common::packets;
+use netstack_testing_common::realms::{KnownServiceProvider, Netstack2, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
-use std::{convert::TryInto as _, pin::pin};
+use std::convert::TryInto as _;
+use std::pin::pin;
 use test_case::test_case;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6, fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext,
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_test_realm as fntr, fidl_fuchsia_posix_socket as fposix_socket,
+    fuchsia_zircon as zx,
+};
 
 const INTERFACE1_MAC_ADDRESS: fnet::MacAddress = fidl_mac!("02:03:04:05:06:07");
 const INTERFACE2_MAC_ADDRESS: fnet::MacAddress = fidl_mac!("06:07:08:09:10:11");
@@ -1561,6 +1557,7 @@ fn extract_v6_multicast_event(data: &[u8]) -> Vec<MulticastEvent> {
                 .collect()
         }
         packet_formats::icmp::mld::MldPacket::MulticastListenerQuery(_) => Vec::new(),
+        packet_formats::icmp::mld::MldPacket::MulticastListenerQueryV2(_) => Vec::new(),
         packet_formats::icmp::mld::MldPacket::MulticastListenerReportV2(packet) => packet
             .body()
             .iter_multicast_records()

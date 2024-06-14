@@ -8,18 +8,16 @@ pub mod environment;
 mod actor_runner;
 mod counter;
 
-use {
-    crate::{counter::start_counter, environment::Environment},
-    fuchsia_async::{Time, Timer},
-    futures::{
-        future::{select, Aborted, Either},
-        stream::FuturesUnordered,
-        StreamExt,
-    },
-    rand::{rngs::SmallRng, Rng, SeedableRng},
-    std::time::Duration,
-    tracing::{error, info},
-};
+use crate::counter::start_counter;
+use crate::environment::Environment;
+use fuchsia_async::{Time, Timer};
+use futures::future::{select, Aborted, Either};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
+use std::time::Duration;
+use tracing::{error, info};
 
 /// Use entropy to generate a random seed
 pub fn random_seed() -> u64 {

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{SendResultExt, TryUnpack},
-    anyhow::format_err,
-    fidl_fuchsia_wlan_softmac as fidl_softmac,
-};
+use crate::{SendResultExt, TryUnpack};
+use anyhow::format_err;
+use fidl_fuchsia_wlan_softmac as fidl_softmac;
 
 /// Defines an abstract ResponderExt trait usually implemented using the impl_responder_ext!() macro.
 pub trait ResponderExt {

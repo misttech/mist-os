@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fidl::{endpoints, AsHandleRef, HandleBased};
+use fuchsia_component::client;
+use fuchsia_runtime::{HandleInfo, HandleType};
+use std::ffi::CString;
 use {
-    anyhow::Error,
-    fidl::endpoints,
-    fidl::{AsHandleRef, HandleBased},
     fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
-    fuchsia_async as fasync,
-    fuchsia_component::client,
-    fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon as zx,
-    std::ffi::CString,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 #[fasync::run_singlethreaded(test)]

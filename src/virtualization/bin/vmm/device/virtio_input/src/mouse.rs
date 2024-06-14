@@ -2,22 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input_device::{InputDevice, InputHandler},
-    crate::wire,
-    anyhow::Error,
-    async_trait::async_trait,
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl_fuchsia_ui_pointer::{MouseDeviceInfo, MouseEvent, MouseSourceProxy, ViewParameters},
-    futures::{
-        select,
-        stream::{Stream, StreamExt},
-    },
-    virtio_device::{
-        mem::DriverMem,
-        queue::{DescChain, DriverNotify},
-    },
-};
+use crate::input_device::{InputDevice, InputHandler};
+use crate::wire;
+use anyhow::Error;
+use async_trait::async_trait;
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl_fuchsia_ui_pointer::{MouseDeviceInfo, MouseEvent, MouseSourceProxy, ViewParameters};
+use futures::select;
+use futures::stream::{Stream, StreamExt};
+use virtio_device::mem::DriverMem;
+use virtio_device::queue::{DescChain, DriverNotify};
 
 pub struct MouseDevice<
     'a,
@@ -214,20 +208,16 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Context,
-        async_utils::PollExt,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_ui_pointer::{MousePointerSample, MouseSourceMarker, Rectangle},
-        fuchsia_async as fasync,
-        futures::FutureExt,
-        virtio_device::{
-            fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
-            util::DescChainStream,
-        },
-        zerocopy::FromBytes,
-    };
+    use super::*;
+    use anyhow::Context;
+    use async_utils::PollExt;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_ui_pointer::{MousePointerSample, MouseSourceMarker, Rectangle};
+    use fuchsia_async as fasync;
+    use futures::FutureExt;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
+    use virtio_device::util::DescChainStream;
+    use zerocopy::FromBytes;
 
     #[fuchsia::test]
     async fn test_map_interval() {

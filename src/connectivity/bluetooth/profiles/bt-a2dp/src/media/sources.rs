@@ -3,18 +3,16 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context as _, Error};
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, PcmFormat};
-use fuchsia_async as fasync;
 use fuchsia_audio_device::stream_config::SoftStreamConfig;
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
-use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::Inspect;
 use fuchsia_zircon::{self as zx, DurationNum};
 use futures::stream::{BoxStream, FusedStream};
 use futures::task::{Context, Poll};
 use futures::FutureExt;
 use std::pin::Pin;
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use crate::PcmAudio;
 

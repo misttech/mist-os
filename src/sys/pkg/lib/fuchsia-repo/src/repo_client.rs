@@ -2,48 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        range::Range,
-        repository::{Error, RepoProvider, RepositorySpec},
-        resource::Resource,
-    },
-    anyhow::{anyhow, Context as _, Result},
-    chrono::{DateTime, Utc},
-    fidl_fuchsia_pkg_ext::{
-        MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
-        RepositoryStorageType,
-    },
-    fuchsia_fs::file::Adapter,
-    fuchsia_hash::Hash,
-    fuchsia_pkg::{MetaContents, MetaSubpackages},
-    fuchsia_url::RepositoryUrl,
-    futures::{
-        future::{BoxFuture, Shared},
-        io::Cursor,
-        stream::{self, BoxStream},
-        AsyncRead, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _,
-    },
-    std::{
-        collections::{BTreeSet, HashMap},
-        fmt::{self, Debug},
-        time::SystemTime,
-    },
-    tuf::{
-        client::{Client as TufClient, Config},
-        crypto::KeyType,
-        metadata::{
-            Metadata as _, MetadataPath, MetadataVersion, RawSignedMetadata, RootMetadata,
-            TargetDescription, TargetPath,
-        },
-        pouf::Pouf1,
-        repository::{
-            EphemeralRepository, RepositoryProvider, RepositoryProvider as TufRepositoryProvider,
-            RepositoryStorage as TufRepositoryStorage,
-        },
-        Database,
-    },
+use crate::range::Range;
+use crate::repository::{Error, RepoProvider, RepositorySpec};
+use crate::resource::Resource;
+use anyhow::{anyhow, Context as _, Result};
+use chrono::{DateTime, Utc};
+use fidl_fuchsia_pkg_ext::{
+    MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
+    RepositoryStorageType,
 };
+use fuchsia_fs::file::Adapter;
+use fuchsia_hash::Hash;
+use fuchsia_pkg::{MetaContents, MetaSubpackages};
+use fuchsia_url::RepositoryUrl;
+use futures::future::{BoxFuture, Shared};
+use futures::io::Cursor;
+use futures::stream::{self, BoxStream};
+use futures::{AsyncRead, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _};
+use std::collections::{BTreeSet, HashMap};
+use std::fmt::{self, Debug};
+use std::time::SystemTime;
+use tuf::client::{Client as TufClient, Config};
+use tuf::crypto::KeyType;
+use tuf::metadata::{
+    Metadata as _, MetadataPath, MetadataVersion, RawSignedMetadata, RootMetadata,
+    TargetDescription, TargetPath,
+};
+use tuf::pouf::Pouf1;
+use tuf::repository::{
+    EphemeralRepository, RepositoryProvider, RepositoryProvider as TufRepositoryProvider,
+    RepositoryStorage as TufRepositoryStorage,
+};
+use tuf::Database;
 
 const LIST_PACKAGE_CONCURRENCY: usize = 5;
 
@@ -618,24 +608,19 @@ pub struct PackageEntry {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            repo_builder::RepoBuilder,
-            repository::PmRepository,
-            test_utils::{
-                make_pm_repository, make_readonly_empty_repository, repo_key, repo_private_key,
-                PKG1_BIN_HASH, PKG1_HASH, PKG1_LIB_HASH, PKG2_HASH,
-            },
-        },
-        assert_matches::assert_matches,
-        camino::{Utf8Path, Utf8PathBuf},
-        pretty_assertions::assert_eq,
-        std::fs::{self, create_dir_all},
-        tuf::{
-            repo_builder::RepoBuilder as TufRepoBuilder, repository::FileSystemRepositoryBuilder,
-        },
+    use super::*;
+    use crate::repo_builder::RepoBuilder;
+    use crate::repository::PmRepository;
+    use crate::test_utils::{
+        make_pm_repository, make_readonly_empty_repository, repo_key, repo_private_key,
+        PKG1_BIN_HASH, PKG1_HASH, PKG1_LIB_HASH, PKG2_HASH,
     };
+    use assert_matches::assert_matches;
+    use camino::{Utf8Path, Utf8PathBuf};
+    use pretty_assertions::assert_eq;
+    use std::fs::{self, create_dir_all};
+    use tuf::repo_builder::RepoBuilder as TufRepoBuilder;
+    use tuf::repository::FileSystemRepositoryBuilder;
 
     fn get_modtime(path: Utf8PathBuf) -> u64 {
         std::fs::metadata(path)

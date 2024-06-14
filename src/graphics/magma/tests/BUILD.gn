@@ -42,16 +42,6 @@ group("tests") {
   ]
 }
 
-# This group must only be referenced from a *_system_image_deps arg, since it contains drivers that
-# go into the system image.
-group("test-drivers") {
-  testonly = true
-  deps = [
-    "//src/graphics/drivers/msd-intel-gen:test-driver",
-    "//src/graphics/drivers/msd-vsi-vip:test-driver",
-  ]
-}
-
 # Tests that require a working libvulkan to run.
 group("vulkan-tests") {
   testonly = true

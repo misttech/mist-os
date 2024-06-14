@@ -7,11 +7,9 @@ use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
-use std::{
-    fs::{metadata, File},
-    io::{BufRead, BufReader, BufWriter, Read, Write},
-    path::PathBuf,
-};
+use std::fs::{metadata, File};
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
+use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
 const PAGE_SIZE: u32 = 4096;

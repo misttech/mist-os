@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{metrics::Metrics, puppet::DiffType},
-    fidl_diagnostics_validate::*,
-    serde::Serialize,
-    std::collections::HashSet,
-};
+use super::metrics::Metrics;
+use super::puppet::DiffType;
+use fidl_diagnostics_validate::*;
+use serde::Serialize;
+use std::collections::HashSet;
 
 #[derive(Serialize, Debug)]
 pub struct Results {
@@ -209,7 +208,8 @@ impl Results {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::*};
+    use super::*;
+    use crate::*;
 
     #[fuchsia::test]
     fn error_result_fails_and_outputs() {

@@ -4,10 +4,8 @@
 
 #![allow(non_camel_case_types)]
 
-use crate::{
-    errors::{error, Errno},
-    uapi,
-};
+use crate::errors::{error, Errno};
+use crate::uapi;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum KcmpResource {

@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        PresentParameters, PresentationInfo, SchedulingFuture, SchedulingFutureState, SchedulingLib,
-    },
-    async_trait::async_trait,
-    fuchsia_async::Time as fasync_time,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
-    std::cell::{Cell, RefCell},
-    std::task::Waker,
+use crate::{
+    PresentParameters, PresentationInfo, SchedulingFuture, SchedulingFutureState, SchedulingLib,
 };
+use async_trait::async_trait;
+use fuchsia_async::Time as fasync_time;
+use std::cell::{Cell, RefCell};
+use std::task::Waker;
+use {fuchsia_trace as trace, fuchsia_zircon as zx};
 
 // Scheduler for maximum throughput. Tries to schedule a frame at each on_next_frame_begin, if
 // there's something to draw (i.e. request_present() has been called). Presents are always
@@ -121,7 +119,10 @@ impl SchedulingFutureState for WakeupData {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, fuchsia_async as fasync, std::task::Poll};
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use std::task::Poll;
 
     #[test]
     fn wait_without_request_present_never_completes() {

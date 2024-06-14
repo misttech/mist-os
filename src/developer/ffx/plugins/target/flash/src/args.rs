@@ -5,7 +5,8 @@
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use ffx_fastboot::common::cmd::{Command, ManifestParams, OemFile};
-use std::{default::Default, path::PathBuf};
+use std::default::Default;
+use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Default, Debug, Eq, PartialEq)]

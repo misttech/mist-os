@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{format::SPARSE_HEADER_SIZE, Chunk, Reader, SparseHeader, Writer, BLK_SIZE},
-    anyhow::{ensure, Result},
-    std::io::{Cursor, SeekFrom},
-};
+use crate::format::SPARSE_HEADER_SIZE;
+use crate::{Chunk, Reader, SparseHeader, Writer, BLK_SIZE};
+use anyhow::{ensure, Result};
+use std::io::{Cursor, SeekFrom};
 
 /// Input data for a SparseImageBuilder.
 pub enum DataSource {

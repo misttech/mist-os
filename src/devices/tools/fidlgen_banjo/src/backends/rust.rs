@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        util::{get_declarations, name_buffer, name_size, to_c_name, Decl},
-        Backend,
-    },
-    anyhow::{anyhow, Error},
-    fidl_ir_lib::fidl::*,
-    std::collections::HashSet,
-    std::io,
-};
+use super::util::{get_declarations, name_buffer, name_size, to_c_name, Decl};
+use super::Backend;
+use anyhow::{anyhow, Error};
+use fidl_ir_lib::fidl::*;
+use std::collections::HashSet;
+use std::io;
 
 pub struct RustBackend<'a, W: io::Write> {
     w: &'a mut W,

@@ -45,6 +45,12 @@ class Fusb302Controls {
   usb_pd::DataRole data_role() const { return data_role_.get(); }
   usb_pd::SpecRevision spec_revision() const { return spec_revision_.get(); }
 
+  // Returns when the PHY layer's transmit FIFO is flushed.
+  zx::result<> WaitForTransmitQueueFlush();
+
+  // Returns when the PHY layer's receive FIFO is flushed.
+  zx::result<> WaitForReceiveQueueFlush();
+
  private:
   // Configures and starts/stops the automated power role detection logic.
   //

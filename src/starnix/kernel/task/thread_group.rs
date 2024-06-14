@@ -2,51 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::terminal::{ControllingSession, Terminal},
-    mutable_state::{state_accessor, state_implementation},
-    security,
-    signals::{
-        send_signal, send_standard_signal, syscalls::WaitingOptions, SignalActions, SignalDetail,
-        SignalInfo,
-    },
-    task::{
-        interval_timer::IntervalTimerHandle, ptrace_detach, AtomicStopState, ClockId,
-        ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable, ProcessGroup,
-        PtraceAllowedPtracers, PtraceEvent, PtraceOptions, PtraceStatus, Session, StopState, Task,
-        TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState, TimerId, TimerTable,
-        WaitQueue, ZombiePtraces,
-    },
-    time::utc,
+use crate::device::terminal::{ControllingSession, Terminal};
+use crate::mutable_state::{state_accessor, state_implementation};
+use crate::security;
+use crate::signals::syscalls::{read_siginfo, WaitingOptions};
+use crate::signals::{
+    action_for_signal, send_standard_signal, DeliveryAction, QueuedSignals, SignalActions,
+    SignalDetail, SignalInfo,
 };
+use crate::task::interval_timer::IntervalTimerHandle;
+use crate::task::{
+    ptrace_detach, AtomicStopState, ClockId, ControllingTerminal, CurrentTask, ExitStatus, Kernel,
+    PidTable, ProcessGroup, PtraceAllowedPtracers, PtraceEvent, PtraceOptions, PtraceStatus,
+    Session, StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo,
+    TaskPersistentInfoState, TimerId, TimerTable, WaitQueue, ZombiePtraces,
+};
+use crate::time::utc;
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
-use starnix_logging::{log_error, log_warn, track_stub};
+use starnix_logging::{log_error, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock};
+use starnix_uapi::auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::{OwnedRef, Releasable, TempRef, WeakRef};
+use starnix_uapi::personality::PersonalityFlags;
+use starnix_uapi::resource_limits::{Resource, ResourceLimits};
+use starnix_uapi::signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU};
+use starnix_uapi::stats::TaskTimeStats;
+use starnix_uapi::time::{duration_from_timeval, timeval_from_duration};
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
-    errno, error,
-    errors::Errno,
-    itimerval,
-    ownership::{OwnedRef, Releasable, TempRef, WeakRef},
-    personality::PersonalityFlags,
-    pid_t,
-    resource_limits::{Resource, ResourceLimits},
-    rlimit,
-    signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU},
-    stats::TaskTimeStats,
-    time::{duration_from_timeval, timeval_from_duration},
-    uid_t,
-    user_address::UserAddress,
-    CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, SIG_IGN,
+    errno, error, itimerval, pid_t, rlimit, uid_t, CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL,
+    ITIMER_VIRTUAL, SIG_IGN, SI_TKILL, SI_USER,
 };
-use std::{
-    collections::BTreeMap,
-    fmt,
-    sync::{atomic::Ordering, Arc, Weak},
-};
+use std::collections::BTreeMap;
+use std::fmt;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Weak};
 
 /// The mutable state of the ThreadGroup.
 pub struct ThreadGroupMutableState {
@@ -196,6 +190,9 @@ pub struct ThreadGroup {
 
     /// Tasks ptraced by this process
     pub ptracees: Mutex<BTreeMap<pid_t, TaskContainer>>,
+
+    /// The signals that are currently pending for this thread group.
+    pub pending_signals: Mutex<QueuedSignals>,
 }
 
 impl fmt::Debug for ThreadGroup {
@@ -392,6 +389,7 @@ impl ThreadGroup {
             next_seccomp_filter_id: Default::default(),
             ptracees: Default::default(),
             stop_state: AtomicStopState::new(StopState::Awake),
+            pending_signals: Default::default(),
             mutable_state: RwLock::new(ThreadGroupMutableState {
                 parent: parent.as_ref().map(|p| Arc::clone(p.base)),
                 tasks: BTreeMap::new(),
@@ -613,18 +611,17 @@ impl ThreadGroup {
         state.children.remove(&zombie.pid);
         state.deferred_zombie_ptracers.retain(|&(_, tracee)| tracee != zombie.pid);
 
-        // Send signals
-        if let Some(exit_signal) = zombie.exit_info.exit_signal {
-            if let Some(signal_target) = state.get_signal_target(exit_signal.into()) {
-                let mut signal_info = zombie.to_wait_result().as_signal_info();
-                signal_info.signal = exit_signal;
-                send_signal(&signal_target, signal_info).unwrap_or_else(|e| {
-                    log_warn!("Failed to send exit signal: {}", e);
-                });
-            }
-        }
+        let exit_signal = zombie.exit_info.exit_signal;
+        let mut signal_info = zombie.to_wait_result().as_signal_info();
+
         state.zombie_children.push(zombie);
         state.child_status_waiters.notify_all();
+
+        // Send signals
+        if let Some(exit_signal) = exit_signal {
+            signal_info.signal = exit_signal;
+            state.send_signal(signal_info);
+        }
     }
 
     /// Notifies the tracer if appropriate.  Returns Some(zombie) if caller
@@ -934,7 +931,7 @@ impl ThreadGroup {
             // If the calling process is a member of a background group and not ignoring SIGTTOU, a
             // SIGTTOU signal is sent to all members of this background process group.
             send_ttou = process_group.leader != cs.foregound_process_group_leader
-                && !current_task.read().signals.mask().has_signal(SIGTTOU)
+                && !current_task.read().signal_mask().has_signal(SIGTTOU)
                 && self.signal_actions.get(SIGTTOU).sa_handler != SIG_IGN;
             if !send_ttou {
                 *controlling_session = controlling_session
@@ -1293,6 +1290,101 @@ impl ThreadGroup {
         }
         None
     }
+
+    /// Attempts to send an unchecked signal to this thread group.
+    ///
+    /// - `current_task`: The task that is sending the signal.
+    /// - `unchecked_signal`: The signal that is to be sent. Unchecked, since `0` is a sentinel value
+    /// where rights are to be checked but no signal is actually sent.
+    ///
+    /// # Returns
+    /// Returns Ok(()) if the signal was sent, or the permission checks passed with a 0 signal, otherwise
+    /// the error that was encountered.
+    pub fn send_signal_unchecked(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        unchecked_signal: UncheckedSignal,
+    ) -> Result<(), Errno> {
+        if let Some(signal) = self.check_signal_access(current_task, unchecked_signal)? {
+            let signal_info = SignalInfo {
+                code: SI_USER as i32,
+                detail: SignalDetail::Kill {
+                    pid: current_task.thread_group.leader,
+                    uid: current_task.creds().uid,
+                },
+                ..SignalInfo::default(signal)
+            };
+
+            self.write().send_signal(signal_info);
+        }
+
+        Ok(())
+    }
+
+    /// Attempts to send an unchecked signal to this thread group, with info read from
+    /// `siginfo_ref`.
+    ///
+    /// - `current_task`: The task that is sending the signal.
+    /// - `unchecked_signal`: The signal that is to be sent. Unchecked, since `0` is a sentinel value
+    /// where rights are to be checked but no signal is actually sent.
+    /// - `siginfo_ref`: The siginfo that will be enqueued.
+    ///
+    /// # Returns
+    /// Returns Ok(()) if the signal was sent, or the permission checks passed with a 0 signal, otherwise
+    /// the error that was encountered.
+    pub fn send_signal_unchecked_with_info(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        unchecked_signal: UncheckedSignal,
+        siginfo_ref: UserAddress,
+    ) -> Result<(), Errno> {
+        if let Some(signal) = self.check_signal_access(current_task, unchecked_signal)? {
+            let signal_info = read_siginfo(current_task, signal, siginfo_ref)?;
+            if self.leader != current_task.get_pid()
+                && (signal_info.code >= 0 || signal_info.code == SI_TKILL)
+            {
+                return error!(EINVAL);
+            }
+
+            self.write().send_signal(signal_info);
+        }
+
+        Ok(())
+    }
+
+    /// Checks whether or not `current_task` can signal this thread group with `unchecked_signal`.
+    ///
+    /// Returns:
+    ///   - `Ok(Some(Signal))` if the signal passed checks and should be sent.
+    ///   - `Ok(None)` if the signal passed checks, but should not be sent. This is used by
+    ///   userspace for permission checks.
+    ///   - `Err(_)` if the permission checks failed.
+    fn check_signal_access(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        unchecked_signal: UncheckedSignal,
+    ) -> Result<Option<Signal>, Errno> {
+        // Pick an arbitrary task in thread_group to check permissions.
+        //
+        // Tasks can technically have different credentials, but in practice they are kept in sync.
+        {
+            let state = self.read();
+            let target_task = state.get_live_task()?;
+            if !current_task.can_signal(&target_task, unchecked_signal) {
+                return error!(EPERM);
+            }
+
+            // 0 is a sentinel value used to do permission checks.
+            if unchecked_signal.is_zero() {
+                return Ok(None);
+            }
+        }
+
+        let signal = Signal::try_from(unchecked_signal)?;
+        security::check_signal_access_tg(current_task, self, signal)?;
+
+        Ok(Some(signal))
+    }
 }
 
 #[apply(state_implementation!)]
@@ -1563,13 +1655,6 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
             .ok_or_else(|| errno!(ESRCH))
     }
 
-    /// Return the appropriate task in |thread_group| to send the given signal.
-    pub fn get_signal_target(&self, _signal: UncheckedSignal) -> Option<TempRef<'_, Task>> {
-        // TODO(https://fxbug.dev/42178771): Consider more than the main thread or the first thread in the thread group
-        // to dispatch the signal.
-        self.get_live_task().ok()
-    }
-
     /// Set the stop status of the process.  If you pass |siginfo| of |None|,
     /// does not update the signal.  If |finalize_only| is set, will check that
     /// the set will be a finalize (Stopping -> Stopped or Stopped -> Stopped)
@@ -1628,6 +1713,55 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
 
         self.base.stop_state.store(state, Ordering::Relaxed)
     }
+
+    /// Sends the signal `signal_info` to this thread group.
+    #[allow(unused_mut)]
+    pub fn send_signal(mut self, signal_info: SignalInfo) {
+        let sigaction = self.base.signal_actions.get(signal_info.signal);
+        let action = action_for_signal(&signal_info, sigaction);
+
+        self.base.pending_signals.lock().enqueue(signal_info.clone());
+        let tasks: Vec<WeakRef<Task>> = self.tasks.values().map(|t| t.weak_clone()).collect();
+
+        // Set state to waking before interrupting any tasks.
+        if signal_info.signal == SIGKILL {
+            self.set_stopped(StopState::ForceWaking, Some(signal_info.clone()), false);
+        } else if signal_info.signal == SIGCONT {
+            self.set_stopped(StopState::Waking, Some(signal_info.clone()), false);
+        }
+
+        let mut has_interrupted_task = false;
+        for task in tasks.iter().flat_map(|t| t.upgrade()) {
+            let mut task_state = task.write();
+
+            if signal_info.signal == SIGKILL {
+                task_state.set_stopped(StopState::ForceWaking, None, None, None);
+            } else if signal_info.signal == SIGCONT {
+                task_state.set_stopped(StopState::Waking, None, None, None);
+            }
+
+            let is_masked = task_state.is_signal_masked(signal_info.signal);
+            let was_masked = task_state.is_signal_masked_by_saved_mask(signal_info.signal);
+
+            let is_queued = action != DeliveryAction::Ignore
+                || is_masked
+                || was_masked
+                || task_state.is_ptraced();
+
+            if is_queued {
+                task_state.notify_signal_waiters();
+                task_state.set_flags(TaskFlags::SIGNALS_AVAILABLE, true);
+
+                if !is_masked && action.must_interrupt(sigaction) && !has_interrupted_task {
+                    // Only interrupt one task, and only interrupt if the signal was actually queued
+                    // and the action must interrupt.
+                    drop(task_state);
+                    task.interrupt();
+                    has_interrupted_task = true;
+                }
+            }
+        }
+    }
 }
 
 /// Container around a weak task and a strong `TaskPersistentInfo`. It is needed to keep the
@@ -1652,6 +1786,10 @@ impl From<TaskContainer> for TaskPersistentInfo {
 impl TaskContainer {
     fn upgrade(&self) -> Option<TempRef<'_, Task>> {
         self.0.upgrade()
+    }
+
+    fn weak_clone(&self) -> WeakRef<Task> {
+        self.0.clone()
     }
 
     fn info(&self) -> MutexGuard<'_, TaskPersistentInfoState> {

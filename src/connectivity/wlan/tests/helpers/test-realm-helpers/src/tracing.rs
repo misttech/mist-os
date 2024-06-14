@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context},
-    fidl::endpoints::Proxy,
-    fuchsia_component::client::connect_to_protocol_at,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{self as zx, prelude::*},
-    futures::AsyncReadExt,
-    std::{io::Write, sync::Arc},
-    tracing::{info, warn},
-};
+use anyhow::{format_err, Context};
+use fidl::endpoints::Proxy;
+use fuchsia_component::client::connect_to_protocol_at;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::prelude::*;
+use fuchsia_zircon::{self as zx};
+use futures::AsyncReadExt;
+use std::io::Write;
+use std::sync::Arc;
+use tracing::{info, warn};
 
 /// An RAII-style struct that initializes tracing in the test realm on creation via
 /// `Tracing::create_and_initialize_tracing` and collects and writes the trace when the

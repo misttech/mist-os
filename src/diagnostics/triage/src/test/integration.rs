@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, format_err, Error},
-    std::path::Path,
-    std::process::{Command, Output},
-};
+use anyhow::{anyhow, format_err, Error};
+use std::path::Path;
+use std::process::{Command, Output};
 
 enum Input {
     Snapshot(String),

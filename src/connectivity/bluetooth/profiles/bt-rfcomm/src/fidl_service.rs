@@ -6,7 +6,8 @@ use anyhow::{Context, Error};
 use fidl_fuchsia_bluetooth_bredr::ProfileRequestStream;
 use fidl_fuchsia_bluetooth_rfcomm_test::RfcommTestRequestStream;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
-use futures::{channel::mpsc, Future, SinkExt, StreamExt};
+use futures::channel::mpsc;
+use futures::{Future, SinkExt, StreamExt};
 use tracing::info;
 
 /// The maximum number of FIDL service client connections that will be serviced concurrently.

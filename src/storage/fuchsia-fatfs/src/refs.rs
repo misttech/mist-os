@@ -4,17 +4,13 @@
 
 //! This module provides abstractions over the fatfs Dir and File types,
 //! erasing their lifetimes and allowing them to be kept without holding the filesystem lock.
-use {
-    crate::{
-        directory::FatDirectory,
-        filesystem::FatFilesystemInner,
-        node::Node,
-        types::{Dir, File},
-    },
-    fuchsia_zircon::Status,
-    scopeguard::defer,
-    std::sync::Arc,
-};
+use crate::directory::FatDirectory;
+use crate::filesystem::FatFilesystemInner;
+use crate::node::Node;
+use crate::types::{Dir, File};
+use fuchsia_zircon::Status;
+use scopeguard::defer;
+use std::sync::Arc;
 
 pub struct FatfsDirRef {
     inner: Option<Dir<'static>>,

@@ -2,28 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    at_commands::{self as at, SerDe},
-    bitflags::bitflags,
-    fidl_fuchsia_bluetooth_bredr as bredr,
-    fidl_fuchsia_bluetooth_hfp::HfpMarker,
-    fidl_fuchsia_bluetooth_internal_a2dp::ControllerMarker,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, AudioDeviceEnumeratorRequest},
-    fixture::fixture,
-    fuchsia_async::{self as fasync, DurationExt, TimeoutExt},
-    fuchsia_audio_dai::test::mock_dai_dev_with_io_devices,
-    fuchsia_bluetooth::types::{Channel, PeerId, Uuid},
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-    },
-    fuchsia_zircon::Duration,
-    futures::{channel::mpsc, stream::StreamExt, TryFutureExt},
-    mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember},
-    realmbuilder_mock_helpers::{mock_component, mock_dev},
-    test_call_manager::TestCallManager,
+use anyhow::format_err;
+use at_commands::{self as at, SerDe};
+use bitflags::bitflags;
+use fidl_fuchsia_bluetooth_hfp::HfpMarker;
+use fidl_fuchsia_bluetooth_internal_a2dp::ControllerMarker;
+use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, AudioDeviceEnumeratorRequest};
+use fixture::fixture;
+use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
+use fuchsia_audio_dai::test::mock_dai_dev_with_io_devices;
+use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
+use fuchsia_zircon::Duration;
+use futures::channel::mpsc;
+use futures::stream::StreamExt;
+use futures::TryFutureExt;
+use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
+use realmbuilder_mock_helpers::{mock_component, mock_dev};
+use test_call_manager::TestCallManager;
+use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_io as fio};
 
 /// HFP-AG component URL.
 const HFP_AG_URL: &str =

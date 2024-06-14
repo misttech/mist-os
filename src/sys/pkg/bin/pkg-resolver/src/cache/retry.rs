@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{FetchError, FetchErrorKind},
-    fuchsia_backoff::Backoff,
-    rand::Rng,
-    std::time::Duration,
-};
+use super::{FetchError, FetchErrorKind};
+use fuchsia_backoff::Backoff;
+use rand::Rng;
+use std::time::Duration;
 
 const MAX_FETCH_FLAKE_RETRIES: u32 = 1;
 const MAX_RATE_LIMIT_RETRY_DELAY: Duration = Duration::from_secs(32);
@@ -82,10 +80,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, delivery_blob::DeliveryBlobType,
-        hyper::StatusCode,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use delivery_blob::DeliveryBlobType;
+    use hyper::StatusCode;
 
     #[test]
     fn http_errors_aborts_on_io_error() {

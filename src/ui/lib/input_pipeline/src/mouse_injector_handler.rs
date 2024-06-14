@@ -4,28 +4,27 @@
 
 #![warn(clippy::await_holding_refcell_ref)]
 
+use crate::input_handler::{InputHandler, InputHandlerStatus};
+use crate::utils::{CursorMessage, Position, Size};
+use crate::{input_device, metrics, mouse_binding};
+use anyhow::{anyhow, Context, Error, Result};
+use async_trait::async_trait;
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_input_report::Range;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_inspect::health::Reporter;
+use futures::channel::mpsc::Sender;
+use futures::stream::StreamExt;
+use futures::SinkExt;
+use metrics_registry::*;
+use std::cell::{Ref, RefCell, RefMut};
+use std::collections::HashMap;
+use std::rc::Rc;
 use {
-    crate::input_handler::{InputHandler, InputHandlerStatus},
-    crate::utils::{CursorMessage, Position, Size},
-    crate::{input_device, metrics, mouse_binding},
-    anyhow::{anyhow, Context, Error, Result},
-    async_trait::async_trait,
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::create_proxy,
     fidl_fuchsia_input_interaction_observation as interaction_observation,
-    fidl_fuchsia_input_report::Range,
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect::health::Reporter,
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc::Sender, stream::StreamExt, SinkExt},
-    metrics_registry::*,
-    std::{
-        cell::{Ref, RefCell, RefMut},
-        collections::HashMap,
-        rc::Rc,
-    },
+    fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config, fuchsia_zircon as zx,
 };
 
 /// Each mm of physical movement by the mouse translates to the cursor moving
@@ -591,22 +590,22 @@ impl MouseInjectorHandler {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::testing_utilities::{
+        assert_handler_ignores_input_event_sequence, create_mouse_event,
+        create_mouse_event_with_handled, create_mouse_pointer_sample_event,
+        create_mouse_pointer_sample_event_with_wheel_physical_pixel,
+    };
+    use assert_matches::assert_matches;
+    use futures::channel::mpsc;
+    use pretty_assertions::assert_eq;
+    use std::collections::HashSet;
+    use std::ops::Add;
+    use test_case::test_case;
     use {
-        super::*,
-        crate::testing_utilities::{
-            assert_handler_ignores_input_event_sequence, create_mouse_event,
-            create_mouse_event_with_handled, create_mouse_pointer_sample_event,
-            create_mouse_pointer_sample_event_with_wheel_physical_pixel,
-        },
-        assert_matches::assert_matches,
         fidl_fuchsia_input_report as fidl_input_report,
         fidl_fuchsia_ui_pointerinjector as pointerinjector, fuchsia_async as fasync,
         fuchsia_zircon as zx,
-        futures::channel::mpsc,
-        pretty_assertions::assert_eq,
-        std::collections::HashSet,
-        std::ops::Add,
-        test_case::test_case,
     };
 
     const DISPLAY_WIDTH_IN_PHYSICAL_PX: f32 = 100.0;

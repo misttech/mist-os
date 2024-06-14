@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_update::{MonitorRequest, MonitorRequestStream},
-    fidl_fuchsia_update_ext::State,
-    futures::prelude::*,
-    std::io::Write,
-};
+use fidl_fuchsia_update::{MonitorRequest, MonitorRequestStream};
+use fidl_fuchsia_update_ext::State;
+use futures::prelude::*;
+use std::io::Write;
 
 fn print_state(state: &State) {
     if termion::is_tty(&std::io::stdout()) {

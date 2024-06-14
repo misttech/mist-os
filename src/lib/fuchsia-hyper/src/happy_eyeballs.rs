@@ -2,26 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::connect_and_bind_device,
-    fuchsia_async::{net, Time, Timer},
-    fuchsia_zircon as zx,
-    futures::{
-        future::{Fuse, Future, FutureExt},
-        stream::{FuturesUnordered, Stream},
-    },
-    itertools::{Interleave, Itertools},
-    pin_project::pin_project,
-    std::{
-        cmp::{max, min},
-        io,
-        iter::Peekable,
-        net::SocketAddr,
-        pin::Pin,
-        task::{Context, Poll},
-        vec::IntoIter,
-    },
-};
+use crate::connect_and_bind_device;
+use fuchsia_async::{net, Time, Timer};
+use fuchsia_zircon as zx;
+use futures::future::{Fuse, Future, FutureExt};
+use futures::stream::{FuturesUnordered, Stream};
+use itertools::{Interleave, Itertools};
+use pin_project::pin_project;
+use std::cmp::{max, min};
+use std::io;
+use std::iter::Peekable;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::vec::IntoIter;
 
 pub(crate) trait SocketConnector {
     type Connection;
@@ -333,22 +327,18 @@ impl<C: SocketConnector> Future for Inner<C> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async::{self as fasync},
-        fuchsia_sync::Mutex,
-        fuchsia_zircon::{self as zx, DurationNum},
-        std::{
-            collections::HashMap,
-            fmt::Debug,
-            io::{Error, ErrorKind},
-            iter::once,
-            net::{Ipv4Addr, Ipv6Addr},
-            sync::Arc,
-        },
-        test_case::test_case,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async::{self as fasync};
+    use fuchsia_sync::Mutex;
+    use fuchsia_zircon::{self as zx, DurationNum};
+    use std::collections::HashMap;
+    use std::fmt::Debug;
+    use std::io::{Error, ErrorKind};
+    use std::iter::once;
+    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::sync::Arc;
+    use test_case::test_case;
 
     #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
     enum Class {

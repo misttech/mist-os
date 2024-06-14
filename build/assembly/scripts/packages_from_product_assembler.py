@@ -60,7 +60,7 @@ def _rebase_bazel_path(path: str, rebase_prefix: str) -> str:
     return rebased_path
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Parse assembly product output manifest to get packages for a particular package set."
     )

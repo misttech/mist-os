@@ -16,7 +16,6 @@
 #include <re2/re2.h>
 
 #include "src/developer/memory/metrics/capture.h"
-#include "src/lib/files/file.h"
 
 namespace memory {
 

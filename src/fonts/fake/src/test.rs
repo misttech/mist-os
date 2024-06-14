@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    assert_matches::assert_matches,
-    fidl_fuchsia_fonts as fonts, fidl_fuchsia_fonts_experimental as fonts_exp,
-    fuchsia_component::client,
-};
+use anyhow::{Context, Error};
+use assert_matches::assert_matches;
+use fuchsia_component::client;
+use {fidl_fuchsia_fonts as fonts, fidl_fuchsia_fonts_experimental as fonts_exp};
 
 #[fuchsia::test]
 async fn test_stable_api() -> Result<(), Error> {

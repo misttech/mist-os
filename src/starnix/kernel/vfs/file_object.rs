@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::{
-        vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
-        MemoryAccessorExt, ProtectionFlags,
-    },
-    task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        file_server::serve_file,
-        fsverity::{
-            FsVerityState, {self},
-        },
-        DirentSink, FallocMode, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard,
-        FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand,
-        RecordLockOwner,
-    },
+use crate::mm::vmo::round_up_to_system_page_size;
+use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags};
+use crate::task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::file_server::serve_file;
+use crate::vfs::fsverity::{
+    FsVerityState, {self},
+};
+use crate::vfs::{
+    DirentSink, EpollFileObject, FallocMode, FdNumber, FdTableId, FileReleaser, FileSystemHandle,
+    FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, NamespaceNode,
+    RecordLockCommand, RecordLockOwner,
 };
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
@@ -28,29 +24,24 @@ use starnix_sync::{
     Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::as_any::AsAny;
+use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
+use starnix_uapi::inotify_mask::InotifyMask;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::Releasable;
+use starnix_uapi::seal_flags::SealFlags;
+use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    as_any::AsAny,
-    errno, error,
-    errors::{Errno, EAGAIN, ETIMEDOUT},
-    fsxattr,
-    inotify_mask::InotifyMask,
-    off_t,
-    open_flags::OpenFlags,
-    ownership::Releasable,
-    pid_t,
-    seal_flags::SealFlags,
-    uapi,
-    user_address::UserAddress,
-    vfs::FdEvents,
-    FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
-    FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR,
-    SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
+    errno, error, fsxattr, off_t, pid_t, uapi, FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY,
+    FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY,
+    FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END,
+    SEEK_HOLE, SEEK_SET, TCGETS,
 };
-use std::{
-    fmt,
-    ops::Deref,
-    sync::{Arc, Weak},
-};
+use std::collections::HashSet;
+use std::fmt;
+use std::ops::Deref;
+use std::sync::{Arc, Weak};
 
 pub const MAX_LFS_FILESIZE: usize = 0x7fff_ffff_ffff_ffff;
 
@@ -772,12 +763,10 @@ macro_rules! fileops_impl_directory {
 
 // Public re-export of macros allows them to be used like regular rust items.
 
-pub(crate) use fileops_impl_dataless;
-pub(crate) use fileops_impl_delegate_read_and_seek;
-pub(crate) use fileops_impl_directory;
-pub(crate) use fileops_impl_nonseekable;
-pub(crate) use fileops_impl_seekable;
-pub(crate) use fileops_impl_seekless;
+pub(crate) use {
+    fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
+    fileops_impl_nonseekable, fileops_impl_seekable, fileops_impl_seekless,
+};
 
 pub fn default_ioctl(
     file: &FileObject,
@@ -1114,6 +1103,10 @@ pub struct FileObject {
 
     async_owner: Mutex<FileAsyncOwner>,
 
+    /// A set of epoll file descriptor numbers that tracks which `EpollFileObject`s add this
+    /// `FileObject` as the control file.
+    epoll_files: Mutex<HashSet<FdNumber>>,
+
     _file_write_guard: Option<FileWriteGuard>,
 }
 
@@ -1165,6 +1158,7 @@ impl FileObject {
                 offset: Mutex::new(0),
                 flags: Mutex::new(flags - OpenFlags::CREAT),
                 async_owner: Default::default(),
+                epoll_files: Default::default(),
                 _file_write_guard: file_write_guard,
             }
             .into()
@@ -1666,12 +1660,33 @@ impl FileObject {
         checked_add_offset_and_length(offset, length)?;
         self.ops().readahead(self, current_task, offset, length)
     }
+
+    /// Register the fd number of an `EpollFileObject` that listens to events from this
+    /// `FileObject`.
+    pub fn register_epfd(&self, fd: FdNumber) {
+        self.epoll_files.lock().insert(fd);
+    }
+
+    pub fn unregister_epfd(&self, fd: FdNumber) {
+        self.epoll_files.lock().remove(&fd);
+    }
 }
 
 impl Releasable for FileObject {
     type Context<'a> = &'a CurrentTask;
 
     fn release(self, current_task: Self::Context<'_>) {
+        // Release all wake leases associated with this file in the corresponding `WaitObject`
+        // of each registered epfd.
+        for epfd in self.epoll_files.lock().drain() {
+            if let Ok(file) = current_task.files.get(epfd) {
+                if let Some(epoll_object) = file.downcast_file::<EpollFileObject>() {
+                    if let Some(file_handle) = self.weak_handle.upgrade() {
+                        epoll_object.drop_lease(&file_handle);
+                    }
+                }
+            }
+        }
         self.ops().close(&self, current_task);
         self.name.entry.node.on_file_closed(&self);
         let event =
@@ -1694,21 +1709,16 @@ impl fmt::Debug for FileObject {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        fs::tmpfs::TmpFs,
-        testing::*,
-        vfs::{
-            buffers::{VecInputBuffer, VecOutputBuffer},
-            MountInfo,
-        },
-    };
-    use starnix_uapi::{
-        auth::FsCred, device_type::DeviceType, file_mode::FileMode, open_flags::OpenFlags,
-    };
-    use std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    };
+    use crate::fs::tmpfs::TmpFs;
+    use crate::testing::*;
+    use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::MountInfo;
+    use starnix_uapi::auth::FsCred;
+    use starnix_uapi::device_type::DeviceType;
+    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::open_flags::OpenFlags;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
     use zerocopy::{AsBytes, FromBytes, LE, U64};
 
     #[::fuchsia::test]

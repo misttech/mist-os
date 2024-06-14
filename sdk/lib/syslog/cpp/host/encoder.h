@@ -45,7 +45,7 @@ struct MsgHeader {
 
   void WriteChar(const char value) {
     if (!RemainingSpace()) {
-      FlushRecord(buffer);
+      buffer->Flush();
       offset = reinterpret_cast<char*>(buffer->data);
       WriteString("CONTINUATION: ");
     }
@@ -69,7 +69,7 @@ struct MsgHeader {
   }
 
   void FlushAndReset() {
-    FlushRecord(buffer);
+    buffer->Flush();
     offset = reinterpret_cast<char*>(buffer->data);
   }
 

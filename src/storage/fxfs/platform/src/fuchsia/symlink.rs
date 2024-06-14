@@ -2,32 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        directory::FxDirectory,
-        errors::map_to_status,
-        node::FxNode,
-        volume::{info_to_filesystem_info, FxVolume},
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    fxfs::{
-        errors::FxfsError,
-        object_handle::{ObjectHandle, ObjectProperties},
-        object_store::{
-            transaction::{lock_keys, LockKey, Options},
-            HandleOptions, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKind, ObjectValue,
-            StoreObjectHandle,
-        },
-    },
-    fxfs_macros::ToWeakNode,
-    std::sync::Arc,
-    vfs::{
-        attributes, common::rights_to_posix_mode_bits,
-        directory::entry_container::MutableDirectory, name::Name, node::Node, symlink::Symlink,
-    },
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::node::FxNode;
+use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume};
+use anyhow::Error;
+use fxfs::errors::FxfsError;
+use fxfs::object_handle::{ObjectHandle, ObjectProperties};
+use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+use fxfs::object_store::{
+    HandleOptions, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKind, ObjectValue,
+    StoreObjectHandle,
 };
+use fxfs_macros::ToWeakNode;
+use std::sync::Arc;
+use vfs::attributes;
+use vfs::common::rights_to_posix_mode_bits;
+use vfs::directory::entry_container::MutableDirectory;
+use vfs::name::Name;
+use vfs::node::Node;
+use vfs::symlink::Symlink;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[derive(ToWeakNode)]
 pub struct FxSymlink {
@@ -112,7 +107,6 @@ impl Symlink for FxSymlink {
     }
 }
 
-#[async_trait]
 impl Node for FxSymlink {
     async fn get_attributes(
         &self,

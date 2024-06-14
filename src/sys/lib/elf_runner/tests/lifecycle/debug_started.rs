@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{
-        events::{DebugStarted, EventStream, Stopped},
-        matcher::EventMatcher,
-    },
-    fidl_fuchsia_io as fio,
-    fuchsia_async::{Duration, Task, Time, Timer},
-    fuchsia_component_test::ScopedInstance,
-    fuchsia_fs::directory::open_file_no_describe,
-    std::mem,
-};
+use component_events::events::{DebugStarted, EventStream, Stopped};
+use component_events::matcher::EventMatcher;
+use fidl_fuchsia_io as fio;
+use fuchsia_async::{Duration, Task, Time, Timer};
+use fuchsia_component_test::ScopedInstance;
+use fuchsia_fs::directory::open_file_no_describe;
+use std::mem;
 
 #[fuchsia::test]
 async fn test_debug_started() {

@@ -1,11 +1,9 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{Context, Error},
-    fidl::endpoints::Proxy,
-    fuchsia_async as fasync,
-};
+use anyhow::{Context, Error};
+use fidl::endpoints::Proxy;
+use fuchsia_async as fasync;
 
 const MAX_RETRY_COUNT: u32 = 20;
 const RETRY_COUNTER_RESET_PERIOD_MIN: i64 = 5;

@@ -16,7 +16,7 @@ constexpr char kUsageMessage[] = R"""(
 Low level access tool for a NAND device.
 WARNING: This tool may overwrite the NAND device.
 
-nand-util --device /dev/sys/platform/05:00:f/aml-raw_nand/nand/fvm --info
+nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm --info
 
 Note that to use this tool either the driver binding rules have to be adjusted
 so that the broker driver is loaded for the desired NAND device, or at least the

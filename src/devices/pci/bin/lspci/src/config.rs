@@ -1,12 +1,10 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::util::is_set,
-    bitfield::bitfield,
-    std::fmt,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref},
-};
+use crate::util::is_set;
+use bitfield::bitfield;
+use std::fmt;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref};
 
 // PCI Local Bus Specification v3.0 section 6.1
 #[repr(C, packed)]

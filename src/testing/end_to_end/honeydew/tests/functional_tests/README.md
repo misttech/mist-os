@@ -75,7 +75,7 @@ device and if your host has only that one device connected.
 
   Here is an example to run a functional test on emulator
   ```shell
-  $ fx set core.x64 --with //src/testing/end_to_end/honeydew/tests/functional_tests
+  $ fx set core.x64 --with //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
   # start the emulator with networking enabled
   $ ffx emu stop ; ffx emu start -H --net tap
@@ -124,6 +124,13 @@ Use the following approach in deciding whether to run the test case in CQ/CI/FYI
     it can be promoted to CQ.
   * If infra has limited testbeds (that is needed to run this test) to run this
     test then it can be promoted to CI.
+
+Once your test case is ready to be promoted to CI/CQ:
+* If a corresponding `stable`
+  [Honeydew Infra Test Groups][Honeydew Infra Test Groups] exists, and that
+  test group is already enabled in a CQ builder, simply move your test target
+  from `unstable` to `stable`.
+* Otherwise, reach out to the Lacewing team for further assistance.
 
 Accordingly, we have created the following:
 * Test groups:

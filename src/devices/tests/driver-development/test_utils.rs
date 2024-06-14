@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_driver_development as fdd,
-    std::{
-        collections::{HashMap, HashSet},
-        rc::Rc,
-    },
-};
+use fidl_fuchsia_driver_development as fdd;
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 /// Represents either a DFv1 device or DFv2 node.
 #[derive(Debug, PartialEq)]

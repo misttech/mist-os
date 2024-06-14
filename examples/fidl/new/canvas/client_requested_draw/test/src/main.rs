@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    diagnostics_data::{Data, Logs},
-    example_tester::{assert_filtered_logs_eq_to_golden, run_test, Client, Server, TestKind},
-    fidl::prelude::*,
-    fidl_examples_canvas_clientrequesteddraw::InstanceMarker,
-    fuchsia_async as fasync,
-    fuchsia_component_test::{ChildRef, RealmBuilder},
-};
+use anyhow::Error;
+use diagnostics_data::{Data, Logs};
+use example_tester::{assert_filtered_logs_eq_to_golden, run_test, Client, Server, TestKind};
+use fidl::prelude::*;
+use fidl_examples_canvas_clientrequesteddraw::InstanceMarker;
+use fuchsia_async as fasync;
+use fuchsia_component_test::{ChildRef, RealmBuilder};
 
 #[fasync::run_singlethreaded(test)]
 async fn test_draw_success() -> Result<(), Error> {

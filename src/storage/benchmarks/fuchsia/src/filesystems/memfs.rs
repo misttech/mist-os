@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::filesystems::MOUNT_PATH,
-    async_trait::async_trait,
-    fidl_fuchsia_component::{CreateChildArgs, RealmMarker},
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
-    fs_management::FS_COLLECTION_NAME,
-    fuchsia_component::client::{connect_to_protocol, open_childs_exposed_directory},
-    std::{
-        path::Path,
-        sync::atomic::{AtomicU64, Ordering},
-    },
-    storage_benchmarks::{BlockDeviceFactory, Filesystem, FilesystemConfig},
-};
+use crate::filesystems::MOUNT_PATH;
+use async_trait::async_trait;
+use fidl_fuchsia_component::{CreateChildArgs, RealmMarker};
+use fs_management::FS_COLLECTION_NAME;
+use fuchsia_component::client::{connect_to_protocol, open_childs_exposed_directory};
+use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use storage_benchmarks::{BlockDeviceFactory, Filesystem, FilesystemConfig};
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
 /// Config object for starting Memfs instances.
 #[derive(Clone)]
@@ -106,16 +102,11 @@ impl Filesystem for MemfsInstance {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::Memfs,
-        std::{
-            fs::OpenOptions,
-            io::{Read, Write},
-        },
-        storage_benchmarks::{
-            block_device::PanickingBlockDeviceFactory, Filesystem, FilesystemConfig,
-        },
-    };
+    use super::Memfs;
+    use std::fs::OpenOptions;
+    use std::io::{Read, Write};
+    use storage_benchmarks::block_device::PanickingBlockDeviceFactory;
+    use storage_benchmarks::{Filesystem, FilesystemConfig};
 
     #[fuchsia::test]
     async fn start_memfs() {

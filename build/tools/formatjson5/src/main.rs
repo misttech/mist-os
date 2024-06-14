@@ -31,10 +31,9 @@
 
 use anyhow::Result;
 use json5format::*;
-use std::fs;
-use std::io;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::{fs, io};
 use structopt::StructOpt;
 
 /// Parses each file in the given `files` vector and returns a parsed object for each JSON5

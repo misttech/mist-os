@@ -2,26 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        features::{Feature, FeatureSet},
-        offer_to_all_would_duplicate, AnyRef, Availability, Capability, CapabilityClause,
-        CapabilityFromRef, CapabilityId, Child, Collection, ConfigKey, ConfigType, ConfigValueType,
-        DependencyType, DictionaryRef, Disable, Document, Environment, EnvironmentExtends,
-        EnvironmentRef, Error, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Name,
-        Offer, OfferFromRef, OfferToRef, OneOrMany, Program, RegistrationRef, Rights,
-        RootDictionaryRef, SourceAvailability, Use, UseFromRef,
-    },
-    cm_types::IterablePath,
-    directed_graph::DirectedGraph,
-    std::{
-        collections::{BTreeMap, HashMap, HashSet},
-        fmt,
-        hash::Hash,
-        iter,
-        path::Path,
-    },
+use crate::features::{Feature, FeatureSet};
+use crate::{
+    offer_to_all_would_duplicate, AnyRef, Availability, Capability, CapabilityClause,
+    CapabilityFromRef, CapabilityId, Child, Collection, ConfigKey, ConfigType, ConfigValueType,
+    DependencyType, DictionaryRef, Disable, Document, Environment, EnvironmentExtends,
+    EnvironmentRef, Error, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Name, Offer,
+    OfferFromRef, OfferToRef, OneOrMany, Program, RegistrationRef, Rights, RootDictionaryRef,
+    SourceAvailability, Use, UseFromRef,
 };
+use cm_types::IterablePath;
+use directed_graph::DirectedGraph;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::hash::Hash;
+use std::path::Path;
+use std::{fmt, iter};
 
 #[derive(Default, Clone)]
 pub struct ProtocolRequirements<'a> {
@@ -1853,12 +1848,12 @@ impl<'a> fmt::Display for DependencyNode<'a> {
 mod tests {
     use super::*;
     use crate::error::Location;
+    use crate::{
+        offer_to_all_and_component_diff_protocols_message,
+        offer_to_all_and_component_diff_sources_message,
+    };
     use assert_matches::assert_matches;
     use serde_json::json;
-    use {
-        crate::offer_to_all_and_component_diff_protocols_message,
-        crate::offer_to_all_and_component_diff_sources_message,
-    };
 
     macro_rules! test_validate_cml {
         (
@@ -7502,10 +7497,8 @@ mod tests {
         ),
     }
 
-    use {
-        crate::translate::test_util::must_parse_cml,
-        crate::translate::{compile, CompileOptions},
-    };
+    use crate::translate::test_util::must_parse_cml;
+    use crate::translate::{compile, CompileOptions};
 
     #[test]
     fn test_cml_use_bad_config_from_self() {

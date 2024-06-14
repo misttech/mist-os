@@ -35,7 +35,7 @@ namespace debug_ipc {
 //   - More complex logic could be implemented by checking the protocol version before sending.
 //
 // NOTE: Before you want to bump the kCurrentProtocolVersion, please make sure that
-// CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in version_history.json.
+// CURRENT_SUPPORTED_API_LEVEL is equal to NEXT_STABLE_API_LEVEL.
 // If not, continue reading the comments below.
 
 constexpr uint32_t kCurrentProtocolVersion = 63;
@@ -44,46 +44,33 @@ constexpr uint32_t kCurrentProtocolVersion = 63;
 // -------------------------------------
 //
 // We want to maintain a compatibility window of 2 major releases, so that zxdb built with a given
-// FUCHSIA_API_LEVEL could support debug_agent built between FUCHSIA_API_LEVEL-2 (inclusive) and
-// FUCHSIA_API_LEVEL+2 (inclusive). This exceeds the minimum compatibility required by RFC-0169,
-// which only requires forward compatibility (older zxdb with newer debug_agent).
+// NEXT_STABLE_API_LEVEL could support debug_agent built between NEXT_STABLE_API_LEVEL-2 (inclusive)
+// and NEXT_STABLE_API_LEVEL+2 (inclusive). This exceeds the minimum compatibility required by
+// RFC-0169, which only requires forward compatibility (older zxdb with newer debug_agent).
 //
 // To achieve this, kMinimumProtocolVersion must be set to the initial protocol version used in
-// FUCHSIA_API_LEVEL-2. The following macros are used to ensure that kMinimumProtocolVersion is
-// set based on FUCHSIA_API_LEVEL.
+// NEXT_STABLE_API_LEVEL-2. The following macros are used to ensure that kMinimumProtocolVersion is
+// set based on NEXT_STABLE_API_LEVEL.
 //
-// To avoid blocking FUCHSIA_API_LEVEL bumps, we allow CURRENT_SUPPORTED_API_LEVEL to be out of
-// sync with FUCHSIA_API_LEVEL, as long as the kCurrentProtocolVersion stays the same.
-// When FUCHSIA_API_LEVEL changes, we need to update those macros as the following:
+// To avoid blocking NEXT_STABLE_API_LEVEL bumps, we allow CURRENT_SUPPORTED_API_LEVEL to be out of
+// sync with NEXT_STABLE_API_LEVEL, as long as the kCurrentProtocolVersion stays the same.
+// When NEXT_STABLE_API_LEVEL changes, we need to update those macros as the following:
 //
 //   - INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 = INITIAL_VERSION_FOR_API_LEVEL_MINUS_1
 //   - INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 = INITIAL_VERSION_FOR_API_LEVEL_CURRENT
 //   - INITIAL_VERSION_FOR_API_LEVEL_CURRENT = kCurrentProtocolVersion
-//   - CURRENT_SUPPORTED_API_LEVEL = FUCHSIA_API_LEVEL
+//   - CURRENT_SUPPORTED_API_LEVEL = NEXT_STABLE_API_LEVEL
 
 #define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 56
 #define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 58
 #define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 60
 #define CURRENT_SUPPORTED_API_LEVEL 19
 
-#if defined(__Fuchsia__) == defined(FUCHSIA_API_LEVEL)
-#error FUCHSIA_API_LEVEL should be defind only and always for non-Fuchsia platforms.
-#endif
-
-#if !defined(FUCHSIA_API_LEVEL)
-// This is a workaround when using this library in the @internal_sdk, as the SDK
-// metadata surface has no way to indicate that a library requires a specific
-// compilation define.
-// When building for host using the @internal_sdk, if __Fuchsia_API_level__ is
-// not defined, the user of this library will need to explicitly define
-// FUCHSIA_API_LEVEL.
-#if !defined(__Fuchsia_API_level__)
-#error FUCHSIA_API_LEVEL or __Fuchsia_API_level__ must be defined
-#endif
-#define FUCHSIA_API_LEVEL __Fuchsia_API_level__
-#endif
-
-#if FUCHSIA_API_LEVEL == CURRENT_SUPPORTED_API_LEVEL
+#if !defined(NEXT_STABLE_API_LEVEL)
+#error `NEXT_STABLE_API_LEVEL` must be defined
+#elif NEXT_STABLE_API_LEVEL < CURRENT_SUPPORTED_API_LEVEL
+#error `NEXT_STABLE_API_LEVEL` must be at least CURRENT_SUPPORTED_API_LEVEL
+#elif NEXT_STABLE_API_LEVEL == CURRENT_SUPPORTED_API_LEVEL
 constexpr uint32_t kMinimumProtocolVersion = INITIAL_VERSION_FOR_API_LEVEL_MINUS_2;
 #else
 // If this branch is chosen, please update as above.

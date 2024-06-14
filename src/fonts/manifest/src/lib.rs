@@ -9,27 +9,22 @@ pub mod serde_ext;
 mod v1_to_v2;
 pub mod v2;
 
-use {
-    crate::{serde_ext::*, v2::FontsManifest as FontsManifestV2},
-    anyhow::Error,
-    char_set::CharSet,
-    clonable_error::ClonableError,
-    fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width, WEIGHT_NORMAL},
-    fuchsia_url::AbsolutePackageUrl,
-    offset_string::OffsetString,
-    serde::{
-        de::{self, Deserializer, Error as DeError},
-        ser::Serializer,
-    },
-    serde::{Deserialize, Serialize},
-    std::{
-        fmt,
-        fs::{self, File},
-        io::BufReader,
-        path::{Path, PathBuf},
-    },
-    thiserror::Error,
-};
+use crate::serde_ext::*;
+use crate::v2::FontsManifest as FontsManifestV2;
+use anyhow::Error;
+use char_set::CharSet;
+use clonable_error::ClonableError;
+use fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width, WEIGHT_NORMAL};
+use fuchsia_url::AbsolutePackageUrl;
+use offset_string::OffsetString;
+use serde::de::{self, Deserializer, Error as DeError};
+use serde::ser::Serializer;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::fs::{self, File};
+use std::io::BufReader;
+use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 /// The various possible versions of the fonts manifest.
 #[derive(Debug, Deserialize, Serialize)]
@@ -302,7 +297,8 @@ pub enum ManifestLoadError {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn test_deserialize_manifest_version_v1_implicit() -> Result<(), Error> {

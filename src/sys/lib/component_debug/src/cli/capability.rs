@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::capability::*, anyhow::Result, fidl_fuchsia_sys2 as fsys};
+use crate::capability::*;
+use anyhow::Result;
+use fidl_fuchsia_sys2 as fsys;
 
 pub async fn capability_cmd<W: std::io::Write>(
     query: String,

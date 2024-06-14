@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 
 use fuchsia_inspect::Node;
 
-use tracing::warn;
+use log::warn;
 
 use netstack3_base::{Inspector, InspectorDeviceExt};
 

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context as _, Result},
-    fidl_fuchsia_test_manager as test_manager,
-    futures::channel::{mpsc, oneshot},
-    futures::{pin_mut, select, FutureExt, SinkExt},
-};
+use anyhow::{anyhow, Context as _, Result};
+use fidl_fuchsia_test_manager as test_manager;
+use futures::channel::{mpsc, oneshot};
+use futures::{pin_mut, select, FutureExt, SinkExt};
 
 pub type LaunchResult = std::result::Result<(), test_manager::LaunchError>;
 

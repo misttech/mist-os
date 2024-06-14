@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::FxfsError,
-    anyhow::{ensure, Error},
-    std::{
-        fmt::Debug,
-        ops::{Range, Rem, Sub},
-    },
-};
+use crate::errors::FxfsError;
+use anyhow::{ensure, Error};
+use std::fmt::Debug;
+use std::ops::{Range, Rem, Sub};
 
 pub trait RangeExt<T> {
     /// Returns whether the range is valid (i.e. start <= end).

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        fs_node_impl_symlink, fs_node_impl_xattr_delegate, FsNode, FsNodeOps, FsStr, FsString,
-        MemoryXattrStorage, SymlinkTarget,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::{
+    fs_node_impl_symlink, fs_node_impl_xattr_delegate, FsNode, FsNodeOps, FsStr, FsString,
+    MemoryXattrStorage, SymlinkTarget,
 };
 use starnix_uapi::errors::Errno;
 

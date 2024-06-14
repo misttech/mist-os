@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    fidl_fuchsia_space::ErrorCode,
-    fuchsia_async as fasync,
-    futures::prelude::*,
-    std::sync::Arc,
-};
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_space::ErrorCode;
+use fuchsia_async as fasync;
+use futures::prelude::*;
+use std::sync::Arc;
 
 type CallHook = Box<dyn Fn() -> Result<(), ErrorCode> + Send + Sync>;
 

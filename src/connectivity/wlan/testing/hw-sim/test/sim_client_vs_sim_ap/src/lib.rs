@@ -2,24 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap::WlantapPhyProxy,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_zircon::DurationNum as _,
-    futures::{channel::oneshot, join, TryFutureExt},
-    ieee80211::MacAddr,
-    std::pin::pin,
-    tracing::{info, warn},
-    wlan_common::{bss::Protection::Wpa2Personal, buffer_reader::BufferReader, mac},
-    wlan_hw_sim::{
-        default_wlantap_config_ap, default_wlantap_config_client,
-        event::{self, action, Handler},
-        has_id_and_state, loop_until_iface_is_found, netdevice_helper, rx_info_with_default_ap,
-        test_utils, wait_until_client_state, Beacon, NetworkConfigBuilder, AP_MAC_ADDR, AP_SSID,
-        CLIENT_MAC_ADDR, ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
-    },
+use fidl_fuchsia_wlan_tap::WlantapPhyProxy;
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_zircon::DurationNum as _;
+use futures::channel::oneshot;
+use futures::{join, TryFutureExt};
+use ieee80211::MacAddr;
+use std::pin::pin;
+use tracing::{info, warn};
+use wlan_common::bss::Protection::Wpa2Personal;
+use wlan_common::buffer_reader::BufferReader;
+use wlan_common::mac;
+use wlan_hw_sim::event::{self, action, Handler};
+use wlan_hw_sim::{
+    default_wlantap_config_ap, default_wlantap_config_client, has_id_and_state,
+    loop_until_iface_is_found, netdevice_helper, rx_info_with_default_ap, test_utils,
+    wait_until_client_state, Beacon, NetworkConfigBuilder, AP_MAC_ADDR, AP_SSID, CLIENT_MAC_ADDR,
+    ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
 };
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 const PASS_PHRASE: &str = "wpa2duel";
 

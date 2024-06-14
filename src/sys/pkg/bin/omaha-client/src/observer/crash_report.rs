@@ -7,7 +7,9 @@
 use anyhow::anyhow;
 use fidl_fuchsia_feedback::{CrashReport, CrashReporterProxy};
 use fuchsia_zircon as zx;
-use futures::{channel::mpsc, future::LocalBoxFuture, prelude::*};
+use futures::channel::mpsc;
+use futures::future::LocalBoxFuture;
+use futures::prelude::*;
 use omaha_client::time::TimeSource;
 use std::time::Duration;
 use tracing::{error, warn};

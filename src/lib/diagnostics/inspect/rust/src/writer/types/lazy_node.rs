@@ -34,7 +34,8 @@ impl InnerType for InnerLazyNodeType {
 
 #[cfg(test)]
 mod tests {
-    use crate::writer::{testing_utils::GetBlockExt, types::Inspector};
+    use crate::writer::testing_utils::GetBlockExt;
+    use crate::writer::types::Inspector;
     use futures::FutureExt;
     use inspect_format::{BlockType, LinkNodeDisposition};
 

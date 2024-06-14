@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {std::str::FromStr, thiserror::Error};
+use std::str::FromStr;
+use thiserror::Error;
 
 #[cfg(target_os = "fuchsia")]
 use diagnostics_reader as reader;

@@ -8,26 +8,20 @@ pub mod simple_persistent_layer;
 pub mod skip_list_layer;
 pub mod types;
 
-use {
-    crate::{
-        drop_event::DropEvent,
-        log::*,
-        object_handle::{ReadObjectHandle, WriteBytes},
-        serialized_types::{Version, LATEST_VERSION},
-    },
-    anyhow::Error,
-    cache::{ObjectCache, ObjectCacheResult},
-    simple_persistent_layer::SimplePersistentLayerWriter,
-    skip_list_layer::SkipListLayer,
-    std::{
-        fmt,
-        ops::Bound,
-        sync::{Arc, RwLock},
-    },
-    types::{
-        Item, ItemRef, Key, Layer, LayerIterator, LayerKey, LayerWriter, MergeableKey,
-        OrdLowerBound, Value,
-    },
+use crate::drop_event::DropEvent;
+use crate::log::*;
+use crate::object_handle::{ReadObjectHandle, WriteBytes};
+use crate::serialized_types::{Version, LATEST_VERSION};
+use anyhow::Error;
+use cache::{ObjectCache, ObjectCacheResult};
+use simple_persistent_layer::SimplePersistentLayerWriter;
+use skip_list_layer::SkipListLayer;
+use std::fmt;
+use std::ops::Bound;
+use std::sync::{Arc, RwLock};
+use types::{
+    Item, ItemRef, Key, Layer, LayerIterator, LayerKey, LayerWriter, MergeableKey, OrdLowerBound,
+    Value,
 };
 
 const SKIP_LIST_LAYER_ITEMS: usize = 512;
@@ -366,38 +360,31 @@ impl<K, V> fmt::Debug for LayerSet<K, V> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::LSMTree,
-        crate::{
-            drop_event::DropEvent,
-            lsm_tree::{
-                cache::{NullCache, ObjectCache, ObjectCachePlaceholder, ObjectCacheResult},
-                layers_from_handles,
-                merge::{MergeLayerIterator, MergeResult},
-                types::{
-                    BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerKey,
-                    OrdLowerBound, OrdUpperBound, SortByU64, Value,
-                },
-            },
-            object_handle::ObjectHandle,
-            serialized_types::{
-                versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
-            },
-            testing::{
-                fake_object::{FakeObject, FakeObjectHandle},
-                writer::Writer,
-            },
-        },
-        anyhow::{anyhow, Error},
-        async_trait::async_trait,
-        fprint::TypeFingerprint,
-        rand::{seq::SliceRandom, thread_rng},
-        std::{
-            hash::Hash,
-            ops::Bound,
-            sync::{Arc, Mutex},
-        },
+    use super::LSMTree;
+    use crate::drop_event::DropEvent;
+    use crate::lsm_tree::cache::{
+        NullCache, ObjectCache, ObjectCachePlaceholder, ObjectCacheResult,
     };
+    use crate::lsm_tree::layers_from_handles;
+    use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
+    use crate::lsm_tree::types::{
+        BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerKey, OrdLowerBound,
+        OrdUpperBound, SortByU64, Value,
+    };
+    use crate::object_handle::ObjectHandle;
+    use crate::serialized_types::{
+        versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
+    };
+    use crate::testing::fake_object::{FakeObject, FakeObjectHandle};
+    use crate::testing::writer::Writer;
+    use anyhow::{anyhow, Error};
+    use async_trait::async_trait;
+    use fprint::TypeFingerprint;
+    use rand::seq::SliceRandom;
+    use rand::thread_rng;
+    use std::hash::Hash;
+    use std::ops::Bound;
+    use std::sync::{Arc, Mutex};
 
     #[derive(
         Clone,
@@ -816,18 +803,14 @@ mod tests {
 
 #[cfg(fuzz)]
 mod fuzz {
-    use {
-        crate::{
-            lsm_tree::types::{Item, LayerKey, OrdLowerBound, OrdUpperBound, SortByU64},
-            serialized_types::{
-                versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
-            },
-        },
-        arbitrary::Arbitrary,
-        fprint::TypeFingerprint,
-        fuzz::fuzz,
-        std::hash::Hash,
+    use crate::lsm_tree::types::{Item, LayerKey, OrdLowerBound, OrdUpperBound, SortByU64};
+    use crate::serialized_types::{
+        versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
     };
+    use arbitrary::Arbitrary;
+    use fprint::TypeFingerprint;
+    use fuzz::fuzz;
+    use std::hash::Hash;
 
     #[derive(
         Arbitrary,
@@ -880,11 +863,10 @@ mod fuzz {
 
     #[fuzz]
     fn fuzz_lsm_tree_actions(actions: Vec<FuzzAction>) {
-        use {
-            super::{cache::NullCache, LSMTree},
-            crate::lsm_tree::merge::{MergeLayerIterator, MergeResult},
-            futures::executor::block_on,
-        };
+        use super::cache::NullCache;
+        use super::LSMTree;
+        use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
+        use futures::executor::block_on;
 
         fn emit_left_merge_fn(
             _left: &MergeLayerIterator<'_, TestKey, u64>,

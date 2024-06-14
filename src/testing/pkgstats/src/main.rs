@@ -4,18 +4,14 @@
 
 #![allow(dead_code)]
 
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    env::current_exe,
-    fs::File,
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicU32, AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
-    time::Instant,
-};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::env::current_exe;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;

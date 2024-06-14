@@ -23,7 +23,7 @@ from typing import Callable, Sequence
 _SCRIPT_BASENAME = os.path.basename(__file__)
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
@@ -154,7 +154,7 @@ def main_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str]) -> None:
+def main(argv: Sequence[str]) -> int:
     parser = main_arg_parser()
     args = parser.parse_args(argv)
 

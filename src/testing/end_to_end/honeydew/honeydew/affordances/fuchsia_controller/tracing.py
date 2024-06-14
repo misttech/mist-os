@@ -275,13 +275,26 @@ class Tracing(tracing.Tracing):
         async with asyncio.TaskGroup() as tg:
             if download:
                 drain_task = tg.create_task(self._drain_socket_async())
-            tg.create_task(
+            terminate_result_blob = tg.create_task(
                 self._trace_controller_proxy.terminate_tracing(
                     options=f_tracingcontroller.TerminateOptions(
                         write_results=download
                     )
                 )
             )
+
+        if terminate_result_blob is not None:
+            controller_terminate_tracing_response = (
+                terminate_result_blob.result().response
+            )
+            terminate_result = controller_terminate_tracing_response["result"]
+            provider_stats = terminate_result.provider_stats
+            for p in provider_stats:
+                if p.records_dropped < 0:
+                    _LOGGER.warning(
+                        "%s records were dropped for %s!"
+                        % (p.records_dropped, p.name)
+                    )
 
         if drain_task is not None:
             return drain_task.result()

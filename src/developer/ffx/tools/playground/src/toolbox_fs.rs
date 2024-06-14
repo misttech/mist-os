@@ -4,11 +4,11 @@
 
 use anyhow::Result;
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_developer_remotecontrol as rc;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as sys2;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
+use {
+    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as sys2,
+};
 
 pub async fn toolbox_directory(
     remote_proxy: &rc::RemoteControlProxy,

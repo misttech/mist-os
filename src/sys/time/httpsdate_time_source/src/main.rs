@@ -9,28 +9,24 @@ mod diagnostics;
 mod httpsdate;
 mod sampler;
 
-use {
-    crate::diagnostics::{
-        CobaltDiagnostics, CompositeDiagnostics, Diagnostics, InspectDiagnostics,
-    },
-    crate::httpsdate::{HttpsDateUpdateAlgorithm, RetryStrategy},
-    crate::sampler::{HttpsSampler, HttpsSamplerImpl},
-    anyhow::{Context, Error},
-    fidl_fuchsia_net_interfaces::StateMarker,
-    fidl_fuchsia_time_external::{
-        PullSourceRequestStream, PushSourceRequestStream, Status, Urgency,
-    },
-    fuchsia_component::server::{ServiceFs, ServiceObj},
-    fuchsia_zircon as zx,
-    futures::{
-        future::{join, Future},
-        FutureExt, StreamExt,
-    },
-    pull_source::PullSource,
-    push_source::PushSource,
-    std::collections::HashMap,
-    tracing::warn,
+use crate::diagnostics::{
+    CobaltDiagnostics, CompositeDiagnostics, Diagnostics, InspectDiagnostics,
 };
+use crate::httpsdate::{HttpsDateUpdateAlgorithm, RetryStrategy};
+use crate::sampler::{HttpsSampler, HttpsSamplerImpl};
+use anyhow::{Context, Error};
+use fidl_fuchsia_net_interfaces::StateMarker;
+use fidl_fuchsia_time_external::{
+    PullSourceRequestStream, PushSourceRequestStream, Status, Urgency,
+};
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use fuchsia_zircon as zx;
+use futures::future::{join, Future};
+use futures::{FutureExt, StreamExt};
+use pull_source::PullSource;
+use push_source::PushSource;
+use std::collections::HashMap;
+use tracing::warn;
 
 /// Retry strategy used while polling for time.
 const RETRY_STRATEGY: RetryStrategy = RetryStrategy {

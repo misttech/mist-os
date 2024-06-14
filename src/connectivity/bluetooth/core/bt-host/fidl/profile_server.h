@@ -93,7 +93,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
 
     bt::l2cap::Channel::UniqueId unique_id() const { return unique_id_; }
 
-    void Stop(StopCallback callback) override {}
+    void Stop(StopCallback callback) override;
 
     void SendOnStartedEvent() { binding()->events().OnStarted(); }
 

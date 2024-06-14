@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_uapi::{
-    file_mode::FileMode, open_flags::OpenFlags, seal_flags::SealFlags, signals::Signal,
-    user_address::UserAddress,
-};
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::seal_flags::SealFlags;
+use starnix_uapi::signals::Signal;
+use starnix_uapi::user_address::UserAddress;
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct SyscallResult(u64);

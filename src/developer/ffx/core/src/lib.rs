@@ -14,13 +14,7 @@ use thiserror::Error;
 /// Exports used in macros
 #[doc(hidden)]
 pub mod macro_deps {
-    pub use anyhow;
-    pub use errors;
-    pub use fidl;
-    pub use fidl_fuchsia_developer_ffx;
-    pub use fuchsia_async;
-    pub use futures;
-    pub use rcs;
+    pub use {anyhow, errors, fidl, fidl_fuchsia_developer_ffx, fuchsia_async, futures, rcs};
 }
 
 #[derive(Error, Debug)]

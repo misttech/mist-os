@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_zircon::{self as zx, AsHandleRef, ObjectType},
-    std::{
-        fmt::{Debug, Write},
-        os::fd::AsFd,
-    },
-    tracing::{field::Field, Event, Level, Subscriber},
-    tracing_log::LogTracer,
-    tracing_subscriber::{field::Visit, layer::Context, prelude::*, Layer, Registry},
-};
+use fuchsia_zircon::{self as zx, AsHandleRef, ObjectType};
+use std::fmt::{Debug, Write};
+use std::os::fd::AsFd;
+use tracing::field::Field;
+use tracing::{Event, Level, Subscriber};
+use tracing_log::LogTracer;
+use tracing_subscriber::field::Visit;
+use tracing_subscriber::layer::Context;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::{Layer, Registry};
 
 /// KernelLogger is a subscriber implementation for the tracing crate.
 pub struct KernelLogger {
@@ -120,16 +120,14 @@ impl Visit for StringVisitor {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Context,
-        fidl_fuchsia_boot as fboot,
-        fuchsia_component::client::connect_channel_to_protocol,
-        fuchsia_zircon::HandleBased,
-        rand::Rng,
-        std::panic,
-        tracing::{error, info, warn},
-    };
+    use super::*;
+    use anyhow::Context;
+    use fidl_fuchsia_boot as fboot;
+    use fuchsia_component::client::connect_channel_to_protocol;
+    use fuchsia_zircon::HandleBased;
+    use rand::Rng;
+    use std::panic;
+    use tracing::{error, info, warn};
 
     fn get_readonlylog() -> zx::DebugLog {
         let (client_end, server_end) = zx::Channel::create();

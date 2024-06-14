@@ -1,0 +1,206 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/config/linker.gni")
+import("//build/zircon/c_utils.gni")
+import("ifs_shared_library.gni")
+
+template("hermetic_source_set") {
+  assert(defined(invoker.global_symbols),
+         "hermetic_source_set() must define `global_symbols`")
+
+  export_target = target_name
+  link_target = "_hermetic_source_set.$target_name.link"
+  link_rspfile_target = "$link_target.rsp"
+  libs_target = "_hermetic_source_set.$target_name.libs"
+  hermetic_target = "_hermetic_source_set.$target_name.hermetic"
+  link_output_name = "$target_name.link"
+  link_rspfile = "$target_gen_dir/$link_output_name.link.rsp"
+  hermetic_output_file = "$target_out_dir/$target_name.o"
+
+  undefined_symbols = []
+  if (defined(invoker.undefined_symbols)) {
+    undefined_symbols = invoker.undefined_symbols
+  }
+
+  # The source_set() will just contribute $hermetic_output_file as a link
+  # input via libs, and reflect the top-level target metadata and pulibc_*.
+  source_set(export_target) {
+    forward_variables_from(invoker,
+                           [
+                             "metadata",
+                             "public",
+                             "public_configs",
+                             "public_deps",
+                             "testonly",
+                             "visibility",
+                           ])
+
+    libs = [ hermetic_output_file ]
+    deps = [
+      ":$hermetic_target",
+      ":$libs_target",
+    ]
+  }
+
+  # A basic_executable() is just the original GN executable() with no wrapper
+  # template or set_defaults applied.  It's evaluated in the same toolchain
+  # as hermetic_source_set(), i.e. no variant selection.  This performs a
+  # relocatable (-r) link.
+  basic_executable(link_target) {
+    visibility = [ ":$link_rspfile_target" ]
+
+    ldflags = []
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "global_symbols",
+                             "metadata",
+                             "ouput_dir",
+                             "output_extension",
+                             "output_name",
+                             "visibility",
+                           ])
+
+    output_dir = target_out_dir
+    output_name = link_output_name
+    output_extension = "o"
+
+    ldflags += [
+      "-r",
+      "-static",
+
+      # This might be implied by -r in the compiler driver, but not always.
+      "-Wl,--build-id=none",
+      "-Wl,--no-eh-frame-hdr",
+    ]
+
+    # Force the exported symbols to be treated as GC roots.
+    foreach(symbol, invoker.global_symbols) {
+      if (linker == "") {  # Presumed BFD.
+        # TODO(https://fxbug.dev/343794592): LLD doesn't have this switch yet.
+        # Nor does Gold, only BFD.  When LLD gets the switch (if Gold still
+        # lacks it), change the check to `linker != "gold"`.
+        ldflags += [ "-Wl,--require-defined=$symbol" ]
+      } else {
+        ldflags += [ "-Wl,--undefined=$symbol" ]
+      }
+    }
+
+    # The relocatable link omits libc, but may include hermetic libc++.
+    #
+    # It includes -lclang_rt.builtins (-lgcc) just to avoid dangling undefined
+    # references that can be avoided, even though for most purposes it would be
+    # fine to share that code with the outer link.  If the reason for the
+    # hermetic_source_set() is something like a no-compiler-abi environment,
+    # the prebuilt lilbcalls use the minimal machine ABI anyway, so private
+    # copies aren't any different than what the outer link would provide.
+    #
+    # However, if the reason is specifically to provide an object with a known
+    # set of undefined references, then the prebuilt library code needs to be
+    # linked in and localized.  If code bloat is a concern, then the outer link
+    # will use --icf=all anyway and that will deduplicate the localized
+    # functions from the prebuilt that are truly identical.
+    libs = [ "c++" ]
+
+    ldflags += [
+      # Without this, there are warnings about -nolibc and -static-libstdc++.
+      "-Wno-unused-command-line-argument",
+    ]
+
+    if (undefined_symbols == true) {
+      configs -= [ "//build/config:symbol_no_undefined" ]
+    } else if (is_gcc) {
+      foreach(symbol, undefined_symbols) {
+        ldflags += [ "-Wl,--ignore-unresolved-symbol=$symbol" ]
+      }
+    }
+
+    # Don't link in any ET_DYN files, which aren't allowed with ld -r.
+    # This will be handled via libs_target instead.
+    configs += [ "//build/config:ifs-as-needed" ]
+
+    # Set the metadata for link_output_rspfile() to collect.
+    output_file = "$output_name.$output_extension"
+    if (zircon_toolchain == false) {
+      link_output_dir = "$output_dir/exe.unstripped"
+    } else {
+      link_output_dir = output_dir
+      output_file += ".debug"
+    }
+    metadata = {
+      link_output_barrier = []
+      link_output_path =
+          [ rebase_path(output_file, root_build_dir, link_output_dir) ]
+    }
+  }
+
+  # Note that the "primary" output of the executable() target is a stripped
+  # file, which for an ET_REL with --strip-sections winds up as an empty file
+  # with just an ELF header.  The tool("link") in the toolchain definition
+  # always does the post-link steps like stripping, but it's only the actual
+  # link output that will be used by the objcopy step that follows.
+  link_output_rspfile(link_rspfile_target) {
+    visibility = [ ":$hermetic_target" ]
+    outputs = [ link_rspfile ]
+    deps = [ ":$link_target" ]
+  }
+
+  # This will provide the ET_DYN files (via AS_NEEDED wrapper input linker
+  # scripts) from `.as-needed` targets in the deps graph to the outer link.
+  ifs_shared_library_libs(libs_target) {
+    visibility = [ ":$export_target" ]
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
+  }
+
+  toolchain_utils_action(hermetic_target) {
+    utils = [ "objcopy" ]
+    script = true
+
+    args = []
+    foreach(symbol, invoker.global_symbols) {
+      args += [ "--keep-global-symbol=$symbol" ]
+    }
+
+    sources = [ link_rspfile ]
+    deps = [ ":$link_rspfile_target" ]
+    args += [ "@" + rebase_path(link_rspfile, root_build_dir) ]
+
+    outputs = [ hermetic_output_file ]
+    args += rebase_path(outputs, root_build_dir)
+  }
+}
+
+# --icf is not compatible with -r.  ICF will be done in the outer link.
+_remove_configs = [
+  "//build/config:icf",
+  "//build/config/zircon:default_icf",
+]
+
+if (linker == "gold") {
+  # Gold doesn't allow --gc-sections in the -r link, though the other
+  # linkers do.  The outer link will apply --gc-sections anyway.
+  _remove_configs += [
+    "//build/config:default_linker_gc",
+    "//build/config:linker_gc",
+  ]
+}
+
+set_defaults("hermetic_source_set") {
+  configs = default_common_binary_configs
+
+  configs += [
+    "//build/config/zircon:no-synthetic-sections",
+    "//build/config/zircon:nolibc",
+    "//build/config/zircon:static-libc++",
+    "//build/config:symbol_no_undefined",
+  ]
+
+  configs += _remove_configs
+  configs -= _remove_configs
+}

@@ -187,7 +187,7 @@ Realm& Realm::AddConfiguration(std::vector<ConfigCapability> configurations) {
 }
 #endif
 
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
 Realm& Realm::AddCapability(fuchsia::component::decl::Capability capability) {
   fuchsia::component::test::Realm_AddCapability_Result result;
   ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
@@ -359,7 +359,7 @@ RealmBuilder& RealmBuilder::AddConfiguration(std::vector<ConfigCapability> confi
 }
 #endif
 
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
 RealmBuilder& RealmBuilder::AddCapability(fuchsia::component::decl::Capability capability) {
   root_.AddCapability(std::move(capability));
   return *this;

@@ -5,48 +5,40 @@
 //! State for an IP device.
 
 use alloc::vec::Vec;
-use core::{
-    fmt::Debug,
-    hash::Hash,
-    num::{NonZeroU16, NonZeroU8},
-    ops::{Deref, DerefMut},
-    time::Duration,
-};
+use core::fmt::Debug;
+use core::hash::Hash;
+use core::num::{NonZeroU16, NonZeroU8};
+use core::ops::{Deref, DerefMut};
+use core::time::Duration;
 
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use net_types::{
-    ip::{
-        AddrSubnet, GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersionMarker, Ipv4,
-        Ipv4Addr, Ipv6, Ipv6Addr,
-    },
-    SpecifiedAddr,
+use net_types::ip::{
+    AddrSubnet, GenericOverIp, Ip, IpAddress, IpMarked, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
+    Ipv6Addr,
 };
+use net_types::SpecifiedAddr;
+use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc},
     CoreTimerContext, ExistsError, Inspectable, InspectableValue, Inspector, Instant,
     InstantBindingsTypes, NestedIntoCoreTimerCtx, NotFoundError, ReferenceNotifiers,
     TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet_formats::utils::NonZeroDuration;
 
-use crate::internal::{
-    device::{
-        dad::DadBindingsTypes,
-        route_discovery::Ipv6RouteDiscoveryState,
-        router_solicitation::RsState,
-        slaac::{SlaacConfiguration, SlaacState},
-        IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceTimerId,
-        Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
-    },
-    gmp::{
-        igmp::{IgmpGroupState, IgmpState, IgmpTimerId},
-        mld::{MldGroupState, MldTimerId},
-        GmpDelayedReportTimerId, GmpState, MulticastGroupSet,
-    },
-    types::{IpTypesIpExt, RawMetric},
+use crate::internal::device::dad::DadBindingsTypes;
+use crate::internal::device::route_discovery::Ipv6RouteDiscoveryState;
+use crate::internal::device::router_solicitation::RsState;
+use crate::internal::device::slaac::{SlaacConfiguration, SlaacState};
+use crate::internal::device::{
+    IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceAddr,
+    Ipv6DeviceTimerId, WeakIpAddressId,
 };
+use crate::internal::gmp::igmp::{IgmpGroupState, IgmpState, IgmpTimerId};
+use crate::internal::gmp::mld::{MldGroupState, MldTimerId};
+use crate::internal::gmp::{GmpDelayedReportTimerId, GmpState, MulticastGroupSet};
+use crate::internal::types::{IpTypesIpExt, RawMetric};
 
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
@@ -772,10 +764,10 @@ impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
 
     /// Returns the IP device state for version `I`.
     pub fn ip_state<I: IpDeviceStateIpExt>(&self) -> &IpDeviceState<I, BT> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(dual_stack)| &dual_stack.ipv4.ip_state,
-            |IpInvariant(dual_stack)| &dual_stack.ipv6.ip_state,
+        I::map_ip_out(
+            self,
+            |dual_stack| &dual_stack.ipv4.ip_state,
+            |dual_stack| &dual_stack.ipv6.ip_state,
         )
     }
 }

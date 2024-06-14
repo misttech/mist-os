@@ -2,27 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::buffer::Buffer,
-    crate::buffer::ImageInstanceId,
-    crate::client::{Client, TaskQueue},
-    crate::display::Callback,
-    crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
-    crate::scenic::FlatlandPtr,
-    crate::subcompositor::Subsurface,
-    crate::xdg_shell::XdgSurface,
-    anyhow::{format_err, Error},
-    fidl_fuchsia_math::{Rect, RectF, Size, SizeU, Vec_},
-    fidl_fuchsia_ui_composition::{BlendMode, TransformId},
-    fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
-    fuchsia_zircon::{self as zx, HandleBased},
-    std::mem,
-    std::sync::atomic::{AtomicUsize, Ordering},
-    wayland_server_protocol::{
-        WlBufferEvent, WlCompositor, WlCompositorRequest, WlRegion, WlRegionRequest, WlSurface,
-        WlSurfaceRequest,
-    },
+use crate::buffer::{Buffer, ImageInstanceId};
+use crate::client::{Client, TaskQueue};
+use crate::display::Callback;
+use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
+use crate::scenic::FlatlandPtr;
+use crate::subcompositor::Subsurface;
+use crate::xdg_shell::XdgSurface;
+use anyhow::{format_err, Error};
+use fidl_fuchsia_math::{Rect, RectF, Size, SizeU, Vec_};
+use fidl_fuchsia_ui_composition::{BlendMode, TransformId};
+use fuchsia_zircon::{self as zx, HandleBased};
+use std::mem;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use wayland_server_protocol::{
+    WlBufferEvent, WlCompositor, WlCompositorRequest, WlRegion, WlRegionRequest, WlSurface,
+    WlSurfaceRequest,
 };
+use {fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_wayland_core as wl};
 
 static NEXT_IMAGE_INSTANCE_ID: AtomicUsize = AtomicUsize::new(1);
 

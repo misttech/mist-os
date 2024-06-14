@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::anyhow,
-    fuchsia_fs::OpenFlags,
-    fuchsia_inspect::{component, health::Reporter},
-    futures::lock::Mutex,
-    std::sync::Arc,
-};
+use anyhow::anyhow;
+use fuchsia_fs::OpenFlags;
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
+use futures::lock::Mutex;
+use std::sync::Arc;
 
 mod codec;
 mod config;
@@ -20,7 +19,9 @@ mod indexes;
 mod signal;
 mod testing;
 
-use crate::{config::Config, configurator::Configurator, default::DefaultConfigurator};
+use crate::config::Config;
+use crate::configurator::Configurator;
+use crate::default::DefaultConfigurator;
 
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {

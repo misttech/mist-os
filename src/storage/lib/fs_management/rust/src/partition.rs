@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::format::{detect_disk_format, DiskFormat},
-    anyhow::{anyhow, Context, Error},
-    fidl::endpoints::Proxy as _,
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_hardware_block::BlockProxy,
-    fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker},
-    fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
-    fidl_fuchsia_io as fio,
-    fuchsia_async::TimeoutExt,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_fs::directory::{WatchEvent, Watcher},
-    fuchsia_zircon::{self as zx, Duration},
-    futures::StreamExt,
-};
+use crate::format::{detect_disk_format, DiskFormat};
+use anyhow::{anyhow, Context, Error};
+use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_hardware_block::BlockProxy;
+use fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker};
+use fidl_fuchsia_hardware_block_volume::VolumeManagerProxy;
+use fidl_fuchsia_io as fio;
+use fuchsia_async::TimeoutExt;
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_fs::directory::{WatchEvent, Watcher};
+use fuchsia_zircon::{self as zx, Duration};
+use futures::StreamExt;
 
 /// Set of parameters to use for identifying the correct partition to open via
 /// [`open_partition`]
@@ -230,16 +228,14 @@ pub async fn fvm_allocate_partition(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{partition_matches_with_proxy, PartitionMatcher},
-        crate::format::{constants, DiskFormat},
-        fidl::endpoints::{create_proxy_and_stream, RequestStream as _},
-        fidl_fuchsia_device::{ControllerMarker, ControllerRequest},
-        fidl_fuchsia_hardware_block::{BlockInfo, Flag},
-        fidl_fuchsia_hardware_block_partition::{Guid, PartitionRequest, PartitionRequestStream},
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::{pin_mut, select, FutureExt, StreamExt},
-    };
+    use super::{partition_matches_with_proxy, PartitionMatcher};
+    use crate::format::{constants, DiskFormat};
+    use fidl::endpoints::{create_proxy_and_stream, RequestStream as _};
+    use fidl_fuchsia_device::{ControllerMarker, ControllerRequest};
+    use fidl_fuchsia_hardware_block::{BlockInfo, Flag};
+    use fidl_fuchsia_hardware_block_partition::{Guid, PartitionRequest, PartitionRequestStream};
+    use futures::{pin_mut, select, FutureExt, StreamExt};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const VALID_TYPE_GUID: [u8; 16] = [
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,

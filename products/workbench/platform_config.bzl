@@ -67,4 +67,11 @@ workbench_platform_config = {
     "power": {
         "suspend_enabled": True,
     },
+    "kernel": {
+        "oom_behavior": {
+            "reboot": {
+                "timeout": "low",
+            },
+        },
+    },
 }

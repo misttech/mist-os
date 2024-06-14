@@ -78,7 +78,14 @@ class CompareJsonListTest(unittest.TestCase):
             ),
         ]
     )
-    def test_run_main(self, exit_code, key, prefixes, reference, comparison):
+    def test_run_main(
+        self,
+        exit_code: int,
+        key: str,
+        prefixes: list[str],
+        reference: str,
+        comparison: str,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             stamp_path = os.path.join(tmpdir, "stamp")
             reference_path = os.path.join(tmpdir, "reference.json")
@@ -102,8 +109,8 @@ class CompareJsonListTest(unittest.TestCase):
             result = compare_json_list.main()
             self.assertEqual(exit_code, result)
 
-    def test_make_hashable(self):
-        prefixes = []
+    def test_make_hashable(self) -> None:
+        prefixes: list[str] = []
         one = compare_json_list.make_hashable([1, 2, 3], prefixes)
         two = compare_json_list.make_hashable([3, 2, 1], prefixes)
         self.assertEqual(1, len(set([one, two])))

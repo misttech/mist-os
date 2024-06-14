@@ -2,34 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use at_commands::{DeserializeBytes, SerDe};
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use fuchsia_async::Timer;
+use fuchsia_bluetooth::types::Channel;
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use futures::channel::mpsc::{self, Receiver, Sender};
+use futures::stream::{FusedStream, Stream, StreamExt};
+use futures::{AsyncWrite, AsyncWriteExt, FutureExt};
+use std::collections::{HashMap, VecDeque};
+use std::io::Cursor;
+use tracing::{debug, info, warn};
 use {
-    at_commands as at,
-    at_commands::{DeserializeBytes, SerDe},
-    core::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    fuchsia_async as fasync,
-    fuchsia_async::Timer,
-    fuchsia_bluetooth::types::Channel,
-    fuchsia_inspect as inspect,
-    fuchsia_inspect_derive::{AttachError, Inspect},
-    fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc::{self, Receiver, Sender},
-        stream::{FusedStream, Stream, StreamExt},
-        AsyncWrite, AsyncWriteExt, FutureExt,
-    },
-    std::{collections::HashMap, collections::VecDeque, io::Cursor},
-    tracing::{debug, info, warn},
+    at_commands as at, fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_zircon as zx,
 };
 
-use super::{
-    indicators::{AgIndicators, AgIndicatorsReporting, HfIndicators},
-    procedure::{IProcedure, Procedure, ProcedureError, ProcedureMarker, ProcedureRequest},
-    slc_request::SlcRequest,
-    update::AgUpdate,
-};
+use super::indicators::{AgIndicators, AgIndicatorsReporting, HfIndicators};
+use super::procedure::{IProcedure, Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
+use super::slc_request::SlcRequest;
+use super::update::AgUpdate;
 
 use crate::features::{AgFeatures, CodecId, HfFeatures};
 use crate::inspect::ServiceLevelConnectionInspect;
@@ -763,20 +755,15 @@ impl FusedStream for ServiceLevelConnection {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use {
-        super::*,
-        crate::peer::{
-            gain_control::Gain,
-            indicators::{
-                AgIndicator, BATT_CHG_INDICATOR_INDEX, CALL_HELD_INDICATOR_INDEX,
-                CALL_INDICATOR_INDEX,
-            },
-            procedure::dtmf::DtmfCode,
-        },
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        std::mem::Discriminant,
+    use super::*;
+    use crate::peer::gain_control::Gain;
+    use crate::peer::indicators::{
+        AgIndicator, BATT_CHG_INDICATOR_INDEX, CALL_HELD_INDICATOR_INDEX, CALL_INDICATOR_INDEX,
     };
+    use crate::peer::procedure::dtmf::DtmfCode;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use std::mem::Discriminant;
 
     /// Builds and returns a connected service level connection. Returns the SLC and
     /// the remote end of the channel.

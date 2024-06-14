@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    fidl_fuchsia_dash as fdash,
-    futures::prelude::*,
-    moniker::Moniker,
-    std::str::FromStr,
-};
+use anyhow::{format_err, Result};
+use fidl_fuchsia_dash as fdash;
+use futures::prelude::*;
+use moniker::Moniker;
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq)]
 pub enum DashNamespaceLayout {

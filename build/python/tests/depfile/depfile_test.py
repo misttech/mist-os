@@ -30,7 +30,7 @@ class DepFileTests(unittest.TestCase):
 
     expected = "baz/output: \\\n  ../input_c \\\n  things/input_a \\\n  things/input_b\n"
 
-    def test_specified_cwd(self):
+    def test_specified_cwd(self) -> None:
         output = "/foo/bar/baz/output"
         input_a = "/foo/bar/things/input_a"
         input_b = "/foo/bar/things/input_b"
@@ -43,7 +43,7 @@ class DepFileTests(unittest.TestCase):
 
         self.assertEqual(str(rebased_depfile), DepFileTests.expected)
 
-    def test_inferred_cwd(self):
+    def test_inferred_cwd(self) -> None:
         """Validate the standard behavior, with a mix of absolute and real paths."""
 
         # make the output absolute (from a path relative to the cwd)
@@ -57,7 +57,7 @@ class DepFileTests(unittest.TestCase):
 
         self.assertEqual(str(depfile), DepFileTests.expected)
 
-    def test_depfile_writing(self):
+    def test_depfile_writing(self) -> None:
         depfile = DepFile("/foo/bar/baz/output", rebase="/foo/bar")
         depfile.update(
             [
@@ -76,7 +76,7 @@ class DepFileTests(unittest.TestCase):
             contents = outfile.read()
             self.assertEqual(contents, DepFileTests.expected)
 
-    def test_empty(self):
+    def test_empty(self) -> None:
         depfile = DepFile("foo/bar/baz/output")
         self.assertEqual(str(depfile), "foo/bar/baz/output:\n")
 

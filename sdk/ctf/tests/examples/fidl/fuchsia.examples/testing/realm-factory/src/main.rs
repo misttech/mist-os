@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    fidl_fuchsia_examples::EchoMarker,
-    fidl_test_example::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    futures::{StreamExt, TryStreamExt},
-    tracing::*,
-};
+use anyhow::{Error, Result};
+use fidl_fuchsia_examples::EchoMarker;
+use fidl_test_example::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        aes::{self, SizedKey},
-        integrity::Algorithm,
-        Error,
-    },
-    tracing::error,
-};
+use crate::aes::{self, SizedKey};
+use crate::integrity::Algorithm;
+use crate::Error;
+use tracing::error;
 
 /// The AES CMAC-128 algorithm is used for integrity checks on AKMS 00-0F-AC:3 through 00-0F-AC:9.
 /// https://tools.ietf.org/html/rfc4493
@@ -41,7 +37,10 @@ impl Algorithm for CmacAes128 {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::aes::AesError, hex::FromHex, wlan_common::assert_variant};
+    use super::*;
+    use crate::aes::AesError;
+    use hex::FromHex;
+    use wlan_common::assert_variant;
 
     const K: &str = "2b7e151628aed2a6abf7158809cf4f3c";
 

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::PackagePath,
-    fuchsia_url::test::{random_package_name, random_package_variant},
-    proptest::prelude::*,
-};
+use crate::PackagePath;
+use fuchsia_url::test::{random_package_name, random_package_variant};
+use proptest::prelude::*;
 
 #[cfg(test)]
 use {

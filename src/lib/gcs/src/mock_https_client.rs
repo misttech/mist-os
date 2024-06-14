@@ -14,10 +14,9 @@
 //! // requests come in, the premade responses will be returned.
 //! ```
 
-use {
-    hyper::{Body, Request},
-    std::{collections::VecDeque, sync::Mutex},
-};
+use hyper::{Body, Request};
+use std::collections::VecDeque;
+use std::sync::Mutex;
 
 #[derive(Debug)]
 struct HttpsClientEvent {
@@ -78,7 +77,8 @@ pub fn new_https_client() -> HttpsClient {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, hyper::Method};
+    use super::*;
+    use hyper::Method;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_mock() {

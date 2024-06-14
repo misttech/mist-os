@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    color::{srgb_to_linear, Color},
-    drawing::DisplayRotation,
-    render::generic::Backend,
-};
+use crate::color::{srgb_to_linear, Color};
+use crate::drawing::DisplayRotation;
+use crate::render::generic::Backend;
 
 use euclid::default::Size2D;
 use fidl::endpoints::ClientEnd;

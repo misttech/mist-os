@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{events::*, matcher::*},
-    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-};
+use component_events::events::*;
+use component_events::matcher::*;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
+use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
 
 // TODO(https://fxbug.dev/42172627): Deduplicate this function. It is used in other CM integration tests
 async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait_on: &str) {

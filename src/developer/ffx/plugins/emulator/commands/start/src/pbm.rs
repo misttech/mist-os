@@ -10,25 +10,22 @@ use emulator_instance::{
     NetworkingMode, OperatingSystem,
 };
 use ffx_config::EnvironmentContext;
-use ffx_emulator_common::{
-    config::{EMU_UPSCRIPT_FILE, KVM_PATH},
-    split_once,
-    tuntap::tap_available,
-};
+use ffx_emulator_common::config::{EMU_UPSCRIPT_FILE, KVM_PATH};
+use ffx_emulator_common::split_once;
+use ffx_emulator_common::tuntap::tap_available;
 use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
 use fho::user_error;
 use pbms::ProductBundle;
 use sdk_metadata::VirtualDeviceManifest;
-use std::{
-    collections::{hash_map::DefaultHasher, HashMap},
-    env,
-    fs::File,
-    hash::Hasher,
-    path::PathBuf,
-    str::FromStr,
-    time::Duration,
-};
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::env;
+use std::fs::File;
+use std::hash::Hasher;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::time::Duration;
 
 /// Create a RuntimeConfiguration based on the command line args.
 pub(crate) async fn make_configs(
@@ -329,7 +326,8 @@ mod tests {
     };
     use regex::Regex;
     use serde_json::json;
-    use std::{fs::create_dir_all, io::Write};
+    use std::fs::create_dir_all;
+    use std::io::Write;
     use tempfile::tempdir;
 
     #[fuchsia::test]

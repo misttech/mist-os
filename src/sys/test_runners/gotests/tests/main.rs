@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_test_manager as ftest_manager,
-    ftest_manager::{CaseStatus, RunOptions, SuiteStatus},
-    fuchsia_async as fasync,
-    pretty_assertions::assert_eq,
-    regex::Regex,
-    test_manager_test_lib::{GroupRunEventByTestCase, RunEvent},
-};
+use anyhow::{Context as _, Error};
+use ftest_manager::{CaseStatus, RunOptions, SuiteStatus};
+use pretty_assertions::assert_eq;
+use regex::Regex;
+use test_manager_test_lib::{GroupRunEventByTestCase, RunEvent};
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 pub async fn run_test(
     test_url: &str,

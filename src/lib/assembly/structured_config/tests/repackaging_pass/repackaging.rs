@@ -8,7 +8,8 @@ use camino::Utf8Path;
 use fuchsia_archive::Utf8Reader;
 use fuchsia_pkg::{BlobInfo, PackageManifest};
 use maplit::btreemap;
-use std::{io::Cursor, path::Path};
+use std::io::Cursor;
+use std::path::Path;
 use tempfile::TempDir;
 
 const PASS_WITH_CONFIG: &str = "meta/pass_with_config.cm";

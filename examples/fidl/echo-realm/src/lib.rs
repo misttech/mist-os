@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    component_events::{events::*, matcher::*},
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-};
+use anyhow::{Context, Error};
+use component_events::events::*;
+use component_events::matcher::*;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 
 #[fuchsia::test]
 async fn launch_realm_components() -> Result<(), Error> {

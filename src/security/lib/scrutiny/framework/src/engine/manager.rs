@@ -2,23 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        dispatcher::ControllerDispatcher,
-        plugin::{Plugin, PluginDescriptor},
-        scheduler::CollectorScheduler,
-    },
-    anyhow::Result,
-    serde::{Deserialize, Serialize},
-    std::fmt,
-    std::{
-        collections::{HashMap, HashSet},
-        sync::{Arc, Mutex, RwLock},
-    },
-    thiserror::Error,
-    tracing::{error, info},
-    uuid::Uuid,
-};
+use super::dispatcher::ControllerDispatcher;
+use super::plugin::{Plugin, PluginDescriptor};
+use super::scheduler::CollectorScheduler;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::sync::{Arc, Mutex, RwLock};
+use thiserror::Error;
+use tracing::{error, info};
+use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum PluginError {
@@ -258,15 +252,14 @@ impl PluginManager {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            engine::hook::PluginHooks,
-            model::{collector::DataCollector, controller::DataController, model::DataModel},
-        },
-        scrutiny_testing::fake::fake_model_config,
-        serde_json::{json, value::Value},
-    };
+    use super::*;
+    use crate::engine::hook::PluginHooks;
+    use crate::model::collector::DataCollector;
+    use crate::model::controller::DataController;
+    use crate::model::model::DataModel;
+    use scrutiny_testing::fake::fake_model_config;
+    use serde_json::json;
+    use serde_json::value::Value;
 
     #[derive(Default)]
     pub struct TestCollector;

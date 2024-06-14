@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Error},
-    tracing::warn,
-};
+use anyhow::{bail, Error};
+use tracing::warn;
 
 /// Loads an argh struct from the command line.
 ///

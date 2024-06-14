@@ -5,23 +5,20 @@
 #![cfg(test)]
 
 use configurable_netstack_test::{server_ips, BUS_NAME, REQUEST, RESPONSE, SERVER_NAME};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_component::client::connect_to_protocol;
 use futures_util::StreamExt as _;
 use net_declare::{fidl_mac, net_ip_v4};
 use net_types::ip::Ipv4;
-use std::{
-    collections::HashMap,
-    io::{Read as _, Write as _},
-    pin::pin,
-};
+use std::collections::HashMap;
+use std::io::{Read as _, Write as _};
+use std::pin::pin;
 use test_case::test_case;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+};
 
 pub const CLIENT_NAME: &str = "client";
 

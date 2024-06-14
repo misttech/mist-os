@@ -3,17 +3,14 @@
 // found in the LICENSE file.
 
 use std::fmt::Display;
-use std::io::{BufRead, BufReader};
+use std::fs::File;
+use std::io::{BufRead, BufReader, ErrorKind};
 use std::process::Command;
-use std::{fs::File, io::ErrorKind};
 
 use camino::{Utf8Path, Utf8PathBuf};
 
-use crate::FileStates;
-use crate::{
-    fuchsia_env::{ConfigMap, FuchsiaEnv, ParseError},
-    ConfigPath,
-};
+use crate::fuchsia_env::{ConfigMap, FuchsiaEnv, ParseError};
+use crate::{ConfigPath, FileStates};
 
 pub const FILE_STEM: &str = "fuchsia_env";
 pub const TOML_FILE_EXTENSION: &str = "toml";

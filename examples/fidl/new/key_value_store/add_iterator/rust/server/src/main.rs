@@ -2,27 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    regex::Regex,
-};
+use anyhow::{Context as _, Error};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 // [START diff_1]
-use {
-    fidl_examples_keyvaluestore_additerator::{
-        Item, IterateConnectionError, IteratorRequest, IteratorRequestStream, StoreRequest,
-        StoreRequestStream, WriteError,
-    },
-    fuchsia_async as fasync,
-    std::collections::btree_map::Entry,
-    std::collections::BTreeMap,
-    std::ops::Bound::*,
-    std::sync::Arc,
-    std::sync::Mutex,
+use fidl_examples_keyvaluestore_additerator::{
+    Item, IterateConnectionError, IteratorRequest, IteratorRequestStream, StoreRequest,
+    StoreRequestStream, WriteError,
 };
+use fuchsia_async as fasync;
+use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
+use std::ops::Bound::*;
+use std::sync::{Arc, Mutex};
 // [END diff_1]
 
 lazy_static! {

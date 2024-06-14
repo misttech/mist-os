@@ -4,23 +4,17 @@
 
 #![deny(missing_docs)]
 
-use {
-    crate::net::EventedFd,
-    futures::{
-        future::Future,
-        io::{AsyncRead, AsyncWrite},
-        ready,
-        stream::Stream,
-        task::{Context, Poll},
-    },
-    std::{
-        io::{self, Write},
-        net::{self, Shutdown, SocketAddr},
-        ops::Deref,
-        os::unix::io::FromRawFd as _,
-        pin::Pin,
-    },
-};
+use crate::net::EventedFd;
+use futures::future::Future;
+use futures::io::{AsyncRead, AsyncWrite};
+use futures::ready;
+use futures::stream::Stream;
+use futures::task::{Context, Poll};
+use std::io::{self, Write};
+use std::net::{self, Shutdown, SocketAddr};
+use std::ops::Deref;
+use std::os::unix::io::FromRawFd as _;
+use std::pin::Pin;
 
 /// An I/O object representing a TCP socket listening for incoming connections.
 ///
@@ -308,18 +302,12 @@ impl Future for TcpConnector {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{TcpListener, TcpStream},
-        crate::TestExecutor,
-        futures::{
-            io::{AsyncReadExt, AsyncWriteExt},
-            stream::StreamExt,
-        },
-        std::{
-            io::{Error, ErrorKind},
-            net::{self, Ipv4Addr, SocketAddr},
-        },
-    };
+    use super::{TcpListener, TcpStream};
+    use crate::TestExecutor;
+    use futures::io::{AsyncReadExt, AsyncWriteExt};
+    use futures::stream::StreamExt;
+    use std::io::{Error, ErrorKind};
+    use std::net::{self, Ipv4Addr, SocketAddr};
 
     #[test]
     fn choose_listen_port() {

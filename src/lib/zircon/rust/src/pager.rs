@@ -4,11 +4,9 @@
 
 //! Type-safe bindings for Zircon pager objects.
 
-use {
-    crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Port, Status, Vmo, VmoOptions},
-    bitflags::bitflags,
-    fuchsia_zircon_sys as sys,
-};
+use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Port, Status, Vmo, VmoOptions};
+use bitflags::bitflags;
+use fuchsia_zircon_sys as sys;
 
 /// An object representing a Zircon
 /// [pager](https://fuchsia.dev/fuchsia-src/concepts/objects/pager.md).
@@ -130,7 +128,8 @@ impl Pager {
 
 #[cfg(test)]
 mod tests {
-    use {crate as zx, std::sync::Arc};
+    use crate as zx;
+    use std::sync::Arc;
 
     const KEY: u64 = 5;
 

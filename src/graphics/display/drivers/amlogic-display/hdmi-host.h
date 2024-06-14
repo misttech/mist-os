@@ -90,7 +90,7 @@ class HdmiHost {
 
   // Configures the video encoder to replace the output pixels of the Video
   // Input Unit (VIU) with black pixels iff `enabled` is true.
-  void ReplaceEncoderPixelColorWithBlack(bool enabled);
+  void ReplaceEncoderPixelColorWithGreen(bool enabled);
 
  private:
   void ConfigurePll(const pll_param& pll_params);

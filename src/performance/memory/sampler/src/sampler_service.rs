@@ -6,7 +6,8 @@
 //! service. It defines functions to process a stream of profiling
 //! requests and produce a complete profile, as well as utilities to
 //! persist it.
-use crate::{crash_reporter::ProfileReport, profile_builder::ProfileBuilder};
+use crate::crash_reporter::ProfileReport;
+use crate::profile_builder::ProfileBuilder;
 
 use anyhow::{Context, Error};
 use fidl_fuchsia_memory_sampler::{
@@ -14,7 +15,8 @@ use fidl_fuchsia_memory_sampler::{
 };
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
-use futures::{channel::mpsc, prelude::*};
+use futures::channel::mpsc;
+use futures::prelude::*;
 use std::time::{Duration, Instant};
 
 /// The threshold of recorded stack traces to trigger a partial
@@ -146,18 +148,17 @@ mod test {
         StackTrace,
     };
     use fuchsia_zircon::Vmo;
-    use futures::{channel::mpsc, join, StreamExt};
+    use futures::channel::mpsc;
+    use futures::{join, StreamExt};
     use itertools::{assert_equal, sorted};
     use prost::Message;
     use std::time::Instant;
 
-    use crate::{
-        crash_reporter::ProfileReport,
-        pprof::pproto::{Location, Mapping, Profile},
-        sampler_service::{
-            process_sampler_request, process_sampler_requests, ProfileBuilder,
-            MAX_DURATION_BETWEEN_PARTIAL_PROFILES, RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD,
-        },
+    use crate::crash_reporter::ProfileReport;
+    use crate::pprof::pproto::{Location, Mapping, Profile};
+    use crate::sampler_service::{
+        process_sampler_request, process_sampler_requests, ProfileBuilder,
+        MAX_DURATION_BETWEEN_PARTIAL_PROFILES, RECLAIMABLE_STACK_TRACES_PROFILE_THRESHOLD,
     };
 
     fn deserialize_profile(profile: Vmo, size: u64) -> Profile {

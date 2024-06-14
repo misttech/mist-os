@@ -2140,8 +2140,11 @@
             "type": "object",
             "patternProperties": {
                 "^[a-z][a-z0-9]*$": {
-                    "$ref": "#/definitions/version-identifier",
-                    "description": "Version selected for this platform"
+                    "description": "Set of versions selected for this platform",
+                    "items": {
+                        "$ref": "#/definitions/version-identifier"
+                    },
+                    "type": "array"
                 }
             }
         },

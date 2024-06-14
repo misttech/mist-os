@@ -2,12 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/python/python_action.gni")
+
 # Generates a partitions config to be consumed by the Image Assembler.
 #
 # Arguments:
 #   output_path (optional)
-#     [path] Board config output location.
-#     Defaults to $target_out_dir/$target_name.json
+#     [path] Partitions config output directory.
+#     Defaults to $target_out_dir
 #
 #   hw_revision (required)
 #     [string] The name of the hardware revision.
@@ -78,7 +80,7 @@
 template("generated_partitions_config") {
   assert(defined(invoker.hw_revision), "Need to define hw_revision")
 
-  output_path = "$target_out_dir/$target_name.json"
+  output_path = "$target_out_dir/$target_name"
   if (defined(invoker.output_path)) {
     output_path = invoker.output_path
   }
@@ -86,7 +88,7 @@ template("generated_partitions_config") {
   bootloaders = []
   if (defined(invoker.bootloader_partitions)) {
     foreach(part, invoker.bootloader_partitions) {
-      assert(defined(part.image), "All bootloaders must define a path")
+      assert(defined(part.image), "All bootloaders must define an image")
       assert(defined(part.type), "All bootloaders must define a type")
 
       path = rebase_path(part.image, root_build_dir)
@@ -130,15 +132,17 @@ template("generated_partitions_config") {
     }
   }
 
-  generated_file(target_name) {
+  cwd_relative_partitions_label = "$target_name.cwd_relative_partitions_config"
+  cwd_relative_partitions_config =
+      "$target_out_dir/${target_name}_intermediate.json"
+  generated_file(cwd_relative_partitions_label) {
     forward_variables_from(invoker,
                            [
-                             "deps",
                              "testonly",
                              "visibility",
                            ])
 
-    outputs = [ output_path ]
+    outputs = [ cwd_relative_partitions_config ]
     output_conversion = "json"
 
     # Aggregate all the non-bootloader partitions.
@@ -236,6 +240,48 @@ template("generated_partitions_config") {
       partitions = _partitions
       bootstrap_partitions = bootstraps
       unlock_credentials = credentials
+    }
+  }
+
+  python_action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    binary_label = "//build/assembly/scripts:collect_partitions_config"
+
+    depfile_path = "$target_out_dir/$target_name.depfile"
+    depfile = depfile_path
+
+    outputs = [
+      output_path,
+      "$output_path/partitions_config.json",
+    ]
+    inputs = [ cwd_relative_partitions_config ]
+
+    metadata = {
+      partitions_configs = [
+        {
+          label = get_label_info(target_name, "label_with_toolchain")
+          name = invoker.hw_revision
+          outdir = rebase_path(outputs[0], root_build_dir)
+        },
+      ]
+    }
+
+    args = [
+      "--partitions-config",
+      rebase_path(inputs[0], root_build_dir),
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+      "--depfile",
+      rebase_path(depfile_path, root_build_dir),
+    ]
+
+    deps = [ ":$cwd_relative_partitions_label" ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
     }
   }
 }

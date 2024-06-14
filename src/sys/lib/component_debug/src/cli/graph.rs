@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::realm::{get_all_instances, Instance},
-    anyhow::Result,
-    fidl_fuchsia_sys2 as fsys,
-    std::{collections::HashSet, fmt::Write, str::FromStr},
-    url::Url,
-};
+use crate::realm::{get_all_instances, Instance};
+use anyhow::Result;
+use fidl_fuchsia_sys2 as fsys;
+use std::collections::HashSet;
+use std::fmt::Write;
+use std::str::FromStr;
+use url::Url;
 
 /// The starting part of our Graphviz graph output. This should be printed before any contents.
 static GRAPHVIZ_START: &str = r##"digraph {

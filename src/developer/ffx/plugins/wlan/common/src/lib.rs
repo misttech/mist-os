@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl::endpoints::{create_endpoints, create_proxy},
-    fidl_fuchsia_wlan_policy as wlan_policy,
-};
+use anyhow::Error;
+use fidl::endpoints::{create_endpoints, create_proxy};
+use fidl_fuchsia_wlan_policy as wlan_policy;
 
 pub mod args;
 

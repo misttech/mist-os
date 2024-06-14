@@ -154,20 +154,16 @@ pub trait Clock {
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
-    use futures::{
-        channel::{mpsc, oneshot},
-        lock::Mutex,
-        StreamExt as _,
-    };
+    use futures::channel::{mpsc, oneshot};
+    use futures::lock::Mutex;
+    use futures::StreamExt as _;
     use rand::SeedableRng as _;
-    use std::{
-        cell::RefCell,
-        cmp::Reverse,
-        collections::BTreeMap,
-        future::Future,
-        ops::{Deref as _, DerefMut as _},
-        rc::Rc,
-    };
+    use std::cell::RefCell;
+    use std::cmp::Reverse;
+    use std::collections::BTreeMap;
+    use std::future::Future;
+    use std::ops::{Deref as _, DerefMut as _};
+    use std::rc::Rc;
 
     /// Provides a seedable implementation of `RngProvider` using `StdRng`.
     pub(crate) struct FakeRngProvider {
@@ -417,7 +413,8 @@ mod test {
     use super::testutil::*;
     use super::*;
     use fuchsia_async as fasync;
-    use futures::{channel::mpsc, FutureExt, StreamExt};
+    use futures::channel::mpsc;
+    use futures::{FutureExt, StreamExt};
     use net_declare::std_socket_addr;
     use std::pin::pin;
 

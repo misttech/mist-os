@@ -2,35 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::sync::atomic;
+
 use arbitrary::{Arbitrary, Unstructured};
 use fuzz::fuzz;
 use fuzz_util::Fuzzed;
 use mdns::protocol::Message as MdnsMessage;
-use net_types::{
-    ethernet::Mac,
-    ip::{Ipv4Addr, Ipv6Addr},
-};
-use netsvc_proto::{debuglog::DebugLogPacket, netboot::NetbootPacket, tftp::TftpPacket};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ipv4Addr, Ipv6Addr};
+use netsvc_proto::debuglog::DebugLogPacket;
+use netsvc_proto::netboot::NetbootPacket;
+use netsvc_proto::tftp::TftpPacket;
 use packet::{BufferView, ParsablePacket};
-use packet_formats::{
-    arp::ArpPacket,
-    ethernet::{EthernetFrame, EthernetFrameLengthCheck},
-    icmp::{IcmpParseArgs, Icmpv4Packet, Icmpv6Packet},
-    igmp::messages::IgmpPacket,
-    ipv4::Ipv4Packet,
-    ipv6::Ipv6Packet,
-    tcp::{TcpParseArgs, TcpSegment},
-    udp::{UdpPacket, UdpParseArgs},
-};
+use packet_formats::arp::ArpPacket;
+use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
+use packet_formats::icmp::{IcmpParseArgs, Icmpv4Packet, Icmpv6Packet};
+use packet_formats::igmp::messages::IgmpPacket;
+use packet_formats::ipv4::Ipv4Packet;
+use packet_formats::ipv6::Ipv6Packet;
+use packet_formats::tcp::{TcpParseArgs, TcpSegment};
+use packet_formats::udp::{UdpPacket, UdpParseArgs};
 use packet_formats_dhcp::v6::Message as Dhcpv6Message;
-use tracing::Subscriber;
-use tracing_subscriber::{
-    fmt::{
-        format::{self, FormatEvent, FormatFields},
-        FmtContext,
-    },
-    registry::LookupSpan,
-};
 use zerocopy::ByteSlice;
 
 /// Packet formats whose parsers are provided by the [`packet_formats_dhcp`]
@@ -99,34 +91,20 @@ where
 }
 
 fn init_logging() {
-    static LOGGER_ONCE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(true);
-    if LOGGER_ONCE.swap(false, core::sync::atomic::Ordering::AcqRel) {
-        struct LogEventFormatter;
-        impl<S, N> FormatEvent<S, N> for LogEventFormatter
-        where
-            S: Subscriber + for<'a> LookupSpan<'a>,
-            N: for<'a> FormatFields<'a> + 'static,
-        {
-            fn format_event(
-                &self,
-                ctx: &FmtContext<'_, S, N>,
-                mut writer: format::Writer<'_>,
-                event: &tracing::Event<'_>,
-            ) -> std::fmt::Result {
-                let level = *event.metadata().level();
-                let path = event.metadata().module_path().unwrap_or("_unknown_");
-                write!(writer, "[{path}][{level}]: ")?;
-                ctx.field_format().format_fields(writer.by_ref(), event)?;
-                writeln!(writer)
+    static LOGGER_ONCE: atomic::AtomicBool = atomic::AtomicBool::new(true);
+    if LOGGER_ONCE.swap(false, atomic::Ordering::AcqRel) {
+        struct StderrLogger;
+        impl log::Log for StderrLogger {
+            fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+                true
             }
+            fn log(&self, record: &log::Record<'_>) {
+                eprintln!("[{}][{}] {}", record.target(), record.level(), record.args());
+            }
+            fn flush(&self) {}
         }
-
-        let subscriber = tracing_subscriber::fmt()
-            .event_format(LogEventFormatter)
-            .with_writer(std::io::stderr)
-            .with_max_level(tracing::Level::DEBUG)
-            .finish();
-        tracing::subscriber::set_global_default(subscriber).expect("Unable to set global default")
+        log::set_logger(&StderrLogger).expect("logging setup failed");
+        log::set_max_level(log::LevelFilter::Debug);
     }
 }
 

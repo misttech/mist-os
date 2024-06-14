@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{events::GraphEventsTracker, Metadata, Vertex, VertexId};
+use super::events::GraphEventsTracker;
+use super::{Metadata, Vertex, VertexId};
 use fuchsia_inspect as inspect;
 use std::marker::PhantomData;
 

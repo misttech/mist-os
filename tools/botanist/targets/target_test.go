@@ -91,37 +91,39 @@ type testTarget struct {
 	ipv6     *net.IPAddr
 }
 
-func (t *testTarget) TestConfig(netboot bool) (any, error) { return TargetInfo(t, netboot, t.pdu) }
-func (t *testTarget) IPv4() (net.IP, error)                { return t.ipv4, nil }
-func (t *testTarget) IPv6() (*net.IPAddr, error)           { return t.ipv6, nil }
-func (t *testTarget) Nodename() string                     { return t.nodename }
-func (t *testTarget) SerialSocketPath() string             { return t.serial }
-func (t *testTarget) SSHKey() string                       { return "" }
+func (t *testTarget) TestConfig(expectsSSH bool) (any, error) {
+	return TargetInfo(t, expectsSSH, t.pdu)
+}
+func (t *testTarget) IPv4() (net.IP, error)      { return t.ipv4, nil }
+func (t *testTarget) IPv6() (*net.IPAddr, error) { return t.ipv6, nil }
+func (t *testTarget) Nodename() string           { return t.nodename }
+func (t *testTarget) SerialSocketPath() string   { return t.serial }
+func (t *testTarget) SSHKey() string             { return "" }
 
 func TestTargetInfo(t *testing.T) {
 	tests := []struct {
-		name    string
-		target  testTarget
-		netboot bool
-		want    targetInfo
+		name       string
+		target     testTarget
+		expectsSSH bool
+		want       targetInfo
 	}{
 		{
-			name:    "valid",
-			target:  testTarget{nodename: "node", serial: "serial", ipv4: net.IPv4zero, ipv6: &net.IPAddr{IP: net.IPv6zero}},
-			netboot: false,
-			want:    targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", IPv4: net.IPv4zero.String(), IPv6: net.IPv6zero.String(), PDU: nil},
+			name:       "valid",
+			target:     testTarget{nodename: "node", serial: "serial", ipv4: net.IPv4zero, ipv6: &net.IPAddr{IP: net.IPv6zero}},
+			expectsSSH: true,
+			want:       targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", IPv4: net.IPv4zero.String(), IPv6: net.IPv6zero.String(), PDU: nil},
 		},
 		{
-			name:    "valid with netboot",
-			target:  testTarget{nodename: "node", serial: "serial", ipv4: net.IPv4zero, ipv6: &net.IPAddr{IP: net.IPv6zero}},
-			netboot: true,
-			want:    targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", PDU: nil},
+			name:       "valid without SSH",
+			target:     testTarget{nodename: "node", serial: "serial", ipv4: net.IPv4zero, ipv6: &net.IPAddr{IP: net.IPv6zero}},
+			expectsSSH: false,
+			want:       targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", PDU: nil},
 		},
 		{
-			name:    "valid no ip addresses",
-			target:  testTarget{nodename: "node", serial: "serial"},
-			netboot: false,
-			want:    targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", PDU: nil},
+			name:       "valid no ip addresses",
+			target:     testTarget{nodename: "node", serial: "serial"},
+			expectsSSH: true,
+			want:       targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", PDU: nil},
 		},
 		{
 			name: "valid with pdu",
@@ -130,7 +132,7 @@ func TestTargetInfo(t *testing.T) {
 				MAC:  "12:34:56:78:9a:bc",
 				Port: 1,
 			}},
-			netboot: false,
+			expectsSSH: true,
 			want: targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", PDU: &targetPDU{
 				IP:   "192.168.1.1",
 				MAC:  "12:34:56:78:9a:bc",
@@ -141,7 +143,7 @@ func TestTargetInfo(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := test.target.TestConfig(test.netboot)
+			got, err := test.target.TestConfig(test.expectsSSH)
 			if err != nil {
 				t.Errorf("unexpected error from target.TestConfig(false): %s", err)
 			}

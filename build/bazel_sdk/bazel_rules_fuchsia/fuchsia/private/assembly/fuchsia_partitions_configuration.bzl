@@ -10,36 +10,38 @@ load(
     "FuchsiaPartitionInfo",
 )
 
-def _collect_partitions(partition_targets):
-    partitions = []
-    for parition in partition_targets:
-        partitions.append(parition[FuchsiaPartitionInfo].partition)
-    return partitions
-
 def _fuchsia_partitions_configuration(ctx):
-    if ctx.file.partition_config:
-        return [
-            DefaultInfo(files = depset(direct = [ctx.file.partition_config])),
-            FuchsiaAssemblyConfigInfo(config = ctx.file.partition_config),
-        ]
+    partitions_config_file = ctx.actions.declare_file("%s/partitions_config.json" % ctx.label.name)
 
-    partitions_config_file = ctx.actions.declare_file(ctx.label.name + "_partitions.json")
+    output_files = [partitions_config_file]
+
+    def _symlink(category, file):
+        symlink = ctx.actions.declare_file("%s/%s/%s" % (ctx.label.name, category, file.basename))
+        output_files.append(symlink)
+        ctx.actions.symlink(output = symlink, target_file = file)
+        return "%s/%s" % (category, symlink.basename)
+
+    def _rebase_image(category, partition_target):
+        partition = partition_target[FuchsiaPartitionInfo].partition
+        return partition | {"image": "%s/%s" % (category, partition["image"].rpartition("/")[-1])}
 
     partitions_config = {
         "hardware_revision": ctx.attr.hardware_revision,
-        "bootstrap_partitions": _collect_partitions(ctx.attr.bootstrap_partitions),
-        "bootloader_partitions": _collect_partitions(ctx.attr.bootloader_partitions),
-        "partitions": _collect_partitions(ctx.attr.partitions),
+        "bootstrap_partitions": [_rebase_image("bootstrap", partition) for partition in ctx.attr.bootstrap_partitions],
+        "bootloader_partitions": [_rebase_image("bootloaders", partition) for partition in ctx.attr.bootloader_partitions],
+        "partitions": [partition[FuchsiaPartitionInfo].partition for partition in ctx.attr.partitions],
+        "unlock_credentials": [_symlink("credentials", cred) for cred in ctx.files.unlock_credentials],
     }
 
-    unlock_credentials = []
-    for credential in ctx.files.unlock_credentials:
-        unlock_credentials.append(credential.path)
-    partitions_config["unlock_credentials"] = unlock_credentials
+    for file in ctx.files.bootstrap_partitions:
+        _symlink("bootstrap", file)
+    for file in ctx.files.bootloader_partitions:
+        _symlink("bootloaders", file)
+
     ctx.actions.write(partitions_config_file, json.encode(partitions_config))
 
     return [
-        DefaultInfo(files = depset(direct = [partitions_config_file] + ctx.files.bootstrap_partitions + ctx.files.bootloader_partitions + ctx.files.unlock_credentials)),
+        DefaultInfo(files = depset(direct = output_files)),
         FuchsiaAssemblyConfigInfo(config = partitions_config_file),
     ]
 
@@ -47,13 +49,6 @@ fuchsia_partitions_configuration = rule(
     doc = """Creates a partitions configuration.""",
     implementation = _fuchsia_partitions_configuration,
     attrs = {
-        # TODO(lijiaming) After the partition configuration generation is moved
-        # OOT, we can remove this workaround.
-        "partition_config": attr.label(
-            doc = "Relative path of built partition config file. If this file is" +
-                  "provided we will skip building it.",
-            allow_single_file = [".json"],
-        ),
         "bootstrap_partitions": attr.label_list(
             doc = "Partitions that are only flashed in the \"fuchsia\" configuration.",
             providers = [FuchsiaPartitionInfo],
@@ -72,6 +67,29 @@ fuchsia_partitions_configuration = rule(
         "unlock_credentials": attr.label_list(
             doc = "List of zip files containing the fastboot unlock credentials.",
             allow_files = [".zip"],
+        ),
+    },
+)
+
+def _fuchsia_prebuilt_partitions_configuration_impl(ctx):
+    return [
+        DefaultInfo(files = depset(direct = ctx.files.srcs)),
+        FuchsiaAssemblyConfigInfo(config = ctx.file.partitions_config),
+    ]
+
+fuchsia_prebuilt_partitions_configuration = rule(
+    doc = """Instantiates a prebuilt partitions configuration.""",
+    implementation = _fuchsia_prebuilt_partitions_configuration_impl,
+    attrs = {
+        "srcs": attr.label(
+            doc = "A filegroup target capturing all prebuilt partition config artifacts.",
+            allow_files = True,
+            mandatory = True,
+        ),
+        "partitions_config": attr.label(
+            doc = "Relative path of prebuilt partition config file. Must be present within `srcs` as well.",
+            allow_single_file = [".json"],
+            mandatory = True,
         ),
     },
 )

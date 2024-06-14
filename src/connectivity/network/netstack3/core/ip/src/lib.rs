@@ -19,7 +19,6 @@ mod internal {
 
     pub(super) mod api;
     pub(super) mod base;
-    pub(super) mod datagram;
     pub(super) mod device;
     pub(super) mod forwarding;
     pub(super) mod gmp;
@@ -30,43 +29,6 @@ mod internal {
     pub(super) mod socket;
     pub(super) mod types;
     pub(super) mod uninstantiable;
-}
-
-/// Shared code for implementing datagram sockets.
-// TODO(https://fxbug.dev/339531757): Split this into its own crate so it
-// doesn't have to be part of the IP module. It's currently here because ICMP
-// echo sockets depend on it.
-pub mod datagram {
-    pub use crate::internal::datagram::spec_context::{
-        DatagramSpecBoundStateContext, DatagramSpecStateContext,
-        DualStackDatagramSpecBoundStateContext, NonDualStackDatagramSpecBoundStateContext,
-    };
-    pub use crate::internal::datagram::{
-        close, collect_all_sockets, connect, create, disconnect_connected, get_bound_device,
-        get_info, get_ip_hop_limits, get_ip_transparent, get_multicast_interface,
-        get_multicast_loop, get_options_device, get_sharing, get_shutdown_connected, listen,
-        send_conn, send_to, set_device, set_ip_transparent, set_multicast_interface,
-        set_multicast_loop, set_multicast_membership, shutdown_connected, update_ip_hop_limit,
-        update_sharing, with_other_stack_ip_options,
-        with_other_stack_ip_options_and_default_hop_limits, with_other_stack_ip_options_mut,
-        with_other_stack_ip_options_mut_if_unbound, BoundSocketState, BoundSocketStateType,
-        BoundSockets, ConnInfo, ConnectError, DatagramBoundStateContext, DatagramFlowId,
-        DatagramSocketMapSpec, DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec,
-        DatagramStateContext, DualStackConnState, DualStackConverter,
-        DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
-        ExpectedUnboundError, InUseError, IpExt, IpOptions, ListenerInfo,
-        MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NonDualStackConverter,
-        NonDualStackDatagramBoundStateContext, ReferenceState, SendError, SendToError,
-        SetMulticastMembershipError, SocketHopLimits, SocketInfo, SocketState, StrongRc, WeakRc,
-        WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
-    };
-
-    /// Datagram socket test utilities.
-    #[cfg(any(test, feature = "testutils"))]
-    pub mod testutil {
-        pub use crate::internal::datagram::create_primary_id;
-        pub use crate::internal::datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs;
-    }
 }
 
 /// Definitions for devices at the IP layer.
@@ -149,18 +111,13 @@ pub mod gmp {
 
 /// The Internet Control Message Protocol (ICMP).
 pub mod icmp {
-    pub use crate::internal::icmp::socket::{
-        BoundSockets, IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoSocketApi,
-        IcmpSocketId, IcmpSocketSet, IcmpSocketState, IcmpSockets,
-        StateContext as IcmpSocketStateContext,
-    };
     pub use crate::internal::icmp::{
         send_icmpv4_host_unreachable, send_icmpv6_address_unreachable, send_ndp_packet,
-        IcmpBindingsContext, IcmpBindingsTypes, IcmpErrorCode, IcmpIpExt, IcmpIpTransportContext,
-        IcmpRxCounters, IcmpRxCountersInner, IcmpState, IcmpStateContext, IcmpTxCounters,
-        IcmpTxCountersInner, Icmpv4ErrorCode, Icmpv4StateBuilder, Icmpv6ErrorCode,
-        InnerIcmpContext, InnerIcmpv4Context, NdpCounters, NdpRxCounters, NdpTxCounters,
-        REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+        EchoTransportContextMarker, IcmpBindingsContext, IcmpBindingsTypes, IcmpErrorCode,
+        IcmpIpExt, IcmpIpTransportContext, IcmpRxCounters, IcmpRxCountersInner, IcmpState,
+        IcmpStateContext, IcmpTxCounters, IcmpTxCountersInner, Icmpv4ErrorCode, Icmpv4StateBuilder,
+        Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters, NdpRxCounters,
+        NdpTxCounters, REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
     };
 
     /// ICMP test utilities.
@@ -212,34 +169,39 @@ pub mod socket {
     pub use crate::internal::socket::{
         DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
         IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketBindingsContext,
-        IpSocketContext, IpSocketHandler, Mms, MmsError, SendOptions,
+        IpSocketContext, IpSocketHandler, Mms, MmsError, SendOneShotIpPacketError, SendOptions,
+        SocketHopLimits,
     };
 
     /// IP Socket test utilities.
     #[cfg(any(test, feature = "testutils"))]
     pub mod testutil {
-        pub use crate::internal::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
+        pub use crate::internal::socket::testutil::{
+            FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeIpSocketCtx, InnerFakeIpSocketCtx,
+        };
     }
 }
 
 /// Raw IP sockets.
 pub mod raw {
+    pub use crate::internal::raw::filter::RawIpSocketIcmpFilter;
     pub use crate::internal::raw::protocol::RawIpSocketProtocol;
     pub use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
     pub use crate::internal::raw::{
-        RawIpSocketApi, RawIpSocketId, RawIpSocketMap, RawIpSocketMapContext,
-        RawIpSocketSendToError, RawIpSocketStateContext, RawIpSocketsBindingsContext,
-        RawIpSocketsBindingsTypes, WeakRawIpSocketId,
+        RawIpSocketApi, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketMap,
+        RawIpSocketMapContext, RawIpSocketSendToError, RawIpSocketStateContext,
+        RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, WeakRawIpSocketId,
     };
 }
 
 pub use internal::api::{RoutesAnyApi, RoutesApi};
 pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
-    receive_ipv6_packet_action, resolve_route_to_destination, AddressStatus, DropReason,
-    FilterHandlerProvider, HopLimits, IpCounters, IpDeviceContext, IpDeviceStateContext, IpExt,
-    IpLayerBindingsContext, IpLayerContext, IpLayerEvent, IpLayerHandler, IpLayerIpExt,
-    IpLayerTimerId, IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
+    receive_ipv6_packet_action, resolve_route_to_destination, AddressStatus,
+    BaseTransportIpContext, DropReason, FilterHandlerProvider, HopLimits, IpCounters,
+    IpDeviceContext, IpDeviceStateContext, IpExt, IpLayerBindingsContext, IpLayerContext,
+    IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination,
+    IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
     Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State,
     Ipv6StateBuilder, MulticastMembershipHandler, ReceivePacketAction, ResolveRouteError,
     SendIpPacketMeta, TransparentLocalDelivery, TransportIpContext, TransportReceiveError,

@@ -6,9 +6,13 @@ use anyhow::Result;
 use async_lock::RwLock;
 use fuchsia_async as fasync;
 use fuchsia_repo::server::ConnectionStream;
-use futures::{channel::mpsc::UnboundedSender, Stream, StreamExt as _};
+use futures::channel::mpsc::UnboundedSender;
+use futures::{Stream, StreamExt as _};
 use protocols::prelude::*;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
 
 const TUNNEL_CONNECT_ATTEMPTS: usize = 5;
 const TUNNEL_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(5);

@@ -30,13 +30,7 @@ base_package_labels = []
 cache_package_labels = []
 universe_package_labels = []
 
-product_bootfs_labels = []
 base_driver_package_labels = []
 sdk_archive_labels = []
-
-product_bootfs_labels += [
-  "//products/kernel_cmdline:kernel.oom.behavior--jobkill",
-  "//products/kernel_cmdline:oom.reboot-timeout--low",
-]
 
 zedboot_product_assembly_config_label = "//products/zedboot"

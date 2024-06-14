@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    animation::{LinearAnimation, StateMachine},
-    artboard::Artboard,
-    core::Object,
-    importers::ImportStackObject,
-    status_code::StatusCode,
-};
+use crate::animation::{LinearAnimation, StateMachine};
+use crate::artboard::Artboard;
+use crate::core::Object;
+use crate::importers::ImportStackObject;
+use crate::status_code::StatusCode;
 
 #[derive(Debug)]
 pub struct ArtboardImporter {

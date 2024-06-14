@@ -54,7 +54,7 @@ template("fidl_rust") {
   crate_name = "fidl_" + string_replace(library_name, ".", "_")
   file_stem = "$fidl_gen_dir/$crate_name"
 
-  if (current_toolchain == fidl_toolchain) {
+  if (is_fidl_toolchain) {
     filename = "$file_stem.rs"
     compiled_action(generation_target) {
       forward_variables_from(invoker,

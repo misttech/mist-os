@@ -2,45 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::app::EventProxy,
-    crate::args::{MAX_FONT_SIZE, MIN_FONT_SIZE},
-    crate::colors::{ColorScheme, DARK_COLOR_SCHEME, LIGHT_COLOR_SCHEME, SPECIAL_COLOR_SCHEME},
-    crate::terminal::Terminal,
-    crate::text_grid::{TextGridFacet, TextGridMessages},
-    anyhow::{anyhow, Error},
-    carnelian::{
-        drawing::load_font,
-        input,
-        render::{rive::load_rive, Context as RenderContext},
-        scene::{
-            facets::{FacetId, RiveFacet},
-            scene::{Scene, SceneBuilder, SceneOrder},
-        },
-        AppSender, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
-    },
-    fidl_fuchsia_hardware_display::VirtconMode,
-    fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminSynchronousProxy, RebootReason},
-    fidl_fuchsia_hardware_pty::WindowSize,
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_channel_to_protocol,
-    fuchsia_zircon::{self as zx, prelude::*},
-    futures::future::{join_all, FutureExt as _},
-    pty::{key_util::CodePoint, key_util::HidUsage},
-    rive_rs as rive,
-    std::{
-        collections::{BTreeMap, BTreeSet},
-        io::Write as _,
-        mem,
-        path::PathBuf,
-    },
-    term_model::{
-        ansi::TermInfo,
-        grid::Scroll,
-        term::{color::Rgb, SizeInfo, TermMode},
-    },
-    terminal::{cell_size_from_cell_height, get_scale_factor, FontSet},
+use crate::app::EventProxy;
+use crate::args::{MAX_FONT_SIZE, MIN_FONT_SIZE};
+use crate::colors::{ColorScheme, DARK_COLOR_SCHEME, LIGHT_COLOR_SCHEME, SPECIAL_COLOR_SCHEME};
+use crate::terminal::Terminal;
+use crate::text_grid::{TextGridFacet, TextGridMessages};
+use anyhow::{anyhow, Error};
+use carnelian::drawing::load_font;
+use carnelian::render::rive::load_rive;
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::{FacetId, RiveFacet};
+use carnelian::scene::scene::{Scene, SceneBuilder, SceneOrder};
+use carnelian::{
+    input, AppSender, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
+use fidl_fuchsia_hardware_display::VirtconMode;
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminSynchronousProxy, RebootReason};
+use fidl_fuchsia_hardware_pty::WindowSize;
+use fuchsia_component::client::connect_channel_to_protocol;
+use fuchsia_zircon::prelude::*;
+use fuchsia_zircon::{self as zx};
+use futures::future::{join_all, FutureExt as _};
+use pty::key_util::{CodePoint, HidUsage};
+use std::collections::{BTreeMap, BTreeSet};
+use std::io::Write as _;
+use std::mem;
+use std::path::PathBuf;
+use term_model::ansi::TermInfo;
+use term_model::grid::Scroll;
+use term_model::term::color::Rgb;
+use term_model::term::{SizeInfo, TermMode};
+use terminal::{cell_size_from_cell_height, get_scale_factor, FontSet};
+use {fuchsia_async as fasync, rive_rs as rive};
 
 fn is_control_only(modifiers: &input::Modifiers) -> bool {
     modifiers.control && !modifiers.shift && !modifiers.alt && !modifiers.caps_lock

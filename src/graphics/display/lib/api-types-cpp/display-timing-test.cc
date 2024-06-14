@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
@@ -309,6 +310,111 @@ TEST(DisplayTiming, FromBanjo) {
         .v_sync_pulse = 0x04'04,
         .v_blanking = 0x0c'0c,
         .flags = MODE_FLAG_INTERLACED | MODE_FLAG_VSYNC_POSITIVE | MODE_FLAG_ALTERNATING_VBLANK,
+    };
+    EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayMode));
+  }
+}
+
+TEST(DisplayTiming, FromFidl) {
+  {
+    constexpr DisplayTiming kExpected = {
+        .horizontal_active_px = 0x0f'0f,
+        .horizontal_front_porch_px = 0x0a'0a,
+        .horizontal_sync_width_px = 0x01'01,
+        .horizontal_back_porch_px = 0x02'02,
+        .vertical_active_lines = 0x0b'0b,
+        .vertical_front_porch_lines = 0x03'03,
+        .vertical_sync_width_lines = 0x04'04,
+        .vertical_back_porch_lines = 0x05'05,
+        .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
+        .fields_per_frame = FieldsPerFrame::kInterlaced,
+        .hsync_polarity = SyncPolarity::kPositive,
+        .vsync_polarity = SyncPolarity::kPositive,
+        .vblank_alternates = true,
+        .pixel_repetition = 0,
+    };
+    constexpr fuchsia_hardware_display_engine::wire::DisplayMode kFidlDisplayMode = {
+        .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
+        .h_addressable = 0x0f'0f,
+        .h_front_porch = 0x0a'0a,
+        .h_sync_pulse = 0x01'01,
+        .h_blanking = 0x0d'0d,
+        .v_addressable = 0x0b'0b,
+        .v_front_porch = 0x03'03,
+        .v_sync_pulse = 0x04'04,
+        .v_blanking = 0x0c'0c,
+        .flags = fuchsia_hardware_display_engine::wire::ModeFlag::kInterlaced |
+                 fuchsia_hardware_display_engine::wire::ModeFlag::kHsyncPositive |
+                 fuchsia_hardware_display_engine::wire::ModeFlag::kVsyncPositive |
+                 fuchsia_hardware_display_engine::wire::ModeFlag::kAlternatingVblank,
+    };
+    EXPECT_EQ(kExpected, ToDisplayTiming(kFidlDisplayMode));
+  }
+
+  // Verify Hsync / Vsync polarities are correctly mapped.
+  {
+    constexpr DisplayTiming kExpected = {
+        .horizontal_active_px = 0x0f'0f,
+        .horizontal_front_porch_px = 0x0a'0a,
+        .horizontal_sync_width_px = 0x01'01,
+        .horizontal_back_porch_px = 0x02'02,
+        .vertical_active_lines = 0x0b'0b,
+        .vertical_front_porch_lines = 0x03'03,
+        .vertical_sync_width_lines = 0x04'04,
+        .vertical_back_porch_lines = 0x05'05,
+        .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
+        .fields_per_frame = FieldsPerFrame::kInterlaced,
+        .hsync_polarity = SyncPolarity::kPositive,
+        .vsync_polarity = SyncPolarity::kNegative,
+        .vblank_alternates = true,
+        .pixel_repetition = 0,
+    };
+    constexpr fuchsia_hardware_display_engine::wire::DisplayMode kFidlDisplayMode = {
+        .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
+        .h_addressable = 0x0f'0f,
+        .h_front_porch = 0x0a'0a,
+        .h_sync_pulse = 0x01'01,
+        .h_blanking = 0x0d'0d,
+        .v_addressable = 0x0b'0b,
+        .v_front_porch = 0x03'03,
+        .v_sync_pulse = 0x04'04,
+        .v_blanking = 0x0c'0c,
+        .flags = fuchsia_hardware_display_engine::wire::ModeFlag::kInterlaced |
+                 fuchsia_hardware_display_engine::wire::ModeFlag::kHsyncPositive |
+                 fuchsia_hardware_display_engine::wire::ModeFlag::kAlternatingVblank,
+    };
+    EXPECT_EQ(kExpected, ToDisplayTiming(kFidlDisplayMode));
+  }
+  {
+    constexpr DisplayTiming kExpected = {
+        .horizontal_active_px = 0x0f'0f,
+        .horizontal_front_porch_px = 0x0a'0a,
+        .horizontal_sync_width_px = 0x01'01,
+        .horizontal_back_porch_px = 0x02'02,
+        .vertical_active_lines = 0x0b'0b,
+        .vertical_front_porch_lines = 0x03'03,
+        .vertical_sync_width_lines = 0x04'04,
+        .vertical_back_porch_lines = 0x05'05,
+        .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
+        .fields_per_frame = FieldsPerFrame::kInterlaced,
+        .hsync_polarity = SyncPolarity::kNegative,
+        .vsync_polarity = SyncPolarity::kPositive,
+        .vblank_alternates = true,
+        .pixel_repetition = 0,
+    };
+    constexpr fuchsia_hardware_display_engine::wire::DisplayMode kBanjoDisplayMode = {
+        .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
+        .h_addressable = 0x0f'0f,
+        .h_front_porch = 0x0a'0a,
+        .h_sync_pulse = 0x01'01,
+        .h_blanking = 0x0d'0d,
+        .v_addressable = 0x0b'0b,
+        .v_front_porch = 0x03'03,
+        .v_sync_pulse = 0x04'04,
+        .v_blanking = 0x0c'0c,
+        .flags = fuchsia_hardware_display_engine::wire::ModeFlag::kInterlaced |
+                 fuchsia_hardware_display_engine::wire::ModeFlag::kVsyncPositive |
+                 fuchsia_hardware_display_engine::wire::ModeFlag::kAlternatingVblank,
     };
     EXPECT_EQ(kExpected, ToDisplayTiming(kBanjoDisplayMode));
   }

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
-use net_types::ip::{GenericOverIp, Ip, IpInvariant};
+use net_types::ip::{GenericOverIp, Ip};
 use packet_formats::ip::IpExt;
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
 
 use super::{ConversionResult, IpVersionMismatchError, IpVersionStrictness, TryConvertToCoreState};
 
@@ -20,13 +19,13 @@ impl TryConvertToCoreState for fnet::IpAddress {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct Wrap<I: IpExt>(Result<ConversionResult<I::Addr>, IpVersionMismatchError>);
-        let Wrap(result) = I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(addr)| match addr {
+        let Wrap(result) = I::map_ip_out(
+            self,
+            |addr| match addr {
                 Self::Ipv4(addr) => Wrap(Ok(ConversionResult::State(addr.into_ext()))),
                 Self::Ipv6(_) => Wrap(ip_version_strictness.mismatch_result()),
             },
-            |IpInvariant(addr)| match addr {
+            |addr| match addr {
                 Self::Ipv4(_) => Wrap(ip_version_strictness.mismatch_result()),
                 Self::Ipv6(addr) => Wrap(Ok(ConversionResult::State(addr.into_ext()))),
             },

@@ -7,38 +7,31 @@
 //! AP. While 802.11 explicitly allows - and sometime requires - authentication with more than one
 //! STA, Fuchsia does intentionally not yet support this use-case.
 
+use crate::akm_algorithm as akm;
+use crate::block_ack::{BlockAckState, Closed};
+use crate::client::lost_bss::LostBssCounter;
+use crate::client::{BoundClient, Client, Context, ParsedAssociateResp, TimedEvent};
+use crate::ddk_converter::{get_rssi_dbm, softmac_key_configuration_from_mlme};
+use crate::device::DeviceOps;
+use crate::disconnect::LocallyInitiated;
+use crate::error::Error;
+use cstr::cstr;
+use fuchsia_trace::Id as TraceId;
+use ieee80211::{Bssid, MacAddr, MacAddrBytes};
+use tracing::{debug, error, info, trace, warn};
+use wlan_common::buffer_reader::BufferReader;
+use wlan_common::capabilities::{intersect_with_ap_as_client, ApCapabilities, StaCapabilities};
+use wlan_common::energy::DecibelMilliWatt;
+use wlan_common::mac::{self, BeaconHdr, PowerState};
+use wlan_common::stats::SignalStrengthAverage;
+use wlan_common::timer::{EventId, Timer};
+use wlan_common::{ie, tim};
+use wlan_statemachine::*;
+use zerocopy::ByteSlice;
 use {
-    crate::{
-        akm_algorithm as akm,
-        block_ack::{BlockAckState, Closed},
-        client::{
-            lost_bss::LostBssCounter, BoundClient, Client, Context, ParsedAssociateResp, TimedEvent,
-        },
-        ddk_converter::{get_rssi_dbm, softmac_key_configuration_from_mlme},
-        device::DeviceOps,
-        disconnect::LocallyInitiated,
-        error::Error,
-    },
-    cstr::cstr,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_trace::Id as TraceId,
-    fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddr, MacAddrBytes},
-    tracing::{debug, error, info, trace, warn},
-    wlan_common::{
-        buffer_reader::BufferReader,
-        capabilities::{intersect_with_ap_as_client, ApCapabilities, StaCapabilities},
-        energy::DecibelMilliWatt,
-        ie,
-        mac::{self, BeaconHdr, PowerState},
-        stats::SignalStrengthAverage,
-        tim,
-        timer::{EventId, Timer},
-    },
-    wlan_statemachine::*,
-    wlan_trace as wtrace,
-    zerocopy::ByteSlice,
+    fuchsia_zircon as zx, wlan_trace as wtrace,
 };
 
 /// Reconnect timeout in Beacon periods.
@@ -1478,40 +1471,32 @@ mod free_function_tests {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::block_ack::{write_addba_req_body, ADDBA_REQ_FRAME_LEN};
+    use crate::client::channel_switch::ChannelState;
+    use crate::client::scanner::Scanner;
+    use crate::client::test_utils::drain_timeouts;
+    use crate::client::{ParsedConnectRequest, TimedEventClass};
+    use crate::device::{FakeDevice, FakeDeviceState};
+    use crate::test_utils::{fake_set_keys_req, fake_wlan_channel, MockWlanRxInfo};
+    use akm::AkmAlgorithm;
+    use fuchsia_sync::Mutex;
+    use lazy_static::lazy_static;
+    use std::sync::Arc;
+    use test_case::test_case;
+    use wlan_common::buffer_writer::BufferWriter;
+    use wlan_common::ie::IeType;
+    use wlan_common::mac::AsBytesExt as _;
+    use wlan_common::sequence::SequenceManager;
+    use wlan_common::test_utils::fake_capabilities::fake_client_capabilities;
+    use wlan_common::test_utils::fake_frames::*;
+    use wlan_common::test_utils::fake_stas::IesOverrides;
+    use wlan_common::timer::{self, create_timer};
+    use wlan_common::{assert_variant, fake_bss_description, mgmt_writer};
+    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
+    use wlan_frame_writer::write_frame_with_dynamic_buffer;
     use {
-        super::*,
-        crate::{
-            block_ack::{write_addba_req_body, ADDBA_REQ_FRAME_LEN},
-            client::{
-                channel_switch::ChannelState, scanner::Scanner, test_utils::drain_timeouts,
-                ParsedConnectRequest, TimedEventClass,
-            },
-            device::{FakeDevice, FakeDeviceState},
-            test_utils::{fake_set_keys_req, fake_wlan_channel, MockWlanRxInfo},
-        },
-        akm::AkmAlgorithm,
-        fidl_fuchsia_wlan_common as fidl_common,
-        fuchsia_sync::Mutex,
-        fuchsia_zircon as zx,
-        lazy_static::lazy_static,
-        std::sync::Arc,
-        test_case::test_case,
-        wlan_common::{
-            assert_variant,
-            buffer_writer::BufferWriter,
-            fake_bss_description,
-            ie::IeType,
-            mac::AsBytesExt as _,
-            mgmt_writer,
-            sequence::SequenceManager,
-            test_utils::{
-                fake_capabilities::fake_client_capabilities, fake_frames::*,
-                fake_stas::IesOverrides,
-            },
-            timer::{self, create_timer},
-        },
-        wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider},
-        wlan_frame_writer::write_frame_with_dynamic_buffer,
+        fidl_fuchsia_wlan_common as fidl_common, fuchsia_zircon as zx,
         wlan_statemachine as statemachine,
     };
 

@@ -130,17 +130,13 @@ class TimerQueue {
   // Moves |source|'s timers (except its preemption timer) to this TimerQueue.
   void TransitionOffCpu(TimerQueue& source);
 
-  // This function is to be invoked after resume on each CPU's TimerQueue that
-  // may have had timers still on it, in order to restart hardware timers.
-  void ThawPercpu();
-
   // Prints the contents of all timer queues into |buf| of length |len| and null
   // terminates |buf|.
   static void PrintTimerQueues(char* buf, size_t len);
 
   // This is called periodically by timer_tick(), which itself is invoked
   // periodically by some hardware timer.
-  void Tick(zx_time_t now, cpu_num_t cpu);
+  void Tick(cpu_num_t cpu);
 
  private:
   // Timers can directly call Insert and Cancel.
@@ -154,6 +150,12 @@ class TimerQueue {
   //
   // This can only be called when interrupts are disabled.
   void UpdatePlatformTimer(zx_time_t new_deadline);
+
+  // This is called by Tick(), and processes all timers with scheduled times less than now.
+  // Once it's done, the scheduled time of the timer at the front of the queue is returned.
+  template <typename TimestampType>
+  static TimestampType TickInternal(TimestampType now, cpu_num_t cpu,
+                                    fbl::DoublyLinkedList<Timer*>& timer_list);
 
   // Timers on this queue.
   fbl::DoublyLinkedList<Timer*> timer_list_;

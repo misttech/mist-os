@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Error, Result};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fuchsia_component_test::{
+    Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Route,
+};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use futures::{FutureExt as _, StreamExt as _};
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::service;
 use {
-    anyhow::{Context, Error, Result},
-    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync,
-    fuchsia_component_test::{
-        Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Route,
-    },
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    fuchsia_zircon as zx,
-    futures::{FutureExt as _, StreamExt as _},
-    vfs::{
-        directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path, service,
-    },
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 async fn get_driver_info(

@@ -6,14 +6,15 @@ pub mod docker_archive;
 pub mod layered_image;
 pub mod populate_bundle_visitor;
 
-use {
-    crate::docker_archive::DockerArchive,
-    crate::layered_image::LayeredImage,
-    crate::populate_bundle_visitor::PopulateBundleVisitor,
-    anyhow::{bail, Error},
-    ext4_metadata::{ROOT_INODE_NUM, S_IFDIR},
-    std::{collections::HashMap, fs::File, path::Path, str::FromStr},
-};
+use crate::docker_archive::DockerArchive;
+use crate::layered_image::LayeredImage;
+use crate::populate_bundle_visitor::PopulateBundleVisitor;
+use anyhow::{bail, Error};
+use ext4_metadata::{ROOT_INODE_NUM, S_IFDIR};
+use std::collections::HashMap;
+use std::fs::File;
+use std::path::Path;
+use std::str::FromStr;
 
 pub enum InputFormat {
     /// A tarball containing the root filesystem.

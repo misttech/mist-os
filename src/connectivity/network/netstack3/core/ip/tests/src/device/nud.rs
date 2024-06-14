@@ -2,62 +2,53 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use alloc::collections::{HashMap, VecDeque};
 use alloc::vec;
-use alloc::{
-    collections::{HashMap, VecDeque},
-    vec::Vec,
-};
+use alloc::vec::Vec;
 use core::num::{NonZeroU16, NonZeroUsize};
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 use net_declare::net_ip_v6;
-use net_types::{
-    ip::{AddrSubnet, Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
-    SpecifiedAddr, UnicastAddr, Witness as _,
-};
+use net_types::ip::{AddrSubnet, Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
+use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
-use packet_formats::{
-    ethernet::{EtherType, EthernetFrameLengthCheck},
-    icmp::{
-        ndp::{
-            options::NdpOptionBuilder, NeighborAdvertisement, NeighborSolicitation,
-            OptionSequenceBuilder, RouterAdvertisement,
-        },
-        IcmpDestUnreachable, IcmpPacketBuilder, IcmpUnusedCode,
-    },
-    ip::{IpProto, Ipv4Proto, Ipv6Proto},
-    ipv4::Ipv4PacketBuilder,
-    ipv6::Ipv6PacketBuilder,
-    testutil::{parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame},
-    udp::UdpPacketBuilder,
+use packet_formats::ethernet::{EtherType, EthernetFrameLengthCheck};
+use packet_formats::icmp::ndp::options::NdpOptionBuilder;
+use packet_formats::icmp::ndp::{
+    NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder, RouterAdvertisement,
 };
+use packet_formats::icmp::{IcmpDestUnreachable, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::Ipv4PacketBuilder;
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::testutil::{
+    parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame,
+};
+use packet_formats::udp::UdpPacketBuilder;
 use test_case::test_case;
 
-use netstack3_base::{
-    testutil::{FakeNetwork, FakeNetworkLinks, WithFakeFrameContext},
-    DeviceIdContext, FrameDestination, InstantContext as _,
+use netstack3_base::testutil::{
+    FakeNetwork, FakeNetworkLinks, TestAddrs, TestIpExt, WithFakeFrameContext,
 };
-use netstack3_core::{
-    device::{EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, WeakDeviceId},
-    tcp::{self, TcpSocketId},
-    testutil::{
-        new_simple_fake_network, tcp as tcp_testutil, CtxPairExt, DispatchedFrame, FakeBindingsCtx,
-        FakeCtx, FakeCtxBuilder, FakeCtxNetworkSpec, TestAddrs, TestIpExt,
-        DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-    },
-    IpExt, UnlockedCoreCtx,
+use netstack3_base::{DeviceIdContext, FrameDestination, InstantContext as _};
+use netstack3_core::device::{
+    EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, WeakDeviceId,
 };
-use netstack3_ip::{
-    self as ip,
-    device::{Ipv6DeviceConfigurationUpdate, SlaacConfiguration},
-    icmp::{self, REQUIRED_NDP_IP_PACKET_HOP_LIMIT},
-    nud::{
-        self, Delay, DynamicNeighborState, DynamicNeighborUpdateSource, Incomplete, NeighborState,
-        NudConfigContext, NudContext, NudHandler, Reachable, Stale,
-    },
-    AddableEntry, AddableMetric,
+use netstack3_core::testutil::{
+    new_simple_fake_network, CtxPairExt, DispatchedFrame, FakeBindingsCtx, FakeCtx, FakeCtxBuilder,
+    FakeCtxNetworkSpec, DEFAULT_INTERFACE_METRIC,
 };
+use netstack3_core::{IpExt, UnlockedCoreCtx};
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_ip::device::{Ipv6DeviceConfigurationUpdate, SlaacConfiguration};
+use netstack3_ip::icmp::{self, REQUIRED_NDP_IP_PACKET_HOP_LIMIT};
+use netstack3_ip::nud::{
+    self, Delay, DynamicNeighborState, DynamicNeighborUpdateSource, Incomplete, NeighborState,
+    NudConfigContext, NudContext, NudHandler, Reachable, Stale,
+};
+use netstack3_ip::{self as ip, AddableEntry, AddableMetric};
+use netstack3_tcp::{self as tcp, TcpSocketId};
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 fn assert_neighbors<I: IpExt>(
@@ -439,7 +430,7 @@ fn ipv6_integration() {
 
 type FakeNudNetwork<L> = FakeNetwork<FakeCtxNetworkSpec, &'static str, L>;
 
-fn new_test_net<I: Ip + TestIpExt>() -> (
+fn new_test_net<I: TestIpExt>() -> (
     FakeNudNetwork<
         impl FakeNetworkLinks<DispatchedFrame, EthernetDeviceId<FakeBindingsCtx>, &'static str>,
     >,
@@ -473,13 +464,13 @@ fn bind_and_connect_sockets<
     L: FakeNetworkLinks<DispatchedFrame, EthernetDeviceId<FakeBindingsCtx>, &'static str>,
 >(
     net: &mut FakeNudNetwork<L>,
-    local_buffers: tcp_testutil::ProvidedBuffers,
+    local_buffers: tcp::testutil::ProvidedBuffers,
 ) -> TcpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx> {
     const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
 
     net.with_context("remote", |ctx| {
         let mut tcp_api = ctx.core_api().tcp::<I>();
-        let socket = tcp_api.create(tcp_testutil::ProvidedBuffers::default());
+        let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
         tcp_api
             .bind(
                 &socket,
@@ -504,9 +495,9 @@ fn bind_and_connect_sockets<
     })
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn upper_layer_confirmation_tcp_handshake<I: Ip + TestIpExt + IpExt>()
+#[ip_test(I)]
+fn upper_layer_confirmation_tcp_handshake<I: TestIpExt + IpExt>()
 where
     for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<FakeBindingsCtx>>
         + NudContext<I, EthernetLinkDevice, FakeBindingsCtx>,
@@ -542,7 +533,7 @@ where
     // Initiate a TCP connection and make sure the SYN and resulting SYN/ACK are
     // received by each context.
     let _: TcpSocketId<I, _, _> =
-        bind_and_connect_sockets::<I, _>(&mut net, tcp_testutil::ProvidedBuffers::default());
+        bind_and_connect_sockets::<I, _>(&mut net, tcp::testutil::ProvidedBuffers::default());
     for _ in 0..2 {
         assert_eq!(net.step().frames_sent, 1);
     }
@@ -571,9 +562,9 @@ where
     }
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn upper_layer_confirmation_tcp_ack<I: Ip + TestIpExt + IpExt>()
+#[ip_test(I)]
+fn upper_layer_confirmation_tcp_ack<I: TestIpExt + IpExt>()
 where
     for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<FakeBindingsCtx>>
         + NudContext<I, EthernetLinkDevice, FakeBindingsCtx>,
@@ -584,10 +575,10 @@ where
 
     // Initiate a TCP connection, allow the handshake to complete, and wait until
     // the neighbor entry goes STALE due to lack of traffic on the connection.
-    let client_ends = tcp_testutil::WriteBackClientBuffers::default();
+    let client_ends = tcp::testutil::WriteBackClientBuffers::default();
     let local_socket = bind_and_connect_sockets::<I, _>(
         &mut net,
-        tcp_testutil::ProvidedBuffers::Buffers(client_ends.clone()),
+        tcp::testutil::ProvidedBuffers::Buffers(client_ends.clone()),
     );
     net.run_until_idle();
     net.with_context("local", |FakeCtx { core_ctx, bindings_ctx: _ }| {
@@ -600,7 +591,7 @@ where
     });
 
     // Send some data on the local socket and wait for it to be ACKed by the peer.
-    let tcp_testutil::ClientBuffers { send, receive: _ } =
+    let tcp::testutil::ClientBuffers { send, receive: _ } =
         client_ends.0.as_ref().lock().take().unwrap();
     send.lock().extend_from_slice(b"hello");
     net.with_context("local", |ctx| {
@@ -634,9 +625,9 @@ where
     }
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn icmp_error_on_address_resolution_failure_tcp_local<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn icmp_error_on_address_resolution_failure_tcp_local<I: TestIpExt + IpExt>() {
     let mut builder = FakeCtxBuilder::default();
     let _device_id = builder.add_device_with_ip(
         I::TEST_ADDRS.local_mac,
@@ -650,7 +641,7 @@ fn icmp_error_on_address_resolution_failure_tcp_local<I: Ip + TestIpExt + IpExt>
     let _loopback_id = ctx.test_api().add_loopback();
 
     let mut tcp_api = ctx.core_api().tcp::<I>();
-    let socket = tcp_api.create(tcp_testutil::ProvidedBuffers::default());
+    let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
     const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
     tcp_api
         .connect(&socket, Some(net_types::ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), REMOTE_PORT)
@@ -664,9 +655,9 @@ fn icmp_error_on_address_resolution_failure_tcp_local<I: Ip + TestIpExt + IpExt>
     assert_eq!(tcp_api.get_socket_error(&socket), Some(tcp::ConnectionError::HostUnreachable),);
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: TestIpExt + IpExt>() {
     let (mut net, local_device, remote_device) = new_test_net::<I>();
 
     let TestAddrs { remote_ip, .. } = I::TEST_ADDRS;
@@ -700,7 +691,7 @@ fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: Ip + TestIpExt + I
 
     let socket = net.with_context("local", |ctx| {
         let mut tcp_api = ctx.core_api().tcp::<I>();
-        let socket = tcp_api.create(tcp_testutil::ProvidedBuffers::default());
+        let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
         const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
         tcp_api
             .connect(

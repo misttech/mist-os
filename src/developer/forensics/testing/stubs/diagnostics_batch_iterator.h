@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "src/developer/forensics/testing/stubs/fidl_server.h"
+#include "src/developer/forensics/testing/stubs/fidl_server_hlcpp.h"
 
 namespace forensics {
 namespace stubs {

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fidl_test_components as ftest, fuchsia_component::client, tracing::*};
+use fidl_fidl_test_components as ftest;
+use fuchsia_component::client;
+use tracing::*;
 
 #[fuchsia::main]
 async fn main() {

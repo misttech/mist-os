@@ -2,42 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::{kobject::DeviceMetadata, DeviceMode},
-    fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo},
-    mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
-    task::CurrentTask,
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless, Buffer,
-        FdNumber, FileHandle, FileObject, FileOps, FsNode, FsString, InputBufferCallback,
-        PeekBufferSegmentsCallback,
-    },
+use crate::device::kobject::{Device, DeviceMetadata};
+use crate::device::DeviceMode;
+use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use crate::mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE};
+use crate::task::CurrentTask;
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless, Buffer,
+    FdNumber, FileHandle, FileObject, FileOps, FsNode, FsString, InputBufferCallback,
+    PeekBufferSegmentsCallback,
 };
 use bitflags::bitflags;
 use fuchsia_zircon::{Vmo, VmoChildOptions};
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::device_type::{DeviceType, LOOP_MAJOR};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::UserRef;
+use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::{
-    __kernel_old_dev_t,
-    device_type::{DeviceType, LOOP_MAJOR},
-    errno, error,
-    errors::Errno,
-    loop_info, loop_info64,
-    open_flags::OpenFlags,
-    uapi,
-    user_address::UserRef,
-    user_buffer::UserBuffer,
-    BLKFLSBUF, BLKGETSIZE, BLKGETSIZE64, LOOP_CHANGE_FD, LOOP_CLR_FD, LOOP_CONFIGURE, LOOP_CTL_ADD,
-    LOOP_CTL_GET_FREE, LOOP_CTL_REMOVE, LOOP_GET_STATUS, LOOP_GET_STATUS64, LOOP_SET_BLOCK_SIZE,
-    LOOP_SET_CAPACITY, LOOP_SET_DIRECT_IO, LOOP_SET_FD, LOOP_SET_STATUS, LOOP_SET_STATUS64,
-    LO_FLAGS_AUTOCLEAR, LO_FLAGS_DIRECT_IO, LO_FLAGS_PARTSCAN, LO_FLAGS_READ_ONLY, LO_KEY_SIZE,
+    __kernel_old_dev_t, errno, error, loop_info, loop_info64, uapi, BLKFLSBUF, BLKGETSIZE,
+    BLKGETSIZE64, LOOP_CHANGE_FD, LOOP_CLR_FD, LOOP_CONFIGURE, LOOP_CTL_ADD, LOOP_CTL_GET_FREE,
+    LOOP_CTL_REMOVE, LOOP_GET_STATUS, LOOP_GET_STATUS64, LOOP_SET_BLOCK_SIZE, LOOP_SET_CAPACITY,
+    LOOP_SET_DIRECT_IO, LOOP_SET_FD, LOOP_SET_STATUS, LOOP_SET_STATUS64, LO_FLAGS_AUTOCLEAR,
+    LO_FLAGS_DIRECT_IO, LO_FLAGS_PARTSCAN, LO_FLAGS_READ_ONLY, LO_KEY_SIZE,
 };
-use std::{
-    collections::btree_map::{BTreeMap, Entry},
-    sync::Arc,
-};
+use std::collections::btree_map::{BTreeMap, Entry};
+use std::sync::Arc;
 
 // See LOOP_SET_BLOCK_SIZE in <https://man7.org/linux/man-pages/man4/loop.4.html>.
 const MIN_BLOCK_SIZE: u32 = 512;
@@ -56,6 +50,7 @@ bitflags! {
 struct LoopDeviceState {
     backing_file: Option<FileHandle>,
     block_size: u32,
+    k_device: Option<Device>,
 
     // See struct loop_info64 for details about these fields.
     offset: u64,
@@ -73,6 +68,7 @@ impl Default for LoopDeviceState {
         LoopDeviceState {
             backing_file: Default::default(),
             block_size: MIN_BLOCK_SIZE,
+            k_device: Default::default(),
             offset: Default::default(),
             size_limit: Default::default(),
             flags: Default::default(),
@@ -122,6 +118,10 @@ impl LoopDeviceState {
         }
         Ok(())
     }
+
+    fn set_k_device(&mut self, k_device: Device) {
+        self.k_device = Some(k_device);
+    }
 }
 
 #[derive(Debug, Default)]
@@ -142,7 +142,7 @@ impl LoopDevice {
             registry.get_or_create_class("block".into(), registry.virtual_bus());
         let device = Arc::new(Self { number: minor, state: Default::default() });
         let device_weak = Arc::<LoopDevice>::downgrade(&device);
-        registry.add_device(
+        let k_device = registry.add_device(
             locked,
             current_task,
             loop_device_name.as_ref(),
@@ -154,6 +154,10 @@ impl LoopDevice {
             virtual_block_class,
             move |dev| BlockDeviceDirectory::new(dev, device_weak.clone()),
         );
+        {
+            let mut state = device.state.lock();
+            state.set_k_device(k_device);
+        }
         device
     }
 
@@ -581,6 +585,13 @@ impl LoopDeviceRegistry {
         }
     }
 
+    fn get(&self, minor: u32) -> Result<Arc<LoopDevice>, Errno> {
+        match self.devices.lock().entry(minor) {
+            Entry::Occupied(e) => Ok(e.get().clone()),
+            Entry::Vacant(_) => return error!(ENODEV),
+        }
+    }
+
     fn get_or_create<L>(
         &self,
         locked: &mut Locked<'_, L>,
@@ -638,7 +649,16 @@ impl LoopDeviceRegistry {
         }
     }
 
-    fn remove(&self, minor: u32) -> Result<(), Errno> {
+    fn remove<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        k_device: Option<Device>,
+        minor: u32,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         match self.devices.lock().entry(minor) {
             Entry::Vacant(_) => Ok(()),
             Entry::Occupied(e) => {
@@ -646,6 +666,13 @@ impl LoopDeviceRegistry {
                     return error!(EBUSY);
                 }
                 e.remove();
+                let kernel = current_task.kernel();
+                let registry = &kernel.device_registry;
+                if let Some(dev) = &k_device {
+                    registry.remove_device(locked, current_task, dev.clone());
+                } else {
+                    return Err(errno!(EINVAL));
+                }
                 Ok(())
             }
         }
@@ -697,7 +724,12 @@ impl FileOps for LoopControlDevice {
             }
             LOOP_CTL_REMOVE => {
                 let minor = arg.into();
-                self.registry.remove(minor)?;
+                let device = self.registry.get(minor)?;
+                let k_device = {
+                    let state = device.state.lock();
+                    state.k_device.clone()
+                };
+                self.registry.remove(locked, current_task, k_device, minor)?;
                 Ok(minor.into())
             }
             _ => default_ioctl(file, current_task, request, arg),
@@ -722,16 +754,12 @@ fn get_or_create_loop_device(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fs::fuchsia::new_remote_file,
-        testing::*,
-        vfs::{
-            buffers::*, Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps,
-        },
-    };
+    use crate::fs::fuchsia::new_remote_file;
+    use crate::testing::*;
+    use crate::vfs::buffers::*;
+    use crate::vfs::{Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps};
     use fidl::endpoints::Proxy;
-    use fidl_fuchsia_io as fio;
-    use fuchsia_zircon as zx;
+    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     #[derive(Clone)]
     struct PassthroughTestFile(Vec<u8>);

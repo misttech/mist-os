@@ -16,6 +16,7 @@ rustc_test("netstack3_udp_integration_test") {
     "//src/connectivity/lib/ip-test-macro",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/netstack3/core:netstack3-core-testutils",
+    "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
     "//src/connectivity/network/netstack3/core/macros:netstack3-macros",
     "//src/lib/const-unwrap",
     "//src/lib/network/packet",

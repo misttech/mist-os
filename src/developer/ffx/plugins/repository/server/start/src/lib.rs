@@ -153,8 +153,7 @@ async fn start_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fho::Format;
-    use fho::TestBuffers;
+    use fho::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest};
     use futures::channel::oneshot::channel;
     use std::net::Ipv4Addr;

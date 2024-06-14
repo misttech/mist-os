@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use futures::{future::BoxFuture, prelude::*, task::Poll};
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use futures::task::Poll;
 
 /// Wraps a future in order to allow reading/writing of "metadata" while
 /// the future is pending. When the future finishes, it will resolve with
@@ -39,7 +41,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync, std::pin::pin, wlan_common::assert_variant};
+    use super::*;
+    use fuchsia_async as fasync;
+    use std::pin::pin;
+    use wlan_common::assert_variant;
 
     #[fuchsia::test]
     fn assign_and_read_metadata_in_future_output() {

@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{storage::Config, BuildOverride, ConfigLevel, ConfigMap};
+use crate::storage::Config;
+use crate::{BuildOverride, ConfigLevel, ConfigMap};
 use anyhow::{bail, Context, Result};
 use fuchsia_lockfile::{Lockfile, LockfileCreateError};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    fmt,
-    fs::{File, OpenOptions},
-    io::{BufReader, ErrorKind, Write},
-    path::{Path, PathBuf},
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::fmt;
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, ErrorKind, Write};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use tracing::info;
 
 mod context;

@@ -5,35 +5,29 @@
 use anyhow::{Context as _, Error, Result};
 use async_utils::stream::FlattenUnorderedExt as _;
 use fidl::prelude::*;
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_decl as fdecl;
-use fidl_fuchsia_hardware_network as fhwnet;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_debug as fnet_debug;
-use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt};
-use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
-use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fidl_fuchsia_net_test_realm as fntr;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
-use fuchsia_zircon as zx;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use futures_lite::FutureExt as _;
 use net_types::ip::{Ipv4, Ipv6};
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::convert::TryFrom as _;
 use std::num::NonZeroU64;
 use std::pin::pin;
 use tracing::{error, info, warn};
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_debug as fnet_debug, fidl_fuchsia_net_dhcp as fnet_dhcp,
+    fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6, fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext,
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_test_realm as fntr,
+    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_ext as fposix_socket_ext,
+    fuchsia_zircon as zx,
+};
 
 /// URL for the realm that contains the hermetic network components with a
 /// Netstack2 instance.

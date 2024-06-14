@@ -4,12 +4,11 @@
 
 pub mod args;
 
-use {
-    anyhow::{Context, Result},
-    args::PingCommand,
-    fidl_fuchsia_io as fio,
-    std::{io::Write, path::Path},
-};
+use anyhow::{Context, Result};
+use args::PingCommand;
+use fidl_fuchsia_io as fio;
+use std::io::Write;
+use std::path::Path;
 
 pub async fn ping(
     _cmd: &PingCommand,

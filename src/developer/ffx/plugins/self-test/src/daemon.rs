@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{assert_eq, test::new_isolate};
+use crate::assert_eq;
+use crate::test::new_isolate;
 use anyhow::*;
 use fuchsia_async::Duration;
-use nix::{sys::signal, unistd::Pid};
-use std::{path::PathBuf, thread::sleep, time::Duration as StdDuration};
+use nix::sys::signal;
+use nix::unistd::Pid;
+use std::path::PathBuf;
+use std::thread::sleep;
+use std::time::Duration as StdDuration;
 
 pub(crate) async fn test_echo() -> Result<()> {
     let isolate = new_isolate("daemon-echo").await?;

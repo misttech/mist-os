@@ -4,54 +4,49 @@
 
 //! Stream sockets, primarily TCP sockets.
 
-use std::{
-    num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
-    ops::ControlFlow,
-    pin::pin,
-    sync::Arc,
-    time::Duration,
-};
+use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError};
+use std::ops::ControlFlow;
+use std::pin::pin;
+use std::sync::Arc;
+use std::time::Duration;
 
 use const_unwrap::const_unwrap_option;
 use explicit::ResultExt as _;
-use fidl::{
-    endpoints::{ClientEnd, RequestStream as _},
-    AsHandleRef as _, HandleBased as _,
-};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fuchsia_async as fasync;
+use fidl::endpoints::{ClientEnd, RequestStream as _};
+use fidl::{AsHandleRef as _, HandleBased as _};
 use fuchsia_zircon::{self as zx, Peered as _};
-use futures::{future::FusedFuture as _, FutureExt as _, StreamExt as _};
-use net_types::ip::{IpAddress, IpVersion, Ipv4, Ipv6};
-use netstack3_core::{
-    device::{DeviceId, WeakDeviceId},
-    socket::ShutdownType,
-    tcp::{
-        self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
-        ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-        Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload, SetReuseAddrError, SocketAddr,
-        SocketInfo, SocketOptions, Takeable, TcpBindingsTypes, UnboundInfo,
-    },
-    IpExt,
+use futures::future::FusedFuture as _;
+use futures::{FutureExt as _, StreamExt as _};
+use log::{debug, error};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6};
+use net_types::{NonMappedAddr, SpecifiedAddr, ZonedAddr};
+use netstack3_core::device::{DeviceId, WeakDeviceId};
+use netstack3_core::socket::ShutdownType;
+use netstack3_core::tcp::{
+    self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
+    ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
+    OriginalDestinationError, Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
+    SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
+    UnboundInfo,
 };
+use netstack3_core::IpExt;
 use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
-
-use crate::bindings::{
-    socket::{
-        worker::{self, CloseResponder, SocketWorker},
-        IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_CONNECTED,
-        ZXSIO_SIGNAL_INCOMING,
-    },
-    trace_duration,
-    util::{
-        AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, NeedsDataNotifier,
-        NeedsDataWatcher, TryIntoCoreWithContext, TryIntoFidlWithContext,
-    },
-    BindingsCtx, Ctx,
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
+    fidl_fuchsia_posix_socket as fposix_socket, fuchsia_async as fasync,
 };
+
+use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
+use crate::bindings::socket::{
+    IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_CONNECTED,
+    ZXSIO_SIGNAL_INCOMING,
+};
+use crate::bindings::util::{
+    AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, NeedsDataNotifier,
+    NeedsDataWatcher, ResultExt as _, TryIntoCoreWithContext, TryIntoFidlWithContext,
+};
+use crate::bindings::{trace_duration, BindingsCtx, Ctx};
 
 /// Maximum values allowed on linux: https://github.com/torvalds/linux/blob/0326074ff4652329f2a1a9c8685104576bd8d131/include/net/tcp.h#L159-L161
 const MAX_TCP_KEEPIDLE_SECS: u64 = 32767;
@@ -623,6 +618,17 @@ impl IntoErrno for ConnectionError {
     }
 }
 
+impl IntoErrno for OriginalDestinationError {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            Self::NotConnected
+            | Self::NotFound
+            | Self::UnspecifiedDestinationAddr
+            | Self::UnspecifiedDestinationPort => fposix::Errno::Enoent,
+        }
+    }
+}
+
 /// Spawns a task that sends more data from the `socket` each time we observe
 /// a wakeup through the `watcher`.
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
@@ -952,6 +958,65 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         ctx.api().tcp().reuseaddr(id)
     }
 
+    fn get_original_destination(
+        self,
+        ip_version: IpVersion,
+    ) -> Result<fnet::SocketAddress, fposix::Errno> {
+        let result = self
+            .ctx
+            .api()
+            .tcp()
+            .get_original_destination(&self.data.id)
+            .map_err(IntoErrno::into_errno);
+
+        fn sockaddr<I: IpSockAddrExt>(
+            addr: SpecifiedAddr<I::Addr>,
+            port: NonZeroU16,
+        ) -> fnet::SocketAddress {
+            I::SocketAddress::new(Some(ZonedAddr::Unzoned(addr)), port.get()).into_sock_addr()
+        }
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct In<I: Ip>(Result<(SpecifiedAddr<I::Addr>, NonZeroU16), fposix::Errno>);
+
+        I::map_ip_in(
+            In(result),
+            |In(result)| match ip_version {
+                IpVersion::V4 => {
+                    let (addr, port) = result?;
+                    Ok(sockaddr::<Ipv4>(addr, port))
+                }
+                IpVersion::V6 => Err(fposix::Errno::Eopnotsupp),
+            },
+            |In(result)| {
+                let (addr, port) = result?;
+                match ip_version {
+                    IpVersion::V4 => {
+                        let addr = addr.to_ipv4_mapped().ok_or(fposix::Errno::Enoent)?;
+                        // TCP connections always have a specified destination address, but this
+                        // invariant is not upheld in the type system here because we are retrieving
+                        // the destination from the connection tracking table.
+                        let addr = SpecifiedAddr::new(addr).ok_or_else(|| {
+                            error!(
+                                "original destination for socket {:?} had unspecified addr \
+                                (port {port})",
+                                self.data.id
+                            );
+                            fposix::Errno::Enoent
+                        })?;
+
+                        Ok(sockaddr::<Ipv4>(addr, port))
+                    }
+                    IpVersion::V6 => {
+                        let addr = NonMappedAddr::new(addr).ok_or(fposix::Errno::Enoent)?;
+                        Ok(sockaddr::<Ipv6>(*addr, port))
+                    }
+                }
+            },
+        )
+    }
+
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
     /// continue being polled or dropped.
     ///
@@ -966,40 +1031,18 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         fposix_socket::StreamSocketCloseResponder,
         Option<fposix_socket::StreamSocketRequestStream>,
     > {
-        // On Error, logs the `Errno` with additional debugging context.
-        //
-        // Implemented as a macro to avoid erasing the callsite information.
-        macro_rules! maybe_log_error {
-            ($operation:expr, $result:expr) => {
-                match $result {
-                    Ok(_) => {}
-                    Err(errno) => crate::bindings::socket::log_errno!(
-                        errno,
-                        "Tcp {} failed to handle {}: {:?}",
-                        I::NAME,
-                        $operation,
-                        errno
-                    ),
-                }
-            };
-        }
-
         let Self {
             data: BindingData { id: _, peer, local_socket_and_watcher: _, send_task_abort: _ },
             ctx: _,
         } = self;
         match request {
             fposix_socket::StreamSocketRequest::Bind { addr, responder } => {
-                responder
-                    .send(self.bind(addr))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(self.bind(addr)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Connect { addr, responder } => {
                 // Connect always spawns on the socket scope.
                 let response = self.connect(addr, &spawners.socket_scope);
-                responder
-                    .send(response)
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(response).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Describe { responder } => {
                 let socket = peer
@@ -1014,12 +1057,10 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                         socket: Some(socket),
                         ..Default::default()
                     })
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Listen { backlog, responder } => {
-                responder
-                    .send(self.listen(backlog))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(self.listen(backlog)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Accept { want_addr, responder } => {
                 // Accept receives the provider scope because it creates a new
@@ -1030,7 +1071,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                         Ok((ref addr, client)) => Ok((addr.as_ref(), client)),
                         Err(e) => Err(e),
                     })
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Close { responder } => {
                 // We don't just close the socket because this socket worker is
@@ -1048,34 +1089,26 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 let identifier = (!value.is_empty()).then_some(value.as_str());
                 responder
                     .send(self.set_bind_to_device(identifier))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetBindToInterfaceIndex { value, responder } => {
-                let result = self.bind_to_device_index(value);
-                maybe_log_error!("set_bind_to_if_index", &result);
-                responder
-                    .send(result)
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                let result =
+                    self.bind_to_device_index(value).log_error("tcp::SetBindToInterfaceIndex");
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Query { responder } => {
                 responder
                     .send(fposix_socket::STREAM_SOCKET_PROTOCOL_NAME.as_bytes())
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetReuseAddress { value, responder } => {
-                responder
-                    .send(self.set_reuse_address(value))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(self.set_reuse_address(value)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetReuseAddress { responder } => {
-                responder
-                    .send(Ok(self.reuse_address()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(self.reuse_address())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetError { responder } => {
-                responder
-                    .send(self.get_error())
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(self.get_error()).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetBroadcast { value: _, responder } => {
                 respond_not_supported!("stream::SetBroadcast", responder);
@@ -1085,36 +1118,26 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             }
             fposix_socket::StreamSocketRequest::SetSendBuffer { value_bytes, responder } => {
                 self.set_send_buffer_size(value_bytes);
-                responder
-                    .send(Ok(()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetSendBuffer { responder } => {
-                responder
-                    .send(Ok(self.send_buffer_size()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(self.send_buffer_size())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetReceiveBuffer { value_bytes, responder } => {
                 responder
                     .send(Ok(self.set_receive_buffer_size(value_bytes)))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetReceiveBuffer { responder } => {
-                responder
-                    .send(Ok(self.receive_buffer_size()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(self.receive_buffer_size())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetKeepAlive { value: enabled, responder } => {
                 self.with_socket_options_mut(|so| so.keep_alive.enabled = enabled);
-                responder
-                    .send(Ok(()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetKeepAlive { responder } => {
                 let enabled = self.with_socket_options(|so| so.keep_alive.enabled);
-                responder
-                    .send(Ok(enabled))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(enabled)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetOutOfBandInline { value: _, responder } => {
                 respond_not_supported!("stream::SetOutOfBandInline", responder);
@@ -1136,10 +1159,8 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::SetLinger", responder);
             }
             fposix_socket::StreamSocketRequest::GetLinger { responder } => {
-                tracing::debug!("stream::GetLinger is not supported, returning Ok((false, 0))");
-                responder
-                    .send(Ok((false, 0)))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
+                debug!("stream::GetLinger is not supported, returning Ok((false, 0))");
+                responder.send(Ok((false, 0))).unwrap_or_log("failed to respond")
             }
             fposix_socket::StreamSocketRequest::SetReusePort { value: _, responder } => {
                 respond_not_supported!("stream::SetReusePort", responder);
@@ -1163,11 +1184,9 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetTimestamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetOriginalDestination { responder } => {
-                // TODO(https://fxbug.dev/338042280): when we support destination NAT, we should
-                // return the original address.
                 responder
-                    .send(Err(fposix::Errno::Enoent))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .send(self.get_original_destination(IpVersion::V4).as_ref().map_err(|e| *e))
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Disconnect { responder } => {
                 respond_not_supported!("stream::Disconnect", responder);
@@ -1175,23 +1194,19 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             fposix_socket::StreamSocketRequest::GetSockName { responder } => {
                 responder
                     .send(self.get_sock_name().as_ref().map_err(|e| *e))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetPeerName { responder } => {
                 responder
                     .send(self.get_peer_name().as_ref().map_err(|e| *e))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Shutdown { mode, responder } => {
-                responder
-                    .send(self.shutdown(mode))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(self.shutdown(mode)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetIpTypeOfService { value: _, responder } => {
-                tracing::debug!("stream::SetIpTypeOfService is not supported, returning Ok(())");
-                responder
-                    .send(Ok(()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                debug!("stream::SetIpTypeOfService is not supported, returning Ok(())");
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetIpTypeOfService { responder } => {
                 respond_not_supported!("stream::GetIpTypeOfService", responder);
@@ -1320,7 +1335,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                             .set_dual_stack_enabled(id, !value)
                             .map_err(IntoErrno::into_errno),
                     )
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetIpv6Only { responder } => {
                 let Self { data: BindingData { id, .. }, ctx } = self;
@@ -1332,7 +1347,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                             .map(|enabled| !enabled)
                             .map_err(IntoErrno::into_errno),
                     )
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceiveTrafficClass {
                 value: _,
@@ -1366,7 +1381,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
 
                 responder
                     .send(Ok((domain, fposix_socket::StreamSocketProtocol::Tcp)))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             // Note for the following two options:
             // Nagle enabled means TCP delays sending segment, thus meaning
@@ -1375,21 +1390,15 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 self.with_socket_options_mut(|so| {
                     so.nagle_enabled = !value;
                 });
-                responder
-                    .send(Ok(()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetTcpNoDelay { responder } => {
                 let nagle_enabled = self.with_socket_options(|so| so.nagle_enabled);
-                responder
-                    .send(Ok(!nagle_enabled))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(!nagle_enabled)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetTcpMaxSegment { value_bytes: _, responder } => {
-                tracing::debug!("stream::SetTcpMaxSegment is not supported, returning Ok(())");
-                responder
-                    .send(Ok(()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                debug!("stream::SetTcpMaxSegment is not supported, returning Ok(())");
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetTcpMaxSegment { responder } => {
                 respond_not_supported!("stream::GetTcpMaxSegment", responder);
@@ -1408,23 +1417,19 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                         self.with_socket_options_mut(|so| {
                             so.keep_alive.idle = NonZeroDuration::from_nonzero_secs(secs)
                         });
-                        responder
-                            .send(Ok(()))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                        responder.send(Ok(())).unwrap_or_log("failed to respond");
                     }
                     None => {
                         responder
                             .send(Err(fposix::Errno::Einval))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                            .unwrap_or_log("failed to respond");
                     }
                 }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveIdle { responder } => {
                 let secs =
                     self.with_socket_options(|so| Duration::from(so.keep_alive.idle).as_secs());
-                responder
-                    .send(Ok(u32::try_from(secs).unwrap()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(u32::try_from(secs).unwrap())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveInterval {
                 value_secs,
@@ -1435,23 +1440,19 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 {
                     Some(dur) => {
                         self.with_socket_options_mut(|so| so.keep_alive.interval = dur);
-                        responder
-                            .send(Ok(()))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                        responder.send(Ok(())).unwrap_or_log("failed to respond");
                     }
                     None => {
                         responder
                             .send(Err(fposix::Errno::Einval))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                            .unwrap_or_log("failed to respond");
                     }
                 }
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveInterval { responder } => {
                 let secs =
                     self.with_socket_options(|so| Duration::from(so.keep_alive.interval).as_secs());
-                responder
-                    .send(Ok(u32::try_from(secs).unwrap()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(u32::try_from(secs).unwrap())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveCount { value, responder } => {
                 match u8::try_from(value)
@@ -1463,22 +1464,18 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                         self.with_socket_options_mut(|so| {
                             so.keep_alive.count = count;
                         });
-                        responder
-                            .send(Ok(()))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                        responder.send(Ok(())).unwrap_or_log("failed to respond");
                     }
                     None => {
                         responder
                             .send(Err(fposix::Errno::Einval))
-                            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                            .unwrap_or_log("failed to respond");
                     }
                 };
             }
             fposix_socket::StreamSocketRequest::GetTcpKeepAliveCount { responder } => {
                 let count = self.with_socket_options(|so| so.keep_alive.count);
-                responder
-                    .send(Ok(u32::from(u8::from(count))))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(u32::from(u8::from(count)))).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetTcpSynCount { value, responder } => {
                 responder
@@ -1489,13 +1486,11 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                             .ok_or(fposix::Errno::Einval)?;
                         Ok(())
                     }))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetTcpSynCount { responder } => {
                 let syn_cnt = self.with_socket_options(|so| u32::from(so.max_syn_retries.get()));
-                responder
-                    .send(Ok(syn_cnt))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(syn_cnt)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetTcpLinger { value_secs, responder } => {
                 const MAX_FIN_WAIT2_TIMEOUT_SECS: u32 = 120;
@@ -1509,17 +1504,13 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 self.with_socket_options_mut(|so| {
                     so.fin_wait2_timeout = fin_wait2_timeout;
                 });
-                responder
-                    .send(Ok(()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetTcpLinger { responder } => {
                 let linger_secs =
                     self.with_socket_options(|so| so.fin_wait2_timeout.map(|d| d.as_secs()));
                 let respond_value = linger_secs.map(|x| u32::try_from(x).unwrap()).into_fidl();
-                responder
-                    .send(Ok(&respond_value))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(&respond_value)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetTcpDeferAccept { value_secs: _, responder } => {
                 respond_not_supported!("stream::SetTcpDeferAccept", responder);
@@ -1534,25 +1525,21 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetTcpWindowClamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetTcpInfo { responder } => {
-                tracing::debug!(
+                debug!(
                     "stream::GetTcpInfo is not supported, \
                      returning fposix_socket::TcpInfo::default()"
                 );
                 responder
                     .send(Ok(&fposix_socket::TcpInfo::default()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetTcpQuickAck { value, responder } => {
                 self.with_socket_options_mut(|so| so.delayed_ack = !value);
-                responder
-                    .send(Ok(()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetTcpQuickAck { responder } => {
                 let quick_ack = self.with_socket_options(|so| !so.delayed_ack);
-                responder
-                    .send(Ok(quick_ack))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(quick_ack)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetTcpCongestion { value: _, responder } => {
                 respond_not_supported!("stream::SetTcpCongestion", responder);
@@ -1566,9 +1553,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 self.with_socket_options_mut(|so| {
                     so.user_timeout = user_timeout;
                 });
-                responder
-                    .send(Ok(()))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetTcpUserTimeout { responder } => {
                 let millis = self.with_socket_options(|so| {
@@ -1576,21 +1561,15 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 });
                 let result =
                     u32::try_from(millis).map_err(|_: TryFromIntError| fposix::Errno::Einval);
-                responder
-                    .send(result)
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetMark { domain: _, mark: _, responder } => {
                 // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                responder
-                    .send(Err(fposix::Errno::Eopnotsupp))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
+                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
             }
             fposix_socket::StreamSocketRequest::GetMark { domain: _, responder } => {
                 // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                responder
-                    .send(Err(fposix::Errno::Eopnotsupp))
-                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
+                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
             }
         }
         ControlFlow::Continue(None)

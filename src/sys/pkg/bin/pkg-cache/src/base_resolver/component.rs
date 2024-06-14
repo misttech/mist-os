@@ -2,17 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::context_authenticator::ContextAuthenticator;
+use super::ResolverError;
+use anyhow::Context as _;
+use fidl::endpoints::Proxy as _;
+use futures::stream::TryStreamExt as _;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::error;
+use version_history::AbiRevision;
 use {
-    super::{context_authenticator::ContextAuthenticator, ResolverError},
-    anyhow::Context as _,
-    fidl::endpoints::Proxy as _,
     fidl_fuchsia_component_decl as fcomponent_decl,
     fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg as fpkg,
-    futures::stream::TryStreamExt as _,
-    std::{collections::HashMap, sync::Arc},
-    tracing::error,
-    version_history::AbiRevision,
 };
 
 pub(crate) async fn serve_request_stream(
@@ -196,7 +198,8 @@ async fn resolve_from_package(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[fuchsia::test]
     async fn resolve_rejects_relative_url() {

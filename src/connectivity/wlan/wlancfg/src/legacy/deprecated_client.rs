@@ -1,12 +1,10 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::legacy::IfaceRef,
-    fidl_fuchsia_wlan_product_deprecatedclient as deprecated, fidl_fuchsia_wlan_sme as fidl_sme,
-    futures::prelude::*,
-    tracing::{debug, error},
-};
+use crate::legacy::IfaceRef;
+use futures::prelude::*;
+use tracing::{debug, error};
+use {fidl_fuchsia_wlan_product_deprecatedclient as deprecated, fidl_fuchsia_wlan_sme as fidl_sme};
 
 const MAX_CONCURRENT_WLAN_REQUESTS: usize = 1000;
 
@@ -89,11 +87,13 @@ fn extract_current_ap(status: &fidl_sme::ClientStatusResponse) -> Option<Box<dep
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::legacy::Iface, fidl::endpoints::create_proxy,
-        fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, futures::task::Poll,
-        std::pin::pin, wlan_common::assert_variant,
-    };
+    use super::*;
+    use crate::legacy::Iface;
+    use fidl::endpoints::create_proxy;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use wlan_common::assert_variant;
+    use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
 
     struct TestValues {
         iface: IfaceRef,

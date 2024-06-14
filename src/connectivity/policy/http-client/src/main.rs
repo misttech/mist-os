@@ -2,20 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Context as _;
+use fidl::endpoints::ServerEnd;
+use fidl::prelude::*;
+use fuchsia_async::{self as fasync, TimeoutExt as _};
+use fuchsia_component::server::{Item, ServiceFs, ServiceFsDir};
+use fuchsia_runtime::{HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::future::Either;
+use futures::prelude::*;
+use futures::StreamExt;
+use http_client_config::Config;
+use std::str::FromStr as _;
+use tracing::{debug, error, info, trace};
 use {
-    anyhow::Context as _,
-    fidl::{endpoints::ServerEnd, prelude::*},
     fidl_fuchsia_io as fio, fidl_fuchsia_net_http as net_http,
-    fidl_fuchsia_process_lifecycle as flifecycle,
-    fuchsia_async::{self as fasync, TimeoutExt as _},
-    fuchsia_component::server::{Item, ServiceFs, ServiceFsDir},
-    fuchsia_hyper as fhyper,
-    fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{future::Either, prelude::*, StreamExt},
-    http_client_config::Config,
-    std::str::FromStr as _,
-    tracing::{debug, error, info, trace},
+    fidl_fuchsia_process_lifecycle as flifecycle, fuchsia_hyper as fhyper,
 };
 
 static MAX_REDIRECTS: u8 = 10;

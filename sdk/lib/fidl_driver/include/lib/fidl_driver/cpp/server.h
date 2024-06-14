@@ -186,7 +186,7 @@ class ServerBinding final : public ::fidl::internal::ServerBindingBase<FidlProto
   // |Impl| should implement |fdf::Server<FidlProtocol>| or
   // |fdf::WireServer<FidlProtocol>|.
   //
-  // |impl| and any state captured in |error_handler| should outlive the bindings.
+  // |impl| and any state captured in |close_handler| should outlive the bindings.
   // It's not safe to move |impl| while the binding is still referencing it.
   //
   // |close_handler| is invoked when the endpoint managed by the |ServerBinding|

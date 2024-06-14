@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_test_manager as ftest_manager,
-    std::{
-        borrow::Borrow,
-        io::{Error, Write},
-        marker::PhantomData,
-        path::Path,
-    },
-    test_list::TestTag,
-};
+use fidl_fuchsia_test_manager as ftest_manager;
+use std::borrow::Borrow;
+use std::io::{Error, Write};
+use std::marker::PhantomData;
+use std::path::Path;
+use test_list::TestTag;
 
 mod directory;
 mod directory_with_stdout;
@@ -21,15 +17,13 @@ mod mux;
 mod noop;
 mod shell;
 
+pub use directory::{DirectoryReporter, SchemaVersion};
+pub use directory_with_stdout::DirectoryWithStdoutReporter;
 use line::AnsiFilterReporter;
-pub use {
-    directory::{DirectoryReporter, SchemaVersion},
-    directory_with_stdout::DirectoryWithStdoutReporter,
-    memory::{InMemoryArtifact, InMemoryDirectoryWriter, InMemoryReporter},
-    mux::MultiplexedReporter,
-    noop::NoopReporter,
-    shell::{ShellReporter, ShellWriterView},
-};
+pub use memory::{InMemoryArtifact, InMemoryDirectoryWriter, InMemoryReporter};
+pub use mux::MultiplexedReporter;
+pub use noop::NoopReporter;
+pub use shell::{ShellReporter, ShellWriterView};
 
 pub(crate) type DynArtifact = dyn 'static + Write + Send + Sync;
 pub(crate) type DynDirectoryArtifact = dyn 'static + DirectoryWrite + Send + Sync;

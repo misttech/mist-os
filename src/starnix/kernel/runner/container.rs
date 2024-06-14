@@ -9,53 +9,49 @@ use crate::{
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
 use fasync::OnSignals;
-use fidl::{
-    endpoints::{ControlHandle, RequestStream},
-    AsyncChannel,
-};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_element as felement;
-use fidl_fuchsia_io as fio;
+use fidl::endpoints::{ControlHandle, RequestStream};
+use fidl::AsyncChannel;
 use fidl_fuchsia_scheduler::RoleManagerMarker;
-use fidl_fuchsia_starnix_container as fstarcontainer;
-use fidl_fuchsia_starnix_device as fstardevice;
-use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
-use fuchsia_component::{client::connect_to_protocol_sync, server::ServiceFs};
-use fuchsia_inspect as inspect;
-use fuchsia_runtime as fruntime;
+use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_component::server::ServiceFs;
 use fuchsia_zircon::{
     AsHandleRef, Signals, Task as _, {self as zx},
 };
-use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
+use futures::channel::oneshot;
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use selinux::security_server::SecurityServer;
-use starnix_core::{
-    device::init_common_devices,
-    execution::{
-        create_filesystem_from_spec, create_remote_block_device_from_spec,
-        create_remotefs_filesystem, execute_task_with_prerun_result,
-    },
-    fs::{layeredfs::LayeredFs, tmpfs::TmpFs},
-    task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task},
-    time::utc::update_utc_clock,
-    vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount},
+use starnix_core::device::init_common_devices;
+use starnix_core::execution::{
+    create_filesystem_from_spec, create_remote_block_device_from_spec, create_remotefs_filesystem,
+    execute_task_with_prerun_result,
 };
+use starnix_core::fs::layeredfs::LayeredFs;
+use starnix_core::fs::tmpfs::TmpFs;
+use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
+use starnix_core::time::utc::update_utc_clock;
+use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
 use starnix_kernel_config::Config;
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
-use starnix_uapi::{
-    errno,
-    errors::{SourceContext, ENOENT},
-    mount_flags::MountFlags,
-    open_flags::OpenFlags,
-    resource_limits::Resource,
-    rlimit,
+use starnix_uapi::errors::{SourceContext, ENOENT};
+use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::resource_limits::Resource;
+use starnix_uapi::{errno, rlimit};
+use std::collections::BTreeMap;
+use std::ffi::CString;
+use std::ops::DerefMut;
+use std::sync::Arc;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
+    fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
+    fidl_fuchsia_starnix_container as fstarcontainer, fidl_fuchsia_starnix_device as fstardevice,
+    fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
 };
-use std::{collections::BTreeMap, ffi::CString, ops::DerefMut, sync::Arc};
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
 /// handles for the container's component controller and `/pkg` directory.
@@ -656,10 +652,13 @@ mod test {
     use super::wait_for_init_file;
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};
-    use starnix_core::{testing::create_kernel_task_and_unlocked, vfs::FdNumber};
-    use starnix_uapi::{
-        file_mode::FileMode, open_flags::OpenFlags, signals::SIGCHLD, vfs::ResolveFlags, CLONE_FS,
-    };
+    use starnix_core::testing::create_kernel_task_and_unlocked;
+    use starnix_core::vfs::FdNumber;
+    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::open_flags::OpenFlags;
+    use starnix_uapi::signals::SIGCHLD;
+    use starnix_uapi::vfs::ResolveFlags;
+    use starnix_uapi::CLONE_FS;
 
     #[fuchsia::test]
     async fn test_init_file_already_exists() {

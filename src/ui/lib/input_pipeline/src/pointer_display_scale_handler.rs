@@ -2,20 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        input_device,
-        input_handler::{InputHandlerStatus, UnhandledInputHandler},
-        metrics, mouse_binding,
-        utils::Position,
-    },
-    anyhow::{format_err, Error},
-    async_trait::async_trait,
-    derivative::Derivative,
-    fuchsia_inspect::health::Reporter,
-    metrics_registry::*,
-    std::rc::Rc,
-};
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
+use crate::utils::Position;
+use crate::{input_device, metrics, mouse_binding};
+use anyhow::{format_err, Error};
+use async_trait::async_trait;
+use derivative::Derivative;
+use fuchsia_inspect::health::Reporter;
+use metrics_registry::*;
+use std::rc::Rc;
 
 // TODO(https://fxbug.dev/42172817) Add trackpad support
 #[derive(Derivative)]
@@ -204,16 +199,16 @@ impl PointerDisplayScaleHandler {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::input_handler::InputHandler,
-        crate::testing_utilities,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        maplit::hashset,
-        std::{cell::Cell, collections::HashSet, ops::Add},
-        test_case::test_case,
-    };
+    use super::*;
+    use crate::input_handler::InputHandler;
+    use crate::testing_utilities;
+    use assert_matches::assert_matches;
+    use maplit::hashset;
+    use std::cell::Cell;
+    use std::collections::HashSet;
+    use std::ops::Add;
+    use test_case::test_case;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const COUNTS_PER_MM: f32 = 12.0;
     const DEVICE_DESCRIPTOR: input_device::InputDeviceDescriptor =

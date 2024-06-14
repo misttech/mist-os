@@ -8,16 +8,14 @@ use ffx_stream_util::TryStreamUtilExt;
 use fuchsia_async::Task;
 use futures::prelude::*;
 use pin_project::pin_project;
-use std::{
-    cmp::Eq,
-    fmt::Debug,
-    hash::Hash,
-    pin::Pin,
-    rc::{Rc, Weak},
-    result,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::cmp::Eq;
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::pin::Pin;
+use std::rc::{Rc, Weak};
+use std::result;
+use std::task::{Context, Poll};
+use std::time::Duration;
 use timeout::timeout;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;

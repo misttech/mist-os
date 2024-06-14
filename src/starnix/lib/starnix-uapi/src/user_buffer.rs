@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    errors::{errno, error, Errno},
-    user_address::UserAddress,
-    PAGE_SIZE,
-};
+use super::errors::{errno, error, Errno};
+use super::user_address::UserAddress;
+use super::PAGE_SIZE;
 use once_cell::sync::Lazy;
 use smallvec::SmallVec;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};

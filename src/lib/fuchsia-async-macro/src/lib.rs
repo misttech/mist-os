@@ -65,15 +65,11 @@
 //! compilation errors will be generated should `#[test]` be specified before
 //! `#[fuchsia_async::run_until_stalled]`.
 
-use {
-    proc_macro::TokenStream,
-    proc_macro2::Span,
-    quote::{quote, quote_spanned},
-    syn::{
-        parse::{Error, Parse, ParseStream},
-        parse_macro_input, Ident,
-    },
-};
+use proc_macro::TokenStream;
+use proc_macro2::Span;
+use quote::{quote, quote_spanned};
+use syn::parse::{Error, Parse, ParseStream};
+use syn::{parse_macro_input, Ident};
 
 mod kw {
     syn::custom_keyword!(test);
@@ -124,7 +120,10 @@ fn common(item: TokenStream, run_executor: TokenStream, test: bool) -> TokenStre
                     .unwrap_or(false)
             })
         {
-            return Err(Error::new(sig.ident.span(), "async entry must be named 'main' or be a '#[test]'."));
+            return Err(Error::new(
+                sig.ident.span(),
+                "async entry must be named 'main' or be a '#[test]'.",
+            ));
         }
         Ok(())
     })() {

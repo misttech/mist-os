@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{input_device::InputDevice, new_fake_device_info},
-    anyhow::{Context as _, Error},
-    async_utils::event::Event as AsyncEvent,
-    fidl::endpoints,
-    fidl_fuchsia_input::Key,
-    fidl_fuchsia_input_injection::InputDeviceRegistryProxy,
-    fidl_fuchsia_input_report::{
-        Axis, ConsumerControlButton, ConsumerControlDescriptor, ConsumerControlInputDescriptor,
-        ContactInputDescriptor, DeviceDescriptor, InputDeviceMarker, KeyboardDescriptor,
-        KeyboardInputDescriptor, MouseDescriptor, MouseInputDescriptor, Range, TouchDescriptor,
-        TouchInputDescriptor, TouchType, Unit, UnitType, TOUCH_MAX_CONTACTS,
-    },
-    fidl_fuchsia_ui_test_input::MouseButton,
+use crate::input_device::InputDevice;
+use crate::new_fake_device_info;
+use anyhow::{Context as _, Error};
+use async_utils::event::Event as AsyncEvent;
+use fidl::endpoints;
+use fidl_fuchsia_input::Key;
+use fidl_fuchsia_input_injection::InputDeviceRegistryProxy;
+use fidl_fuchsia_input_report::{
+    Axis, ConsumerControlButton, ConsumerControlDescriptor, ConsumerControlInputDescriptor,
+    ContactInputDescriptor, DeviceDescriptor, InputDeviceMarker, KeyboardDescriptor,
+    KeyboardInputDescriptor, MouseDescriptor, MouseInputDescriptor, Range, TouchDescriptor,
+    TouchInputDescriptor, TouchType, Unit, UnitType, TOUCH_MAX_CONTACTS,
 };
+use fidl_fuchsia_ui_test_input::MouseButton;
 
 /// Implements the client side of the `fuchsia.input.injection.InputDeviceRegistry` protocol.
 pub(crate) struct InputDeviceRegistry {
@@ -199,15 +198,14 @@ impl InputDeviceRegistry {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::format_err,
-        fidl_fuchsia_input_injection::{InputDeviceRegistryMarker, InputDeviceRegistryRequest},
-        fidl_fuchsia_input_report::InputReportsReaderMarker,
-        fuchsia_async as fasync,
-        futures::{pin_mut, task::Poll, StreamExt},
-        test_case::test_case,
-    };
+    use super::*;
+    use anyhow::format_err;
+    use fidl_fuchsia_input_injection::{InputDeviceRegistryMarker, InputDeviceRegistryRequest};
+    use fidl_fuchsia_input_report::InputReportsReaderMarker;
+    use fuchsia_async as fasync;
+    use futures::task::Poll;
+    use futures::{pin_mut, StreamExt};
+    use test_case::test_case;
 
     #[test_case(&|registry| InputDeviceRegistry::add_touchscreen_device(registry, -1, 1, -1, 1);
                 "touchscreen_device")]

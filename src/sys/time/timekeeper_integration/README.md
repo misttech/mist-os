@@ -21,7 +21,3 @@ the test to control the monotonic time as observed by Timekeeper under test. To
 support this, the fake-clock tests additionally launch the fake clock manager
 component, which makes `fuchsia.testing.FakeClock` available to Timekeeper.
 
-## Future Work
-Timekeeper and the timekeeper integration tests are currently components v1
-components. As v2 provides significantly more support for injecting dependencies,
-much of the testing harness can be removed when migrating.

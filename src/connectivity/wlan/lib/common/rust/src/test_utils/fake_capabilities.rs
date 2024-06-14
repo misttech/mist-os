@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capabilities::{ClientCapabilities, StaCapabilities};
+use crate::ie;
+use crate::mac::CapabilityInfo;
+use zerocopy::AsBytes;
 use {
-    crate::{
-        capabilities::{ClientCapabilities, StaCapabilities},
-        ie,
-        mac::CapabilityInfo,
-    },
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_mlme as fidl_mlme,
-    zerocopy::AsBytes,
 };
 
 pub fn fake_5ghz_band_capability_ht_cbw(chanwidth: ie::ChanWidthSet) -> fidl_mlme::BandCapability {

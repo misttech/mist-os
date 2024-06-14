@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, format_err, Error, Result},
-    fidl::endpoints::ControlHandle,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_testing_harness::OperationError,
-    fidl_test_wlan_realm::*,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
-    },
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    fuchsia_zircon_status as zx_status,
-    futures::{StreamExt, TryStreamExt},
-    tracing::{error, info, warn},
+use anyhow::{bail, format_err, Error, Result};
+use fidl::endpoints::{ControlHandle, ServerEnd};
+use fidl_fuchsia_testing_harness::OperationError;
+use fidl_test_wlan_realm::*;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use futures::{StreamExt, TryStreamExt};
+use tracing::{error, info, warn};
+use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
@@ -350,10 +346,10 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl::endpoints::create_endpoints, fidl_fuchsia_driver_test::RealmArgs,
-        test_case::test_case,
-    };
+    use super::*;
+    use fidl::endpoints::create_endpoints;
+    use fidl_fuchsia_driver_test::RealmArgs;
+    use test_case::test_case;
 
     // RealmOptions without specific topology or wlan_config are invalid
     #[test_case(RealmOptions { ..Default::default() })]

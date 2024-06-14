@@ -7,8 +7,7 @@ use crate::{
     ControllerCreationError, ControllerId, PushChangesError,
 };
 use fidl::marker::SourceBreaking;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fuchsia_zircon as zx;
+use {fidl_fuchsia_net_filter as fnet_filter, fuchsia_zircon as zx};
 
 /// A controller for filtering state with blocking methods.
 pub struct Controller {
@@ -92,13 +91,11 @@ impl Controller {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        tests::{
-            handle_commit, handle_open_controller, handle_push_changes, invalid_resource,
-            test_resource, test_resource_id, unknown_resource_id,
-        },
-        ChangeCommitError, ChangeValidationError,
+    use crate::tests::{
+        handle_commit, handle_open_controller, handle_push_changes, invalid_resource,
+        test_resource, test_resource_id, unknown_resource_id,
     };
+    use crate::{ChangeCommitError, ChangeValidationError};
     use assert_matches::assert_matches;
 
     #[fuchsia::test(threads = 2)]

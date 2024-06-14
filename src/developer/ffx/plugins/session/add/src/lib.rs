@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Result},
-    async_trait::async_trait,
-    ffx_session_add_args::SessionAddCommand,
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_element::{
-        self as felement, Annotation, AnnotationKey, AnnotationValue, ControllerMarker,
-        ManagerProxy, Spec,
-    },
-    futures::{channel::oneshot, FutureExt},
-    signal_hook::{consts::signal::*, iterator::Signals},
-    std::future::Future,
+use anyhow::{format_err, Context, Result};
+use async_trait::async_trait;
+use ffx_session_add_args::SessionAddCommand;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
+use fidl_fuchsia_element::{
+    self as felement, Annotation, AnnotationKey, AnnotationValue, ControllerMarker, ManagerProxy,
+    Spec,
 };
+use futures::channel::oneshot;
+use futures::FutureExt;
+use signal_hook::consts::signal::*;
+use signal_hook::iterator::Signals;
+use std::future::Future;
 
 #[derive(FfxTool)]
 pub struct AddTool {
@@ -106,12 +106,10 @@ fn spawn_ctrl_c_listener() -> impl Future<Output = ()> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_element::{self as felement, ManagerRequest},
-        futures::poll,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_element::{self as felement, ManagerRequest};
+    use futures::poll;
 
     #[fuchsia::test]
     async fn test_add_element() {

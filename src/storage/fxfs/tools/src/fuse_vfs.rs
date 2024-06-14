@@ -2,40 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        fuse_attr::{create_file_attr, to_fxfs_time},
-        fuse_errors::{FuseErrorParser, FxfsResult},
-        fuse_fs::{FuseFs, FuseStrParser},
-    },
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio, fuchsia as _,
-    fuse3::{
-        raw::prelude::{Filesystem as FuseFilesystem, *},
-        Result,
-    },
-    futures as _,
-    futures_util::{stream, stream::Iter, StreamExt},
-    fxfs::{
-        errors::FxfsError,
-        filesystem::SyncOptions,
-        log::info,
-        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
-        object_store::{
-            directory::{replace_child, ReplacedChild},
-            transaction::{lock_keys, LockKey, Options},
-            ObjectDescriptor, Timestamp,
-        },
-    },
-    std::{
-        ffi::{OsStr, OsString},
-        io::Write,
-        os::unix::ffi::OsStrExt,
-        sync::Arc,
-        time::Duration,
-        vec::IntoIter,
-    },
-};
+use crate::fuse_attr::{create_file_attr, to_fxfs_time};
+use crate::fuse_errors::{FuseErrorParser, FxfsResult};
+use crate::fuse_fs::{FuseFs, FuseStrParser};
+use async_trait::async_trait;
+use fuse3::raw::prelude::{Filesystem as FuseFilesystem, *};
+use fuse3::Result;
+use futures_util::stream::Iter;
+use futures_util::{stream, StreamExt};
+use fxfs::errors::FxfsError;
+use fxfs::filesystem::SyncOptions;
+use fxfs::log::info;
+use fxfs::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
+use fxfs::object_store::directory::{replace_child, ReplacedChild};
+use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+use fxfs::object_store::{ObjectDescriptor, Timestamp};
+use std::ffi::{OsStr, OsString};
+use std::io::Write;
+use std::os::unix::ffi::OsStrExt;
+use std::sync::Arc;
+use std::time::Duration;
+use std::vec::IntoIter;
+use {fidl_fuchsia_io as fio, fuchsia as _, futures as _};
 
 /// The TTL duration of each reply.
 const TTL: Duration = Duration::from_secs(1);
@@ -1186,19 +1174,14 @@ impl FuseFilesystem for FuseFs {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::fuse_fs::{FuseFs, FuseStrParser},
-        fuse3::{
-            raw::{
-                prelude::{DirectoryEntry, DirectoryEntryPlus},
-                Filesystem, Request,
-            },
-            Errno, FileType, Result, SetAttr, Timestamp,
-        },
-        futures::stream::StreamExt,
-        fxfs::{errors::FxfsError, object_store::ObjectDescriptor},
-        std::ffi::OsStr,
-    };
+    use crate::fuse_fs::{FuseFs, FuseStrParser};
+    use fuse3::raw::prelude::{DirectoryEntry, DirectoryEntryPlus};
+    use fuse3::raw::{Filesystem, Request};
+    use fuse3::{Errno, FileType, Result, SetAttr, Timestamp};
+    use futures::stream::StreamExt;
+    use fxfs::errors::FxfsError;
+    use fxfs::object_store::ObjectDescriptor;
+    use std::ffi::OsStr;
 
     const DEFAULT_FILE_MODE: u32 = 0o755;
     const DEFAULT_FLAG: u32 = 0;

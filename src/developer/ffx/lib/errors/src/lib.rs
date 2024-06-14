@@ -46,7 +46,12 @@ pub enum FfxError {
 
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
-        OpenTargetError::QueryAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target_string(.target)),
+        OpenTargetError::QueryAmbiguous => {
+            match target_string(.target) {
+                target if target == "\"unspecified\"" => format!("More than one device/emulator found. Use `ffx target list` to list known targets and choose a target with `ffx -t`."),
+                target => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target),
+            }
+        },
         OpenTargetError::TargetNotFound => format!("Target specification {} was not found. Use `ffx target list` to list known targets, and use a different matcher.", target_string(.target))
     })]
     OpenTargetError { err: OpenTargetError, target: Option<String> },

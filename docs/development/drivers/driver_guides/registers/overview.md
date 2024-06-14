@@ -64,7 +64,7 @@ as an example on how to use the registers driver.
 
    Metadata format is declared in [metadata.fidl][metadata.fidl].
 
-   In the board driver (i.e. [vim3-registers][vim3-registers]), make the
+   In the board driver (i.e. [nelson-registers][nelson-registers]), make the
    following changes.
 
    a. MMIO
@@ -222,8 +222,8 @@ controlled by bit 2 and SD_EMMC by bits 12-14. The hardware design forces
 us to share `RESET1_REGISTER` among multiple drivers including the EMMC
 driver and the USB driver.
 
-See [vim3-registers][vim3-registers] for the board file changes made for reset
-registers and [vim3-usb][vim3-usb] - `aml_usb_phy` device for adding reset
+See [nelson-registers][nelson-registers] for the board file changes made for reset
+registers and [nelson-usb][nelson-usb] - `aml_usb_phy` device for adding reset
 register fragments. `AmlUsbPhy::InitPhy()` of [aml-usb-phy][aml-usb-phy] uses
 the FIDL client to write to the reset register.
 
@@ -250,5 +250,5 @@ desired, we may still use the registers driver for isolation of resources.
 [registers-driver]: /src/devices/registers/drivers/registers
 [registers-util.fidl]: /sdk/fidl/fuchsia.hardware.registers/register-util.fidl
 [S905D3]: https://dl.khadas.com/products/vim3l/datasheet/s905d3_datasheet_0.2_wesion.pdf
-[vim3-registers]: /src/devices/board/drivers/vim3/vim3-registers.cc
-[vim3-usb]: /src/devices/board/drivers/vim3/vim3-usb.cc
+[nelson-registers]: /src/devices/board/drivers/nelson/nelson-registers.cc
+[nelson-usb]: /src/devices/board/drivers/nelson/nelson-usb.cc

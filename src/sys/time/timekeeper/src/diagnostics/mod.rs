@@ -14,15 +14,13 @@ pub use self::composite::CompositeDiagnostics;
 pub use self::fake::FakeDiagnostics;
 pub use self::inspect::{InspectDiagnostics, INSPECTOR};
 
-use {
-    crate::enums::{
-        ClockCorrectionStrategy, ClockUpdateReason, FrequencyDiscardReason, InitialClockState,
-        InitializeRtcOutcome, Role, SampleValidationError, StartClockSource, TimeSourceError,
-        Track, WriteRtcOutcome,
-    },
-    fidl_fuchsia_time_external::Status,
-    fuchsia_zircon as zx,
+use crate::enums::{
+    ClockCorrectionStrategy, ClockUpdateReason, FrequencyDiscardReason, InitialClockState,
+    InitializeRtcOutcome, Role, SampleValidationError, StartClockSource, TimeSourceError, Track,
+    WriteRtcOutcome,
 };
+use fidl_fuchsia_time_external::Status;
+use fuchsia_zircon as zx;
 
 /// A special `Duration` that will match any value during an `eq_with_any` operation.
 #[cfg(test)]

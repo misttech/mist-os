@@ -17,10 +17,10 @@ use std::str::from_utf8;
 use std::sync::Arc;
 use test_case::test_case;
 use test_list::TestTag;
-use test_output_directory::{
-    self as directory,
-    testing::{ExpectedDirectory, ExpectedSuite, ExpectedTestCase, ExpectedTestRun},
+use test_output_directory::testing::{
+    ExpectedDirectory, ExpectedSuite, ExpectedTestCase, ExpectedTestRun,
 };
+use test_output_directory::{self as directory};
 use test_util::assert_geq;
 
 const PROVIDED_HERMETIC_REALM: &str = "/provided_test_realm:hermetic_test_coll";

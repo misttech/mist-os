@@ -65,7 +65,8 @@ impl Notification {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync};
+    use super::*;
+    use fuchsia_async as fasync;
 
     #[fasync::run_until_stalled(test)]
     async fn test() {

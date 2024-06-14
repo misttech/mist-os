@@ -2,24 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::cli::format::{
+    format_create_error, format_destroy_error, format_resolve_error, format_start_error,
+};
+use crate::lifecycle::{
+    create_instance_in_collection, destroy_instance_in_collection, resolve_instance,
+    start_instance, ActionError, CreateError, DestroyError,
+};
+use anyhow::{bail, format_err, Result};
+use fidl::HandleBased;
+use fuchsia_url::AbsoluteComponentUrl;
+use futures::AsyncReadExt;
+use moniker::Moniker;
+use std::io::Read;
 use {
-    crate::{
-        cli::format::{
-            format_create_error, format_destroy_error, format_resolve_error, format_start_error,
-        },
-        lifecycle::{
-            create_instance_in_collection, destroy_instance_in_collection, resolve_instance,
-            start_instance, ActionError, CreateError, DestroyError,
-        },
-    },
-    anyhow::{bail, format_err, Result},
-    fidl::HandleBased,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
-    fuchsia_url::AbsoluteComponentUrl,
-    futures::AsyncReadExt,
-    moniker::Moniker,
-    std::io::Read,
 };
 
 // This value is fairly arbitrary. The value matches `MAX_BUF` from `fuchsia.io`, but that
@@ -202,10 +200,10 @@ pub async fn run_cmd<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_sys2 as fsys,
-        futures::TryStreamExt,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_sys2 as fsys;
+    use futures::TryStreamExt;
 
     fn setup_fake_lifecycle_controller_ok(
         expected_parent_moniker: &'static str,

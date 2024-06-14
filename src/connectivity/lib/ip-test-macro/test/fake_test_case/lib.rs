@@ -8,12 +8,9 @@
 
 use proc_macro::TokenStream;
 use quote::quote_spanned;
-use syn::{
-    parse::{Parse, ParseStream},
-    parse_macro_input,
-    punctuated::Punctuated,
-    Expr, Ident, ItemFn, LitStr, Token,
-};
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
+use syn::{parse_macro_input, Expr, Ident, ItemFn, LitStr, Token};
 
 /// A #[test_case] macro that parses a comma-separated list of arguments,
 /// followed by a semicolon, followed by a string literal. The arguments and

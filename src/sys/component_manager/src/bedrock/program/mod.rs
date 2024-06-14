@@ -2,28 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    model::{escrow::EscrowedState, token::InstanceToken},
-    runner::RemoteRunner,
-};
+use crate::model::escrow::EscrowedState;
+use crate::model::token::InstanceToken;
+use crate::runner::RemoteRunner;
 use errors::{StartError, StopError};
 use fidl::endpoints;
 use fidl::endpoints::{ClientEnd, ServerEnd};
-use fidl_fuchsia_component_runner as fcrunner;
-use fidl_fuchsia_component_sandbox as fsandbox;
-use fidl_fuchsia_data as fdata;
-use fidl_fuchsia_diagnostics_types as fdiagnostics;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_mem as fmem;
-use fidl_fuchsia_process as fprocess;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::oneshot,
-    future::{BoxFuture, Either},
-    FutureExt,
-};
+use futures::channel::oneshot;
+use futures::future::{BoxFuture, Either};
+use futures::FutureExt;
 use serve_processargs::NamespaceBuilder;
 use vfs::execution_scope::ExecutionScope;
+use {
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_diagnostics_types as fdiagnostics,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
+    fuchsia_zircon as zx,
+};
 
 mod component_controller;
 use component_controller::ComponentController;
@@ -359,19 +354,19 @@ impl From<fcrunner::ComponentControllerOnEscrowRequest> for EscrowRequest {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        crate::model::testing::mocks::{
-            self, ControlMessage, ControllerActionResponse, MockController,
-        },
-        assert_matches::assert_matches,
-        fidl::endpoints::ControlHandle,
-        fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx, Koid},
-        futures::lock::Mutex,
-        std::{collections::HashMap, sync::Arc, task::Poll},
-        zx::AsHandleRef,
+    use super::*;
+    use crate::model::testing::mocks::{
+        self, ControlMessage, ControllerActionResponse, MockController,
     };
+    use assert_matches::assert_matches;
+    use fidl::endpoints::ControlHandle;
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::{self as zx, Koid};
+    use futures::lock::Mutex;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use std::task::Poll;
+    use zx::AsHandleRef;
 
     #[fuchsia::test]
     /// Test scenario where we tell the controller to stop the component and

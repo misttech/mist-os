@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        directory::{entry::DirectoryEntry, entry_container::Directory},
-        name::Name,
-    },
-    fuchsia_zircon_status::Status,
-    std::sync::Arc,
-    thiserror::Error,
-};
+use crate::directory::entry::DirectoryEntry;
+use crate::directory::entry_container::Directory;
+use crate::name::Name;
+use fuchsia_zircon_status::Status;
+use std::sync::Arc;
+use thiserror::Error;
 
 /// An entry with the same name already exists in the directory.
 #[derive(Error, Debug)]

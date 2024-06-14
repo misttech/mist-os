@@ -6,18 +6,22 @@
 // Needed for invocations of the `assert_data_tree` macro.
 #![recursion_limit = "256"]
 
-use std::{collections::HashMap, convert::TryFrom as _, num::NonZeroU16};
+mod common;
+
+use std::collections::HashMap;
+use std::convert::TryFrom as _;
+use std::num::NonZeroU16;
 
 use diagnostics_assertions::{
     assert_data_tree, tree_assertion, AnyProperty, NonZeroIntProperty, PropertyAssertion,
     TreeAssertion,
 };
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
-use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 use const_unwrap::const_unwrap_option;
 use diagnostics_hierarchy::{DiagnosticsHierarchy, Property};
@@ -25,21 +29,14 @@ use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet};
 use net_types::ip::Ip as _;
 use netemul::InStack;
-use netstack_testing_common::{
-    constants,
-    realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
-    Result,
-};
+use netstack_testing_common::realms::{KnownServiceProvider, Netstack, TestSandboxExt as _};
+use netstack_testing_common::{constants, Result};
 use netstack_testing_macros::netstack_test;
 use packet::{ParsablePacket as _, Serializer as _};
-use packet_formats::{
-    ethernet::{
-        testutil::ETHERNET_HDR_LEN_NO_TAG, EtherType, EthernetFrameBuilder,
-        ETHERNET_MIN_BODY_LEN_NO_TAG,
-    },
-    ipv4::{Ipv4Header as _, Ipv4PacketBuilder},
-    udp::{UdpPacketBuilder, UdpParseArgs},
-};
+use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
+use packet_formats::ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG};
+use packet_formats::ipv4::{Ipv4Header as _, Ipv4PacketBuilder};
+use packet_formats::udp::{UdpPacketBuilder, UdpParseArgs};
 use test_case::test_case;
 
 /// A helper type to provide address verification in inspect NIC data.
@@ -1467,6 +1464,16 @@ async fn inspect_socket_stats(name: &str) {
     });
 }
 
+struct InspectDataGetter {
+    diagnostics_dir: fio::DirectoryProxy,
+}
+
+impl common::InspectDataGetter for InspectDataGetter {
+    async fn get_inspect_data(&self, metric: &str) -> diagnostics_hierarchy::DiagnosticsHierarchy {
+        get_inspect_data(&self.diagnostics_dir, metric, "counters").await
+    }
+}
+
 #[netstack_test]
 async fn inspect_for_sampler(name: &str) {
     type N = netstack_testing_common::realms::Netstack2;
@@ -1479,73 +1486,9 @@ async fn inspect_for_sampler(name: &str) {
     let diagnostics_dir =
         realm.open_diagnostics_directory("netstack").expect("diagnostics dir exists");
 
-    let sampler_config = sampler_config::SamplerConfigBuilder::default()
-        .sampler_dir("/pkg/data/sampler-config")
-        .load()
-        .expect("SamplerConfig load failed");
-    let project_config = match &sampler_config.project_configs[..] {
-        [project_config] => project_config,
-        project_configs => panic!("expected one project_config but got {:#?}", project_configs),
-    };
-    for metric_config in &project_config.metrics {
-        let selector = match &metric_config.selectors[..] {
-            [selector] => {
-                &selector
-                    .as_ref()
-                    .expect("SamplerConfig load should never return None for selectors")
-                    .selector
-            }
-            selectors => panic!("expected one selector but got {:#?}", selectors),
-        };
-        let fidl_fuchsia_diagnostics::Selector { tree_selector, .. } = selector;
-        let (tree_selector, expected_key) = match tree_selector.as_ref().expect("tree_selector") {
-            fidl_fuchsia_diagnostics::TreeSelector::PropertySelector(
-                fidl_fuchsia_diagnostics::PropertySelector { node_path, target_properties },
-            ) => {
-                let tree_selector = node_path
-                    .iter()
-                    .map(|selector| match selector {
-                        fidl_fuchsia_diagnostics::StringSelector::ExactMatch(segment) => {
-                            selectors::sanitize_string_for_selectors(segment)
-                        }
-                        selector => panic!("expected exact match selector but got {:#?}", selector),
-                    })
-                    .join("/");
-                let expected_key = match target_properties {
-                    fidl_fuchsia_diagnostics::StringSelector::ExactMatch(segment) => segment,
-                    selector => panic!("expected exact match selector but got {:#?}", selector),
-                };
-                (tree_selector, expected_key)
-            }
-            selector => panic!("expected property selector but got {:#?}", selector),
-        };
-        let data = get_inspect_data(
-            &diagnostics_dir,
-            &format!("{tree_selector}:{expected_key}"),
-            "counters",
-        )
-        .await;
-        let properties: Vec<_> = data
-            .property_iter()
-            .filter_map(|(_hierarchy_path, property_opt): (Vec<&str>, _)| property_opt)
-            .collect();
-        match &properties[..] {
-            [Property::Uint(key, _)] => {
-                if key != expected_key {
-                    panic!(
-                        "wrong key {:#?} found (expected {:#?}) for selector {:#?}",
-                        key, expected_key, selector
-                    );
-                }
-            }
-            [] => {
-                panic!("no properties found for selector {:#?}", selector)
-            }
-            properties => {
-                panic!("wrong properties {:#?} found for selector {:#?}", properties, selector);
-            }
-        }
-    }
+    let sampler = InspectDataGetter { diagnostics_dir };
+
+    common::inspect_for_sampler_test_inner(&sampler).await;
 }
 
 const CONFIG_DATA_EMPTY: &str = "/pkg/netstack/empty.json";

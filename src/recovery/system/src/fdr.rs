@@ -239,9 +239,9 @@ pub async fn execute_reset() -> Result<(), Error> {
 mod tests {
     use super::*;
     use fidl_fuchsia_paver::BootManagerRequest;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
-    use futures::{channel::mpsc, StreamExt, TryStreamExt};
+    use futures::channel::mpsc;
+    use futures::{StreamExt, TryStreamExt};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     // A mock BootManager service that stores an initial last_active_config and reports the queries
     // it receives to mpsc::Receivers for the test to listen and consume.

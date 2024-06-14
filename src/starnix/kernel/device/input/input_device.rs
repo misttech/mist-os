@@ -4,38 +4,30 @@
 
 use crate::{parse_fidl_keyboard_event_to_linux_input_event, InputFile};
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
-use fidl_fuchsia_ui_input3 as fuiinput;
 use fidl_fuchsia_ui_pointer::{
     EventPhase as FidlEventPhase, TouchEvent as FidlTouchEvent, TouchResponse as FidlTouchResponse,
     TouchResponseType, {self as fuipointer},
 };
-use fidl_fuchsia_ui_policy as fuipolicy;
-use fidl_fuchsia_ui_views as fuiviews;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use futures::StreamExt as _;
-use starnix_core::{
-    device::{kobject::DeviceMetadata, DeviceMode, DeviceOps},
-    fs::sysfs::DeviceDirectory,
-    task::{CurrentTask, Kernel},
-    vfs::{FileOps, FsNode, FsString},
-};
+use starnix_core::device::kobject::DeviceMetadata;
+use starnix_core::device::{DeviceMode, DeviceOps};
+use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::vfs::{FileOps, FsNode, FsString};
 use starnix_logging::log_warn;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex};
-use starnix_uapi as uapi;
-use starnix_uapi::{
-    device_type::{DeviceType, INPUT_MAJOR},
-    errors::Errno,
-    input_id,
-    open_flags::OpenFlags,
-    time::timeval_from_time,
-    timeval,
-    vfs::FdEvents,
-    BUS_VIRTUAL,
-};
-use std::sync::{
-    atomic::{AtomicU32, Ordering},
-    Arc, Weak,
+use starnix_uapi::device_type::{DeviceType, INPUT_MAJOR};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::time::timeval_from_time;
+use starnix_uapi::vfs::FdEvents;
+use starnix_uapi::{input_id, timeval, BUS_VIRTUAL};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Weak};
+use {
+    fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
+    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, fuchsia_zircon as zx,
+    starnix_uapi as uapi,
 };
 
 // Touch and keyboard input IDs should be distinct.
@@ -509,22 +501,22 @@ mod test {
     use anyhow::anyhow;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
-    use fidl_fuchsia_ui_pointer as fuipointer;
-    use fidl_fuchsia_ui_policy as fuipolicy;
-    use fuchsia_zircon as zx;
     use fuipointer::{
         EventPhase, TouchEvent, TouchPointerSample, TouchResponse, TouchSourceMarker,
         TouchSourceRequest,
     };
-    use starnix_core::{
-        task::{EventHandler, Waiter},
-        testing::{create_kernel_and_task, create_kernel_task_and_unlocked},
-        vfs::{buffers::VecOutputBuffer, FileHandle},
-    };
+    use starnix_core::task::{EventHandler, Waiter};
+    use starnix_core::testing::{create_kernel_and_task, create_kernel_task_and_unlocked};
+    use starnix_core::vfs::buffers::VecOutputBuffer;
+    use starnix_core::vfs::FileHandle;
     use starnix_uapi::errors::EAGAIN;
     use test_case::test_case;
     use test_util::assert_near;
-    use zerocopy::FromBytes as _; // for `read_from()`
+    use zerocopy::FromBytes as _;
+    use {
+        fidl_fuchsia_ui_pointer as fuipointer, fidl_fuchsia_ui_policy as fuipolicy,
+        fuchsia_zircon as zx,
+    }; // for `read_from()`
 
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 

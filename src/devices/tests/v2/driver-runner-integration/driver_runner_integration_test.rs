@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{
-        descriptor::EventDescriptor,
-        events::{self, Event, EventStream},
-        matcher::EventMatcher,
-    },
-    diagnostics_assertions::assert_data_tree,
-    diagnostics_reader::{ArchiveReader, Logs},
-    fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync,
-    fuchsia_component_test::RealmBuilder,
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    futures::StreamExt,
-};
+use component_events::descriptor::EventDescriptor;
+use component_events::events::{self, Event, EventStream};
+use component_events::matcher::EventMatcher;
+use diagnostics_assertions::assert_data_tree;
+use diagnostics_reader::{ArchiveReader, Logs};
+use fuchsia_component_test::RealmBuilder;
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use futures::StreamExt;
+use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync};
 
 // This will only return once all `events` are seen in `event_stream`.
 // The events do not have to happen in order.

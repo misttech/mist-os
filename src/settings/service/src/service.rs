@@ -20,14 +20,10 @@
 //! message hubs located in the internal mod. Communication from these hubs
 //! should migrate here over time.
 
-use crate::agent;
 use crate::base::SettingType;
-use crate::event;
-use crate::handler::base as handler;
-use crate::handler::setting_handler as controller;
-use crate::job;
+use crate::handler::{base as handler, setting_handler as controller};
 use crate::message::message_hub;
-use crate::storage;
+use crate::{agent, event, job, storage};
 
 pub struct MessageHub;
 

@@ -4,14 +4,13 @@
 
 use anyhow::Context;
 use fidl::{endpoints, HandleBased};
-use fidl_fuchsia_testing_harness as ftth;
-use fidl_fuchsia_time as fft;
 use fidl_fuchsia_time_external::TimeSample;
-use fidl_test_time_realm as fttr;
-use fuchsia_async as fasync;
 use fuchsia_component::client;
-use fuchsia_zircon as zx;
 use lazy_static::lazy_static;
+use {
+    fidl_fuchsia_testing_harness as ftth, fidl_fuchsia_time as fft, fidl_test_time_realm as fttr,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 lazy_static! {
     // A sample backstop time.

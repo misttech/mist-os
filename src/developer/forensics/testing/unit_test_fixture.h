@@ -14,6 +14,7 @@
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/sys/cpp/testing/service_directory_provider.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/vfs/cpp/service.h>
 #include <zircon/errors.h>
 
 #include <memory>
@@ -46,6 +47,10 @@ class UnitTestFixture : public gtest::TestLoopFixture {
   template <typename ServiceProvider>
   void InjectServiceProvider(ServiceProvider* service_provider, const char* name = nullptr) {
     AddHandler(service_provider->GetHandler(), name);
+  }
+
+  void InjectServiceProvider(std::unique_ptr<vfs::Service> service, std::string name) {
+    FX_CHECK(service_directory_provider_.AddService(std::move(service), std::move(name)) == ZX_OK);
   }
 
   // Inspect related methods.

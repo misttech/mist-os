@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        common::CreationMode, directory::DirectoryOptions, file::FileOptions, node::NodeOptions,
-        service::ServiceOptions, symlink::SymlinkOptions,
-    },
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-};
+use crate::common::CreationMode;
+use crate::directory::DirectoryOptions;
+use crate::file::FileOptions;
+use crate::node::NodeOptions;
+use crate::service::ServiceOptions;
+use crate::symlink::SymlinkOptions;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
 
 /// Extends fio::ConnectionProtocols and fio::OpenFlags
 pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {

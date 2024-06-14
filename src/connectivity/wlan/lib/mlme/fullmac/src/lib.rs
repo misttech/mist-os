@@ -6,23 +6,21 @@ mod convert;
 pub mod device;
 mod logger;
 
+use crate::convert::banjo_to_fidl;
+use crate::device::DeviceOps;
+use anyhow::bail;
+use fuchsia_inspect::Inspector;
+use fuchsia_inspect_contrib::auto_persist;
+use futures::channel::{mpsc, oneshot};
+use futures::{select, StreamExt};
+use tracing::{error, info, warn};
+use wlan_common::sink::UnboundedSink;
+use wlan_sme::serve::create_sme;
 use {
-    crate::{convert::banjo_to_fidl, device::DeviceOps},
-    anyhow::bail,
     banjo_fuchsia_wlan_common as banjo_wlan_common, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async as fasync,
-    fuchsia_inspect::Inspector,
-    fuchsia_inspect_contrib::auto_persist,
-    fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        select, StreamExt,
-    },
-    tracing::{error, info, warn},
-    wlan_common::sink::UnboundedSink,
-    wlan_sme::serve::create_sme,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -91,6 +89,7 @@ pub struct FullmacMlmeHandle {
 
 impl FullmacMlmeHandle {
     pub fn stop(&mut self) {
+        info!("Requesting MLME stop...");
         if let Err(e) = self.driver_event_sender.unbounded_send(FullmacDriverEvent::Stop) {
             error!("Cannot signal MLME event loop thread: {}", e);
         }
@@ -102,6 +101,7 @@ impl FullmacMlmeHandle {
             }
             None => warn!("Called stop on already stopped MLME"),
         }
+        info!("MLME main loop thread has shutdown.");
     }
 
     pub fn delete(mut self) {
@@ -561,17 +561,14 @@ enum DriverState {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::device::test_utils::{FakeFullmacDevice, FakeFullmacDeviceMocks},
-        fuchsia_async as fasync,
-        futures::{task::Poll, Future},
-        std::{
-            pin::Pin,
-            sync::{Arc, Mutex},
-        },
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use crate::device::test_utils::{FakeFullmacDevice, FakeFullmacDeviceMocks};
+    use fuchsia_async as fasync;
+    use futures::task::Poll;
+    use futures::Future;
+    use std::pin::Pin;
+    use std::sync::{Arc, Mutex};
+    use wlan_common::assert_variant;
 
     #[test]
     fn test_main_loop_thread_happy_path() {
@@ -761,15 +758,15 @@ mod tests {
 
 #[cfg(test)]
 mod handle_mlme_request_tests {
+    use super::*;
+    use crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks};
+    use std::sync::{Arc, Mutex};
+    use test_case::test_case;
+    use wlan_common::assert_variant;
     use {
-        super::*,
-        crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks},
         banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
         banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
         fidl_fuchsia_wlan_stats as fidl_stats,
-        std::sync::{Arc, Mutex},
-        test_case::test_case,
-        wlan_common::assert_variant,
     };
 
     #[test]
@@ -1588,20 +1585,19 @@ mod handle_mlme_request_tests {
 mod handle_driver_event_tests {
     use crate::device::WlanFullmacIfcProtocol;
 
+    use super::*;
+    use crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks};
+    use futures::task::Poll;
+    use futures::Future;
+    use std::pin::Pin;
+    use std::sync::{Arc, Mutex};
+    use test_case::test_case;
+    use wlan_common::{assert_variant, fake_fidl_bss_description};
     use {
-        super::*,
-        crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks},
         banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
         banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
         banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
         fuchsia_async as fasync,
-        futures::{task::Poll, Future},
-        std::{
-            pin::Pin,
-            sync::{Arc, Mutex},
-        },
-        test_case::test_case,
-        wlan_common::{assert_variant, fake_fidl_bss_description},
     };
 
     fn create_bss_descriptions(

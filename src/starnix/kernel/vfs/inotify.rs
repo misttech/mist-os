@@ -2,37 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::{vmo::round_up_to_increment, MemoryAccessorExt},
-    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        default_ioctl, fileops_impl_nonseekable, fs_args, inotify, Anon, BytesFile, BytesFileOps,
-        DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr, FsString,
-        WdNumber,
-    },
+use crate::mm::vmo::round_up_to_increment;
+use crate::mm::MemoryAccessorExt;
+use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    default_ioctl, fileops_impl_nonseekable, fs_args, inotify, Anon, BytesFile, BytesFileOps,
+    DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr, FsString,
+    WdNumber,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use starnix_uapi::{
-    arc_key::WeakKey,
-    auth::CAP_SYS_ADMIN,
-    errno, error,
-    errors::Errno,
-    file_mode::FileMode,
-    inotify_event,
-    inotify_mask::InotifyMask,
-    open_flags::OpenFlags,
-    user_address::{UserAddress, UserRef},
-    vfs::FdEvents,
-    FIONREAD,
-};
-use std::{
-    borrow::Cow,
-    collections::{HashMap, VecDeque},
-    mem::size_of,
-    sync::atomic::{AtomicI32, Ordering},
-};
+use starnix_uapi::arc_key::WeakKey;
+use starnix_uapi::auth::CAP_SYS_ADMIN;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::inotify_mask::InotifyMask;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::vfs::FdEvents;
+use starnix_uapi::{errno, error, inotify_event, FIONREAD};
+use std::borrow::Cow;
+use std::collections::{HashMap, VecDeque};
+use std::mem::size_of;
+use std::sync::atomic::{AtomicI32, Ordering};
 use zerocopy::AsBytes;
 
 const DATA_SIZE: usize = size_of::<inotify_event>();
@@ -583,11 +576,12 @@ pub type InotifyMaxUserWatches = InotifyLimitProcFile<MaxUserWatchesGetter>;
 #[cfg(test)]
 mod tests {
     use super::{InotifyEvent, InotifyEventQueue, InotifyFileObject, DATA_SIZE};
-    use crate::{
-        testing::{create_kernel_and_task, create_kernel_task_and_unlocked},
-        vfs::{buffers::VecOutputBuffer, OutputBuffer, WdNumber},
-    };
-    use starnix_uapi::{arc_key::WeakKey, file_mode::FileMode, inotify_mask::InotifyMask};
+    use crate::testing::{create_kernel_and_task, create_kernel_task_and_unlocked};
+    use crate::vfs::buffers::VecOutputBuffer;
+    use crate::vfs::{OutputBuffer, WdNumber};
+    use starnix_uapi::arc_key::WeakKey;
+    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::inotify_mask::InotifyMask;
 
     #[::fuchsia::test]
     fn inotify_event() {

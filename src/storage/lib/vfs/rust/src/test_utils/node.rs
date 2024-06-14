@@ -4,10 +4,8 @@
 
 //! Helper methods for the `NodeProxy` objects.
 
-use {
-    fidl::endpoints::{create_proxy, ProtocolMarker, ServerEnd},
-    fidl_fuchsia_io as fio,
-};
+use fidl::endpoints::{create_proxy, ProtocolMarker, ServerEnd};
+use fidl_fuchsia_io as fio;
 
 pub fn open_get_proxy<M>(proxy: &fio::DirectoryProxy, flags: fio::OpenFlags, path: &str) -> M::Proxy
 where

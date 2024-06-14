@@ -34,8 +34,8 @@ pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
+pub use device::link::{LinkAddress, LinkDevice, LinkUnicastAddress};
 pub use device::{
-    link::{LinkAddress, LinkDevice, LinkUnicastAddress},
     AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
     StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
@@ -55,10 +55,10 @@ pub use resource_references::{
     RemoveResourceResult, RemoveResourceResultWithContext,
 };
 pub use rng::RngContext;
+pub use time::local_timer_heap::LocalTimerHeap;
 pub use time::{
-    local_timer_heap::LocalTimerHeap, CoreTimerContext, HandleableTimer, Instant,
-    InstantBindingsTypes, InstantContext, IntoCoreTimerCtx, NestedIntoCoreTimerCtx,
-    TimerBindingsTypes, TimerContext, TimerHandler,
+    CoreTimerContext, HandleableTimer, Instant, InstantBindingsTypes, InstantContext,
+    IntoCoreTimerCtx, NestedIntoCoreTimerCtx, TimerBindingsTypes, TimerContext, TimerHandler,
 };
 pub use trace::TracingContext;
 pub use uninstantiable::{Uninstantiable, UninstantiableWrapper};
@@ -106,13 +106,11 @@ pub mod sync {
     // types exported from this module.
 
     // Exclusively re-exports from the sync crate.
-    pub use netstack3_sync::{
-        rc::{
-            DebugReferences, DynDebugReferences, MapNotifier as MapRcNotifier,
-            Notifier as RcNotifier, Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
-        },
-        LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    pub use netstack3_sync::rc::{
+        DebugReferences, DynDebugReferences, MapNotifier as MapRcNotifier, Notifier as RcNotifier,
+        Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
     };
+    pub use netstack3_sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 }
 
 /// Test utilities provided to all crates.
@@ -126,12 +124,10 @@ pub mod testutil {
     mod misc;
     mod monotonic_id;
 
-    pub use crate::device::{
-        link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
-        testutil::{
-            FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
-            MultipleDevicesId,
-        },
+    pub use crate::device::link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId};
+    pub use crate::device::testutil::{
+        FakeDeviceId, FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId,
+        MultipleDevicesId,
     };
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};

@@ -6,28 +6,27 @@
 // because these modules all come from //third_party/rust_crates:omaha_client.
 mod installer;
 mod policy;
-use {
-    crate::omaha::installer::IsolatedInstaller,
-    anyhow::{Context, Error},
-    futures::lock::Mutex,
-    futures::prelude::*,
-    omaha_client::{
-        app_set::VecAppSet,
-        common::App,
-        configuration::{Config, Updater},
-        cup_ecdsa::StandardCupv2Handler,
-        http_request::HttpRequest,
-        metrics::StubMetricsReporter,
-        protocol::{request::OS, Cohort},
-        state_machine::{update_check, StateMachineBuilder, StateMachineEvent, UpdateCheckError},
-        storage::MemStorage,
-        time::StandardTimeSource,
-        version::Version,
-    },
-    omaha_client_fuchsia::{http_request, timer},
-    std::rc::Rc,
-    tracing::error,
+use crate::omaha::installer::IsolatedInstaller;
+use anyhow::{Context, Error};
+use futures::lock::Mutex;
+use futures::prelude::*;
+use omaha_client::app_set::VecAppSet;
+use omaha_client::common::App;
+use omaha_client::configuration::{Config, Updater};
+use omaha_client::cup_ecdsa::StandardCupv2Handler;
+use omaha_client::http_request::HttpRequest;
+use omaha_client::metrics::StubMetricsReporter;
+use omaha_client::protocol::request::OS;
+use omaha_client::protocol::Cohort;
+use omaha_client::state_machine::{
+    update_check, StateMachineBuilder, StateMachineEvent, UpdateCheckError,
 };
+use omaha_client::storage::MemStorage;
+use omaha_client::time::StandardTimeSource;
+use omaha_client::version::Version;
+use omaha_client_fuchsia::{http_request, timer};
+use std::rc::Rc;
+use tracing::error;
 
 /// Get a |Config| object to use when making requests to Omaha.
 async fn get_omaha_config(version: &str, service_url: &str) -> Config {
@@ -139,15 +138,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::updater::for_tests::{UpdaterBuilder, UpdaterForTest, UpdaterResult},
-        fuchsia_pkg_testing::PackageBuilder,
-        fuchsia_zircon as zx,
-        mock_paver::{hooks as mphooks, PaverEvent},
-        omaha_client::http_request::mock::MockHttpRequest,
-        serde_json::json,
-    };
+    use super::*;
+    use crate::updater::for_tests::{UpdaterBuilder, UpdaterForTest, UpdaterResult};
+    use fuchsia_pkg_testing::PackageBuilder;
+    use fuchsia_zircon as zx;
+    use mock_paver::{hooks as mphooks, PaverEvent};
+    use omaha_client::http_request::mock::MockHttpRequest;
+    use serde_json::json;
 
     const TEST_REPO_URL: &str = "fuchsia-pkg://example.com";
 

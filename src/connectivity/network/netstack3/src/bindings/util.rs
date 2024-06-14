@@ -2,58 +2,50 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    convert::Infallible as Never,
-    fmt::Debug,
-    num::{NonZeroU16, NonZeroU64},
-    ops::Deref,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Weak,
-    },
-};
+use std::convert::Infallible as Never;
+use std::fmt::Debug;
+use std::num::{NonZeroU16, NonZeroU64};
+use std::ops::Deref;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Weak};
 
 use explicit::UnreachableExt as _;
-use fidl_fuchsia_net as fidl_net;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
-use fidl_fuchsia_net_stack as fidl_net_stack;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use futures::{task::AtomicWaker, Future, FutureExt as _, Stream, StreamExt as _};
-use net_types::{
-    ethernet::Mac,
-    ip::{
-        AddrSubnetEither, AddrSubnetError, GenericOverIp, Ip, IpAddr, IpAddress,
-        IpInvariant as IpInv, Ipv4Addr, Ipv6Addr, SubnetEither, SubnetError,
-    },
-    AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
+use futures::task::AtomicWaker;
+use futures::{Future, FutureExt as _, Stream, StreamExt as _};
+use log::debug;
+use net_types::ethernet::Mac;
+use net_types::ip::{
+    AddrSubnetEither, AddrSubnetError, GenericOverIp, Ip, IpAddr, IpAddress, Ipv4Addr, Ipv6Addr,
+    SubnetEither, SubnetError,
 };
-use netstack3_core::{
-    device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId},
-    error::{ExistsError, NotFoundError},
-    neighbor::{NudUserConfig, NudUserConfigUpdate},
-    routes::{
-        AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric,
-        RawMetric,
-    },
-    socket::{
-        self as core_socket, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
-    },
-    sync::RemoveResourceResult,
-    types::WorkQueueReport,
+use net_types::{AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
+use netstack3_core::device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId};
+use netstack3_core::error::{ExistsError, NotFoundError};
+use netstack3_core::neighbor::{NudUserConfig, NudUserConfigUpdate};
+use netstack3_core::routes::{
+    AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric,
+    RawMetric,
 };
+use netstack3_core::socket::{
+    self as core_socket, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
+};
+use netstack3_core::sync::RemoveResourceResult;
+use netstack3_core::types::WorkQueueReport;
 use packet_formats::utils::NonZeroDuration;
-use tracing::debug;
-
-use crate::bindings::{
-    devices::BindingId,
-    routes,
-    socket::{IntoErrno, IpSockAddrExt, SockAddr},
-    BindingsCtx,
+use {
+    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    fidl_fuchsia_net_stack as fidl_net_stack, fidl_fuchsia_posix as fposix,
+    fidl_fuchsia_posix_socket as fposix_socket,
 };
+
+use crate::bindings::devices::BindingId;
+use crate::bindings::socket::{IntoErrno, IpSockAddrExt, SockAddr};
+use crate::bindings::{routes, BindingsCtx};
+
+mod result_ext;
+pub(crate) use result_ext::*;
 
 /// The value used to specify that a `ForwardingEntry.metric` is unset, and the
 /// entry's metric should track the interface's routing metric.
@@ -673,9 +665,9 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::IpMulticastMembership>
     type Error = MulticastMembershipConversionError;
 
     fn try_from_fidl(fidl: fposix_socket::IpMulticastMembership) -> Result<Self, Self::Error> {
-        <A::Version as Ip>::map_ip(
-            IpInv(fidl),
-            |IpInv(fidl)| {
+        <A::Version as Ip>::map_ip_out(
+            fidl,
+            |fidl| {
                 let fposix_socket::IpMulticastMembership { iface, local_addr, mcast_addr } = fidl;
                 let mcast_addr = MulticastAddr::new(mcast_addr.into_core())
                     .ok_or(Self::Error::AddrNotMulticast)?;
@@ -689,7 +681,7 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::IpMulticastMembership>
                     });
                 Ok((mcast_addr, selector))
             },
-            |IpInv(_fidl)| Err(Self::Error::WrongIpVersion),
+            |_fidl| Err(Self::Error::WrongIpVersion),
         )
     }
 }
@@ -700,10 +692,10 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::Ipv6MulticastMembership>
     type Error = MulticastMembershipConversionError;
 
     fn try_from_fidl(fidl: fposix_socket::Ipv6MulticastMembership) -> Result<Self, Self::Error> {
-        <A::Version as Ip>::map_ip(
-            IpInv(fidl),
-            |IpInv(_fidl)| Err(Self::Error::WrongIpVersion),
-            |IpInv(fidl)| {
+        <A::Version as Ip>::map_ip_out(
+            fidl,
+            |_fidl| Err(Self::Error::WrongIpVersion),
+            |fidl| {
                 let fposix_socket::Ipv6MulticastMembership { iface, mcast_addr } = fidl;
                 let mcast_addr = MulticastAddr::new(mcast_addr.into_core())
                     .ok_or(Self::Error::AddrNotMulticast)?;

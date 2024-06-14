@@ -20,23 +20,23 @@ struct ExpectedBucket {
 
 void ConfirmBuckets(const Digest& digest, const std::vector<ExpectedBucket>& expected_buckets) {
   std::vector<Bucket> buckets_copy = digest.buckets();
-  for (size_t i = 0; i < expected_buckets.size(); ++i) {
-    const auto& expected_bucket = expected_buckets.at(i);
+  for (const auto& expected_bucket : expected_buckets) {
     bool found = false;
     for (size_t j = 0; j < buckets_copy.size(); ++j) {
       const auto& bucket = buckets_copy.at(j);
 
       if (expected_bucket.name == bucket.name()) {
-        EXPECT_EQ(expected_bucket.size, bucket.size()) << "Bucket name: " << expected_bucket.name;
+        EXPECT_EQ(expected_bucket.size, bucket.size())
+            << "Bucket name='" << expected_bucket.name << "' has an unexpected value";
         buckets_copy.erase(buckets_copy.begin() + j);
         found = true;
         break;
       }
     }
-    EXPECT_TRUE(found) << "Bucket name: " << expected_bucket.name;
+    EXPECT_TRUE(found) << "Bucket name='" << expected_bucket.name << "' is missing";
   }
   for (const auto& unmatched_bucket : buckets_copy) {
-    EXPECT_TRUE(false) << "Unmatched bucket: " << unmatched_bucket.name();
+    EXPECT_TRUE(false) << "Bucket name='" << unmatched_bucket.name() << "' is unexpected";
   }
 }
 
@@ -146,7 +146,10 @@ TEST_F(DigestUnitTest, Orphaned) {
   Digester digester({{"A", ".*", "a.*"}});
   Digest d(c, &digester);
   EXPECT_EQ(0U, d.undigested_vmos().size());
-  ConfirmBuckets(d, {{"A", 100U}, {"Orphaned", 200U}, {"Kernel", 0U}, {"Free", 0U}});
+  ConfirmBuckets(d, {{.name = "A", .size = 100U},
+                     {.name = "Orphaned", .size = 200U},
+                     {.name = "Kernel", .size = 0U},
+                     {.name = "Free", .size = 0U}});
 }
 
 TEST_F(DigestUnitTest, DefaultBuckets) {

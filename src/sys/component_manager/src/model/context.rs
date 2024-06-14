@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::{
-            BuiltinCapability, CapabilityProvider, CapabilitySource, FrameworkCapability,
-        },
-        model::component::WeakComponentInstance,
-        model::token::InstanceRegistry,
-    },
-    ::routing::policy::GlobalPolicyChecker,
-    cm_config::{AbiRevisionPolicy, RuntimeConfig},
-    errors::ModelError,
-    futures::lock::Mutex,
-    std::sync::Arc,
+use crate::capability::{
+    BuiltinCapability, CapabilityProvider, CapabilitySource, FrameworkCapability,
 };
+use crate::model::component::WeakComponentInstance;
+use crate::model::token::InstanceRegistry;
+use ::routing::policy::GlobalPolicyChecker;
+use cm_config::{AbiRevisionPolicy, RuntimeConfig};
+use errors::ModelError;
+use futures::lock::Mutex;
+use std::sync::Arc;
 
 /// The ModelContext provides the API boundary between the Model and Realms. It
 /// defines what parts of the Model or authoritative state about the tree we

@@ -4,12 +4,10 @@
 
 use derivative::Derivative;
 use fuchsia_zircon::sys::zx_handle_t;
-use std::{
-    ffi::CStr,
-    mem::{self, MaybeUninit},
-    os::raw::c_char,
-    ptr,
-};
+use std::ffi::CStr;
+use std::mem::{self, MaybeUninit};
+use std::os::raw::c_char;
+use std::ptr;
 use vk_sys as vk;
 
 macro_rules! ptrs {(
@@ -419,7 +417,10 @@ pub fn device_pointers(vk_i: &vk::InstancePointers, device: vk::Device) -> vk::D
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::{ffi::CStr, mem::MaybeUninit, os::raw::c_char, ptr};
+    use std::ffi::CStr;
+    use std::mem::MaybeUninit;
+    use std::os::raw::c_char;
+    use std::ptr;
     use vk_sys as vk;
 
     macro_rules! vulkan_version {

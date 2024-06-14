@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    proc_macro2::TokenStream as TokenStream2,
-    quote::{quote, TokenStreamExt},
-};
+use proc_macro2::TokenStream as TokenStream2;
+use quote::{quote, TokenStreamExt};
 
 pub fn gen_visit_str(ty: Option<TokenStream2>, expected: &syn::LitStr) -> TokenStream2 {
     let ret = match ty {

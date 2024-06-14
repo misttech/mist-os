@@ -67,7 +67,7 @@ empty_blob_raw_json = """{
 
 
 class PackageManifestTest(unittest.TestCase):
-    def test_deserialize_from_json(self):
+    def test_deserialize_from_json(self) -> None:
         manifest = serialization.json_loads(
             PackageManifest, raw_package_manifest_json
         )
@@ -109,7 +109,7 @@ class PackageManifestTest(unittest.TestCase):
             ),
         )
 
-    def test_serialize_json(self):
+    def test_serialize_json(self) -> None:
         manifest = PackageManifest(
             PackageMetaData("some_package", 42),
             [
@@ -148,7 +148,7 @@ class PackageManifestTest(unittest.TestCase):
         self.maxDiff = None
         self.assertEqual(serialized_json, raw_package_manifest_json)
 
-    def test_serialize_empty_blob(self):
+    def test_serialize_empty_blob(self) -> None:
         blob = BlobEntry(
             path="an/empty/file",
             merkle="15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b",
@@ -269,7 +269,7 @@ raw_assembly_input_bundle_json = """{
 
 
 class AssemblyInputBundleTest(unittest.TestCase):
-    def test_serialization(self):
+    def test_serialization(self) -> None:
         self.maxDiff = None
 
         aib = AssemblyInputBundle()
@@ -324,7 +324,7 @@ class AssemblyInputBundleTest(unittest.TestCase):
             aib.json_dumps(indent=2), raw_assembly_input_bundle_json
         )
 
-    def test_deserialization(self):
+    def test_deserialization(self) -> None:
         self.maxDiff = None
 
         aib = AssemblyInputBundle()
@@ -377,7 +377,11 @@ class AssemblyInputBundleTest(unittest.TestCase):
             raw_assembly_input_bundle_json
         )
 
-        def assert_field_equal(parsed, expected, field_name):
+        def assert_field_equal(
+            parsed: AssemblyInputBundle,
+            expected: AssemblyInputBundle,
+            field_name: str,
+        ) -> None:
             self.assertEqual(
                 getattr(parsed, field_name), getattr(expected, field_name)
             )
@@ -418,7 +422,7 @@ class PackageManifestBuilder:
     path given.
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str) -> None:
         self._manifest_path: Optional[FilePath] = None
         self._name = name
         self._blobs: List[BlobEntry] = []
@@ -490,7 +494,9 @@ class PackageManifestBuilder:
 
 
 class AIBCreatorTest(unittest.TestCase):
-    def test_aib_creator_file_copy_and_package_manifest_relative_paths(self):
+    def test_aib_creator_file_copy_and_package_manifest_relative_paths(
+        self,
+    ) -> None:
         """This tests that the AIBCreator will correctly copy the blobs/* files
         and create the package manifests in the correct location within the
         AIB structure, with package-manifest relative paths to the blobs.
@@ -624,7 +630,7 @@ class AIBCreatorTest(unittest.TestCase):
             # relative blob paths into the correct directory.
             def validate_rewritten_package_manifest(
                 path: FilePath, expected: PackageManifest
-            ):
+            ) -> None:
                 """Parses the PackageManifest at the given path, and compares it
                 with the `expected` one.
                 """
@@ -676,9 +682,7 @@ class AIBCreatorTest(unittest.TestCase):
             # in-AIB version of the manifests.
             expected_deps = [entry.source for entry in expected_files]
             expected_deps.extend(source_package_manifests)
-            self.assertEqual(
-                sorted(deps), sorted(expected_deps)
-            )  # type: ignore
+            self.assertEqual(sorted(deps), sorted(expected_deps))
 
             # Verify that the fini manifest created (used to create archives of
             # the AIB is correct).
@@ -695,7 +699,7 @@ class AIBCreatorTest(unittest.TestCase):
             )
             self.assertEqual(
                 sorted(bundle.all_file_paths()), sorted(expected_paths)
-            )  # type: ignore
+            )
 
             # Created the expected entries from the expected_paths by pre-
             # pending the assembly_dir to create the source path.

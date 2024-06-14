@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::VecDeque, time::Duration, time::Instant};
+use std::collections::VecDeque;
+use std::time::{Duration, Instant};
 
 /// The short period used for throttling update checks.
 const SHORT_PERIOD_DURATION: Duration = Duration::from_secs(5 * 60);

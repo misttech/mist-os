@@ -14,22 +14,22 @@
 namespace fidlc {
 namespace {
 
-class VersioningBasicTest : public testing::TestWithParam<Version> {};
+class VersioningBasicTest : public testing::TestWithParam<TargetVersions> {};
 
 const Version V1 = Version::From(1).value();
 const Version V2 = Version::From(2).value();
 const Version HEAD = Version::kHead;
-const Version LEGACY = Version::kLegacy;
 
-INSTANTIATE_TEST_SUITE_P(VersioningBasicTests, VersioningBasicTest,
-                         testing::Values(V1, V2, HEAD, LEGACY),
+const TargetVersions kParamValues[] = {{V1}, {V2}, {HEAD}, {V1, HEAD}, {V1, V2, HEAD}};
+
+INSTANTIATE_TEST_SUITE_P(VersioningBasicTests, VersioningBasicTest, testing::ValuesIn(kParamValues),
                          [](auto info) { return info.param.ToString(); });
 
 TEST_P(VersioningBasicTest, GoodLibraryDefault) {
   TestLibrary library(R"FIDL(
 library example;
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
 }
 
@@ -38,7 +38,7 @@ TEST_P(VersioningBasicTest, GoodLibraryAddedAtHead) {
 @available(added=HEAD)
 library example;
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
 }
 
@@ -47,7 +47,7 @@ TEST_P(VersioningBasicTest, GoodLibraryAddedAtOne) {
 @available(added=1)
 library example;
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
 }
 
@@ -56,7 +56,7 @@ TEST_P(VersioningBasicTest, GoodLibraryAddedAndRemoved) {
 @available(added=1, removed=2)
 library example;
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
 }
 
@@ -65,25 +65,7 @@ TEST_P(VersioningBasicTest, GoodLibraryAddedAndDeprecatedAndRemoved) {
 @available(added=1, deprecated=2, removed=HEAD)
 library example;
 )FIDL");
-  library.SelectVersion("example", GetParam());
-  ASSERT_COMPILED(library);
-}
-
-TEST_P(VersioningBasicTest, GoodLibraryAddedAndRemovedLegacyFalse) {
-  TestLibrary library(R"FIDL(
-@available(added=1, removed=2, legacy=false)
-library example;
-)FIDL");
-  library.SelectVersion("example", GetParam());
-  ASSERT_COMPILED(library);
-}
-
-TEST_P(VersioningBasicTest, GoodLibraryAddedAndRemovedLegacyTrue) {
-  TestLibrary library(R"FIDL(
-@available(added=1, removed=2, legacy=true)
-library example;
-)FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
 }
 
@@ -95,9 +77,9 @@ library example;
 @available(added=HEAD)
 type Foo = struct {};
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.HasStruct("Foo"), GetParam() >= HEAD);
+  EXPECT_EQ(library.HasStruct("Foo"), GetParam().Any() >= HEAD);
 }
 
 TEST_P(VersioningBasicTest, GoodDeclAddedAtOne) {
@@ -108,7 +90,7 @@ library example;
 @available(added=1)
 type Foo = struct {};
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
   EXPECT_TRUE(library.HasStruct("Foo"));
 }
@@ -121,9 +103,9 @@ library example;
 @available(added=1, removed=2)
 type Foo = struct {};
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.HasStruct("Foo"), GetParam() >= V1 && GetParam() < V2);
+  EXPECT_EQ(library.HasStruct("Foo"), GetParam().Any() == V1);
 }
 
 TEST_P(VersioningBasicTest, GoodDeclAddedAndReplaced) {
@@ -137,10 +119,10 @@ type Foo = struct {};
 @available(added=2)
 type Foo = resource struct {};
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
   EXPECT_EQ(library.LookupStruct("Foo")->resourceness,
-            GetParam() == V1 ? Resourceness::kValue : Resourceness::kResource);
+            GetParam().All() == V1 ? Resourceness::kValue : Resourceness::kResource);
 }
 
 TEST_P(VersioningBasicTest, GoodDeclAddedAndDeprecatedAndRemoved) {
@@ -151,25 +133,13 @@ library example;
 @available(added=1, deprecated=2, removed=HEAD)
 type Foo = struct {};
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
-  ASSERT_EQ(library.HasStruct("Foo"), GetParam() < HEAD);
-  if (GetParam() < HEAD) {
-    EXPECT_EQ(library.LookupStruct("Foo")->availability.is_deprecated(), GetParam() >= V2);
+  bool present = GetParam().Any() < HEAD;
+  ASSERT_EQ(library.HasStruct("Foo"), present);
+  if (present) {
+    EXPECT_EQ(library.LookupStruct("Foo")->availability.is_deprecated(), GetParam().Any() >= V2);
   }
-}
-
-TEST_P(VersioningBasicTest, GoodDeclAddedAndRemovedLegacy) {
-  TestLibrary library(R"FIDL(
-@available(added=1)
-library example;
-
-@available(added=1, removed=2, legacy=true)
-type Foo = struct {};
-)FIDL");
-  library.SelectVersion("example", GetParam());
-  ASSERT_COMPILED(library);
-  EXPECT_EQ(library.HasStruct("Foo"), GetParam() == V1 || GetParam() == LEGACY);
 }
 
 TEST_P(VersioningBasicTest, GoodMemberAddedAtHead) {
@@ -182,9 +152,9 @@ type Foo = struct {
     member string;
 };
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.LookupStruct("Foo")->members.size(), GetParam() >= HEAD ? 1u : 0u);
+  EXPECT_EQ(library.LookupStruct("Foo")->members.size(), GetParam().Any() >= HEAD ? 1u : 0u);
 }
 
 TEST_P(VersioningBasicTest, GoodMemberAddedAtOne) {
@@ -197,7 +167,7 @@ type Foo = struct {
     member string;
 };
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
   EXPECT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
 }
@@ -212,9 +182,9 @@ type Foo = struct {
     member string;
 };
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.LookupStruct("Foo")->members.size(), GetParam() == V1 ? 1u : 0u);
+  EXPECT_EQ(library.LookupStruct("Foo")->members.size(), GetParam().Any() == V1 ? 1u : 0u);
 }
 
 TEST_P(VersioningBasicTest, GoodMemberAddedAndReplaced) {
@@ -229,11 +199,11 @@ type Foo = struct {
     member uint32;
 };
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
   ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   EXPECT_EQ(library.LookupStruct("Foo")->members.front().type_ctor->type->kind,
-            GetParam() == V1 ? Type::Kind::kString : Type::Kind::kPrimitive);
+            GetParam().All() == V1 ? Type::Kind::kString : Type::Kind::kPrimitive);
 }
 
 TEST_P(VersioningBasicTest, GoodMemberAddedAndDeprecatedAndRemoved) {
@@ -246,28 +216,14 @@ type Foo = struct {
     member string;
 };
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
-  ASSERT_EQ(library.LookupStruct("Foo")->members.size(), GetParam() < HEAD ? 1u : 0u);
-  if (GetParam() < HEAD) {
+  bool present = GetParam().Any() < HEAD;
+  ASSERT_EQ(library.LookupStruct("Foo")->members.size(), present ? 1u : 0u);
+  if (present) {
     EXPECT_EQ(library.LookupStruct("Foo")->members.front().availability.is_deprecated(),
-              GetParam() >= V2);
+              GetParam().Any() >= V2);
   }
-}
-
-TEST_P(VersioningBasicTest, GoodMemberAddedAndRemovedLegacy) {
-  TestLibrary library(R"FIDL(
-@available(added=1)
-library example;
-
-type Foo = struct {
-    @available(added=1, removed=2, legacy=true)
-    member string;
-};
-)FIDL");
-  library.SelectVersion("example", GetParam());
-  ASSERT_COMPILED(library);
-  EXPECT_EQ(library.LookupStruct("Foo")->members.size(), GetParam() == V1 || GetParam() == LEGACY);
 }
 
 // TODO(https://fxbug.dev/42052719): Generalize this with more comprehensive tests in
@@ -282,7 +238,7 @@ const FOO uint32 = BAR;
 @available(deprecated=1)
 const BAR uint32 = 1;
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
 }
 
@@ -302,11 +258,12 @@ type Bar = struct {
     ensure_split_at_v2 string;
 };
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
-  ASSERT_EQ(library.HasStruct("Bar"), GetParam() <= V2);
-  if (GetParam() <= V2) {
-    EXPECT_EQ(library.LookupStruct("Bar")->members.size(), GetParam() == V1 ? 1u : 2u);
+  bool present = GetParam().Any() <= V2;
+  ASSERT_EQ(library.HasStruct("Bar"), present);
+  if (present) {
+    EXPECT_EQ(library.LookupStruct("Bar")->members.size(), GetParam().All() == V1 ? 1u : 2u);
   }
 }
 
@@ -326,11 +283,12 @@ type Bar = struct {
     ensure_split_at_v2 string;
 };
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
-  ASSERT_EQ(library.HasStruct("Bar"), GetParam() <= V2);
-  if (GetParam() <= V2) {
-    EXPECT_EQ(library.LookupStruct("Bar")->members.size(), GetParam() == V1 ? 1u : 2u);
+  bool present = GetParam().Any() <= V2;
+  ASSERT_EQ(library.HasStruct("Bar"), present);
+  if (present) {
+    EXPECT_EQ(library.LookupStruct("Bar")->members.size(), GetParam().All() == V1 ? 1u : 2u);
   }
 }
 
@@ -357,15 +315,15 @@ type Bar = struct {
     foo box<Foo>;
 };
 )FIDL");
-  library.SelectVersion("example", GetParam());
+  library.SelectVersions("example", GetParam());
   ASSERT_COMPILED(library);
-  ASSERT_EQ(library.HasStruct("Foo"), GetParam() >= V2);
-  ASSERT_EQ(library.HasStruct("Bar"), GetParam() >= V2);
+  ASSERT_EQ(library.HasStruct("Foo"), GetParam().Any() >= V2);
+  ASSERT_EQ(library.HasStruct("Bar"), GetParam().Any() >= V2);
 }
 
 TEST_P(VersioningBasicTest, GoodMultipleLibraries) {
   SharedAmongstLibraries shared;
-  shared.SelectVersion("platform", GetParam());
+  shared.SelectVersions("platform", GetParam());
   TestLibrary dependency(&shared, "dependency.fidl", R"FIDL(
 @available(added=1)
 library platform.dependency;
@@ -388,7 +346,7 @@ type ShouldBeSplit = struct {
 )FIDL");
   ASSERT_COMPILED(example);
   ASSERT_EQ(example.LookupStruct("ShouldBeSplit")->type_shape->inline_size,
-            GetParam() == V1 ? 1u : 16u);
+            GetParam().All() == V1 ? 1u : 16u);
 }
 
 }  // namespace

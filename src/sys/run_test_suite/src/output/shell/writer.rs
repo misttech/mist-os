@@ -4,10 +4,8 @@
 
 use crate::trace::duration;
 use fuchsia_sync::Mutex;
-use std::{
-    io::{Error, Write},
-    sync::Arc,
-};
+use std::io::{Error, Write};
+use std::sync::Arc;
 
 /// A handle around an inner writer. This serves as a "multiplexing" writer that
 /// writes bytes from multiple sources into a single serial destination, typically

@@ -79,7 +79,13 @@ def _fuchsia_board_configuration_impl(ctx):
 
     if ctx.attr.devicetree:
         deps.append(ctx.file.devicetree)
-        board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
+        if ctx.attr.board_bundles_dir:
+            # Relativize the file path to the board file instead of the
+            # workspace root
+            short_dir = board_config_file.short_path.removesuffix(board_config_file.basename)
+            board_config["devicetree"] = ctx.file.devicetree.path.removeprefix(short_dir)
+        else:
+            board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
 
     content = json.encode_indent(board_config, indent = "  ")
     ctx.actions.write(board_config_file, content)

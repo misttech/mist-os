@@ -6,8 +6,7 @@
 //!
 //! Used to load and store keymap configurations from configuration files.
 
-use fidl_fuchsia_input as input;
-use fidl_fuchsia_ui_input3 as input3; // Experimenting with really short aliases.
+use {fidl_fuchsia_input as input, fidl_fuchsia_ui_input3 as input3}; // Experimenting with really short aliases.
 
 /// The data model for a single keymap configuration.
 #[derive(Debug, Clone)]

@@ -10,7 +10,8 @@ pub mod rsne;
 pub mod suite_filter;
 pub mod suite_selector;
 
-pub use {fake_rsnes::*, suite_selector::OUI};
+pub use fake_rsnes::*;
+pub use suite_selector::OUI;
 
 use thiserror::Error;
 

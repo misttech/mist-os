@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
-    security,
-    task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-        fs_node_impl_dir_readonly, parse_i32_file, serialize_i32_file, BytesFile, BytesFileOps,
-        CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
-        DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
-        FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget,
-        SimpleFileNode, StaticDirectory, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
-        VecDirectory, VecDirectoryEntry,
-    },
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE};
+use crate::security;
+use crate::task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
+    fs_node_impl_dir_readonly, parse_i32_file, serialize_i32_file, BytesFile, BytesFileOps,
+    CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget,
+    SimpleFileNode, StaticDirectory, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
+    VecDirectory, VecDirectoryEntry,
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;
@@ -23,22 +21,21 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_uapi::auth::{Credentials, CAP_SYS_RESOURCE};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::{TempRef, WeakRef};
+use starnix_uapi::resource_limits::Resource;
+use starnix_uapi::time::duration_to_scheduler_clock;
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    auth::{Credentials, CAP_SYS_RESOURCE},
-    errno, error,
-    errors::Errno,
-    file_mode::mode,
-    gid_t, off_t,
-    open_flags::OpenFlags,
-    ownership::{TempRef, WeakRef},
-    pid_t,
-    resource_limits::Resource,
-    time::duration_to_scheduler_clock,
-    uapi, uid_t,
-    user_address::UserAddress,
-    OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
+    errno, error, gid_t, off_t, pid_t, uapi, uid_t, OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN,
+    RLIM_INFINITY,
 };
-use std::{borrow::Cow, ffi::CString, sync::Arc};
+use std::borrow::Cow;
+use std::ffi::CString;
+use std::sync::Arc;
 
 /// TaskDirectory delegates most of its operations to StaticDirectory, but we need to override
 /// FileOps::as_pid so that these directories can be used in places that expect a pidfd.
@@ -1126,6 +1123,10 @@ impl DynamicFileSource for StatusFile {
 
         if let Some(task) = task {
             writeln!(sink, "Umask:\t0{:03o}", task.fs().umask().bits())?;
+            let task_state = task.read();
+            writeln!(sink, "SigBlk:\t{:x}", task_state.signal_mask().0)?;
+            writeln!(sink, "SigPnd:\t{:x}", task_state.task_specific_pending_signals().0)?;
+            writeln!(sink, "ShdPnd:\t{:x}", task.thread_group.pending_signals.lock().pending().0)?;
         }
 
         let state_code =

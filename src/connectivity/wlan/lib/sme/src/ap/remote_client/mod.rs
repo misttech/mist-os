@@ -6,22 +6,18 @@ mod state;
 
 use state::*;
 
+use crate::ap::event::{ClientEvent, Event};
+use crate::ap::{aid, Context, MlmeRequest, RsnCfg};
+use ieee80211::{MacAddr, MacAddrBytes};
+use tracing::error;
+use wlan_common::ie::SupportedRate;
+use wlan_common::mac::{Aid, CapabilityInfo};
+use wlan_common::timer::EventId;
+use wlan_rsn::key::exchange::Key;
+use wlan_rsn::key::Tk;
 use {
-    crate::ap::{
-        aid,
-        event::{ClientEvent, Event},
-        Context, MlmeRequest, RsnCfg,
-    },
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
-    ieee80211::{MacAddr, MacAddrBytes},
-    tracing::error,
-    wlan_common::{
-        ie::SupportedRate,
-        mac::{Aid, CapabilityInfo},
-        timer::EventId,
-    },
-    wlan_rsn::key::{exchange::Key, Tk},
 };
 
 pub struct RemoteClient {
@@ -213,15 +209,12 @@ impl RemoteClient {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{test_utils, MlmeSink, MlmeStream},
-        futures::channel::mpsc,
-        lazy_static::lazy_static,
-        wlan_common::{
-            assert_variant, test_utils::fake_features::fake_mac_sublayer_support, timer,
-        },
-    };
+    use super::*;
+    use crate::{test_utils, MlmeSink, MlmeStream};
+    use futures::channel::mpsc;
+    use lazy_static::lazy_static;
+    use wlan_common::test_utils::fake_features::fake_mac_sublayer_support;
+    use wlan_common::{assert_variant, timer};
 
     lazy_static! {
         static ref AP_ADDR: MacAddr = [6u8; 6].into();

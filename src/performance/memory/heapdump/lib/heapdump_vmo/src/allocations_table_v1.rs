@@ -6,10 +6,8 @@ use fuchsia_zircon as zx;
 use static_assertions::const_assert;
 use std::collections::HashSet;
 use std::mem::{align_of, size_of};
-use std::sync::atomic::{
-    AtomicU32,
-    Ordering::{Relaxed, SeqCst},
-};
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 
 use crate::memory_mapped_vmo::{MemoryMappable, MemoryMappedVmo};
 pub use crate::resources_table_v1::ResourceKey;
@@ -373,7 +371,8 @@ impl AllocationsTableReader {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use std::{alloc::Layout, collections::HashMap};
+    use std::alloc::Layout;
+    use std::collections::HashMap;
 
     // Some tests below use this constant to ensure that each bucket is been used at least 10 times.
     const NUM_ITERATIONS: usize = NUM_BUCKETS * 10;

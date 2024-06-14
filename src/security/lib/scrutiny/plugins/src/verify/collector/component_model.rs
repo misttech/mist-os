@@ -2,34 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        core::{
-            collection::{Components, CoreDataDeps, ManifestData, Manifests},
-            package::collector::ROOT_RESOURCE,
-        },
-        verify::collection::V2ComponentModel,
-        zbi::Zbi,
-    },
-    anyhow::{anyhow, Context, Result},
-    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-    cm_config::RuntimeConfig,
-    cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
-    cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration},
-    cm_types::{Name, Url},
-    config_encoder::ConfigFields,
-    fidl::unpersist,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
-    fuchsia_url::{boot_url::BootUrl, AbsoluteComponentUrl},
-    moniker::Moniker,
-    once_cell::sync::Lazy,
-    routing::environment::RunnerRegistry,
-    scrutiny::model::{collector::DataCollector, model::DataModel},
-    serde::{Deserialize, Serialize},
-    serde_json5::from_reader,
-    std::{collections::HashMap, fs::File, path::PathBuf, sync::Arc},
-    tracing::{error, info, warn},
-};
+use crate::core::collection::{Components, CoreDataDeps, ManifestData, Manifests};
+use crate::core::package::collector::ROOT_RESOURCE;
+use crate::verify::collection::V2ComponentModel;
+use crate::zbi::Zbi;
+use anyhow::{anyhow, Context, Result};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
+use cm_config::RuntimeConfig;
+use cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer;
+use cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration};
+use cm_types::{Name, Url};
+use config_encoder::ConfigFields;
+use fidl::unpersist;
+use fuchsia_url::boot_url::BootUrl;
+use fuchsia_url::AbsoluteComponentUrl;
+use moniker::Moniker;
+use once_cell::sync::Lazy;
+use routing::environment::RunnerRegistry;
+use scrutiny::model::collector::DataCollector;
+use scrutiny::model::model::DataModel;
+use serde::{Deserialize, Serialize};
+use serde_json5::from_reader;
+use std::collections::HashMap;
+use std::fs::File;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tracing::{error, info, warn};
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal};
 
 // The default root component URL used to identify the root instance of the component model
 // unless the RuntimeConfig specifies a different root URL.

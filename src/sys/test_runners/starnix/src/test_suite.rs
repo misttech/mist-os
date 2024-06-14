@@ -2,25 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::binder_latency::run_binder_latency,
-    crate::gbenchmark::*,
-    crate::gtest::*,
-    crate::helpers::*,
-    crate::ltp::*,
-    anyhow::{anyhow, Context, Error},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
-    fidl_fuchsia_test::{self as ftest},
-    frunner::ComponentStartInfo,
-    frunner::{ComponentRunnerMarker, ComponentRunnerProxy},
-    fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
-    futures::TryStreamExt,
-    namespace::Namespace,
-    rust_measure_tape_for_case::Measurable as _,
-    test_runners_lib::elf::SuiteServerError,
-    tracing::debug,
-};
+use crate::binder_latency::run_binder_latency;
+use crate::gbenchmark::*;
+use crate::gtest::*;
+use crate::helpers::*;
+use crate::ltp::*;
+use anyhow::{anyhow, Context, Error};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_test::{self as ftest};
+use frunner::{ComponentRunnerMarker, ComponentRunnerProxy, ComponentStartInfo};
+use fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES;
+use futures::TryStreamExt;
+use namespace::Namespace;
+use rust_measure_tape_for_case::Measurable as _;
+use test_runners_lib::elf::SuiteServerError;
+use tracing::debug;
+use {fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata};
 
 /// Determines what type of tests the program is.
 fn get_test_type(program: &fdata::Dictionary) -> Result<TestType, Error> {
@@ -254,11 +251,9 @@ async fn handle_case_iterator(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::{create_request_stream, ClientEnd},
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-    };
+    use super::*;
+    use fidl::endpoints::{create_request_stream, ClientEnd};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     /// Returns a `ftest::CaseIteratorProxy` that is served by `super::handle_case_iterator`.
     ///

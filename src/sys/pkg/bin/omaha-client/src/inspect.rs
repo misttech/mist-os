@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{app_set::FuchsiaAppSet, fidl::State, policy::PolicyConfig};
+use crate::app_set::FuchsiaAppSet;
+use crate::fidl::State;
+use crate::policy::PolicyConfig;
 use chrono::{DateTime, Utc};
 use fuchsia_inspect::{Node, Property, StringProperty};
-use omaha_client::{
-    app_set::AppSet,
-    common::{ProtocolState, UpdateCheckSchedule},
-    configuration::{Config, Updater},
-    protocol::request::OS,
-    state_machine::{update_check, UpdateCheckError},
-};
+use omaha_client::app_set::AppSet;
+use omaha_client::common::{ProtocolState, UpdateCheckSchedule};
+use omaha_client::configuration::{Config, Updater};
+use omaha_client::protocol::request::OS;
+use omaha_client::state_machine::{update_check, UpdateCheckError};
 use std::collections::VecDeque;
 use std::time::SystemTime;
 
@@ -219,18 +219,15 @@ impl PolicyConfigNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        app_set::{AppIdSource, AppMetadata},
-        configuration::get_config,
-    };
+    use crate::app_set::{AppIdSource, AppMetadata};
+    use crate::configuration::get_config;
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
     use fuchsia_inspect::Inspector;
-    use omaha_client::{
-        common::{App, UserCounting},
-        protocol::{request::InstallSource, Cohort},
-        state_machine,
-    };
+    use omaha_client::common::{App, UserCounting};
+    use omaha_client::protocol::request::InstallSource;
+    use omaha_client::protocol::Cohort;
+    use omaha_client::state_machine;
     use std::time::Duration;
 
     #[fasync::run_singlethreaded(test)]

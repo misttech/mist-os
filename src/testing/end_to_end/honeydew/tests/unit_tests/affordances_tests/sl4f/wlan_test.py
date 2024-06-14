@@ -259,11 +259,13 @@ class WlanSL4FTests(unittest.TestCase):
         """Test for Wlan.scan_for_bss_info()."""
         self.sl4f_obj.run.return_value = {
             "result": {
-                "test_bss": {
-                    "bssid": "not_list",
-                    "ies": [1, 2],
-                    "channel": {"primary": 1, "cbw": 0, "secondary80": 1},
-                }
+                "bss1": [
+                    {
+                        "bssid": "not_list",
+                        "ies": [1, 2],
+                        "channel": {"primary": 1, "cbw": 0, "secondary80": 1},
+                    },
+                ],
             }
         }
 
@@ -275,11 +277,13 @@ class WlanSL4FTests(unittest.TestCase):
         """Test for Wlan.scan_for_bss_info()."""
         self.sl4f_obj.run.return_value = {
             "result": {
-                "test_bss": {
-                    "bssid": [1, 2],
-                    "ies": "not_list",
-                    "channel": {"primary": 1, "cbw": 0, "secondary80": 1},
-                }
+                "bss1": [
+                    {
+                        "bssid": [1, 2],
+                        "ies": "not_list",
+                        "channel": {"primary": 1, "cbw": 0, "secondary80": 1},
+                    },
+                ],
             }
         }
 
@@ -291,11 +295,13 @@ class WlanSL4FTests(unittest.TestCase):
         """Test for Wlan.scan_for_bss_info()."""
         self.sl4f_obj.run.return_value = {
             "result": {
-                "test_bss": {
-                    "bssid": [1, 2],
-                    "ies": [1, 2],
-                    "channel": "not_dict",
-                }
+                "bss1": [
+                    {
+                        "bssid": [1, 2],
+                        "ies": [1, 2],
+                        "channel": "not_dict",
+                    },
+                ],
             }
         }
         with self.assertRaises(TypeError):

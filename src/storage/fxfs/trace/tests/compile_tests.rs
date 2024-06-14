@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fxfs_trace::{trace_future_args, TraceFutureExt},
-    std::ops::Range,
-};
+use fxfs_trace::{trace_future_args, TraceFutureExt};
+use std::ops::Range;
 
 #[fuchsia::test]
 fn test_fn_attr_sync() {

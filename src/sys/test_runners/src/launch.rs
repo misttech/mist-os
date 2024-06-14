@@ -4,17 +4,14 @@
 
 //! Helpers for launching components.
 
-use {
-    crate::logs::{create_log_stream, create_std_combined_log_stream, LoggerError, LoggerStream},
-    anyhow::Error,
-    fidl_fuchsia_process as fproc,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_runtime as runtime, fuchsia_zircon as zx,
-    namespace::Namespace,
-    runtime::{HandleInfo, HandleType},
-    thiserror::Error,
-    zx::{AsHandleRef, HandleBased, Process, Rights, Task},
-};
+use crate::logs::{create_log_stream, create_std_combined_log_stream, LoggerError, LoggerStream};
+use anyhow::Error;
+use fuchsia_component::client::connect_to_protocol;
+use namespace::Namespace;
+use runtime::{HandleInfo, HandleType};
+use thiserror::Error;
+use zx::{AsHandleRef, HandleBased, Process, Rights, Task};
+use {fidl_fuchsia_process as fproc, fuchsia_runtime as runtime, fuchsia_zircon as zx};
 
 /// Error encountered while launching a component.
 #[derive(Debug, Error)]
@@ -203,13 +200,13 @@ impl Drop for ScopedJob {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use fidl::endpoints::{create_proxy_and_stream, ClientEnd, Proxy};
+    use fuchsia_runtime::{job_default, process_self, swap_utc_clock_handle};
+    use futures::prelude::*;
     use {
-        super::*,
-        fidl::endpoints::{create_proxy_and_stream, ClientEnd, Proxy},
         fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_runtime::{job_default, process_self, swap_utc_clock_handle},
         fuchsia_zircon as zx,
-        futures::prelude::*,
     };
 
     #[test]

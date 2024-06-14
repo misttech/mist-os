@@ -194,6 +194,10 @@ void SimInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
   auto builder = wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest::Builder(test_arena_);
   if (request->has_peer_sta_address()) {
     builder.peer_sta_address(request->peer_sta_address());
+    const auto& peer_sta_address = request->peer_sta_address().data();
+    if (memcmp(assoc_ctx_.bssid.byte, peer_sta_address, ETH_ALEN) == 0) {
+      assoc_ctx_.state = AssocContext::kNone;
+    }
   }
   stats_.deauth_results.emplace_back(builder.Build());
   completer.buffer(arena).Reply();
@@ -202,6 +206,11 @@ void SimInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
 void SimInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
                              DeauthIndCompleter::Sync& completer) {
   stats_.deauth_indications.push_back(request->ind);
+  const auto& peer_sta_address = request->ind.peer_sta_address.data();
+  if (memcmp(assoc_ctx_.bssid.byte, peer_sta_address, ETH_ALEN) == 0) {
+    assoc_ctx_.state = AssocContext::kNone;
+  }
+
   completer.buffer(arena).Reply();
 }
 
@@ -217,12 +226,14 @@ void SimInterface::DisassocConf(DisassocConfRequestView request, fdf::Arena& are
   const auto disassoc_conf = wlan_fullmac_wire::WlanFullmacImplIfcBaseDisassocConfRequest{
       .resp = {.status = request->resp.status}};
   stats_.disassoc_results.emplace_back(disassoc_conf);
+  assoc_ctx_.state = AssocContext::kNone;
   completer.buffer(arena).Reply();
 }
 
 void SimInterface::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
                                DisassocIndCompleter::Sync& completer) {
   stats_.disassoc_indications.push_back(request->ind);
+  assoc_ctx_.state = AssocContext::kNone;
   completer.buffer(arena).Reply();
 }
 
@@ -578,6 +589,19 @@ zx_status_t SimTest::Init() {
   auto result = client_.buffer(test_arena_)->GetSupportedMacRoles();
   EXPECT_TRUE(result.ok());
 
+  return ZX_OK;
+}
+
+zx_status_t SimTest::CreateFactoryClient() {
+  // Connect to the service (device connector) provided by the devfs node
+  zx::result conn_status = node_server_.SyncCall([](fdf_testing::TestNode* root_node) {
+    return root_node->children().at("factory-broadcom").ConnectToDevice();
+  });
+  EXPECT_EQ(ZX_OK, conn_status.status_value());
+  // Bind to the client end
+  fidl::ClientEnd<fuchsia_factory_wlan::Iovar> client_end(std::move(conn_status.value()));
+  factory_client_.Bind(std::move(client_end));
+  EXPECT_EQ(true, factory_client_.is_valid());
   return ZX_OK;
 }
 

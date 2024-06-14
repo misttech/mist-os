@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        data::{self, Data, LazyNode},
-        metrics::Metrics,
-        PUPPET_MONIKER,
-    },
-    anyhow::{format_err, Error},
-    fidl_diagnostics_validate as validate, fidl_fuchsia_inspect as fidl_inspect,
-    fuchsia_component::client as fclient,
-    fuchsia_zircon::{self as zx, Vmo},
-    serde::Serialize,
-};
+use super::data::{self, Data, LazyNode};
+use super::metrics::Metrics;
+use super::PUPPET_MONIKER;
+use anyhow::{format_err, Error};
+use fuchsia_component::client as fclient;
+use fuchsia_zircon::{self as zx, Vmo};
+use serde::Serialize;
+use {fidl_diagnostics_validate as validate, fidl_fuchsia_inspect as fidl_inspect};
 
 pub const VMO_SIZE: u64 = 4096;
 
@@ -200,22 +196,20 @@ impl Connection {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use {
-        super::*,
-        crate::create_node,
-        anyhow::Context as _,
-        fidl::endpoints::{create_proxy, RequestStream, ServerEnd},
-        fidl_diagnostics_validate::{
-            Action, CreateNode, CreateNumericProperty, InspectPuppetMarker, InspectPuppetRequest,
-            InspectPuppetRequestStream, Options, TestResult, Value, ROOT_ID,
-        },
-        fuchsia_async as fasync,
-        fuchsia_inspect::{Inspector, InspectorConfig, IntProperty, Node},
-        fuchsia_zircon::HandleBased,
-        futures::prelude::*,
-        std::collections::HashMap,
-        tracing::info,
+    use super::*;
+    use crate::create_node;
+    use anyhow::Context as _;
+    use fidl::endpoints::{create_proxy, RequestStream, ServerEnd};
+    use fidl_diagnostics_validate::{
+        Action, CreateNode, CreateNumericProperty, InspectPuppetMarker, InspectPuppetRequest,
+        InspectPuppetRequestStream, Options, TestResult, Value, ROOT_ID,
     };
+    use fuchsia_async as fasync;
+    use fuchsia_inspect::{Inspector, InspectorConfig, IntProperty, Node};
+    use fuchsia_zircon::HandleBased;
+    use futures::prelude::*;
+    use std::collections::HashMap;
+    use tracing::info;
 
     #[fuchsia::test]
     async fn test_fidl_loopback() -> Result<(), Error> {

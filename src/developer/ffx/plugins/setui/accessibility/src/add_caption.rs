@@ -7,8 +7,7 @@ use ffx_setui_accessibility_args::CaptionArgs;
 use fidl_fuchsia_settings::{
     AccessibilityProxy, AccessibilitySettings, CaptionFontStyle, CaptionsSettings,
 };
-use utils::handle_mixed_result;
-use utils::{Either, WatchOrSetResult};
+use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 pub async fn add_caption<W: std::io::Write>(
     accessibility_proxy: AccessibilityProxy,

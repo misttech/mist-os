@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    geometry::IntVector,
-    input::{mouse, touch, Button, ButtonSet, DeviceId, Event, EventType},
-    IntPoint, IntSize,
-};
-use euclid::{default::Transform2D, point2};
+use crate::geometry::IntVector;
+use crate::input::{mouse, touch, Button, ButtonSet, DeviceId, Event, EventType};
+use crate::{IntPoint, IntSize};
+use euclid::default::Transform2D;
+use euclid::point2;
 use fidl_fuchsia_ui_pointer::{EventPhase, MouseEvent, TouchEvent};
 use std::collections::HashSet;
 

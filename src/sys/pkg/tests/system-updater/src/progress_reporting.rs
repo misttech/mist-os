@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*,
-    assert_matches::assert_matches,
-    fidl_fuchsia_update_installer_ext::{
-        monitor_update, Progress, State, StateId, UpdateInfo, UpdateInfoAndProgress,
-    },
-    pretty_assertions::assert_eq,
+use super::*;
+use assert_matches::assert_matches;
+use fidl_fuchsia_update_installer_ext::{
+    monitor_update, Progress, State, StateId, UpdateInfo, UpdateInfoAndProgress,
 };
+use pretty_assertions::assert_eq;
 
 #[fasync::run_singlethreaded(test)]
 async fn progress_reporting_fetch_multiple_packages() {
@@ -292,13 +290,11 @@ pub fn _assert_failure_monitor_states(states: Vec<State>, ordering: Vec<StateId>
 }
 
 mod util {
-    use {
-        fidl_fuchsia_update_installer_ext::{
-            PrepareFailureReason, Progress, State, StateId, UpdateInfo, UpdateInfoAndProgress,
-        },
-        std::collections::HashSet,
-        thiserror::Error,
+    use fidl_fuchsia_update_installer_ext::{
+        PrepareFailureReason, Progress, State, StateId, UpdateInfo, UpdateInfoAndProgress,
     };
+    use std::collections::HashSet;
+    use thiserror::Error;
 
     #[derive(Debug, Error, PartialEq)]
     pub enum VerifyMonitorStatesError {

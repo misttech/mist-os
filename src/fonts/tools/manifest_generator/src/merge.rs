@@ -4,12 +4,11 @@
 
 //! Traits for mergeable structs and collections of font metadata.
 
-use {
-    anyhow::Error,
-    itertools::Itertools,
-    std::{fmt::Debug, hash::Hash},
-    thiserror::Error,
-};
+use anyhow::Error;
+use itertools::Itertools;
+use std::fmt::Debug;
+use std::hash::Hash;
+use thiserror::Error;
 
 /// Indicates that multiple items that implement this trait should be merged if they all have the
 /// same key.

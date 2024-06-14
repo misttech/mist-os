@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_wlan_policy as wlan_policy,
-    percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS},
-    serde::{Deserialize, Serialize},
-};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_wlan_policy as wlan_policy;
+use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 struct WlanConfigDump {
@@ -153,7 +151,8 @@ pub fn deserialize_saved_networks(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, ieee80211::Ssid};
+    use super::*;
+    use ieee80211::Ssid;
 
     fn generate_test_data() -> (String, Vec<wlan_policy::NetworkConfig>) {
         let serialized = "{%22version%22:1,%22data%22:[{%22ssid%22:[84,101,115,116,87,76,65,78,49],%22credential%22:{%22Password%22:[49,50,51,52,53,54,55,56]},%22security_type%22:%22Wpa2%22}]}".to_string();

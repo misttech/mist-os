@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_ui_pointerinjector as pointerinjector, fuchsia_zircon::Time};
+use fidl_fuchsia_ui_pointerinjector as pointerinjector;
+use fuchsia_zircon::Time;
 
 /// State tracking for touch events. Touch events follow a cycle of states:
 /// Add -> Change -> Remove -> Add -> ...

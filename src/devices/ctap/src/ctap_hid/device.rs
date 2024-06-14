@@ -2,27 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::ctap_hid::connection::{Connection, FidlConnection},
-    crate::ctap_hid::message::Message,
-    crate::CtapDevice,
-    anyhow::{format_err, Context, Error},
-    async_trait::async_trait,
-    bitfield::bitfield,
-    bytes::{Buf, BufMut, Bytes, BytesMut},
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_fido_report::{CtapHidCommand, SecurityKeyDeviceMarker},
-    fidl_fuchsia_io as fio,
-    fuchsia_async::{Time, TimeoutExt},
-    fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    futures::TryFutureExt,
-    lazy_static::lazy_static,
-    rand::{rngs::OsRng, Rng},
-    std::io::Read,
-    std::path::PathBuf,
-    tracing::{info, warn},
-};
+use crate::ctap_hid::connection::{Connection, FidlConnection};
+use crate::ctap_hid::message::Message;
+use crate::CtapDevice;
+use anyhow::{format_err, Context, Error};
+use async_trait::async_trait;
+use bitfield::bitfield;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_fido_report::{CtapHidCommand, SecurityKeyDeviceMarker};
+use fuchsia_async::{Time, TimeoutExt};
+use futures::lock::Mutex;
+use futures::TryFutureExt;
+use lazy_static::lazy_static;
+use rand::rngs::OsRng;
+use rand::Rng;
+use std::io::Read;
+use std::path::PathBuf;
+use tracing::{info, warn};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// The broadcast channel to use for the initial init request, as defined in the CTAP HID spec.
 const INIT_CHANNEL: u32 = 0xffffffff;

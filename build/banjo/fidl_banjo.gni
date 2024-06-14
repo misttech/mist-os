@@ -21,7 +21,7 @@ template("_fidl_banjo_c") {
   c_header_include_base = "${fidl_gen_dir}/c"
   c_header_file = "$c_header_include_base/$c_header_path/c/banjo.h"
 
-  if (current_toolchain == fidl_toolchain) {
+  if (is_fidl_toolchain) {
     # Run fidlgen_banjo on the IR and generate C code.
     compiled_action(c_fidlgen_target_name) {
       forward_variables_from(invoker, [ "testonly" ])
@@ -114,7 +114,7 @@ template("_fidl_banjo_cpp") {
       "$cpp_header_include_base/$cpp_header_path/cpp/banjo-internal.h"
   cpp_mock_file = "$cpp_header_include_base/$cpp_header_path/cpp/banjo-mock.h"
 
-  if (current_toolchain == fidl_toolchain) {
+  if (is_fidl_toolchain) {
     # Run fidlgen_banjo on the IR and generate C++ code.
     compiled_action(cpp_public_fidlgen_target_name) {
       forward_variables_from(invoker, [ "testonly" ])
@@ -290,7 +290,7 @@ template("_fidl_banjo_rust") {
   rust_file_name = "$rust_library_name.rs"
   rust_source_file = "${fidl_gen_dir}/rust/$rust_file_name"
 
-  if (current_toolchain == fidl_toolchain) {
+  if (is_fidl_toolchain) {
     # Run fidlgen_banjo on the IR and generate Rust code.
     compiled_action(rust_fidlgen_target_name) {
       forward_variables_from(invoker, [ "testonly" ])
@@ -412,7 +412,7 @@ template("fidl_banjo") {
 
   _fidl_banjo_cpp("${target_name}_cpp") {
     forward_variables_from(params, "*")
-    if (current_toolchain != fidl_toolchain) {
+    if (!is_fidl_toolchain) {
       forward_variables_from(invoker, [ "sdk_category" ])
     }
   }

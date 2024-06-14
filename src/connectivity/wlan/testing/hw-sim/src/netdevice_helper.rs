@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::{create_proxy, Proxy},
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    futures::{FutureExt as _, StreamExt as _, TryStreamExt as _},
-    std::pin::pin,
-    wlan_common::{appendable::Appendable, big_endian::BigEndianU16, mac},
-};
+use fidl::endpoints::{create_proxy, Proxy};
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
+use std::pin::pin;
+use wlan_common::appendable::Appendable;
+use wlan_common::big_endian::BigEndianU16;
+use wlan_common::mac;
 
 /// Returns a Netdevice client with the specified MAC address, or None if none is found.
 pub async fn create_client(

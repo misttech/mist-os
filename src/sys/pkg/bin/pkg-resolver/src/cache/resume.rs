@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{BlobFetchParams, FetchError, FetchStats},
-    anyhow::anyhow,
-    fuchsia_async::TimeoutExt as _,
-    futures::{
-        future::TryFutureExt as _,
-        stream::{Stream, TryStreamExt as _},
-    },
-    hyper::{body::HttpBody, Body, Request, StatusCode},
-    std::{convert::TryInto as _, str::FromStr},
-    tracing::warn,
-};
+use super::{BlobFetchParams, FetchError, FetchStats};
+use anyhow::anyhow;
+use fuchsia_async::TimeoutExt as _;
+use futures::future::TryFutureExt as _;
+use futures::stream::{Stream, TryStreamExt as _};
+use hyper::body::HttpBody;
+use hyper::{Body, Request, StatusCode};
+use std::convert::TryInto as _;
+use std::str::FromStr;
+use tracing::warn;
 
 // On success, returns the Content-Length of the resource, as determined by the first GET,
 // and a Stream of the content.
@@ -258,7 +256,8 @@ impl FromStr for HttpContentRange {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn parse_http_byte_range_success() {

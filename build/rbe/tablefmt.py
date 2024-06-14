@@ -13,7 +13,7 @@ import sys
 from typing import Any, Iterable, Sequence
 
 
-def create_row(num_cols: int, init=None) -> Sequence[Any]:
+def create_row(num_cols: int, init: Any = None) -> list[Any]:
     """Create and populate one row with initial values."""
     # Use list comprehension instead of list replication to avoid referencing
     # the same object from each cell.
@@ -21,8 +21,8 @@ def create_row(num_cols: int, init=None) -> Sequence[Any]:
 
 
 def create_table(
-    num_rows: int, num_cols: int, init=None
-) -> Sequence[Sequence[Any]]:
+    num_rows: int, num_cols: int, init: Any = None
+) -> list[list[Any]]:
     """Create and populate a sized table with initial values."""
     # Use list comprehension instead of list replication to avoid referencing
     # the same object from each cell.
@@ -45,11 +45,12 @@ def human_readable_size(
     Returns:
       formatted number (str)
     """
+    size_float = float(size)
     for suffix in ["", "Ki", "Mi", "Gi", "Ti", "Pi"]:
-        if size < 1024.0 or suffix == "Pi":
+        if size_float < 1024.0 or suffix == "Pi":
             break
-        size /= 1024.0
-    return f"{size:.{decimal_places}f} {suffix}{unit}"
+        size_float = size_float / 1024
+    return f"{size_float:.{decimal_places}f} {suffix}{unit}"
 
 
 def auto_size_column_widths(table: Sequence[Sequence[Any]]) -> Sequence[int]:
@@ -69,7 +70,7 @@ def auto_size_column_widths(table: Sequence[Sequence[Any]]) -> Sequence[int]:
 
 def make_table_header(columns: Sequence[str], title: str = "") -> Sequence[str]:
     """Build a table row that can be used as a table header."""
-    return [title] + columns
+    return [title] + list(columns)
 
 
 def make_separator_row(
@@ -97,7 +98,7 @@ def make_row_formatter(
     )
 
 
-def format_numeric_table(table: Sequence[Sequence[str]]) -> Iterable[str]:
+def format_numeric_table(table: Sequence[Sequence[str | int]]) -> Iterable[str]:
     # Format table using fitted column widths.
     column_widths = auto_size_column_widths(table)
     alignments = ["<"] + [">"] * (

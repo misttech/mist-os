@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    epoch::EpochFile,
-    std::fs::{read_to_string, File},
-};
+use anyhow::{Context, Error};
+use epoch::EpochFile;
+use std::fs::{read_to_string, File};
 
 mod args;
 mod history;
 
-use {args::Args, history::History};
+use args::Args;
+use history::History;
 
 fn main() -> Result<(), Error> {
     let args: Args = argh::from_env();

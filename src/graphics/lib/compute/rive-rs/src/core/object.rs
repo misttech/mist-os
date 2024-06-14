@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    any::{self, Any, TypeId},
-    fmt, hash,
-    marker::PhantomData,
-    ops::Deref,
-    rc::{Rc, Weak},
-};
+use std::any::{self, Any, TypeId};
+use std::marker::PhantomData;
+use std::ops::Deref;
+use std::rc::{Rc, Weak};
+use std::{fmt, hash};
 
-use crate::{
-    core::{Cast, Core, CoreContext, OnAdded},
-    importers::ImportStack,
-    status_code::StatusCode,
-};
+use crate::core::{Cast, Core, CoreContext, OnAdded};
+use crate::importers::ImportStack;
+use crate::status_code::StatusCode;
 
 fn any_type_name<T: Any>() -> &'static str {
     any::type_name::<T>().rsplit("::").next().unwrap()

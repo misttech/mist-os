@@ -4,19 +4,20 @@
 
 use anyhow::Error;
 use fidl::endpoints::{ControlHandle, RequestStream};
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_memory_attribution as fattribution;
-use fidl_fuchsia_settings as fsettings;
-use fidl_fuchsia_starnix_runner as fstarnixrunner;
-use fuchsia_component::{client::connect_to_protocol_sync, server::ServiceFs};
+use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 use fuchsia_zircon::{HandleBased, Task};
 use futures::{StreamExt, TryStreamExt};
 use kernel_manager::StarnixKernel;
 use std::sync::Arc;
 use tracing::{info, warn};
 use zx::AsHandleRef;
+use {
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_memory_attribution as fattribution,
+    fidl_fuchsia_settings as fsettings, fidl_fuchsia_starnix_runner as fstarnixrunner,
+    fuchsia_zircon as zx,
+};
 
 mod kernels;
 use crate::kernels::Kernels;

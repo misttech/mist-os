@@ -15,9 +15,10 @@ if (is_host) {
     transport = "fuchsia-controller"
     environments = [ vim3_env ]
   }
+}
 
-  group("tests") {
-    testonly = true
-    public_deps = [ ":rtc_test_fc($host_toolchain)" ]
-  }
+# Group containing all of the RTC affordance functional test cases and its dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [ ":rtc_test_fc($host_toolchain)" ]
 }

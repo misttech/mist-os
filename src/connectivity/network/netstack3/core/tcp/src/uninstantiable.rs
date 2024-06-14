@@ -8,12 +8,10 @@ use explicit::UnreachableExt as _;
 
 use netstack3_base::{CounterContext, Uninstantiable, UninstantiableWrapper, WeakDeviceIdentifier};
 
-use crate::internal::{
-    base::TcpCounters,
-    socket::{
-        AsThisStack, DemuxState, DualStackBaseIpExt, DualStackDemuxIdConverter, DualStackIpExt,
-        TcpBindingsTypes, TcpDemuxContext, TcpDualStackContext, TcpSocketId,
-    },
+use crate::internal::base::TcpCounters;
+use crate::internal::socket::{
+    AsThisStack, DemuxState, DualStackBaseIpExt, DualStackDemuxIdConverter, DualStackIpExt,
+    TcpBindingsTypes, TcpDemuxContext, TcpDualStackContext, TcpSocketId,
 };
 
 impl<

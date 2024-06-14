@@ -7,7 +7,8 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 use crate::vfs::FsStr;
 use starnix_syscalls::{SyscallArg, SyscallResult};
-use starnix_uapi::{errno, errors::Errno, AT_FDCWD};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{errno, AT_FDCWD};
 
 // NB: We believe deriving Default (i.e., have a default FdNumber of 0) will be error-prone.
 #[derive(

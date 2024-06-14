@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use async_trait::async_trait;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon::{Duration, Status as zx_status};
 #[cfg(test)]
 use mockall::automock;
-use {
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_hardware_power_statecontrol as powercontrol, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon::{Duration, Status as zx_status},
-};
+use {fidl_fuchsia_hardware_power_statecontrol as powercontrol, fuchsia_async as fasync};
 
 #[cfg_attr(test, automock)]
 #[async_trait(?Send)]
@@ -56,10 +54,10 @@ impl RebootHandler for RebootImpl {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_hardware_power_statecontrol as powercontrol;
-    use fuchsia_async as fasync;
     use fuchsia_async::TimeoutExt;
-    use futures::{channel::mpsc, StreamExt, TryStreamExt};
+    use futures::channel::mpsc;
+    use futures::{StreamExt, TryStreamExt};
+    use {fidl_fuchsia_hardware_power_statecontrol as powercontrol, fuchsia_async as fasync};
 
     // Reboot tests - this functionality is only exercised in recovery OTA flows.
     fn create_mock_powercontrol_server(

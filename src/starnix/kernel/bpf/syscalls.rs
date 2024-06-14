@@ -5,21 +5,21 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use crate::{
-    bpf::{
-        fs::{get_bpf_object, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle},
-        map::Map,
-        program::{Program, ProgramInfo},
-    },
-    mm::{MemoryAccessor, MemoryAccessorExt},
-    task::CurrentTask,
-    vfs::{Anon, FdFlags, FdNumber, LookupContext, OutputBuffer, UserBuffersOutputBuffer},
-};
+use crate::bpf::fs::{get_bpf_object, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle};
+use crate::bpf::map::Map;
+use crate::bpf::program::{Program, ProgramInfo};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::task::CurrentTask;
+use crate::vfs::{Anon, FdFlags, FdNumber, LookupContext, OutputBuffer, UserBuffersOutputBuffer};
 use ebpf::MapSchema;
 use smallvec::smallvec;
 use starnix_logging::{log_error, log_trace, track_stub};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::{
     bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
     bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5, bpf_attr__bindgen_ty_9,
@@ -37,12 +37,7 @@ use starnix_uapi::{
     bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_cmd_BPF_PROG_RUN,
     bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_insn, bpf_map_info,
     bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info, errno,
-    error,
-    errors::Errno,
-    open_flags::OpenFlags,
-    user_address::{UserAddress, UserCString, UserRef},
-    user_buffer::UserBuffer,
-    BPF_F_RDONLY_PROG, PATH_MAX,
+    error, BPF_F_RDONLY_PROG, PATH_MAX,
 };
 use zerocopy::{AsBytes, FromBytes};
 

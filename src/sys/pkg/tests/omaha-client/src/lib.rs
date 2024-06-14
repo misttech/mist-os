@@ -4,59 +4,55 @@
 
 #![allow(clippy::let_unit_value)]
 #![cfg(test)]
+use anyhow::anyhow;
+use assert_matches::assert_matches;
+use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, TreeAssertion};
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use diagnostics_reader::{ArchiveReader, Inspect};
+use fidl_fuchsia_feedback::FileReportResults;
+use fidl_fuchsia_pkg::{self as fpkg, PackageCacheRequestStream, PackageResolverRequestStream};
+use fidl_fuchsia_update::{
+    AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream,
+    CheckNotStartedReason, CheckOptions, CheckingForUpdatesData, CommitStatusProviderMarker,
+    CommitStatusProviderProxy, ErrorCheckingForUpdateData, Initiator, InstallationDeferralReason,
+    InstallationDeferredData, InstallationErrorData, InstallationProgress, InstallingData,
+    ManagerMarker, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
+    NoUpdateAvailableData, State, UpdateInfo,
+};
+use fidl_fuchsia_update_channelcontrol::{ChannelControlMarker, ChannelControlProxy};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_pkg_testing::{make_current_epoch_json, make_packages_json};
+use fuchsia_sync::Mutex;
+use fuchsia_url::{PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl};
+use futures::channel::{mpsc, oneshot};
+use futures::prelude::*;
+use mock_boot_arguments::MockBootArgumentsService;
+use mock_crash_reporter::{CrashReport, MockCrashReporterService, ThrottleHook};
+use mock_installer::MockUpdateInstallerService;
+use mock_omaha_server::{
+    OmahaResponse, OmahaServer, OmahaServerBuilder, PrivateKeyAndId, PrivateKeys,
+    ResponseAndMetadata,
+};
+use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
+use mock_reboot::{MockRebootService, RebootReason};
+use mock_resolver::MockResolverService;
+use mock_verifier::MockVerifierService;
+use omaha_client::cup_ecdsa::test_support::{
+    make_default_private_key_for_test, RAW_PUBLIC_KEY_FOR_TEST,
+};
+use serde_json::json;
+use std::collections::HashMap;
+use std::fs::{self, create_dir};
+use std::path::PathBuf;
+use std::sync::Arc;
+use tempfile::TempDir;
 use {
-    anyhow::anyhow,
-    assert_matches::assert_matches,
-    diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, TreeAssertion},
-    diagnostics_hierarchy::DiagnosticsHierarchy,
-    diagnostics_reader::{ArchiveReader, Inspect},
-    fidl_fuchsia_boot as fboot,
-    fidl_fuchsia_feedback::FileReportResults,
-    fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_paver as fpaver,
-    fidl_fuchsia_pkg::{self as fpkg, PackageCacheRequestStream, PackageResolverRequestStream},
-    fidl_fuchsia_update::{
-        AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream,
-        CheckNotStartedReason, CheckOptions, CheckingForUpdatesData, CommitStatusProviderMarker,
-        CommitStatusProviderProxy, ErrorCheckingForUpdateData, Initiator,
-        InstallationDeferralReason, InstallationDeferredData, InstallationErrorData,
-        InstallationProgress, InstallingData, ManagerMarker, ManagerProxy, MonitorMarker,
-        MonitorRequest, MonitorRequestStream, NoUpdateAvailableData, State, UpdateInfo,
-    },
-    fidl_fuchsia_update_channelcontrol::{ChannelControlMarker, ChannelControlProxy},
-    fidl_fuchsia_update_installer as finstaller, fidl_fuchsia_update_installer_ext as installer,
-    fidl_fuchsia_update_verify as fupdate_verify, fuchsia_async as fasync,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_pkg_testing::{make_current_epoch_json, make_packages_json},
-    fuchsia_sync::Mutex,
-    fuchsia_url::{PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl},
-    fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        prelude::*,
-    },
-    mock_boot_arguments::MockBootArgumentsService,
-    mock_crash_reporter::{CrashReport, MockCrashReporterService, ThrottleHook},
-    mock_installer::MockUpdateInstallerService,
-    mock_omaha_server::{
-        OmahaResponse, OmahaServer, OmahaServerBuilder, PrivateKeyAndId, PrivateKeys,
-        ResponseAndMetadata,
-    },
-    mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent},
-    mock_reboot::{MockRebootService, RebootReason},
-    mock_resolver::MockResolverService,
-    mock_verifier::MockVerifierService,
-    omaha_client::cup_ecdsa::test_support::{
-        make_default_private_key_for_test, RAW_PUBLIC_KEY_FOR_TEST,
-    },
-    serde_json::json,
-    std::{
-        collections::HashMap,
-        fs::{self, create_dir},
-        path::PathBuf,
-        sync::Arc,
-    },
-    tempfile::TempDir,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
+    fidl_fuchsia_paver as fpaver, fidl_fuchsia_update_installer as finstaller,
+    fidl_fuchsia_update_installer_ext as installer, fidl_fuchsia_update_verify as fupdate_verify,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 const OMAHA_CLIENT_CML: &str = "#meta/omaha-client-service.cm";

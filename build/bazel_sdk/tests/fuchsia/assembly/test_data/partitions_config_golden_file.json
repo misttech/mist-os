@@ -1,7 +1,7 @@
 {
   "bootloader_partitions": [
     {
-      "image": "fuchsia/assembly/test_data/u-boot.bin.signed.test-b4",
+      "image": "bootloaders/u-boot.bin.signed.test-b4",
       "name": "bootloader",
       "type": "skip_metadata"
     }
@@ -12,7 +12,7 @@
         "value": "0xe9000000",
         "variable": "emmc-total-bytes"
       },
-      "image": "fuchsia/assembly/test_data/gpt.fuchsia.3776.bin",
+      "image": "bootstrap/gpt.fuchsia.3776.bin",
       "name": "gpt"
     },
     {
@@ -20,7 +20,7 @@
         "value": "0xe9000000",
         "variable": "emmc-total-bytes"
       },
-      "image": "fuchsia/assembly/test_data/gpt.fuchsia.3728.bin",
+      "image": "bootstrap/gpt.fuchsia.3728.bin",
       "name": "gpt"
     }
   ],
@@ -42,6 +42,6 @@
     }
   ],
   "unlock_credentials": [
-    "fuchsia/assembly/test_data/unlock-creds.zip"
+    "credentials/unlock-creds.zip"
   ]
 }

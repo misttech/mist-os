@@ -26,13 +26,13 @@ use packet::{
     BufferView, FragmentedBytesMut, InnerPacketBuilder, PacketBuilder, PacketConstraints,
     ParsablePacket, ParseMetadata, SerializeTarget,
 };
-use std::{io::Write as _, num::NonZeroU16, str::FromStr};
+use std::io::Write as _;
+use std::num::NonZeroU16;
+use std::str::FromStr;
 use thiserror::Error;
 use witness::NonEmptyValidStr;
-use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
-    Ref, Unaligned,
-};
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 /// The port netsvc uses to send TFTP traffic from.
 pub const OUTGOING_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33340));

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::platform::PlatformServices,
-    anyhow::{anyhow, Error},
-    fidl_fuchsia_virtualization::{GuestManagerProxy, GuestStatus},
-    guest_cli_args as arguments,
-    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
-    std::fmt,
-};
+use crate::platform::PlatformServices;
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_virtualization::{GuestManagerProxy, GuestStatus};
+use guest_cli_args as arguments;
+use prettytable::format::consts::FORMAT_CLEAN;
+use prettytable::{cell, row, Table};
+use std::fmt;
 
 fn guest_status_to_string(status: GuestStatus) -> &'static str {
     match status {
@@ -270,16 +269,14 @@ pub async fn handle_list<P: PlatformServices>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_net::MacAddress,
-        fidl_fuchsia_virtualization::{
-            GuestDescriptor, GuestError, GuestInfo, GuestManagerMarker, NetSpec,
-        },
-        fuchsia_async as fasync,
-        futures::StreamExt,
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_net::MacAddress;
+    use fidl_fuchsia_virtualization::{
+        GuestDescriptor, GuestError, GuestInfo, GuestManagerMarker, NetSpec,
     };
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
 
     fn serve_mock_manager(response: Option<GuestInfo>) -> GuestManagerProxy {
         let (proxy, mut stream) = create_proxy_and_stream::<GuestManagerMarker>()

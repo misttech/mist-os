@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    check::{summarize_results, PreflightCheck, PreflightCheckResult, RunSummary},
-    config::*,
-    errors::ffx_bail,
-    ffx_core::ffx_plugin,
-    ffx_preflight_args::PreflightCommand,
-    regex::Regex,
-    std::fmt,
-    std::io::{stdout, Write},
-    termion::color,
-};
+use anyhow::{anyhow, Result};
+use check::{summarize_results, PreflightCheck, PreflightCheckResult, RunSummary};
+use config::*;
+use errors::ffx_bail;
+use ffx_core::ffx_plugin;
+use ffx_preflight_args::PreflightCommand;
+use regex::Regex;
+use std::fmt;
+use std::io::{stdout, Write};
+use termion::color;
 
 mod analytics;
 mod check;
@@ -193,7 +191,9 @@ impl fmt::Display for PreflightCheckResult {
 
 #[cfg(test)]
 mod test {
-    use {super::*, crate::command_runner::ExitStatus, async_trait::async_trait};
+    use super::*;
+    use crate::command_runner::ExitStatus;
+    use async_trait::async_trait;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_parse_macos_version() -> Result<()> {

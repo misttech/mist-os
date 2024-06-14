@@ -11,8 +11,9 @@ use fuchsia_stream_processors::*;
 use hex::{decode, encode};
 use mundane::hash::{Digest, Hasher, Sha256};
 use num_traits::PrimInt;
+use std::fmt;
 use std::io::Write;
-use std::{fmt, rc::Rc};
+use std::rc::Rc;
 use tracing::info;
 
 #[derive(ValidFidlTable, Debug, PartialEq)]

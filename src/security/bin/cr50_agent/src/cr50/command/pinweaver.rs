@@ -13,10 +13,8 @@ use num_traits::FromPrimitive;
 use std::marker::PhantomData;
 use tracing::warn;
 
-use crate::{
-    cr50::command::{Deserializable, Header, Serializable, Subcommand, TpmRequest},
-    util::{DeserializeError, Deserializer, Serializer},
-};
+use crate::cr50::command::{Deserializable, Header, Serializable, Subcommand, TpmRequest};
+use crate::util::{DeserializeError, Deserializer, Serializer};
 
 /// Pinweaver protocol version.
 pub const PROTOCOL_VERSION: u8 = 1;

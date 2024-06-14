@@ -49,8 +49,10 @@ def main():
 
     config = {
         "bootloader_partitions": partitions,
+        "bootstrap_partitions": [],
         "hardware_revision": args.hardware_revision,
         "partitions": [],
+        "unlock_credentials": [],
     }
 
     with open(args.output, "w") as f:

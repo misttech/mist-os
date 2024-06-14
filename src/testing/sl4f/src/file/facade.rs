@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
 use serde_json::{to_value, Value};
-use std::{fs, io, path::Path};
+use std::path::Path;
+use std::{fs, io};
 
 use super::types::*;
 

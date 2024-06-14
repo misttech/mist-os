@@ -4,8 +4,10 @@
 
 use fidl_fuchsia_inspect::{TreeMarker, TreeProxy};
 use fuchsia_inspect::Inspector;
-use futures::{future::BoxFuture, FutureExt};
-use inspect_runtime::{service::handle_request_stream, TreeServerSendPreference};
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use inspect_runtime::service::handle_request_stream;
+use inspect_runtime::TreeServerSendPreference;
 
 /// Spawns a tree server for the test purposes.
 pub fn spawn_server(

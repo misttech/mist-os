@@ -4,18 +4,13 @@
 
 //! A task that is run to process communication with an individual watcher.
 
-use crate::{
-    directory::{entry_container::DirectoryWatcher, watchers::event_producers::EventProducer},
-    execution_scope::ExecutionScope,
-};
+use crate::directory::entry_container::DirectoryWatcher;
+use crate::directory::watchers::event_producers::EventProducer;
+use crate::execution_scope::ExecutionScope;
 
-use {
-    fidl_fuchsia_io as fio,
-    futures::{
-        channel::mpsc::{self, UnboundedSender},
-        select, FutureExt,
-    },
-};
+use fidl_fuchsia_io as fio;
+use futures::channel::mpsc::{self, UnboundedSender};
+use futures::{select, FutureExt};
 
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::MessageBuf;

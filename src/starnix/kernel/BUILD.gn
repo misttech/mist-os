@@ -48,6 +48,7 @@ rustc_binary("starnix_kernel_bin") {
     ":starnix_kernel_runner",
     ":starnix_logging",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
+    "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//src/graphics/lib/magma/src/libmagma",
@@ -168,6 +169,7 @@ rustc_library("starnix_core") {
     "fs/tracefs/tracing_directory.rs",
     "lib.rs",
     "loader.rs",
+    "memory_attribution/mod.rs",
     "mm/futex_table.rs",
     "mm/memory_manager.rs",
     "mm/mod.rs",
@@ -300,6 +302,7 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
+    "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
@@ -349,6 +352,7 @@ rustc_library("starnix_core") {
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/vulkan",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/performance/memory/attribution",
     "//src/starnix/kernel/device/fidl:fuchsia.starnix.device_rust",
     "//src/starnix/lib/ebpf",
     "//src/starnix/lib/extended_pstate:lib",
@@ -473,6 +477,7 @@ rustc_library("starnix_kernel_runner") {
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
@@ -501,6 +506,7 @@ rustc_library("starnix_kernel_runner") {
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]

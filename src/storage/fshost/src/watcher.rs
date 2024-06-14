@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::device::{BlockDevice, Device, NandDevice},
-    anyhow::{Context as _, Error},
-    assert_matches::assert_matches,
-    fuchsia_async as fasync,
-    futures::{channel::mpsc, lock::Mutex, stream, SinkExt, StreamExt},
-    std::sync::Arc,
-};
+use crate::device::{BlockDevice, Device, NandDevice};
+use anyhow::{Context as _, Error};
+use assert_matches::assert_matches;
+use fuchsia_async as fasync;
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::{stream, SinkExt, StreamExt};
+use std::sync::Arc;
 
 const DEV_CLASS_BLOCK: &'static str = "/dev/class/block";
 const DEV_CLASS_NAND: &'static str = "/dev/class/nand";
@@ -244,19 +244,16 @@ impl Watcher {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{PathSource, Watcher},
-        fidl_fuchsia_device::{ControllerRequest, ControllerRequestStream},
-        fidl_fuchsia_io as fio,
-        futures::StreamExt,
-        std::sync::Arc,
-        vfs::{
-            directory::{entry_container::Directory, helper::DirectlyMutable},
-            execution_scope::ExecutionScope,
-            path::Path,
-            service,
-        },
-    };
+    use super::{PathSource, Watcher};
+    use fidl_fuchsia_device::{ControllerRequest, ControllerRequestStream};
+    use fidl_fuchsia_io as fio;
+    use futures::StreamExt;
+    use std::sync::Arc;
+    use vfs::directory::entry_container::Directory;
+    use vfs::directory::helper::DirectlyMutable;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use vfs::service;
 
     pub fn fshost_controller(path: &'static str) -> Arc<service::Service> {
         service::host(move |mut stream: ControllerRequestStream| async move {

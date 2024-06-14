@@ -66,7 +66,8 @@
         // topology.
         power_topology_integration_enabled: { type: "bool" },
 
-        // If set, Timekeeper will only read the RTC, never update it.
-        rtc_is_read_only: { type: "bool" },
+        // If set, Timekeeper will serve test-only protocols such as
+        // `fuchsia.time.test/RTC`.
+        serve_test_protocols: { type: "bool" },
     },
 }

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::Config,
-    crate::{estimator::frequency_to_adjust_ppm, time_source::Sample},
-    anyhow::{anyhow, Error},
-    fuchsia_zircon as zx,
-    std::sync::Arc,
-    time_util::Transform,
-};
+use crate::estimator::frequency_to_adjust_ppm;
+use crate::time_source::Sample;
+use crate::Config;
+use anyhow::{anyhow, Error};
+use fuchsia_zircon as zx;
+use std::sync::Arc;
+use time_util::Transform;
 
 /// The minimum covariance allowed for the UTC estimate in nanoseconds squared. This helps the
 /// kalman filter not drink its own bathwater after receiving very low uncertainly updates from a
@@ -166,7 +165,10 @@ impl KalmanFilter {
 
 #[cfg(test)]
 mod test {
-    use {super::*, crate::make_test_config, test_util::assert_near, zx::DurationNum};
+    use super::*;
+    use crate::make_test_config;
+    use test_util::assert_near;
+    use zx::DurationNum;
 
     const TIME_1: zx::Time = zx::Time::from_nanos(10_000_000_000);
     const TIME_2: zx::Time = zx::Time::from_nanos(20_000_000_000);

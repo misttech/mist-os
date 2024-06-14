@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::args::{Arg, RawArg};
+use crate::error::ParseWarning;
+use crate::init::Ticks;
+use crate::session::ResolveCtx;
+use crate::string::StringRef;
+use crate::thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef};
 use crate::{
-    args::{Arg, RawArg},
-    error::ParseWarning,
-    init::Ticks,
-    session::ResolveCtx,
-    string::StringRef,
-    take_n_padded,
-    thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef},
-    trace_header, ParseResult, Provider, BLOB_RECORD_TYPE, LARGE_RECORD_TYPE,
+    take_n_padded, trace_header, ParseResult, Provider, BLOB_RECORD_TYPE, LARGE_RECORD_TYPE,
 };
 use flyweights::FlyStr;
-use nom::{combinator::all_consuming, number::complete::le_u64};
+use nom::combinator::all_consuming;
+use nom::number::complete::le_u64;
 
 const BLOB_TYPE_DATA: u8 = 0x01;
 const BLOB_TYPE_LAST_BRANCH: u8 = 0x02;
@@ -230,7 +230,8 @@ bitfield::bitfield! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fxt_builder::FxtBuilder, RawTraceRecord};
+    use crate::fxt_builder::FxtBuilder;
+    use crate::RawTraceRecord;
     use std::num::{NonZeroU16, NonZeroU8};
 
     #[test]

@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    scrutiny::{model::controller::DataController, model::model::DataModel},
-    scrutiny_utils::usage::UsageBuilder,
-    serde_json::{json, value::Value},
-    std::sync::Arc,
-};
+use anyhow::Result;
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::DataModel;
+use scrutiny_utils::usage::UsageBuilder;
+use serde_json::json;
+use serde_json::value::Value;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct HealthController {}

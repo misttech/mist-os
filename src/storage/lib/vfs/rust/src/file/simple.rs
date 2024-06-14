@@ -2,20 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
-    execution_scope::ExecutionScope,
-    file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode},
-    node::Node,
-    ObjectRequestRef,
-};
-
-use {
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    std::sync::{Arc, Mutex},
-};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::execution_scope::ExecutionScope;
+use crate::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
+use crate::node::Node;
+use crate::ObjectRequestRef;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 mod tests;
@@ -52,7 +46,6 @@ impl DirectoryEntry for SimpleFile {
     }
 }
 
-#[async_trait]
 impl Node for SimpleFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let content_size = self.data.lock().unwrap().len().try_into().unwrap();

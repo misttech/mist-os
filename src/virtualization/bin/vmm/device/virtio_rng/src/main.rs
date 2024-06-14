@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization_hardware::VirtioRngRequestStream,
-    fuchsia_component::server,
-    fuchsia_zircon::{self as zx},
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-    machina_virtio_device::{config_builder_from_stream, from_start_info},
-    virtio_device::chain::WritableChain,
-};
+use anyhow::{anyhow, Context};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization_hardware::VirtioRngRequestStream;
+use fuchsia_component::server;
+use fuchsia_zircon::{self as zx};
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use machina_virtio_device::{config_builder_from_stream, from_start_info};
+use virtio_device::chain::WritableChain;
 
 async fn run_virtio_rng(mut con: VirtioRngRequestStream) -> Result<(), anyhow::Error> {
     // Receive start info as first message.

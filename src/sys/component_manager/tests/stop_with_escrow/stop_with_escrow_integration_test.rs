@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use component_events::{
-    events::{ExitStatus, Started, Stopped},
-    matcher::EventMatcher,
-};
+use component_events::events::{ExitStatus, Started, Stopped};
+use component_events::matcher::EventMatcher;
 use fidl_fidl_test_components::TriggerMarker;
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_process as fprocess;
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
+};
 
 /// Tests a component can stop with a request buffered in its outgoing dir,
 /// and that request is handled on the next start (which should be automatic).

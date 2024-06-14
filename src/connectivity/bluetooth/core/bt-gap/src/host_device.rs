@@ -9,23 +9,21 @@ use fidl_fuchsia_bluetooth_host::{
     DiscoverySessionMarker, DiscoverySessionProxy, HostProxy, HostStartDiscoveryRequest,
     PeerWatcherGetNextResponse, PeerWatcherMarker,
 };
-use fidl_fuchsia_bluetooth_sys as sys;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::inspect::Inspectable;
 use fuchsia_bluetooth::types::{Address, BondingData, HostData, HostId, HostInfo, Peer, PeerId};
 use fuchsia_sync::RwLock;
-use futures::{future::try_join_all, Future, FutureExt, TryFutureExt};
+use futures::future::try_join_all;
+use futures::{Future, FutureExt, TryFutureExt};
 use std::pin::pin;
 use std::sync::{Arc, Weak};
 use tracing::{debug, error, info, trace, warn};
+use {fidl_fuchsia_bluetooth_sys as sys, fuchsia_async as fasync};
 
 #[cfg(test)]
 use fidl_fuchsia_bluetooth_sys::TechnologyType;
 
-use crate::{
-    build_config,
-    types::{self, from_fidl_result, Error},
-};
+use crate::build_config;
+use crate::types::{self, from_fidl_result, Error};
 
 /// When the host dispatcher requests being discoverable on a host device, the host device enables
 /// discoverable and returns a HostDiscoverableSession. The discoverable state on the host device
@@ -446,15 +444,13 @@ pub(crate) mod test {
 
     use super::*;
 
-    use {
-        async_helpers::maybe_stream::MaybeStream,
-        fidl_fuchsia_bluetooth_host::{
-            BondingDelegateRequest, DiscoverySessionRequest, DiscoverySessionRequestStream,
-            HostRequest, HostRequestStream, PeerWatcherRequestStream,
-        },
-        fidl_fuchsia_bluetooth_sys::HostInfo as FidlHostInfo,
-        futures::{select, StreamExt},
+    use async_helpers::maybe_stream::MaybeStream;
+    use fidl_fuchsia_bluetooth_host::{
+        BondingDelegateRequest, DiscoverySessionRequest, DiscoverySessionRequestStream,
+        HostRequest, HostRequestStream, PeerWatcherRequestStream,
     };
+    use fidl_fuchsia_bluetooth_sys::HostInfo as FidlHostInfo;
+    use futures::{select, StreamExt};
 
     pub(crate) struct FakeHostServer {
         host_stream: HostRequestStream,

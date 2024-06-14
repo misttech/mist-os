@@ -3,7 +3,10 @@
 # found in the LICENSE file.
 
 import("//build/host.gni")
+import("//build/python/python_action.gni")
 import("//build/python/python_binary.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_embed_files.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
 
@@ -14,6 +17,8 @@ import("//build/testing/host_test_data.gni")
 # such as multi-device testing.
 #
 # Subtargets:
+#  * $target_name.hermetic
+#    - A host_test() target that runs in hermetic-mode (Rust-compiled Lacewing application).
 #  * $target_name.binary_and_config
 #    - The associated group target that contains metadata information on the
 #      test binary and test config.
@@ -135,6 +140,12 @@ import("//build/testing/host_test_data.gni")
 #    Type: boolean
 #    Default: false
 #
+#  enable_hermetic_exe (optional)
+#    Whether to also build a hermetic self-extracting executable and define a
+#    corresponding host_test().
+#    Type: boolean
+#    Default: false
+#
 #  timeout_secs (optional)
 #    [int] The infra timeout in seconds for the test.
 #
@@ -172,6 +183,11 @@ template("python_mobly_test") {
           invoker.transport == "fuchsia-controller-preferred",
       "transport should be either 'fuchsia-controller' or 'fuchsia-controller-preferred' but received: " + invoker.transport)
 
+  _test_name = "${target_name}"
+  if (defined(invoker.test_name)) {
+    _test_name = invoker.test_name
+  }
+
   _testonly = true
   if (defined(invoker.testonly)) {
     _testonly = invoker.testonly
@@ -182,13 +198,14 @@ template("python_mobly_test") {
     _enable_mypy = invoker.enable_mypy
   }
 
+  _enable_hermetic_exe = false
+  if (defined(invoker.enable_hermetic_exe)) {
+    _enable_hermetic_exe = invoker.enable_hermetic_exe
+  }
+
   #
   # Define Mobly test python_binary().
   #
-  _test_name = "${target_name}"
-  if (defined(invoker.test_name)) {
-    _test_name = invoker.test_name
-  }
   _test_binary_name = "${_test_name}.pyz"
   _test_binary_target = "${_test_name}_python_binary"
   python_binary(_test_binary_target) {
@@ -273,23 +290,20 @@ template("python_mobly_test") {
 
   _md_test_data_dir =
       get_label_info("//src/testing/end_to_end/mobly_driver", "target_out_dir")
-  _host_test_args = [
-    rebase_path("${_md_test_data_dir}/test_data/mobly_driver.pyz",
-                root_build_dir),
-    rebase_path("${_test_dir}/${_test_binary_name}", root_build_dir),
-    "-test_data_path",
+  _common_host_test_args = [
+    "--test-data-path",
     rebase_path(_test_dir, root_build_dir),
-    "-ffx_path",
+    "--ffx-path",
     rebase_path("${host_tools_dir}/ffx", root_build_dir),
-    "-transport",
+    "--transport",
     invoker.transport,
-    "-ffx_subtools_search_path",
+    "--ffx-subtools-path",
     rebase_path(host_tools_dir, root_build_dir),
-    "-ssh_path",
+    "--ssh-path",
     rebase_path("${_test_dir}/ssh", root_build_dir),
   ]
   if (defined(invoker.multi_fuchsia_device) && invoker.multi_fuchsia_device) {
-    _host_test_args += [ "-multi_device" ]
+    _common_host_test_args += [ "--multi-device" ]
   }
 
   _additional_deps = []
@@ -320,8 +334,8 @@ template("python_mobly_test") {
       deps = _params_deps
     }
 
-    _host_test_args += [
-      "-params_yaml_path",
+    _common_host_test_args += [
+      "--params-yaml-path",
       rebase_path("${_test_dir}/test_params.yaml", root_build_dir),
     ]
 
@@ -364,12 +378,23 @@ template("python_mobly_test") {
       outputs = [ "${_test_dir}/config.yaml" ]
     }
 
-    _host_test_args += [
-      "-config_yaml_path",
+    _common_host_test_args += [
+      "--config-yaml-path",
       rebase_path("${_test_dir}/config.yaml", root_build_dir),
     ]
 
     _additional_deps += [ ":${_config_yaml_data_target}" ]
+  }
+
+  if (defined(invoker.extra_args)) {
+    _common_host_test_args += invoker.extra_args
+  }
+
+  common_environments = []
+  if (defined(invoker.environments)) {
+    common_environments = invoker.environments
+  } else {
+    common_environments = [ emu_env ]
   }
 
   #
@@ -385,11 +410,12 @@ template("python_mobly_test") {
     binary_path = python_exe_src
 
     # Disable Python's output buffering when launching Mobly Driver.
-    args = [ "-u" ] + _host_test_args
-
-    if (defined(invoker.extra_args)) {
-      args += invoker.extra_args
-    }
+    args = [
+             "-u",
+             rebase_path("${_md_test_data_dir}/test_data/mobly_driver.pyz",
+                         root_build_dir),
+             rebase_path("${_test_dir}/${_test_binary_name}", root_build_dir),
+           ] + _common_host_test_args
 
     data_deps = [ "//src/developer/ffx:suite_test_data" ]
 
@@ -404,10 +430,154 @@ template("python_mobly_test") {
       deps += invoker.test_data_deps
     }
 
-    if (defined(invoker.environments)) {
-      environments = invoker.environments
-    } else {
-      environments = [ emu_env ]
+    environments = common_environments
+  }
+
+  #
+  # Hermetic Python Binary
+  #
+  if (_enable_hermetic_exe) {
+    _labels = {
+      fidl_ir_list = "${_test_name}_fidl_ir_list"
+      compress_artifacts = "${_test_name}_compress_artifacts"
+      rust_embed_lib = "${_test_name}_rustc_embed_files"
+    }
+
+    _files = {
+      fidl_ir_list = "${target_gen_dir}/${_test_name}_fidl_ir_infos.json"
+      compress_artifacts =
+          "${target_gen_dir}/${_test_name}_lacewing_artifacts.zip"
+    }
+
+    generated_file(_labels.fidl_ir_list) {
+      testonly = _testonly
+
+      visibility = [ ":*" ]
+
+      public_deps = [ ":${_test_binary_target}" ]
+
+      outputs = [ _files.fidl_ir_list ]
+      output_conversion = "json"
+      data_keys = [ "fidl_ir_info" ]
+    }
+
+    python_action(_labels.compress_artifacts) {
+      forward_variables_from(invoker, [ "visibility" ])
+      testonly = _testonly
+      binary_label = "//build/python:compress_lacewing_inputs"
+      inputs = [
+        _files.fidl_ir_list,
+        python_exe_src,
+        "${root_out_dir}/fidl_codec.so",
+        "${root_out_dir}/fuchsia_controller_internal.so",
+        get_label_info(":${_test_binary_target}", "target_out_dir") +
+            "/${_test_binary_name}",
+      ]
+      outputs = [ _files.compress_artifacts ]
+      depfile = "${target_out_dir}/${target_name}.d"
+      args = [
+        "--cpython",
+        rebase_path(python_exe_src, root_build_dir),
+        "--cpython-stdlibs",
+        rebase_path("//prebuilt/third_party/python3/${host_platform}/lib",
+                    root_build_dir),
+        "--test-pyz",
+        rebase_path(get_label_info(":${_test_binary_target}",
+                                   "target_out_dir") + "/${_test_binary_name}",
+                    root_build_dir),
+        "--fidl-ir-list",
+        rebase_path(_files.fidl_ir_list, root_build_dir),
+        "--c-extension-libs",
+        rebase_path("${root_out_dir}/fidl_codec.so", root_build_dir),
+        rebase_path("${root_out_dir}/fuchsia_controller_internal.so",
+                    root_build_dir),
+        "--output",
+        rebase_path(_files.compress_artifacts, root_build_dir),
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
+      ]
+      deps = [
+        ":${_labels.fidl_ir_list}",
+        ":${_test_binary_target}",
+        "//src/developer/ffx/lib/fuchsia-controller:fidl_codec_shlib",
+        "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_internal_shlib",
+      ]
+    }
+
+    rustc_embed_files(_labels.rust_embed_lib) {
+      edition = "2021"
+      testonly = _testonly
+      name = "data"
+
+      files = [
+        {
+          constant_name = "LACEWING_ARTIFACTS"
+          source = _files.compress_artifacts
+          deps = [ ":${_labels.compress_artifacts}" ]
+        },
+      ]
+    }
+
+    _hermetic_test_binary_label = "${_test_name}_hermetic_python_binary"
+    rustc_binary(_hermetic_test_binary_label) {
+      edition = "2021"
+      testonly = _testonly
+      source_root = "//build/python/self_extracting_binary/src/main.rs"
+
+      sources = [ "//build/python/self_extracting_binary/src/main.rs" ]
+
+      deps = [
+        ":${_labels.rust_embed_lib}",
+        "//third_party/rust_crates:tempfile",
+        "//third_party/rust_crates:zip",
+      ]
+    }
+
+    #
+    # Define Hermetic Mobly test host_test_data().
+    #
+    _hermetic_mobly_test_data_target =
+        "${_test_name}_hermetic_python_binary_test_data"
+    host_test_data(_hermetic_mobly_test_data_target) {
+      visibility = [ ":*" ]
+      testonly = _testonly
+      sources = [ "$root_out_dir/${_hermetic_test_binary_label}" ]
+      outputs = [ "${_test_dir}/${_hermetic_test_binary_label}" ]
+      deps = [ ":${_hermetic_test_binary_label}" ]
+    }
+
+    host_test("${_test_name}.hermetic") {
+      forward_variables_from(invoker,
+                             [
+                               "visibility",
+                               "timeout_secs",
+                             ])
+
+      binary_path = python_exe_src
+
+      # Disable Python's output buffering when launching Mobly Driver.
+      args = [
+               "-u",
+               rebase_path("${_md_test_data_dir}/test_data/mobly_driver.pyz",
+                           root_build_dir),
+               rebase_path("${_test_dir}/${_hermetic_test_binary_label}",
+                           root_build_dir),
+               "--hermetic",
+             ] + _common_host_test_args
+
+      data_deps = [ "//src/developer/ffx:suite_test_data" ]
+
+      deps = [
+               ":${_hermetic_mobly_test_data_target}",
+               ":${_ssh_binary_test_data_target}",
+               "//build/python:interpreter",
+               "//src/testing/end_to_end/mobly_driver:mobly_driver_test_data_target",
+             ] + _additional_deps
+      if (defined(invoker.test_data_deps)) {
+        deps += invoker.test_data_deps
+      }
+
+      environments = common_environments
     }
   }
 }

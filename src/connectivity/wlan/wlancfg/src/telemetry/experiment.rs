@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_wlan_common as fidl_common, std::collections::HashMap};
+use fidl_fuchsia_wlan_common as fidl_common;
+use std::collections::HashMap;
 
 // The ExperimentType, ExperimentId, and Experiments represent the internal telemetry accounting
 // for any active WLAN policy experiments.  The rest of the telemetry module will see an
@@ -93,7 +94,8 @@ impl From<fidl_common::PowerSaveType> for ExperimentId {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, test_case::test_case};
+    use super::*;
+    use test_case::test_case;
 
     #[test_case(ExperimentUpdate::Power(fidl_common::PowerSaveType::PsModePerformance), (ExperimentType::Power, PERFORMANCE_EXPERIMENT_ID))]
     fn test_key_value_conversion(

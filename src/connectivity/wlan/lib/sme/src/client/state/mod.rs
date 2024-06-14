@@ -4,41 +4,34 @@
 
 mod link_state;
 
+use crate::client::event::{self, Event};
+use crate::client::internal::Context;
+use crate::client::protection::{build_protection_ie, Protection, ProtectionIe};
+use crate::client::{
+    report_connect_finished, AssociationFailure, ClientConfig, ClientSmeStatus, ConnectResult,
+    ConnectTransactionEvent, ConnectTransactionSink, EstablishRsnaFailure,
+    EstablishRsnaFailureReason, ServingApInfo,
+};
+use crate::{mlme_event_name, MlmeRequest, MlmeSink};
+use anyhow::bail;
+use fidl_fuchsia_wlan_mlme::{self as fidl_mlme, MlmeEvent};
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::log::InspectBytes;
+use ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid};
+use link_state::LinkState;
+use tracing::{error, info, warn};
+use wlan_common::bss::BssDescription;
+use wlan_common::ie::rsn::cipher;
+use wlan_common::ie::rsn::suite_selector::OUI;
+use wlan_common::ie::{self};
+use wlan_common::security::wep::WepKey;
+use wlan_common::timer::EventId;
+use wlan_rsn::auth;
+use wlan_rsn::rsna::{AuthRejectedReason, AuthStatus, SecAssocUpdate, UpdateSink};
+use wlan_statemachine::*;
 use {
-    crate::{
-        client::{
-            event::{self, Event},
-            internal::Context,
-            protection::{build_protection_ie, Protection, ProtectionIe},
-            report_connect_finished, AssociationFailure, ClientConfig, ClientSmeStatus,
-            ConnectResult, ConnectTransactionEvent, ConnectTransactionSink, EstablishRsnaFailure,
-            EstablishRsnaFailureReason, ServingApInfo,
-        },
-        mlme_event_name, MlmeRequest, MlmeSink,
-    },
-    anyhow::bail,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_mlme::{self as fidl_mlme, MlmeEvent},
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_inspect_contrib::{inspect_log, log::InspectBytes},
-    fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid},
-    link_state::LinkState,
-    tracing::{error, info, warn},
-    wlan_common::{
-        bss::BssDescription,
-        ie::{
-            self,
-            rsn::{cipher, suite_selector::OUI},
-        },
-        security::wep::WepKey,
-        timer::EventId,
-    },
-    wlan_rsn::{
-        auth,
-        rsna::{AuthRejectedReason, AuthStatus, SecAssocUpdate, UpdateSink},
-    },
-    wlan_statemachine::*,
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
 };
 /// Timeout for the MLME connect op, which consists of Join, Auth, and Assoc steps.
 /// TODO(https://fxbug.dev/42182084): Consider having a single overall connect timeout that is
@@ -1336,53 +1329,41 @@ fn now() -> zx::Time {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::format_err,
-        diagnostics_assertions::{
-            assert_data_tree, AnyBytesProperty, AnyNumericProperty, AnyStringProperty,
-        },
-        fuchsia_async::DurationExt,
-        fuchsia_inspect::Inspector,
-        futures::{channel::mpsc, Stream, StreamExt},
-        link_state::{EstablishingRsna, LinkUp},
-        std::{sync::Arc, task::Poll},
-        wlan_common::{
-            assert_variant,
-            bss::Protection as BssProtection,
-            channel::{Cbw, Channel},
-            fake_bss_description,
-            ie::{
-                fake_ies::{fake_probe_resp_wsc_ie_bytes, get_vendor_ie_bytes_for_wsc_ie},
-                rsn::rsne::Rsne,
-            },
-            test_utils::{
-                fake_features::{
-                    fake_mac_sublayer_support, fake_security_support,
-                    fake_spectrum_management_support_empty,
-                },
-                fake_stas::IesOverrides,
-            },
-            timer,
-        },
-        wlan_rsn::{key::exchange::Key, rsna::SecAssocStatus, NegotiatedProtection},
-        zx::DurationNum,
+    use super::*;
+    use anyhow::format_err;
+    use diagnostics_assertions::{
+        assert_data_tree, AnyBytesProperty, AnyNumericProperty, AnyStringProperty,
     };
+    use fuchsia_async::DurationExt;
+    use fuchsia_inspect::Inspector;
+    use futures::channel::mpsc;
+    use futures::{Stream, StreamExt};
+    use link_state::{EstablishingRsna, LinkUp};
+    use std::sync::Arc;
+    use std::task::Poll;
+    use wlan_common::bss::Protection as BssProtection;
+    use wlan_common::channel::{Cbw, Channel};
+    use wlan_common::ie::fake_ies::{fake_probe_resp_wsc_ie_bytes, get_vendor_ie_bytes_for_wsc_ie};
+    use wlan_common::ie::rsn::rsne::Rsne;
+    use wlan_common::test_utils::fake_features::{
+        fake_mac_sublayer_support, fake_security_support, fake_spectrum_management_support_empty,
+    };
+    use wlan_common::test_utils::fake_stas::IesOverrides;
+    use wlan_common::{assert_variant, fake_bss_description, timer};
+    use wlan_rsn::key::exchange::Key;
+    use wlan_rsn::rsna::SecAssocStatus;
+    use wlan_rsn::NegotiatedProtection;
+    use zx::DurationNum;
 
-    use crate::{
-        client::{
-            event::RsnaCompletionTimeout,
-            inspect,
-            rsn::Rsna,
-            test_utils::{
-                create_connect_conf, create_on_wmm_status_resp, expect_stream_empty,
-                fake_wmm_param, mock_psk_supplicant, MockSupplicant, MockSupplicantController,
-            },
-            ConnectTransactionStream,
-        },
-        test_utils::{self, make_wpa1_ie},
-        MlmeStream,
+    use crate::client::event::RsnaCompletionTimeout;
+    use crate::client::rsn::Rsna;
+    use crate::client::test_utils::{
+        create_connect_conf, create_on_wmm_status_resp, expect_stream_empty, fake_wmm_param,
+        mock_psk_supplicant, MockSupplicant, MockSupplicantController,
     };
+    use crate::client::{inspect, ConnectTransactionStream};
+    use crate::test_utils::{self, make_wpa1_ie};
+    use crate::MlmeStream;
 
     #[test]
     fn connect_happy_path_unprotected() {

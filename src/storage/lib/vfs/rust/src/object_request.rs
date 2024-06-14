@@ -2,22 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        execution_scope::ExecutionScope,
-        node::{self, Node},
-        ProtocolsExt,
-    },
-    fidl::{
-        endpoints::{ControlHandle, ProtocolMarker, RequestStream, ServerEnd},
-        epitaph::ChannelEpitaphExt,
-        AsHandleRef, HandleBased,
-    },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon_status::Status,
-    futures::future::BoxFuture,
-    std::{future::Future, sync::Arc},
-};
+use crate::execution_scope::ExecutionScope;
+use crate::node::{self, Node};
+use crate::ProtocolsExt;
+use fidl::endpoints::{ControlHandle, ProtocolMarker, RequestStream, ServerEnd};
+use fidl::epitaph::ChannelEpitaphExt;
+use fidl::{AsHandleRef, HandleBased};
+use fuchsia_zircon_status::Status;
+use futures::future::BoxFuture;
+use std::future::Future;
+use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Wraps the channel provided in the open methods and provide convenience methods for sending
 /// appropriate responses.  It also records actions that should be taken upon successful connection

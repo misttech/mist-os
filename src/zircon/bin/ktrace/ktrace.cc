@@ -130,7 +130,7 @@ int DoSave(const sys::ServiceDirectory& svc, const char* path) {
   // Read/write this many bytes at a time.
   std::vector<uint8_t> buf;
   size_t read_size = 4096;
-  size_t offset = 0;
+  uint32_t offset = 0;
   zx_status_t out_status;
   zx_status_t status;
   while ((status = reader->ReadAt(read_size, offset, &out_status, &buf)) == ZX_OK &&

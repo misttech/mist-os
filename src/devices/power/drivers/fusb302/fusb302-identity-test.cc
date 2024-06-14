@@ -38,7 +38,10 @@ class Fusb302IdentityTest : public inspect::InspectTestHelper, public zxtest::Te
     identity_.emplace(mock_i2c_client_, inspect_.GetRoot().CreateChild("Identity"));
   }
 
-  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+  void TearDown() override {
+    mock_i2c_.VerifyAndClear();
+    fdf::Logger::SetGlobalInstance(nullptr);
+  }
 
   void ExpectInspectPropertyEquals(const char* property_name, const std::string& expected_value) {
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_.DuplicateVmo()));

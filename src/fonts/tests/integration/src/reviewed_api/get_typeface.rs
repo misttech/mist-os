@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::util::*,
-    crate::{FONTS_ALIASED_CM, FONTS_MEDIUM_CM, FONTS_SMALL_CM},
-    fidl_fuchsia_fonts::{self as fonts, Style2, Width},
-    fidl_fuchsia_intl::LocaleId,
-};
+use super::util::*;
+use crate::{FONTS_ALIASED_CM, FONTS_MEDIUM_CM, FONTS_SMALL_CM};
+use fidl_fuchsia_fonts::{self as fonts, Style2, Width};
+use fidl_fuchsia_intl::LocaleId;
 
 // Add new tests here so we don't overload component manager with requests (b/42136076).
 #[fuchsia::test]

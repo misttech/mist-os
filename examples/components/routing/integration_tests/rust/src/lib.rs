@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 // [START example_snippet]
-use {anyhow::Error, fidl_fidl_examples_routing_echo as fecho, fuchsia_component::client};
+use anyhow::Error;
+use fidl_fidl_examples_routing_echo as fecho;
+use fuchsia_component::client;
 
 #[fuchsia::test]
 async fn echo_integration_test() -> Result<(), Error> {

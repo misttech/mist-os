@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::audio_streams::*,
-    crate::reply::*,
-    crate::sequencer,
-    crate::throttled_log,
-    crate::wire,
-    crate::wire_convert::*,
-    anyhow::{anyhow, Error},
-    futures::TryStreamExt,
-    std::cell::Cell,
-    std::io::{Read, Write},
-    zerocopy::{AsBytes, FromBytes, NoCell},
-};
+use crate::audio_streams::*;
+use crate::reply::*;
+use crate::wire_convert::*;
+use crate::{sequencer, throttled_log, wire};
+use anyhow::{anyhow, Error};
+use futures::TryStreamExt;
+use std::cell::Cell;
+use std::io::{Read, Write};
+use zerocopy::{AsBytes, FromBytes, NoCell};
 
 /// Wraps a request parsed from a virtqueue.
 ///

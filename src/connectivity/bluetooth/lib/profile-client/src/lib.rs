@@ -28,7 +28,8 @@
 //! }
 //!
 
-use fidl::{client::QueryResponseFut, endpoints::create_request_stream};
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::stream::{FusedStream, Stream, StreamExt};

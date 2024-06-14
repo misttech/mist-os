@@ -146,13 +146,29 @@ pub struct BoardProvidedConfig {
     pub thermal: Option<FileRelativePathBuf>,
 }
 
+/// Where to print the serial logs.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum SerialMode {
+    /// Do not output any serial logs.
+    #[default]
+    NoOutput,
+    /// Output the serial logs to the legacy console.
+    /// This is only valid on 'eng' builds.
+    Legacy,
+}
+
 /// This struct defines supported kernel features.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct BoardKernelConfig {
     /// Enable the use of 'contiguous physical pages'. This should be enabled
     /// when a significant contiguous memory size is required.
+    #[serde(default)]
     pub contiguous_physical_pages: bool,
+    /// Where to print serial logs.
+    #[serde(default)]
+    pub serial_mode: SerialMode,
 }
 
 /// This struct defines platform configurations specified by board.
@@ -294,7 +310,10 @@ mod test {
                 FileRelativePathBuf::Resolved("some/path/to/board/bundle_b".into()),
             ],
             devicetree: Some(FileRelativePathBuf::Resolved("some/path/to/board/test.dtb".into())),
-            kernel: BoardKernelConfig { contiguous_physical_pages: true },
+            kernel: BoardKernelConfig {
+                contiguous_physical_pages: true,
+                serial_mode: SerialMode::NoOutput,
+            },
             platform: PlatformConfig {
                 connectivity: ConnectivityConfig::default(),
                 development_support: DevelopmentSupportConfig {

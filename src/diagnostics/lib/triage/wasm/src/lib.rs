@@ -8,7 +8,9 @@ pub mod shim;
 mod bindings {
     use wasm_bindgen::prelude::*;
 
-    use {super::shim, serde_json5, std::collections::HashMap};
+    use super::shim;
+    use serde_json5;
+    use std::collections::HashMap;
 
     macro_rules! format_js_err {
         ($msg:literal $(,)?) => {

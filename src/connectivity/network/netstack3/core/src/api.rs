@@ -5,27 +5,23 @@
 ///! Defines the main API entry objects for the exposed API from core.
 use lock_order::Unlocked;
 use net_types::ip::Ip;
+use netstack3_base::{ContextPair as _, ContextProvider, CtxPair, TimerHandler as _};
+use netstack3_device::queue::{ReceiveQueueApi, TransmitQueueApi};
+use netstack3_device::socket::DeviceSocketApi;
+use netstack3_device::{DeviceAnyApi, DeviceApi};
+use netstack3_filter::FilterApi;
+use netstack3_icmp_echo::IcmpEchoSocketApi;
+use netstack3_ip::device::{DeviceIpAnyApi, DeviceIpApi};
+use netstack3_ip::nud::NeighborApi;
+use netstack3_ip::raw::RawIpSocketApi;
+use netstack3_ip::{RoutesAnyApi, RoutesApi};
+use netstack3_tcp::TcpApi;
+use netstack3_udp::UdpApi;
 
-use crate::{
-    context::{ContextPair as _, ContextProvider, CoreCtx, CtxPair, TimerHandler as _},
-    counters::CountersApi,
-    device::{
-        queue::{ReceiveQueueApi, TransmitQueueApi},
-        socket::DeviceSocketApi,
-        DeviceAnyApi, DeviceApi,
-    },
-    filter::FilterApi,
-    ip::{
-        device::{DeviceIpAnyApi, DeviceIpApi},
-        icmp::IcmpEchoSocketApi,
-        nud::NeighborApi,
-        raw::RawIpSocketApi,
-        RoutesAnyApi, RoutesApi,
-    },
-    time::TimerId,
-    transport::{tcp::TcpApi, udp::UdpApi},
-    BindingsTypes,
-};
+use crate::context::CoreCtx;
+use crate::counters::CountersApi;
+use crate::time::TimerId;
+use crate::BindingsTypes;
 
 type CoreApiCtxPair<'a, BP> = CtxPair<CoreCtx<'a, <BP as ContextProvider>::Context, Unlocked>, BP>;
 

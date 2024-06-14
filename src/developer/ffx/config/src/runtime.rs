@@ -5,7 +5,9 @@
 use crate::nested::nested_set;
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{Map, Value};
-use std::{fs::File, io::BufReader, path::Path};
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
 
 fn try_split_name_value_pairs(config: &String) -> Result<Option<Value>> {
     let mut runtime_config = Map::new();

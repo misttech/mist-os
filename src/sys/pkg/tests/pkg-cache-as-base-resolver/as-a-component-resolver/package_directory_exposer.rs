@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fuchsia_async as fasync, futures::stream::StreamExt as _};
+use fuchsia_async as fasync;
+use futures::stream::StreamExt as _;
 
 /// Exposes the component's package directory.
 /// fake_dependencies.rs uses this to write the to-be-resolved subpackage to the blobfs it gives to

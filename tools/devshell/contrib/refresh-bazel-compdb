@@ -24,8 +24,15 @@ fi
 source "${_script_dir}/../lib/bazel_utils.sh" || exit $?
 fx-update-bazel-workspace
 
+# We need to figure out our compilation mode to pass to bazel
+fx-build-dir-if-present || return 1
+optimization=$(fx-command-run gn args ${FUCHSIA_BUILD_DIR} --list=optimize --json | fx-command-run jq ".[0] | if .current then .current else .default end |  .value")
+
 BAZEL_EXE="$(fx-get-bazel)"
 "${_script_dir}/refresh-bazel-compdb-bin.py" \
   --bazel $BAZEL_EXE \
+  --optimization "${optimization}" \
   --build-dir "${FUCHSIA_BUILD_DIR}" \
   "$@"
+
+

@@ -5,8 +5,7 @@
 //! Defines the lexer for the Documentation Compiler.
 //! It extracts all the lexical items (with their location) from a source text (Documentation).
 
-use crate::source::Location;
-use crate::source::Source;
+use crate::source::{Location, Source};
 use crate::DocCompiler;
 use std::rc::Rc;
 use std::str::CharIndices;

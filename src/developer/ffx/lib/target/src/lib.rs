@@ -7,8 +7,10 @@ use anyhow::{bail, Context as _, Result};
 use compat_info::CompatibilityInfo;
 use discovery::{DiscoverySources, TargetEvent, TargetHandle, TargetState};
 use errors::{ffx_bail, FfxError};
-use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
-use fidl::{endpoints::create_proxy, prelude::*};
+use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_config::EnvironmentContext;
+use fidl::endpoints::create_proxy;
+use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
     self as ffx, DaemonError, DaemonProxy, TargetCollectionMarker, TargetCollectionProxy,
     TargetInfo, TargetMarker, TargetQuery,
@@ -16,13 +18,13 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
 use fuchsia_async::TimeoutExt;
-use futures::{future::join_all, select, Future, FutureExt, StreamExt, TryStreamExt};
+use futures::future::join_all;
+use futures::{select, Future, FutureExt, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::net::IpAddr;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
 use thiserror::Error;
@@ -37,12 +39,10 @@ mod ssh_connector;
 const SSH_PORT_DEFAULT: u16 = 22;
 const DEFAULT_SSH_TIMEOUT_MS: u64 = 10000;
 
-pub use connection::Connection;
-pub use connection::ConnectionError;
+pub use connection::{Connection, ConnectionError};
 pub use discovery::desc::{Description, FastbootInterface};
 pub use discovery::query::TargetInfoQuery;
-pub use fidl_pipe::create_overnet_socket;
-pub use fidl_pipe::FidlPipe;
+pub use fidl_pipe::{create_overnet_socket, FidlPipe};
 pub use overnet_connector::{OvernetConnection, OvernetConnector};
 pub use ssh_connector::SshConnector;
 
@@ -746,7 +746,8 @@ pub async fn add_manual_target(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_config::{macro_deps::serde_json::Value, test_init, ConfigLevel};
+    use ffx_config::macro_deps::serde_json::Value;
+    use ffx_config::{test_init, ConfigLevel};
 
     #[fuchsia::test]
     async fn test_target_wait_too_short_timeout() {

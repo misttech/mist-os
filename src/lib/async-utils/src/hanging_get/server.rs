@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::hanging_get::error::HangingGetServerError,
-    core::hash::Hash,
-    fuchsia_sync::Mutex,
-    std::{collections::HashMap, sync::Arc},
-};
+use crate::hanging_get::error::HangingGetServerError;
+use core::hash::Hash;
+use fuchsia_sync::Mutex;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// A broker of updates to some state, using the hanging get pattern.
 ///
@@ -318,12 +317,11 @@ mod subscriber_key {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{hanging_get::test_util::TestObserver, PollExt},
-        fuchsia_async as fasync,
-        futures::channel::oneshot,
-    };
+    use super::*;
+    use crate::hanging_get::test_util::TestObserver;
+    use crate::PollExt;
+    use fuchsia_async as fasync;
+    use futures::channel::oneshot;
 
     #[test]
     fn subscriber_key_generator_creates_unique_keys() {

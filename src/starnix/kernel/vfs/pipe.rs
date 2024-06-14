@@ -2,37 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::{read_to_vec, MemoryAccessorExt, NumberOfElementsRead, PAGE_SIZE},
-    signals::{send_standard_signal, SignalInfo},
-    task::{CurrentTask, EventHandler, Kernel, WaitCallback, WaitCanceler, WaitQueue, Waiter},
-    vfs::{
-        buffers::{
-            Buffer, InputBuffer, InputBufferCallback, MessageQueue, OutputBuffer,
-            OutputBufferCallback, PeekBufferSegmentsCallback, UserBuffersInputBuffer,
-            UserBuffersOutputBuffer,
-        },
-        default_fcntl, default_ioctl, fileops_impl_nonseekable, CacheMode, FileHandle, FileObject,
-        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
-        SpecialNode,
-    },
+use crate::mm::{read_to_vec, MemoryAccessorExt, NumberOfElementsRead, PAGE_SIZE};
+use crate::signals::{send_standard_signal, SignalInfo};
+use crate::task::{
+    CurrentTask, EventHandler, Kernel, WaitCallback, WaitCanceler, WaitQueue, Waiter,
+};
+use crate::vfs::buffers::{
+    Buffer, InputBuffer, InputBufferCallback, MessageData, MessageQueue, OutputBuffer,
+    OutputBufferCallback, PeekBufferSegmentsCallback, PipeMessageData, UserBuffersInputBuffer,
+    UserBuffersOutputBuffer,
+};
+use crate::vfs::{
+    default_fcntl, default_ioctl, fileops_impl_nonseekable, CacheMode, FileHandle, FileObject,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
+    SpecialNode,
 };
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, MutexGuard, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::auth::CAP_SYS_RESOURCE;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::signals::SIGPIPE;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
+use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{
-    auth::CAP_SYS_RESOURCE,
-    errno, error,
-    errors::Errno,
-    file_mode::mode,
-    open_flags::OpenFlags,
-    signals::SIGPIPE,
-    statfs, uapi,
-    user_address::{UserAddress, UserRef},
-    user_buffer::{UserBuffer, UserBuffers},
-    vfs::{default_statfs, FdEvents},
-    FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
+    errno, error, statfs, uapi, FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
 };
-use std::{cmp::Ordering, sync::Arc};
+use std::cmp::Ordering;
+use std::sync::Arc;
 
 const ATOMIC_IO_BYTES: u16 = 4096;
 
@@ -45,7 +44,7 @@ fn round_up(value: usize, increment: usize) -> usize {
 
 #[derive(Debug)]
 pub struct Pipe {
-    messages: MessageQueue,
+    messages: MessageQueue<PipeMessageData>,
 
     waiters: WaitQueue,
 
@@ -335,7 +334,7 @@ impl Pipe {
                 // The `from` pipe is empty.
                 break;
             };
-            if let Some(data) = message.data.split_off(limit) {
+            if let Some(data) = MessageData::split_off(&mut message.data, limit) {
                 // Some data is left in the message. Push it back.
                 assert!(data.len() > 0);
                 from.messages.write_front(data.into());
@@ -556,7 +555,7 @@ impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
         }?;
         let bytes_len = bytes.len();
         if bytes_len > 0 {
-            self.pipe.messages.write_message(bytes.into());
+            self.pipe.messages.write_message(PipeMessageData::from(bytes).into());
             self.pipe.notify_write();
             self.available -= bytes_len;
         }
@@ -575,7 +574,7 @@ impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
         let bytes = vec![0; self.available];
         let len = bytes.len();
         if len > 0 {
-            self.pipe.messages.write_message(bytes.into());
+            self.pipe.messages.write_message(PipeMessageData::from(bytes).into());
             self.pipe.notify_write();
             self.available -= len;
         }
@@ -607,10 +606,9 @@ impl<'a> Buffer for SpliceInputBuffer<'a> {
         let mut available = self.available;
         for message in self.pipe.messages.messages() {
             let to_read = std::cmp::min(available, message.len());
-            let buffer = &message.data.bytes()[0..to_read];
             callback(&UserBuffer {
-                address: UserAddress::from(buffer.as_ptr() as u64),
-                length: buffer.len(),
+                address: UserAddress::from(message.data.ptr() as u64),
+                length: to_read,
             });
             available -= to_read;
         }
@@ -624,7 +622,7 @@ impl<'a> InputBuffer for SpliceInputBuffer<'a> {
         let mut available = self.available;
         for message in self.pipe.messages.messages() {
             let to_read = std::cmp::min(available, message.len());
-            let result = callback(&message.data.bytes()[0..to_read])?;
+            let result = message.data.with_bytes(|bytes| callback(&bytes[0..to_read]))?;
             if result > to_read {
                 return error!(EINVAL);
             }
@@ -660,7 +658,7 @@ impl<'a> InputBuffer for SpliceInputBuffer<'a> {
         }
         self.available -= length;
         while let Some(mut message) = self.pipe.messages.read_message() {
-            if let Some(data) = message.data.split_off(length) {
+            if let Some(data) = MessageData::split_off(&mut message.data, length) {
                 // Some data is left in the message. Push it back.
                 self.pipe.messages.write_front(data.into());
             }
@@ -895,7 +893,7 @@ impl PipeFileObject {
 
         let bytes_transferred = data.read_each(&mut |bytes| {
             let actual = std::cmp::min(bytes.len(), available);
-            pipe.messages.write_message(bytes[0..actual].to_vec().into());
+            pipe.messages.write_message(PipeMessageData::from(bytes[0..actual].to_vec()).into());
             available -= actual;
             Ok(actual)
         })?;

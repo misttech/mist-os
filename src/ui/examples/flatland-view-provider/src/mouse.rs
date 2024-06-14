@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::internal_message::*,
-    fidl_fuchsia_ui_pointer as fptr, fuchsia_async as fasync,
-    futures::channel::mpsc::UnboundedSender,
-    tracing::{error, info},
-};
+use crate::internal_message::*;
+use futures::channel::mpsc::UnboundedSender;
+use tracing::{error, info};
+use {fidl_fuchsia_ui_pointer as fptr, fuchsia_async as fasync};
 
 pub fn spawn_mouse_source_watcher(
     mouse_source: fptr::MouseSourceProxy,

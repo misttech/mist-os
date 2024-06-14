@@ -255,7 +255,7 @@ Refer to `kernel.oom.outofmemory-mb`, `kernel.oom.critical-mb`,
 memory pressure state transitions.
 
 The current memory availability state can be queried with the command
-`k pmm mem_avail_state info`.
+`k mem mem_avail_state info`.
 
 ### kernel.oom.outofmemory-mb=\<uint64_t>
 
@@ -646,19 +646,6 @@ less physical memory than it actually has.
 When set, allows the page scanner to evict user pager backed pages. Eviction can
 reduce memory usage and prevent out of memory scenarios, but removes some
 timing predictability from system behavior.
-
-### kernel.page-scanner.discardable-evictions-percent=\<uint32_t>
-
-**Default:** `0x14`
-
-Percentage of page evictions, that should be satisfied from
-discardable VMOs, as opposed to pager-backed VMOs. For example, if this value
-is set to `X` and the kernel needs to reclaim `N` pages to relieve memory
-pressure, it will evict `(N * X / 100)` pages from discardable VMOs, and the
-remaining `(N * (100 - X) / 100)` pages from pager-backed VMOs.
-
-Note that the kernel will try its best to honor this ratio between discardable
-and pager-backed pages evicted, but the actual numbers might not be exact.
 
 ### kernel.page-scanner.page-table-eviction-policy=\[always | never | on_request\]
 
@@ -1247,16 +1234,10 @@ option has no effect.
 
 **Default:** `0x20`
 
-This option caps the number of CPUs to initialize.  It cannot be greater than *SMP\_MAX\_CPUS* 
+This option caps the number of CPUs to initialize.  It cannot be greater than *SMP\_MAX\_CPUS*
 for a specific architecture.
 
 Note: The default value may vary for each architecture.
-
-### kernel.enable_suspend=\<bool>
-
-**Default:** `false`
-
-Enable the kernel to go to the S3 (Suspend to RAM) ACPI power state.
 
 ### kernel.wallclock=\[auto | tsc | pit | hpet\]
 

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_media_sounds::{PlaySoundError, PlayerRequest, PlayerRequestStream},
-    fuchsia_component_test::{ChildOptions, RealmBuilder},
-    futures::{channel::mpsc::UnboundedSender, TryStreamExt},
-};
+use fidl_fuchsia_media_sounds::{PlaySoundError, PlayerRequest, PlayerRequestStream};
+use fuchsia_component_test::{ChildOptions, RealmBuilder};
+use futures::channel::mpsc::UnboundedSender;
+use futures::TryStreamExt;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum SoundPlayerBehavior {

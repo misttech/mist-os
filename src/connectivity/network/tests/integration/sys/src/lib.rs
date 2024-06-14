@@ -4,19 +4,18 @@
 
 #![cfg(test)]
 
-use fidl::{
-    endpoints::{DiscoverableProtocolMarker, RequestStream},
-    AsHandleRef as _,
-};
-use fidl_fuchsia_netemul as fnetemul;
-use fidl_fuchsia_posix_socket as fposix_socket;
+use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
+use fidl::AsHandleRef as _;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObj};
-use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use netemul::{TestRealm, TestSandbox};
 use netstack_testing_common::realms::{constants, Netstack, NetstackVersion, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use std::borrow::Cow;
+use {
+    fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket,
+    fuchsia_zircon as zx,
+};
 
 const MOCK_SERVICES_NAME: &str = "mock";
 const CONFIG_PATH: &str = "/pkg/data/netstack.persist";

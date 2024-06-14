@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_fxfs::BlobWriterProxy,
-    fuchsia_zircon as zx,
-    futures::{
-        future::{BoxFuture, FutureExt as _},
-        stream::{FuturesOrdered, StreamExt as _, TryStreamExt as _},
-    },
-};
+use fidl_fuchsia_fxfs::BlobWriterProxy;
+use fuchsia_zircon as zx;
+use futures::future::{BoxFuture, FutureExt as _};
+use futures::stream::{FuturesOrdered, StreamExt as _, TryStreamExt as _};
 
 mod errors;
 pub use errors::{CreateError, WriteError};
@@ -159,16 +155,14 @@ impl BlobWriter {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_fxfs::{BlobWriterMarker, BlobWriterRequest},
-        fuchsia_zircon::HandleBased,
-        futures::{pin_mut, select},
-        rand::{thread_rng, Rng as _},
-        std::sync::{Arc, Mutex},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_fxfs::{BlobWriterMarker, BlobWriterRequest};
+    use fuchsia_zircon::HandleBased;
+    use futures::{pin_mut, select};
+    use rand::{thread_rng, Rng as _};
+    use std::sync::{Arc, Mutex};
 
     const VMO_SIZE: usize = 4096;
 

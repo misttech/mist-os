@@ -8,8 +8,7 @@
 //! listening to requests immediately after creation.
 //!
 
-use crate::agent::Context;
-use crate::agent::Payload;
+use crate::agent::{Context, Payload};
 use crate::base::SettingType;
 use crate::handler::base::{Payload as HandlerPayload, Request};
 use crate::message::base::{MessageEvent, MessengerType};

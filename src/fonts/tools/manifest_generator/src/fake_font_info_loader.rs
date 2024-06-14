@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    char_set::CharSet,
-    font_info::{FontAssetSource, FontInfo, FontInfoLoader},
-    std::{collections::BTreeSet, path::PathBuf},
-};
+use anyhow::{format_err, Error};
+use char_set::CharSet;
+use font_info::{FontAssetSource, FontInfo, FontInfoLoader};
+use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 /// An implementation of [`FakeFontInfoLoader`] that doesn't read the font file, but instead claims
 /// that the font file contains exactly the code points that appear in the file name, plus the
@@ -61,7 +60,9 @@ impl FontInfoLoader for FakeFontInfoLoaderImpl {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, char_collection::char_collect, pretty_assertions::assert_eq};
+    use super::*;
+    use char_collection::char_collect;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_load_font_info() -> Result<(), Error> {

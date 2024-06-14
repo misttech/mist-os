@@ -2,30 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capability::{BuiltinCapability, CapabilityProvider, InternalCapabilityProvider};
+use crate::model::component::WeakComponentInstance;
+use crate::model::resolver::{self, Resolver};
+use anyhow::{format_err, Error};
+use async_trait::async_trait;
+use fidl::endpoints::{ClientEnd, Proxy, ServerEnd};
+use fuchsia_pkg::PackagePath;
+use fuchsia_url::boot_url::BootUrl;
+use fuchsia_url::{PackageName, PackageVariant};
+use futures::TryStreamExt;
+use routing::capability_source::InternalCapability;
+use routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
+use std::path::Path;
+use std::str::FromStr;
+use std::sync::Arc;
+use system_image::{Bootfs, PathHashMapping};
+use version_history::AbiRevision;
 use {
-    crate::{
-        capability::{BuiltinCapability, CapabilityProvider, InternalCapabilityProvider},
-        model::{
-            component::WeakComponentInstance,
-            resolver::{self, Resolver},
-        },
-    },
-    anyhow::{format_err, Error},
-    async_trait::async_trait,
-    fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_io as fio,
-    fuchsia_pkg::PackagePath,
-    fuchsia_url::{boot_url::BootUrl, PackageName, PackageVariant},
-    fuchsia_zircon as zx,
-    futures::TryStreamExt,
-    routing::capability_source::InternalCapability,
-    routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
-    std::path::Path,
-    std::str::FromStr,
-    std::sync::Arc,
-    system_image::{Bootfs, PathHashMapping},
-    version_history::AbiRevision,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
 };
 
 pub static SCHEME: &str = "fuchsia-boot";
@@ -423,29 +419,26 @@ impl Resolver for FuchsiaBootResolver {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::{
-            component::ComponentInstance, context::ModelContext, environment::Environment,
-        },
-        ::routing::resolving::ResolvedPackage,
-        assert_matches::assert_matches,
-        cm_rust::{FidlIntoNative, NativeIntoFidl},
-        cm_util::TaskGroup,
-        fidl::endpoints::{create_endpoints, create_proxy},
-        fidl::persist,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
-        fuchsia_async::Task,
-        fuchsia_fs::directory::open_in_namespace,
-        std::sync::Weak,
-        vfs::{
-            directory::{entry::OpenRequest, entry_container::Directory},
-            execution_scope::ExecutionScope,
-            file::vmo::read_only,
-            path::Path as VfsPath,
-            pseudo_directory, ToObjectRequest,
-        },
-    };
+    use super::*;
+    use crate::model::component::ComponentInstance;
+    use crate::model::context::ModelContext;
+    use crate::model::environment::Environment;
+    use ::routing::resolving::ResolvedPackage;
+    use assert_matches::assert_matches;
+    use cm_rust::{FidlIntoNative, NativeIntoFidl};
+    use cm_util::TaskGroup;
+    use fidl::endpoints::{create_endpoints, create_proxy};
+    use fidl::persist;
+    use fuchsia_async::Task;
+    use fuchsia_fs::directory::open_in_namespace;
+    use std::sync::Weak;
+    use vfs::directory::entry::OpenRequest;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::read_only;
+    use vfs::path::Path as VfsPath;
+    use vfs::{pseudo_directory, ToObjectRequest};
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata};
 
     fn serve_vfs_dir(root: Arc<impl Directory>) -> (Task<()>, fio::DirectoryProxy) {
         let fs_scope = ExecutionScope::new();

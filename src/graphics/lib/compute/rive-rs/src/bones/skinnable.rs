@@ -4,11 +4,9 @@
 
 use std::fmt;
 
-use crate::{
-    bones::Skin,
-    core::{Object, ObjectRef},
-    shapes::PointsPath,
-};
+use crate::bones::Skin;
+use crate::core::{Object, ObjectRef};
+use crate::shapes::PointsPath;
 
 pub fn try_from(core: Object) -> Option<Object> {
     core.try_cast::<PointsPath>().map(|object| object.into())

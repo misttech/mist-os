@@ -11,11 +11,9 @@ use ffx_config::EnvironmentContext;
 use ffx_daemon_core::events::{self, EventHandler};
 use ffx_daemon_events::{DaemonEvent, TargetConnectionState, TargetEvent, WireTrafficType};
 use ffx_daemon_protocols::create_protocol_register_map;
-use ffx_daemon_target::{
-    target::{self, Target, TargetProtocol, TargetTransport},
-    target_collection::{TargetCollection, TargetUpdateFilter},
-    zedboot::zedboot_discovery,
-};
+use ffx_daemon_target::target::{self, Target, TargetProtocol, TargetTransport};
+use ffx_daemon_target::target_collection::{TargetCollection, TargetUpdateFilter};
+use ffx_daemon_target::zedboot::zedboot_discovery;
 use ffx_metrics::{add_daemon_launch_event, add_daemon_metrics_event};
 use ffx_stream_util::TryStreamUtilExt;
 use ffx_target::Description;
@@ -29,29 +27,23 @@ use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async::{Task, TimeoutExt, Timer};
-use futures::{
-    channel::{mpsc, oneshot},
-    executor::block_on,
-    prelude::*,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::executor::block_on;
+use futures::prelude::*;
 use manual_targets::{Config, ManualTargets};
 use notify::{RecursiveMode, Watcher};
 use overnet_core::ListablePeer;
 use protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister};
 use rcs::RcsConnection;
-use signal_hook::{
-    consts::signal::{SIGHUP, SIGINT, SIGTERM},
-    iterator::Signals,
-};
-use std::{
-    cell::Cell,
-    collections::HashSet,
-    hash::{Hash, Hasher},
-    path::PathBuf,
-    rc::Rc,
-    sync::Arc,
-    time::Duration,
-};
+use signal_hook::consts::signal::{SIGHUP, SIGINT, SIGTERM};
+use signal_hook::iterator::Signals;
+use std::cell::Cell;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Duration;
 
 #[cfg(not(target_os = "macos"))]
 use notify::RecommendedWatcher;
@@ -524,7 +516,8 @@ impl Daemon {
         let event_handler = move |res| {
             let mut quit_tx = quit_tx.clone();
             block_on(async {
-                use notify::event::{Event, EventKind::Remove};
+                use notify::event::Event;
+                use notify::event::EventKind::Remove;
                 match res {
                     Ok(Event { kind: Remove(_), paths, .. }) if paths.contains(&socket_path) => {
                         tracing::info!("daemon socket was deleted, triggering quit message.");
@@ -929,12 +922,10 @@ mod test {
     use chrono::Utc;
     use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrStatus};
     use fidl_fuchsia_developer_ffx::DaemonProxy;
-    use std::{
-        cell::RefCell,
-        collections::BTreeSet,
-        str::FromStr,
-        time::{Instant, SystemTime},
-    };
+    use std::cell::RefCell;
+    use std::collections::BTreeSet;
+    use std::str::FromStr;
+    use std::time::{Instant, SystemTime};
 
     fn spawn_test_daemon() -> (DaemonProxy, Daemon, Task<Result<()>>) {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");

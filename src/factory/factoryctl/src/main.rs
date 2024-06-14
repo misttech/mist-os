@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_boot::{FactoryItemsMarker, FactoryItemsProxy},
-    fidl_fuchsia_factory::{
-        AlphaFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderMarker,
-        MiscFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderMarker,
-        WeaveFactoryStoreProviderMarker, WidevineFactoryStoreProviderMarker,
-    },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_fs::directory::DirentKind,
-    futures::stream::TryStreamExt,
-    nom::HexDisplay,
-    structopt::StructOpt,
+use anyhow::Error;
+use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl_fuchsia_boot::{FactoryItemsMarker, FactoryItemsProxy};
+use fidl_fuchsia_factory::{
+    AlphaFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderMarker,
+    MiscFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderMarker,
+    WeaveFactoryStoreProviderMarker, WidevineFactoryStoreProviderMarker,
 };
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_fs::directory::DirentKind;
+use futures::stream::TryStreamExt;
+use nom::HexDisplay;
+use structopt::StructOpt;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -177,31 +175,27 @@ async fn main() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_boot::{FactoryItemsRequest, FactoryItemsRequestStream},
-        fidl_fuchsia_factory::{
-            AlphaFactoryStoreProviderRequest, AlphaFactoryStoreProviderRequestStream,
-            CastCredentialsFactoryStoreProviderRequest,
-            CastCredentialsFactoryStoreProviderRequestStream, MiscFactoryStoreProviderRequest,
-            MiscFactoryStoreProviderRequestStream, PlayReadyFactoryStoreProviderRequest,
-            PlayReadyFactoryStoreProviderRequestStream, WeaveFactoryStoreProviderRequest,
-            WeaveFactoryStoreProviderRequestStream, WidevineFactoryStoreProviderRequest,
-            WidevineFactoryStoreProviderRequestStream,
-        },
-        fuchsia_async as fasync,
-        fuchsia_component::server as fserver,
-        fuchsia_component_test::{
-            Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref,
-            Route,
-        },
-        fuchsia_zircon as zx,
-        futures::StreamExt,
-        vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::vmo::read_only, tree_builder::TreeBuilder,
-        },
+    use super::*;
+    use fidl_fuchsia_boot::{FactoryItemsRequest, FactoryItemsRequestStream};
+    use fidl_fuchsia_factory::{
+        AlphaFactoryStoreProviderRequest, AlphaFactoryStoreProviderRequestStream,
+        CastCredentialsFactoryStoreProviderRequest,
+        CastCredentialsFactoryStoreProviderRequestStream, MiscFactoryStoreProviderRequest,
+        MiscFactoryStoreProviderRequestStream, PlayReadyFactoryStoreProviderRequest,
+        PlayReadyFactoryStoreProviderRequestStream, WeaveFactoryStoreProviderRequest,
+        WeaveFactoryStoreProviderRequestStream, WidevineFactoryStoreProviderRequest,
+        WidevineFactoryStoreProviderRequestStream,
     };
+    use fuchsia_component::server as fserver;
+    use fuchsia_component_test::{
+        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+    };
+    use futures::StreamExt;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::read_only;
+    use vfs::tree_builder::TreeBuilder;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const ALPHA_TXT_FILE_NAME: &str = "txt/alpha.txt";
     const CAST_TXT_FILE_NAME: &str = "txt/cast.txt";

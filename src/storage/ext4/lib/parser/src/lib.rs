@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    ext4_read_only::{
-        parser::Parser,
-        readers::{BlockDeviceReader, Reader, VmoReader},
-        structs::{self, MIN_EXT4_SIZE},
-    },
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fuchsia_zircon as zx,
-    std::sync::Arc,
-    tracing::error,
-};
+use ext4_read_only::parser::Parser;
+use ext4_read_only::readers::{BlockDeviceReader, Reader, VmoReader};
+use ext4_read_only::structs::{self, MIN_EXT4_SIZE};
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fuchsia_zircon as zx;
+use std::sync::Arc;
+use tracing::error;
 
 pub enum FsSourceType {
     BlockDevice(ClientEnd<BlockMarker>),
@@ -65,13 +61,11 @@ mod tests {
         open_as_vmo_file_assert_content, open_get_proxy_assert, open_get_vmo_file_proxy_assert_ok,
     };
 
-    use {
-        ext4_read_only::structs::MIN_EXT4_SIZE,
-        fidl_fuchsia_io as fio,
-        fuchsia_zircon::Vmo,
-        std::fs,
-        vfs::directory::test_utils::{run_server_client, DirentsSameInodeBuilder},
-    };
+    use ext4_read_only::structs::MIN_EXT4_SIZE;
+    use fidl_fuchsia_io as fio;
+    use fuchsia_zircon::Vmo;
+    use std::fs;
+    use vfs::directory::test_utils::{run_server_client, DirentsSameInodeBuilder};
 
     #[fuchsia::test]
     fn image_too_small() {

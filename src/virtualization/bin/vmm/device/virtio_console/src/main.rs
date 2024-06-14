@@ -5,13 +5,11 @@
 mod device;
 mod wire;
 
-use {
-    anyhow::{anyhow, Error},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization_hardware::VirtioConsoleRequestStream,
-    fuchsia_component::server,
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-};
+use anyhow::{anyhow, Error};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization_hardware::VirtioConsoleRequestStream;
+use fuchsia_component::server;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 
 async fn run_virtio_console(
     mut virtio_console_fidl: VirtioConsoleRequestStream,

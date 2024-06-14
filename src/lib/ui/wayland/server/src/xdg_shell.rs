@@ -2,55 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::{Client, TaskQueue},
-    crate::compositor::{Surface, SurfaceCommand, SurfaceRole},
-    crate::display::Callback,
-    crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
-    crate::scenic::{Flatland, FlatlandPtr},
-    anyhow::{format_err, Error, Result},
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::{create_endpoints, create_proxy, ServerEnd},
-    fidl::prelude::*,
-    fidl_fuchsia_element::{
-        Annotation, AnnotationKey, AnnotationValue, ViewControllerMarker, ViewControllerProxy,
-        ViewSpec,
-    },
-    fidl_fuchsia_math::{Rect, Size, SizeF},
-    fidl_fuchsia_math::{SizeU, Vec_},
-    fidl_fuchsia_ui_app::{ViewProviderControlHandle, ViewProviderMarker, ViewProviderRequest},
-    fidl_fuchsia_ui_composition::{
-        ChildViewWatcherMarker, ChildViewWatcherProxy, ContentId, FlatlandEvent,
-        FlatlandEventStream, FlatlandMarker, ParentViewportWatcherMarker,
-        ParentViewportWatcherProxy, TransformId, ViewportProperties,
-    },
-    fidl_fuchsia_ui_pointer::{
-        MousePointerSample, MouseSourceMarker, MouseSourceProxy, TouchPointerSample,
-        TouchSourceMarker, TouchSourceProxy,
-    },
-    fidl_fuchsia_ui_views::{
-        ViewIdentityOnCreation, ViewRefFocusedMarker, ViewRefFocusedProxy, ViewportCreationToken,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_scenic::flatland::{ViewBoundProtocols, ViewCreationTokenPair},
-    fuchsia_scenic::ViewRefPair,
-    fuchsia_sync::Mutex,
-    fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
-    fuchsia_wayland_core::Enum,
-    futures::prelude::*,
-    std::collections::BTreeSet,
-    std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    xdg_shell_server_protocol::{
-        self as xdg_shell,
-        xdg_positioner::{Anchor, Gravity},
-        xdg_toplevel, XdgPopupEvent, XdgPopupRequest, XdgPositionerRequest, XdgSurfaceEvent,
-        XdgSurfaceRequest, XdgToplevelEvent, XdgToplevelRequest, XdgWmBase, XdgWmBaseRequest,
-    },
+use crate::client::{Client, TaskQueue};
+use crate::compositor::{Surface, SurfaceCommand, SurfaceRole};
+use crate::display::Callback;
+use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
+use crate::scenic::{Flatland, FlatlandPtr};
+use anyhow::{format_err, Error, Result};
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::{create_endpoints, create_proxy, ServerEnd};
+use fidl::prelude::*;
+use fidl_fuchsia_element::{
+    Annotation, AnnotationKey, AnnotationValue, ViewControllerMarker, ViewControllerProxy, ViewSpec,
 };
+use fidl_fuchsia_math::{Rect, Size, SizeF, SizeU, Vec_};
+use fidl_fuchsia_ui_app::{ViewProviderControlHandle, ViewProviderMarker, ViewProviderRequest};
+use fidl_fuchsia_ui_composition::{
+    ChildViewWatcherMarker, ChildViewWatcherProxy, ContentId, FlatlandEvent, FlatlandEventStream,
+    FlatlandMarker, ParentViewportWatcherMarker, ParentViewportWatcherProxy, TransformId,
+    ViewportProperties,
+};
+use fidl_fuchsia_ui_pointer::{
+    MousePointerSample, MouseSourceMarker, MouseSourceProxy, TouchPointerSample, TouchSourceMarker,
+    TouchSourceProxy,
+};
+use fidl_fuchsia_ui_views::{
+    ViewIdentityOnCreation, ViewRefFocusedMarker, ViewRefFocusedProxy, ViewportCreationToken,
+};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_scenic::flatland::{ViewBoundProtocols, ViewCreationTokenPair};
+use fuchsia_scenic::ViewRefPair;
+use fuchsia_sync::Mutex;
+use fuchsia_wayland_core::Enum;
+use futures::prelude::*;
+use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use xdg_shell_server_protocol::xdg_positioner::{Anchor, Gravity};
+use xdg_shell_server_protocol::{
+    self as xdg_shell, xdg_toplevel, XdgPopupEvent, XdgPopupRequest, XdgPositionerRequest,
+    XdgSurfaceEvent, XdgSurfaceRequest, XdgToplevelEvent, XdgToplevelRequest, XdgWmBase,
+    XdgWmBaseRequest,
+};
+use {fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_wayland_core as wl};
 
 // This must start at 1 to satisfy the ViewProducer protocol.
 static NEXT_VIEW_ID: AtomicUsize = AtomicUsize::new(1);

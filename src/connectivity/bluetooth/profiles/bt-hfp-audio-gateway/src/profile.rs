@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Context as _, fidl_fuchsia_bluetooth_bredr as bredr, profile_client::ProfileClient};
+use anyhow::Context as _;
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use profile_client::ProfileClient;
 
-use crate::{config::AudioGatewayFeatureSupport, service_definitions};
+use crate::config::AudioGatewayFeatureSupport;
+use crate::service_definitions;
 
 fn register(
     proxy: bredr::ProfileProxy,
@@ -37,7 +40,9 @@ pub fn register_audio_gateway(
 
 #[cfg(test)]
 pub(crate) mod test_server {
-    use {super::*, fidl_fuchsia_bluetooth_bredr as bredr, futures::StreamExt};
+    use super::*;
+    use fidl_fuchsia_bluetooth_bredr as bredr;
+    use futures::StreamExt;
 
     /// Register a new Profile object, and create an associated test server.
     pub(crate) fn setup_profile_and_test_server(

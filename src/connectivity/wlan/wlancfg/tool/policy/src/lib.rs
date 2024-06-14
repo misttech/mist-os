@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Error};
+use eui48::MacAddress;
+use fidl::endpoints::create_proxy;
+use futures::future::BoxFuture;
+use futures::TryStreamExt;
 use {
-    anyhow::{format_err, Error},
-    eui48::MacAddress,
-    fidl::endpoints::create_proxy,
     fidl_fuchsia_wlan_common as fidl_wlan_common, fidl_fuchsia_wlan_policy as wlan_policy,
     fidl_fuchsia_wlan_product_deprecatedconfiguration as wlan_deprecated,
-    futures::{future::BoxFuture, TryStreamExt},
 };
 
 pub mod opts;
@@ -708,16 +709,15 @@ pub async fn handle_suggest_ap_mac(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints,
-        fuchsia_async::TestExecutor,
-        fuchsia_zircon_status as zx_status,
-        futures::{stream::StreamExt, task::Poll},
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use fidl::endpoints;
+    use fuchsia_async::TestExecutor;
+    use fuchsia_zircon_status as zx_status;
+    use futures::stream::StreamExt;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
 
     static TEST_SSID: &str = "test_ssid";
     static TEST_PASSWORD: &str = "test_password";

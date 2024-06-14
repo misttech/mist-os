@@ -6,13 +6,12 @@ use crate::event::Publisher;
 use crate::service_context::{ExternalServiceProxy, ServiceContext};
 use anyhow::{anyhow, Context as _, Error};
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_media::AudioRenderUsage;
 use fidl_fuchsia_media_sounds::{PlayerMarker, PlayerProxy};
-use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Creates a file-based sound from a resource file.
 fn resource_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>, Error> {

@@ -18,7 +18,10 @@ python_mobly_test("power_cycle_test_fc") {
   local_config_source = "PowerCycleTestbed.yaml"
   transport = "fuchsia-controller"
 
-  environments = [ vim3_env ]
+  environments = [
+    vim3_env,
+    nuc11_env,
+  ]
 }
 
 group("tests") {

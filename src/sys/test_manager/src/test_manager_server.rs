@@ -2,31 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        above_root_capabilities::AboveRootCapabilitiesForTest,
-        constants,
-        debug_data_processor::{DebugDataDirectory, DebugDataProcessor},
-        debug_data_server,
-        error::TestManagerError,
-        facet,
-        offers::map_offers,
-        running_suite::{enumerate_test_cases, RunningSuite},
-        self_diagnostics::RootDiagnosticNode,
-        test_suite::{Suite, SuiteRealm, TestRunBuilder},
-    },
-    fidl::endpoints::ControlHandle,
-    fidl::Error,
-    fidl_fuchsia_component_resolution::ResolverProxy,
-    fidl_fuchsia_test_manager as ftest_manager,
-    fidl_fuchsia_test_manager::{QueryEnumerateInRealmResponder, QueryEnumerateResponder},
-    ftest_manager::LaunchError,
-    fuchsia_async::{self as fasync},
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    std::sync::Arc,
-    tracing::warn,
-};
+use crate::above_root_capabilities::AboveRootCapabilitiesForTest;
+use crate::debug_data_processor::{DebugDataDirectory, DebugDataProcessor};
+use crate::error::TestManagerError;
+use crate::offers::map_offers;
+use crate::running_suite::{enumerate_test_cases, RunningSuite};
+use crate::self_diagnostics::RootDiagnosticNode;
+use crate::test_suite::{Suite, SuiteRealm, TestRunBuilder};
+use crate::{constants, debug_data_server, facet};
+use fidl::endpoints::ControlHandle;
+use fidl::Error;
+use fidl_fuchsia_component_resolution::ResolverProxy;
+use fidl_fuchsia_test_manager::{QueryEnumerateInRealmResponder, QueryEnumerateResponder};
+use ftest_manager::LaunchError;
+use fuchsia_async::{self as fasync};
+use futures::prelude::*;
+use std::sync::Arc;
+use tracing::warn;
+use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_zircon as zx};
 
 /// Start `RunBuilder` server and serve it over `stream`.
 pub async fn run_test_manager_run_builder_server(

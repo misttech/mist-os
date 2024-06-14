@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
-use {
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_zircon as zx,
-    futures::{future::Either, prelude::*, stream::StreamFuture, task::Poll},
-    std::pin::pin,
-};
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_zircon as zx;
+use futures::future::Either;
+use futures::prelude::*;
+use futures::stream::StreamFuture;
+use futures::task::Poll;
+use std::pin::pin;
 
 /// Run a background task while waiting for a future that should occur.
 /// This is useful for running a task which you expect to produce side effects that
@@ -68,7 +69,8 @@ pub fn poll_ap_sme_req(
 }
 
 mod tests {
-    use {super::*, fuchsia_async as fasync};
+    use super::*;
+    use fuchsia_async as fasync;
 
     #[fuchsia::test]
     fn test_run_while() {

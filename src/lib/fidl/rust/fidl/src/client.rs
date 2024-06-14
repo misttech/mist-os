@@ -4,26 +4,25 @@
 
 //! An implementation of a client for a fidl interface.
 
-use {
-    crate::{
-        encoding::{
-            decode_transaction_header, Decode, Decoder, DynamicFlags, Encode, Encoder, EpitaphBody,
-            TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
-        },
-        handle::{AsyncChannel, HandleDisposition, MessageBufEtc},
-        Error,
-    },
-    fuchsia_sync::Mutex,
-    fuchsia_zircon_status as zx_status,
-    futures::{
-        future::{self, FusedFuture, Future, FutureExt, Map, MaybeDone},
-        ready,
-        stream::{FusedStream, Stream},
-        task::{noop_waker, ArcWake, Context, Poll, Waker},
-    },
-    slab::Slab,
-    std::{collections::VecDeque, mem, pin::Pin, sync::Arc},
+use crate::encoding::{
+    decode_transaction_header, Decode, Decoder, DynamicFlags, Encode, Encoder, EpitaphBody,
+    TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
 };
+use crate::handle::{AsyncChannel, HandleDisposition, MessageBufEtc};
+use crate::Error;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, FusedFuture, Future, FutureExt, Map, MaybeDone};
+use futures::ready;
+use futures::stream::{FusedStream, Stream};
+use futures::task::{Context, Poll, Waker};
+use slab::Slab;
+use std::collections::VecDeque;
+use std::mem;
+use std::ops::ControlFlow;
+use std::pin::Pin;
+use std::sync::{Arc, Weak};
+use std::task::{RawWaker, RawWakerVTable};
 
 /// Decodes the body of `buf` as the FIDL type `T`.
 #[doc(hidden)] // only exported for use in macros or generated code
@@ -145,26 +144,24 @@ impl Client {
     /// this `Client`, and no outstanding messages awaiting a response, even if
     /// that response will be discarded.
     pub fn into_channel(self) -> Result<AsyncChannel, Self> {
-        // We need to check the message_interests table to make sure there are
-        // no outstanding interests, since an interest might still exist even if
-        // all EventReceivers and MessageResponses have been dropped. That would
-        // lead to returning an AsyncChannel which could then later receive the
-        // outstanding response unexpectedly.
+        // We need to check the message_interests table to make sure there are no outstanding
+        // interests, since an interest might still exist even if all EventReceivers and
+        // MessageResponses have been dropped. That would lead to returning an AsyncChannel which
+        // could then later receive the outstanding response unexpectedly.
         //
-        // We do try_unwrap before checking the message_interests to avoid a
-        // race where another thread inserts a new value into message_interests
-        // after we check message_interests.is_empty(), but before we get to
-        // try_unwrap. This forces us to create a new Arc if message_interests
-        // isn't empty, since try_unwrap destroys the original Arc.
+        // We do try_unwrap before checking the message_interests to avoid a race where another
+        // thread inserts a new value into message_interests after we check
+        // message_interests.is_empty(), but before we get to try_unwrap. This forces us to create a
+        // new Arc if message_interests isn't empty, since try_unwrap destroys the original Arc.
         match Arc::try_unwrap(self.inner) {
             Ok(inner) => {
                 if inner.interests.lock().messages.is_empty() || inner.channel.is_closed() {
                     Ok(inner.channel)
                 } else {
-                    // This creates a new arc if there are outstanding
-                    // interests. This is ok because we never create any weak
-                    // references to ClientInner, otherwise doing this would
-                    // detach weak references.
+                    // This creates a new arc if there are outstanding interests. This will drop
+                    // weak references, and whilst we do create a weak reference to ClientInner if
+                    // we use it as a waker, it doesn't matter because if we have got this far, the
+                    // waker is obsolete: no tasks are waiting.
                     Err(Self { inner: Arc::new(inner) })
                 }
             }
@@ -337,15 +334,6 @@ impl MessageInterest {
             panic!("EXPECTED received message")
         }
     }
-
-    /// Wake the interested task, if it is waiting, putting it in a WillPoll state.
-    /// This function is idempotent.
-    fn wake(&mut self) {
-        if let Self::Waiting(_) = self {
-            let Self::Waiting(waker) = mem::replace(self, Self::WillPoll) else { unreachable!() };
-            waker.wake();
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -389,7 +377,7 @@ impl Stream for EventReceiver {
             }
         }
 
-        Poll::Ready(match ready!(self.inner.as_ref().poll_recv_event(cx)) {
+        Poll::Ready(match ready!(self.inner.poll_recv_event(cx)) {
             Ok(x) => Some(Ok(x)),
             Err(Error::ClientChannelClosed { status: zx_status::Status::PEER_CLOSED, .. }) => {
                 // The channel is closed, with no epitaph. Set our internal state so that on
@@ -430,24 +418,6 @@ impl EventListener {
     }
 }
 
-struct CombinedWaker {
-    wakers: Vec<Waker>,
-}
-
-impl CombinedWaker {
-    fn make_waker(wakers: Vec<Waker>) -> Waker {
-        futures::task::waker(Arc::new(Self { wakers }))
-    }
-}
-
-impl ArcWake for CombinedWaker {
-    fn wake_by_ref(arc_self: &Arc<Self>) {
-        for waker in &arc_self.wakers {
-            waker.wake_by_ref();
-        }
-    }
-}
-
 /// A shared client channel which tracks EXPECTED and received responses
 #[derive(Debug)]
 struct ClientInner {
@@ -470,8 +440,8 @@ struct Interests {
     messages: Slab<MessageInterest>,
     events: VecDeque<MessageBufEtc>,
     event_listener: EventListener,
-    // The number of tasks waiting for either a message or an event.
-    pending: usize,
+    // The number of wakers registered waiting for either a message or an event.
+    waker_count: usize,
 }
 
 impl Interests {
@@ -491,16 +461,24 @@ impl Interests {
             };
 
             // Matches the +1 in `register_event_listener`.
-            self.pending -= 1;
+            self.waker_count -= 1;
             Some(waker)
         } else {
             None
         }
     }
 
+    /// Returns a reference to the waker.
+    fn event_waker(&self) -> Option<&Waker> {
+        match &self.event_listener {
+            EventListener::Some(waker) => Some(waker),
+            _ => None,
+        }
+    }
+
     /// Receive a message, waking the waiter if they are waiting to poll and `wake` is true.
     /// Returns an error of the message isn't found.
-    fn push_message(&mut self, txid: Txid, buf: MessageBufEtc, wake: bool) -> Result<(), Error> {
+    fn push_message(&mut self, txid: Txid, buf: MessageBufEtc) -> Result<Option<Waker>, Error> {
         let InterestId(raw_id) = InterestId::from_txid(txid);
         // Look for a message interest with the given ID.
         // If one is found, store the message so that it can be picked up later.
@@ -509,20 +487,19 @@ impl Interests {
             return Err(Error::InvalidResponseTxid);
         };
 
+        let mut waker = None;
         if let MessageInterest::Discard = interest {
             self.messages.remove(raw_id);
-        } else if let MessageInterest::Waiting(waker) =
+        } else if let MessageInterest::Waiting(w) =
             mem::replace(interest, MessageInterest::Received(buf))
         {
-            if wake {
-                waker.wake();
-            }
+            waker = Some(w);
+
+            // Matches the +1 in `register`.
+            self.waker_count -= 1;
         }
 
-        // Matches the +1 in `register_msg_interest`.
-        self.pending -= 1;
-
-        Ok(())
+        Ok(waker)
     }
 
     /// Registers the waker from `cx` if the message has not already been received, replacing any
@@ -531,23 +508,30 @@ impl Interests {
         let InterestId(raw_id) = InterestId::from_txid(txid);
         let interest = self.messages.get_mut(raw_id).expect("Polled unregistered interest");
         match interest {
-            MessageInterest::Received(_) => Some(self.messages.remove(raw_id).unwrap_received()),
-            MessageInterest::Discard => panic!("Polled a discarded MessageReceiver?!"),
-            MessageInterest::WillPoll | MessageInterest::Waiting(_) => {
-                *interest = MessageInterest::Waiting(cx.waker().clone());
-                None
+            MessageInterest::Received(_) => {
+                return Some(self.messages.remove(raw_id).unwrap_received())
             }
+            MessageInterest::Discard => panic!("Polled a discarded MessageReceiver?!"),
+            MessageInterest::WillPoll => self.waker_count += 1,
+            MessageInterest::Waiting(_) => {}
         }
+        *interest = MessageInterest::Waiting(cx.waker().clone());
+        None
     }
 
     /// Deregisters an interest.
     fn deregister(&mut self, txid: Txid) {
         let InterestId(raw_id) = InterestId::from_txid(txid);
-        if self.messages[raw_id].is_received() {
-            self.messages.remove(raw_id);
-        } else {
-            self.messages[raw_id] = MessageInterest::Discard;
+        match self.messages[raw_id] {
+            MessageInterest::Received(_) => {
+                self.messages.remove(raw_id);
+                return;
+            }
+            MessageInterest::WillPoll => {}
+            MessageInterest::Waiting(_) => self.waker_count -= 1,
+            MessageInterest::Discard => unreachable!(),
         }
+        self.messages[raw_id] = MessageInterest::Discard;
     }
 
     /// Registers an event listener.
@@ -556,7 +540,7 @@ impl Interests {
             if !mem::replace(&mut self.event_listener, EventListener::Some(cx.waker().clone()))
                 .is_some()
             {
-                self.pending += 1;
+                self.waker_count += 1;
             }
             None
         })
@@ -566,7 +550,7 @@ impl Interests {
     fn dropped_event_listener(&mut self) {
         if self.event_listener.is_some() {
             // Matches the +1 in register_event_listener.
-            self.pending -= 1;
+            self.waker_count -= 1;
         }
         self.event_listener = EventListener::None;
     }
@@ -576,7 +560,6 @@ impl Interests {
     /// This function returns a new transaction ID which should be used to send a message
     /// via the channel. Responses are then received using `poll_recv_msg_response`.
     fn register_msg_interest(&mut self) -> Txid {
-        self.pending += 1;
         // TODO(cramertj) use `try_from` here and assert that the conversion from
         // `usize` to `u32` hasn't overflowed.
         Txid::from_interest_id(InterestId(self.messages.insert(MessageInterest::WillPoll)))
@@ -584,7 +567,7 @@ impl Interests {
 }
 
 impl ClientInner {
-    fn poll_recv_event(&self, cx: &Context<'_>) -> Poll<Result<MessageBufEtc, Error>> {
+    fn poll_recv_event(self: &Arc<Self>, cx: &Context<'_>) -> Poll<Result<MessageBufEtc, Error>> {
         // Update the EventListener with the latest waker, remove any stale WillPoll state
         if let Some(msg_buf) = self.interests.lock().register_event_listener(cx) {
             return Poll::Ready(Ok(msg_buf));
@@ -592,7 +575,7 @@ impl ClientInner {
 
         // Process any data on the channel, registering any tasks still waiting to wake when the
         // channel becomes ready.
-        let maybe_terminal_error = self.recv_all(Txid(0));
+        let maybe_terminal_error = self.recv_all(Some(Txid(0)));
 
         let mut lock = self.interests.lock();
 
@@ -607,7 +590,7 @@ impl ClientInner {
     /// Poll for the response to `txid`, registering the waker associated with `cx` to be awoken,
     /// or returning the response buffer if it has been received.
     fn poll_recv_msg_response(
-        &self,
+        self: &Arc<Self>,
         txid: Txid,
         cx: &Context<'_>,
     ) -> Poll<Result<MessageBufEtc, Error>> {
@@ -618,7 +601,7 @@ impl ClientInner {
 
         // Process any data on the channel, registering tasks still waiting for wake when the
         // channel becomes ready.
-        let maybe_terminal_error = self.recv_all(txid);
+        let maybe_terminal_error = self.recv_all(Some(txid));
 
         let InterestId(raw_id) = InterestId::from_txid(txid);
         let mut interests = self.interests.lock();
@@ -642,7 +625,7 @@ impl ClientInner {
     /// of the channel being closed, a decode error or some other error.  Before using this terminal
     /// error, callers *should* check to see if a response or event has been received as they
     /// should normally, at least for the PEER_CLOSED case, be delivered before the terminal error.
-    fn recv_all(&self, want_txid: Txid) -> Result<(), Error> {
+    fn recv_all(self: &Arc<Self>, want_txid: Option<Txid>) -> Result<(), Error> {
         // Acquire a mutex so that only one thread can read from the underlying channel
         // at a time. Channel is already synchronized, but we need to also decode the
         // FIDL message header atomically so that epitaphs can be properly handled.
@@ -651,9 +634,7 @@ impl ClientInner {
             return Err(error.clone());
         }
 
-        let recv_once = || {
-            // Get a combined waker that will wake up everyone who is waiting.
-            let waker = self.get_combined_waker();
+        let recv_once = |waker| {
             let cx = &mut Context::from_waker(&waker);
 
             let mut buf = MessageBufEtc::new();
@@ -671,7 +652,7 @@ impl ClientInner {
                     });
                 }
                 Poll::Ready(Err(e)) => return Err(Error::ClientRead(e)),
-                Poll::Pending => return Ok(true),
+                Poll::Pending => return Ok(ControlFlow::Break(())),
             };
 
             let (header, body_bytes) = decode_transaction_header(buf.bytes())?;
@@ -693,31 +674,70 @@ impl ClientInner {
                 });
             }
 
-            let mut interests = self.interests.lock();
+            let txid = Txid(header.tx_id);
 
-            assert!(interests.pending > 0, "{}", header.tx_id);
-
-            if header.tx_id == 0 {
-                if let Some(waker) = interests.push_event(buf) {
-                    if want_txid != Txid(0) {
-                        waker.wake();
-                    }
+            let waker = {
+                let mut interests = self.interests.lock();
+                if txid == Txid(0) {
+                    interests.push_event(buf)
+                } else {
+                    interests.push_message(txid, buf)?
                 }
-            } else {
-                let txid = Txid(header.tx_id);
-                interests.push_message(txid, buf, want_txid != txid)?;
-            }
-            if interests.pending == 0 {
-                return Ok(true);
+            };
+
+            // Skip waking if the message was for the caller.
+            if want_txid != Some(txid) {
+                if let Some(waker) = waker {
+                    waker.wake();
+                }
             }
 
-            Ok(false)
+            Ok(ControlFlow::Continue(()))
         };
 
         loop {
-            match recv_once() {
-                Ok(true) => return Ok(()),
-                Ok(false) => {}
+            let waker = {
+                let interests = self.interests.lock();
+                if interests.waker_count == 0 {
+                    return Ok(());
+                } else if interests.waker_count == 1 {
+                    // There's only one waker, so just use the waker for the one interest.  This
+                    // is also required to allow `into_channel` to work, which relies on
+                    // `Arc::try_into` which won't always work if we use a waker based on
+                    // `ClientInner` (even if it's weak), because there can be races where the
+                    // reference count on ClientInner is > 1.
+                    if let Some(waker) = interests.event_waker() {
+                        waker.clone()
+                    } else {
+                        interests
+                            .messages
+                            .iter()
+                            .find_map(|(_, interest)| {
+                                if let MessageInterest::Waiting(waker) = interest {
+                                    Some(waker.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap()
+                    }
+                } else {
+                    // If there's more than one waker, use a waker that points to
+                    // `ClientInner` which will read the message and figure out which is
+                    // the correct task to wake.
+                    // SAFETY: We meet the requirements specified by RawWaker.
+                    unsafe {
+                        Waker::from_raw(RawWaker::new(
+                            Arc::downgrade(self).into_raw() as *const (),
+                            &WAKER_VTABLE,
+                        ))
+                    }
+                }
+            };
+
+            match recv_once(waker) {
+                Ok(ControlFlow::Continue(())) => {}
+                Ok(ControlFlow::Break(())) => return Ok(()),
                 Err(error) => {
                     // Broadcast all errors.
                     self.wake_all();
@@ -727,45 +747,57 @@ impl ClientInner {
         }
     }
 
-    /// Gets a waker that will wake up all the tasks that are waiting on this channel.
-    /// `wake_all` is preferred if you are certain you are waking everyone immediately, as it is
-    /// idempotent (it will only wake each task once)
-    // TODO(https://fxbug.dev/42154109): if Arc::new_cyclic becomes stable, we can wake tasks only when their
-    // message has arrived.
-    fn get_combined_waker(&self) -> Waker {
-        let mut wakers = Vec::new();
-        {
-            let lock = self.interests.lock();
-            wakers.reserve_exact(
-                lock.messages.len()
-                    + matches!(lock.event_listener, EventListener::Some(_)) as usize,
-            );
-            for (_, message_interest) in &lock.messages {
-                if let MessageInterest::Waiting(waker) = message_interest {
-                    wakers.push(waker.clone());
-                }
-            }
-            if let EventListener::Some(waker) = &lock.event_listener {
-                wakers.push(waker.clone());
-            }
-        }
-        if !wakers.is_empty() {
-            CombinedWaker::make_waker(wakers)
-        } else {
-            noop_waker()
-        }
-    }
-
     /// Wakes all tasks that have polled on this channel.
     fn wake_all(&self) {
         let mut lock = self.interests.lock();
         for (_, interest) in &mut lock.messages {
-            interest.wake();
+            if let MessageInterest::Waiting(_) = interest {
+                let MessageInterest::Waiting(waker) =
+                    mem::replace(interest, MessageInterest::WillPoll)
+                else {
+                    unreachable!()
+                };
+                waker.wake();
+            }
         }
         if let Some(waker) = lock.take_event_waker() {
             waker.wake();
         }
+        lock.waker_count = 0;
     }
+
+    fn wake(weak: &Weak<Self>) {
+        if let Some(strong) = weak.upgrade() {
+            // On host, we can't call recv_all because there are reentrancy issues; the waker is
+            // woken whilst locks are held on the channel which recv_all needs.
+            #[cfg(target_os = "fuchsia")]
+            if strong.recv_all(None).is_ok() {
+                return;
+            }
+
+            strong.wake_all();
+        }
+    }
+}
+
+static WAKER_VTABLE: RawWakerVTable =
+    RawWakerVTable::new(clone_waker, wake, wake_by_ref, drop_waker);
+
+unsafe fn clone_waker(data: *const ()) -> RawWaker {
+    let weak = mem::ManuallyDrop::new(Weak::from_raw(data as *const ClientInner));
+    RawWaker::new((*weak).clone().into_raw() as *const (), &WAKER_VTABLE)
+}
+
+unsafe fn wake(data: *const ()) {
+    ClientInner::wake(&Weak::from_raw(data as *const ClientInner));
+}
+
+unsafe fn wake_by_ref(data: *const ()) {
+    ClientInner::wake(&mem::ManuallyDrop::new(Weak::from_raw(data as *const ClientInner)));
+}
+
+unsafe fn drop_waker(data: *const ()) {
+    Weak::from_raw(data as *const ClientInner);
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -924,19 +956,20 @@ pub mod sync {
 #[cfg(all(test, target_os = "fuchsia"))]
 mod tests {
     use super::*;
-    use {
-        crate::encoding::MAGIC_NUMBER_INITIAL,
-        crate::epitaph::{self, ChannelEpitaphExt},
-        anyhow::{Context as _, Error},
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        fuchsia_async::{DurationExt, TimeoutExt},
-        fuchsia_zircon as zx,
-        fuchsia_zircon::{AsHandleRef, DurationNum},
-        futures::{join, stream::FuturesUnordered, StreamExt, TryFutureExt},
-        futures_test::task::new_count_waker,
-        std::{future::pending, thread},
-    };
+    use crate::encoding::MAGIC_NUMBER_INITIAL;
+    use crate::epitaph::{self, ChannelEpitaphExt};
+    use anyhow::{Context as _, Error};
+    use assert_matches::assert_matches;
+    use fuchsia_async::{DurationExt, TimeoutExt};
+    use fuchsia_zircon::{AsHandleRef, DurationNum};
+    use futures::channel::oneshot;
+    use futures::stream::FuturesUnordered;
+    use futures::task::{noop_waker, waker, ArcWake};
+    use futures::{join, StreamExt, TryFutureExt};
+    use futures_test::task::new_count_waker;
+    use std::future::pending;
+    use std::thread;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const SEND_ORDINAL_HIGH_BYTE: u8 = 42;
     const SEND_ORDINAL: u64 = 42 << 32;
@@ -1511,11 +1544,9 @@ mod tests {
         // get event loop to deliver readiness notifications to channels
         let _ = executor.run_until_stalled(&mut future::pending::<()>());
 
-        // BOTH response_waker and event_waker should be woken, since the transaction
-        // that arrived could be for either.
-        assert_eq!(response_waker_count.get(), 1);
+        // The event wake should be woken but not the response_waker.
+        assert_eq!(response_waker_count.get(), 0);
         assert_eq!(event_waker_count.get(), 1);
-        let last_response_waker_count = response_waker_count.get();
 
         // we'll pretend event_waker was woken, and have that poll out the event
         assert!(event_receiver.poll_next_unpin(event_cx).is_ready());
@@ -1529,8 +1560,8 @@ mod tests {
         // get event loop to deliver readiness notifications to channels
         let _ = executor.run_until_stalled(&mut future::pending::<()>());
 
-        // response waker should have been woken again
-        assert_eq!(response_waker_count.get(), last_response_waker_count + 1);
+        // response waker should now get woken.
+        assert_eq!(response_waker_count.get(), 1);
     }
 
     #[test]
@@ -1606,12 +1637,6 @@ mod tests {
 
         // get event loop to deliver readiness notifications to channels
         let _ = executor.run_until_stalled(&mut future::pending::<()>());
-
-        // response1 will have woken all the wakers a second time, because epitaphs wake everyone.
-        // TODO: we don't actually need to do this, I think.
-        for wake_count in &wakers {
-            assert_eq!(wake_count.get(), 2);
-        }
 
         // poll response2 to completion.
         assert_matches!(
@@ -1910,5 +1935,68 @@ mod tests {
             .collect::<Vec<_>>()
             .on_timeout(1.seconds().after_now(), || panic!("timed out!"))
             .await;
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn into_channel_from_waker_succeeds() {
+        let (client_end, server_end) = zx::Channel::create();
+        let client_end = AsyncChannel::from_channel(client_end);
+        let client = Client::new(client_end, "test_protocol");
+
+        let server = AsyncChannel::from_channel(server_end);
+        let mut buffer = MessageBufEtc::new();
+        let receiver = async move {
+            server.recv_etc_msg(&mut buffer).await.expect("failed to recv msg");
+            let two_way_tx_id = 1u8;
+            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id));
+
+            let (bytes, handles) = (&mut vec![], &mut vec![]);
+            let header =
+                TransactionHeader::new(two_way_tx_id as u32, SEND_ORDINAL, DynamicFlags::empty());
+            encode_transaction(header, bytes, handles);
+            server.write_etc(bytes, handles).expect("Server channel write failed");
+        };
+
+        struct Sender {
+            future: Mutex<Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>>,
+        }
+
+        let (done_tx, done_rx) = oneshot::channel();
+
+        let sender = Arc::new(Sender {
+            future: Mutex::new(Box::pin(async move {
+                client
+                    .send_query::<u8, u8, SEND_ORDINAL>(SEND_DATA, DynamicFlags::empty())
+                    .map_ok(|x| assert_eq!(x, SEND_DATA))
+                    .unwrap_or_else(|e| panic!("fidl error: {:?}", e))
+                    .await;
+
+                assert!(client.into_channel().is_ok());
+
+                let _ = done_tx.send(());
+            })),
+        });
+
+        // This test isn't typically how this would work; normally, the future would get woken and
+        // an executor would be responsible for running the task.  We do it this way because if this
+        // works, then it means the case where `into_channel` is used after a response is received
+        // on a multi-threaded executor will always work (which isn't easy to test directly).
+        impl ArcWake for Sender {
+            fn wake_by_ref(arc_self: &Arc<Self>) {
+                assert!(arc_self
+                    .future
+                    .lock()
+                    .poll_unpin(&mut Context::from_waker(&noop_waker()))
+                    .is_ready());
+            }
+        }
+
+        let waker = waker(sender.clone());
+
+        assert!(sender.future.lock().poll_unpin(&mut Context::from_waker(&waker)).is_pending());
+
+        receiver.await;
+
+        done_rx.await.unwrap();
     }
 }

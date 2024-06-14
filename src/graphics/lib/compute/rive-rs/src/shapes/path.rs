@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    component_dirt::ComponentDirt,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    dyn_vec::DynVec,
-    math::{self, Mat},
-    node::Node,
-    option_cell::OptionCell,
-    shapes::{
-        command_path::CommandPathBuilder, CommandPath, CubicVertex, PathVertex, PointsPath, Shape,
-        StraightVertex,
-    },
-    status_code::StatusCode,
-    Component, TransformComponent,
-};
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::dyn_vec::DynVec;
+use crate::math::{self, Mat};
+use crate::node::Node;
+use crate::option_cell::OptionCell;
+use crate::shapes::command_path::CommandPathBuilder;
+use crate::shapes::{CommandPath, CubicVertex, PathVertex, PointsPath, Shape, StraightVertex};
+use crate::status_code::StatusCode;
+use crate::{Component, TransformComponent};
 
 #[derive(Debug, Default)]
 pub struct Path {

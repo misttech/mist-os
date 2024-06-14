@@ -7,10 +7,8 @@ use super::SecurityId;
 use selinux_common::AbstractObjectClass;
 use selinux_policy::AccessVector;
 use starnix_sync::Mutex;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc, Weak,
-};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Weak};
 
 /// An interface for computing the rights permitted to a source accessing a target of a particular
 /// SELinux object type. This interface requires implementers to update state via interior mutability.
@@ -465,15 +463,14 @@ mod tests {
     use super::*;
 
     use once_cell::sync::Lazy;
-    use rand::{distributions::Uniform, thread_rng, Rng as _};
+    use rand::distributions::Uniform;
+    use rand::{thread_rng, Rng as _};
     use selinux_common::ObjectClass;
     use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
-    use std::{
-        collections::{HashMap, HashSet},
-        num::NonZeroU32,
-        sync::atomic::{AtomicU32, AtomicUsize},
-        thread::spawn,
-    };
+    use std::collections::{HashMap, HashSet};
+    use std::num::NonZeroU32;
+    use std::sync::atomic::{AtomicU32, AtomicUsize};
+    use std::thread::spawn;
 
     /// SID to use where any value will do.
     static A_TEST_SID: Lazy<SecurityId> = Lazy::new(unique_sid);

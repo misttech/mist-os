@@ -4,12 +4,11 @@
 
 pub mod args;
 
-use {
-    anyhow::{Context, Result},
-    args::TransactCommand,
-    fidl_fuchsia_hardware_i2c as fi2c, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
-    std::{fmt::Display, io::Write},
-};
+use anyhow::{Context, Result};
+use args::TransactCommand;
+use std::fmt::Display;
+use std::io::Write;
+use {fidl_fuchsia_hardware_i2c as fi2c, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
 
 fn parse_transactions<T: AsRef<str> + Display>(
     src: impl IntoIterator<Item = T>,
@@ -102,7 +101,8 @@ pub async fn transact(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_hardware_i2c as fi2c};
+    use super::*;
+    use fidl_fuchsia_hardware_i2c as fi2c;
 
     fn i2c_read(length: u32) -> fi2c::Transaction {
         fi2c::Transaction {

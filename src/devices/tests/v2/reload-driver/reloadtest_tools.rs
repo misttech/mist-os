@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    fidl_fuchsia_driver_development as fdd,
-    futures::{channel::mpsc, StreamExt},
-    std::collections::{HashMap, HashSet},
-};
+use anyhow::{anyhow, Result};
+use fidl_fuchsia_driver_development as fdd;
+use futures::channel::mpsc;
+use futures::StreamExt;
+use std::collections::{HashMap, HashSet};
 
 // Wait for the events from the |nodes| to be received. Updates the entries to be Some.
 pub async fn wait_for_nodes(

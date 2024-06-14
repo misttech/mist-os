@@ -7,8 +7,7 @@
 /// Convert the lexical items to text to be able to check them.
 #[cfg(test)]
 pub mod test {
-    use crate::lexer::LexicalContent;
-    use crate::lexer::LexicalItem;
+    use crate::lexer::{LexicalContent, LexicalItem};
     use crate::DocCompiler;
 
     pub fn lexical_items_to_errors(

@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, format_err, Error};
-use fidl_fuchsia_feedback as fidl_feedback;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
@@ -12,6 +10,7 @@ use injectable_time::TimeSource;
 use std::cell::RefCell;
 use std::rc::Rc;
 use tracing::{error, warn};
+use {fidl_fuchsia_feedback as fidl_feedback, fuchsia_async as fasync};
 
 // Name of the crash-report product we're filing against.
 const CRASH_PRODUCT_NAME: &'static str = "FuchsiaDetect";

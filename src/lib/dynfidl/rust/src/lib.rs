@@ -8,14 +8,10 @@
 //! [FIDL wire format]: https://fuchsia.dev/fuchsia-src/reference/fidl/language/wire-format
 
 /// A FIDL struct for encoding. Fields are defined in order.
+
+#[derive(Default)]
 pub struct Structure {
     fields: Vec<Field>,
-}
-
-impl Default for Structure {
-    fn default() -> Self {
-        Structure { fields: vec![] }
-    }
 }
 
 impl Structure {
@@ -62,6 +58,10 @@ impl Structure {
     }
 
     pub fn encode_inline(&self, buf: &mut Vec<u8>) {
+        self.encode_fields(buf);
+    }
+
+    pub fn encode_fields(&self, buf: &mut Vec<u8>) {
         // encode the struct's fields:
         if self.fields.is_empty() {
             // A structure can be:
@@ -84,11 +84,58 @@ impl Structure {
     }
 }
 
+/// A boxed struct. Boxes are encoded out of line, and are optional.
+#[derive(Default)]
+pub struct Box {
+    inner: Option<Structure>,
+}
+
+impl Box {
+    pub fn set_present(self) -> Self {
+        Box {
+            inner: match self.inner {
+                Some(s) => Some(s),
+                None => Some(Structure::default()),
+            },
+        }
+    }
+    /// Add a field and its value to this dynamic struct definition.
+    pub fn field(mut self, field: Field) -> Self {
+        self.inner = match self.inner {
+            Some(s) => Some(s.field(field)),
+            None => Some(Structure::default().field(field)),
+        };
+        self
+    }
+
+    fn alignment(&self) -> usize {
+        8
+    }
+
+    fn encode_inline(&self, buf: &mut Vec<u8>) {
+        // When encoded for transfer, `data` indicates presence of content:
+        //   * `0`: struct is absent
+        //   * `UINTPTR_MAX`: struct is present, data is the next out-of-line object */
+        match &self.inner {
+            None => buf.extend(0u64.to_le_bytes()),
+            Some(_) => buf.extend(u64::MAX.to_le_bytes()),
+        }
+    }
+
+    fn encode_out_of_line(&self, buf: &mut Vec<u8>) {
+        match &self.inner {
+            None => (),
+            Some(s) => s.encode_fields(buf),
+        }
+    }
+}
+
 /// A field of a FIDL struct.
 pub enum Field {
     Basic(BasicField),
     Vector(VectorField),
     Struct(Structure),
+    Box(Box),
 }
 
 impl Field {
@@ -97,6 +144,7 @@ impl Field {
             Self::Basic(b) => b.alignment(),
             Self::Vector(l) => l.alignment(),
             Self::Struct(s) => s.alignment(),
+            Self::Box(s) => s.alignment(),
         }
     }
 
@@ -106,6 +154,7 @@ impl Field {
             Self::Basic(b) => b.encode_inline(buf),
             Self::Vector(l) => l.encode_inline(buf),
             Self::Struct(s) => s.encode_inline(buf),
+            Self::Box(s) => s.encode_inline(buf),
         }
     }
 
@@ -118,6 +167,11 @@ impl Field {
                 l.encode_out_of_line(buf);
             }
             Self::Struct(_) => (),
+            Self::Box(s) => {
+                // each secondary object must be padded to 8 bytes, as well as the primary
+                buf.pad_to(8);
+                s.encode_out_of_line(buf)
+            }
         }
     }
 }
@@ -160,6 +214,8 @@ impl BasicField {
 }
 
 pub enum VectorField {
+    /// A null vector is one that does not exist.
+    Null,
     BoolVector(Vec<bool>),
     UInt8Vector(Vec<u8>),
     UInt16Vector(Vec<u16>),
@@ -183,6 +239,7 @@ impl VectorField {
         //   * `size`: 64-bit unsigned number of elements
         //   * `data`: 64-bit presence indication or pointer to out-of-line element data
         let size = match self {
+            Self::Null => 0,
             Self::BoolVector(v) => v.len(),
             Self::UInt8Vector(v) => v.len(),
             Self::UInt16Vector(v) => v.len(),
@@ -199,12 +256,15 @@ impl VectorField {
         // When encoded for transfer, `data` indicates presence of content:
         //   * `0`: vector is absent
         //   * `UINTPTR_MAX`: vector is present, data is the next out-of-line object */
-        // (we always encode UINTPTR_MAX because we don't support nullable vectors)
-        buf.extend(u64::MAX.to_le_bytes());
+        match self {
+            Self::Null => buf.extend(0u64.to_le_bytes()),
+            _ => buf.extend(u64::MAX.to_le_bytes()),
+        }
     }
 
     fn encode_out_of_line(&self, buf: &mut Vec<u8>) {
         match self {
+            Self::Null => (),
             Self::BoolVector(v) => {
                 for b in v {
                     BasicField::Bool(*b).encode_inline(buf);

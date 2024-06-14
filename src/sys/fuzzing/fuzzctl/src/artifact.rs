@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input::Input,
-    crate::util::digest_path,
-    anyhow::{bail, Context as _, Result},
-    fidl_fuchsia_fuzzer::{Artifact as FidlArtifact, Result_ as FuzzResult},
-    fuchsia_zircon_status as zx,
-    std::fs,
-    std::path::{Path, PathBuf},
-};
+use crate::input::Input;
+use crate::util::digest_path;
+use anyhow::{bail, Context as _, Result};
+use fidl_fuchsia_fuzzer::{Artifact as FidlArtifact, Result_ as FuzzResult};
+use fuchsia_zircon_status as zx;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Combines the results of a long-running fuzzer workflow.
 pub struct Artifact {
@@ -74,15 +72,13 @@ pub async fn save_artifact<P: AsRef<Path>>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::save_artifact,
-        crate::input::InputPair,
-        crate::util::digest_path,
-        anyhow::Result,
-        fidl_fuchsia_fuzzer::{Artifact as FidlArtifact, Result_ as FuzzResult},
-        fuchsia_fuzzctl_test::{verify_saved, Test},
-        futures::join,
-    };
+    use super::save_artifact;
+    use crate::input::InputPair;
+    use crate::util::digest_path;
+    use anyhow::Result;
+    use fidl_fuchsia_fuzzer::{Artifact as FidlArtifact, Result_ as FuzzResult};
+    use fuchsia_fuzzctl_test::{verify_saved, Test};
+    use futures::join;
 
     #[fuchsia::test]
     async fn test_save_artifact() -> Result<()> {

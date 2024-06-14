@@ -227,7 +227,7 @@ class Realm final {
   Realm& AddConfiguration(std::vector<ConfigCapability> configurations);
 #endif
 
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
   // Adds a capability to the root realm.
   Realm& AddCapability(fuchsia::component::decl::Capability capability);
 #endif
@@ -353,7 +353,7 @@ class RealmBuilder final {
   RealmBuilder& AddConfiguration(std::vector<ConfigCapability> configurations);
 #endif
 
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
   // Adds a capability to the root realm.
   RealmBuilder& AddCapability(fuchsia::component::decl::Capability capability);
 #endif

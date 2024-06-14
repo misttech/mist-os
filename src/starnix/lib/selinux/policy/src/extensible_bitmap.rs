@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    array_type, array_type_validate_deref_both, error::ValidateError, parser::ParseStrategy, Array,
-    Counted, Validate, ValidateArray,
-};
+use super::error::ValidateError;
+use super::parser::ParseStrategy;
+use super::{array_type, array_type_validate_deref_both, Array, Counted, Validate, ValidateArray};
 
-use std::{cmp::Ordering, fmt::Debug, mem};
+use std::cmp::Ordering;
+use std::fmt::Debug;
+use std::mem;
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 
 /// Maximum number of [`MapItem`] objects in a single [`ExtensibleBitmap`].
@@ -288,16 +289,13 @@ impl<PS: ParseStrategy> ValidateArray<Metadata, MapItem> for ExtensibleBitmap<PS
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::{
-            error::ParseError,
-            parser::{ByRef, ByValue},
-            test::{as_parse_error, as_validate_error, parse_test},
-            Parse,
-        },
-        *,
-    };
-    use std::{borrow::Borrow, marker::PhantomData};
+    use super::super::error::ParseError;
+    use super::super::parser::{ByRef, ByValue};
+    use super::super::test::{as_parse_error, as_validate_error, parse_test};
+    use super::super::Parse;
+    use super::*;
+    use std::borrow::Borrow;
+    use std::marker::PhantomData;
 
     pub(crate) struct ExtensibleBitmapIterator<PS: ParseStrategy, B: Borrow<ExtensibleBitmap<PS>>> {
         extensible_bitmap: B,

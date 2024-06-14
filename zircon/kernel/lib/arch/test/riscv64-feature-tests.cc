@@ -44,20 +44,21 @@ TEST(RiscvFeatureTests, And) {
 }
 
 TEST(RiscvFeatureTests, SetMany) {
-  constexpr std::string_view kIsaString1 =
-      "rv64imafdch_zicsr_zifencei_zihintpause_zba_zbb_zbc_zbs_sstc";
+  constexpr std::string_view kIsaString1 = "rv64imafdch_zicsr_zifencei_zihintpause_zba_zbb_zbc_zbs";
   constexpr std::string_view kIsaString2 =
       "rv64imafdcvh_zicbom_zicboz_zicsr_zifencei_zihintpause_zawrs_zba_zbb_zbc_zbs_zve32f_zve64f_zve64d_sstc_svadu_svpbmt";
 
   arch::RiscvFeatures features;
 
   features.SetMany(kIsaString1);
+  EXPECT_FALSE(features[arch::RiscvFeature::kSstc]);
   EXPECT_FALSE(features[arch::RiscvFeature::kVector]);
   EXPECT_FALSE(features[arch::RiscvFeature::kSvpbmt]);
   EXPECT_FALSE(features[arch::RiscvFeature::kZicbom]);
   EXPECT_FALSE(features[arch::RiscvFeature::kZicboz]);
 
   features.SetMany(kIsaString2);
+  EXPECT_TRUE(features[arch::RiscvFeature::kSstc]);
   EXPECT_TRUE(features[arch::RiscvFeature::kVector]);
   EXPECT_TRUE(features[arch::RiscvFeature::kSvpbmt]);
   EXPECT_TRUE(features[arch::RiscvFeature::kZicbom]);

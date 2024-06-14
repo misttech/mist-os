@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    io_conformance_util::{test_harness::TestHarness, *},
-};
+use assert_matches::assert_matches;
+use fidl::endpoints::create_proxy;
+use io_conformance_util::test_harness::TestHarness;
+use io_conformance_util::*;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn open_dir_without_describe_flag() {
@@ -48,6 +47,25 @@ async fn open_file_without_describe_flag() {
 
         assert_on_open_not_received(&client).await;
     }
+}
+
+#[fuchsia::test]
+async fn open1_epitaph_no_describe() {
+    let harness = TestHarness::new().await;
+    let root = root_directory(vec![]);
+    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+
+    let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
+    root_dir
+        .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "does_not_exist", server)
+        .expect("Open should not fail!");
+    // Since Open1 is asynchronous, we need to invoke another method on the channel to check that
+    // opening failed.
+    let e = client
+        .get_connection_info()
+        .await
+        .expect_err("GetConnectionInfo should fail on a nonexistent file.");
+    assert_matches!(e, fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. });
 }
 
 /// Checks that open fails with ZX_ERR_BAD_PATH when it should.

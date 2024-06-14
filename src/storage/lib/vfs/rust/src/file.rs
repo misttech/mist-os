@@ -4,18 +4,14 @@
 
 //! Module holding different kinds of files and their building blocks.
 
-use {
-    crate::{
-        execution_scope::ExecutionScope, node::Node, object_request::ObjectRequestRef,
-        protocols::ProtocolsExt,
-    },
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    std::{
-        future::{ready, Future},
-        sync::Arc,
-    },
-};
+use crate::execution_scope::ExecutionScope;
+use crate::node::Node;
+use crate::object_request::ObjectRequestRef;
+use crate::protocols::ProtocolsExt;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use std::future::{ready, Future};
+use std::sync::Arc;
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -336,7 +332,7 @@ pub trait FileLike: Node {
 
 /// Helper to open a file or node as required.
 pub fn serve(
-    file: Arc<impl FileLike + ?Sized>,
+    file: Arc<impl FileLike>,
     scope: ExecutionScope,
     protocols: &impl ProtocolsExt,
     object_request: ObjectRequestRef<'_>,

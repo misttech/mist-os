@@ -6,7 +6,8 @@ use anyhow::Error;
 use ffx_core::ffx_plugin;
 use ffx_scrutiny_zbi_args::ScrutinyZbiCommand;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_frontend::command_builder::CommandBuilder;
+use scrutiny_frontend::launcher;
 
 #[ffx_plugin()]
 pub async fn scrutiny_zbi(cmd: ScrutinyZbiCommand) -> Result<(), Error> {

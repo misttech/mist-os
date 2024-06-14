@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::framework::factory::FactoryCapabilityHost;
+use crate::model::testing::out_dir::OutDir;
+use crate::model::testing::routing_test_helpers::*;
+use cm_rust::*;
+use cm_rust_testing::*;
+use fidl::endpoints::{self, ServerEnd};
+use fidl_fidl_examples_routing_echo::EchoMarker;
+use futures::TryStreamExt;
+use moniker::Moniker;
+use routing_test_helpers::RoutingTestModel;
+use std::path::PathBuf;
+use test_case::test_case;
 use {
-    crate::{
-        framework::factory::FactoryCapabilityHost,
-        model::testing::{out_dir::OutDir, routing_test_helpers::*},
-    },
-    cm_rust::*,
-    cm_rust_testing::*,
-    fidl::endpoints::{self, ServerEnd},
-    fidl_fidl_examples_routing_echo::EchoMarker,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon as zx,
-    futures::TryStreamExt,
-    moniker::Moniker,
-    routing_test_helpers::RoutingTestModel,
-    std::path::PathBuf,
-    test_case::test_case,
 };
 
 #[fuchsia::test]

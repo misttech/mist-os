@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context, Result};
+use async_net::TcpStream;
 use async_trait::async_trait;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use ffx_fastboot_interface::fastboot_proxy::FastbootProxy;
@@ -138,7 +139,7 @@ pub async fn tcp_proxy(
     target_name: String,
     addr: &SocketAddr,
     config: FastbootNetworkConnectionConfig,
-) -> Result<FastbootProxy<TcpNetworkInterface>> {
+) -> Result<FastbootProxy<TcpNetworkInterface<TcpStream>>> {
     if target_name.is_empty() {
         bail!(FastbootConnectionFactoryError::EmptyTargetName);
     }
@@ -149,7 +150,7 @@ pub async fn tcp_proxy(
         .open()
         .await
         .with_context(|| format!("FastbootProxy connecting via TCP to Fastboot address: {addr}"))?;
-    Ok(FastbootProxy::<TcpNetworkInterface>::new(addr.to_string(), interface, factory))
+    Ok(FastbootProxy::<TcpNetworkInterface<TcpStream>>::new(addr.to_string(), interface, factory))
 }
 
 ///////////////////////////////////////////////////////////////////////////////

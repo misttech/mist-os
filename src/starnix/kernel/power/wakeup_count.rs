@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        fileops_impl_seekable, FileObject, FileOps, FsNodeOps, InputBuffer, OutputBuffer,
-        SimpleFileNode,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::{
+    fileops_impl_seekable, FileObject, FileOps, FsNodeOps, InputBuffer, OutputBuffer,
+    SimpleFileNode,
 };
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
-use starnix_uapi::{errno, error, errors::Errno};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{errno, error};
 
 /// This file allows user space to put the system into a sleep state while taking into account the
 /// concurrent arrival of wakeup events.

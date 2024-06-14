@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::backend::{BlockBackend, DeviceAttrs, Request, Sector},
-    anyhow::{anyhow, Error},
-    async_lock::Semaphore,
-    async_trait::async_trait,
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_io::{FileMarker, FileProxy, MAX_BUF},
-    fuchsia_trace as ftrace, fuchsia_zircon_status as zx_status,
-    futures::future::try_join_all,
-    virtio_device::mem::DeviceRange,
-};
+use crate::backend::{BlockBackend, DeviceAttrs, Request, Sector};
+use anyhow::{anyhow, Error};
+use async_lock::Semaphore;
+use async_trait::async_trait;
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_io::{FileMarker, FileProxy, MAX_BUF};
+use futures::future::try_join_all;
+use virtio_device::mem::DeviceRange;
+use {fuchsia_trace as ftrace, fuchsia_zircon_status as zx_status};
 
 const MAX_INFLIGHT_REQUESTS: usize = 64;
 
@@ -145,15 +143,11 @@ impl BlockBackend for FileBackend {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        crate::backend_test::{BackendController, BackendTest},
-        std::{
-            io::{Read, Seek, SeekFrom, Write},
-            os::fd::AsFd,
-        },
-        tempfile::tempfile,
-    };
+    use super::*;
+    use crate::backend_test::{BackendController, BackendTest};
+    use std::io::{Read, Seek, SeekFrom, Write};
+    use std::os::fd::AsFd;
+    use tempfile::tempfile;
 
     pub struct FileBackendController(std::fs::File);
 

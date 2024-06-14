@@ -4,14 +4,10 @@
 
 use crate::task::{ProcessGroup, Task, ThreadGroup, ZombieProcess};
 use starnix_logging::track_stub;
-use starnix_uapi::{
-    ownership::{TempRef, WeakRef},
-    pid_t,
-};
-use std::{
-    collections::HashMap,
-    sync::{Arc, Weak},
-};
+use starnix_uapi::ownership::{TempRef, WeakRef};
+use starnix_uapi::pid_t;
+use std::collections::HashMap;
+use std::sync::{Arc, Weak};
 
 #[derive(Default, Debug)]
 enum ProcessEntry {

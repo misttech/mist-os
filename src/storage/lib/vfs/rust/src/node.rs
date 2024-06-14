@@ -4,27 +4,21 @@
 
 //! Implementation of a (limited) node connection.
 
-use crate::{
-    common::{inherit_rights_for_clone, IntoAny},
-    directory::entry_container::MutableDirectory,
-    execution_scope::ExecutionScope,
-    name::Name,
-    node,
-    object_request::Representation,
-    protocols::ToNodeOptions,
-    ObjectRequestRef, ToObjectRequest,
-};
-
-use {
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    futures::stream::StreamExt,
-    libc::{S_IRUSR, S_IWUSR},
-    std::{future::Future, sync::Arc},
-};
+use crate::common::{inherit_rights_for_clone, IntoAny};
+use crate::directory::entry_container::MutableDirectory;
+use crate::execution_scope::ExecutionScope;
+use crate::name::Name;
+use crate::object_request::Representation;
+use crate::protocols::ToNodeOptions;
+use crate::{node, ObjectRequestRef, ToObjectRequest};
+use anyhow::Error;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use futures::stream::StreamExt;
+use libc::{S_IRUSR, S_IWUSR};
+use std::future::{ready, Future};
+use std::sync::Arc;
 
 /// POSIX emulation layer access attributes for all services created with service().
 #[cfg(not(target_os = "macos"))]
@@ -44,16 +38,19 @@ pub trait IsDirectory {
 }
 
 /// All nodes must implement this trait.
-#[async_trait]
 pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
     /// Returns node attributes (io2).
-    async fn get_attributes(
+    fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, Status>;
+    ) -> impl Future<Output = Result<fio::NodeAttributes2, Status>> + Send
+    where
+        Self: Sized;
 
     /// Get this node's attributes.
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status>;
+    fn get_attrs(&self) -> impl Future<Output = Result<fio::NodeAttributes, Status>> + Send
+    where
+        Self: Sized;
 
     /// Called when the node is about to be opened as the node protocol.  Implementers can use this
     /// to perform any initialization or reference counting.  Errors here will result in the open
@@ -71,12 +68,15 @@ pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
     /// Called when the node is closed.
     fn close(self: Arc<Self>) {}
 
-    async fn link_into(
+    fn link_into(
         self: Arc<Self>,
         _destination_dir: Arc<dyn MutableDirectory>,
         _name: Name,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
+    ) -> impl Future<Output = Result<(), Status>> + Send
+    where
+        Self: Sized,
+    {
+        ready(Err(Status::NOT_SUPPORTED))
     }
 
     /// Returns information about the filesystem.
@@ -90,7 +90,10 @@ pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
         scope: ExecutionScope,
         options: NodeOptions,
         object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
+    ) -> Result<(), Status>
+    where
+        Self: Sized,
+    {
         self.will_open_as_node()?;
         scope.spawn(node::Connection::create(scope.clone(), self, options, object_request)?);
         Ok(())
@@ -98,7 +101,7 @@ pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
 }
 
 /// Represents a FIDL (limited) node connection.
-pub struct Connection<N: Node + ?Sized> {
+pub struct Connection<N: Node> {
     // Execution scope this connection and any async operations and connections it creates will
     // use.
     scope: ExecutionScope,
@@ -120,7 +123,7 @@ enum ConnectionState {
     Closed,
 }
 
-impl<N: Node + ?Sized> Connection<N> {
+impl<N: Node> Connection<N> {
     pub fn create(
         scope: ExecutionScope,
         node: Arc<N>,
@@ -279,7 +282,7 @@ impl<N: Node + ?Sized> Connection<N> {
     }
 }
 
-impl<N: Node + ?Sized> Representation for Connection<N> {
+impl<N: Node> Representation for Connection<N> {
     type Protocol = fio::NodeMarker;
 
     async fn get_representation(
@@ -302,23 +305,23 @@ impl<N: Node + ?Sized> Representation for Connection<N> {
 }
 
 /// This struct is a RAII wrapper around a node that will call close() on it when dropped.
-pub struct OpenNode<T: Node + ?Sized> {
+pub struct OpenNode<T: Node> {
     node: Arc<T>,
 }
 
-impl<T: Node + ?Sized> OpenNode<T> {
+impl<T: Node> OpenNode<T> {
     pub fn new(node: Arc<T>) -> Self {
         Self { node }
     }
 }
 
-impl<T: Node + ?Sized> Drop for OpenNode<T> {
+impl<T: Node> Drop for OpenNode<T> {
     fn drop(&mut self) {
         self.node.clone().close();
     }
 }
 
-impl<T: Node + ?Sized> std::ops::Deref for OpenNode<T> {
+impl<T: Node> std::ops::Deref for OpenNode<T> {
     type Target = Arc<T>;
 
     fn deref(&self) -> &Self::Target {

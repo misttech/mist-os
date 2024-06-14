@@ -283,6 +283,7 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
 
   async_dispatcher_t* driver_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
   fdf_testing::DriverRuntime& runtime() { return runtime_; }
+  zx_status_t CreateFactoryClient();
 
   std::unique_ptr<simulation::Environment> env_;
 
@@ -290,6 +291,7 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   std::map<uint16_t, SimInterface*> ifaces_;
 
   fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl> client_;
+  fidl::WireSyncClient<fuchsia_factory_wlan::Iovar> factory_client_;
   fdf::Arena test_arena_;
 
  private:

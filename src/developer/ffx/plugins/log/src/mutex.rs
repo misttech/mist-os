@@ -4,11 +4,9 @@
 
 use crate::condition_variable::LocalConditionVariable;
 use derivative::Derivative;
-use std::{
-    cell::{Cell, RefCell, RefMut},
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-};
+use std::cell::{Cell, RefCell, RefMut};
+use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
 
 /// Mutex designed for local executors which guarantees
 /// wakeup ordering.
@@ -76,15 +74,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        future::poll_fn,
-        pin::pin,
-        task::{Context, Poll},
-    };
+    use std::future::poll_fn;
+    use std::pin::pin;
+    use std::task::{Context, Poll};
 
     use super::*;
     use assert_matches::assert_matches;
-    use futures::{stream::FuturesUnordered, Future, StreamExt};
+    use futures::stream::FuturesUnordered;
+    use futures::{Future, StreamExt};
 
     #[fuchsia::test]
     async fn mutex_signals_completions_in_order() {

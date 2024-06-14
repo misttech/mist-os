@@ -3,17 +3,15 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use carnelian::{
-    color::Color,
-    drawing::{linebreak_text, FontFace},
-    render::Context as RenderContext,
-    scene::{
-        facets::{TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment},
-        layout::{CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize},
-        scene::{Scene, SceneBuilder},
-    },
-    Message, Point, Size, ViewAssistant, ViewAssistantContext,
+use carnelian::color::Color;
+use carnelian::drawing::{linebreak_text, FontFace};
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::{TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment};
+use carnelian::scene::layout::{
+    CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize,
 };
+use carnelian::scene::scene::{Scene, SceneBuilder};
+use carnelian::{Message, Point, Size, ViewAssistant, ViewAssistantContext};
 use fuchsia_zircon::Event;
 
 const TEXT_FONT_SIZE: f32 = 24.0;

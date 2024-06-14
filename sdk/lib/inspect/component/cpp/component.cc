@@ -6,9 +6,10 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/component/cpp/service.h>
+#include <zircon/availability.h>
 
 namespace inspect {
-#if __Fuchsia_API_level__ >= 16
+#if FUCHSIA_API_LEVEL_AT_LEAST(16)
 ComponentInspector::ComponentInspector(async_dispatcher_t* dispatcher, PublishOptions opts)
     : inspector_(std::move(opts.inspector)) {
   auto client_end = opts.client_end.has_value()
@@ -50,7 +51,7 @@ ComponentInspector::ComponentInspector(component::OutgoingDirectory& outgoing_di
 
   ZX_ASSERT(status.is_ok());
 }
-#endif  // __Fuchsia_API_level__
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(16)
 
 NodeHealth& ComponentInspector::Health() {
   if (!component_health_) {

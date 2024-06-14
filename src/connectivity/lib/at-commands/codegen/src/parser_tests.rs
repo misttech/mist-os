@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use codegen_lib::{
-    definition::{
-        Argument, Arguments, Command, Definition, DelimitedArguments, PossiblyOptionType,
-        PrimitiveType, Type, Variant,
-    },
-    parser,
+use codegen_lib::definition::{
+    Argument, Arguments, Command, Definition, DelimitedArguments, PossiblyOptionType,
+    PrimitiveType, Type, Variant,
 };
+use codegen_lib::parser;
 
 #[test]
 fn parse_empty() {

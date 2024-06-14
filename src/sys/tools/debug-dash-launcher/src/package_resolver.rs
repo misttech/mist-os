@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_dash as fdash, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg, tracing::warn};
+use tracing::warn;
+use {fidl_fuchsia_dash as fdash, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 pub(crate) struct PackageResolver {
     resolver: fpkg::PackageResolverProxy,

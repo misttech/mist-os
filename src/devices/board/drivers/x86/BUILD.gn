@@ -71,7 +71,6 @@ fuchsia_driver("platform-bus-x86-driver") {
   deps = [
     ":x64-bind",
     ":x86-config",
-    "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
     "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp",
     "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",

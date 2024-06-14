@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::display_metrics::DisplayMetrics,
-    input_pipeline::{Position, Size},
-};
+use crate::display_metrics::DisplayMetrics;
+use input_pipeline::{Position, Size};
 
 /// [`ScreenCoordinates`] represents a point on the screen. It can be created from pixels, pips, or
 /// millimeters and the coordinate vales can be retrieved in any of those units.

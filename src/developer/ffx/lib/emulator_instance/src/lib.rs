@@ -5,12 +5,10 @@
 use schemars::JsonSchema;
 pub use sdk_metadata::{AudioDevice, DataAmount, DataUnits, PointingDevice, Screen};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    ops::Deref,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 mod enumerations;
 mod instances;

@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    diagnostics_data::Severity, fidl_fuchsia_diagnostics::LogInterestSelector,
-    fidl_fuchsia_test_manager as ftest_manager, std::sync::Arc, test_list::TestTag,
-};
+use diagnostics_data::Severity;
+use fidl_fuchsia_diagnostics::LogInterestSelector;
+use fidl_fuchsia_test_manager as ftest_manager;
+use std::sync::Arc;
+use test_list::TestTag;
 
 /// Parameters that specify how a single test suite should be executed.
 #[derive(Clone, Debug, PartialEq, Default)]

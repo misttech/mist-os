@@ -2,31 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Context, Error};
+use fidl::endpoints;
+use fidl::endpoints::{ClientEnd, Proxy};
+use fidl_fuchsia_test::CaseListenerRequest::Finished;
+use fidl_fuchsia_test::RunListenerRequest::{OnFinished, OnTestCaseStarted};
+use fidl_fuchsia_test::{Invocation, Result_ as TestResult, RunListenerRequestStream};
+use fuchsia_component::client::{self, connect_to_protocol_at_dir_root};
+use fuchsia_runtime::job_default;
+use futures::channel::mpsc;
+use futures::prelude::*;
+use namespace::{Namespace, NamespaceError};
+use std::collections::HashMap;
+use std::sync::Arc;
+use test_manager_test_lib::RunEvent;
+use test_runners_lib::elf::{BuilderArgs, Component};
 use {
-    anyhow::{format_err, Context, Error},
-    fidl::endpoints,
-    fidl::endpoints::ClientEnd,
-    fidl::endpoints::Proxy,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
-    fidl_fuchsia_test::{
-        CaseListenerRequest::Finished,
-        Invocation, Result_ as TestResult,
-        RunListenerRequest::{OnFinished, OnTestCaseStarted},
-        RunListenerRequestStream,
-    },
-    fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
-    fuchsia_component::client::{self, connect_to_protocol_at_dir_root},
-    fuchsia_runtime::job_default,
-    fuchsia_zircon as zx,
-    futures::channel::mpsc,
-    futures::prelude::*,
-    namespace::Namespace,
-    namespace::NamespaceError,
-    std::collections::HashMap,
-    std::sync::Arc,
-    test_manager_test_lib::RunEvent,
-    test_runners_lib::elf::{BuilderArgs, Component},
+    fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 #[derive(PartialEq, Debug)]

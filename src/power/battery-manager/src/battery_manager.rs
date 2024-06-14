@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fidl::endpoints::Proxy;
+use futures::lock::Mutex;
+use futures::TryStreamExt;
+use std::sync::{Arc, RwLock};
+use tracing::{debug, error};
 use {
-    anyhow::Error,
-    fidl::endpoints::Proxy,
     fidl_fuchsia_hardware_powersource as hpower, fidl_fuchsia_power_battery as fpower,
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{lock::Mutex, TryStreamExt},
-    std::sync::{Arc, RwLock},
-    tracing::{debug, error},
 };
 
 #[derive(Debug, PartialEq)]

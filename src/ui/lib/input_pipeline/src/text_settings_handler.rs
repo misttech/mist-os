@@ -7,14 +7,12 @@ use crate::{autorepeater, input_device, metrics};
 use anyhow::{Context, Error, Result};
 use async_trait::async_trait;
 use async_utils::hanging_get::client::HangingGetStream;
-use fidl_fuchsia_input as finput;
-use fidl_fuchsia_settings as fsettings;
-use fuchsia_async as fasync;
 use fuchsia_inspect::health::Reporter;
 use futures::{TryFutureExt, TryStreamExt};
 use metrics_registry::*;
 use std::cell::RefCell;
 use std::rc::Rc;
+use {fidl_fuchsia_input as finput, fidl_fuchsia_settings as fsettings, fuchsia_async as fasync};
 
 /// The text settings handler instance. Refer to as `text_settings_handler::TextSettingsHandler`.
 /// Its task is to decorate an input event with the keymap identifier.  The instance can
@@ -191,12 +189,10 @@ mod tests {
     use super::*;
 
     use crate::input_handler::InputHandler;
-    use crate::keyboard_binding;
-    use crate::testing_utilities;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
+    use crate::{keyboard_binding, testing_utilities};
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     fn input_event_from(
         keyboard_event: keyboard_binding::KeyboardEvent,

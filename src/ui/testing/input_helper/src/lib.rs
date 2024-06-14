@@ -2,30 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use async_utils::event::Event as AsyncEvent;
+use fidl_fuchsia_input::Key;
+use fidl_fuchsia_input_injection::InputDeviceRegistryMarker;
+use fidl_fuchsia_input_report::{
+    ConsumerControlInputReport, ContactInputReport, DeviceInformation, InputReport,
+    KeyboardInputReport, MouseInputReport, TouchInputReport,
+};
+use fidl_fuchsia_ui_input::KeyboardReport;
+use fidl_fuchsia_ui_test_input::{
+    CoordinateUnit, KeyboardRequest, KeyboardRequestStream, MediaButtonsDeviceRequest,
+    MediaButtonsDeviceRequestStream, MouseRequest, MouseRequestStream, RegistryRequest,
+    RegistryRequestStream, TouchScreenRequest, TouchScreenRequestStream,
+};
+use fuchsia_component::client::connect_to_protocol;
+use futures::{StreamExt, TryStreamExt};
+use keymaps::inverse_keymap::{InverseKeymap, Shift};
+use keymaps::usages::{hid_usage_to_input3_key, Usages};
+use std::time::Duration;
+use tracing::{error, info, warn};
 use {
-    async_utils::event::Event as AsyncEvent,
-    fidl_fuchsia_input::Key,
-    fidl_fuchsia_input_injection::InputDeviceRegistryMarker,
-    fidl_fuchsia_input_report::{
-        ConsumerControlInputReport, ContactInputReport, DeviceInformation, InputReport,
-        KeyboardInputReport, MouseInputReport, TouchInputReport,
-    },
     fidl_fuchsia_math as math, fidl_fuchsia_ui_display_singleton as display_info,
-    fidl_fuchsia_ui_input::KeyboardReport,
-    fidl_fuchsia_ui_test_input::{
-        CoordinateUnit, KeyboardRequest, KeyboardRequestStream, MediaButtonsDeviceRequest,
-        MediaButtonsDeviceRequestStream, MouseRequest, MouseRequestStream, RegistryRequest,
-        RegistryRequestStream, TouchScreenRequest, TouchScreenRequestStream,
-    },
     fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    futures::{StreamExt, TryStreamExt},
-    keymaps::{
-        inverse_keymap::{InverseKeymap, Shift},
-        usages::{hid_usage_to_input3_key, Usages},
-    },
-    std::time::Duration,
-    tracing::{error, info, warn},
 };
 
 mod input_device;

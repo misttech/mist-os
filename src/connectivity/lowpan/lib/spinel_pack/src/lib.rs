@@ -662,14 +662,10 @@ pub enum SpinelDataWlen {}
 /// use spinel_pack::prelude::*;
 /// ```
 pub mod prelude {
-    pub use super::spinel_read;
-    pub use super::spinel_write;
-    pub use super::spinel_write_len;
-    pub use super::TryOwnedUnpack as _;
-    pub use super::TryPack as _;
-    pub use super::TryPackAs as _;
-    pub use super::TryUnpack as _;
-    pub use super::TryUnpackAs as _;
+    pub use super::{
+        spinel_read, spinel_write, spinel_write_len, TryOwnedUnpack as _, TryPack as _,
+        TryPackAs as _, TryUnpack as _, TryUnpackAs as _,
+    };
     pub use impl_try_unpack_for_owned;
     pub use spinel_pack_macros::spinel_packed;
 }

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{LinkState, Proto},
-    fuchsia_inspect::Node,
-    fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode},
-};
+use crate::{LinkState, Proto};
+use fuchsia_inspect::Node;
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 
 // Keep only the 50 most recent events.
 static INSPECT_LOG_WINDOW_SIZE: usize = 50;
@@ -39,7 +38,9 @@ impl InspectInfo {
 }
 #[cfg(test)]
 mod tests {
-    use {super::*, diagnostics_assertions::assert_data_tree, fuchsia_inspect::Inspector};
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::Inspector;
 
     #[test]
     fn test_log_state() {

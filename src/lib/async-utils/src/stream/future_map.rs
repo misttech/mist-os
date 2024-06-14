@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    futures::{
-        stream::{FusedStream, Stream},
-        Future,
-    },
-    std::{
-        collections::HashMap,
-        hash::Hash,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use futures::stream::{FusedStream, Stream};
+use futures::Future;
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// A collection of Future indexed by key, allowing removal by Key. When polled, a FutureMap yields
 /// from whichever member future is ready first.
@@ -124,13 +118,13 @@ mod test {
     //!   * Progress is always eventually made - the Stream cannot be stalled
     //!   * All inserted elements will eventually be yielded
     //!   * Elements are never duplicated
-    use {
-        super::*,
-        crate::stream::WithTag,
-        futures::{channel::oneshot, StreamExt},
-        proptest::prelude::*,
-        std::{collections::HashSet, fmt::Debug},
-    };
+    use super::*;
+    use crate::stream::WithTag;
+    use futures::channel::oneshot;
+    use futures::StreamExt;
+    use proptest::prelude::*;
+    use std::collections::HashSet;
+    use std::fmt::Debug;
 
     /// Possible actions to take in evaluating the stream
     enum Event<K> {

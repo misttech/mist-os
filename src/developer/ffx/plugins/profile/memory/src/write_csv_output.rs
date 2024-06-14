@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::bucket::Bucket, crate::digest, crate::plugin_output::ProcessesMemoryUsage,
-    crate::write_human_readable_output::filter_and_order_vmo_groups_names_for_printing,
-    crate::ProfileMemoryOutput, anyhow::Result, digest::processed, std::io::Write,
-};
+use crate::bucket::Bucket;
+use crate::plugin_output::ProcessesMemoryUsage;
+use crate::write_human_readable_output::filter_and_order_vmo_groups_names_for_printing;
+use crate::{digest, ProfileMemoryOutput};
+use anyhow::Result;
+use digest::processed;
+use std::io::Write;
 
 /// Transforms nanoseconds into seconds, because tools that use the CSV output expect seconds.
 fn nanoseconds_to_seconds(time: u64) -> u64 {
@@ -108,12 +110,9 @@ pub fn write_csv_output<'a, W: Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::processed::Kernel;
-    use crate::processed::RetainedMemory;
-    use crate::ProfileMemoryOutput::CompleteDigest;
-    use crate::ProfileMemoryOutput::ProcessDigest;
-    use std::collections::HashMap;
-    use std::collections::HashSet;
+    use crate::processed::{Kernel, RetainedMemory};
+    use crate::ProfileMemoryOutput::{CompleteDigest, ProcessDigest};
+    use std::collections::{HashMap, HashSet};
 
     fn process_digest_for_test() -> crate::ProfileMemoryOutput {
         ProcessDigest(ProcessesMemoryUsage {

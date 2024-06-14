@@ -2,20 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    routes,
-    util::{TryFromFidlWithContext as _, TryIntoCore as _},
-    Ctx,
-};
+use super::util::{ResultExt as _, TryFromFidlWithContext as _, TryIntoCore as _};
+use super::{routes, Ctx};
 
 use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_stack::{
     self as fidl_net_stack, ForwardingEntry, StackRequest, StackRequestStream,
 };
 use futures::{TryFutureExt as _, TryStreamExt as _};
+use log::{debug, error, warn};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_core::routes::{AddableEntry, AddableEntryEither};
-use tracing::{debug, error};
 
 pub(crate) struct StackFidlWorker {
     netstack: crate::bindings::Netstack,
@@ -32,7 +29,7 @@ impl StackFidlWorker {
                     StackRequest::AddForwardingEntry { entry, responder } => {
                         responder.send(
                             worker.fidl_add_forwarding_entry(entry).await
-                        ).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                        ).unwrap_or_log("failed to respond");
                     }
                     StackRequest::DelForwardingEntry {
                         entry:
@@ -46,17 +43,21 @@ impl StackFidlWorker {
                     } => {
                         responder.send(
                             worker.fidl_del_forwarding_entry(subnet).await
-                        ).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                        ).unwrap_or_log("failed to respond");
                     }
                     StackRequest::SetInterfaceIpForwardingDeprecated {
-                        id: _,
-                        ip_version: _,
-                        enabled: _,
+                        id,
+                        ip_version,
+                        enabled,
                         responder,
                     } => {
+                        warn!(
+                            "not updating {ip_version:?} forwarding on interface {id} to \
+                            enabled={enabled}; not supported via fuchsia.net.stack"
+                        );
                         // TODO(https://fxbug.dev/42156951): Support configuring
                         // per-NIC forwarding.
-                        responder.send(Err(fidl_net_stack::Error::NotSupported)).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                        responder.send(Err(fidl_net_stack::Error::NotSupported)).unwrap_or_log("failed to respond");
                     }
                     StackRequest::SetDhcpClientEnabled { responder, id: _, enable } => {
                         // TODO(https://fxbug.dev/42162065): Remove this once
@@ -64,7 +65,7 @@ impl StackFidlWorker {
                         if enable {
                             error!("TODO(https://fxbug.dev/42062356): Support starting DHCP client");
                         }
-                        responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                        responder.send(Ok(())).unwrap_or_log("failed to respond");
                     }
                     StackRequest::BridgeInterfaces{ interfaces: _, bridge, control_handle: _ } => {
                         error!("TODO(https://fxbug.dev/42167696): Support bridging in NS3, probably via a new API");

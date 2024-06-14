@@ -31,22 +31,19 @@
 //! let hierarchy = reader::read(&inspector)?;
 //! ```
 
-use {
-    crate::reader::snapshot::{ScannedBlock, Snapshot},
-    diagnostics_hierarchy::*,
-    inspect_format::{utils, BlockIndex, BlockType, PropertyFormat},
-    maplit::btreemap,
-    std::{borrow::Cow, cmp::min, collections::BTreeMap},
-};
+use crate::reader::snapshot::{ScannedBlock, Snapshot};
+use diagnostics_hierarchy::*;
+use inspect_format::{utils, BlockIndex, BlockType, PropertyFormat};
+use maplit::btreemap;
+use std::borrow::Cow;
+use std::cmp::min;
+use std::collections::BTreeMap;
 
-pub use {
-    crate::reader::{
-        error::ReaderError, readable_tree::ReadableTree, tree_reader::read,
-        tree_reader::read_with_timeout,
-    },
-    diagnostics_hierarchy::{ArrayContent, ArrayFormat, DiagnosticsHierarchy, Property},
-    inspect_format::LinkNodeDisposition,
-};
+pub use crate::reader::error::ReaderError;
+pub use crate::reader::readable_tree::ReadableTree;
+pub use crate::reader::tree_reader::{read, read_with_timeout};
+pub use diagnostics_hierarchy::{ArrayContent, ArrayFormat, DiagnosticsHierarchy, Property};
+pub use inspect_format::LinkNodeDisposition;
 
 mod error;
 mod readable_tree;
@@ -572,17 +569,14 @@ impl<'a> ScanResult<'a> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            types::private::InspectTypeInternal, writer::testing_utils::GetBlockExt, ArrayProperty,
-            HistogramProperty, Inspector, StringReference,
-        },
-        anyhow::Error,
-        diagnostics_assertions::{assert_data_tree, assert_json_diff},
-        futures::prelude::*,
-        inspect_format::{constants, BlockContainer, CopyBytes, PayloadFields},
-    };
+    use super::*;
+    use crate::types::private::InspectTypeInternal;
+    use crate::writer::testing_utils::GetBlockExt;
+    use crate::{ArrayProperty, HistogramProperty, Inspector, StringReference};
+    use anyhow::Error;
+    use diagnostics_assertions::{assert_data_tree, assert_json_diff};
+    use futures::prelude::*;
+    use inspect_format::{constants, BlockContainer, CopyBytes, PayloadFields};
 
     #[fuchsia::test]
     async fn test_load_string_reference() {

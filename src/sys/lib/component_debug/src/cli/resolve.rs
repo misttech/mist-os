@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        cli::format::format_resolve_error, lifecycle::resolve_instance,
-        query::get_cml_moniker_from_query,
-    },
-    anyhow::Result,
-    fidl_fuchsia_sys2 as fsys,
-};
+use crate::cli::format::format_resolve_error;
+use crate::lifecycle::resolve_instance;
+use crate::query::get_cml_moniker_from_query;
+use anyhow::Result;
+use fidl_fuchsia_sys2 as fsys;
 
 pub async fn resolve_cmd<W: std::io::Write>(
     query: String,
@@ -32,10 +29,11 @@ pub async fn resolve_cmd<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, crate::test_utils::serve_realm_query_instances,
-        fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt, moniker::Moniker,
-    };
+    use super::*;
+    use crate::test_utils::serve_realm_query_instances;
+    use fidl::endpoints::create_proxy_and_stream;
+    use futures::TryStreamExt;
+    use moniker::Moniker;
 
     fn setup_fake_lifecycle_controller(
         expected_moniker: &'static str,

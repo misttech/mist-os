@@ -2,74 +2,72 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::fuchsia::{TimerFile, TimerFileClock, TimerWakeup},
-    mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE},
-    task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
-    vfs::{
-        buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer},
-        checked_add_offset_and_length,
-        eventfd::{new_eventfd, EventFdFileObject, EventFdType},
-        inotify::InotifyFileObject,
-        namespace::FileSystemCreator,
-        new_memfd,
-        pidfd::new_pidfd,
-        pipe::{new_pipe, PipeFileObject},
-        splice, AioContext, CheckAccessReason, DirentSink64, EpollFileObject, FallocMode, FdFlags,
-        FdNumber, FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, FsString,
-        IoOperation, IoOperationType, LookupContext, NamespaceNode, PathWithReachability,
-        RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget,
-        TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
-    },
+use crate::fs::fuchsia::{TimerFile, TimerFileClock, TimerWakeup};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
+use crate::task::{
+    CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter,
+};
+use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
+use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
+use crate::vfs::inotify::InotifyFileObject;
+use crate::vfs::namespace::FileSystemCreator;
+use crate::vfs::pidfd::new_pidfd;
+use crate::vfs::pipe::{new_pipe, PipeFileObject};
+use crate::vfs::{
+    checked_add_offset_and_length, new_memfd, splice, AioContext, CheckAccessReason, DirentSink64,
+    EpollFileObject, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle, FileSystemOptions,
+    FlockOperation, FsStr, FsString, IoOperation, IoOperationType, LookupContext, NamespaceNode,
+    PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode,
+    SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount,
+    XattrOp,
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::auth::{
+    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM,
+    PTRACE_MODE_ATTACH_REALCREDS,
+};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT};
+use starnix_uapi::file_mode::{Access, FileMode};
+use starnix_uapi::inotify_mask::InotifyMask;
+use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::personality::PersonalityFlags;
+use starnix_uapi::resource_limits::Resource;
+use starnix_uapi::seal_flags::SealFlags;
+use starnix_uapi::signals::SigSet;
+use starnix_uapi::time::{
+    duration_from_poll_timeout, duration_from_timespec, time_from_timespec, timespec_from_duration,
+};
+use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_buffer::UserBuffer;
+use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
-    __kernel_fd_set, aio_context_t,
-    auth::{CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS},
-    device_type::DeviceType,
-    errno, error,
-    errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT},
-    f_owner_ex,
-    file_mode::{Access, FileMode},
-    inotify_mask::InotifyMask,
-    io_event, iocb, itimerspec,
-    mount_flags::MountFlags,
-    off_t,
-    open_flags::OpenFlags,
-    personality::PersonalityFlags,
-    pid_t, pollfd, pselect6_sigmask,
-    resource_limits::Resource,
-    seal_flags::SealFlags,
-    signals::SigSet,
-    sigset_t, statfs, statx,
-    time::{
-        duration_from_poll_timeout, duration_from_timespec, time_from_timespec,
-        timespec_from_duration,
-    },
-    timespec, uapi, uid_t,
-    user_address::{UserAddress, UserCString, UserRef},
-    user_buffer::UserBuffer,
-    vfs::{EpollEvent, FdEvents, ResolveFlags},
-    AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
-    AT_SYMLINK_NOFOLLOW, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME,
-    CLOCK_REALTIME_ALARM, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK,
-    EFD_SEMAPHORE, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, F_ADD_SEALS,
-    F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLK, F_GETOWN, F_GETOWN_EX, F_GET_SEALS,
-    F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD,
-    F_SETFL, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD,
-    MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX,
-    O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP,
-    POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED,
+    __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, iocb, itimerspec, off_t,
+    pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t, AT_EACCESS,
+    AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
+    CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
+    CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK, EFD_SEMAPHORE,
+    EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, F_ADD_SEALS, F_DUPFD,
+    F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLK, F_GETOWN, F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK,
+    F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD, F_SETFL, F_SETLK,
+    F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, MFD_ALLOW_SEALING,
+    MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT,
+    O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT,
+    POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED,
     POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL,
     POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME,
     TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
 };
-use std::{
-    cmp::Ordering, collections::VecDeque, marker::PhantomData, mem::MaybeUninit, sync::Arc, usize,
-};
+use std::cmp::Ordering;
+use std::collections::VecDeque;
+use std::marker::PhantomData;
+use std::mem::MaybeUninit;
+use std::sync::Arc;
+use std::usize;
 
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
@@ -2016,7 +2014,7 @@ fn select(
     let mask = if !sigmask_addr.is_null() {
         let sigmask = current_task.read_object(sigmask_addr)?;
         let mask = if sigmask.ss.is_null() {
-            current_task.read().signals.mask()
+            current_task.read().signal_mask()
         } else {
             if sigmask.ss_len < std::mem::size_of::<sigset_t>() {
                 return error!(EINVAL);
@@ -2180,17 +2178,34 @@ pub fn sys_epoll_ctl(
     let file = current_task.files.get(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
 
+    let epoll_event = match current_task.read_object(event) {
+        Ok(mut epoll_event) => {
+            // If EPOLLWAKEUP is specified in flags, but the caller does not have the CAP_BLOCK_SUSPEND
+            // capability, then the EPOLLWAKEUP flag is silently ignored.
+            // See https://man7.org/linux/man-pages/man2/epoll_ctl.2.html
+            if epoll_event.events().contains(FdEvents::EPOLLWAKEUP) {
+                if !current_task.creds().has_capability(CAP_BLOCK_SUSPEND) {
+                    epoll_event.ignore(FdEvents::EPOLLWAKEUP);
+                }
+            }
+            Ok(epoll_event)
+        }
+        result => result,
+    };
+
     let ctl_file = current_task.files.get(fd)?;
     match op {
         EPOLL_CTL_ADD => {
-            let epoll_event = current_task.read_object(event)?;
-            epoll_file.add(current_task, &ctl_file, &file, epoll_event)?;
+            epoll_file.add(current_task, &ctl_file, &file, epoll_event?)?;
+            ctl_file.register_epfd(epfd);
         }
         EPOLL_CTL_MOD => {
-            let epoll_event = current_task.read_object(event)?;
-            epoll_file.modify(current_task, &ctl_file, epoll_event)?;
+            epoll_file.modify(current_task, &ctl_file, epoll_event?)?;
         }
-        EPOLL_CTL_DEL => epoll_file.delete(&ctl_file)?,
+        EPOLL_CTL_DEL => {
+            epoll_file.delete(&ctl_file)?;
+            ctl_file.unregister_epfd(epfd);
+        }
         _ => return error!(EINVAL),
     }
     Ok(())
@@ -2317,7 +2332,7 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
             // When wait_until() returns Ok() it means there was a wake up; however there may not
             // be a ready item, for example if waiting on a sync file with multiple sync points.
             // Keep waiting until there's at least one ready item.
-            let signal_mask = signal_mask.unwrap_or_else(|| current_task.read().signals.mask());
+            let signal_mask = signal_mask.unwrap_or_else(|| current_task.read().signal_mask());
             let mut result = current_task.wait_with_temporary_mask(signal_mask, |current_task| {
                 self.waiter.wait_until(current_task, deadline)
             });
@@ -2930,7 +2945,8 @@ pub fn sys_io_destroy(
 mod tests {
     use super::*;
     use crate::testing::*;
-    use starnix_uapi::{vfs::default_statfs, O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET};
+    use starnix_uapi::vfs::default_statfs;
+    use starnix_uapi::{O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET};
     use zerocopy::AsBytes;
 
     #[::fuchsia::test]

@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        drop_event::DropEvent,
-        object_handle::ReadObjectHandle,
-        serialized_types::{Version, Versioned, VersionedLatest},
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    fprint::TypeFingerprint,
-    serde::{Deserialize, Serialize},
-    std::{fmt::Debug, future::Future, hash::Hash, marker::PhantomData, pin::Pin, sync::Arc},
-};
+use crate::drop_event::DropEvent;
+use crate::object_handle::ReadObjectHandle;
+use crate::serialized_types::{Version, Versioned, VersionedLatest};
+use anyhow::Error;
+use async_trait::async_trait;
+use fprint::TypeFingerprint;
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+use std::future::Future;
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::sync::Arc;
 
 // Force keys to be sorted first by a u64, so that they can be located approximately based on only
 // that integer without the whole key.

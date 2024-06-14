@@ -2,19 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fidl::endpoints::create_proxy;
+use fidl::prelude::*;
+use fuchsia_component::server as fserver;
+use fuchsia_component_test::LocalComponentHandles;
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
+use std::sync::Arc;
+use tracing::{info, warn};
 use {
-    anyhow::Error,
-    fidl::{endpoints::create_proxy, prelude::*},
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_component::server as fserver,
-    fuchsia_component_test::LocalComponentHandles,
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc, future::BoxFuture, FutureExt, StreamExt, TryFutureExt, TryStreamExt},
-    power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext},
-    std::sync::Arc,
-    tracing::{info, warn},
+    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 struct ActivityGovernor {

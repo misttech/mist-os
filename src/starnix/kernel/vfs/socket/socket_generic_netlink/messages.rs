@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable};
-use netlink_packet_generic::{constants::GENL_ID_CTRL, ctrl::GenlCtrl, GenlMessage};
+use netlink_packet_generic::constants::GENL_ID_CTRL;
+use netlink_packet_generic::ctrl::GenlCtrl;
+use netlink_packet_generic::GenlMessage;
 use netlink_packet_utils::DecodeError;
 
 #[derive(Clone, Debug)]

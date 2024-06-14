@@ -13,14 +13,12 @@ use std::fmt::Debug;
 // https://blog.rust-lang.org/inside-rust/2023/05/03/stabilizing-async-fn-in-trait.html.
 use async_trait::async_trait;
 
-use crate::{
-    client::{ExternalClient, InternalClient},
-    logging::{log_debug, log_warn},
-    messaging::Sender,
-    multicast_groups::{
-        InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
-        MulticastCapableNetlinkFamily,
-    },
+use crate::client::{ExternalClient, InternalClient};
+use crate::logging::{log_debug, log_warn};
+use crate::messaging::Sender;
+use crate::multicast_groups::{
+    InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
+    MulticastCapableNetlinkFamily,
 };
 
 /// A type representing a Netlink Protocol Family.
@@ -53,18 +51,14 @@ pub mod route {
 
     use super::*;
 
-    use std::{
-        fmt::Display,
-        num::{NonZeroU32, NonZeroU64},
-    };
+    use std::fmt::Display;
+    use std::num::{NonZeroU32, NonZeroU64};
 
     use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
     use either::Either;
-    use futures::{
-        channel::{mpsc, oneshot},
-        sink::SinkExt as _,
-    };
+    use futures::channel::{mpsc, oneshot};
+    use futures::sink::SinkExt as _;
     use linux_uapi::{
         rt_class_t_RT_TABLE_COMPAT, rt_class_t_RT_TABLE_MAIN, rtnetlink_groups_RTNLGRP_DCB,
         rtnetlink_groups_RTNLGRP_DECnet_IFADDR, rtnetlink_groups_RTNLGRP_DECnet_ROUTE,
@@ -84,27 +78,21 @@ pub mod route {
         rtnetlink_groups_RTNLGRP_PHONET_IFADDR, rtnetlink_groups_RTNLGRP_PHONET_ROUTE,
         rtnetlink_groups_RTNLGRP_TC, IFA_F_NOPREFIXROUTE,
     };
-    use net_types::{
-        ip::{
-            AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpInvariant, IpVersion, Ipv4, Ipv4Addr,
-            Ipv6, Ipv6Addr, Subnet,
-        },
-        SpecifiedAddr,
+    use net_types::ip::{
+        AddrSubnetEither, AddrSubnetError, Ip, IpAddr, IpInvariant, IpVersion, Ipv4, Ipv4Addr,
+        Ipv6, Ipv6Addr, Subnet,
     };
-    use netlink_packet_route::{
-        address::{AddressAttribute, AddressMessage},
-        link::{LinkAttribute, LinkFlags, LinkMessage},
-        route::{RouteAttribute, RouteMessage, RouteType},
-        AddressFamily, RouteNetlinkMessage,
-    };
+    use net_types::SpecifiedAddr;
+    use netlink_packet_route::address::{AddressAttribute, AddressMessage};
+    use netlink_packet_route::link::{LinkAttribute, LinkFlags, LinkMessage};
+    use netlink_packet_route::route::{RouteAttribute, RouteMessage, RouteType};
+    use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 
-    use crate::{
-        eventloop::UnifiedRequest,
-        interfaces,
-        netlink_packet::{self, errno::Errno},
-        routes,
-        rules::{RuleRequest, RuleRequestArgs},
-    };
+    use crate::eventloop::UnifiedRequest;
+    use crate::netlink_packet::errno::Errno;
+    use crate::netlink_packet::{self};
+    use crate::rules::{RuleRequest, RuleRequestArgs};
+    use crate::{interfaces, routes};
 
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP, NLM_F_REPLACE};
 
@@ -552,7 +540,11 @@ pub mod route {
         // this once we've merged the routes and interfaces event loops.
         const LOOPBACK_INTERFACE_ID: u64 = 1;
 
-        let IpInvariant(priority) = I::map_ip((), |()| IpInvariant(0), |()| IpInvariant(1));
+        let priority = match I::VERSION {
+            IpVersion::V4 => 0,
+            IpVersion::V6 => 1,
+        };
+
         priority + {
             // Bump the default priority by 1 on loopback interfaces as a hack
             // to avoid conflicts between routes that would otherwise be in
@@ -1246,14 +1238,10 @@ pub mod route {
             client: client.clone(),
             completer,
         };
-        let IpInvariant(fut) = I::map_ip(
+        let fut = I::map_ip_in(
             (request, IpInvariant(sink)),
-            |(request, IpInvariant(sink))| {
-                IpInvariant(sink.send(UnifiedRequest::RoutesV4Request(request)))
-            },
-            |(request, IpInvariant(sink))| {
-                IpInvariant(sink.send(UnifiedRequest::RoutesV6Request(request)))
-            },
+            |(request, IpInvariant(sink))| sink.send(UnifiedRequest::RoutesV4Request(request)),
+            |(request, IpInvariant(sink))| sink.send(UnifiedRequest::RoutesV6Request(request)),
         );
         fut.await.expect("route event loop should never terminate");
         waiter.await.expect("routes event loop should have handled the request")
@@ -1374,51 +1362,45 @@ pub(crate) mod testutil {
 mod test {
     use super::*;
 
-    use std::{
-        collections::VecDeque,
-        net::IpAddr,
-        num::{NonZeroU32, NonZeroU64},
-        pin::pin,
-        sync::{Arc, Mutex},
-    };
+    use std::collections::VecDeque;
+    use std::net::IpAddr;
+    use std::num::{NonZeroU32, NonZeroU64};
+    use std::pin::pin;
+    use std::sync::{Arc, Mutex};
 
     use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 
     use assert_matches::assert_matches;
-    use futures::{channel::mpsc, future::FutureExt as _, stream::StreamExt as _, SinkExt};
+    use futures::channel::mpsc;
+    use futures::future::FutureExt as _;
+    use futures::stream::StreamExt as _;
+    use futures::SinkExt;
     use linux_uapi::{
         net_device_flags_IFF_UP, rt_class_t_RT_TABLE_COMPAT, rt_class_t_RT_TABLE_MAIN, AF_INET,
         AF_INET6, AF_UNSPEC, IFA_F_NOPREFIXROUTE, RTN_MULTICAST, RTN_UNICAST,
     };
     use net_declare::{net_addr_subnet, net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-    use net_types::{
-        ip::{
-            AddrSubnetEither, GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6,
-            Ipv6Addr, Subnet,
-        },
-        SpecifiedAddr, Witness as _,
+    use net_types::ip::{
+        AddrSubnetEither, GenericOverIp, Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
     };
+    use net_types::{SpecifiedAddr, Witness as _};
     use netlink_packet_core::{NetlinkHeader, NLM_F_ACK, NLM_F_DUMP, NLM_F_REPLACE};
-    use netlink_packet_route::{
-        address::{AddressAttribute, AddressFlags, AddressMessage},
-        link::{LinkAttribute, LinkFlags, LinkMessage},
-        route::{RouteAddress, RouteAttribute, RouteMessage, RouteType},
-        rule::RuleMessage,
-        tc::TcMessage,
-        AddressFamily, RouteNetlinkMessage,
-    };
+    use netlink_packet_route::address::{AddressAttribute, AddressFlags, AddressMessage};
+    use netlink_packet_route::link::{LinkAttribute, LinkFlags, LinkMessage};
+    use netlink_packet_route::route::{RouteAddress, RouteAttribute, RouteMessage, RouteType};
+    use netlink_packet_route::rule::RuleMessage;
+    use netlink_packet_route::tc::TcMessage;
+    use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
     use test::testutil::AF_PACKET;
     use test_case::test_case;
 
-    use crate::{
-        eventloop::UnifiedRequest,
-        interfaces,
-        messaging::testutil::{FakeSender, SentMessage},
-        netlink_packet::{self, errno::Errno},
-        protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler},
-        routes,
-        rules::{RuleRequest, RuleRequestArgs, RuleRequestHandler},
-    };
+    use crate::eventloop::UnifiedRequest;
+    use crate::messaging::testutil::{FakeSender, SentMessage};
+    use crate::netlink_packet::errno::Errno;
+    use crate::netlink_packet::{self};
+    use crate::protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler};
+    use crate::rules::{RuleRequest, RuleRequestArgs, RuleRequestHandler};
+    use crate::{interfaces, routes};
 
     enum ExpectedResponse {
         Ack,
@@ -3336,11 +3318,7 @@ mod test {
     }
 
     fn route_addr_from_spec_addr<I: Ip>(a: &SpecifiedAddr<I::Addr>) -> RouteAddress {
-        let IpInvariant(bytes) = I::map_ip(
-            a,
-            |a| IpInvariant(a.ipv4_bytes().to_vec()),
-            |a| IpInvariant(a.ipv6_bytes().to_vec()),
-        );
+        let bytes = I::map_ip_in(a, |a| a.ipv4_bytes().to_vec(), |a| a.ipv6_bytes().to_vec());
         match I::VERSION {
             IpVersion::V4 => RouteAddress::parse(AddressFamily::Inet, &bytes).unwrap(),
             IpVersion::V6 => RouteAddress::parse(AddressFamily::Inet6, &bytes).unwrap(),
@@ -3348,10 +3326,10 @@ mod test {
     }
 
     fn route_addr_from_subnet<I: Ip>(a: &Subnet<I::Addr>) -> RouteAddress {
-        let IpInvariant(bytes) = I::map_ip(
+        let bytes = I::map_ip_in(
             a,
-            |a| IpInvariant(a.network().ipv4_bytes().to_vec()),
-            |a| IpInvariant(a.network().ipv6_bytes().to_vec()),
+            |a| a.network().ipv4_bytes().to_vec(),
+            |a| a.network().ipv6_bytes().to_vec(),
         );
         match I::VERSION {
             IpVersion::V4 => RouteAddress::parse(AddressFamily::Inet, &bytes).unwrap(),
@@ -3388,8 +3366,10 @@ mod test {
             kind,
             flags,
             family: {
-                let IpInvariant(family) =
-                    I::map_ip((), |()| IpInvariant(AF_INET), |()| IpInvariant(AF_INET6));
+                let family = match I::VERSION {
+                    IpVersion::V4 => AF_INET,
+                    IpVersion::V6 => AF_INET6,
+                };
                 // Conversion is safe as family is guaranteed to fit into an 8-bit integer.
                 family as u16
             },
@@ -3399,11 +3379,7 @@ mod test {
                 .chain(extra_nlas.into_iter())
                 .collect(),
             destination_prefix_len: {
-                let IpInvariant(prefix_len) = I::map_ip(
-                    dst,
-                    |dst| IpInvariant(dst.prefix()),
-                    |dst| IpInvariant(dst.prefix()),
-                );
+                let prefix_len = I::map_ip_in(dst, |dst| dst.prefix(), |dst| dst.prefix());
                 prefix_len
             },
             table,

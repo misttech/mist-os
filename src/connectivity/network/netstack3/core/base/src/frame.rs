@@ -4,13 +4,12 @@
 
 //! Common traits and types for dealing with abstracted frames.
 
-use net_types::{
-    ethernet::Mac,
-    ip::{Ip, IpVersionMarker},
-    BroadcastAddr, MulticastAddr,
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ip, IpVersionMarker};
+use net_types::{BroadcastAddr, MulticastAddr};
 
-use core::{convert::Infallible as Never, fmt::Debug};
+use core::convert::Infallible as Never;
+use core::fmt::Debug;
 use packet::{BufferMut, Serializer};
 
 /// A context for receiving frames.
@@ -186,7 +185,8 @@ impl<D, I: Ip> RecvIpFrameMeta<D, I> {
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;
-    use alloc::{boxed::Box, vec::Vec};
+    use alloc::boxed::Box;
+    use alloc::vec::Vec;
 
     /// A fake [`FrameContext`].
     pub struct FakeFrameCtx<Meta> {

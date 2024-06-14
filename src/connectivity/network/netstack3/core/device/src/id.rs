@@ -10,19 +10,17 @@ use core::hash::Hash;
 use core::num::NonZeroU64;
 
 use derivative::Derivative;
-use netstack3_base::{
-    sync::{DynDebugReferences, PrimaryRc, StrongRc},
-    Device, DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier,
-};
+use netstack3_base::sync::{DynDebugReferences, PrimaryRc, StrongRc};
+use netstack3_base::{Device, DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier};
 use netstack3_filter as filter;
 
-use crate::internal::{
-    base::{DeviceClassMatcher as _, DeviceIdAndNameMatcher as _, DeviceLayerTypes, OriginTracker},
-    ethernet::EthernetLinkDevice,
-    loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId},
-    pure_ip::{PureIpDevice, PureIpDeviceId, PureIpWeakDeviceId},
-    state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, WeakCookie},
+use crate::internal::base::{
+    DeviceClassMatcher as _, DeviceIdAndNameMatcher as _, DeviceLayerTypes, OriginTracker,
 };
+use crate::internal::ethernet::EthernetLinkDevice;
+use crate::internal::loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId};
+use crate::internal::pure_ip::{PureIpDevice, PureIpDeviceId, PureIpWeakDeviceId};
+use crate::internal::state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, WeakCookie};
 
 /// A weak ID identifying a device.
 ///

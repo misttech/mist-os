@@ -12,6 +12,18 @@ import("//build/sdk/sdk_atom.gni")
 import("//build/testing/fidl_api_compatibility_test.gni")
 import("//build/testing/golden_files.gni")
 
+if (override_target_api_level == "PLATFORM") {
+  # FIDL directly supports targeting multiple API levels. "PLATFORM" is a
+  # meta-level that refers to the set of all supported API levels.
+  _levels = []
+  foreach(_level, platform_version.runtime_supported_api_levels) {
+    _levels += [ "$_level" ]
+  }
+  fidl_target_api_levels = string_join(",", _levels)
+} else {
+  fidl_target_api_levels = "$override_target_api_level"
+}
+
 # Declares a bindings agnostic FIDL library. See //build/fidl/fidl.gni for the
 # full FIDL template which produces bindings. This template does the following:
 #
@@ -48,9 +60,8 @@ import("//build/testing/golden_files.gni")
 #    - Optional: Usual GN meanings.
 #
 template("fidl_library") {
-  assert(
-      current_toolchain == fidl_toolchain,
-      "This template can only be used in the FIDL toolchain $fidl_toolchain.")
+  assert(is_fidl_toolchain,
+         "This template can only be used in a FIDL toolchain.")
 
   assert(defined(invoker.sources), "sources is required")
   assert(defined(invoker.library_name), "library_name is required")
@@ -129,9 +140,8 @@ template("fidl_library") {
     fidl_library_name = library_name
     gen_dir = target_gen_dir
     json_representation = fidl_ir_json
-    target_api_level = fidl_fuchsia_api_level
     if (!defined(available)) {
-      available = [ "fuchsia:$target_api_level" ]
+      available = [ "fuchsia:$fidl_target_api_levels" ]
     }
     if (!defined(versioned)) {
       if (defined(invoker.testonly) && invoker.testonly) {

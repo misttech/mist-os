@@ -15,8 +15,7 @@ use fuchsia_zircon as zx;
 use std::net::Ipv6Addr;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::Waker;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, Waker};
 
 const PREFIX_LEN: u8 = 64;
 
@@ -51,15 +50,10 @@ fn convert_zx_time_into_seconds_until(time: zx::Time) -> u32 {
 
 fn make_fake_ra_prefix_packet(prefix: ot::Ip6Prefix, valid: u32, preferred: u32) -> Vec<u8> {
     use net_types::ip::Ipv6;
-    use packet::InnerPacketBuilder;
-    use packet::Serializer;
-    use packet_formats::icmp::ndp::options::NdpOptionBuilder;
-    use packet_formats::icmp::ndp::options::PrefixInformation;
-    use packet_formats::icmp::ndp::OptionSequenceBuilder;
-    use packet_formats::icmp::ndp::RoutePreference;
-    use packet_formats::icmp::ndp::RouterAdvertisement;
-    use packet_formats::icmp::IcmpPacketBuilder;
-    use packet_formats::icmp::IcmpUnusedCode;
+    use packet::{InnerPacketBuilder, Serializer};
+    use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
+    use packet_formats::icmp::ndp::{OptionSequenceBuilder, RoutePreference, RouterAdvertisement};
+    use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
 
     let src_addr = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1); // Local host address
     let dst_addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 2); // All routers multicast

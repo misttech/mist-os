@@ -2,25 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy},
-    fidl_fuchsia_hardware_bluetooth::EmulatorProxy,
-    fuchsia_bluetooth::expectation::asynchronous::{expectable, Expectable, ExpectableExt},
-    futures::future::BoxFuture,
-    futures::{FutureExt, StreamExt},
-    std::{
-        ops::{Deref, DerefMut},
-        sync::Arc,
-    },
-    test_harness::{SharedState, TestHarness},
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy};
+use fidl_fuchsia_hardware_bluetooth::EmulatorProxy;
+use fuchsia_bluetooth::expectation::asynchronous::{expectable, Expectable, ExpectableExt};
+use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use test_harness::{SharedState, TestHarness};
 
-use crate::{
-    core_realm::{CoreRealm, SHARED_STATE_INDEX},
-    emulator::EmulatorState,
-    host_watcher::ActivatedFakeHost,
-};
+use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
+use crate::emulator::EmulatorState;
+use crate::host_watcher::ActivatedFakeHost;
 
 #[derive(Clone, Debug, Default)]
 pub struct ProfileState {

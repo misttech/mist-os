@@ -2,28 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_factory::{
-        AlphaFactoryStoreProviderRequest, AlphaFactoryStoreProviderRequestStream,
-        CastCredentialsFactoryStoreProviderRequest,
-        CastCredentialsFactoryStoreProviderRequestStream, MiscFactoryStoreProviderRequest,
-        MiscFactoryStoreProviderRequestStream, PlayReadyFactoryStoreProviderRequest,
-        PlayReadyFactoryStoreProviderRequestStream, WeaveFactoryStoreProviderRequest,
-        WeaveFactoryStoreProviderRequestStream, WidevineFactoryStoreProviderRequest,
-        WidevineFactoryStoreProviderRequestStream,
-    },
-    fidl_fuchsia_io as fio,
-    fuchsia_component::server::ServiceFs,
-    futures::{lock::Mutex, prelude::*},
-    serde_json::from_reader,
-    std::{collections::HashMap, fs::File, str::FromStr, sync::Arc},
-    structopt::StructOpt,
-    vfs::{
-        directory::entry_container::Directory, execution_scope::ExecutionScope,
-        file::vmo::read_only, tree_builder::TreeBuilder,
-    },
+use anyhow::{format_err, Error};
+use fidl_fuchsia_factory::{
+    AlphaFactoryStoreProviderRequest, AlphaFactoryStoreProviderRequestStream,
+    CastCredentialsFactoryStoreProviderRequest, CastCredentialsFactoryStoreProviderRequestStream,
+    MiscFactoryStoreProviderRequest, MiscFactoryStoreProviderRequestStream,
+    PlayReadyFactoryStoreProviderRequest, PlayReadyFactoryStoreProviderRequestStream,
+    WeaveFactoryStoreProviderRequest, WeaveFactoryStoreProviderRequestStream,
+    WidevineFactoryStoreProviderRequest, WidevineFactoryStoreProviderRequestStream,
 };
+use fidl_fuchsia_io as fio;
+use fuchsia_component::server::ServiceFs;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use serde_json::from_reader;
+use std::collections::HashMap;
+use std::fs::File;
+use std::str::FromStr;
+use std::sync::Arc;
+use structopt::StructOpt;
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::read_only;
+use vfs::tree_builder::TreeBuilder;
 
 type LockedDirectoryProxy = Arc<Mutex<fio::DirectoryProxy>>;
 

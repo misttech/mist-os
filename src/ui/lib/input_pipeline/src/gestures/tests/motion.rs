@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 
 mod tests {
-    use {
-        super::super::utils,
-        crate::{gestures::args, input_device, mouse_binding, touch_binding, Position},
-        assert_matches::assert_matches,
-        maplit::hashset,
-        pretty_assertions::assert_eq,
-        std::collections::HashSet,
-        test_util::{assert_gt, assert_lt, assert_near},
-    };
+    use super::super::utils;
+    use crate::gestures::args;
+    use crate::{input_device, mouse_binding, touch_binding, Position};
+    use assert_matches::assert_matches;
+    use maplit::hashset;
+    use pretty_assertions::assert_eq;
+    use std::collections::HashSet;
+    use test_util::{assert_gt, assert_lt, assert_near};
 
     fn touchpad_event(
         positions: Vec<Position>,
@@ -149,15 +148,14 @@ mod tests {
     }
 
     mod chain {
-        use {
-            super::super::super::utils,
-            super::touchpad_event,
-            crate::{gestures::args, input_device, mouse_binding, Position},
-            assert_matches::assert_matches,
-            maplit::hashset,
-            pretty_assertions::assert_eq,
-            test_util::{assert_gt, assert_near},
-        };
+        use super::super::super::utils;
+        use super::touchpad_event;
+        use crate::gestures::args;
+        use crate::{input_device, mouse_binding, Position};
+        use assert_matches::assert_matches;
+        use maplit::hashset;
+        use pretty_assertions::assert_eq;
+        use test_util::{assert_gt, assert_near};
 
         #[fuchsia::test(allow_stalls = false)]
         async fn motion_then_place_2nd_finger_then_lift() {

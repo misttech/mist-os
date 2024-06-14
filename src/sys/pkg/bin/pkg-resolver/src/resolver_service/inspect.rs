@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::inspect_util, fidl_fuchsia_pkg as fpkg, fuchsia_inspect::Node,
-    fuchsia_url::AbsolutePackageUrl, fuchsia_zircon as zx, futures::future::BoxFuture,
-};
+use crate::inspect_util;
+use fuchsia_inspect::Node;
+use fuchsia_url::AbsolutePackageUrl;
+use futures::future::BoxFuture;
+use {fidl_fuchsia_pkg as fpkg, fuchsia_zircon as zx};
 
 fn now_monotonic_nanos() -> i64 {
     zx::Time::get_monotonic().into_nanos()
@@ -86,11 +87,9 @@ pub struct PackageWithRewrittenUrl {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
-        fuchsia_inspect::Inspector,
-    };
+    use super::*;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fuchsia_inspect::Inspector;
 
     #[test]
     fn package_state_progression() {

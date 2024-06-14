@@ -106,7 +106,7 @@ where
                         backlight_brightness
                     }
                     LedType::Named(led_name) => {
-                        let Some(light_group) =  light_groups.get(&*led_name) else {
+                        let Some(light_group) = light_groups.get(&*led_name) else {
                             return acc;
                         };
                         if let Some(brightness) = light_group.brightness() {

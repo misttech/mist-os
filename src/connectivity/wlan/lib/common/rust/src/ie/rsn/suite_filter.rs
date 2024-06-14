@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        akm::{self, Akm, AKM_EAP},
-        cipher::{self, Cipher, CIPHER_BIP_CMAC_128, CIPHER_CCMP_128},
-    },
-    crate::ie,
-};
+use super::akm::{self, Akm, AKM_EAP};
+use super::cipher::{self, Cipher, CIPHER_BIP_CMAC_128, CIPHER_CCMP_128};
+use crate::ie;
 
 // IEEE 802.11-2016, 9.4.2.25.2
 // If group data cipher suite field is not included in RSNE, CCMP-128 is the default for
@@ -141,10 +137,8 @@ pub const WPA3_ENTERPRISE_192_BIT: SuiteFilter = SuiteFilter {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test_utils::fake_frames::{fake_wpa2_rsne, fake_wpa3_enterprise_192_bit_rsne},
-    };
+    use super::*;
+    use crate::test_utils::fake_frames::{fake_wpa2_rsne, fake_wpa3_enterprise_192_bit_rsne};
 
     #[test]
     fn test_suite_filter() {

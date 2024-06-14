@@ -15,14 +15,13 @@ use futures::io::{self, AsyncRead, AsyncWrite};
 use futures::ready;
 use futures::task::{AtomicWaker, Context};
 
-use std::fmt;
 use std::io::{Read, Write};
-use std::mem;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
+use std::{fmt, mem};
 
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
 

@@ -9,11 +9,9 @@
 //! for raising and lowering from and to the low level ASTs and high level generated tyoes.
 
 pub use crate::parser::common::ParseError;
-use {
-    crate::{highlevel, lowlevel},
-    std::io,
-    thiserror::Error,
-};
+use crate::{highlevel, lowlevel};
+use std::io;
+use thiserror::Error;
 
 /// Errors that can occur while deserializing AT commands into high level generated AT command
 /// and response types.
@@ -80,16 +78,11 @@ impl From<io::Error> for SerializeErrorCause {
 // a module, clients can be prevented from using them.  The module is pub(crate) to allow
 // tests access to the internal traits.
 pub(crate) mod internal {
-    use {
-        super::{DeserializeError, DeserializeErrorCause, ParseError, SerializeErrorCause},
-        crate::{
-            highlevel, lowlevel,
-            lowlevel::write_to::WriteTo,
-            parser::{command_grammar, command_parser, response_grammar, response_parser},
-            translate,
-        },
-        std::io,
-    };
+    use super::{DeserializeError, DeserializeErrorCause, ParseError, SerializeErrorCause};
+    use crate::lowlevel::write_to::WriteTo;
+    use crate::parser::{command_grammar, command_parser, response_grammar, response_parser};
+    use crate::{highlevel, lowlevel, translate};
+    use std::io;
 
     /// Trait to specify the parse, raise and lower functions for AT commands or responses.
     /// This is used by the blanket SerDe implementation below to glue together the pieces

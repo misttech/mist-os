@@ -5,7 +5,6 @@
 import("//sdk/ctf/build/compatibility_test_suite.gni")
 import("//sdk/ctf/build/ctf.gni")
 import("//sdk/ctf/build/internal/ctf_releases.gni")
-import("//sdk/ctf/build/internal/platform_version.gni")
 
 # Store accumulated test targets.
 all_test_targets = []

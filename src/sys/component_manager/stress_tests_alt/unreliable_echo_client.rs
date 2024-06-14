@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fasync::TimeoutExt,
-    fidl_fidl_examples_routing_echo as fecho, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    rand::{thread_rng, Rng},
-    std::time::Duration,
-};
+use fasync::TimeoutExt;
+use fuchsia_component::client::connect_to_protocol;
+use rand::{thread_rng, Rng};
+use std::time::Duration;
+use {fidl_fidl_examples_routing_echo as fecho, fuchsia_async as fasync};
 
 #[fasync::run_singlethreaded]
 async fn main() {

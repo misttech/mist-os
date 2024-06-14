@@ -4,15 +4,13 @@
 
 pub mod args;
 
-use {
-    crate::common::{
-        node_property_key_to_string, node_property_value_to_string, write_node_properties,
-    },
-    anyhow::{Context, Result},
-    args::ListCompositeNodeSpecsCommand,
-    fidl_fuchsia_driver_development as fdd,
-    std::io::Write,
+use crate::common::{
+    node_property_key_to_string, node_property_value_to_string, write_node_properties,
 };
+use anyhow::{Context, Result};
+use args::ListCompositeNodeSpecsCommand;
+use fidl_fuchsia_driver_development as fdd;
+use std::io::Write;
 
 pub async fn list_composite_node_specs(
     cmd: ListCompositeNodeSpecsCommand,
@@ -105,16 +103,12 @@ pub async fn list_composite_node_specs(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        argh::FromArgs,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_driver_framework as fdf, fuchsia_async as fasync,
-        futures::{
-            future::{Future, FutureExt},
-            stream::StreamExt,
-        },
-    };
+    use super::*;
+    use argh::FromArgs;
+    use fidl::endpoints::ServerEnd;
+    use futures::future::{Future, FutureExt};
+    use futures::stream::StreamExt;
+    use {fidl_fuchsia_driver_framework as fdf, fuchsia_async as fasync};
 
     /// Invokes `list_composite_node_specs` with `cmd` and runs a mock driver development server that
     /// invokes `on_driver_development_request` whenever it receives a request.

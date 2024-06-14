@@ -3,17 +3,15 @@
 // found in the LICENSE file.
 
 mod tests {
-    use {
-        crate::routing::RoutingTestBuilderForAnalyzer,
-        cm_rust::{Availability, ExposeSource},
-        cm_rust_testing::*,
-        moniker::Moniker,
-        routing_test_helpers::{
-            availability::CommonAvailabilityTest, CheckUse, ExpectedResult, RoutingTestModel,
-            RoutingTestModelBuilder, ServiceInstance,
-        },
-        std::path::PathBuf,
+    use crate::routing::RoutingTestBuilderForAnalyzer;
+    use cm_rust::{Availability, ExposeSource};
+    use cm_rust_testing::*;
+    use moniker::Moniker;
+    use routing_test_helpers::availability::CommonAvailabilityTest;
+    use routing_test_helpers::{
+        CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder, ServiceInstance,
     };
+    use std::path::PathBuf;
 
     #[fuchsia::test]
     async fn offer_availability_successful_routes() {

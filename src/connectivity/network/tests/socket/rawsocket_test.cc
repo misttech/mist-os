@@ -545,7 +545,11 @@ TEST(RawSocketICMPv6Test, FilterICMPPackets) {
       .sin6_addr = IN6ADDR_LOOPBACK_INIT,
   };
 
-  constexpr uint8_t kAllowedType = 111;
+  // Allow Echo Request (128); disallow everything else, e.g. Echo Reply (129).
+  // NB: Netstack3 doesn't allow sending ICMP messages with invalid message
+  // types; so stick to known valid message types.
+  constexpr uint8_t kAllowedType = 128;
+  constexpr uint8_t kDisallowedType = 129;
 
   // Pass only the allowed type.
   {
@@ -556,12 +560,12 @@ TEST(RawSocketICMPv6Test, FilterICMPPackets) {
         << strerror(errno);
   }
 
-  // Send an ICMP packet for each type.
-  uint8_t icmp_type = 0;
+  // Send an allowed ICMP message, and a disallowed ICMP message.
+  std::array<uint8_t, 2> types = {kAllowedType, kDisallowedType};
   constexpr uint8_t kUnusedICMPCode = 0;
-  do {
+  for (uint8_t type : types) {
     const icmp6_hdr packet = {
-        .icmp6_type = icmp_type,
+        .icmp6_type = type,
         .icmp6_code = kUnusedICMPCode,
         // The stack will calculate the checksum.
         .icmp6_cksum = 0,
@@ -571,7 +575,7 @@ TEST(RawSocketICMPv6Test, FilterICMPPackets) {
                        reinterpret_cast<const sockaddr*>(&kLoopbackAddr), sizeof(kLoopbackAddr));
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, static_cast<ssize_t>(sizeof(packet)));
-  } while (icmp_type++ != std::numeric_limits<uint8_t>::max());
+  }
 
   // Make sure only the allowed type was received.
   {

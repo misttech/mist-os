@@ -4,19 +4,17 @@
 
 pub mod psk;
 
-use {
-    crate::{
-        key::exchange::Key,
-        rsna::{AuthRejectedReason, AuthStatus, Dot11VerifiedKeyFrame, SecAssocUpdate, UpdateSink},
-        Error,
-    },
-    fidl_fuchsia_wlan_mlme::SaeFrame,
-    ieee80211::{MacAddr, MacAddrBytes, Ssid},
-    tracing::warn,
-    wlan_common::ie::rsn::akm::AKM_SAE,
-    wlan_sae as sae,
-    zerocopy::ByteSlice,
+use crate::key::exchange::Key;
+use crate::rsna::{
+    AuthRejectedReason, AuthStatus, Dot11VerifiedKeyFrame, SecAssocUpdate, UpdateSink,
 };
+use crate::Error;
+use fidl_fuchsia_wlan_mlme::SaeFrame;
+use ieee80211::{MacAddr, MacAddrBytes, Ssid};
+use tracing::warn;
+use wlan_common::ie::rsn::akm::AKM_SAE;
+use wlan_sae as sae;
+use zerocopy::ByteSlice;
 
 /// IEEE Std 802.11-2016, 12.4.4.1
 /// Elliptic curve group 19 is the default supported group -- all SAE peers must support it, and in

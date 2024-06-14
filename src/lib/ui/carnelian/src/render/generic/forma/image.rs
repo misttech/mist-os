@@ -2,13 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{io::Read, mem, slice, sync::Arc};
+use std::io::Read;
+use std::sync::Arc;
+use std::{mem, slice};
 
 use anyhow::Error;
 use fidl_fuchsia_sysmem2::{BufferCollectionSynchronousProxy, CoherencyDomain};
 use fuchsia_trace::duration;
-use fuchsia_zircon::sys;
-use fuchsia_zircon::{self as zx, prelude::*};
+use fuchsia_zircon::prelude::*;
+use fuchsia_zircon::{self as zx, sys};
 use mapped_vmo::Mapping;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

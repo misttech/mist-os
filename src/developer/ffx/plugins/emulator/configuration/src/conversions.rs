@@ -169,12 +169,14 @@ mod tests {
     use super::*;
     use assembly_manifest::BlobfsContents;
     use assembly_partitions_config::PartitionsConfig;
+    use sdk_metadata::virtual_device::{Cpu, Hardware};
     use sdk_metadata::{
-        virtual_device::{Cpu, Hardware},
         AudioDevice, AudioModel, CpuArchitecture, DataAmount, DataUnits, ElementType, InputDevice,
         PointingDevice, Screen, ScreenUnits,
     };
-    use std::{collections::HashMap, fs::File, io::Write};
+    use std::collections::HashMap;
+    use std::fs::File;
+    use std::io::Write;
 
     const VIRTUAL_DEVICE_VALID: &str =
         include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");

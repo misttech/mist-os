@@ -2,34 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    async_trait::async_trait,
-    camino::Utf8Path,
-    chrono::{offset::Utc, DateTime},
-    errors::ffx_bail,
-    ffx_config::{environment::EnvironmentKind, EnvironmentContext},
-    ffx_repository_packages_args::{
-        ExtractArchiveSubCommand, ListSubCommand, PackagesCommand, PackagesSubCommand,
-        ShowSubCommand,
-    },
-    fho::{FfxMain, FfxTool, MachineWriter, ToolIO},
-    fuchsia_hash::Hash,
-    fuchsia_hyper::new_https_client,
-    fuchsia_pkg::PackageArchiveBuilder,
-    fuchsia_repo::{
-        repo_client::{PackageEntry, RepoClient},
-        repository::{PmRepository, RepoProvider},
-    },
-    humansize::{file_size_opts, FileSize},
-    pkg::repo::repo_spec_to_backend,
-    prettytable::{cell, format::TableFormat, row, Row, Table},
-    std::{
-        fs::File,
-        io::{BufWriter, Cursor, Read},
-        time::{Duration, SystemTime},
-    },
+use anyhow::{Context as _, Result};
+use async_trait::async_trait;
+use camino::Utf8Path;
+use chrono::offset::Utc;
+use chrono::DateTime;
+use errors::ffx_bail;
+use ffx_config::environment::EnvironmentKind;
+use ffx_config::EnvironmentContext;
+use ffx_repository_packages_args::{
+    ExtractArchiveSubCommand, ListSubCommand, PackagesCommand, PackagesSubCommand, ShowSubCommand,
 };
+use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
+use fuchsia_hash::Hash;
+use fuchsia_hyper::new_https_client;
+use fuchsia_pkg::PackageArchiveBuilder;
+use fuchsia_repo::repo_client::{PackageEntry, RepoClient};
+use fuchsia_repo::repository::{PmRepository, RepoProvider};
+use humansize::{file_size_opts, FileSize};
+use pkg::repo::repo_spec_to_backend;
+use prettytable::format::TableFormat;
+use prettytable::{cell, row, Row, Table};
+use std::fs::File;
+use std::io::{BufWriter, Cursor, Read};
+use std::time::{Duration, SystemTime};
 
 const MAX_HASH: usize = 11;
 const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
@@ -383,17 +379,15 @@ async fn extract_archive_impl(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        ffx_config::ConfigLevel,
-        ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader},
-        fho::TestBuffers,
-        fuchsia_async as fasync,
-        fuchsia_repo::test_utils,
-        pretty_assertions::assert_eq,
-        prettytable::format::FormatBuilder,
-        std::path::Path,
-    };
+    use super::*;
+    use ffx_config::ConfigLevel;
+    use ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader};
+    use fho::TestBuffers;
+    use fuchsia_async as fasync;
+    use fuchsia_repo::test_utils;
+    use pretty_assertions::assert_eq;
+    use prettytable::format::FormatBuilder;
+    use std::path::Path;
 
     const PKG1_HASH: &str = "2881455493b5870aaea36537d70a2adc635f516ac2092598f4b6056dabc6b25d";
     const PKG2_HASH: &str = "050907f009ff634f9aa57bff541fb9e9c2c62b587c23578e77637cda3bd69458";
@@ -535,7 +529,6 @@ mod test {
     }
 
     #[fasync::run_singlethreaded(test)]
-    #[ignore = "TODO(https://fxbug.dev/344009079): Learn cause of whitespace difference and fix"]
     async fn test_package_list_including_components() {
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;
@@ -568,9 +561,11 @@ mod test {
         assert_eq!(
             stdout,
             format!(
-                " NAME        SIZE      HASH         MODIFIED                         COMPONENTS \n \
+                " NAME        SIZE      HASH         {:1$}  COMPONENTS \n \
                 package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified}  meta/package1.cm \n \
                 package2/0  24.03 KB  {pkg2_hash}  {pkg2_modified}  meta/package2.cm \n",
+                "MODIFIED",
+                pkg1_modified.len().max(pkg2_modified.len())
             ),
         );
 

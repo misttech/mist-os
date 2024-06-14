@@ -2,11 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    serde_json::{json, Value},
-    std::collections::HashMap,
-    std::collections::VecDeque,
-};
+use serde_json::{json, Value};
+use std::collections::{HashMap, VecDeque};
 
 /// Converts a series of tokens into a single json value. For example:
 /// --foo bar --baz a b would produce the json:

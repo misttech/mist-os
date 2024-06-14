@@ -4,10 +4,12 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.fuchsia_controller.tracing.py."""
 
+import asyncio
 import os
 import tempfile
 import unittest
 from collections.abc import Callable
+import logging
 from typing import Any
 from unittest import mock
 
@@ -333,6 +335,80 @@ class TracingFCTests(unittest.TestCase):
         else:
             self.tracing_obj.terminate()
             mock_tracingcontroller_terminate.assert_called()
+            # Check that no warning logs got printed.
+            self.assertNoLogs()
+
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "when_session_is_not_initialized",
+                    "session_initialized": False,
+                },
+            ),
+            (
+                {
+                    "label": "with_no_download",
+                    "session_initialized": True,
+                },
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    @mock.patch.object(
+        f_tracingcontroller.Controller.Client,
+        "initialize_tracing",
+    )
+    @mock.patch.object(
+        f_tracingcontroller.Controller.Client,
+        "terminate_tracing",
+        new_callable=mock.AsyncMock,
+    )
+    @mock.patch.object(
+        f_tracingcontroller.ControllerTerminateTracingResult,
+        "response",
+        f_tracingcontroller.ControllerTerminateTracingResponse(
+            result=f_tracingcontroller.TerminateResult(
+                provider_stats=[
+                    f_tracingcontroller.ProviderStats(
+                        name="virtual-console.cm",
+                        pid=4566,
+                        buffering_mode=1,
+                        buffer_wrapped_count=0,
+                        records_dropped=10,
+                        percentage_durable_buffer_used=0.0,
+                        non_durable_bytes_written=16,
+                    )
+                ]
+            )
+        ),
+    )
+    def test_terminate_with_warning(
+        self,
+        parameterized_dict: dict[str, Any],
+        mock_tracingcontroller_terminate: mock.Mock,
+        mock_tracingcontroller_response: f_tracingcontroller.ControllerTerminateTracingResponse,
+        *unused_args: Any,
+    ) -> None:
+        """Test for Tracing.terminate() method with Warning."""
+        # Perform setup based on parameters.
+        if parameterized_dict.get("session_initialized"):
+            self.tracing_obj.initialize()
+
+        # Check whether an `errors.FuchsiaStateError` exception is raised when
+        # state is not valid.
+        if not parameterized_dict.get("session_initialized"):
+            with self.assertRaises(errors.FuchsiaStateError):
+                self.tracing_obj.terminate()
+        else:
+            self.tracing_obj.terminate()
+            mock_tracingcontroller_terminate.assert_called()
+            mock_tracingcontroller_response.assert_called()
+
+            with self.assertLogs("Tracing", level="WARNING") as cm:
+                logging.getLogger("Tracing").warning(
+                    "10 records were dropped for 4566!"
+                )
 
     @mock.patch.object(
         f_tracingcontroller.Controller.Client,

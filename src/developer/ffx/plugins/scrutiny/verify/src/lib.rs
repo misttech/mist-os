@@ -6,7 +6,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use ffx_core::ffx_plugin;
 use ffx_scrutiny_verify_args::{Command, SubCommand};
 use scrutiny_utils::path::relativize_path;
-use std::{fs, io::Write, path::PathBuf};
+use std::fs;
+use std::io::Write;
+use std::path::PathBuf;
 
 mod bootfs;
 mod component_resolvers;

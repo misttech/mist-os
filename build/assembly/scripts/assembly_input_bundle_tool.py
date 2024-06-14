@@ -5,12 +5,14 @@
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
-from typing import List, Set, Tuple
-import logging
+from typing import Any, TextIO
+
 from assembly.assembly_input_bundle import (
+    CompiledPackageDefinition,
     CompiledPackageDefinitionFromGN,
 )
 from depfile import DepFile
@@ -131,8 +133,8 @@ def create_bundle(args: argparse.Namespace) -> None:
 
 
 def add_pkg_list_from_file(
-    pkg_set: List[PackageDetails], pkg_list_file, pkg_set_name: str
-):
+    pkg_set: set[PackageDetails], pkg_list_file: TextIO, pkg_set_name: str
+) -> None:
     pkg_list = _read_json_file(pkg_list_file)
     for package in [PackageDetails(m, pkg_set_name) for m in pkg_list]:
         if package in pkg_set:
@@ -140,7 +142,9 @@ def add_pkg_list_from_file(
         pkg_set.add(package)
 
 
-def add_kernel_cmdline_from_file(aib_creator: AIBCreator, kernel_cmdline_file):
+def add_kernel_cmdline_from_file(
+    aib_creator: AIBCreator, kernel_cmdline_file: TextIO
+) -> None:
     cmdline_list = _read_json_file(kernel_cmdline_file)
     for cmd in cmdline_list:
         if cmd in aib_creator.kernel.args:
@@ -149,8 +153,10 @@ def add_kernel_cmdline_from_file(aib_creator: AIBCreator, kernel_cmdline_file):
 
 
 def add_driver_list_from_file(
-    aib_creator: AIBCreator, driver_list_file, driver_list
-):
+    aib_creator: AIBCreator,
+    driver_list_file: TextIO,
+    driver_list: list[DriverDetails],
+) -> None:
     # cross-check the base and bootfs_package sets for the driver before adding
     # it to the target driver_list.
     driver_details_list = _read_json_file(driver_list_file)
@@ -168,8 +174,8 @@ def add_driver_list_from_file(
 
 
 def add_shell_commands_from_file(
-    aib_creator: AIBCreator, shell_commands_list_file
-):
+    aib_creator: AIBCreator, shell_commands_list_file: TextIO
+) -> None:
     """
     [
         {
@@ -191,8 +197,8 @@ def add_shell_commands_from_file(
 
 
 def add_config_data_entries_from_file(
-    aib_creator: AIBCreator, config_data_entries
-):
+    aib_creator: AIBCreator, config_data_entries: TextIO
+) -> None:
     """
     config_data_entries schema:
     [
@@ -212,17 +218,21 @@ def add_config_data_entries_from_file(
         aib_creator.config_data.append(entry)
 
 
-def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
+def add_compiled_packages_from_file(
+    aib_creator: AIBCreator, compiled_packages: TextIO
+) -> None:
     """
     compiled_packages should be
-    List[CompiledPackageDefinition]
+    list[CompiledPackageDefinition]
     """
 
-    _compiled_packages = _read_json_file(compiled_packages)
-    for package_def in _compiled_packages:
+    _compiled_packages: list[dict[str, Any]] = _read_json_file(
+        compiled_packages
+    )
+    for package_dict in _compiled_packages:
         # Parse the dict into an object.
         package_def = instance_from_dict(
-            CompiledPackageDefinitionFromGN, package_def
+            CompiledPackageDefinitionFromGN, package_dict
         )
 
         # If a bootfs package, validate the package name against the allowlist
@@ -237,7 +247,9 @@ def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
         aib_creator.compiled_packages.append(package_def)
 
 
-def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):
+def add_bootfs_files_from_list(
+    aib_creator: AIBCreator, bootfs_files: TextIO
+) -> None:
     """
     bootfs_files schema:
     [
@@ -257,7 +269,7 @@ def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):
             )
 
 
-def _read_json_file(pkg_list_file):
+def _read_json_file(pkg_list_file: TextIO) -> list[dict[str, Any]]:
     try:
         return json.load(pkg_list_file)
     except:
@@ -320,7 +332,7 @@ def generate_archive(args: argparse.Namespace) -> None:
     the contents manifest, and then calling the tarmaker tool to build the
     archive itself, using the generated creation manifest.
     """
-    deps: Set[str] = set()
+    deps: set[str] = set()
     # Read the AIB's contents manifest, all of these files will be added to the
     # creation manifest for the archive.
     contents_manifest = args.contents_manifest.readlines()
@@ -380,7 +392,7 @@ def intersect_bundles(args: argparse.Namespace) -> None:
 def find_blob(args: argparse.Namespace) -> None:
     bundle = AssemblyInputBundle.json_load(args.bundle_config)
     bundle_dir = os.path.dirname(args.bundle_config.name)
-    manifests: List[FilePath] = [*bundle.base, *bundle.cache, *bundle.system]
+    manifests: list[FilePath] = [*bundle.base, *bundle.cache, *bundle.system]
     found_at = find_blob_in_manifests(args.blob, bundle_dir, manifests)
     if found_at:
         pkg_header = "Package"
@@ -400,9 +412,9 @@ def find_blob(args: argparse.Namespace) -> None:
 
 
 def find_blob_in_manifests(
-    blob_to_find: str, bundle_dir: str, manifests_to_search: List[FilePath]
-) -> List[Tuple[FilePath, FilePath]]:
-    found_at: List[Tuple[FilePath, FilePath]] = []
+    blob_to_find: str, bundle_dir: str, manifests_to_search: list[FilePath]
+) -> list[tuple[FilePath, FilePath]]:
+    found_at: list[tuple[FilePath, FilePath]] = []
     known_manifests = set(manifests_to_search)
 
     i = 0
@@ -435,7 +447,7 @@ def find_blob_in_manifests(
     return found_at
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Tool for creating Assembly Input Bundles in-tree, for use with out-of-tree assembly"
     )
@@ -648,6 +660,8 @@ def main():
         # having specified a subcommand), then just display usage instead of
         # a cryptic KeyError.
         parser.print_help()
+
+    return 0
 
 
 if __name__ == "__main__":

@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::error::Error, anyhow::format_err, wlan_common::mac, zerocopy::Ref};
+use crate::error::Error;
+use anyhow::format_err;
+use wlan_common::mac;
+use zerocopy::Ref;
 
 pub fn set_more_data(buffer: &mut [u8]) -> Result<(), Error> {
     let (frame_ctrl, _) = Ref::<&mut [u8], mac::FrameControl>::new_from_prefix(buffer)

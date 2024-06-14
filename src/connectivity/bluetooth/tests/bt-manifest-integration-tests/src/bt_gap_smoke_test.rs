@@ -2,25 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy};
+use fidl_fuchsia_bluetooth_sys::{
+    AccessMarker, AccessProxy, BootstrapMarker, BootstrapProxy, ConfigurationMarker,
+    ConfigurationProxy, HostWatcherMarker, HostWatcherProxy, PairingMarker, PairingProxy,
+};
+use fidl_fuchsia_device::{NameProviderMarker, NameProviderRequestStream};
+use fidl_fuchsia_stash::SecureStoreMarker;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
+};
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
+use realmbuilder_mock_helpers::provide_bt_gap_uses;
+use tracing::info;
 use {
-    anyhow::Error,
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy},
     fidl_fuchsia_bluetooth_gatt as fbgatt, fidl_fuchsia_bluetooth_gatt2 as fbgatt2,
     fidl_fuchsia_bluetooth_le as fble,
-    fidl_fuchsia_bluetooth_sys::{
-        AccessMarker, AccessProxy, BootstrapMarker, BootstrapProxy, ConfigurationMarker,
-        ConfigurationProxy, HostWatcherMarker, HostWatcherProxy, PairingMarker, PairingProxy,
-    },
-    fidl_fuchsia_device::{NameProviderMarker, NameProviderRequestStream},
-    fidl_fuchsia_stash::SecureStoreMarker,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
-    futures::{channel::mpsc, SinkExt, StreamExt},
-    realmbuilder_mock_helpers::provide_bt_gap_uses,
-    tracing::info,
 };
 
 const BT_GAP_URL: &str = "fuchsia-pkg://fuchsia.com/bt-gap-smoke-test#meta/bt-gap.cm";

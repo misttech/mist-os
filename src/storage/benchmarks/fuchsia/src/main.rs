@@ -2,32 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::blob_benchmarks::{
-        OpenAndGetVmoContentBlobCold, OpenAndGetVmoContentBlobWarm, OpenAndGetVmoMetaFileCold,
-        OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
-        PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
-    },
-    fuchsia_storage_benchmarks_lib::{
-        block_devices::FvmVolumeFactory,
-        filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest},
-    },
-    regex::{Regex, RegexSetBuilder},
-    std::{fs::File, path::PathBuf},
-    storage_benchmarks::{
-        add_benchmarks,
-        directory_benchmarks::{
-            DirectoryTreeStructure, GitStatus, OpenDeeplyNestedFile, OpenFile, StatPath,
-            WalkDirectoryTreeCold, WalkDirectoryTreeWarm,
-        },
-        io_benchmarks::{
-            ReadRandomCold, ReadRandomWarm, ReadSequentialCold, ReadSequentialWarm, ReadSparseCold,
-            WriteRandomCold, WriteRandomWarm, WriteSequentialCold, WriteSequentialFsyncCold,
-            WriteSequentialFsyncWarm, WriteSequentialWarm,
-        },
-        BenchmarkSet,
-    },
+use crate::blob_benchmarks::{
+    OpenAndGetVmoContentBlobCold, OpenAndGetVmoContentBlobWarm, OpenAndGetVmoMetaFileCold,
+    OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
+    PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
 };
+use fuchsia_storage_benchmarks_lib::block_devices::FvmVolumeFactory;
+use fuchsia_storage_benchmarks_lib::filesystems::{
+    Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest,
+};
+use regex::{Regex, RegexSetBuilder};
+use std::fs::File;
+use std::path::PathBuf;
+use storage_benchmarks::directory_benchmarks::{
+    DirectoryTreeStructure, GitStatus, OpenDeeplyNestedFile, OpenFile, StatPath,
+    WalkDirectoryTreeCold, WalkDirectoryTreeWarm,
+};
+use storage_benchmarks::io_benchmarks::{
+    ReadRandomCold, ReadRandomWarm, ReadSequentialCold, ReadSequentialWarm, ReadSparseCold,
+    WriteRandomCold, WriteRandomWarm, WriteSequentialCold, WriteSequentialFsyncCold,
+    WriteSequentialFsyncWarm, WriteSequentialWarm,
+};
+use storage_benchmarks::{add_benchmarks, BenchmarkSet};
 
 mod blob_benchmarks;
 mod blob_loader;

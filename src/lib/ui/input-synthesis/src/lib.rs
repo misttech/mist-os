@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::synthesizer::*,
-    anyhow::{format_err, Error},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_ui_input::{KeyboardReport, Touch},
-    fuchsia_component::client::{new_protocol_connector, new_protocol_connector_in_dir},
-    keymaps::{
-        inverse_keymap::{InverseKeymap, Shift},
-        usages::{self, Usages},
-    },
-    std::time::Duration,
-};
+use crate::synthesizer::*;
+use anyhow::{format_err, Error};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_ui_input::{KeyboardReport, Touch};
+use fuchsia_component::client::{new_protocol_connector, new_protocol_connector_in_dir};
+use keymaps::inverse_keymap::{InverseKeymap, Shift};
+use keymaps::usages::{self, Usages};
+use std::time::Duration;
 
 pub mod modern_backend;
 pub mod synthesizer;

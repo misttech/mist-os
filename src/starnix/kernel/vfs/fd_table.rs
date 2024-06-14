@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::Task,
-    vfs::{FdNumber, FileHandle},
-};
+use crate::task::Task;
+use crate::vfs::{FdNumber, FileHandle};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_sync::Mutex;
 use starnix_syscalls::SyscallResult;
-use starnix_uapi::{
-    errno, error, errors::Errno, open_flags::OpenFlags, ownership::ReleasableByRef,
-    resource_limits::Resource, FD_CLOEXEC,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::ReleasableByRef;
+use starnix_uapi::resource_limits::Resource;
+use starnix_uapi::{errno, error, FD_CLOEXEC};
 use std::sync::Arc;
 
 bitflags! {
@@ -407,7 +406,9 @@ impl Clone for FdTable {
 mod test {
     use super::*;
 
-    use crate::{fs::fuchsia::SyslogFile, task::*, testing::*};
+    use crate::fs::fuchsia::SyslogFile;
+    use crate::task::*;
+    use crate::testing::*;
 
     fn add(
         current_task: &CurrentTask,

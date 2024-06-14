@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::backend::{BlockBackend, DeviceAttrs, Request, Sector},
-    anyhow::{anyhow, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fuchsia_trace as ftrace,
-    futures::future::try_join_all,
-    remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient},
-    virtio_device::mem::DeviceRange,
-};
+use crate::backend::{BlockBackend, DeviceAttrs, Request, Sector};
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fuchsia_trace as ftrace;
+use futures::future::try_join_all;
+use remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
+use virtio_device::mem::DeviceRange;
 
 /// RemoteBackend is a BlockBackend that fulfills requests by interfacing with a Fuchsia block
 /// device (see /sdk/fidl/fuchsia.hardware.block.driver/block.fidl).
@@ -149,12 +147,10 @@ impl BlockBackend for RemoteBackend {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::backend_test::{BackendController, BackendTest},
-        fuchsia_zircon as zx,
-        fuchsia_zircon::HandleBased as _,
-    };
+    use super::*;
+    use crate::backend_test::{BackendController, BackendTest};
+    use fuchsia_zircon as zx;
+    use fuchsia_zircon::HandleBased as _;
 
     struct RemoteBackendController {
         vmo: zx::Vmo,

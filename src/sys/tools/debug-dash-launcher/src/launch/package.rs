@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::layout;
-use crate::socket;
+use crate::{layout, socket};
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_dash as fdash;
-use fidl_fuchsia_hardware_pty as pty;
-use fuchsia_zircon as zx;
+use {fidl_fuchsia_dash as fdash, fidl_fuchsia_hardware_pty as pty, fuchsia_zircon as zx};
 
 pub async fn explore_over_socket(
     fuchsia_pkg_resolver: fdash::FuchsiaPkgResolver,

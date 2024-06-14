@@ -4,22 +4,16 @@
 
 //! An implementation that extends the generic control protocol to comply with IPV6CP.
 
-use {
-    crate::{
-        link,
-        ppp::{
-            self, ControlProtocol as PppControlProtocol, FrameTransmitter, Opened, ProtocolError,
-            ProtocolState, CODE_CODE_REJECT, CODE_CONFIGURE_ACK, CODE_CONFIGURE_NAK,
-            CODE_CONFIGURE_REJECT, CODE_CONFIGURE_REQUEST, CODE_TERMINATE_ACK,
-            CODE_TERMINATE_REQUEST, PROTOCOL_IPV6_CONTROL,
-        },
-    },
-    packet::{GrowBuffer, InnerPacketBuilder, ParsablePacket, ParseBuffer, Serializer},
-    ppp_packet::{
-        ipv6,
-        records::options::{Options, OptionsSerializer},
-        CodeRejectPacket, ConfigurationPacket, ControlProtocolPacket, TerminationPacket,
-    },
+use crate::link;
+use crate::ppp::{
+    self, ControlProtocol as PppControlProtocol, FrameTransmitter, Opened, ProtocolError,
+    ProtocolState, CODE_CODE_REJECT, CODE_CONFIGURE_ACK, CODE_CONFIGURE_NAK, CODE_CONFIGURE_REJECT,
+    CODE_CONFIGURE_REQUEST, CODE_TERMINATE_ACK, CODE_TERMINATE_REQUEST, PROTOCOL_IPV6_CONTROL,
+};
+use packet::{GrowBuffer, InnerPacketBuilder, ParsablePacket, ParseBuffer, Serializer};
+use ppp_packet::records::options::{Options, OptionsSerializer};
+use ppp_packet::{
+    ipv6, CodeRejectPacket, ConfigurationPacket, ControlProtocolPacket, TerminationPacket,
 };
 
 /// An implementation of the PPP IPV6 Control Protocol.

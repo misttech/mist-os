@@ -6,17 +6,14 @@
 
 //! Utility methods for tests in `font_service::typeface`.
 
-use {
-    super::Typeface,
-    crate::font_service::AssetId,
-    char_set::CharSet,
-    fidl_fuchsia_fonts::{
-        GenericFontFamily, Slant, Style2, TypefaceQuery, TypefaceRequest, TypefaceRequestFlags,
-        Width,
-    },
-    fidl_fuchsia_intl::LocaleId,
-    manifest::v2,
+use super::Typeface;
+use crate::font_service::AssetId;
+use char_set::CharSet;
+use fidl_fuchsia_fonts::{
+    GenericFontFamily, Slant, Style2, TypefaceQuery, TypefaceRequest, TypefaceRequestFlags, Width,
 };
+use fidl_fuchsia_intl::LocaleId;
+use manifest::v2;
 
 /// Creates a typeface with the given properties (with an `AssetId` of `0` and font index of `0`).
 pub fn make_fake_typeface(

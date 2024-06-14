@@ -7,18 +7,18 @@
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use net_types::ip::{Ipv6Addr, Subnet};
-use num::{rational::Ratio, CheckedMul};
+use num::rational::Ratio;
+use num::CheckedMul;
 use packet::serialize::InnerPacketBuilder;
 use packet_formats_dhcp::v6;
 use rand::{thread_rng, Rng};
-use std::{
-    cmp::{Eq, Ord, PartialEq, PartialOrd},
-    collections::{hash_map::Entry, BinaryHeap, HashMap, HashSet},
-    fmt::Debug,
-    hash::Hash,
-    marker::PhantomData,
-    time::Duration,
-};
+use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
+use std::collections::hash_map::Entry;
+use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::time::Duration;
 use tracing::{debug, info, warn};
 use zerocopy::ByteSlice;
 
@@ -6153,7 +6153,8 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use std::{cmp::Ordering, time::Instant};
+    use std::cmp::Ordering;
+    use std::time::Instant;
 
     use super::*;
     use const_unwrap::const_unwrap_option;

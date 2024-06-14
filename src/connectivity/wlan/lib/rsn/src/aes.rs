@@ -22,13 +22,11 @@
 //       treated as if it were exported, though it is not and must not be.
 #![allow(dead_code)]
 
-use {
-    bssl_sys::{
-        AES_set_decrypt_key, AES_set_encrypt_key, AES_unwrap_key, AES_wrap_key, AES_CMAC, AES_KEY,
-    },
-    std::ptr,
-    thiserror::Error,
+use bssl_sys::{
+    AES_set_decrypt_key, AES_set_encrypt_key, AES_unwrap_key, AES_wrap_key, AES_CMAC, AES_KEY,
 };
+use std::ptr;
+use thiserror::Error;
 
 /// Size of the RFC 4493 AES-CMAC output MAC in bytes.
 pub const CMAC_LEN: usize = 16;

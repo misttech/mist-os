@@ -8,10 +8,10 @@ mod controller;
 
 pub use collection::StaticPkgsCollection;
 
-use {
-    collector::StaticPkgsCollector, controller::ExtractStaticPkgsController, scrutiny::prelude::*,
-    std::sync::Arc,
-};
+use collector::StaticPkgsCollector;
+use controller::ExtractStaticPkgsController;
+use scrutiny::prelude::*;
+use std::sync::Arc;
 
 plugin!(
     StaticPkgsPlugin,

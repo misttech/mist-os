@@ -5,13 +5,13 @@
 use anyhow::{format_err, Result};
 use bt_rfcomm::profile as rfcomm;
 use fidl::endpoints::create_proxy_and_stream;
-use fidl_fuchsia_bluetooth as fidl_bt;
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use tracing::{info, warn};
+use {
+    fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
+    fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync,
+};
 
 use peer_task::PeerTask;
 

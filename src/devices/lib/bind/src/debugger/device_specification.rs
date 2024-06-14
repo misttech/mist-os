@@ -6,7 +6,9 @@ use crate::parser::common::{
     compound_identifier, condition_value, many_until_eof, map_err, ws, BindParserError,
     CompoundIdentifier, NomSpan, Value,
 };
-use nom::{bytes::complete::tag, sequence::separated_pair, IResult};
+use nom::bytes::complete::tag;
+use nom::sequence::separated_pair;
+use nom::IResult;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]

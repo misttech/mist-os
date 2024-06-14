@@ -10,8 +10,12 @@ use fidl_fuchsia_bluetooth_bredr::AudioOffloadExtProxy;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
-use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
+use futures::future::BoxFuture;
+use futures::{FutureExt, TryFutureExt};
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::{info, warn};
 
 use crate::codec::{CodecNegotiation, MediaCodecConfig};

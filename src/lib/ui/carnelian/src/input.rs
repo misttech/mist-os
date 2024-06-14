@@ -2,26 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    app::{InternalSender, MessageInternal},
-    geometry::{IntPoint, IntSize},
-};
+use crate::app::{InternalSender, MessageInternal};
+use crate::geometry::{IntPoint, IntSize};
 use anyhow::{format_err, Error};
 use euclid::default::Transform2D;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync, Time, TimeoutExt};
-use fuchsia_fs::directory as vfs_watcher;
-use fuchsia_fs::OpenFlags;
+use fuchsia_fs::{directory as vfs_watcher, OpenFlags};
 use fuchsia_zircon::{self as zx, Duration};
 use futures::{TryFutureExt, TryStreamExt};
 use keymaps::usages::input3_key_to_hid_usage;
-use std::{
-    collections::HashSet,
-    fs,
-    hash::{Hash, Hasher},
-    path::{Path, PathBuf},
-};
+use std::collections::HashSet;
+use std::fs;
+use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub(crate) enum UserInputMessage {

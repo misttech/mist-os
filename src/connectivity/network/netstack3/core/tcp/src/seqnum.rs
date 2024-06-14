@@ -4,7 +4,9 @@
 
 //! TCP sequence numbers and operations on them.
 
-use core::{convert::TryFrom as _, num::TryFromIntError, ops};
+use core::convert::TryFrom as _;
+use core::num::TryFromIntError;
+use core::ops;
 
 use explicit::ResultExt as _;
 
@@ -255,12 +257,10 @@ impl From<UnscaledWindowSize> for u16 {
 
 #[cfg(test)]
 mod tests {
-    use proptest::{
-        arbitrary::any,
-        proptest,
-        strategy::{Just, Strategy},
-        test_runner::Config,
-    };
+    use proptest::arbitrary::any;
+    use proptest::proptest;
+    use proptest::strategy::{Just, Strategy};
+    use proptest::test_runner::Config;
     use proptest_support::failed_seeds;
     use test_case::test_case;
 

@@ -4,9 +4,10 @@
 
 //! Type-safe bindings for Zircon vmar objects.
 
-use crate::ok;
-use crate::{object_get_info, ObjectQuery, Topic};
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Status, Vmo};
+use crate::{
+    object_get_info, ok, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery, Status, Topic,
+    Vmo,
+};
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
 

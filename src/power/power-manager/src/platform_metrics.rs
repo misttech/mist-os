@@ -4,17 +4,16 @@
 
 use crate::common_utils::get_current_timestamp;
 use crate::error::PowerManagerError;
-use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
-use crate::ok_or_default_err;
 use crate::types::{Celsius, Seconds, ThermalLoad};
 use crate::utils::{CobaltIntHistogram, CobaltIntHistogramConfig};
+use crate::{log_if_err, ok_or_default_err};
 use anyhow::{format_err, Context, Error, Result};
 use async_trait::async_trait;
-use fidl_contrib::{protocol_connector::ProtocolSender, ProtocolConnector};
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_contrib::ProtocolConnector;
 use fidl_fuchsia_metrics::MetricEvent;
-use fuchsia_async as fasync;
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_inspect::{self as inspect, HistogramProperty, LinearHistogramParams, Property};
 use futures::future::{self, LocalBoxFuture};
@@ -23,11 +22,11 @@ use futures::{FutureExt, StreamExt};
 use power_manager_metrics::power_manager_metrics as power_metrics_registry;
 use power_metrics_registry::ThermalLimitResultMigratedMetricDimensionResult as thermal_limit_result;
 use serde_derive::Deserialize;
-use serde_json as json;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use tracing::*;
+use {fuchsia_async as fasync, serde_json as json};
 
 /// Node: PlatformMetrics
 ///

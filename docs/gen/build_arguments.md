@@ -52,7 +52,7 @@ the //:default target
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:140
+From //BUILD.gn:144
 
 ### all_cpu_kernel_boot_tests
 
@@ -88,7 +88,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2117
+From //build/config/BUILDCONFIG.gn:2115
 
 ### allowed_test_device_types
 
@@ -197,6 +197,15 @@ room to initialize on boot.
 
 From //build/images/args.gni:156
 
+### assembly_partitions_configs
+
+Platform builders should populate this list in their product.gni file.
+The result will be built and uploaded to CIPD by infra.
+
+**Current value (from the default):** `[]`
+
+From //BUILD.gn:140
+
 ### authorized_ssh_keys_label
 
 Path to the file containing the authorized keys that are able to connect via
@@ -237,7 +246,7 @@ From //build/images/vbmeta.gni:23
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:69
+From //boards/common/x64-common.gni:45
 
 **Overridden from the default:** `""`
 
@@ -257,7 +266,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:67
+From //boards/common/x64-common.gni:43
 
 **Overridden from the default:** `""`
 
@@ -271,7 +280,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:34
+From //products/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
@@ -279,7 +288,7 @@ From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:34
+From //products/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
@@ -336,7 +345,7 @@ to save about 3 minutes of build time when they are not needed.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_fuchsia_sdk.gni:10
+From //build/bazel/bazel_fuchsia_sdk.gni:14
 
 ### bazel_product_bundle_board
 
@@ -350,7 +359,7 @@ From //build/images/args.gni:205
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //boards/x64.gni:40
+From //boards/x64.gni:31
 
 **Overridden from the default:** `false`
 
@@ -398,7 +407,7 @@ to stdout/stderr during the Ninja build.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:19
+From //build/bazel/bazel_action.gni:18
 
 ### bazel_upload_build_events
 
@@ -419,15 +428,7 @@ Valid options:
 
 **Current value (from the default):** `""`
 
-From //build/bazel/remote_services.gni:30
-
-### bless_goldens
-
-TODO(https://fxbug.dev/42051023): delete bless_goldens, to give users time to switch to new gn arg, update_goldens
-
-**Current value (from the default):** `false`
-
-From //build/testing/config.gni:11
+From //build/bazel/remote_services.gni:32
 
 ### blobfs_capacity
 
@@ -437,7 +438,7 @@ False means no limit.
 
 **Current value for `target_cpu = "arm64"`:** `10485760000`
 
-From //boards/common/arm64-common.gni:26
+From //boards/common/arm64-common.gni:24
 
 **Overridden from the default:** `false`
 
@@ -445,7 +446,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:71
+From //boards/common/x64-common.gni:47
 
 **Overridden from the default:** `false`
 
@@ -512,7 +513,7 @@ From //boards/arm64.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:83
+From //build/board.gni:64
 
 **Current value for `target_cpu = "x64"`:** `"//boards/x64"`
 
@@ -520,7 +521,7 @@ From //boards/x64.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:83
+From //build/board.gni:64
 
 ### board_core_realm_shards
 
@@ -529,7 +530,7 @@ context.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:65
+From //build/board.gni:46
 
 ### board_description
 
@@ -584,23 +585,7 @@ board's fastboot protocol.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:69
-
-### board_fshost_config
-
-A list of fshost options to add to the fshost config.
-
-**Current value (from the default):** `{ }`
-
-From //build/board.gni:53
-
-### board_host_labels
-
-A list of binary host tool labels to also build.
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:39
+From //build/board.gni:50
 
 ### board_is_emu
 
@@ -614,15 +599,15 @@ From //boards/arm64.gni:29
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:88
+From //build/board.gni:69
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:38
+From //boards/x64.gni:29
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:88
+From //build/board.gni:69
 
 ### board_is_phys
 
@@ -632,11 +617,11 @@ From //boards/arm64.gni:30
 
 **Overridden from the default:** `true`
 
-From //build/board.gni:89
+From //build/board.gni:70
 
 **Current value (from the default):** `true`
 
-From //build/board.gni:89
+From //build/board.gni:70
 
 ### board_name
 
@@ -673,7 +658,7 @@ A list of binary labels to include in the recovery ZBI.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:50
+From //build/board.gni:42
 
 ### board_recovery_package_labels
 
@@ -683,14 +668,6 @@ board definition rather than the product definition.
 **Current value (from the default):** `[]`
 
 From //build/board.gni:33
-
-### board_system_image_deps
-
-A list of binary labels to include in the system_image package.
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:61
 
 ### board_tools
 
@@ -706,7 +683,7 @@ any kind of stable contract for users of the archive.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:80
+From //build/board.gni:61
 
 ### board_zedboot_bootfs_labels
 
@@ -714,25 +691,7 @@ A list of binary labels to include in the zedboot ZBI.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:47
-
-### board_zedboot_cmdline_args
-
-List of kernel command line arguments to bake into the zedboot image that are
-required by this board. See also zedboot_cmdline_args in
-//build/images/zedboot/BUILD.gn
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:44
-
-### board_zedboot_fshost_config
-
-A list of fshost options to add to the fshost config in the zedboot image.
-
-**Current value (from the default):** `{ }`
-
-From //build/board.gni:57
+From //build/board.gni:39
 
 ### bootfs_only
 
@@ -885,7 +844,7 @@ From //build/images/args.gni:30
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:75
+From //boards/common/x64-common.gni:51
 
 **Overridden from the default:** `false`
 
@@ -1043,7 +1002,7 @@ be built, they should be included in the build graph through other means.
 
 **Current value (from the default):** `["//build/images:main_assembly"]`
 
-From //build/product.gni:59
+From //build/product.gni:56
 
 ### clang_embed_bitcode
 
@@ -1141,7 +1100,40 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:208
+From //build/toolchain/rbe.gni:211
+
+### compilation_mode
+
+The overall compilation mode to use.  The valid values are:
+ * `dbg`: for debug-enabled builds.
+ * `fastbuild`: some optimizations, but prioritizing compilation speed over
+                runtime performance.
+ * `opt`: all the optimizations, used for product releases.
+
+**Current value (from the default):** `""`
+
+From //build/config/compilation_modes.gni:18
+
+### compilation_settings_overrides
+
+Overridden settings for the compilation mode.  This is a set of override
+values for variables whose default values are set by the chosen compilation
+mode (above).
+  * optimize:  The optimization mode to use.  Valid values are:
+      * `none`: really unoptimized, usually only build-tested and not run
+      * `debug`: "optimized for debugging", light enough to avoid confusion
+      * `default`: default optimization level
+      * `size`:  optimized for space rather than purely for speed
+      * `size_lto`:  optimize for space and use LTO
+      * `speed`: optimized purely for speed
+      * `sanitizer`: optimized for sanitizers (ASan, etc.)
+      * `profile`: optimized for coverage/profile data collection
+      * `coverage`: optimized for coverage data collection
+
+
+**Current value (from the default):** `{ }`
+
+From //build/config/compilation_modes.gni:34
 
 ### compress_debuginfo
 
@@ -1149,7 +1141,7 @@ Enable compression of debug sections.
 
 **Current value (from the default):** `"zstd"`
 
-From //build/config/compiler.gni:92
+From //build/config/compiler.gni:88
 
 ### config_example_cpp_greeting
 
@@ -1184,7 +1176,7 @@ TODO: redo comments
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:27
+From //build/product.gni:24
 
 ### crash_diagnostics_dir
 
@@ -1306,7 +1298,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:203
+From //build/toolchain/rbe.gni:206
 
 ### cxx_rbe_download_obj_files
 
@@ -1318,7 +1310,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:215
+From //build/toolchain/rbe.gni:218
 
 ### cxx_rbe_enable
 
@@ -1329,17 +1321,17 @@ Enabling this takes precedence over `use_goma`.
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `false`
+**Overridden from the default:** `true`
 
-From //build/toolchain/rbe.gni:156
+From //build/toolchain/rbe.gni:159
 
 **Current value for `target_cpu = "x64"`:** `false`
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `false`
+**Overridden from the default:** `true`
 
-From //build/toolchain/rbe.gni:156
+From //build/toolchain/rbe.gni:159
 
 ### cxx_rbe_exec_strategy
 
@@ -1362,7 +1354,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:179
+From //build/toolchain/rbe.gni:182
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -1372,7 +1364,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:161
+From //build/toolchain/rbe.gni:164
 
 ### data_filesystem_format
 
@@ -1392,7 +1384,7 @@ From //src/storage/fshost/generated_fshost_config.gni:12
 
 **Current value (from the default):** `"debug"`
 
-From //build/config/compiler.gni:54
+From //build/config/compiler.gni:50
 
 ### default_configs
 
@@ -1434,7 +1426,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:37
+From //build/config/BUILD.gn:38
 
 ### dev_bootfs_labels
 
@@ -1514,14 +1506,6 @@ From //out/not-default/args.gn:29
 **Overridden from the default:** `[]`
 
 From //BUILD.gn:115
-
-### devicetree_board_driver
-
-Set to true if a devicetree based board driver is being used.
-
-**Current value (from the default):** `false`
-
-From //build/devicetree/args.gni:7
 
 ### dir_docker
 
@@ -2798,7 +2782,7 @@ Explicitly specify DWARF version used.
 
 **Current value (from the default):** `5`
 
-From //build/config/compiler.gni:68
+From //build/config/compiler.gni:64
 
 ### e2e_test_labels
 
@@ -2825,7 +2809,7 @@ From //BUILD.gn:104
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:51
+From //build/product.gni:48
 
 ### emu_window_size_width
 
@@ -2833,7 +2817,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:50
+From //build/product.gni:47
 
 ### enable_bazel_remote_rbe
 
@@ -2852,7 +2836,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `false`
 
-From //build/bazel/remote_services.gni:14
+From //build/bazel/remote_services.gni:16
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -2860,7 +2844,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `false`
 
-From //build/bazel/remote_services.gni:14
+From //build/bazel/remote_services.gni:16
 
 ### enable_frame_pointers
 
@@ -2874,7 +2858,7 @@ remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILD.gn:33
+From //build/config/BUILD.gn:34
 
 ### enable_grpc_ares
 
@@ -3320,7 +3304,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1839
+From //build/config/BUILDCONFIG.gn:1837
 
 ### extra_vbmeta_descriptors
 
@@ -3467,7 +3451,7 @@ TODO(https://fxbug.dev/42161120) move this to a toolchain to allow multiple prod
 
 **Current value (from the default):** `true`
 
-From //build/product.gni:32
+From //build/product.gni:29
 
 ### fuchsia_product_assembly_config_label
 
@@ -3478,7 +3462,7 @@ For Bazel products, netboot will only be available when this is supplied.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:38
+From //build/product.gni:35
 
 ### fuchsia_sdk_root
 
@@ -3723,7 +3707,7 @@ This is a build that imports a board (vs. sdk).  If a board is set
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/common/arm64-common.gni:22
+From //boards/common/arm64-common.gni:20
 
 **Overridden from the default:** `false`
 
@@ -3731,7 +3715,7 @@ From //build/board.gni:8
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:25
+From //boards/common/x64-common.gni:22
 
 **Overridden from the default:** `false`
 
@@ -3870,6 +3854,16 @@ TODO(https://fxbug.dev/42162166): remove once we have a better way to manage ACP
 **Current value (from the default):** `false`
 
 From //src/devices/board/lib/acpi/BUILD.gn:12
+
+### ice_detection
+
+Enables a rustc wrapper that detects timeouts and ICEs
+TODO(pineapple): enable by default when using rust_incremental after
+b/345596983 is resolved
+
+**Current value (from the default):** `false`
+
+From //build/rust/build.gni:30
 
 ### icons_path
 
@@ -4120,7 +4114,7 @@ and the analysis overhead turned off by default.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:23
+From //build/config/BUILDCONFIG.gn:24
 
 ### is_debug
 
@@ -4130,17 +4124,17 @@ Debug build.
 
 From //out/not-default/args.gn:10
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `""`
 
-From //build/config/BUILDCONFIG.gn:26
+From //build/config/compilation_modes.gni:54
 
 **Current value for `target_cpu = "x64"`:** `false`
 
 From //out/not-default/args.gn:10
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `""`
 
-From //build/config/BUILDCONFIG.gn:26
+From //build/config/compilation_modes.gni:54
 
 ### is_perfetto_build_generator
 
@@ -4453,7 +4447,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1651
+From //build/config/BUILDCONFIG.gn:1649
 
 ### legacy_base_package_labels
 
@@ -4490,17 +4484,13 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:262
+From //build/toolchain/rbe.gni:265
 
 ### link_rbe_download_unstripped_outputs
 
-Controls whether or not to download (often large) unstripped linker
-outputs.  When downloading is disabled, the build produces stubs
-that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
-
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:267
+From //build/toolchain/rbe.gni:271
 
 ### link_rbe_enable
 
@@ -4514,7 +4504,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:224
+From //build/toolchain/rbe.gni:227
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -4522,7 +4512,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:224
+From //build/toolchain/rbe.gni:227
 
 ### link_rbe_exec_strategy
 
@@ -4543,9 +4533,9 @@ One of:
 
   (There are other rewrapper options that are not exposed.)
 
-**Current value (from the default):** `"remote"`
+**Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:242
+From //build/toolchain/rbe.gni:245
 
 ### llvm_prefix
 
@@ -4603,7 +4593,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:35
 
 **Current value (from the default):** `false`
 
-From //src/graphics/magma/lib/magma/util/BUILD.gn:15
+From //src/graphics/magma/lib/magma/util/BUILD.gn:16
 
 ### magma_enable_tracing
 
@@ -4638,7 +4628,7 @@ of how they are stored).
 
 **Current value for `target_cpu = "arm64"`:** `5216665600`
 
-From //boards/common/arm64-common.gni:28
+From //boards/common/arm64-common.gni:26
 
 **Overridden from the default:** `false`
 
@@ -4646,7 +4636,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:73
+From //boards/common/x64-common.gni:49
 
 **Overridden from the default:** `false`
 
@@ -5336,7 +5326,7 @@ From //third_party/openthread/etc/gn/openthread.gni:205
 
 **Current value (from the default):** `"size_lto"`
 
-From //build/config/compiler.gni:23
+From //build/config/compiler.gni:18
 
 ### output_breakpad_syms
 
@@ -5344,7 +5334,7 @@ Sets if we should output breakpad symbols for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:29
+From //build/config/BUILDCONFIG.gn:27
 
 ### output_gsym
 
@@ -5352,7 +5342,7 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:32
+From //build/config/BUILDCONFIG.gn:30
 
 ### override_build_time_supported_api_levels
 
@@ -5388,7 +5378,7 @@ To override the set of API levels, see
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:57
+From //build/sdk/config.gni:65
 
 ### override_target_api_level
 
@@ -5443,15 +5433,15 @@ From //boards/arm64.gni:42
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:94
+From //build/board.gni:75
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:63
+From //boards/common/x64-common.gni:39
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:94
+From //build/board.gni:75
 
 ### partitions_config_label
 
@@ -5464,15 +5454,15 @@ From //boards/arm64.gni:41
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:93
+From //build/board.gni:74
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:62
+From //boards/common/x64-common.gni:38
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:93
+From //build/board.gni:74
 
 ### perfetto_build_with_android
 
@@ -5634,27 +5624,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:284
-
-### product_bootfs_labels
-
-A list of binary labels to include in ZBIs built for this product.
-
-**Current value for `target_cpu = "arm64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low"]`
-
-From //products/bringup.gni:37
-
-**Overridden from the default:** `[]`
-
-From //build/product.gni:11
-
-**Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low"]`
-
-From //products/bringup.gni:37
-
-**Overridden from the default:** `[]`
-
-From //build/product.gni:11
+From //build/assembly/developer_overrides.gni:331
 
 ### product_bootfs_packages
 
@@ -5663,7 +5633,7 @@ meta.fars and content-id'd blobs.
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:18
+From //build/product.gni:15
 
 ### product_description
 
@@ -5671,7 +5641,7 @@ A human readable product description.
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:21
+From //build/product.gni:18
 
 ### product_host_labels
 
@@ -5679,7 +5649,7 @@ A list of binary host tool labels to also build.
 
 **Current value (from the default):** `[]`
 
-From //build/product.gni:14
+From //build/product.gni:11
 
 ### profile_source_files
 
@@ -7097,7 +7067,37 @@ precedence over those earlier in the list.
 
 **Current value (from the default):** `[]`
 
-From //build/toolchain/rbe.gni:28
+From //build/toolchain/rbe.gni:30
+
+### rbe_mode
+
+The overall mode for RBE to be operating in.  The valid values are:
+ * 'off' => RBE is fully disabled. This is suitable for offline building
+            using only local resources.
+ * 'default' => The standard RBE configuration used if not otherwise
+                specified. This contains a mix of enabled/disabled remote
+                services.
+ * 'cloudtop' => An RBE configuration that's optimized for running on a
+                 cloudtop. Suitable for high-bandwidth connections to
+                 remote services.
+ * 'infra' => The RBE configuration used by CI/CQ bots. Also high-bandwidth.
+ * 'remote_cache_only' => Use RBE only as a remote-cache: on cache-miss,
+                          execute locally instead of remotely.
+ * 'low_bandwidth' => An RBE configuration for developers that have a
+                      powerful workstations, but low bandwidth.
+
+**Current value (from the default):** `"default"`
+
+From //build/toolchain/rbe_modes.gni:34
+
+### rbe_settings_overrides
+
+Overridden settings for the RBE mode.  This is a set of override values for
+variables whose default values are set by the chosen RBE mode (above).
+
+**Current value (from the default):** `{ }`
+
+From //build/toolchain/rbe_modes.gni:38
 
 ### recovery_label
 
@@ -7226,7 +7226,7 @@ Enable debug assertions, e.g. for overflow checking.
 
 **Current value (from the default):** `false`
 
-From //build/config/rust/BUILD.gn:33
+From //build/config/rust/BUILD.gn:29
 
 ### rust_emit_rmeta
 
@@ -7237,7 +7237,7 @@ This is required to support skipping downloads of rlibs.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:144
+From //build/toolchain/rbe.gni:147
 
 ### rust_incremental
 
@@ -7246,7 +7246,7 @@ as the cache.
 
 **Current value (from the default):** `""`
 
-From //build/config/rust/BUILD.gn:30
+From //build/rust/build.gni:8
 
 ### rust_lto
 
@@ -7265,7 +7265,7 @@ into its own exclusive directory. This requires
 
 **Current value (from the default):** `true`
 
-From //build/rust/build.gni:16
+From //build/rust/build.gni:22
 
 ### rust_parallel_frontend_threads
 
@@ -7273,7 +7273,7 @@ Enable the rust parallel front-end with N threads
 
 **Current value (from the default):** `false`
 
-From //build/config/rust/BUILD.gn:36
+From //build/config/rust/BUILD.gn:32
 
 ### rust_rbe_check
 
@@ -7304,7 +7304,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:131
+From //build/toolchain/rbe.gni:133
 
 ### rust_rbe_download_rlibs
 
@@ -7313,19 +7313,13 @@ rlibs from remote Rust build actions.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:148
+From //build/toolchain/rbe.gni:151
 
 ### rust_rbe_download_unstripped_binaries
 
-Controls whether or not to download (often large) unstripped Rust
-binaries.  When downloading is disabled, the build produces stubs
-that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
-TODO(b/284994230): This option is only available to developers,
-and not restricted environments that lack direct network access.
-
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:138
+From //build/toolchain/rbe.gni:141
 
 ### rust_rbe_enable
 
@@ -7337,7 +7331,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:87
+From //build/toolchain/rbe.gni:89
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7345,7 +7339,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:87
+From //build/toolchain/rbe.gni:89
 
 ### rust_rbe_exec_strategy
 
@@ -7368,7 +7362,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:105
+From //build/toolchain/rbe.gni:107
 
 ### rust_v0_symbol_mangling
 
@@ -7396,6 +7390,15 @@ This can be used to test custom Rust toolchains.
 
 From //build/rust/config.gni:19
 
+### rustc_timeout
+
+A timeout to catch rustc hangs, expressed in seconds. A value of zero
+means no timeout
+
+**Current value (from the default):** `0`
+
+From //build/rust/build.gni:34
+
 ### rustc_use_response_files
 
 Place lengthy rustdeps and externs (GN) into ninja response files.
@@ -7405,7 +7408,7 @@ added with revision 'git_revision:dfe53afaebd817f334d8ef9dc75a5cd2562cf6e6'.
 
 **Current value (from the default):** `true`
 
-From //build/rust/build.gni:10
+From //build/rust/build.gni:16
 
 ### rustc_version_description
 
@@ -7520,7 +7523,7 @@ extension mechanism for IDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:35
+From //products/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -7528,7 +7531,7 @@ From //BUILD.gn:132
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:35
+From //products/bringup.gni:34
 
 **Overridden from the default:** `[]`
 
@@ -7549,7 +7552,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"20.99991231.0.1"`
+**Current value (from the default):** `"21.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -7561,6 +7564,19 @@ Can be true for any API level, including the default level.
 **Current value (from the default):** `false`
 
 From //build/sdk/config.gni:12
+
+### sdk_legacy_unstable_abi_revisions
+
+When true, uses the "legacy" way of assigning an ABI revision to unstable
+API levels (e.g., `HEAD`, `PLATFORM`). When false, uses the "new way", which
+derives an ABI revision from the latest integration.git hash.
+
+TODO(https://fxbug.dev/324892812): Delete this option after a transition
+period.
+
+**Current value (from the default):** `true`
+
+From //build/sdk/config.gni:20
 
 ### sdk_max_simultaneous_sub_builds
 
@@ -7582,7 +7598,7 @@ But also these bad things:
 
 **Current value (from the default):** `5`
 
-From //build/sdk/config.gni:29
+From //build/sdk/config.gni:37
 
 ### sdk_sub_build_max_load_average
 
@@ -7592,7 +7608,7 @@ blank, the subbuild script will make a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:41
+From //build/sdk/config.gni:49
 
 ### sdk_sub_build_parallelism
 
@@ -7604,7 +7620,7 @@ a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:36
+From //build/sdk/config.gni:44
 
 ### sdk_sub_build_verbose
 
@@ -7612,7 +7628,7 @@ Set to `true` to enable verbose logging during IDK subbuilds.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:44
+From //build/sdk/config.gni:52
 
 ### select_variant
 
@@ -7684,7 +7700,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2107
+From //build/config/BUILDCONFIG.gn:2105
 
 ### select_variant_canonical
 
@@ -7694,7 +7710,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2112
+From //build/config/BUILDCONFIG.gn:2110
 
 ### select_variant_shortcuts
 
@@ -7753,7 +7769,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1885
+From //build/config/BUILDCONFIG.gn:1883
 
 ### size_checker_input
 
@@ -8176,7 +8192,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:106
+From //build/config/BUILDCONFIG.gn:104
 
 ### truncate_build_info_commit_date
 
@@ -8239,7 +8255,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1869
+From //build/config/BUILDCONFIG.gn:1867
 
 ### universe_package_labels
 
@@ -8395,7 +8411,7 @@ From //build/images/args.gni:27
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:76
+From //boards/common/x64-common.gni:52
 
 **Overridden from the default:** `false`
 
@@ -8435,7 +8451,7 @@ From //build/toolchain/goma.gni:13
 
 **Current value (from the default):** `false`
 
-From //zircon/system/ulib/c/libc.gni:18
+From //zircon/system/ulib/c/libc.gni:19
 
 ### use_null_vulkan_on_host
 
@@ -8459,7 +8475,7 @@ Controls whether to use -Oz when `optimize` is set to `"size"`.
 
 **Current value (from the default):** `false`
 
-From //build/config/compiler.gni:43
+From //build/config/compiler.gni:39
 
 ### use_prebuilt_buildidtool
 
@@ -8555,7 +8571,7 @@ From //build/images/vbmeta.gni:15
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:65
+From //boards/common/x64-common.gni:41
 
 **Overridden from the default:** `false`
 
@@ -8635,7 +8651,7 @@ Controls whether the build runs the depfile verifier
 
 **Current value (from the default):** `true`
 
-From //build/rust/build.gni:19
+From //build/rust/build.gni:25
 
 ### vim3_mcu_fan_default_level
 
@@ -8684,7 +8700,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:47
+From //build/product.gni:44
 
 ### vm_tracing_level
 
@@ -8804,33 +8820,25 @@ Selects the wlan configuration type to use. Choices:
 
 From //src/connectivity/wlan/wlancfg/BUILD.gn:19
 
-### zedboot_additional_boot_args
-
-List of arguments to populate /boot/config/additional_boot_args in the Zedboot image.
-
-**Current value (from the default):** `[]`
-
-From //build/images/zedboot/zedboot_args.gni:7
-
 ### zedboot_product_assembly_config_label
 
 The product assembly config used to configure the Zedboot image.
 
 **Current value for `target_cpu = "arm64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:42
+From //products/bringup.gni:36
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:41
+From //build/product.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:42
+From //products/bringup.gni:36
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:41
+From //build/product.gni:38
 
 ### zircon_a_partition
 
@@ -8908,7 +8916,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:123
+From //build/config/BUILDCONFIG.gn:121
 
 ### zircon_tracelog
 

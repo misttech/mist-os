@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_fonts::{
-        self as fonts, CacheMissPolicy, FallbackGroup, FamilyName, FontFamilyInfo,
-        GenericFontFamily, Style2, TypefaceQuery, TypefaceRequest, TypefaceRequestFlags,
-        TypefaceResponse, Width,
-    },
-    fidl_fuchsia_intl as intl,
+use fidl_fuchsia_fonts::{
+    self as fonts, CacheMissPolicy, FallbackGroup, FamilyName, FontFamilyInfo, GenericFontFamily,
+    Style2, TypefaceQuery, TypefaceRequest, TypefaceRequestFlags, TypefaceResponse, Width,
 };
+use fidl_fuchsia_intl as intl;
 
 /// Extensions for [`FallbackGroup`](fidl_fuchsia_fonts::FallbackGroup).
 pub trait FallbackGroupExt {

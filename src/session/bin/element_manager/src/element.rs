@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServiceMarker},
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-};
+use anyhow::Error;
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServiceMarker};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Represents a component launched by an Element Manager.
 ///

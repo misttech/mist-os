@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        matcher::select_best_match,
-        typeface::{Typeface, TypefaceAndLangScore, TypefaceId},
-    },
-    anyhow::{format_err, Error},
-    char_set::CharSet,
-    fidl_fuchsia_fonts::{Style2, TypefaceQuery, TypefaceRequest},
-    fidl_fuchsia_fonts_ext::TypefaceRequestExt,
-    std::{collections::HashSet, sync::Arc},
-};
+use super::matcher::select_best_match;
+use super::typeface::{Typeface, TypefaceAndLangScore, TypefaceId};
+use anyhow::{format_err, Error};
+use char_set::CharSet;
+use fidl_fuchsia_fonts::{Style2, TypefaceQuery, TypefaceRequest};
+use fidl_fuchsia_fonts_ext::TypefaceRequestExt;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 fn unwrap_query<'a>(query: &'a Option<TypefaceQuery>) -> Result<&'a TypefaceQuery, Error> {
     query.as_ref().ok_or(format_err!("Missing query"))
@@ -140,13 +137,12 @@ impl TypefaceCollectionBuilder {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{super::test_util::*, *},
-        crate::font_service::AssetId,
-        fidl_fuchsia_fonts::{
-            GenericFontFamily, Slant, TypefaceRequestFlags, Width, WEIGHT_LIGHT, WEIGHT_NORMAL,
-            WEIGHT_SEMI_BOLD, WEIGHT_THIN,
-        },
+    use super::super::test_util::*;
+    use super::*;
+    use crate::font_service::AssetId;
+    use fidl_fuchsia_fonts::{
+        GenericFontFamily, Slant, TypefaceRequestFlags, Width, WEIGHT_LIGHT, WEIGHT_NORMAL,
+        WEIGHT_SEMI_BOLD, WEIGHT_THIN,
     };
 
     fn make_fake_typeface_collection(mut faces: Vec<Typeface>) -> Collection {

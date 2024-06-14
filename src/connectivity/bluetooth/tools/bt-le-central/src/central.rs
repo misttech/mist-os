@@ -6,15 +6,19 @@
 #![allow(unreachable_code)]
 
 use anyhow::{format_err, Context, Error};
-use fidl::{endpoints, endpoints::Proxy};
+use fidl::endpoints;
+use fidl::endpoints::Proxy;
 use fidl_fuchsia_bluetooth_gatt2::ClientMarker;
 use fidl_fuchsia_bluetooth_le::{
     CentralProxy, ConnectionMarker, ConnectionOptions, ScanResultWatcherProxy,
 };
-use fuchsia_bluetooth::types::{le::Peer, PeerId, Uuid};
+use fuchsia_bluetooth::types::le::Peer;
+use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_sync::RwLock;
-use futures::{future::FutureExt, select};
-use std::{pin::pin, sync::Arc};
+use futures::future::FutureExt;
+use futures::select;
+use std::pin::pin;
+use std::sync::Arc;
 
 use crate::gatt::repl::start_gatt_loop;
 

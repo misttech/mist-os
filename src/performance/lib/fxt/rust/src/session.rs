@@ -2,23 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    error::ParseWarning,
-    init::{InitRecord, Ticks},
-    metadata::{
-        MetadataRecord, Provider, ProviderEventMetadataRecord, ProviderInfoMetadataRecord,
-        ProviderSectionMetadataRecord, TraceInfoMetadataRecord,
-    },
-    string::{StringRecord, StringRef},
-    thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRecord, ThreadRef},
-    ParseError, ParsedWithOriginalBytes, RawTraceRecord, TraceRecord,
+use crate::error::ParseWarning;
+use crate::init::{InitRecord, Ticks};
+use crate::metadata::{
+    MetadataRecord, Provider, ProviderEventMetadataRecord, ProviderInfoMetadataRecord,
+    ProviderSectionMetadataRecord, TraceInfoMetadataRecord,
 };
+use crate::string::{StringRecord, StringRef};
+use crate::thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRecord, ThreadRef};
+use crate::{ParseError, ParsedWithOriginalBytes, RawTraceRecord, TraceRecord};
 use flyweights::FlyStr;
 use futures::{AsyncRead, AsyncReadExt, SinkExt, Stream};
-use std::{
-    collections::BTreeMap,
-    num::{NonZeroU16, NonZeroU8},
-};
+use std::collections::BTreeMap;
+use std::num::{NonZeroU16, NonZeroU8};
 
 pub fn parse_full_session<'a>(
     buf: &'a [u8],
@@ -355,11 +351,9 @@ impl ResolveCtx {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{EventPayload, EventRecord},
-        fxt_builder::FxtBuilder,
-        scheduling::{LegacyContextSwitchEvent, SchedulingRecord, ThreadState},
-    };
+    use crate::event::{EventPayload, EventRecord};
+    use crate::fxt_builder::FxtBuilder;
+    use crate::scheduling::{LegacyContextSwitchEvent, SchedulingRecord, ThreadState};
     use futures::{StreamExt, TryStreamExt};
 
     static SIMPLE_TRACE_FXT: &[u8] =

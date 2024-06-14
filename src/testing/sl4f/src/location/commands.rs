@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    location::{
-        emergency_provider_facade::EmergencyProviderFacade,
-        regulatory_region_facade::RegulatoryRegionFacade, types::PositionSerializer,
-    },
-    server::Facade,
-};
+use crate::location::emergency_provider_facade::EmergencyProviderFacade;
+use crate::location::regulatory_region_facade::RegulatoryRegionFacade;
+use crate::location::types::PositionSerializer;
+use crate::server::Facade;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use serde_json::{to_value, Value};

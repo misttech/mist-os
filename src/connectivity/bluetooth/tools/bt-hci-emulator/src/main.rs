@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fuchsia_bluetooth::constants::DEV_DIR,
-    futures::future::pending,
-    hci_emulator_client::Emulator,
-};
+use anyhow::{Context as _, Error};
+use fuchsia_bluetooth::constants::DEV_DIR;
+use futures::future::pending;
+use hci_emulator_client::Emulator;
 
 fn usage(appname: &str) {
     eprintln!("usage: {}", appname);

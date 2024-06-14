@@ -2,30 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    bt_test_harness::{
-        access::{expectation, AccessHarness},
-        profile::ProfileHarness,
-    },
-    fidl::endpoints::create_request_stream,
-    fidl_fuchsia_bluetooth::{DeviceClass, ErrorCode, MAJOR_DEVICE_CLASS_MISCELLANEOUS},
-    fidl_fuchsia_bluetooth_bredr::{
-        ConnectParameters, ConnectionReceiverRequestStream, DataElement, L2capParameters,
-        ProfileAdvertiseRequest, ProfileDescriptor, ProfileSearchRequest, ProtocolDescriptor,
-        ProtocolIdentifier, SearchResultsRequest, SearchResultsRequestStream,
-        ServiceClassProfileIdentifier, ServiceDefinition, PSM_AVDTP,
-    },
-    fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
-    fidl_fuchsia_hardware_bluetooth::{BredrPeerParameters, EmulatorProxy, PeerProxy},
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_bluetooth::{
-        constants::INTEGRATION_TIMEOUT,
-        expectation::asynchronous::{ExpectableExt, ExpectableStateExt},
-        types::{Address, PeerId, Uuid},
-    },
-    futures::{FutureExt, StreamExt, TryFutureExt},
+use anyhow::{format_err, Context, Error};
+use bt_test_harness::access::{expectation, AccessHarness};
+use bt_test_harness::profile::ProfileHarness;
+use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_bluetooth::{ErrorCode, MAJOR_DEVICE_CLASS_MISCELLANEOUS};
+use fidl_fuchsia_bluetooth_bredr::{
+    ConnectParameters, ConnectionReceiverRequestStream, DataElement, L2capParameters,
+    ProfileAdvertiseRequest, ProfileDescriptor, ProfileSearchRequest, ProtocolDescriptor,
+    ProtocolIdentifier, SearchResultsRequest, SearchResultsRequestStream,
+    ServiceClassProfileIdentifier, ServiceDefinition, PSM_AVDTP,
 };
+use fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy;
+use fidl_fuchsia_hardware_bluetooth::{EmulatorProxy, PeerParameters, PeerProxy};
+use fuchsia_async::{DurationExt, TimeoutExt};
+use fuchsia_bluetooth::constants::INTEGRATION_TIMEOUT;
+use fuchsia_bluetooth::expectation::asynchronous::{ExpectableExt, ExpectableStateExt};
+use fuchsia_bluetooth::types::{Address, PeerId, Uuid};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 
 /// This makes a custom BR/EDR service definition that runs over L2CAP.
 fn service_definition_for_testing() -> ServiceDefinition {
@@ -76,17 +70,15 @@ fn add_service(profile: &ProfileHarness) -> Result<ConnectionReceiverRequestStre
 }
 
 async fn create_bredr_peer(proxy: &EmulatorProxy, address: Address) -> Result<PeerProxy, Error> {
-    let peer_params = BredrPeerParameters {
+    let (peer, remote) = fidl::endpoints::create_proxy()?;
+    let peer_params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
-        device_class: Some(DeviceClass { value: MAJOR_DEVICE_CLASS_MISCELLANEOUS + 0 }),
-        service_definition: Some(vec![a2dp_sink_service_definition()]),
+        channel: Some(remote),
         ..Default::default()
     };
-
-    let (peer, remote) = fidl::endpoints::create_proxy()?;
     let _ = proxy
-        .add_bredr_peer(&peer_params, remote)
+        .add_bredr_peer(peer_params)
         .await?
         .map_err(|e| format_err!("Failed to register fake peer: {:#?}", e))?;
     Ok(peer)
@@ -179,7 +171,9 @@ async fn test_add_search((access, profile): (AccessHarness, ProfileHarness)) {
     let peer_address = default_address();
     let profile_id = ServiceClassProfileIdentifier::AudioSink;
     let mut search_result = add_search(&profile, profile_id).await.expect("can register search");
-    let _test_peer = create_bredr_peer(&emulator, peer_address).await.unwrap();
+    let test_peer = create_bredr_peer(&emulator, peer_address).await.unwrap();
+    let _ = test_peer.set_device_class(MAJOR_DEVICE_CLASS_MISCELLANEOUS + 0).await.unwrap();
+    let _ = test_peer.set_service_definitions(&vec![a2dp_sink_service_definition()]).await.unwrap();
     let _discovery_result = start_discovery(&access).await.unwrap();
 
     let state = access

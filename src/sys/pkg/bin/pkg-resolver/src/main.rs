@@ -6,25 +6,24 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::enum_variant_names)]
 
+use anyhow::{anyhow, Context as _, Error};
+use async_lock::RwLock as AsyncRwLock;
+use delivery_blob::DeliveryBlobType;
+use fdio::Namespace;
+use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_contrib::ProtocolConnector;
+use fuchsia_cobalt_builders::MetricEventExt as _;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use futures::stream::FuturesUnordered;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tracing::{error, info, warn};
 use {
-    anyhow::{anyhow, Context as _, Error},
-    async_lock::RwLock as AsyncRwLock,
-    cobalt_sw_delivery_registry as metrics,
-    delivery_blob::DeliveryBlobType,
-    fdio::Namespace,
-    fidl::endpoints::DiscoverableProtocolMarker as _,
-    fidl_contrib::{protocol_connector::ProtocolSender, ProtocolConnector},
-    fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg,
-    fuchsia_async as fasync,
-    fuchsia_cobalt_builders::MetricEventExt as _,
-    fuchsia_component::server::ServiceFs,
+    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio,
+    fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg, fuchsia_async as fasync,
     fuchsia_inspect as inspect, fuchsia_trace as ftrace,
-    futures::{prelude::*, stream::FuturesUnordered},
-    std::{
-        sync::Arc,
-        time::{Duration, Instant},
-    },
-    tracing::{error, info, warn},
 };
 
 mod cache;
@@ -46,15 +45,13 @@ mod util;
 #[cfg(test)]
 mod test_util;
 
-use crate::{
-    cache::BasePackageIndex,
-    config::Config,
-    repository_manager::{RepositoryManager, RepositoryManagerBuilder},
-    repository_service::RepositoryService,
-    resolver_service::ResolverServiceInspectState,
-    rewrite_manager::{LoadRulesError, RewriteManager, RewriteManagerBuilder},
-    rewrite_service::RewriteService,
-};
+use crate::cache::BasePackageIndex;
+use crate::config::Config;
+use crate::repository_manager::{RepositoryManager, RepositoryManagerBuilder};
+use crate::repository_service::RepositoryService;
+use crate::resolver_service::ResolverServiceInspectState;
+use crate::rewrite_manager::{LoadRulesError, RewriteManager, RewriteManagerBuilder};
+use crate::rewrite_service::RewriteService;
 
 // FIXME: allow for multiple threads and sendable futures once repo updates support it.
 // FIXME(43342): trace durations assume they start and end on the same thread, but since the

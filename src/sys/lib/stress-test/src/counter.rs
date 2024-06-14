@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::Task,
-    futures::{channel::mpsc, StreamExt},
-    std::collections::HashMap,
-    tracing::debug,
-};
+use fuchsia_async::Task;
+use futures::channel::mpsc;
+use futures::StreamExt;
+use std::collections::HashMap;
+use tracing::debug;
 
 /// An unbounded mpsc channel connecting each runner to the counter thread.
 ///

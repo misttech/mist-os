@@ -2,19 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    async_trait::async_trait,
-    blackout_target::{Test, TestServer},
-    byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt},
-    fidl_fuchsia_io as fio,
-    fs_management::{filesystem::Filesystem, Blobfs},
-    fuchsia_fs::directory::readdir,
-    fuchsia_merkle::MerkleTreeBuilder,
-    fuchsia_zircon as zx,
-    rand::{distributions::Standard, rngs::StdRng, Rng, SeedableRng},
-    std::{collections::HashMap, sync::Arc},
-};
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use blackout_target::{Test, TestServer};
+use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
+use fs_management::filesystem::Filesystem;
+use fs_management::Blobfs;
+use fuchsia_fs::directory::readdir;
+use fuchsia_merkle::MerkleTreeBuilder;
+use rand::distributions::Standard;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+use std::collections::HashMap;
+use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 async fn write_blob(rng: &mut impl Rng, root: &fio::DirectoryProxy, i: u64) -> Result<String> {
     let mut data = vec![];

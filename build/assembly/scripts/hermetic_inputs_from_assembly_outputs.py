@@ -10,8 +10,8 @@ import os
 
 from assembly import FilePath, PackageManifest
 from depfile import DepFile
+from pathlib import Path
 from serialization import json_load
-from typing import List, Set
 
 
 def get_relative_path(relative_path: str, relative_to_file: str) -> str:
@@ -22,13 +22,13 @@ def get_relative_path(relative_path: str, relative_to_file: str) -> str:
 
 
 def add_inputs_from_packages(
-    package_paths: Set[FilePath],
-    all_manifest_paths: Set[FilePath],
-    inputs: List[FilePath],
+    package_paths: set[FilePath],
+    all_manifest_paths: set[FilePath],
+    inputs: list[FilePath],
     include_blobs: bool,
     in_subpackage: bool = False,
-):
-    anonymous_subpackages: Set[FilePath] = set()
+) -> None:
+    anonymous_subpackages: set[FilePath] = set()
     for manifest_path in package_paths:
         inputs.append(manifest_path)
 
@@ -70,14 +70,14 @@ def add_inputs_from_packages(
         )
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Generate a hermetic inputs file that includes the outputs of Assembly"
     )
     parser.add_argument(
         "--partitions",
-        type=argparse.FileType("r"),
         required=True,
+        type=argparse.FileType("r"),
         help="The partitions config that follows this schema: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/developer/ffx/plugins/assembly/#partitions-config",
     )
     parser.add_argument(
@@ -109,16 +109,18 @@ def main():
     inputs = []
 
     # Add all the bootloaders as inputs.
+    inputs.append(args.partitions.name)
     partitions = json.load(args.partitions)
+    base_dir = os.path.dirname(args.partitions.name)
     for bootloader in partitions.get("bootloader_partitions", []):
-        inputs.append(bootloader["image"])
+        inputs.append(os.path.join(base_dir, bootloader["image"]))
     for bootstrap in partitions.get("bootstrap_partitions", []):
-        inputs.append(bootstrap["image"])
+        inputs.append(os.path.join(base_dir, bootstrap["image"]))
     for credential in partitions.get("unlock_credentials", []):
-        inputs.append(credential)
+        inputs.append(os.path.join(base_dir, credential))
 
     # Add all the system images as inputs.
-    package_manifest_paths: Set[FilePath] = set()
+    package_manifest_paths: set[FilePath] = set()
     for image_manifest_file in args.system:
         image_manifest = json.load(image_manifest_file)
         manifest_path = os.path.dirname(image_manifest_file.name)
@@ -141,7 +143,7 @@ def main():
 
     # If we collected any package manifests, include all the blobs referenced
     # by them.
-    all_manifest_paths: Set[FilePath] = set(package_manifest_paths)
+    all_manifest_paths: set[FilePath] = set(package_manifest_paths)
     add_inputs_from_packages(
         package_manifest_paths,
         all_manifest_paths,
@@ -157,6 +159,8 @@ def main():
         DepFile.from_deps(args.output.name, all_manifest_paths).write_to(
             args.depfile
         )
+
+    return 0
 
 
 if __name__ == "__main__":

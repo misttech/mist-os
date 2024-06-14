@@ -7,8 +7,7 @@ use async_trait::async_trait;
 use ffx_setui_audio_args::Audio;
 use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{AudioProxy, AudioSettings};
-use utils::handle_mixed_result;
-use utils::{Either, WatchOrSetResult};
+use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("setui"))]

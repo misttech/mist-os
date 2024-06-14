@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fs_management::partition::{find_partition, PartitionMatcher},
-    fuchsia_zircon::Duration,
-    ramdevice_client::RamdiskClient,
-};
+use fs_management::partition::{find_partition, PartitionMatcher};
+use fuchsia_zircon::Duration;
+use ramdevice_client::RamdiskClient;
 
 #[fuchsia::test]
 async fn find_partition_test() {

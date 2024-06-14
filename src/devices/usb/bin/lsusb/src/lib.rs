@@ -5,17 +5,14 @@
 pub mod args;
 mod descriptors;
 
-use {
-    crate::args::{Args, UsbDevice},
-    crate::descriptors::*,
-    anyhow::{format_err, Context, Result},
-    fidl_fuchsia_io as fio,
-    fuchsia_async::TimeoutExt,
-    fuchsia_zircon_status as zx,
-    futures::future::{BoxFuture, FutureExt},
-    futures::TryStreamExt,
-    std::sync::Mutex,
-};
+use crate::args::{Args, UsbDevice};
+use crate::descriptors::*;
+use anyhow::{format_err, Context, Result};
+use fuchsia_async::TimeoutExt;
+use futures::future::{BoxFuture, FutureExt};
+use futures::TryStreamExt;
+use std::sync::Mutex;
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
 
 // This isn't actually unused, but rustc can't seem to tell otherwise.
 #[allow(unused_imports)]

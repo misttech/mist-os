@@ -7,51 +7,44 @@ use super::{
     SocketFile, SocketMessageFlags, SocketProtocol, SocketType, UnixSocket, VsockSocket,
     ZxioBackedSocket,
 };
-use crate::{
-    mm::MemoryAccessorExt,
-    task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
-    vfs::{
-        buffers::{
-            AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer,
-            VecOutputBuffer,
-        },
-        default_ioctl,
-        socket::SocketShutdownFlags,
-        Anon, FileHandle, FileObject, FsNodeInfo,
-    },
+use crate::mm::MemoryAccessorExt;
+use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
+use crate::vfs::buffers::{
+    AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
 };
+use crate::vfs::socket::SocketShutdownFlags;
+use crate::vfs::{default_ioctl, Anon, FileHandle, FileObject, FsNodeInfo};
 use byteorder::{ByteOrder as _, NativeEndian};
 use fuchsia_zircon as zx;
 use net_types::ip::IpAddress;
 use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
-use netlink_packet_route::{
-    address::{AddressAttribute, AddressMessage},
-    link::{LinkAttribute, LinkFlags, LinkMessage},
-    AddressFamily, RouteNetlinkMessage,
-};
+use netlink_packet_route::address::{AddressAttribute, AddressMessage};
+use netlink_packet_route::link::{LinkAttribute, LinkFlags, LinkMessage};
+use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::as_any::AsAny;
+use starnix_uapi::auth::CAP_NET_RAW;
+use starnix_uapi::errors::{Errno, ErrnoCode};
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::time::{duration_from_timeval, timeval_from_duration};
+use starnix_uapi::union::struct_with_union_into_bytes;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_buffer::UserBuffer;
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    as_any::AsAny,
-    auth::CAP_NET_RAW,
-    c_char, errno, error,
-    errors::{Errno, ErrnoCode},
-    file_mode::mode,
-    ifreq, in_addr,
-    open_flags::OpenFlags,
-    sockaddr, sockaddr_in,
-    time::{duration_from_timeval, timeval_from_duration},
-    ucred,
-    union::struct_with_union_into_bytes,
-    user_address::{UserAddress, UserRef},
-    user_buffer::UserBuffer,
-    vfs::FdEvents,
-    AF_INET, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR,
-    SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
+    c_char, errno, error, ifreq, in_addr, sockaddr, sockaddr_in, ucred, AF_INET, SIOCGIFADDR,
+    SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR, SIOCSIFFLAGS, SOL_SOCKET,
+    SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
 };
 use static_assertions::const_assert;
-use std::{collections::VecDeque, ffi::CStr, mem::size_of, net::IpAddr, sync::Arc};
+use std::collections::VecDeque;
+use std::ffi::CStr;
+use std::mem::size_of;
+use std::net::IpAddr;
+use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes as _};
 
 pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
@@ -60,6 +53,15 @@ pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
 const NETLINK_ROUTE_BUF_SIZE: usize = 1024;
 
 pub trait SocketOps: Send + Sync + AsAny {
+    /// Returns the domain, type and protocol of the socket. This is only used for socket that are
+    /// build without previous knowledge of this information, and can be ignored if all sockets are
+    /// build with it.
+    fn get_socket_info(&self) -> Result<(SocketDomain, SocketType, SocketProtocol), Errno> {
+        // This should not be used by most socket type that are created with their domain, type and
+        // protocol.
+        error!(EINVAL)
+    }
+
     /// Connect the `socket` to the listening `peer`. On success
     /// a new socket is created and added to the accept queue.
     fn connect(
@@ -297,14 +299,19 @@ impl Socket {
         protocol: SocketProtocol,
     ) -> Result<SocketHandle, Errno> {
         let ops = create_socket_ops(current_task, domain, socket_type, protocol)?;
-        Ok(Arc::new(Socket { ops, domain, socket_type, protocol, state: Mutex::default() }))
+        Ok(Self::new_with_ops_and_info(ops, domain, socket_type, protocol))
     }
 
-    pub fn new_with_ops(
+    pub fn new_with_ops(ops: Box<dyn SocketOps>) -> Result<SocketHandle, Errno> {
+        let (domain, socket_type, protocol) = ops.get_socket_info()?;
+        Ok(Self::new_with_ops_and_info(ops, domain, socket_type, protocol))
+    }
+
+    pub fn new_with_ops_and_info(
+        ops: Box<dyn SocketOps>,
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
-        ops: Box<dyn SocketOps>,
     ) -> SocketHandle {
         Arc::new(Socket { ops, domain, socket_type, protocol, state: Mutex::default() })
     }
@@ -1004,10 +1011,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        testing::{create_kernel_task_and_unlocked, map_memory},
-        vfs::UnixControlData,
-    };
+    use crate::testing::{create_kernel_task_and_unlocked, map_memory};
+    use crate::vfs::UnixControlData;
     use starnix_uapi::SO_PASSCRED;
 
     #[::fuchsia::test]

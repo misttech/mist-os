@@ -6,26 +6,24 @@
 
 #![deny(missing_docs)]
 
-use {
-    anyhow::{anyhow, Context as _, Result},
-    async_trait::async_trait,
-    device_watcher::{recursive_wait, recursive_wait_and_open},
-    fidl_fuchsia_blackout_test::{ControllerRequest, ControllerRequestStream},
-    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::client::{
-        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
-    },
-    fuchsia_component::server::{ServiceFs, ServiceObj},
-    fuchsia_fs::directory::readdir,
-    fuchsia_zircon as zx,
-    futures::{future, FutureExt, StreamExt, TryFutureExt, TryStreamExt},
-    rand::{distributions, rngs::StdRng, Rng, SeedableRng},
-    std::sync::Arc,
-    storage_isolated_driver_manager::fvm,
-    uuid::Uuid,
+use anyhow::{anyhow, Context as _, Result};
+use async_trait::async_trait;
+use device_watcher::{recursive_wait, recursive_wait_and_open};
+use fidl_fuchsia_blackout_test::{ControllerRequest, ControllerRequestStream};
+use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fuchsia_component::client::{
+    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
 };
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use fuchsia_fs::directory::readdir;
+use futures::{future, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use rand::rngs::StdRng;
+use rand::{distributions, Rng, SeedableRng};
+use std::sync::Arc;
+use storage_isolated_driver_manager::fvm;
+use uuid::Uuid;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub mod static_tree;
 

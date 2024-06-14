@@ -4,14 +4,12 @@
 
 pub mod args;
 
-use {
-    anyhow::{format_err, Result},
-    args::DumpCommand,
-    fidl_fuchsia_driver_development as fdd,
-    fuchsia_driver_dev::{DFv1Device, DFv2Node, Device},
-    std::collections::{BTreeMap, VecDeque},
-    std::io::Write,
-};
+use anyhow::{format_err, Result};
+use args::DumpCommand;
+use fidl_fuchsia_driver_development as fdd;
+use fuchsia_driver_dev::{DFv1Device, DFv2Node, Device};
+use std::collections::{BTreeMap, VecDeque};
+use std::io::Write;
 
 const INDENT_SIZE: usize = 2;
 
@@ -217,17 +215,13 @@ pub async fn dump(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Context,
-        argh::FromArgs,
-        fidl::endpoints::ServerEnd,
-        fuchsia_async as fasync,
-        futures::{
-            future::{Future, FutureExt},
-            stream::StreamExt,
-        },
-    };
+    use super::*;
+    use anyhow::Context;
+    use argh::FromArgs;
+    use fidl::endpoints::ServerEnd;
+    use fuchsia_async as fasync;
+    use futures::future::{Future, FutureExt};
+    use futures::stream::StreamExt;
 
     async fn test_dump<F, Fut>(cmd: DumpCommand, on_driver_development_request: F) -> Result<String>
     where

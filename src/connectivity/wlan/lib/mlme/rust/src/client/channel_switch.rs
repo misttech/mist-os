@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        client::{scanner::Scanner, Context, TimedEvent},
-        device::DeviceOps,
-    },
-    anyhow::bail,
-    fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::Future,
-    tracing::error,
-    wlan_common::{ie, mac::BeaconHdr, timer::EventId, TimeUnit},
-    zerocopy::ByteSlice,
-};
+use crate::client::scanner::Scanner;
+use crate::client::{Context, TimedEvent};
+use crate::device::DeviceOps;
+use anyhow::bail;
+use futures::Future;
+use tracing::error;
+use wlan_common::mac::BeaconHdr;
+use wlan_common::timer::EventId;
+use wlan_common::{ie, TimeUnit};
+use zerocopy::ByteSlice;
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub trait ChannelActions {
     fn switch_channel(
@@ -390,14 +389,13 @@ impl<B: ByteSlice> ChannelSwitchBuilder<B> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        futures::task::Poll,
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::{assert_variant, mac::CapabilityInfo},
-        zerocopy::AsBytes,
-    };
+    use super::*;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
+    use wlan_common::mac::CapabilityInfo;
+    use zerocopy::AsBytes;
 
     const NEW_CHANNEL: u8 = 10;
     const NEW_OPERATING_CLASS: u8 = 20;

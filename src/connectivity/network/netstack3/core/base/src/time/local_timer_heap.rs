@@ -309,7 +309,8 @@ impl<T: Instant, K> PartialOrd for HeapEntry<T, K> {
 
 #[cfg(any(test, feature = "testutils"))]
 mod testutil {
-    use core::{fmt::Debug, ops::RangeBounds};
+    use core::fmt::Debug;
+    use core::ops::RangeBounds;
 
     use super::*;
 
@@ -383,10 +384,8 @@ mod testutil {
 mod tests {
     use alloc::vec::Vec;
 
-    use crate::{
-        testutil::{FakeInstant, FakeInstantCtx},
-        InstantContext,
-    };
+    use crate::testutil::{FakeInstant, FakeInstantCtx};
+    use crate::InstantContext;
 
     use super::*;
 

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::terminal_view::TerminalViewAssistant,
-    anyhow::Error,
-    carnelian::{AppAssistant, AppSender, ViewAssistantPtr, ViewKey},
-    std::ffi::CString,
-};
+use crate::terminal_view::TerminalViewAssistant;
+use anyhow::Error;
+use carnelian::{AppAssistant, AppSender, ViewAssistantPtr, ViewKey};
+use std::ffi::CString;
 
 const TERMINAL_ENVIRON: &[&str; 1] = &["TERM=xterm-256color"];
 

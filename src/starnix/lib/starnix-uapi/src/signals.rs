@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    errors::{errno, error, Errno},
-    sigset_t,
-};
+use crate::errors::{errno, error, Errno};
+use crate::sigset_t;
 use linux_uapi as uapi;
 use static_assertions::assert_eq_size;
-use std::{
-    fmt,
-    ops::{BitAnd, BitOr, Not},
-};
+use std::fmt;
+use std::ops::{BitAnd, BitOr, Not};
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 pub const UNBLOCKABLE_SIGNALS: SigSet = SigSet(SIGKILL.mask() | SIGSTOP.mask());

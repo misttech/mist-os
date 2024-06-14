@@ -35,35 +35,29 @@
 // house one entry fewer than the number of data blocks, and the final block may be incomplete if
 // the entire block isn't needed.
 
-use {
-    crate::{
-        drop_event::DropEvent,
-        errors::FxfsError,
-        filesystem::MAX_BLOCK_SIZE,
-        log::*,
-        lsm_tree::types::{
-            BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerWriter, Value,
-        },
-        object_handle::{ObjectHandle, ReadObjectHandle, WriteBytes},
-        object_store::caching_object_handle::{CachedChunk, CachingObjectHandle, CHUNK_SIZE},
-        round::{how_many, round_down, round_up},
-        serialized_types::{Version, Versioned, VersionedLatest, LATEST_VERSION},
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    async_trait::async_trait,
-    byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt},
-    fprint::TypeFingerprint,
-    serde::{Deserialize, Serialize},
-    static_assertions::const_assert,
-    std::{
-        cmp::Ordering,
-        io::{Read, Write},
-        marker::PhantomData,
-        ops::Bound,
-        sync::{Arc, Mutex},
-    },
-    storage_device::buffer::Buffer,
+use crate::drop_event::DropEvent;
+use crate::errors::FxfsError;
+use crate::filesystem::MAX_BLOCK_SIZE;
+use crate::log::*;
+use crate::lsm_tree::types::{
+    BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerWriter, Value,
 };
+use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteBytes};
+use crate::object_store::caching_object_handle::{CachedChunk, CachingObjectHandle, CHUNK_SIZE};
+use crate::round::{how_many, round_down, round_up};
+use crate::serialized_types::{Version, Versioned, VersionedLatest, LATEST_VERSION};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use async_trait::async_trait;
+use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
+use fprint::TypeFingerprint;
+use serde::{Deserialize, Serialize};
+use static_assertions::const_assert;
+use std::cmp::Ordering;
+use std::io::{Read, Write};
+use std::marker::PhantomData;
+use std::ops::Bound;
+use std::sync::{Arc, Mutex};
+use storage_device::buffer::Buffer;
 
 /// The first block of each layer contains metadata for the rest of the layer.
 pub type LayerInfo = LayerInfoV32;
@@ -700,35 +694,24 @@ impl<W: WriteBytes, K: Key, V: Value> Drop for SimplePersistentLayerWriter<W, K,
 #[cfg(test)]
 mod tests {
 
-    use {
-        super::{block_split, SimplePersistentLayer, SimplePersistentLayerWriter},
-        crate::{
-            filesystem::MAX_BLOCK_SIZE,
-            lsm_tree::{
-                types::{
-                    DefaultOrdUpperBound, Item, ItemRef, Layer, LayerKey, LayerWriter, MergeType,
-                    SortByU64,
-                },
-                LayerIterator,
-            },
-            object_handle::WriteBytes,
-            round::round_up,
-            serialized_types::{
-                versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
-            },
-            testing::{
-                fake_object::{FakeObject, FakeObjectHandle},
-                writer::Writer,
-            },
-        },
-        fprint::TypeFingerprint,
-        std::{
-            fmt::Debug,
-            hash::Hash,
-            ops::{Bound, Range},
-            sync::Arc,
-        },
+    use super::{block_split, SimplePersistentLayer, SimplePersistentLayerWriter};
+    use crate::filesystem::MAX_BLOCK_SIZE;
+    use crate::lsm_tree::types::{
+        DefaultOrdUpperBound, Item, ItemRef, Layer, LayerKey, LayerWriter, MergeType, SortByU64,
     };
+    use crate::lsm_tree::LayerIterator;
+    use crate::object_handle::WriteBytes;
+    use crate::round::round_up;
+    use crate::serialized_types::{
+        versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
+    };
+    use crate::testing::fake_object::{FakeObject, FakeObjectHandle};
+    use crate::testing::writer::Writer;
+    use fprint::TypeFingerprint;
+    use std::fmt::Debug;
+    use std::hash::Hash;
+    use std::ops::{Bound, Range};
+    use std::sync::Arc;
 
     impl DefaultOrdUpperBound for i32 {}
     impl SortByU64 for i32 {

@@ -3,120 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_diagnostics as fdiagnostics;
-use std::{borrow::Cow, fmt::Debug};
-
-/// Severity
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Severity {
-    Trace,
-    Debug,
-    Info,
-    Warn,
-    Error,
-    Fatal,
-}
-
-/// Identifier
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Identifier {
-    Filename,
-    LifecycleEventType,
-    LineNumber,
-    Pid,
-    Severity,
-    Tags,
-    Tid,
-    Timestamp,
-}
-
-/// Supported comparison operators.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ComparisonOperator {
-    Equal,
-    GreaterEq,
-    Greater,
-    LessEq,
-    Less,
-    NotEq,
-}
-
-/// Supported inclusion operators.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum InclusionOperator {
-    HasAny,
-    HasAll,
-    In,
-}
-
-/// Supported operators.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Operator {
-    Inclusion(InclusionOperator),
-    Comparison(ComparisonOperator),
-}
-
-/// Accepted right-hand-side values that can be used in an operation.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Value<'a> {
-    Severity(Severity),
-    StringLiteral(&'a str),
-    Number(u64),
-}
-
-impl Value<'_> {
-    fn ty(&self) -> ValueType {
-        match self {
-            Value::Severity(_) => ValueType::Severity,
-            Value::StringLiteral(_) => ValueType::StringLiteral,
-            Value::Number(_) => ValueType::Number,
-        }
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum ValueType {
-    Severity,
-    StringLiteral,
-    Number,
-}
-
-/// Holds a single value or a vector of values of type `T`.
-#[derive(Debug, Eq, PartialEq)]
-pub enum OneOrMany<T: Debug + Eq + PartialEq> {
-    One(T),
-    Many(Vec<T>),
-}
-
-impl OneOrMany<Value<'_>> {
-    pub(crate) fn ty(&self) -> OneOrMany<ValueType> {
-        match self {
-            Self::One(value) => OneOrMany::One(value.ty()),
-            Self::Many(values) => OneOrMany::Many(values.into_iter().map(|v| v.ty()).collect()),
-        }
-    }
-}
-
-/// A single filter expression in a metadata selector.
-#[derive(Debug, Eq, PartialEq)]
-pub struct FilterExpression<'a> {
-    pub identifier: Identifier,
-    pub operator: Operator,
-    pub value: OneOrMany<Value<'a>>,
-}
-
-/// Represents a  metadata selector, which consists of a list of filters.
-#[derive(Debug, Eq, PartialEq)]
-pub struct MetadataSelector<'a>(pub(crate) Vec<FilterExpression<'a>>);
-
-impl<'a> MetadataSelector<'a> {
-    pub fn new(filters: Vec<FilterExpression<'a>>) -> Self {
-        Self(filters)
-    }
-
-    pub fn filters(&self) -> &[FilterExpression<'a>] {
-        self.0.as_slice()
-    }
-}
+use std::borrow::Cow;
+use std::fmt::Debug;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Segment<'a> {
@@ -179,7 +67,6 @@ pub struct ComponentSelector<'a> {
 pub struct Selector<'a> {
     pub component: ComponentSelector<'a>,
     pub tree: TreeSelector<'a>,
-    pub metadata: Option<MetadataSelector<'a>>,
 }
 
 impl Into<fdiagnostics::Selector> for Selector<'_> {
@@ -187,7 +74,7 @@ impl Into<fdiagnostics::Selector> for Selector<'_> {
         fdiagnostics::Selector {
             component_selector: Some(self.component.into()),
             tree_selector: Some(self.tree.into()),
-            ..Default::default() // TODO(https://fxbug.dev/42132713): add metadata.
+            ..Default::default()
         }
     }
 }

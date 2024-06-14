@@ -340,6 +340,17 @@ config("static-libc++") {
       ]
     }
   }
+  if (is_kernel || toolchain_variant.tags + [ "no-compiler-abi" ] -
+                   [ "no-compiler-abi" ] != toolchain_variant.tags) {
+    # This directory contains just a libc++.a file that is a stub input linker
+    # script to prevent the real libc++.a from being found by the linker.
+    # Instead, it will find the empty file and any references to symbols
+    # defined in the real libc++.a (which includes libc++abi) will cause the
+    # link to fail.  This doesn't use lib_dirs because it propagates in ways
+    # that ldflags doesn't.  It also ensures the stub is first in the path,
+    # since any -L switches from lib_dirs directories come after ldflags.
+    ldflags += [ "-L" + rebase_path("libc++-stub", root_build_dir) ]
+  }
 }
 
 # This config is used for code that needs to be purely position-independent
@@ -412,11 +423,7 @@ config("hermetic-code-blob") {
   }
 
   # Don't add any additional sections or dependencies.
-  ldflags += [
-    "-Wl,--build-id=none",
-    "-Wl,--no-dynamic-linker",
-    "-Wl,--no-eh-frame-hdr",
-  ]
+  configs = [ ":no-synthetic-sections" ]
   if (!is_kernel) {
     ldflags += [
       "-static",
@@ -434,5 +441,19 @@ config("hermetic-code-blob") {
         "-unwindlib=none",
       ]
     }
+  }
+}
+
+config("no-synthetic-sections") {
+  # These may be necessary to override earlier explicit switches passed by
+  # //build/config:compiler and its dependencies, e.g. when using -r.
+  ldflags = [
+    "-Wl,--build-id=none",  # Don't generate .note.gnu.build-id section.
+    "-Wl,--no-eh-frame-hdr",  # Don't generate .eh_frame_hdr section.
+  ]
+  if (linker != "gold") {
+    ldflags += [
+      "-Wl,--no-dynamic-linker",  # Don't generate .interp section.
+    ]
   }
 }

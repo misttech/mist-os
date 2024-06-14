@@ -9,9 +9,6 @@
 use anyhow::Result;
 use async_test_helpers::run_while;
 use async_utils::PollExt;
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::channel::mpsc;
 use futures::StreamExt;
@@ -20,6 +17,10 @@ use std::future::Future;
 use std::pin::{pin, Pin};
 use std::task::Poll;
 use test_profile_server::{ConnectChannel, TestProfileServer, TestProfileServerEndpoints};
+use {
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp as fidl_hfp,
+    fuchsia_async as fasync,
+};
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::hfp::{Hfp, SEARCH_RESULT_CONNECT_DELAY_SECONDS};

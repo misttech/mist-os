@@ -67,7 +67,7 @@ func TestFFXInstance(t *testing.T) {
 		err,
 		stdout,
 		fmt.Sprintf(
-			"--target target test run --continue-on-timeout --test-file %s --output-directory %s",
+			"--target target test run --continue-on-timeout --test-file %s --output-directory %s --show-full-moniker-in-logs",
 			filepath.Join(outDir, "test-list.json"), testOutputDir,
 		),
 	)

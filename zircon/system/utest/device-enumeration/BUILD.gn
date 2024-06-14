@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/devicetree/args.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 import("//tools/cmc/build/expect_includes.gni")
@@ -48,14 +47,9 @@ test("device-enumeration") {
     "boards/qemu_riscv64.cc",
     "boards/qemu_x64.cc",
     "boards/sherlock.cc",
+    "boards/vim3.cc",
     "bootfs_main.cc",
   ]
-
-  if (devicetree_board_driver) {
-    sources += [ "boards/vim3-devicetree.cc" ]
-  } else {
-    sources += [ "boards/vim3.cc" ]
-  }
 
   deps = [
     ":common",
@@ -155,12 +149,8 @@ foreach(board_info, _boards) {
   test("device-enumeration-test-${board}-bin") {
     configs += [ ":include_packaged_drivers" ]
 
-    # TODO(https://fxbug.dev/340607972): Update source file for vim3-devicetree. Once the migration is complete, this condition can be removed.
-    if (devicetree_board_driver && board == "vim3") {
-      sources = [ "boards/${board}-devicetree.cc" ]
-    } else {
-      sources = [ "boards/${board}.cc" ]
-    }
+    sources = [ "boards/${board}.cc" ]
+
     deps = [ ":common" ]
   }
 

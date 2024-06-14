@@ -5,18 +5,15 @@
 mod usb;
 
 use crate::usb::listen_for_usb_devices;
-use anyhow::Context as ErrorContext;
-use anyhow::{bail, format_err, Error};
+use anyhow::{bail, format_err, Context as ErrorContext, Error};
 use argh::FromArgs;
 use async_net::unix::{UnixListener, UnixStream};
 use fuchsia_async::{Task, TimeoutExt};
 use futures::channel::mpsc::unbounded;
 use futures::prelude::*;
 use overnet_core::AscenddClientRouting;
-use std::io::{
-    ErrorKind::{self, TimedOut},
-    Write,
-};
+use std::io::ErrorKind::{self, TimedOut};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;

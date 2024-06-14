@@ -2,30 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::ProtectionFlags,
-    task::{CurrentTask, Kernel},
-    vfs::{
-        default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
-        fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode,
-        DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
-        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        FsString, SeekTarget, SymlinkTarget, VmoFileObject, XattrOp,
-    },
+use crate::mm::ProtectionFlags;
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::{
+    default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
+    fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode, DirectoryEntryType,
+    DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
+    SymlinkTarget, VmoFileObject, XattrOp,
 };
-use ext4_read_only::{
-    parser::{Parser as ExtParser, XattrMap as ExtXattrMap},
-    readers::VmoReader,
-    structs::{EntryType, INode, ROOT_INODE_NUM},
-};
+use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
+use ext4_read_only::readers::VmoReader;
+use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
-use starnix_uapi::{
-    auth::FsCred, errno, error, errors::Errno, file_mode::FileMode, ino_t, mount_flags::MountFlags,
-    off_t, open_flags::OpenFlags, statfs, vfs::default_statfs, EXT4_SUPER_MAGIC,
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::{errno, error, ino_t, off_t, statfs, EXT4_SUPER_MAGIC};
 use std::sync::Arc;
 
 mod pager;

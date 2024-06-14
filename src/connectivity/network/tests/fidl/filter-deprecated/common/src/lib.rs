@@ -3,20 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::Context as _;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_filter_deprecated as fnetfilter;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
-use futures::{
-    io::AsyncReadExt as _, io::AsyncWriteExt as _, FutureExt as _, StreamExt, TryFutureExt as _,
-};
+use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
+use futures::{FutureExt as _, StreamExt, TryFutureExt as _};
 use net_declare::{fidl_mac, fidl_subnet};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netfilter::FidlReturn as _;
-use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
+use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
 use netstack_testing_common::{
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use std::ops::RangeInclusive;
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_deprecated as fnetfilter};
 
 pub const CLIENT_IPV4_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
 pub const SERVER_IPV4_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
@@ -276,12 +274,12 @@ pub async fn run_socket_test(
     }
 }
 
-pub async fn test_filter<N: Netstack>(name: &str, test: Test) {
+pub async fn test_filter(name: &str, test: Test) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
     let client = sandbox
-        .create_netstack_realm::<N, _>(format!("{}_client", name))
+        .create_netstack_realm::<Netstack2, _>(format!("{}_client", name))
         .expect("failed to create client realm");
     let client_ep = client
         .join_network_with(
@@ -298,7 +296,7 @@ pub async fn test_filter<N: Netstack>(name: &str, test: Test) {
         .expect("client failed to connect to filter service");
 
     let server = sandbox
-        .create_netstack_realm::<N, _>(format!("{}_server", name))
+        .create_netstack_realm::<Netstack2, _>(format!("{}_server", name))
         .expect("failed to create server realm");
     let server_ep = server
         .join_network_with(

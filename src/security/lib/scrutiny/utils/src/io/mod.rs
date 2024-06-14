@@ -4,16 +4,12 @@
 
 mod u64_arithmetic;
 
-use {
-    anyhow::{anyhow, Context, Result},
-    std::{
-        fmt::Debug,
-        fs::File,
-        io::{BufReader, Read, Seek, SeekFrom},
-    },
-    thiserror::Error,
-    u64_arithmetic::{abs, named_u64, u64_add, u64_sub, U64Eval},
-};
+use anyhow::{anyhow, Context, Result};
+use std::fmt::Debug;
+use std::fs::File;
+use std::io::{BufReader, Read, Seek, SeekFrom};
+use thiserror::Error;
+use u64_arithmetic::{abs, named_u64, u64_add, u64_sub, U64Eval};
 
 /// A fallible `Clone` trait.
 pub trait TryClone: Sized {
@@ -314,17 +310,12 @@ impl<RS: Read + Seek> Seek for WrappedReaderSeeker<RS> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            u64_arithmetic::{
-                named_u64, u64_add, u64_sub, U64ArithmeticError, U64Operation,
-                NEGATIVE_I64_MIN_AS_U64,
-            },
-            WrappedReaderSeeker, WrappedReaderSeekerError,
-        },
-        anyhow::Context,
-        std::io::{Read, Seek, SeekFrom},
+    use super::u64_arithmetic::{
+        named_u64, u64_add, u64_sub, U64ArithmeticError, U64Operation, NEGATIVE_I64_MIN_AS_U64,
     };
+    use super::{WrappedReaderSeeker, WrappedReaderSeekerError};
+    use anyhow::Context;
+    use std::io::{Read, Seek, SeekFrom};
 
     /// A `Clone + std::io::Read + std::io::Seek` that reads `b'\0'` bytes within the range
     /// `[0, self.length)`. Seeking is unrestricted, and uses naive unchecked arithmetic.

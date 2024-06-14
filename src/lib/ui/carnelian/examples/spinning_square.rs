@@ -3,21 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
+use carnelian::app::{Config, ViewCreationParameters};
+use carnelian::color::Color;
+use carnelian::drawing::{load_font, path_for_rectangle, path_for_rounded_rectangle, FontFace};
+use carnelian::input::{self};
+use carnelian::render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, Style};
+use carnelian::scene::facets::{Facet, FacetId, TextFacetOptions};
+use carnelian::scene::scene::{Scene, SceneBuilder, SceneOrder};
+use carnelian::scene::LayerGroup;
 use carnelian::{
-    app::{Config, ViewCreationParameters},
-    color::Color,
-    derive_handle_message_with_default,
-    drawing::{load_font, path_for_rectangle, path_for_rounded_rectangle, FontFace},
-    input::{self},
-    render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, Style},
-    scene::{
-        facets::{Facet, FacetId, TextFacetOptions},
-        scene::{Scene, SceneBuilder, SceneOrder},
-        LayerGroup,
-    },
-    App, AppAssistant, AppAssistantPtr, AppSender, AssistantCreatorFunc, Coord, LocalBoxFuture,
-    MessageTarget, Point, Rect, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr,
-    ViewKey,
+    derive_handle_message_with_default, App, AppAssistant, AppAssistantPtr, AppSender,
+    AssistantCreatorFunc, Coord, LocalBoxFuture, MessageTarget, Point, Rect, Size, ViewAssistant,
+    ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::{point2, size2, vec2, Angle, Transform2D};
 use fidl::prelude::*;
@@ -25,7 +22,8 @@ use fidl_test_placeholders::{EchoMarker, EchoRequest, EchoRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_zircon::Time;
 use futures::prelude::*;
-use std::{f32::consts::PI, path::PathBuf};
+use std::f32::consts::PI;
+use std::path::PathBuf;
 
 struct SpinningSquareAppAssistant {
     app_sender: AppSender,

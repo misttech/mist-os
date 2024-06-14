@@ -5,25 +5,20 @@
 //! yaml checks the yaml  files that part of the //docs publishing process
 //! for correctness.
 
-use {
-    self::toc_checker::Toc,
-    crate::{
-        link_checker::{
-            check_external_links, do_check_link, do_in_tree_check, is_intree_link, LinkReference,
-            PUBLISHED_DOCS_HOST,
-        },
-        DocCheckError, DocCheckerArgs, DocLine, DocYamlCheck,
-    },
-    anyhow::Result,
-    async_trait::async_trait,
-    serde::{de::DeserializeOwned, Deserialize},
-    serde_yaml::{Mapping, Value},
-    std::{
-        collections::{HashMap, HashSet},
-        ffi::OsStr,
-        path::{self, Path, PathBuf},
-    },
+use self::toc_checker::Toc;
+use crate::link_checker::{
+    check_external_links, do_check_link, do_in_tree_check, is_intree_link, LinkReference,
+    PUBLISHED_DOCS_HOST,
 };
+use crate::{DocCheckError, DocCheckerArgs, DocLine, DocYamlCheck};
+use anyhow::Result;
+use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use serde_yaml::{Mapping, Value};
+use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
+use std::path::{self, Path, PathBuf};
 
 mod toc_checker;
 

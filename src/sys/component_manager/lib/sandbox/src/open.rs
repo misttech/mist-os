@@ -1,22 +1,21 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{connector::Connectable, registry, CapabilityTrait, Connector, ConversionError};
+use crate::connector::Connectable;
+use crate::fidl::registry;
+use crate::{Connector, ConversionError, RemotableCapability};
 use core::fmt;
 use fidl::endpoints::{create_request_stream, ClientEnd};
 use fidl::handle::{AsHandleRef, Channel, Status};
-use fidl_fuchsia_component_sandbox as fsandbox;
-use fidl_fuchsia_io as fio;
 use fuchsia_zircon::Koid;
 use futures::TryStreamExt;
 use std::sync::Arc;
-use vfs::{
-    directory::entry::{DirectoryEntry, OpenRequest, SubNode},
-    execution_scope::ExecutionScope,
-    remote::remote_dir,
-    service::endpoint,
-    ToObjectRequest,
-};
+use vfs::directory::entry::{DirectoryEntry, OpenRequest, SubNode};
+use vfs::execution_scope::ExecutionScope;
+use vfs::remote::remote_dir;
+use vfs::service::endpoint;
+use vfs::ToObjectRequest;
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
 /// a [Channel], usually treated as the server endpoint of some FIDL protocol.
@@ -152,7 +151,7 @@ impl fmt::Debug for Open {
     }
 }
 
-impl CapabilityTrait for Open {
+impl RemotableCapability for Open {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(self.entry)
     }
@@ -231,13 +230,12 @@ mod tests {
     use anyhow::Result;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, create_proxy};
-    use fidl_fuchsia_io as fio;
-    use fuchsia_async as fasync;
     use futures::StreamExt;
-    use vfs::directory::{
-        entry::serve_directory, entry_container::Directory as _, helper::DirectlyMutable,
-        immutable::simple as pfs,
-    };
+    use vfs::directory::entry::serve_directory;
+    use vfs::directory::entry_container::Directory as _;
+    use vfs::directory::helper::DirectlyMutable;
+    use vfs::directory::immutable::simple as pfs;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn get_entries(client_end: ClientEnd<fio::DirectoryMarker>) -> Result<Vec<String>> {
         let client = client_end.into_proxy()?;

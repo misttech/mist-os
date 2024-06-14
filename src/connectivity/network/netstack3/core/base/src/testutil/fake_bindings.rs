@@ -5,13 +5,14 @@
 //! A shareable fake bindings context.
 
 use alloc::vec::Vec;
-use core::{convert::Infallible as Never, fmt::Debug};
+use core::convert::Infallible as Never;
+use core::fmt::Debug;
 
+use crate::sync::DynDebugReferences;
+use crate::testutil::{
+    FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant, FakeTimerCtx, WithFakeTimerContext,
+};
 use crate::{
-    sync::DynDebugReferences,
-    testutil::{
-        FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant, FakeTimerCtx, WithFakeTimerContext,
-    },
     ContextProvider, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
     InstantContext, ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext,
     TracingContext,

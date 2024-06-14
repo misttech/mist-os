@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::Client;
+use crate::object::{ObjectRef, RequestReceiver};
+use crate::scenic::{FlatlandInstanceId, FlatlandPtr};
+use anyhow::Error;
+use fidl_fuchsia_math::Size;
+use fidl_fuchsia_ui_composition::{BufferCollectionImportToken, ContentId, ImageProperties};
+use fuchsia_zircon::{self as zx, HandleBased};
+use std::cell::Cell;
+use std::rc::Rc;
+use wayland_server_protocol::*;
 use {
-    crate::client::Client,
-    crate::object::{ObjectRef, RequestReceiver},
-    crate::scenic::{FlatlandInstanceId, FlatlandPtr},
-    anyhow::Error,
-    fidl_fuchsia_math as fmath,
-    fidl_fuchsia_math::Size,
-    fidl_fuchsia_ui_composition as composition,
-    fidl_fuchsia_ui_composition::{BufferCollectionImportToken, ContentId, ImageProperties},
-    fuchsia_trace as ftrace,
-    fuchsia_zircon::{self as zx, HandleBased},
-    std::{cell::Cell, rc::Rc},
-    wayland_server_protocol::*,
+    fidl_fuchsia_math as fmath, fidl_fuchsia_ui_composition as composition, fuchsia_trace as ftrace,
 };
 
 pub type ImageInstanceId = usize;

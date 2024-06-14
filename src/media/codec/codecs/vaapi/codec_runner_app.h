@@ -37,7 +37,8 @@ class CodecRunnerApp {
 #ifdef NDEBUG
     fuchsia_logging::SetTags(kLogTags);
 #else
-    fuchsia_logging::SetLogSettings({.min_log_level = fuchsia_logging::LOG_DEBUG}, kLogTags);
+    fuchsia_logging::LogSettingsBuilder builder;
+    builder.WithMinLogSeverity(fuchsia_logging::LOG_DEBUG).BuildAndInitializeWithTags(kLogTags);
 #endif
 
     trace_provider_ =

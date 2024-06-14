@@ -2,26 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::wire::{VirtioBalloonFeatureFlags, VirtioBalloonMemStat, LE32, PAGE_SIZE},
-    anyhow::{anyhow, Error},
-    fidl_fuchsia_virtualization::MemStat,
-    fidl_fuchsia_virtualization_hardware::VirtioBalloonGetMemStatsResponder,
-    fidl_fuchsia_virtualization_hardware::{VirtioBalloonRequest, VirtioBalloonRequestStream},
-    fuchsia_inspect as inspect,
-    fuchsia_inspect::NumericProperty,
-    fuchsia_zircon::{self as zx},
-    futures::channel::mpsc,
-    futures::{StreamExt, TryStreamExt},
-    machina_virtio_device::Device,
-    machina_virtio_device::WrappedDescChainStream,
-    std::io::Read,
-    std::ops::Range,
-    virtio_device::chain::{ReadableChain, WritableChain},
-    virtio_device::mem::{DeviceRange, DriverMem, DriverRange},
-    virtio_device::queue::DriverNotify,
-    zerocopy::FromBytes,
+use crate::wire::{VirtioBalloonFeatureFlags, VirtioBalloonMemStat, LE32, PAGE_SIZE};
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_virtualization::MemStat;
+use fidl_fuchsia_virtualization_hardware::{
+    VirtioBalloonGetMemStatsResponder, VirtioBalloonRequest, VirtioBalloonRequestStream,
 };
+use fuchsia_inspect as inspect;
+use fuchsia_inspect::NumericProperty;
+use fuchsia_zircon::{self as zx};
+use futures::channel::mpsc;
+use futures::{StreamExt, TryStreamExt};
+use machina_virtio_device::{Device, WrappedDescChainStream};
+use std::io::Read;
+use std::ops::Range;
+use virtio_device::chain::{ReadableChain, WritableChain};
+use virtio_device::mem::{DeviceRange, DriverMem, DriverRange};
+use virtio_device::queue::DriverNotify;
+use zerocopy::FromBytes;
 
 fn read_pfn<'a, 'b, N: DriverNotify, M: DriverMem>(
     chain: &mut ReadableChain<'a, 'b, N, M>,
@@ -283,14 +281,12 @@ impl<B: BalloonBackend> BalloonDevice<B> {
 mod tests {
     use std::cell::RefCell;
 
-    use {
-        super::*,
-        crate::wire::{LE16, LE64},
-        diagnostics_assertions::assert_data_tree,
-        fuchsia_inspect::Inspector,
-        virtio_device::fake_queue::{Chain, ChainBuilder, IdentityDriverMem, TestQueue},
-        virtio_device::ring::DescAccess,
-    };
+    use super::*;
+    use crate::wire::{LE16, LE64};
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::Inspector;
+    use virtio_device::fake_queue::{Chain, ChainBuilder, IdentityDriverMem, TestQueue};
+    use virtio_device::ring::DescAccess;
 
     pub struct TestBalloonBackend {
         inner: Option<VmoMemoryBackend>,

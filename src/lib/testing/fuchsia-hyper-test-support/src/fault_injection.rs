@@ -5,14 +5,11 @@
 //! These are Handler implementations that are specifically for injecting faults into the behavior
 //! of the server.
 
-use {
-    crate::Handler,
-    futures::{
-        future::{pending, BoxFuture},
-        prelude::*,
-    },
-    hyper::{header::CONTENT_LENGTH, Body, Request, Response, StatusCode},
-};
+use crate::Handler;
+use futures::future::{pending, BoxFuture};
+use futures::prelude::*;
+use hyper::header::CONTENT_LENGTH;
+use hyper::{Body, Request, Response, StatusCode};
 
 /// Handler that never sends bytes.
 pub struct Hang;

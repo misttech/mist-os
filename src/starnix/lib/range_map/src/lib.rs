@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{borrow::Borrow, cmp::Ordering, collections::BTreeMap, ops::Range};
+use std::borrow::Borrow;
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::ops::Range;
 
 /// Keys for the map inside RangeMap.
 ///

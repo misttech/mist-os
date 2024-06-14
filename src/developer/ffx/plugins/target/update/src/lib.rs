@@ -4,7 +4,6 @@
 
 use anyhow::{Context as _, Error};
 use async_trait::async_trait;
-use ffx_update_args as args;
 use fho::{deferred, moniker, AvailabilityFlag, Deferred, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_update::{
     CheckOptions, Initiator, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
@@ -12,9 +11,9 @@ use fidl_fuchsia_update::{
 use fidl_fuchsia_update_channelcontrol::ChannelControlProxy;
 use fidl_fuchsia_update_ext::State;
 use fidl_fuchsia_update_installer::{self as finstaller, InstallerProxy};
-use fidl_fuchsia_update_installer_ext as installer;
 use fuchsia_url::AbsolutePackageUrl;
 use futures::prelude::*;
+use {ffx_update_args as args, fidl_fuchsia_update_installer_ext as installer};
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("target_update"))]

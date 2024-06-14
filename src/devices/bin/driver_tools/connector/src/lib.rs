@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Result;
 use {
-    anyhow::Result, fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_playground as fdp,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_playground as fdp,
     fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftm,
 };
 

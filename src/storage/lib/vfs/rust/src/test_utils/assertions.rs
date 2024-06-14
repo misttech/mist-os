@@ -6,10 +6,10 @@
 
 #[doc(hidden)]
 pub mod reexport {
-    pub use {
-        crate::directory::test_utils::DirentsSameInodeBuilder, fidl_fuchsia_io as fio,
-        fuchsia_zircon_status::Status, futures::stream::StreamExt,
-    };
+    pub use crate::directory::test_utils::DirentsSameInodeBuilder;
+    pub use fidl_fuchsia_io as fio;
+    pub use fuchsia_zircon_status::Status;
+    pub use futures::stream::StreamExt;
 
     #[cfg(not(target_os = "fuchsia"))]
     pub use fuchsia_async::emulated_handle::MessageBuf;

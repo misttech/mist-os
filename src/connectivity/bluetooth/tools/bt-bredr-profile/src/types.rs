@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_bluetooth_bredr::{ChannelMode, ChannelParameters},
-    fuchsia_zircon as zx,
-    futures::channel::oneshot,
-    std::{
-        cmp::PartialEq,
-        collections::{hash_map::Iter, HashMap},
-        fmt::Debug,
-    },
-    test_rfcomm_client::RfcommManager,
-};
+use fidl_fuchsia_bluetooth_bredr::{ChannelMode, ChannelParameters};
+use fuchsia_zircon as zx;
+use futures::channel::oneshot;
+use std::cmp::PartialEq;
+use std::collections::hash_map::Iter;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use test_rfcomm_client::RfcommManager;
 
 #[derive(Debug, PartialEq)]
 pub struct IncrementedIdMap<T> {

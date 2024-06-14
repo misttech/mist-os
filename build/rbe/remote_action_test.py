@@ -21,7 +21,7 @@ import cl_utils
 import output_leak_scanner
 import remotetool
 
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Collection, Dict, Sequence, Tuple
 
 _HAVE_XATTR = hasattr(os, "setxattr")
 
@@ -32,7 +32,7 @@ class ImmediateExit(Exception):
     pass
 
 
-def _write_file_contents(path: Path, contents: str):
+def _write_file_contents(path: Path, contents: str) -> None:
     with open(path, "w") as f:
         f.write(contents)
 
@@ -46,7 +46,7 @@ def _strs(items: Sequence[Any]) -> Sequence[str]:
     return [str(i) for i in items]
 
 
-def _paths(items: Sequence[Any]) -> Sequence[Path]:
+def _paths(items: Collection[Any]) -> Collection[Path]:
     if isinstance(items, list):
         return [Path(i) for i in items]
     elif isinstance(items, set):
@@ -119,7 +119,7 @@ def _fake_download_input_fail(
 
 
 class PathToDownloadStubTests(unittest.TestCase):
-    def test_is_stub(self):
+    def test_is_stub(self) -> None:
         path = Path("obj/stubby.stub")
         fake_stub_info = remote_action.DownloadStubInfo(
             path=path,
@@ -141,7 +141,7 @@ class PathToDownloadStubTests(unittest.TestCase):
         mock_check_stub.assert_called_once_with(path)
         mock_read_stub.assert_called_once_with(path)
 
-    def test_not_stub(self):
+    def test_not_stub(self) -> None:
         path = Path("not/stubby.o")
         with mock.patch.object(
             remote_action, "is_download_stub_file", return_value=False
@@ -153,7 +153,7 @@ class PathToDownloadStubTests(unittest.TestCase):
 
 
 class DownloadFromStubPathTests(unittest.TestCase):
-    def test_stub_does_not_exist_ignored(self):
+    def test_stub_does_not_exist_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             stub_path = Path(td) / "stub-not-exist"
             with mock.patch.object(
@@ -161,12 +161,12 @@ class DownloadFromStubPathTests(unittest.TestCase):
             ) as mock_exists:
                 subprocess_result = remote_action.download_from_stub_path(
                     stub_path,
-                    downloader=None,  # not needed
+                    downloader=None,  # type: ignore[arg-type]
                     working_dir_abs=Path(td),
                 )
         self.assertEqual(subprocess_result.returncode, 0)
 
-    def test_stub_using_invoked_path(self):
+    def test_stub_using_invoked_path(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
             stub_path = tdp / "foo.exe"
@@ -188,7 +188,7 @@ class DownloadFromStubPathTests(unittest.TestCase):
             ) as mock_download:
                 subprocess_result = remote_action.download_from_stub_path(
                     stub_path,
-                    downloader=None,  # not needed
+                    downloader=None,  # type: ignore[arg-type]
                     working_dir_abs=Path(td),
                 )
             # Ensure that we use the invoked path,
@@ -202,7 +202,7 @@ class DownloadFromStubPathTests(unittest.TestCase):
 
 
 class UndownloadTests(unittest.TestCase):
-    def test_undownload_non_stub_ignored(self):
+    def test_undownload_non_stub_ignored(self) -> None:
         path = Path("foo/barf.baz")
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
@@ -214,7 +214,7 @@ class UndownloadTests(unittest.TestCase):
             # nothing changes
             self.assertFalse(remote_action.is_download_stub_file(tdp / path))
 
-    def test_undownload_restored(self):
+    def test_undownload_restored(self) -> None:
         path = Path("foo/barf.baz")
         stub = remote_action.DownloadStubInfo(
             path=path,
@@ -230,8 +230,8 @@ class UndownloadTests(unittest.TestCase):
             download_status = 0
 
             def fake_download_file(
-                downloader_self, path: Path, digest: str, **kwargs
-            ):
+                downloader_self: object, path: Path, digest: str, **kwargs: Any
+            ) -> cl_utils.SubprocessResult:
                 path.write_text("greetings\n")
                 return cl_utils.SubprocessResult(download_status)
 
@@ -251,7 +251,7 @@ class UndownloadTests(unittest.TestCase):
 
 
 class DownloadOutputStubInfosBatchTests(unittest.TestCase):
-    def test_empty_list(self):
+    def test_empty_list(self) -> None:
         statuses = remote_action.download_output_stub_infos_batch(
             downloader=_FAKE_DOWNLOADER,
             stub_infos=[],
@@ -259,7 +259,7 @@ class DownloadOutputStubInfosBatchTests(unittest.TestCase):
         )
         self.assertEqual(statuses, {})
 
-    def test_one_download_stub_downloaded_success(self):
+    def test_one_download_stub_downloaded_success(self) -> None:
         path = Path("foo/bar.o")
         fake_stub_info = remote_action.DownloadStubInfo(
             path=path,
@@ -279,7 +279,7 @@ class DownloadOutputStubInfosBatchTests(unittest.TestCase):
 
         self.assertEqual(statuses[path].returncode, 0)
 
-    def test_one_download_stub_downloaded_failure(self):
+    def test_one_download_stub_downloaded_failure(self) -> None:
         path = Path("foo/bar.o")
         fake_stub_info = remote_action.DownloadStubInfo(
             path=path,
@@ -301,7 +301,7 @@ class DownloadOutputStubInfosBatchTests(unittest.TestCase):
 
         self.assertEqual(statuses[path].returncode, 1)
 
-    def test_multiple_download_stub_downloaded_success(self):
+    def test_multiple_download_stub_downloaded_success(self) -> None:
         path1 = Path("foo/bar.o")
         path2 = Path("baz/quux.o")
         fake_stub_infos = [
@@ -334,7 +334,7 @@ class DownloadOutputStubInfosBatchTests(unittest.TestCase):
 
 
 class DownloadInputStubPathsBatchTests(unittest.TestCase):
-    def test_empty_list(self):
+    def test_empty_list(self) -> None:
         statuses = remote_action.download_input_stub_paths_batch(
             downloader=_FAKE_DOWNLOADER,
             stub_paths=[],
@@ -342,7 +342,7 @@ class DownloadInputStubPathsBatchTests(unittest.TestCase):
         )
         self.assertEqual(statuses, {})
 
-    def test_one_download_path_downloaded_success(self):
+    def test_one_download_path_downloaded_success(self) -> None:
         path = Path("foo/bar.o")
         with mock.patch.object(
             remote_action, "_download_input_for_mp", new=_fake_download_input
@@ -355,7 +355,7 @@ class DownloadInputStubPathsBatchTests(unittest.TestCase):
 
         self.assertEqual(statuses[path].returncode, 0)
 
-    def test_one_download_path_downloaded_failure(self):
+    def test_one_download_path_downloaded_failure(self) -> None:
         path = Path("foo/bar.o")
         with mock.patch.object(
             remote_action,
@@ -370,7 +370,7 @@ class DownloadInputStubPathsBatchTests(unittest.TestCase):
 
         self.assertEqual(statuses[path].returncode, 1)
 
-    def test_multiple_download_stub_downloaded_success(self):
+    def test_multiple_download_stub_downloaded_success(self) -> None:
         path1 = Path("foo/bar.o")
         path2 = Path("baz/quux.o")
         with mock.patch.object(
@@ -389,7 +389,12 @@ class DownloadInputStubPathsBatchTests(unittest.TestCase):
 class FakeReproxyLogEntry(remote_action.ReproxyLogEntry):
     """Mimic a ReproxyLogEntry by setting properties without parsing."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
+        self._execution_id: str
+        self._action_digest: str
+        self._output_file_digests: Dict[Path, str]
+        self._output_directory_digests: Dict[Path, str]
+        self._completion_status: str
         # intentionally does not call super().__init__(), but instead
         # sets property attributes.
         for k, v in kwargs.items():
@@ -417,7 +422,7 @@ class FakeReproxyLogEntry(remote_action.ReproxyLogEntry):
 
 
 class FileMatchTests(unittest.TestCase):
-    def test_match(self):
+    def test_match(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             f1path = Path(td, "left.txt")
             f2path = Path(td, "right.txt")
@@ -426,7 +431,7 @@ class FileMatchTests(unittest.TestCase):
             self.assertTrue(remote_action._files_match(f1path, f2path))
             self.assertTrue(remote_action._files_match(f2path, f1path))
 
-    def test_not_match(self):
+    def test_not_match(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             f1path = Path(td, "left.txt")
             f2path = Path(td, "right.txt")
@@ -437,7 +442,7 @@ class FileMatchTests(unittest.TestCase):
 
 
 class DetailDiffTests(unittest.TestCase):
-    def test_called(self):
+    def test_called(self) -> None:
         with mock.patch.object(
             cl_utils,
             "subprocess_call",
@@ -457,7 +462,7 @@ class DetailDiffTests(unittest.TestCase):
             command[0].endswith(str(remote_action._DETAIL_DIFF_SCRIPT))
         )
 
-    def test_filtered(self):
+    def test_filtered(self) -> None:
         def _filter_for_compare(
             file1: Path, filtered1: Path, file2: Path, filtered2: Path
         ) -> bool:
@@ -489,13 +494,14 @@ class DetailDiffTests(unittest.TestCase):
 
 
 class TextDiffTests(unittest.TestCase):
-    def test_called(self):
+    def test_called(self) -> None:
         result = cl_utils.SubprocessResult(0)
         with mock.patch.object(
             cl_utils, "subprocess_call", return_value=result
         ) as mock_call:
             self.assertEqual(
-                remote_action._text_diff("file1.txt", "file2.txt"), result
+                remote_action._text_diff(Path("file1.txt"), Path("file2.txt")),
+                result,
             )
         mock_call.assert_called_once()
         first_call = mock_call.call_args_list[0]
@@ -504,7 +510,7 @@ class TextDiffTests(unittest.TestCase):
         self.assertEqual(command[0], "diff")
         self.assertEqual(command[-2:], ["file1.txt", "file2.txt"])
 
-    def test_matches(self):  # no mocking
+    def test_matches(self) -> None:  # no mocking
         with tempfile.TemporaryDirectory() as td:
             f1 = Path(td) / "left.txt"
             f2 = Path(td) / "right.txt"
@@ -515,7 +521,7 @@ class TextDiffTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertEqual(result.stdout, [])
 
-    def test_not_matches(self):  # no mocking
+    def test_not_matches(self) -> None:  # no mocking
         with tempfile.TemporaryDirectory() as td:
             f1 = Path(td) / "left.txt"
             f2 = Path(td) / "right.txt"
@@ -528,7 +534,7 @@ class TextDiffTests(unittest.TestCase):
 
 
 class FilesUnderDirTests(unittest.TestCase):
-    def test_walk(self):
+    def test_walk(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             f1path = Path(td) / "left.txt"
             subdir = Path(td) / "sub"
@@ -537,24 +543,26 @@ class FilesUnderDirTests(unittest.TestCase):
             _write_file_contents(f1path, "\n")
             _write_file_contents(f2path, "\n")
             self.assertEqual(
-                set(remote_action._files_under_dir(td)),
+                set(remote_action._files_under_dir(Path(td))),
                 _paths({"left.txt", "sub/right.txt"}),
             )
 
 
 class CommonFilesUnderDirsTests(unittest.TestCase):
-    def test_none_in_common(self):
+    def test_none_in_common(self) -> None:
         with mock.patch.object(
             remote_action,
             "_files_under_dir",
             side_effect=[iter(["a", "b", "c"]), iter(["d", "e", "f"])],
         ) as mock_lsr:
             self.assertEqual(
-                remote_action._common_files_under_dirs("foo-dir", "bar-dir"),
+                remote_action._common_files_under_dirs(
+                    Path("foo-dir"), Path("bar-dir")
+                ),
                 set(),
             )
 
-    def test_some_in_common(self):
+    def test_some_in_common(self) -> None:
         with mock.patch.object(
             remote_action,
             "_files_under_dir",
@@ -564,15 +572,17 @@ class CommonFilesUnderDirsTests(unittest.TestCase):
             ],
         ) as mock_lsr:
             self.assertEqual(
-                remote_action._common_files_under_dirs(
-                    Path("foo-dir"), Path("bar-dir")
+                set(
+                    remote_action._common_files_under_dirs(
+                        Path("foo-dir"), Path("bar-dir")
+                    )
                 ),
                 _paths({"b/x", "c"}),
             )
 
 
 class ExpandCommonFilesBetweenDirs(unittest.TestCase):
-    def test_common(self):
+    def test_common(self) -> None:
         # Normally returns a set, but mock-return a list for deterministic
         # ordering.
         with mock.patch.object(
@@ -583,7 +593,7 @@ class ExpandCommonFilesBetweenDirs(unittest.TestCase):
             self.assertEqual(
                 list(
                     remote_action._expand_common_files_between_dirs(
-                        [_paths(("c", "d")), _paths(("a", "b"))]
+                        [(Path("c"), Path("d")), (Path("a"), Path("b"))]
                     )
                 ),
                 [
@@ -596,29 +606,31 @@ class ExpandCommonFilesBetweenDirs(unittest.TestCase):
 
 
 class FileLinesMatchingTests(unittest.TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         with mock.patch(
             "builtins.open", mock.mock_open(read_data="")
         ) as mock_file:
             self.assertEqual(
                 list(
-                    remote_action._file_lines_matching("log.txt", "never-match")
+                    remote_action._file_lines_matching(
+                        Path("log.txt"), "never-match"
+                    )
                 ),
                 [],
             )
 
-    def test_matches(self):
+    def test_matches(self) -> None:
         with mock.patch(
             "builtins.open", mock.mock_open(read_data="ab\nbc\ncd\n")
         ) as mock_file:
             self.assertEqual(
-                list(remote_action._file_lines_matching("file.txt", "c")),
+                list(remote_action._file_lines_matching(Path("file.txt"), "c")),
                 ["bc\n", "cd\n"],
             )
 
 
 class TransformFileByLines(unittest.TestCase):
-    def test_no_change(self):
+    def test_no_change(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             f1 = Path(td) / "in.txt"
             f2 = Path(td) / "out.txt"
@@ -632,24 +644,24 @@ class TransformFileByLines(unittest.TestCase):
 
 
 class ReclientCanonicalWorkingDirTests(unittest.TestCase):
-    def test_empty(self):
+    def test_empty(self) -> None:
         self.assertEqual(
             remote_action.reclient_canonical_working_dir(Path("")), Path("")
         )
 
-    def test_one_level(self):
+    def test_one_level(self) -> None:
         self.assertEqual(
             remote_action.reclient_canonical_working_dir(Path("build-here")),
             Path("set_by_reclient"),
         )
 
-    def test_two_levels(self):
+    def test_two_levels(self) -> None:
         self.assertEqual(
             remote_action.reclient_canonical_working_dir(Path("build/there")),
             Path("set_by_reclient/a"),
         )
 
-    def test_three_levels(self):
+    def test_three_levels(self) -> None:
         self.assertEqual(
             remote_action.reclient_canonical_working_dir(
                 Path("build/inside/there")
@@ -659,7 +671,7 @@ class ReclientCanonicalWorkingDirTests(unittest.TestCase):
 
 
 class RewriteDepfileTests(unittest.TestCase):
-    def test_depfile_in_place(self):
+    def test_depfile_in_place(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             depfile = Path(td) / "dep.d"
 
@@ -676,7 +688,7 @@ class RewriteDepfileTests(unittest.TestCase):
                 "obj/foo.o: foo/bar.h baz/quux.h\n",
             )
 
-    def test_depfile_new_file(self):
+    def test_depfile_new_file(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             depfile = Path(td) / "dep.d"
             output = depfile.with_suffix(".new")
@@ -697,7 +709,7 @@ class RewriteDepfileTests(unittest.TestCase):
 
 
 class ResolvedShlibsFromLddTests(unittest.TestCase):
-    def test_sample(self):
+    def test_sample(self) -> None:
         ldd_output = """
 	linux-vdso.so.1 (0x00007ffd653b2000)
 	librustc_driver-897e90da9cc472c4.so => /usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so (0x00007f6fdf600000)
@@ -730,7 +742,7 @@ class ResolvedShlibsFromLddTests(unittest.TestCase):
 
 
 class HostToolNonsystemShlibsTests(unittest.TestCase):
-    def test_sample(self):
+    def test_sample(self) -> None:
         unfiltered_shlibs = _paths(
             [
                 "/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so",
@@ -749,7 +761,9 @@ class HostToolNonsystemShlibsTests(unittest.TestCase):
         ) as mock_host_tool_shlibs:
             self.assertEqual(
                 list(
-                    remote_action.host_tool_nonsystem_shlibs("../path/to/rustc")
+                    remote_action.host_tool_nonsystem_shlibs(
+                        Path("../path/to/rustc")
+                    )
                 ),
                 _paths(
                     [
@@ -764,31 +778,31 @@ class HostToolNonsystemShlibsTests(unittest.TestCase):
 
 class RewrapperArgParserTests(unittest.TestCase):
     @property
-    def _parser(self):
+    def _parser(self) -> argparse.ArgumentParser:
         return remote_action._REWRAPPER_ARG_PARSER
 
-    def test_default(self):
+    def test_default(self) -> None:
         args, _ = self._parser.parse_known_args([])
         self.assertIsNone(args.exec_root)
         self.assertIsNone(args.canonicalize_working_dir)
 
-    def test_exec_root(self):
+    def test_exec_root(self) -> None:
         args, _ = self._parser.parse_known_args(["--exec_root=/foo/bar"])
         self.assertEqual(args.exec_root, "/foo/bar")
 
-    def test_canonicalize_working_dir_true(self):
+    def test_canonicalize_working_dir_true(self) -> None:
         args, _ = self._parser.parse_known_args(
             ["--canonicalize_working_dir=true"]
         )
         self.assertTrue(args.canonicalize_working_dir)
 
-    def test_canonicalize_working_dir_false(self):
+    def test_canonicalize_working_dir_false(self) -> None:
         args, _ = self._parser.parse_known_args(
             ["--canonicalize_working_dir=false"]
         )
         self.assertFalse(args.canonicalize_working_dir)
 
-    def test_help_unwanted(self):
+    def test_help_unwanted(self) -> None:
         for opt in ("-h", "--help"):
             with mock.patch.object(sys, "exit") as mock_exit:
                 self._parser.parse_known_args([opt])
@@ -797,11 +811,11 @@ class RewrapperArgParserTests(unittest.TestCase):
 
 class RemoteActionMainParserTests(unittest.TestCase):
     @property
-    def default_cfg(self):
+    def default_cfg(self) -> Path:
         return Path("default.cfg")
 
     @property
-    def default_bindir(self):
+    def default_bindir(self) -> Path:
         return Path("/opt/reclient/bin")
 
     def _make_main_parser(self) -> argparse.ArgumentParser:
@@ -813,7 +827,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         )
         return parser
 
-    def test_defaults(self):
+    def test_defaults(self) -> None:
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(["--", "echo", "hello"])
         self.assertEqual(main_args.cfg, self.default_cfg)
@@ -829,7 +843,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(main_args.command, ["echo", "hello"])
         self.assertIsNone(main_args.remote_debug_command)
 
-    def test_cfg(self):
+    def test_cfg(self) -> None:
         p = self._make_main_parser()
         cfg = Path("other.cfg")
         main_args, other = p.parse_known_args([f"--cfg={cfg}", "--", "echo"])
@@ -840,7 +854,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(action.local_only_command, ["echo"])
         self.assertEqual(action.options, ["--cfg", str(cfg)])
 
-    def test_platform_merge_override_no_env(self):
+    def test_platform_merge_override_no_env(self) -> None:
         p = self._make_main_parser()
         cfg = Path("other.cfg")
         platform_value = "foo=zoo,alice=bob"
@@ -888,7 +902,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
             mock_read_cfg.assert_called_once_with()
             mock_env.assert_called_once_with()
 
-    def test_platform_merge_env_no_flag(self):
+    def test_platform_merge_env_no_flag(self) -> None:
         p = self._make_main_parser()
         cfg = Path("other.cfg")
         platform_env = "foo=notfoo,alice=joe"
@@ -939,7 +953,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         mock_read_cfg.assert_not_called()  # used env, not cfg
         mock_env.assert_called_once_with()
 
-    def test_platform_merge_override_with_env(self):
+    def test_platform_merge_override_with_env(self) -> None:
         p = self._make_main_parser()
         cfg = Path("other.cfg")
         platform_value = "foo=zoo,alice=bob"
@@ -989,7 +1003,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
             mock_read_cfg.assert_not_called()  # because env was used
             mock_env.assert_called_once_with()
 
-    def test_bindir(self):
+    def test_bindir(self) -> None:
         p = self._make_main_parser()
         bindir = Path("/usr/local/bin")
         main_args, other = p.parse_known_args(
@@ -999,7 +1013,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         action = remote_action.remote_action_from_args(main_args)
         self.assertEqual(action.local_only_command, ["echo"])
 
-    def test_local_command_with_env(self):
+    def test_local_command_with_env(self) -> None:
         local_command = ["FOO=BAR", "echo"]
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(["--"] + local_command)
@@ -1011,12 +1025,12 @@ class RemoteActionMainParserTests(unittest.TestCase):
             action.remote_only_command, [cl_utils._ENV] + local_command
         )
 
-    def test_verbose(self):
+    def test_verbose(self) -> None:
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(["--verbose", "--", "echo"])
         self.assertTrue(main_args.verbose)
 
-    def test_dry_run(self):
+    def test_dry_run(self) -> None:
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(["--dry-run", "--", "echo"])
         self.assertTrue(main_args.dry_run)
@@ -1027,7 +1041,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         mock_run.assert_not_called()
 
     @mock.patch.object(fuchsia, "REPROXY_WRAP", "/path/to/reproxy-wrap.sh")
-    def test_auto_reproxy(self):
+    def test_auto_reproxy(self) -> None:
         # --auto-reproxy is now obsolete, and will be removed in the future
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(["--auto-reproxy", "--", "echo"])
@@ -1040,7 +1054,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(Path(rewrapper_prefix[0]).name, "rewrapper")
         self.assertEqual(remote_command, ["echo"])
 
-    def test_save_temps(self):
+    def test_save_temps(self) -> None:
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(["--save-temps", "--", "echo"])
         self.assertTrue(main_args.save_temps)
@@ -1048,14 +1062,14 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(action.local_only_command, ["echo"])
         self.assertTrue(action.save_temps)
 
-    def test_label(self):
+    def test_label(self) -> None:
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
             ["--label=//build/this:that", "--", "echo"]
         )
         self.assertEqual(main_args.label, "//build/this:that")
 
-    def test_diagnose_nonzero(self):
+    def test_diagnose_nonzero(self) -> None:
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
             ["--diagnose-nonzero", "--", "echo"]
@@ -1064,7 +1078,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         action = remote_action.remote_action_from_args(main_args)
         self.assertTrue(action.diagnose_nonzero)
 
-    def test_input_list_paths(self):
+    def test_input_list_paths(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1102,7 +1116,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 },  # relative to exec_root
             )
 
-    def test_remote_debug_command(self):
+    def test_remote_debug_command(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1133,19 +1147,19 @@ class RemoteActionMainParserTests(unittest.TestCase):
         )
         self.assertEqual(remote_command, debug.split())
 
-    def test_remote_log_named(self):
+    def test_remote_log_named(self) -> None:
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
             ["--log", "bar.remote-log", "--", "echo"]
         )
         self.assertEqual(main_args.remote_log, "bar.remote-log")
 
-    def test_remote_log_unnamed(self):
+    def test_remote_log_unnamed(self) -> None:
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(["--log", "--", "echo"])
         self.assertEqual(main_args.remote_log, "<AUTO>")
 
-    def test_remote_log_from_main_args_auto_named(self):
+    def test_remote_log_from_main_args_auto_named(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1187,7 +1201,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         )
         self.assertEqual(main_command, command)
 
-    def test_remote_log_from_main_args_explicitly_named(self):
+    def test_remote_log_from_main_args_explicitly_named(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1234,7 +1248,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         )
         self.assertEqual(main_command, command)
 
-    def test_remote_fsatrace_path_default(self):
+    def test_remote_fsatrace_path_default(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1274,14 +1288,14 @@ class RemoteActionMainParserTests(unittest.TestCase):
         # Confirm that the remote command is wrapped with fsatrace
         self.assertIn(str(fake_fsatrace_rel), fsatrace_prefix)
         self.assertEqual(
-            fsatrace_prefix + ["--"],
+            [*fsatrace_prefix, "--"],
             action._fsatrace_command_prefix(
                 Path(str(output) + ".remote-fsatrace")
             ),
         )
         self.assertEqual(remote_command, command)
 
-    def test_remote_fsatrace_from_main_args(self):
+    def test_remote_fsatrace_from_main_args(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1319,14 +1333,14 @@ class RemoteActionMainParserTests(unittest.TestCase):
         # Confirm that the remote command is wrapped with fsatrace
         self.assertIn(str(fake_fsatrace_rel), trace_wrapper)
         self.assertEqual(
-            trace_wrapper + ["--"],
+            [*trace_wrapper, "--"],
             action._fsatrace_command_prefix(
                 Path(str(output) + ".remote-fsatrace")
             ),
         )
         self.assertEqual(main_command, ["touch", str(output)])
 
-    def test_remote_log_and_fsatrace_from_main_args(self):
+    def test_remote_log_and_fsatrace_from_main_args(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1386,14 +1400,14 @@ class RemoteActionMainParserTests(unittest.TestCase):
         )
         # Confirm that the inner wrapper is for fsatrace
         self.assertEqual(
-            trace_wrapper + ["--"],
+            [*trace_wrapper, "--"],
             action._fsatrace_command_prefix(
                 Path(str(output) + ".remote-fsatrace")
             ),
         )
         self.assertEqual(main_command, command)
 
-    def test_local_only_no_compare(self):
+    def test_local_only_no_compare(self) -> None:
         # --compare does nothing with --local
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
@@ -1425,7 +1439,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         mock_run.assert_called_once()
         mock_compare.assert_not_called()
 
-    def test_compare_forces_remote(self):
+    def test_compare_forces_remote(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1445,7 +1459,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertTrue(action.compare_with_local)
         self.assertEqual(action.exec_strategy, "remote")  # forced
 
-    def test_compare_fsatraces_acceptable_match(self):
+    def test_compare_fsatraces_acceptable_match(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build/out/here")
         working_dir = exec_root / build_dir
@@ -1479,7 +1493,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
                 )
         self.assertEqual(status.returncode, 0)  # contents are equivalent
 
-    def test_compare_fsatraces_with_difference(self):
+    def test_compare_fsatraces_with_difference(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build/out/here")
         working_dir = exec_root / build_dir
@@ -1514,7 +1528,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
                 )
         self.assertEqual(result.returncode, 1)  # traces differ
 
-    def test_local_remote_compare_no_diffs_from_main_args(self):
+    def test_local_remote_compare_no_diffs_from_main_args(self) -> None:
         # Same as test_remote_fsatrace_from_main_args, but with --compare
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
@@ -1567,7 +1581,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         self.assertEqual(remote_command[-2:], base_command)
         mock_cleanup.assert_called_with(Path(str(output) + ".remote"))
 
-    def test_local_remote_compare_found_diffs_from_main_args(self):
+    def test_local_remote_compare_found_diffs_from_main_args(self) -> None:
         # Same as test_remote_fsatrace_from_main_args, but with --compare
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
@@ -1621,7 +1635,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         mock_remote_launch.assert_called_once()
         self.assertEqual(remote_command[-2:], base_command)
 
-    def test_local_remote_compare_found_diffs_exported_files(self):
+    def test_local_remote_compare_found_diffs_exported_files(self) -> None:
         # Checks that miscompared files are exported.
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
@@ -1703,7 +1717,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         )
         mock_chdir.assert_called_with(exec_root)
 
-    def test_local_remote_compare_with_fsatrace_from_main_args(self):
+    def test_local_remote_compare_with_fsatrace_from_main_args(self) -> None:
         # Same as test_remote_fsatrace_from_main_args, but with --compare
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
@@ -1782,7 +1796,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
             Path(local_trace + ".norm"), Path(remote_trace + ".norm")
         )
 
-    def test_local_check_determinism(self):
+    def test_local_check_determinism(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1827,7 +1841,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         self.assertEqual(output_list, [str(output)])
         self.assertEqual(main_command, base_command)
 
-    def test_local_check_determinism_with_export(self):
+    def test_local_check_determinism_with_export(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1889,7 +1903,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         self.assertEqual(output_list, [str(output)])
         self.assertEqual(main_command, base_command)
 
-    def test_output_leak_scan_with_canonical_working_dir_mocked(self):
+    def test_output_leak_scan_with_canonical_working_dir_mocked(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1925,7 +1939,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         )
         mock_run.assert_called()
 
-    def test_output_leak_scan_skipped_when_build_subdir_is_dot(self):
+    def test_output_leak_scan_skipped_when_build_subdir_is_dot(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root  # build_subdir == '.'
         canonical_dir_option = "--canonicalize_working_dir=true"
@@ -1956,7 +1970,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         mock_scan.assert_not_called()
         mock_run.assert_called()
 
-    def test_output_leak_scan_with_canonical_working_dir_called(self):
+    def test_output_leak_scan_with_canonical_working_dir_called(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -1984,7 +1998,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         self.assertEqual(exit_code, 0)
         mock_run.assert_called()
 
-    def test_output_leak_scan_with_error_stops_run(self):
+    def test_output_leak_scan_with_error_stops_run(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -2015,16 +2029,18 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
 
 
 class RemoteActionFlagParserTests(unittest.TestCase):
-    def _forward_and_parse(self, command):
+    def _forward_and_parse(
+        self, command: Sequence[str]
+    ) -> tuple[argparse.Namespace, list[str], Sequence[str]]:
         forwarded, filtered = remote_action.forward_remote_flags(
-            ["--"] + command
+            ["--", *command]
         )
         main_args, unknown = remote_action._MAIN_ARG_PARSER.parse_known_args(
             forwarded
         )
         return main_args, unknown, filtered
 
-    def test_defaults(self):
+    def test_defaults(self) -> None:
         remote_args, unknown, other = self._forward_and_parse([])
         self.assertFalse(remote_args.local)
         self.assertEqual(remote_args.inputs, [])
@@ -2033,7 +2049,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(unknown, [])
         self.assertEqual(other, [])
 
-    def test_command_without_forwarding(self):
+    def test_command_without_forwarding(self) -> None:
         command = [
             "clang++",
             "--target=powerpc-apple-darwin8",
@@ -2051,7 +2067,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(unknown, [])
         self.assertEqual(other, command)
 
-    def test_disable(self):
+    def test_disable(self) -> None:
         remote_args, unknown, other = self._forward_and_parse(
             ["cat", "foo.txt", "--remote-disable"]
         )
@@ -2059,7 +2075,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(unknown, [])
         self.assertEqual(other, ["cat", "foo.txt"])
 
-    def test_inputs(self):
+    def test_inputs(self) -> None:
         remote_args, unknown, other = self._forward_and_parse(
             [
                 "cat",
@@ -2073,7 +2089,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(unknown, [])
         self.assertEqual(other, ["cat", "bar.txt", "quux.txt"])
 
-    def test_inputs_comma(self):
+    def test_inputs_comma(self) -> None:
         remote_args, unknown, other = self._forward_and_parse(
             [
                 "cat",
@@ -2090,7 +2106,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(unknown, [])
         self.assertEqual(other, ["cat", "bar.txt", "quux.txt"])
 
-    def test_output_files_comma(self):
+    def test_output_files_comma(self) -> None:
         remote_args, unknown, other = self._forward_and_parse(
             [
                 "./generate.sh",
@@ -2107,7 +2123,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(unknown, [])
         self.assertEqual(other, ["./generate.sh", "bar.txt", "quux.txt"])
 
-    def test_output_dirs_comma(self):
+    def test_output_dirs_comma(self) -> None:
         remote_args, unknown, other = self._forward_and_parse(
             [
                 "./generate_dirs.sh",
@@ -2124,7 +2140,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(unknown, [])
         self.assertEqual(other, ["./generate_dirs.sh", "bar.txt", "quux.txt"])
 
-    def test_flags(self):
+    def test_flags(self) -> None:
         remote_args, unknown, other = self._forward_and_parse(
             [
                 "cat",
@@ -2148,22 +2164,22 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def _make_remote_action(
         self,
-        rewrapper=None,
-        command=None,
-        exec_root=None,
-        working_dir=None,
-        **kwargs,  # RemoteAction params
+        rewrapper: Path | None = None,
+        command: Sequence[str] | None = None,
+        exec_root: Path | None = None,
+        working_dir: Path | None = None,
+        **kwargs: Any,  # RemoteAction params
     ) -> remote_action.RemoteAction:
         """Create a RemoteAction for testing with some defaults."""
         return remote_action.RemoteAction(
             rewrapper=rewrapper or self._rewrapper,
-            command=command,
+            command=command,  # type: ignore[arg-type]
             exec_root=exec_root or self._PROJECT_ROOT,
             working_dir=working_dir or self._WORKING_DIR,
             **kwargs,
         )
 
-    def test_minimal(self):
+    def test_minimal(self) -> None:
         command = ["cat", "meow.txt"]
         action = self._make_remote_action(command=command)
         self.assertEqual(action.remote_only_command, command)
@@ -2183,7 +2199,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertFalse(action.diagnose_nonzero)
         self.assertTrue(action.download_outputs)
 
-    def test_path_setup_implicit(self):
+    def test_path_setup_implicit(self) -> None:
         command = ["beep", "boop"]
         fake_root = Path("/home/project")
         fake_builddir = Path("out/not-default")
@@ -2198,7 +2214,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 self.assertEqual(action.exec_root_rel, Path("../.."))
                 self.assertEqual(action.build_subdir, fake_builddir)
 
-    def test_path_setup_explicit_exec_root(self):
+    def test_path_setup_explicit_exec_root(self) -> None:
         command = ["beep", "boop"]
         fake_root = Path("/home/project")
         fake_builddir = Path("out/not-default")
@@ -2213,7 +2229,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             self.assertEqual(action.exec_root_rel, Path("../.."))
             self.assertEqual(action.build_subdir, fake_builddir)
 
-    def test_path_setup_explicit_exec_root_and_working_dir(self):
+    def test_path_setup_explicit_exec_root_and_working_dir(self) -> None:
         command = ["beep", "boop"]
         fake_root = Path("/home/project")
         fake_builddir = Path("out/not-default")
@@ -2235,7 +2251,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             remote_action._REMOTE_PROJECT_ROOT / fake_builddir,
         )
 
-    def test_path_setup_explicit_canonicalize_working_dir(self):
+    def test_path_setup_explicit_canonicalize_working_dir(self) -> None:
         command = ["b33p", "b00p"]
         fake_root = Path("/home/project")
         fake_builddir = Path("out/not-default")
@@ -2259,7 +2275,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             remote_action._REMOTE_PROJECT_ROOT / remote_builddir,
         )
 
-    def test_inputs_outputs(self):
+    def test_inputs_outputs(self) -> None:
         command = ["cat", "../src/meow.txt"]
         action = self._make_remote_action(
             command=command,
@@ -2310,7 +2326,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
                     mock_call.assert_called_once()
                     mock_cleanup.assert_called_once()
 
-    def test_save_temps(self):
+    def test_save_temps(self) -> None:
         command = ["echo", "hello"]
         action = self._make_remote_action(
             command=command,
@@ -2331,7 +2347,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 mock_call.assert_called_once()
                 mock_cleanup.assert_not_called()
 
-    def test_flag_forwarding_pass_through_remote(self):
+    def test_flag_forwarding_pass_through_remote(self) -> None:
         # RemoteAction construction no longer forwards --remote-* flags;
         # that responsibility has been moved to
         # remote_action.forward_remote_flags().
@@ -2345,7 +2361,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertEqual(action.local_only_flags, [])
         self.assertEqual(action.options, [])
 
-    def test_local_only_flag_forwarding(self):
+    def test_local_only_flag_forwarding(self) -> None:
         local_file = Path("local_preamble.txt")
         command = [
             "cat",
@@ -2365,7 +2381,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         # which is generated and cleaned up.
         self.assertIn("--local_wrapper=./out/banner.local.sh", rewrapper_prefix)
 
-    def test_relativize_local_deps(self):
+    def test_relativize_local_deps(self) -> None:
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
         action = self._make_remote_action(
@@ -2386,7 +2402,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             "gen/include/foo.h",
         )
 
-    def test_relativize_remote_deps(self):
+    def test_relativize_remote_deps(self) -> None:
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work" / "out"
         action = self._make_remote_action(
@@ -2420,7 +2436,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             "jen/project/include/foo.h",
         )
 
-    def test_remote_fail_no_retry(self):
+    def test_remote_fail_no_retry(self) -> None:
         command = ["echo", "hello"]
         action = self._make_remote_action(command=command)
         self.assertEqual(action.local_only_command, command)
@@ -2440,7 +2456,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             mock_cleanup.assert_called_once()
             mock_call.assert_called_once()  # no retry
 
-    def test_local_fail_no_retry(self):
+    def test_local_fail_no_retry(self) -> None:
         command = ["echo", "hello"]
         action = self._make_remote_action(
             command=command,
@@ -2465,7 +2481,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         mock_cleanup.assert_called_once()
         mock_call.assert_called_once()  # no retry
 
-    def test_file_not_found_no_retry(self):
+    def test_file_not_found_no_retry(self) -> None:
         command = ["echo", "hello"]
         action = self._make_remote_action(command=command)
         self.assertEqual(action.local_only_command, command)
@@ -2488,7 +2504,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         mock_cleanup.assert_called_once()
         mock_call.assert_called_once()  # no retry
 
-    def test_fail_to_dial_retry(self):
+    def test_fail_to_dial_retry(self) -> None:
         command = ["echo", "hello"]
         action = self._make_remote_action(command=command)
         self.assertEqual(action.local_only_command, command)
@@ -2515,7 +2531,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         mock_call.assert_called()
         self.assertEqual(len(mock_call.call_args_list), 2)
 
-    def test_retry_once_successful(self):
+    def test_retry_once_successful(self) -> None:
         command = ["echo", "hello"]
         action = self._make_remote_action(command=command)
         self.assertEqual(action.local_only_command, command)
@@ -2541,7 +2557,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             # expect called twice, second time is the retry
             self.assertEqual(len(mock_call.call_args_list), 2)
 
-    def test_retry_once_fails_again(self):
+    def test_retry_once_fails_again(self) -> None:
         command = ["echo", "hello"]
         action = self._make_remote_action(command=command)
         self.assertEqual(action.local_only_command, command)
@@ -2569,7 +2585,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
 
     def _test_local_execution_strategy(
         self, exec_strategy: str, local_status: int
-    ):
+    ) -> None:
         remote_command = ["echo", "hello"]
         local_command = ["repeat-after-me", "hello"]
         action = self._make_remote_action(
@@ -2608,25 +2624,25 @@ class RemoteActionConstructionTests(unittest.TestCase):
         mock_cleanup.assert_called_with()
         mock_downloader.assert_called_once_with()
 
-    def test_strategy_local_fallback_different_command_succeeds(self):
+    def test_strategy_local_fallback_different_command_succeeds(self) -> None:
         self._test_local_execution_strategy(
             exec_strategy="remote_local_fallback",
             local_status=0,
         )
 
-    def test_strategy_local_fallback_different_command_fails(self):
+    def test_strategy_local_fallback_different_command_fails(self) -> None:
         self._test_local_execution_strategy(
             exec_strategy="remote_local_fallback",
             local_status=1,
         )
 
-    def test_strategy_local_only_different_command_succeeds(self):
+    def test_strategy_local_only_different_command_succeeds(self) -> None:
         self._test_local_execution_strategy(
             exec_strategy="local",
             local_status=0,
         )
 
-    def test_strategy_local_only_different_command_fails(self):
+    def test_strategy_local_only_different_command_fails(self) -> None:
         self._test_local_execution_strategy(
             exec_strategy="local",
             local_status=3,
@@ -2646,7 +2662,7 @@ _FAKE_DOWNLOADER = _fake_downloader()
 
 
 class DownloadStubsTests(unittest.TestCase):
-    def test_create_stub_for_nonexistent_ignored(self):
+    def test_create_stub_for_nonexistent_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
             p = Path("crash_logs/optional-log.txt")
@@ -2668,7 +2684,7 @@ remote_metadata: {
             # `p` was an optional output that was not created by the action.
             self.assertEqual(stub_infos, {})
 
-    def test_create_file_stub_and_download(self):
+    def test_create_file_stub_and_download(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
             p = Path("dir/big-file.txt")
@@ -2701,8 +2717,8 @@ remote_metadata: {{
             self.assertTrue(remote_action.is_download_stub_file(destination))
 
             def fake_download_file(
-                downloader_self, path: Path, digest: str, **kwargs
-            ):
+                downloader_self: object, path: Path, digest: str, **kwargs: Any
+            ) -> cl_utils.SubprocessResult:
                 (tdp / path).write_text("hello\n")
                 return cl_utils.SubprocessResult(0)
 
@@ -2719,7 +2735,7 @@ remote_metadata: {{
             mock_rename.assert_called_with(destination)
             self.assertEqual(destination.stat().st_mode, mode)
 
-    def test_create_directory_stub_and_download(self):
+    def test_create_directory_stub_and_download(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
             p = Path("bag/of/goodies")
@@ -2750,8 +2766,8 @@ remote_metadata: {{
             self.assertTrue(remote_action.is_download_stub_file(destination))
 
             def fake_download_dir(
-                downloader_self, path: Path, digest: str, **kwargs
-            ):
+                downloader_self: object, path: Path, digest: str, **kwargs: Any
+            ) -> cl_utils.SubprocessResult:
                 (tdp / path).mkdir()
                 (tdp / path / "readme.txt").write_text("hello\n")
                 return cl_utils.SubprocessResult(0)
@@ -2767,14 +2783,14 @@ remote_metadata: {{
                     )
             mock_rename.assert_called_with(destination)
 
-    def test_read_fail(self):
+    def test_read_fail(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             stub_file = Path(td) / "testing.stub"
             _write_file_contents(stub_file, "#!/bin/sh\nnot a stub file\n")
             with self.assertRaises(remote_action.DownloadStubFormatError):
                 remote_action.DownloadStubInfo.read_from_file(stub_file)
 
-    def test_stub_write_read_match(self):
+    def test_stub_write_read_match(self) -> None:
         stub = remote_action.DownloadStubInfo(
             path=Path("foo/bar.baz"),
             type="file",
@@ -2789,7 +2805,7 @@ remote_metadata: {{
 
         self.assertEqual(stub, new_stub)
 
-    def test_create(self):
+    def test_create(self) -> None:
         path = Path("foo/goes/deeper/bar.baz")
         stub = remote_action.DownloadStubInfo(
             path=path,
@@ -2805,7 +2821,7 @@ remote_metadata: {{
             read_back = remote_action.DownloadStubInfo.read_from_file(full_path)
             self.assertEqual(read_back, stub)
 
-    def test_download_to_alt_dest(self):
+    def test_download_to_alt_dest(self) -> None:
         blob_digest = "00111ddeee000aa/24"
         stub = remote_action.DownloadStubInfo(
             path=Path("foo/bar.baz"),
@@ -2846,7 +2862,7 @@ remote_metadata: {{
         mock_is_stub.assert_called_once()
         mock_rename.assert_called_with(working_dir / dest)
 
-    def test_download_to_alt_dest_preserving_backup_stub(self):
+    def test_download_to_alt_dest_preserving_backup_stub(self) -> None:
         blob_digest = "00111ddeee000aa/24"
         stub = remote_action.DownloadStubInfo(
             path=Path("foo/bar.baz"),
@@ -2897,7 +2913,7 @@ remote_metadata: {{
             any_order=False,  # order matters
         )
 
-    def test_download_fail(self):
+    def test_download_fail(self) -> None:
         stub = remote_action.DownloadStubInfo(
             path=Path("foo/bar.baz"),
             type="file",
@@ -2920,7 +2936,7 @@ remote_metadata: {{
         mock_download.assert_called_once()
         mock_rename.assert_not_called()
 
-    def test_made_download_stubs_for_remote_execution(self):
+    def test_made_download_stubs_for_remote_execution(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -2970,7 +2986,7 @@ remote_metadata: {{
             build_id=Path(logdir).name,
         )
 
-    def test_made_download_stubs_for_racing_remote_win(self):
+    def test_made_download_stubs_for_racing_remote_win(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -3028,7 +3044,7 @@ remote_metadata: {{
             build_id=Path(logdir).name,
         )
 
-    def test_download_inputs_for_local_execution(self):
+    def test_download_inputs_for_local_execution(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -3074,7 +3090,7 @@ remote_metadata: {{
         mock_downloader.assert_called_once_with()
         mock_download.assert_called_once()
 
-    def test_no_download_stubs_for_local_execution(self):
+    def test_no_download_stubs_for_local_execution(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -3126,7 +3142,7 @@ remote_metadata: {{
         mock_parse_log.assert_called_with(Path(output + ".rrpl"))
         mock_stub.assert_not_called()
 
-    def test_no_download_stubs_for_racing_local_win(self):
+    def test_no_download_stubs_for_racing_local_win(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -3176,7 +3192,7 @@ remote_metadata: {{
         mock_parse_log.assert_called_with(Path(output + ".rrpl"))
         mock_stub.assert_not_called()
 
-    def test_no_download_stubs_for_local_fallback(self):
+    def test_no_download_stubs_for_local_fallback(self) -> None:
         exec_root = Path("/home/project")
         build_dir = Path("build-out")
         working_dir = exec_root / build_dir
@@ -3228,7 +3244,7 @@ remote_metadata: {{
         mock_stub.assert_not_called()
 
     def _setup_update_stub_test(
-        self, tdp: Path, output_contents: str = None
+        self, tdp: Path, output_contents: str | None = None
     ) -> Tuple[remote_action.RemoteAction, FakeReproxyLogEntry]:
         exec_root = tdp
         build_dir = Path("build-out")
@@ -3275,14 +3291,16 @@ remote_metadata: {{
 
     def test_update_stub_preserve_unchanged_output_mtime_existing_stub_matches_digest(
         self,
-    ):
+    ) -> None:
         with tempfile.TemporaryDirectory() as td:
             action, fake_log_record = self._setup_update_stub_test(Path(td))
 
             # create a pre-existing stub-file with the same digest as the new output
+            assert fake_log_record is not None
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
             old_stub_info.create(self.working_dir)
             self.assertTrue(
                 remote_action.is_download_stub_file(
@@ -3300,13 +3318,14 @@ remote_metadata: {{
 
     def test_update_stub_preserve_unchanged_output_mtime_existing_stub_mismatches_digest(
         self,
-    ):
+    ) -> None:
         with tempfile.TemporaryDirectory() as td:
             action, fake_log_record = self._setup_update_stub_test(Path(td))
             # create a pre-existing stub-file with a different digest as the new output
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
             new_stub_info = copy.deepcopy(old_stub_info)
             old_stub_info._blob_digest = "66776677/33"  # mismatched digest
             old_stub_info.create(self.working_dir)
@@ -3326,7 +3345,7 @@ remote_metadata: {{
 
     def test_update_stub_preserve_unchanged_output_mtime_existing_file_matches_digest_with_backup_stub(
         self,
-    ):
+    ) -> None:
         with tempfile.TemporaryDirectory() as td:
             action, fake_log_record = self._setup_update_stub_test(
                 Path(td), output_contents="h3llo"
@@ -3340,6 +3359,7 @@ remote_metadata: {{
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
             old_stub_info.create(self.working_dir, dest=stub_location)
             self.assertTrue(
                 remote_action.is_download_stub_file(
@@ -3360,7 +3380,7 @@ remote_metadata: {{
 
     def test_update_stub_preserve_unchanged_output_mtime_existing_file_matches_digest_without_backup_stub(
         self,
-    ):
+    ) -> None:
         with tempfile.TemporaryDirectory() as td:
             action, fake_log_record = self._setup_update_stub_test(
                 Path(td), output_contents="h3llo"
@@ -3371,6 +3391,7 @@ remote_metadata: {{
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
 
             # bypass the remote action running
             with mock.patch.object(
@@ -3383,7 +3404,7 @@ remote_metadata: {{
             mock_remove.assert_not_called()
             mock_create_stub.assert_not_called()
 
-    def test_make_download_stub_info_not_found(self):
+    def test_make_download_stub_info_not_found(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             action, fake_log_record = self._setup_update_stub_test(
                 Path(td), output_contents="h3llo"
@@ -3397,7 +3418,7 @@ remote_metadata: {{
 
     def test_update_stub_preserve_unchanged_output_mtime_existing_file_mismatches_digest_with_backup_stub(
         self,
-    ):
+    ) -> None:
         with tempfile.TemporaryDirectory() as td:
             action, fake_log_record = self._setup_update_stub_test(
                 Path(td), output_contents="h3llo"
@@ -3411,6 +3432,7 @@ remote_metadata: {{
             old_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert old_stub_info is not None
             new_stub_info = copy.deepcopy(old_stub_info)
             old_stub_info.create(self.working_dir, dest=stub_location)
             new_stub_info._blob_digest = "43218765/11"  # mismatched digest
@@ -3433,7 +3455,7 @@ remote_metadata: {{
 
     def test_update_stub_preserve_unchanged_output_mtime_existing_file_mismatches_digest_without_backup_stub(
         self,
-    ):
+    ) -> None:
         with tempfile.TemporaryDirectory() as td:
             action, fake_log_record = self._setup_update_stub_test(
                 Path(td), output_contents="h3llo"
@@ -3443,6 +3465,7 @@ remote_metadata: {{
             new_stub_info = fake_log_record.make_download_stub_info(
                 self.output, build_id="new-build-id"
             )
+            assert new_stub_info is not None
             new_stub_info._blob_digest = "43218765/11"  # mismatched digest
 
             # bypass the remote action running
@@ -3458,19 +3481,19 @@ remote_metadata: {{
 
 
 class RbeDiagnosticsTests(unittest.TestCase):
-    def _make_remote_action(self, **kwargs):
+    def _make_remote_action(self, **kwargs: Any) -> remote_action.RemoteAction:
         command = ["echo", "hello"]
         exec_root = Path("/path/to/project/root")
         working_dir = exec_root / "build/stuff/here"
         return remote_action.RemoteAction(
-            rewrapper="/path/to/rewrapper",
+            rewrapper=Path("/path/to/rewrapper"),
             command=command,
             exec_root=exec_root,
             working_dir=working_dir,
             **kwargs,
         )
 
-    def test_analyze_conditions_positive(self):
+    def test_analyze_conditions_positive(self) -> None:
         action = self._make_remote_action(diagnose_nonzero=True)
 
         with mock.patch.object(
@@ -3492,7 +3515,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
         args, kwargs = mock_analyze.call_args_list[0]
         self.assertEqual(kwargs["action_log"], action._action_log)
 
-    def test_analyzing_not_requested(self):
+    def test_analyzing_not_requested(self) -> None:
         action = self._make_remote_action(diagnose_nonzero=False)
 
         with mock.patch.object(
@@ -3512,7 +3535,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
         mock_run.assert_called_once()
         mock_analyze.assert_not_called()
 
-    def test_not_analyzing_on_success(self):
+    def test_not_analyzing_on_success(self) -> None:
         action = self._make_remote_action(diagnose_nonzero=True)
 
         with mock.patch.object(
@@ -3532,7 +3555,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
         mock_run.assert_called_once()
         mock_analyze.assert_not_called()
 
-    def test_not_analyzing_local_execution(self):
+    def test_not_analyzing_local_execution(self) -> None:
         action = self._make_remote_action(
             diagnose_nonzero=True,
             exec_strategy="local",
@@ -3559,7 +3582,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
         mock_run.assert_called_once()
         mock_analyze.assert_not_called()
 
-    def test_analyze_flow(self):
+    def test_analyze_flow(self) -> None:
         pid = 6789
         action_log = Path("obj/my_action.rrpl")
         fake_rewrapper_logs = [
@@ -3606,7 +3629,7 @@ class RbeDiagnosticsTests(unittest.TestCase):
         mock_parse_action_log.assert_called_with(action_log)
         mock_diagnose_line.assert_called()
 
-    def test_parse_reproxy_log_record_lines(self):
+    def test_parse_reproxy_log_record_lines(self) -> None:
         exec_id = "xx-yy-zzzz"
         action_digest = "2afd98ae7274456b2bfc208e10f4cbe75fca88c2c41e352e57cb6b9ad840bf64/144"
         output_path = Path("obj/sub/lib/foo.o")
@@ -3636,21 +3659,21 @@ remote_metadata:  {{
             log_entry.output_file_digests[output_path], output_digest
         )
 
-    def test_diagnose_uninteresting_log_line(self):
+    def test_diagnose_uninteresting_log_line(self) -> None:
         line = "This diagnostic does not appear interesting."
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
             remote_action._diagnose_reproxy_error_line(line)
         self.assertEqual(f.getvalue(), "")
 
-    def test_diagnose_fail_to_dial(self):
+    def test_diagnose_fail_to_dial(self) -> None:
         line = "Fail to dial something something unix:///path/to/reproxy.socket"
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
             remote_action._diagnose_reproxy_error_line(line)
         self.assertIn("reproxy is not running", f.getvalue())
 
-    def test_diagnose_rbe_permissions(self):
+    def test_diagnose_rbe_permissions(self) -> None:
         line = "Error connecting to remote execution client: rpc error: code = PermissionDenied.  You have no power here!"
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
@@ -3660,7 +3683,7 @@ remote_metadata:  {{
             f.getvalue(),
         )
 
-    def test_diagnose_missing_input_file(self):
+    def test_diagnose_missing_input_file(self) -> None:
         path = "../oops/did/I/forget/this.file"
         line = f"Status:LocalErrorResultStatus ... Err:stat {path}: no such file or directory"
         f = io.StringIO()
@@ -3673,7 +3696,7 @@ remote_metadata:  {{
 
 
 class MainTests(unittest.TestCase):
-    def test_help_flag(self):
+    def test_help_flag(self) -> None:
         stdout = io.StringIO()
         # Just make sure help exits successfully, without any exceptions
         # due to argument parsing.
@@ -3685,7 +3708,7 @@ class MainTests(unittest.TestCase):
                     remote_action.main(["--help"])
         mock_exit.assert_called_with(0)
 
-    def test_auto_relaunch_with_reproxy_not_needed_for_local(self):
+    def test_auto_relaunch_with_reproxy_not_needed_for_local(self) -> None:
         command = ["--local", "--", "echo", "hello"]
         exit_code = 7
         with mock.patch.object(
@@ -3695,11 +3718,11 @@ class MainTests(unittest.TestCase):
         ):
             self.assertEqual(remote_action.main(command), exit_code)
 
-    def test_auto_relaunch_with_reproxy_not_needed_for_dry_run(self):
+    def test_auto_relaunch_with_reproxy_not_needed_for_dry_run(self) -> None:
         command = ["--dry-run", "--", "echo", "hello"]
         self.assertEqual(remote_action.main(command), 0)
 
-    def test_auto_relaunch_with_reproxy_not_needed_with_env(self):
+    def test_auto_relaunch_with_reproxy_not_needed_with_env(self) -> None:
         command = ["--", "echo", "hello"]
         exit_code = 9
         with mock.patch.object(
@@ -3714,7 +3737,7 @@ class MainTests(unittest.TestCase):
         mock_env.assert_called()
         mock_run.assert_called_once()
 
-    def test_auto_relaunch_with_reproxy_needed(self):
+    def test_auto_relaunch_with_reproxy_needed(self) -> None:
         command = ["--", "echo", "hello"]
         # Expect to relaunch because the necessary env variables
         # are absent.
@@ -3737,7 +3760,7 @@ class MainTests(unittest.TestCase):
         self.assertTrue(self_script[-1].endswith("remote_action.py"))
         self.assertEqual(wrapped_command, command[1:])
 
-    def test_main_args_remote_inputs(self):
+    def test_main_args_remote_inputs(self) -> None:
         command = ["--inputs", "src/in.txt", "--", "echo", "hello"]
         with mock.patch.object(
             remote_action, "auto_relaunch_with_reproxy"
@@ -3752,7 +3775,7 @@ class MainTests(unittest.TestCase):
         main_args = args[0]
         self.assertEqual(main_args.inputs, ["src/in.txt"])
 
-    def test_main_args_remote_inputs_repeated(self):
+    def test_main_args_remote_inputs_repeated(self) -> None:
         command = [
             "--inputs",
             "src/in.txt",
@@ -3774,7 +3797,7 @@ class MainTests(unittest.TestCase):
         main_args = args[0]
         self.assertEqual(main_args.inputs, ["src/in.txt", "another.s"])
 
-    def test_main_args_local(self):
+    def test_main_args_local(self) -> None:
         command = ["--local", "--", "echo", "hello"]
         with mock.patch.object(
             remote_action, "auto_relaunch_with_reproxy"
@@ -3789,7 +3812,7 @@ class MainTests(unittest.TestCase):
         main_args = args[0]
         self.assertTrue(main_args.local)
 
-    def test_flag_forwarding_remote_disable(self):
+    def test_flag_forwarding_remote_disable(self) -> None:
         command = ["--", "echo", "--remote-disable", "hello"]
         with mock.patch.object(
             remote_action, "auto_relaunch_with_reproxy"
@@ -3804,7 +3827,7 @@ class MainTests(unittest.TestCase):
         main_args = args[0]
         self.assertTrue(main_args.local)
 
-    def test_main_args_local_check_determinism(self):
+    def test_main_args_local_check_determinism(self) -> None:
         command = ["--local", "--check-determinism", "--", "echo", "hello"]
         with mock.patch.object(
             remote_action, "auto_relaunch_with_reproxy"

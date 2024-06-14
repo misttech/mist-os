@@ -2,6 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/remote_services.gni")
+import("//build/toolchain/rbe.gni")
+import("//build/toolchain/rbe_modes.gni")
+
 import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 
@@ -12,7 +16,7 @@ group("tests") {
 
   deps = [
     ":bbtool_test($host_toolchain)",
-    ":build_summary($host_toolchain)",
+    ":build_summary_test($host_toolchain)",
     ":cl_utils_test($host_toolchain)",
     ":cxx_link_remote_wrapper_test($host_toolchain)",
     ":cxx_remote_wrapper_test($host_toolchain)",
@@ -28,7 +32,7 @@ group("tests") {
     ":remotetool_test($host_toolchain)",
     ":rustc_remote_wrapper_test($host_toolchain)",
     ":rustc_test($host_toolchain)",
-    ":tablefmt($host_toolchain)",
+    ":tablefmt_test($host_toolchain)",
     ":textpb_test($host_toolchain)",
   ]
 }
@@ -73,192 +77,227 @@ if (is_host) {
       _cl_utils_sources + _remote_action_sources
 
   python_library("bbtool") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _bbtool_sources
   }
   python_host_test("bbtool_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "bbtool_test.py"
     sources = _bbtool_sources
   }
 
   python_library("build_summary") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _build_summary_sources
   }
   python_host_test("build_summary_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "build_summary_test.py"
     sources = _build_summary_sources
   }
 
   python_library("cl_utils") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _cl_utils_sources
   }
   python_host_test("cl_utils_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "cl_utils_test.py"
     sources = _cl_utils_sources
   }
 
   python_library("cxx") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _cxx_sources
   }
   python_host_test("cxx_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "cxx_test.py"
     sources = _cxx_sources
   }
 
   python_library("cxx_link_remote_wrapper") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _cxx_link_remote_wrapper_sources
   }
   python_host_test("cxx_link_remote_wrapper_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "cxx_link_remote_wrapper_test.py"
     sources = _cxx_link_remote_wrapper_sources
   }
 
   python_library("cxx_remote_wrapper") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _cxx_remote_wrapper_sources
   }
   python_host_test("cxx_remote_wrapper_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "cxx_remote_wrapper_test.py"
     sources = _cxx_remote_wrapper_sources
   }
 
   python_library("depfile") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _depfile_sources
   }
   python_host_test("depfile_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "depfile_test.py"
     sources = _depfile_sources
   }
 
   python_library("dlwrap") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _dlwrap_sources
   }
   python_host_test("dlwrap_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "dlwrap_test.py"
     sources = _dlwrap_sources
   }
 
   python_library("fuchsia") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _fuchsia_sources
   }
   python_host_test("fuchsia_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "fuchsia_test.py"
     sources = _fuchsia_sources
   }
 
   python_library("linker") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _linker_sources
   }
   python_host_test("linker_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "linker_test.py"
     sources = _linker_sources
   }
 
   python_library("output_leak_scanner") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _output_leak_scanner_sources
   }
   python_host_test("output_leak_scanner_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "output_leak_scanner_test.py"
     sources = _output_leak_scanner_sources
   }
 
   python_library("prebuilt_tool_remote_wrapper") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _prebuilt_tool_remote_wrapper_sources
   }
   python_host_test("prebuilt_tool_remote_wrapper_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "prebuilt_tool_remote_wrapper_test.py"
     sources = _prebuilt_tool_remote_wrapper_sources
   }
 
   python_library("relativize_args") {
-    enable_mypy = false
+    enable_mypy = true
     sources = [ "relativize_args.py" ]
   }
   python_host_test("relativize_args_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "relativize_args_test.py"
     sources = [ "relativize_args.py" ]
   }
 
   python_library("remote_action") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _remote_action_sources
   }
   python_host_test("remote_action_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "remote_action_test.py"
     sources = _remote_action_sources
   }
 
   python_library("remotetool") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _remotetool_sources
   }
   python_host_test("remotetool_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "remotetool_test.py"
     sources = _remotetool_sources
   }
 
   python_library("rustc") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _rustc_sources
   }
   python_host_test("rustc_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "rustc_test.py"
     sources = _rustc_sources
   }
 
   python_library("rustc_remote_wrapper") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _rustc_remote_wrapper_sources
   }
   python_host_test("rustc_remote_wrapper_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "rustc_remote_wrapper_test.py"
     sources = _rustc_remote_wrapper_sources
   }
 
   python_library("tablefmt") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _tablefmt_sources
   }
   python_host_test("tablefmt_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "tablefmt_test.py"
     sources = _tablefmt_sources
   }
 
   python_library("textpb") {
-    enable_mypy = false
+    enable_mypy = true
     sources = _textpb_sources
   }
   python_host_test("textpb_test") {
-    enable_mypy = false
+    enable_mypy = true
     main_source = "textpb_test.py"
     sources = _textpb_sources
+  }
+}
+
+if (current_toolchain == default_toolchain) {
+  # List all of the RBE related settings after modes have been applied
+  # and resolved.
+  # TODO(b/346845227): the final override and source-of-truth still lies
+  # with the global variables, but this will eventually migrate to using
+  # the corresponding variables in the `rbe_settings` scope.
+  generated_file("rbe_settings.json") {
+    contents = {
+      settings = rbe_settings
+      final = {
+        # after considering top-level overrides
+        bazel_enable = enable_bazel_remote_rbe
+        cxx_download_objects = cxx_rbe_download_obj_files
+        cxx_enable = cxx_rbe_enable
+        cxx_exec_strategy = cxx_rbe_exec_strategy
+        link_download_unstripped_outputs = link_rbe_download_unstripped_outputs
+        link_enable = link_rbe_enable
+        link_exec_strategy = link_rbe_exec_strategy
+        rust_download_rlibs = rust_rbe_download_rlibs
+        rust_download_unstripped_binaries =
+            rust_rbe_download_unstripped_binaries
+        rust_enable = rust_rbe_enable
+        rust_exec_strategy = rust_rbe_exec_strategy
+
+        # derived values:
+
+        # The following is used by lib/vars.sh to auto-startup reproxy.
+        needs_reproxy = cxx_enable || link_enable || rust_enable
+      }
+    }
+    output_conversion = "json"
+    outputs = [ "$root_build_dir/rbe_settings.json" ]
   }
 }

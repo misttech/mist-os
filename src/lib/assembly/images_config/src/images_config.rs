@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::board_filesystem_config as bfc;
-use crate::product_filesystem_config as pfc;
+use crate::{board_filesystem_config as bfc, product_filesystem_config as pfc};
 use anyhow::{anyhow, bail, Context, Result};
 use bfc::{PostProcessingScript, VBMetaDescriptor, ZbiCompression};
 use camino::Utf8PathBuf;
@@ -519,7 +518,8 @@ mod tests {
             zbi: bfc::Zbi {
                 compression: bfc::ZbiCompression::ZStd,
                 postprocessing_script: Some(bfc::PostProcessingScript {
-                    path: "path/to/script".into(),
+                    path: Some("path/to/script".into()),
+                    board_script_path: None,
                     args: vec!["arg1".into(), "arg2".into()],
                 }),
             },
@@ -556,7 +556,8 @@ mod tests {
             zbi: bfc::Zbi {
                 compression: bfc::ZbiCompression::ZStd,
                 postprocessing_script: Some(bfc::PostProcessingScript {
-                    path: "path/to/script".into(),
+                    path: Some("path/to/script".into()),
+                    board_script_path: None,
                     args: vec!["arg1".into(), "arg2".into()],
                 }),
             },
@@ -613,7 +614,8 @@ mod tests {
                         name: "a-product".into(),
                         compression: bfc::ZbiCompression::ZStd,
                         postprocessing_script: Some(bfc::PostProcessingScript {
-                            path: "path/to/script".into(),
+                            path: Some("path/to/script".into()),
+                            board_script_path: None,
                             args: vec!["arg1".into(), "arg2".into()],
                         }),
                     }),
@@ -649,7 +651,8 @@ mod tests {
                         name: "a-product".into(),
                         compression: bfc::ZbiCompression::ZStd,
                         postprocessing_script: Some(bfc::PostProcessingScript {
-                            path: "path/to/script".into(),
+                            path: Some("path/to/script".into()),
+                            board_script_path: None,
                             args: vec!["arg1".into(), "arg2".into()],
                         }),
                     }),
@@ -693,7 +696,8 @@ mod tests {
                         name: "a-product".into(),
                         compression: bfc::ZbiCompression::ZStd,
                         postprocessing_script: Some(bfc::PostProcessingScript {
-                            path: "path/to/script".into(),
+                            path: Some("path/to/script".into()),
+                            board_script_path: None,
                             args: vec!["arg1".into(), "arg2".into()],
                         }),
                     }),
@@ -787,7 +791,8 @@ mod tests {
                         name: "a-product".into(),
                         compression: bfc::ZbiCompression::ZStd,
                         postprocessing_script: Some(bfc::PostProcessingScript {
-                            path: "path/to/script".into(),
+                            path: Some("path/to/script".into()),
+                            board_script_path: None,
                             args: vec!["arg1".into(), "arg2".into()],
                         }),
                     }),

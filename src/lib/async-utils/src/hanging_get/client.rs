@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::client::QueryResponseFut,
-    futures::{
-        future::{FusedFuture as _, FutureExt as _, MaybeDone},
-        stream::{FusedStream, Stream},
-        task::{Context, Poll},
-    },
-    pin_project::pin_project,
-    std::pin::Pin,
-};
+use fidl::client::QueryResponseFut;
+use futures::future::{FusedFuture as _, FutureExt as _, MaybeDone};
+use futures::stream::{FusedStream, Stream};
+use futures::task::{Context, Poll};
+use pin_project::pin_project;
+use std::pin::Pin;
 
 /// HangingGetStream is a [`Stream`] that is oriented towards being a client to the
 /// "Hanging Get" design pattern for flow control as in //docs/development/api/fidl.md#flow_control
@@ -117,7 +113,9 @@ where
 mod tests {
 
     use super::*;
-    use {fuchsia_async as fasync, futures::TryStreamExt as _, std::cell::Cell};
+    use fuchsia_async as fasync;
+    use futures::TryStreamExt as _;
+    use std::cell::Cell;
 
     struct TestProxy {
         state: Cell<usize>,

@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy, ProfileRequestStream},
-    fidl_fuchsia_bluetooth_rfcomm_test::{RfcommTestMarker, RfcommTestProxy},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
-    futures::{channel::mpsc, SinkExt, StreamExt},
-    realmbuilder_mock_helpers::add_fidl_service_handler,
-    tracing::info,
+use anyhow::Error;
+use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy, ProfileRequestStream};
+use fidl_fuchsia_bluetooth_rfcomm_test::{RfcommTestMarker, RfcommTestProxy};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
+use realmbuilder_mock_helpers::add_fidl_service_handler;
+use tracing::info;
 
 /// RFCOMM component URL.
 const RFCOMM_URL: &str = "fuchsia-pkg://fuchsia.com/bt-rfcomm-smoke-test#meta/bt-rfcomm.cm";

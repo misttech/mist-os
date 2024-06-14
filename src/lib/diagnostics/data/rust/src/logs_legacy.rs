@@ -5,11 +5,11 @@
 #![cfg(target_os = "fuchsia")]
 
 use crate::{Data, Logs, Severity};
-use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogLevelFilter, LogMessage};
-use fuchsia_zircon as zx;
-use std::{fmt::Write, os::raw::c_int};
+use std::fmt::Write;
+use std::os::raw::c_int;
 use thiserror::Error;
+use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_zircon as zx};
 
 /// The legacy severity representation.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

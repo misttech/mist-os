@@ -9,11 +9,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
 use flate2::read::GzDecoder;
-use std::{
-    fs::{create_dir_all, File},
-    io::{copy, Write},
-    path::{Path, PathBuf},
-};
+use std::fs::{create_dir_all, File};
+use std::io::{copy, Write};
+use std::path::{Path, PathBuf};
 use tar::Archive;
 use tempfile::{tempdir, TempDir};
 use zip::read::ZipArchive;
@@ -123,11 +121,11 @@ impl FileResolver for ZipArchiveResolver {
             }
         }
         let time = Utc::now();
+        tracing::debug!("Extracting to {}", self.temp_dir.path().display());
         write!(
             writer,
-            "Extracting {} to {}... ",
-            file.sanitized_name().file_name().expect("has a file name").to_string_lossy(),
-            self.temp_dir.path().display()
+            "Extracting {}... ",
+            file.sanitized_name().file_name().expect("has a file name").to_string_lossy()
         )?;
         if file.size() > (1 << 24) {
             write!(writer, "large file, please wait... ")?;
@@ -151,7 +149,8 @@ impl TarResolver {
         let file = File::open(path.clone())
             .map_err(|e| ffx_error!("Could not open archive file: {}", e))?;
         let time = Utc::now();
-        write!(writer, "Extracting {} to {}... ", path.display(), temp_dir.path().display())?;
+        tracing::debug!("Extracting to {}", temp_dir.path().display());
+        write!(writer, "Extracting {}... ", path.display())?;
         writer.flush()?;
         // Tarballs can't do per file extraction well like Zip, so just unpack it all.
         match path.extension() {
@@ -197,7 +196,8 @@ mod test {
     // use tempfile::NamedTempFile;
 
     use super::*;
-    use std::{io::Read, str::FromStr};
+    use std::io::Read;
+    use std::str::FromStr;
     use zip::write::{FileOptions, ZipWriter};
     use zip::CompressionMethod;
 

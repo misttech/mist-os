@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::server::Facade;
-use crate::wpan::{facade::WpanFacade, types::WpanMethod};
+use crate::wpan::facade::WpanFacade;
+use crate::wpan::types::WpanMethod;
 use anyhow::Error;
 use async_trait::async_trait;
 use serde_json::{from_value, to_value, Value};

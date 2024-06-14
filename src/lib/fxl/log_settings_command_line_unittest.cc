@@ -23,7 +23,8 @@ class LogSettingsFixture : public ::testing::Test {
   LogSettingsFixture()
       : old_severity_(fuchsia_logging::GetMinLogSeverity()), old_stderr_(dup(STDERR_FILENO)) {}
   ~LogSettingsFixture() {
-    fuchsia_logging::SetLogSettings({.min_log_level = old_severity_});
+    fuchsia_logging::LogSettingsBuilder builder;
+    builder.WithMinLogSeverity(old_severity_).BuildAndInitialize();
     dup2(old_stderr_.get(), STDERR_FILENO);
   }
 
@@ -33,7 +34,7 @@ class LogSettingsFixture : public ::testing::Test {
 };
 
 TEST(LogSettings, ParseValidOptions) {
-  fuchsia_logging::LogSettings settings;
+  fxl::LogSettings settings;
   settings.min_log_level = fuchsia_logging::LOG_FATAL;
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0"}), &settings));
@@ -92,7 +93,7 @@ TEST(LogSettings, ParseValidOptions) {
 }
 
 TEST(LogSettings, ParseInvalidOptions) {
-  fuchsia_logging::LogSettings settings;
+  fxl::LogSettings settings;
   settings.min_log_level = fuchsia_logging::LOG_FATAL;
 
   EXPECT_FALSE(
@@ -141,7 +142,7 @@ TEST_F(LogSettingsFixture, SetInvalidOptions) {
 }
 
 TEST_F(LogSettingsFixture, ToArgv) {
-  fuchsia_logging::LogSettings settings;
+  fxl::LogSettings settings;
   EXPECT_TRUE(LogSettingsToArgv(settings).empty());
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet"}), &settings));
@@ -183,7 +184,7 @@ TEST_F(LogSettingsFixture, ToArgv) {
   EXPECT_TRUE(LogSettingsToArgv(settings) == std::vector<std::string>{"--severity=FATAL"});
 
   // Reset |settings| back to defaults so we don't pick up previous tests.
-  settings = fuchsia_logging::LogSettings{};
+  settings = fxl::LogSettings{};
 #ifndef __Fuchsia__
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--log-file=/foo"}), &settings));

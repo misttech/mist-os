@@ -7,7 +7,8 @@
 use core::fmt::Debug;
 
 use derivative::Derivative;
-use netstack3_base::{sync::Mutex, Device, DeviceIdContext};
+use netstack3_base::sync::Mutex;
+use netstack3_base::{Device, DeviceIdContext};
 use packet::BufferMut;
 
 use crate::internal::queue::{fifo, DequeueState, EnqueueResult, ReceiveQueueFullError};
@@ -161,15 +162,17 @@ impl<D: Device, BC: ReceiveQueueBindingsContext<CC::DeviceId>, CC: ReceiveQueueC
 mod tests {
     use super::*;
 
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
+    use alloc::vec::Vec;
 
-    use netstack3_base::{
-        testutil::{FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId},
-        ContextPair, CtxPair, WorkQueueReport,
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId,
     };
+    use netstack3_base::{ContextPair, CtxPair, WorkQueueReport};
     use packet::Buf;
 
-    use crate::internal::queue::{api::ReceiveQueueApi, MAX_BATCH_SIZE, MAX_RX_QUEUED_LEN};
+    use crate::internal::queue::api::ReceiveQueueApi;
+    use crate::internal::queue::{MAX_BATCH_SIZE, MAX_RX_QUEUED_LEN};
 
     #[derive(Default)]
     struct FakeRxQueueState {

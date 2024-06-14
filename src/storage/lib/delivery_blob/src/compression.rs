@@ -6,17 +6,13 @@
 //! [`ChunkedArchive`] and serializing/writing it. An archive's header can be verified and seek
 //! table decoded using [`decode_archive`].
 
-use {
-    crc::Hasher32,
-    itertools::Itertools,
-    rayon::prelude::*,
-    std::ops::Range,
-    thiserror::Error,
-    zerocopy::{
-        byteorder::{LE, U16, U32, U64},
-        AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-    },
-};
+use crc::Hasher32;
+use itertools::Itertools;
+use rayon::prelude::*;
+use std::ops::Range;
+use thiserror::Error;
+use zerocopy::byteorder::{LE, U16, U32, U64};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 #[derive(Debug, Error)]
 pub enum ChunkedArchiveError {
@@ -509,7 +505,9 @@ fn round_up(value: usize, multiple: usize) -> usize {
 #[cfg(test)]
 mod tests {
 
-    use {super::*, rand::Rng, std::matches};
+    use super::*;
+    use rand::Rng;
+    use std::matches;
 
     const BLOCK_SIZE: usize = 8192;
 

@@ -16,7 +16,8 @@ use ffx_config::EnvironmentContext;
 use ffx_emulator_common::config;
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fho::{bug, return_bug, Result};
-use std::{env, process::Command};
+use std::env;
+use std::process::Command;
 
 #[derive(Clone, Debug)]
 pub struct FemuEngine {
@@ -212,7 +213,8 @@ impl QemuBasedEngine for FemuEngine {
 mod tests {
     use super::*;
     use emulator_instance::NetworkingMode;
-    use std::{ffi::OsStr, path::PathBuf};
+    use std::ffi::OsStr;
+    use std::path::PathBuf;
 
     #[test]
     fn test_build_emulator_cmd() {

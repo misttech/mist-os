@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DISPLAY_TIMING_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DISPLAY_TIMING_H_
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <zircon/assert.h>
@@ -432,6 +433,9 @@ constexpr bool operator==(const DisplayTiming& lhs, const DisplayTiming& rhs) {
 constexpr bool operator!=(const DisplayTiming& lhs, const DisplayTiming& rhs) {
   return !(lhs == rhs);
 }
+
+DisplayTiming ToDisplayTiming(
+    const fuchsia_hardware_display_engine::wire::DisplayMode& fidl_display_mode);
 
 DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode);
 

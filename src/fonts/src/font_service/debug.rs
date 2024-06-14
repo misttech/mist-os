@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    fidl_fuchsia_fonts as fonts,
-    std::stringify,
-    tracing::debug,
-};
+use anyhow::{Error, Result};
+use fidl_fuchsia_fonts as fonts;
+use std::stringify;
+use tracing::debug;
 
 macro_rules! format_field {
     ($debug_struct:expr, $parent:expr, $field:ident, $wrapper:path) => {

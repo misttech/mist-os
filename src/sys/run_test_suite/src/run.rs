@@ -2,27 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        artifacts,
-        cancel::{Cancelled, NamedFutureExt, OrCancel},
-        connector::RunBuilderConnector,
-        diagnostics::{self, LogDisplayConfiguration},
-        outcome::{Outcome, RunTestSuiteError},
-        output::{self, RunReporter, SuiteId, Timestamp},
-        params::{RunParams, TestParams, TimeoutBehavior},
-        running_suite::{run_suite_and_collect_logs, RunningSuite},
-        trace::duration,
-    },
-    diagnostics_data::LogTextDisplayOptions,
-    fidl_fuchsia_test_manager::{self as ftest_manager, RunBuilderProxy},
-    fuchsia_async as fasync,
-    futures::{future::Either, prelude::*, stream::FuturesUnordered, StreamExt},
-    std::collections::HashMap,
-    std::io::Write,
-    std::path::PathBuf,
-    tracing::{error, warn},
-};
+use crate::artifacts;
+use crate::cancel::{Cancelled, NamedFutureExt, OrCancel};
+use crate::connector::RunBuilderConnector;
+use crate::diagnostics::{self, LogDisplayConfiguration};
+use crate::outcome::{Outcome, RunTestSuiteError};
+use crate::output::{self, RunReporter, SuiteId, Timestamp};
+use crate::params::{RunParams, TestParams, TimeoutBehavior};
+use crate::running_suite::{run_suite_and_collect_logs, RunningSuite};
+use crate::trace::duration;
+use diagnostics_data::LogTextDisplayOptions;
+use fidl_fuchsia_test_manager::{self as ftest_manager, RunBuilderProxy};
+use fuchsia_async as fasync;
+use futures::future::Either;
+use futures::prelude::*;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use std::collections::HashMap;
+use std::io::Write;
+use std::path::PathBuf;
+use tracing::{error, warn};
 
 // Will invoke the WithSchedulingOptions FIDL method if a client indicates
 // that they want to use experimental parallel execution.
@@ -454,17 +453,13 @@ pub fn create_reporter<W: 'static + Write + Send + Sync>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            connector::SingleRunConnector,
-            output::{EntityId, InMemoryReporter},
-        },
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        futures::future::join,
-        maplit::hashmap,
-    };
+    use super::*;
+    use crate::connector::SingleRunConnector;
+    use crate::output::{EntityId, InMemoryReporter};
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use futures::future::join;
+    use maplit::hashmap;
     #[cfg(target_os = "fuchsia")]
     use {
         fidl::endpoints::ServerEnd,

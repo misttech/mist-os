@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::stream;
-use crate::{Error, Node, Result};
+use crate::{stream, Error, Node, Result};
 
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::channel::oneshot;

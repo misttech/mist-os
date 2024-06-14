@@ -4,10 +4,8 @@
 
 //! Factory functions for proxies - one each for sending a handle and receiving a handle.
 
-use super::super::{
-    handle::{IntoProxied, ProxyableHandle, ProxyableRW},
-    Proxy, ProxyTransferInitiationReceiver,
-};
+use super::super::handle::{IntoProxied, ProxyableHandle, ProxyableRW};
+use super::super::{Proxy, ProxyTransferInitiationReceiver};
 use crate::handle_info::WithRights;
 use crate::peer::{FramedStreamReader, FramedStreamWriter, PeerConnRef};
 use crate::router::{FoundTransfer, OpenedTransfer, Router};

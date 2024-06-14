@@ -5,11 +5,12 @@
 //! Tests for AT command serialization and deserialization with defragmentation.
 #![cfg(test)]
 
-use crate::{
-    highlevel::Command,
-    serde::{DeserializeBytes, DeserializeError, DeserializeErrorCause, DeserializeResult, SerDe},
+use crate::highlevel::Command;
+use crate::serde::{
+    DeserializeBytes, DeserializeError, DeserializeErrorCause, DeserializeResult, SerDe,
 };
-use {assert_matches::assert_matches, std::io::Cursor};
+use assert_matches::assert_matches;
+use std::io::Cursor;
 
 #[test]
 fn serialize() {

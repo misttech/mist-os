@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::FullmacDriverFixture,
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
-    fullmac_helpers::config::{default_fullmac_query_info, FullmacDriverConfig},
-    rand::seq::SliceRandom,
-    wlan_common::assert_variant,
-};
+use crate::FullmacDriverFixture;
+use fullmac_helpers::config::{default_fullmac_query_info, FullmacDriverConfig};
+use rand::seq::SliceRandom;
+use wlan_common::assert_variant;
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac};
 
 #[fuchsia::test]
 async fn test_generic_sme_query() {
@@ -24,14 +22,16 @@ async fn test_generic_sme_query() {
         ..Default::default()
     };
 
-    let (mut fullmac_driver, generic_sme_proxy) =
-        FullmacDriverFixture::create_and_get_generic_sme(config).await;
+    let mut fullmac_driver = FullmacDriverFixture::create(config).await;
+
+    let generic_sme_proxy = &fullmac_driver.generic_sme_proxy;
+    let request_stream = &mut fullmac_driver.request_stream;
 
     // Returns the query response
     let sme_fut = async { generic_sme_proxy.query().await.expect("Failed to request SME query") };
 
     let driver_fut = async {
-        assert_variant!(fullmac_driver.request_stream.next().await,
+        assert_variant!(request_stream.next().await,
         fidl_fullmac::WlanFullmacImplBridgeRequest::Query { responder } => {
             responder.send(Ok(&fullmac_driver.config.query_info))
                 .expect("Failed to respondt to Query");

@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <threads.h>
 #include <zircon/assert.h>
+#include <zircon/availability.h>
 #include <zircon/errors.h>
 #include <zircon/listnode.h>
 #include <zircon/status.h>
@@ -1888,7 +1889,7 @@ void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
 }
 
 zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
   zx::result client_end = component::Connect<fuchsia_scheduler::RoleManager>();
   if (client_end.is_error()) {
     return client_end.status_value();

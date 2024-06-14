@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::Measurable,
-    anyhow::{Context as _, Result},
-    fidl_fuchsia_pkg::{
-        BlobIdIteratorNextResponder, BlobIdIteratorRequest, BlobIdIteratorRequestStream,
-        BlobInfoIteratorNextResponder, BlobInfoIteratorRequest, BlobInfoIteratorRequestStream,
-        PackageIndexEntry, PackageIndexIteratorNextResponder, PackageIndexIteratorRequest,
-        PackageIndexIteratorRequestStream,
-    },
-    fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES,
-    futures::prelude::*,
+use crate::Measurable;
+use anyhow::{Context as _, Result};
+use fidl_fuchsia_pkg::{
+    BlobIdIteratorNextResponder, BlobIdIteratorRequest, BlobIdIteratorRequestStream,
+    BlobInfoIteratorNextResponder, BlobInfoIteratorRequest, BlobInfoIteratorRequestStream,
+    PackageIndexEntry, PackageIndexIteratorNextResponder, PackageIndexIteratorRequest,
+    PackageIndexIteratorRequestStream,
 };
+use fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES;
+use futures::prelude::*;
 
 /// Serves fidl iterators like:
 ///
@@ -298,14 +296,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_pkg::{BlobInfoIteratorMarker, PackageIndexIteratorMarker},
-        fuchsia_async::Task,
-        fuchsia_hash::HashRangeFull,
-        fuchsia_pkg::PackagePath,
-        proptest::prelude::*,
-    };
+    use super::*;
+    use fidl_fuchsia_pkg::{BlobInfoIteratorMarker, PackageIndexIteratorMarker};
+    use fuchsia_async::Task;
+    use fuchsia_hash::HashRangeFull;
+    use fuchsia_pkg::PackagePath;
+    use proptest::prelude::*;
 
     #[test]
     fn zx_channel_max_msg_bytes_fits_in_usize() {

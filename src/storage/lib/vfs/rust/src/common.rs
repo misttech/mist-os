@@ -4,10 +4,12 @@
 
 //! Common utilities used by both directory and file traits.
 
-use {
-    fidl::endpoints::ServerEnd, fidl::prelude::*, fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status, futures::StreamExt as _, std::sync::Arc,
-};
+use fidl::endpoints::ServerEnd;
+use fidl::prelude::*;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use futures::StreamExt as _;
+use std::sync::Arc;
 
 pub use vfs_macros::attribute_query;
 

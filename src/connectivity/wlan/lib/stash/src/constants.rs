@@ -87,18 +87,3 @@ impl PersistentStorageData {
         }
     }
 }
-
-/// Used when migrating persisted networks from deprecated stash to the new local storage format.
-pub fn new_persisted_data_from_old(
-    id: NetworkIdentifier,
-    data: Vec<PersistentData>,
-) -> Vec<PersistentStorageData> {
-    data.into_iter()
-        .map(|c| PersistentStorageData {
-            ssid: id.ssid.clone(),
-            security_type: id.security_type,
-            credential: c.credential,
-            has_ever_connected: c.has_ever_connected,
-        })
-        .collect()
-}

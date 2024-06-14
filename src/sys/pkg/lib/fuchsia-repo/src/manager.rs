@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{repo_client::RepoClient, repository::RepoProvider},
-    async_lock::RwLock as AsyncRwLock,
-    std::{
-        collections::HashMap,
-        sync::{Arc, RwLock as SyncRwLock},
-    },
-};
+use crate::repo_client::RepoClient;
+use crate::repository::RepoProvider;
+use async_lock::RwLock as AsyncRwLock;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock as SyncRwLock};
 
 type ArcRepoClient = Arc<AsyncRwLock<RepoClient<Box<dyn RepoProvider>>>>;
 
@@ -65,7 +62,8 @@ impl RepositoryManager {
 #[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 mod test {
-    use {super::*, crate::test_utils::make_readonly_empty_repository};
+    use super::*;
+    use crate::test_utils::make_readonly_empty_repository;
     const REPO_NAME: &str = "fake-repo";
 
     #[fuchsia_async::run_singlethreaded(test)]

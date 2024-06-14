@@ -8,15 +8,12 @@ mod controller;
 
 pub use collection::Zbi;
 
-use {
-    collector::ZbiCollector,
-    controller::{
-        BootFsFilesController, BootFsPackagesController, ZbiCmdlineController,
-        ZbiSectionsController,
-    },
-    scrutiny::prelude::*,
-    std::sync::Arc,
+use collector::ZbiCollector;
+use controller::{
+    BootFsFilesController, BootFsPackagesController, ZbiCmdlineController, ZbiSectionsController,
 };
+use scrutiny::prelude::*;
+use std::sync::Arc;
 
 plugin!(
     ZbiPlugin,

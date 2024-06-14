@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bt_avctp::{AvcCommandType, AvcOpCode, AvcPacketType},
-    fidl_fuchsia_bluetooth_avrcp::AvcPanelCommand,
-    packet_encoding::{Decodable, Encodable},
-    thiserror::Error,
-    tracing::{trace, warn},
-};
+use bt_avctp::{AvcCommandType, AvcOpCode, AvcPacketType};
+use fidl_fuchsia_bluetooth_avrcp::AvcPanelCommand;
+use packet_encoding::{Decodable, Encodable};
+use thiserror::Error;
+use tracing::{trace, warn};
 
 use crate::packets::{Error as PacketError, *};
 

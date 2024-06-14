@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_ui_test_conformance::{
-        PuppetEmbedRemoteViewResponse, PuppetFactoryCreateResponse, PuppetFactoryRequest,
-        PuppetFactoryRequestStream, PuppetRequest, PuppetRequestStream,
-        PuppetSetEmbeddedViewPropertiesResponse, Result_,
-    },
-    futures::TryStreamExt,
-    std::{cell::RefCell, rc::Rc},
-    tracing::info,
+use fidl_fuchsia_ui_test_conformance::{
+    PuppetEmbedRemoteViewResponse, PuppetFactoryCreateResponse, PuppetFactoryRequest,
+    PuppetFactoryRequestStream, PuppetRequest, PuppetRequestStream,
+    PuppetSetEmbeddedViewPropertiesResponse, Result_,
 };
+use futures::TryStreamExt;
+use std::cell::RefCell;
+use std::rc::Rc;
+use tracing::info;
 
 mod presentation_loop;
 mod view;

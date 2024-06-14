@@ -4,21 +4,16 @@
 
 use fidl::endpoints::create_proxy;
 
-use {
-    crate::{
-        io::{Directory, DirentKind, LocalDirectory, RemoteDirectory},
-        path::{
-            add_source_filename_to_path_if_absent, open_parent_subdir_readable,
-            LocalOrRemoteDirectoryPath,
-        },
-    },
-    anyhow::{bail, Result},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    regex::Regex,
-    std::path::PathBuf,
-    thiserror::Error,
+use crate::io::{Directory, DirentKind, LocalDirectory, RemoteDirectory};
+use crate::path::{
+    add_source_filename_to_path_if_absent, open_parent_subdir_readable, LocalOrRemoteDirectoryPath,
 };
+use anyhow::{bail, Result};
+use fidl::endpoints::ServerEnd;
+use regex::Regex;
+use std::path::PathBuf;
+use thiserror::Error;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 #[derive(Error, Debug)]
 pub enum CopyError {
@@ -337,17 +332,15 @@ async fn get_dirents_matching_pattern<D: Directory>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::test_utils::{
-            create_tmp_dir, generate_directory_paths, generate_file_paths, serve_realm_query, File,
-            SeedPath,
-        },
-        std::collections::HashMap,
-        std::fs::{read, write},
-        std::iter::zip,
-        test_case::test_case,
+    use super::*;
+    use crate::test_utils::{
+        create_tmp_dir, generate_directory_paths, generate_file_paths, serve_realm_query, File,
+        SeedPath,
     };
+    use std::collections::HashMap;
+    use std::fs::{read, write};
+    use std::iter::zip;
+    use test_case::test_case;
 
     const CHANNEL_SIZE_LIMIT: u64 = 64 * 1024;
     const LARGE_FILE_ARRAY: [u8; CHANNEL_SIZE_LIMIT as usize] = [b'a'; CHANNEL_SIZE_LIMIT as usize];

@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, format_err, Context as _, Error, Result},
-    async_trait::async_trait,
-    fidl_fuchsia_component::{
-        self as fcomponent, ChildIteratorMarker, CreateChildArgs, RealmMarker, RealmProxy,
-    },
-    fidl_fuchsia_component_decl::{Child, ChildRef, CollectionRef, StartupMode},
-    fidl_fuchsia_io::DirectoryProxy,
-    fidl_fuchsia_time_external::{
-        self as ftexternal, PushSourceProxy, Status, TimeSample, Urgency,
-    },
-    fuchsia_component::client,
-    fuchsia_zircon as zx,
-    futures::{stream::Stream, FutureExt, TryFutureExt},
-    std::{fmt::Debug, sync::Arc},
-    tracing::debug,
+use anyhow::{anyhow, format_err, Context as _, Error, Result};
+use async_trait::async_trait;
+use fidl_fuchsia_component::{
+    self as fcomponent, ChildIteratorMarker, CreateChildArgs, RealmMarker, RealmProxy,
 };
+use fidl_fuchsia_component_decl::{Child, ChildRef, CollectionRef, StartupMode};
+use fidl_fuchsia_io::DirectoryProxy;
+use fidl_fuchsia_time_external::{
+    self as ftexternal, PushSourceProxy, Status, TimeSample, Urgency,
+};
+use fuchsia_component::client;
+use fuchsia_zircon as zx;
+use futures::stream::Stream;
+use futures::{FutureExt, TryFutureExt};
+use std::fmt::Debug;
+use std::sync::Arc;
+use tracing::debug;
 
 const TIMESOURCE_COLLECTION_NAME: &str = "timesource";
 
@@ -485,7 +485,10 @@ impl PullSource for FakePullTimeSource {
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl::prelude::*, fuchsia_async as fasync, lazy_static::lazy_static};
+    use super::*;
+    use fidl::prelude::*;
+    use fuchsia_async as fasync;
+    use lazy_static::lazy_static;
 
     const STATUS_1: Status = Status::Initializing;
     const SAMPLE_1_UTC_NANOS: i64 = 1234567;

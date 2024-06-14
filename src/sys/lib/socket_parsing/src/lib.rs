@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::{self as fasync, ReadableHandle, ReadableState},
-    fuchsia_zircon as zx,
-    futures::Stream,
-    std::{
-        pin::Pin,
-        task::{ready, Context, Poll},
-    },
-    thiserror::Error,
-};
+use fuchsia_async::{self as fasync, ReadableHandle, ReadableState};
+use fuchsia_zircon as zx;
+use futures::Stream;
+use std::pin::Pin;
+use std::task::{ready, Context, Poll};
+use thiserror::Error;
 
 const NEWLINE: u8 = b'\n';
 

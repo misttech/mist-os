@@ -2,28 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::{now, Protection, StateChangeContext, StateChangeContextExt};
+use crate::client::event::{self, Event, RsnaCompletionTimeout, RsnaResponseTimeout};
+use crate::client::internal::Context;
+use crate::client::rsn::Rsna;
+use crate::client::EstablishRsnaFailureReason;
+use crate::{MlmeRequest, MlmeSink};
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::log::InspectBytes;
+use ieee80211::{Bssid, MacAddr, MacAddrBytes, WILDCARD_BSSID};
+use tracing::{error, warn};
+use wlan_common::bss::BssDescription;
+use wlan_common::timer::EventId;
+use wlan_rsn::key::exchange::Key;
+use wlan_rsn::key::Tk;
+use wlan_rsn::rsna::{self, SecAssocStatus, SecAssocUpdate};
+use wlan_statemachine::*;
 use {
-    super::{now, Protection, StateChangeContext, StateChangeContextExt},
-    crate::{
-        client::{
-            event::{self, Event, RsnaCompletionTimeout, RsnaResponseTimeout},
-            internal::Context,
-            rsn::Rsna,
-            EstablishRsnaFailureReason,
-        },
-        MlmeRequest, MlmeSink,
-    },
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_inspect_contrib::{inspect_log, log::InspectBytes},
     fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddr, MacAddrBytes, WILDCARD_BSSID},
-    tracing::{error, warn},
-    wlan_common::{bss::BssDescription, timer::EventId},
-    wlan_rsn::{
-        key::{exchange::Key, Tk},
-        rsna::{self, SecAssocStatus, SecAssocUpdate},
-    },
-    wlan_statemachine::*,
 };
 
 #[derive(Debug)]

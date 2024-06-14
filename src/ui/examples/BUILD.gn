@@ -8,6 +8,7 @@ group("examples") {
   public_deps = [
     ":flatland-examples",
     "escher",
+    "escher-flatland",
   ]
 }
 

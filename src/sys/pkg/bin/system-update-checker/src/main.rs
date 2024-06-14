@@ -16,20 +16,17 @@ mod update_manager;
 mod update_monitor;
 mod update_service;
 
-use {
-    crate::{
-        channel_handler::ChannelHandler,
-        update_service::{RealUpdateManager, UpdateService},
-    },
-    anyhow::{anyhow, Context as _, Error},
-    fidl_fuchsia_update_channel::ProviderRequestStream,
-    fidl_fuchsia_update_channelcontrol::ChannelControlRequestStream,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect as finspect,
-    futures::{prelude::*, stream::FuturesUnordered},
-    std::sync::Arc,
-    tracing::error,
-};
+use crate::channel_handler::ChannelHandler;
+use crate::update_service::{RealUpdateManager, UpdateService};
+use anyhow::{anyhow, Context as _, Error};
+use fidl_fuchsia_update_channel::ProviderRequestStream;
+use fidl_fuchsia_update_channelcontrol::ChannelControlRequestStream;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect as finspect;
+use futures::prelude::*;
+use futures::stream::FuturesUnordered;
+use std::sync::Arc;
+use tracing::error;
 
 const MAX_CONCURRENT_CONNECTIONS: usize = 100;
 const DEFAULT_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.com/update";

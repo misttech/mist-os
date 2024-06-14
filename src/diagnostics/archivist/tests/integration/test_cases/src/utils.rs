@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error, Result};
-use component_events::{events::*, matcher::*};
+use component_events::events::*;
+use component_events::matcher::*;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_diagnostics::{self as fdiagnostics, ArchiveAccessorMarker, Interest, Severity};
 use realm_proxy_client::RealmProxyClient;

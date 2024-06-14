@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use heck::SnakeCase;
-use serde::Deserialize;
-use serde::Serialize;
-use serde_json::Map;
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Map, Value};
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;

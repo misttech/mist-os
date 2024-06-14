@@ -62,10 +62,8 @@
 
 #![deny(missing_docs)]
 
-use std::{
-    marker::PhantomData,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Application related items
 pub mod app;
@@ -112,12 +110,10 @@ where
     }
 }
 
-pub use crate::{
-    app::{
-        make_app_assistant, App, AppAssistant, AppAssistantPtr, AppSender, AssistantCreator,
-        AssistantCreatorFunc, LocalBoxFuture, MessageTarget,
-    },
-    geometry::{Coord, IntCoord, IntPoint, IntRect, IntSize, Point, Rect, Size},
-    message::{make_message, Message},
-    view::{ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey},
+pub use crate::app::{
+    make_app_assistant, App, AppAssistant, AppAssistantPtr, AppSender, AssistantCreator,
+    AssistantCreatorFunc, LocalBoxFuture, MessageTarget,
 };
+pub use crate::geometry::{Coord, IntCoord, IntPoint, IntRect, IntSize, Point, Rect, Size};
+pub use crate::message::{make_message, Message};
+pub use crate::view::{ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey};

@@ -11,9 +11,11 @@ import json
 import os
 import tempfile
 import unittest
+from typing import Any, Generator
 from unittest import mock
 
 from assembly import (
+    AIBCreator,
     FileEntry,
     ImageAssemblyConfig,
     PackageManifest,
@@ -41,7 +43,9 @@ def make_merkle(blob_name: str) -> str:
     return m.hexdigest()
 
 
-def _make_package_contents(package_name, blobs, source_dir) -> PackageManifest:
+def _make_package_contents(
+    package_name: str, blobs: list[str], source_dir: str
+) -> PackageManifest:
     manifest = PackageManifest(
         PackageMetaData(package_name), [], repository="fuchsia.com"
     )
@@ -58,7 +62,9 @@ def _make_package_contents(package_name, blobs, source_dir) -> PackageManifest:
     return manifest
 
 
-def make_package_manifest(package_name, blobs, source_dir):
+def make_package_manifest(
+    package_name: str, blobs: list[str], source_dir: str
+) -> str:
     manifest = _make_package_contents(package_name, blobs, source_dir)
 
     # Write the manifest out to the temp dir
@@ -69,34 +75,36 @@ def make_package_manifest(package_name, blobs, source_dir):
     return manifest_path
 
 
-def make_image_assembly_path(package_name):
+def make_image_assembly_path(package_name: str) -> str:
     return "source/" + package_name + ".json"
 
 
-def make_package_path(package_name):
+def make_package_path(package_name: str) -> str:
     return "packages/" + package_name
 
 
 TestSetupArgs = namedtuple(
     "TestSetupArgs",
-    "base, cache, system, bootfs_packages, kernel, boot_args, shell_commands_file, driver_manifest_path, driver_component_file, bootfs",
+    "base, cache, bootfs_packages, kernel, boot_args, shell_commands_file, driver_manifest_path, driver_component_file, bootfs",
 )
 SOURCE_DIR = "source"
 OUTDIR = "outdir"
 
 
 @contextmanager
-def setup_temp_dir(*args, **kwargs):
+def setup_temp_dir(
+    *args: str, **kwargs: Any
+) -> Generator[TestSetupArgs, None, None]:
     temp_dir = tempfile.TemporaryDirectory()
     try:
         os.chdir(temp_dir.name)
         os.mkdir(SOURCE_DIR)
 
         # Write out package manifests which are part of the package.
-        base = set()
-        cache = set()
-        system = set()
-        for package_set in ["base", "cache", "system"]:
+        base: set[str] = set()
+        cache: set[str] = set()
+        system: set[str] = set()
+        for package_set in ["base", "cache"]:
             for suffix in ["a", "b"]:
                 package_name = f"{package_set}_{suffix}"
                 blob_suffixes = ["1", "2", "3"]
@@ -171,7 +179,6 @@ def setup_temp_dir(*args, **kwargs):
         yield TestSetupArgs(
             base,
             cache,
-            system,
             bootfs_packages,
             kernel,
             boot_args,
@@ -185,7 +192,7 @@ def setup_temp_dir(*args, **kwargs):
 
 
 class MakeLegacyConfig(unittest.TestCase):
-    def test_make_legacy_config(self):
+    def test_make_legacy_config(self) -> None:
         self.maxDiff = None
 
         # Patch in a mock for the fast_copy() fn
@@ -195,7 +202,6 @@ class MakeLegacyConfig(unittest.TestCase):
             (
                 base,
                 cache,
-                system,
                 bootfs_packages,
                 kernel,
                 boot_args,
@@ -209,7 +215,6 @@ class MakeLegacyConfig(unittest.TestCase):
             aib, _, deps = make_legacy_config.copy_to_assembly_input_bundle(
                 base=base,
                 cache=cache,
-                system=system,
                 bootfs_packages=bootfs_packages,
                 kernel=kernel,
                 boot_args=boot_args,
@@ -237,8 +242,6 @@ class MakeLegacyConfig(unittest.TestCase):
                         PackageDetails("packages/base_b", "base"),
                         PackageDetails("packages/cache_a", "cache"),
                         PackageDetails("packages/cache_b", "cache"),
-                        PackageDetails("packages/system_a", "system"),
-                        PackageDetails("packages/system_b", "system"),
                         PackageDetails("packages/bootfs", "bootfs"),
                     ]
                 ),
@@ -278,7 +281,7 @@ class MakeLegacyConfig(unittest.TestCase):
             )
 
             # Make sure all the manifests were created in the correct location.
-            for package_set in ["base", "cache", "system"]:
+            for package_set in ["base", "cache"]:
                 for suffix in ["a", "b"]:
                     package_name = f"{package_set}_{suffix}"
                     with open(
@@ -359,14 +362,6 @@ class MakeLegacyConfig(unittest.TestCase):
                         "source/cache_b/internal/path/file_b_1",
                         "source/cache_b/internal/path/file_b_2",
                         "source/cache_b/internal/path/file_b_3",
-                        "source/system_a.json",
-                        "source/system_a/internal/path/file_a_1",
-                        "source/system_a/internal/path/file_a_2",
-                        "source/system_a/internal/path/file_a_3",
-                        "source/system_b.json",
-                        "source/system_b/internal/path/file_b_1",
-                        "source/system_b/internal/path/file_b_2",
-                        "source/system_b/internal/path/file_b_3",
                         "source/kernel.bin",
                         "source/bootfs_files_package.json",
                         "source/bootfs_files_package/some/file",
@@ -443,30 +438,6 @@ class MakeLegacyConfig(unittest.TestCase):
                             destination="outdir/blobs/b548948fd2dc40574775308a92a8330e5c5d84ddf31513d1fe69964b458479e7",
                         ),
                         FileEntry(
-                            source="source/system_a/internal/path/file_a_1",
-                            destination="outdir/blobs/8ca898b1389c58b6cd9a6a777e320f2756ab3437b402c61d774dd2758ad9cf06",
-                        ),
-                        FileEntry(
-                            source="source/system_a/internal/path/file_a_2",
-                            destination="outdir/blobs/ef84c6711eaba482164fe4eb08a6c45f18fe62d493e5a31a631c32937bf7229d",
-                        ),
-                        FileEntry(
-                            source="source/system_a/internal/path/file_a_3",
-                            destination="outdir/blobs/d66cb673257e25393a319fb2c3e9745ef6e0f1cfa4fb89c5576df73cd3eba586",
-                        ),
-                        FileEntry(
-                            source="source/system_b/internal/path/file_b_1",
-                            destination="outdir/blobs/fd0891d15ce65d7682f7437e441e917b8ed4bde4db07a11dc100104f25056051",
-                        ),
-                        FileEntry(
-                            source="source/system_b/internal/path/file_b_2",
-                            destination="outdir/blobs/c244c7c6ebf40a9a4c9d59e7b08a1cf54ae3d60404d1cecb417a7b55cc308d91",
-                        ),
-                        FileEntry(
-                            source="source/system_b/internal/path/file_b_3",
-                            destination="outdir/blobs/0cdbf3e4f1246ce7522e78c21bcf1c3aef2d41ac2b4de3f0ee98fc6273f62eb9",
-                        ),
-                        FileEntry(
                             source="source/core/realm/shard1.cml",
                             destination="outdir/compiled_packages/core/core/shard1.cml",
                         ),
@@ -502,7 +473,6 @@ class MakeLegacyConfig(unittest.TestCase):
             self.assertEqual(
                 sorted(file_paths),
                 [
-                    "blobs/0cdbf3e4f1246ce7522e78c21bcf1c3aef2d41ac2b4de3f0ee98fc6273f62eb9",
                     "blobs/0f32059964674afd810001c76c2a5d783a2ce012c41303685ec1adfdb83290fd",
                     "blobs/1834109a42a5ff6501fbe05216475b2b0acc44e0d9c94924469a485d6f45dc86",
                     "blobs/1be711a4235aefc04302d3a20eefafcf0ac26b573881bc7967479aff6e1e8dd7",
@@ -511,20 +481,15 @@ class MakeLegacyConfig(unittest.TestCase):
                     "blobs/6468d9d6761c8afcc97744dfd9e066f29bb697a9a0c8248b5e6eec989134a048",
                     "blobs/809aae59e2ca524e21f93c4e5747fc718b6f61aefe9eabc46f981d5856b88de3",
                     "blobs/8135016519df51d386efaea9b02f50cb454b6c7afe69c77895c1d4d844c3584d",
-                    "blobs/8ca898b1389c58b6cd9a6a777e320f2756ab3437b402c61d774dd2758ad9cf06",
                     "blobs/a2e574ccd55c815f0a87c4f27e7a3115fe8e46d41a2e0caf2a91096a41421f78",
                     "blobs/ae9fd81e1c2fd1b084ec2c362737e812c5ef9b3aa8cb0538ec8e2269ea7fbe1a",
                     "blobs/b3a484b7b9bc926298dc6ebeb12556641e21adc6708f3f59f1b43ade3f9f627c",
                     "blobs/b548948fd2dc40574775308a92a8330e5c5d84ddf31513d1fe69964b458479e7",
                     "blobs/bf0c3ae1356b5863258f73a37d555cf878007b8bfe4fd780d74466ec62fe062d",
-                    "blobs/c244c7c6ebf40a9a4c9d59e7b08a1cf54ae3d60404d1cecb417a7b55cc308d91",
                     "blobs/ce856fe1e31bd6ed129db4a0145cc9670dfcbeef414e65b28f9def62679540e9",
                     "blobs/d3cd38c4881c3bc31f1e2e397a548d431a6430299785446f28be10cc5b76d92b",
-                    "blobs/d66cb673257e25393a319fb2c3e9745ef6e0f1cfa4fb89c5576df73cd3eba586",
-                    "blobs/ef84c6711eaba482164fe4eb08a6c45f18fe62d493e5a31a631c32937bf7229d",
                     "blobs/efac096092f7cf879c72ac51d23d9f142e97405dec7dd9c69aeee81de083f794",
                     "blobs/f0601d51be1ec8c11d825b756841937706eb2805ce9b924b67b4b0dc14caba29",
-                    "blobs/fd0891d15ce65d7682f7437e441e917b8ed4bde4db07a11dc100104f25056051",
                     "compiled_packages/core/core/shard1.cml",
                     "compiled_packages/core/core/shard2.cml",
                     "kernel/kernel.bin",
@@ -533,12 +498,10 @@ class MakeLegacyConfig(unittest.TestCase):
                     "packages/bootfs",
                     "packages/cache_a",
                     "packages/cache_b",
-                    "packages/system_a",
-                    "packages/system_b",
                 ],
             )
 
-    def test_package_found_in_base_and_cache(self):
+    def test_package_found_in_base_and_cache(self) -> None:
         """
         Asserts that the copy_to_assembly_input_bundle function has the side effect of
         assigning packages found in both base and cache in the image assembly config to
@@ -554,21 +517,20 @@ class MakeLegacyConfig(unittest.TestCase):
 
             # Copies legacy config into AIB
             aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                [manifest_path],
-                [manifest_path],
-                [],
-                [],
-                KernelInfo(),
-                [],
-                [],
-                OUTDIR,
-                [],
-                [],
-                [],
-                [],
-                dict(),
-                [],
-                None,
+                base=[manifest_path],
+                cache=[manifest_path],
+                bootfs_packages=[],
+                kernel=KernelInfo(),
+                boot_args=[],
+                config_data_entries=[],
+                outdir=OUTDIR,
+                base_driver_packages_list=[],
+                base_driver_components_files_list=[],
+                boot_driver_packages_list=[],
+                boot_driver_components_files_list=[],
+                shell_commands=dict(),
+                core_realm_shards=[],
+                bootfs_files_package=None,
             )
 
             # Asserts that the duplicate package is present in the base package set after
@@ -584,7 +546,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 ),
             )
 
-    def test_driver_package_removed_from_base(self):
+    def test_driver_package_removed_from_base(self) -> None:
         """
         Asserts that the copy_to_assembly_input_bundle function has the side effect of
         removing packages from base if they are listed as driver packages, and adds them to the
@@ -601,7 +563,7 @@ class MakeLegacyConfig(unittest.TestCase):
             # Replace the AIBCreator._get_driver_details function within the
             # context manager with a mock.
             with mock.patch.object(
-                make_legacy_config.AIBCreator, "_get_driver_details"
+                AIBCreator, "_get_driver_details"
             ) as patched_method:
                 # This fixed return value should add the contents of the set in the first index
                 # of the tuple to the aib.base_drivers, and remove it from the aib.base package set
@@ -611,21 +573,20 @@ class MakeLegacyConfig(unittest.TestCase):
                     list(),
                 )
                 aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                    [manifest_path],
-                    [],
-                    [],
-                    [],
-                    KernelInfo(),
-                    [],
-                    [],
-                    OUTDIR,
-                    [manifest_path],
-                    [],
-                    [],
-                    [],
-                    dict(),
-                    [],
-                    None,
+                    base=[manifest_path],
+                    cache=[],
+                    bootfs_packages=[],
+                    kernel=KernelInfo(),
+                    boot_args=[],
+                    config_data_entries=[],
+                    outdir=OUTDIR,
+                    base_driver_packages_list=[manifest_path],
+                    base_driver_components_files_list=[],
+                    boot_driver_packages_list=[],
+                    boot_driver_components_files_list=[],
+                    shell_commands=dict(),
+                    core_realm_shards=[],
+                    bootfs_files_package=None,
                 )
 
             self.assertEqual(aib.packages, set([]))
@@ -633,7 +594,7 @@ class MakeLegacyConfig(unittest.TestCase):
                 make_package_path(duplicate_package), aib.base_drivers
             )
 
-    def test_different_manifest_same_pkg_name(self):
+    def test_different_manifest_same_pkg_name(self) -> None:
         """
         Asserts that when a package is found in a package set that has a different package
         manifest path, but the same package name, assembly will raise a DuplicatePackageException.
@@ -666,20 +627,19 @@ class MakeLegacyConfig(unittest.TestCase):
                 DuplicatePackageException,
                 partial(
                     make_legacy_config.copy_to_assembly_input_bundle,
-                    base,
-                    [],
-                    [],
-                    [],
-                    KernelInfo(),
-                    [],
-                    [],
-                    OUTDIR,
-                    [],
-                    [],
-                    [],
-                    [],
-                    dict(),
-                    [],
-                    None,
+                    base=base,
+                    cache=[],
+                    bootfs_packages=[],
+                    kernel=KernelInfo(),
+                    boot_args=[],
+                    config_data_entries=[],
+                    outdir=OUTDIR,
+                    base_driver_packages_list=[],
+                    base_driver_components_files_list=[],
+                    boot_driver_packages_list=[],
+                    boot_driver_components_files_list=[],
+                    shell_commands=dict(),
+                    core_realm_shards=[],
+                    bootfs_files_package=None,
                 ),
             )

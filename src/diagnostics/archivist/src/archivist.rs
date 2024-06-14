@@ -2,37 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    accessor::{ArchiveAccessorServer, BatchRetrievalTimeout},
-    component_lifecycle,
-    error::Error,
-    events::{
-        router::{ConsumerConfig, EventRouter, ProducerConfig},
-        sources::EventSource,
-        types::*,
-    },
-    identity::ComponentIdentity,
-    inspect::{repository::InspectRepository, servers::*},
-    logs::{
-        repository::LogsRepository,
-        serial::{SerialConfig, SerialSink},
-        servers::*,
-        KernelDebugLog,
-    },
-    pipeline::Pipeline,
-};
+use crate::accessor::{ArchiveAccessorServer, BatchRetrievalTimeout};
+use crate::component_lifecycle;
+use crate::error::Error;
+use crate::events::router::{ConsumerConfig, EventRouter, ProducerConfig};
+use crate::events::sources::EventSource;
+use crate::events::types::*;
+use crate::identity::ComponentIdentity;
+use crate::inspect::repository::InspectRepository;
+use crate::inspect::servers::*;
+use crate::logs::repository::LogsRepository;
+use crate::logs::serial::{SerialConfig, SerialSink};
+use crate::logs::servers::*;
+use crate::logs::KernelDebugLog;
+use crate::pipeline::Pipeline;
 use archivist_config::Config;
 use fidl_fuchsia_diagnostics::ArchiveAccessorRequestStream;
-use fidl_fuchsia_diagnostics_host as fhost;
 use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
-use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
-use fuchsia_inspect::{component, health::Reporter};
-use fuchsia_zircon as zx;
-use futures::{channel::oneshot, future::abortable, prelude::*};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
+use futures::channel::oneshot;
+use futures::future::abortable;
+use futures::prelude::*;
 use moniker::ExtendedMoniker;
-use std::{path::Path, sync::Arc};
+use std::path::Path;
+use std::sync::Arc;
 use tracing::{debug, error, info, warn};
+use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Responsible for initializing an `Archivist` instance. Supports multiple configurations by
 /// either calling or not calling methods on the builder like `serve_test_controller_protocol`.
@@ -380,24 +377,20 @@ impl Archivist {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        constants::*,
-        events::router::{Dispatcher, EventProducer},
-        logs::testing::*,
-    };
+    use crate::constants::*;
+    use crate::events::router::{Dispatcher, EventProducer};
+    use crate::logs::testing::*;
     use diagnostics_data::LogsData;
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_diagnostics::{
         ClientSelectorConfiguration, DataType, Format, StreamParameters,
     };
-    use fidl_fuchsia_diagnostics_host as fhost;
     use fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkRequestStream};
-    use fidl_fuchsia_io as fio;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
-    use fuchsia_async as fasync;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use std::marker::PhantomData;
+    use {fidl_fuchsia_diagnostics_host as fhost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn init_archivist(fs: &mut ServiceFs<ServiceObj<'static, ()>>) -> Archivist {
         let config = Config {

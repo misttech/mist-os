@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::Cell, iter, num::NonZeroU64};
+use std::cell::Cell;
+use std::iter;
+use std::num::NonZeroU64;
 
 use smallvec::SmallVec;
 
-use crate::{
-    math::{self, Bezier, Mat},
-    renderer::StrokeStyle,
-    shapes::paint::{StrokeCap, StrokeJoin},
-};
+use crate::math::{self, Bezier, Mat};
+use crate::renderer::StrokeStyle;
+use crate::shapes::paint::{StrokeCap, StrokeJoin};
 
 #[derive(Clone, Debug, Default)]
 pub struct CommandPathBuilder {

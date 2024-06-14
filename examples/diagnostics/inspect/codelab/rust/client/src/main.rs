@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_component::BinderMarker,
-    fidl_fuchsia_examples_inspect::ReverserMarker,
-    fuchsia_component::client,
-    fuchsia_zircon::DurationNum,
-    tracing::{error, info},
-};
+use anyhow::Error;
+use fidl_fuchsia_component::BinderMarker;
+use fidl_fuchsia_examples_inspect::ReverserMarker;
+use fuchsia_component::client;
+use fuchsia_zircon::DurationNum;
+use tracing::{error, info};
 
 struct Args {
     strings: Vec<String>,

@@ -1,7 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use std::{cell::RefCell, collections::HashSet, num::NonZeroU64};
+use std::cell::RefCell;
+use std::collections::HashSet;
+use std::num::NonZeroU64;
 
 use fidl_fuchsia_net_dhcp::{ClientExitReason, ClientProviderRequest, ClientProviderRequestStream};
 use fidl_fuchsia_posix_socket_packet as fpacket;
@@ -161,7 +163,11 @@ pub(crate) async fn serve_client_provider(
                             });
                         }
                         crate::client::Error::Fidl(e) => {
-                            tracing::error!("FIDL error while serving client: {:?}", e);
+                            if e.is_closed() {
+                                tracing::warn!("Channel closed while serving client: {:?}", e);
+                            } else {
+                                tracing::error!("FIDL error while serving client: {:?}", e);
+                            }
                         }
                         crate::client::Error::Core(e) => {
                             tracing::error!("error while serving client: {:?}", e);

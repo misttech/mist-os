@@ -6,21 +6,17 @@ mod mocks;
 mod packaged_component;
 mod traits;
 
-use {
-    crate::{
-        mocks::{
-            factory_reset_mock::FactoryResetMock,
-            pointer_injector_mock::PointerInjectorMock,
-            sound_player_mock::{SoundPlayerBehavior, SoundPlayerMock, SoundPlayerRequestName},
-        },
-        packaged_component::PackagedComponent,
-        traits::realm_builder_ext::RealmBuilderExt as _,
-    },
-    fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fuchsia_component_test::{DirectoryContents, RealmBuilder, RealmBuilderParams, RealmInstance},
-    futures::StreamExt,
-    input_synthesis::{modern_backend, synthesizer},
+use crate::mocks::factory_reset_mock::FactoryResetMock;
+use crate::mocks::pointer_injector_mock::PointerInjectorMock;
+use crate::mocks::sound_player_mock::{
+    SoundPlayerBehavior, SoundPlayerMock, SoundPlayerRequestName,
 };
+use crate::packaged_component::PackagedComponent;
+use crate::traits::realm_builder_ext::RealmBuilderExt as _;
+use fidl_fuchsia_ui_pointerinjector as pointerinjector;
+use fuchsia_component_test::{DirectoryContents, RealmBuilder, RealmBuilderParams, RealmInstance};
+use futures::StreamExt;
+use input_synthesis::{modern_backend, synthesizer};
 
 /// Creates a test realm with
 /// a) routes from the given mocks to the input pipeline, and

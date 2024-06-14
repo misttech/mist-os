@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx, futures::lock::Mutex,
-    moniker::Moniker, std::sync::Arc, tracing::*,
-};
+use futures::lock::Mutex;
+use moniker::Moniker;
+use std::sync::Arc;
+use tracing::*;
+use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Any stored data is removed after this amount of time
 const CLEANUP_DEADLINE_SECONDS: i64 = 600;

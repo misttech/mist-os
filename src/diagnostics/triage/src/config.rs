@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::file_io::{config_from_files, diagnostics_from_directory},
-    crate::Options,
-    anyhow::{bail, format_err, Error},
-    fuchsia_triage::{ActionTagDirective, DiagnosticData, ParseResult},
-    std::{path::Path, str::FromStr},
-};
+use crate::file_io::{config_from_files, diagnostics_from_directory};
+use crate::Options;
+use anyhow::{bail, format_err, Error};
+use fuchsia_triage::{ActionTagDirective, DiagnosticData, ParseResult};
+use std::path::Path;
+use std::str::FromStr;
 
 // TODO(https://fxbug.dev/42127533): Add support for CSV.
 #[derive(Debug, PartialEq, Clone)]

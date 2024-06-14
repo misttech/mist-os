@@ -5,13 +5,11 @@
 // This is a temporary solution to use v1 repository configs in pkgctl
 // until there is no longer a need to accept v1 repository configs.
 
-use {
-    anyhow::bail,
-    fidl_fuchsia_pkg as fidl,
-    fidl_fuchsia_pkg_ext::RepositoryStorageType,
-    serde::{Deserialize, Serialize},
-    std::borrow::Cow,
-};
+use anyhow::bail;
+use fidl_fuchsia_pkg as fidl;
+use fidl_fuchsia_pkg_ext::RepositoryStorageType;
+use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(non_snake_case)]

@@ -4,15 +4,14 @@
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        crate::{config::Config, configurator::Configurator},
-        anyhow::Error,
-        async_trait::async_trait,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_component_test::{RealmBuilder, RealmInstance},
-        fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-        futures::stream::TryStreamExt as _,
-    };
+    use crate::config::Config;
+    use crate::configurator::Configurator;
+    use anyhow::Error;
+    use async_trait::async_trait;
+    use fuchsia_component_test::{RealmBuilder, RealmInstance};
+    use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+    use futures::stream::TryStreamExt as _;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     pub struct NullConfigurator {}
 

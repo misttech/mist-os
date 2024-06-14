@@ -9,13 +9,9 @@ use fuchsia_inspect::{
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, Duration};
 use lazy_static::lazy_static;
-use std::{
-    collections::BTreeMap,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, OnceLock,
-    },
-};
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
 
 lazy_static! {
     // Exponential histograms for time in microseconds contains power-of-two intervals
@@ -413,7 +409,8 @@ impl Drop for BatchIteratorConnectionStats {
 mod test {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use fuchsia_inspect::{component, health::Reporter, Inspector};
+    use fuchsia_inspect::health::Reporter;
+    use fuchsia_inspect::{component, Inspector};
 
     #[fuchsia::test]
     fn health() {

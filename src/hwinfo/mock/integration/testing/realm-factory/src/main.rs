@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Error, Result};
+use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker};
+use fidl_test_mock::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
 use {
-    anyhow::{Error, Result},
-    fidl::endpoints::ControlHandle,
-    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_hwinfo as fhwinfo, fidl_fuchsia_hwinfo_mock as fhwinfo_mock,
-    fidl_test_mock::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_zircon_status as zx_status,
-    futures::{StreamExt, TryStreamExt},
-    tracing::*,
+    fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
 };
 
 #[fuchsia::main(logging = true)]

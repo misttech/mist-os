@@ -220,7 +220,6 @@ class AmlCpuEnvironment : public fdf_testing::Environment {
                   .status_value());
 
     power_server_.SetVoltage(0);
-    power_server_.SetSupportedVoltageRange(0, 0);
     EXPECT_OK(to_driver_vfs
                   .AddService<fuchsia_hardware_power::Service>(power_server_.GetInstanceHandler(),
                                                                "power-01")

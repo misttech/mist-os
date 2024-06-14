@@ -8,11 +8,9 @@
 macro_rules! impl_traits {
     ($ty:ident) => {
         mod __private_bitflags_serde_legacy {
-            use {
-                ::bitflags::Flags,
-                ::serde::{de, Deserialize, Serialize},
-                ::std::marker::PhantomData,
-            };
+            use ::bitflags::Flags;
+            use ::serde::{de, Deserialize, Serialize};
+            use ::std::marker::PhantomData;
 
             #[derive(Serialize, Deserialize)]
             struct Helper {

@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    cm_fidl_analyzer::component_model::ComponentModelForAnalyzer,
-    scrutiny::prelude::*,
-    serde::{Deserialize, Serialize},
-    std::{collections::HashSet, path::PathBuf, sync::Arc},
-};
+use cm_fidl_analyzer::component_model::ComponentModelForAnalyzer;
+use scrutiny::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Deserialize, Serialize)]
 pub struct V2ComponentModel {

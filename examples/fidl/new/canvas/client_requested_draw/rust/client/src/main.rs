@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    config::Config,
-    fidl_examples_canvas_clientrequesteddraw::{InstanceEvent, InstanceMarker, Point},
-    fuchsia_component::client::connect_to_protocol,
-    futures::TryStreamExt,
-    std::{thread, time},
-};
+use anyhow::{format_err, Context as _, Error};
+use config::Config;
+use fidl_examples_canvas_clientrequesteddraw::{InstanceEvent, InstanceMarker, Point};
+use fuchsia_component::client::connect_to_protocol;
+use futures::TryStreamExt;
+use std::{thread, time};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

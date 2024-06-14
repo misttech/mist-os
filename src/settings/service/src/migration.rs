@@ -428,13 +428,12 @@ pub(crate) struct LastMigration {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_io as fio;
     use fidl_fuchsia_io::DirectoryMarker;
-    use fuchsia_async as fasync;
     use futures::future::BoxFuture;
     use futures::FutureExt;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[async_trait]
     impl<T> Migration for (u64, T)

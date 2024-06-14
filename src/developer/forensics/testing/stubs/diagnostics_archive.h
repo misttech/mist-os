@@ -11,7 +11,7 @@
 #include <algorithm>
 
 #include "src/developer/forensics/testing/stubs/diagnostics_batch_iterator.h"
-#include "src/developer/forensics/testing/stubs/fidl_server.h"
+#include "src/developer/forensics/testing/stubs/fidl_server_hlcpp.h"
 
 namespace forensics {
 namespace stubs {

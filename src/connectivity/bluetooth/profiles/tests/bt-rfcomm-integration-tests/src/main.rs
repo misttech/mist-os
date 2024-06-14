@@ -2,20 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol},
-    bt_rfcomm::ServerChannel,
-    fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_bluetooth::profile::{l2cap_connect_parameters, Psm},
-    fuchsia_bluetooth::types::{Channel, PeerId, Uuid},
-    fuchsia_component_test::{Capability, RealmInstance},
-    fuchsia_zircon::Duration,
-    futures::stream::StreamExt,
-    mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember},
-    profile_client::{ProfileClient, ProfileEvent},
-    std::pin::pin,
-};
+use bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol};
+use bt_rfcomm::ServerChannel;
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_async::{DurationExt, TimeoutExt};
+use fuchsia_bluetooth::profile::{l2cap_connect_parameters, Psm};
+use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
+use fuchsia_component_test::{Capability, RealmInstance};
+use fuchsia_zircon::Duration;
+use futures::stream::StreamExt;
+use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
+use profile_client::{ProfileClient, ProfileEvent};
+use std::pin::pin;
 
 /// RFCOMM component URL.
 /// The RFCOMM component is a unique component in that it functions as a proxy for the

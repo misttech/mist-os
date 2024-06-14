@@ -5,12 +5,10 @@ use crate::{Connector, Message};
 use derivative::Derivative;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_component_sandbox as fsandbox;
-use futures::{
-    channel::mpsc::{self, UnboundedReceiver},
-    future::{self, Either},
-    lock::Mutex,
-    StreamExt,
-};
+use futures::channel::mpsc::{self, UnboundedReceiver};
+use futures::future::{self, Either};
+use futures::lock::Mutex;
+use futures::StreamExt;
 use std::pin::pin;
 use std::sync::Arc;
 

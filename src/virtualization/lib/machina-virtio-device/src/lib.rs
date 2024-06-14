@@ -19,25 +19,20 @@ pub use bell::{BellError, GuestBellTrap};
 pub use mem::{guest_mem_from_vmo, translate_queue, GuestMem};
 pub use notify::NotifyEvent;
 
-use {
-    fidl_fuchsia_virtualization_hardware::{
-        StartInfo, VirtioDeviceReadyResponder, VirtioDeviceRequest, VirtioDeviceRequestStream,
-    },
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{self as zx},
-    futures::{task::AtomicWaker, Stream, TryFutureExt, TryStreamExt},
-    std::{
-        collections::{hash_map, HashMap},
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    thiserror::Error,
-    virtio_device::{
-        mem::DriverMem,
-        queue::{DescChain, DriverNotify, Queue},
-        util::DescChainStream,
-    },
+use fidl_fuchsia_virtualization_hardware::{
+    StartInfo, VirtioDeviceReadyResponder, VirtioDeviceRequest, VirtioDeviceRequestStream,
 };
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{self as zx};
+use futures::task::AtomicWaker;
+use futures::{Stream, TryFutureExt, TryStreamExt};
+use std::collections::{hash_map, HashMap};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use thiserror::Error;
+use virtio_device::mem::DriverMem;
+use virtio_device::queue::{DescChain, DriverNotify, Queue};
+use virtio_device::util::DescChainStream;
 
 #[derive(Error, Debug)]
 pub enum DeviceError {

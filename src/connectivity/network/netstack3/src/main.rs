@@ -12,7 +12,7 @@ mod bindings;
 use argh::FromArgs;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 
-use bindings::{NetstackSeed, Service};
+use bindings::{InspectPublisher, NetstackSeed, Service};
 
 /// Netstack3.
 ///
@@ -69,6 +69,8 @@ pub fn main() {
         .add_fidl_service(Service::RootRoutesV6)
         .add_fidl_service(Service::Interfaces)
         .add_fidl_service(Service::InterfacesAdmin)
+        .add_fidl_service(Service::MulticastAdminV4)
+        .add_fidl_service(Service::MulticastAdminV6)
         .add_fidl_service(Service::FilterState)
         .add_fidl_service(Service::FilterControl)
         .add_fidl_service(Service::Neighbor)
@@ -77,12 +79,9 @@ pub fn main() {
 
     let seed = NetstackSeed::default();
 
-    let inspector = fuchsia_inspect::component::inspector();
-    let _inspect_server_task =
-        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
-            .expect("publish Inspect task");
+    let inspect_publisher = InspectPublisher::new();
 
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle().expect("directory handle");
 
-    executor.run(seed.serve(fs, inspector))
+    executor.run(seed.serve(fs, inspect_publisher))
 }

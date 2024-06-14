@@ -2,16 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    proc_macro2::TokenStream,
-    quote::ToTokens,
-    syn::{
-        braced, parenthesized,
-        parse::{Parse, ParseStream},
-        punctuated::Punctuated,
-        token, Ident, LitInt, Path, Result, Token, Type,
-    },
-};
+use proc_macro2::TokenStream;
+use quote::ToTokens;
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
+use syn::{braced, parenthesized, token, Ident, LitInt, Path, Result, Token, Type};
 
 pub enum BitRange {
     Closed { start_inclusive: LitInt, separator: Token![..=], end_inclusive: LitInt },

@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_pkg as fpkg,
-    futures::{future::TryFutureExt as _, stream::Stream},
-};
+use fidl_fuchsia_pkg as fpkg;
+use futures::future::TryFutureExt as _;
+use futures::stream::Stream;
 
 /// Converts a proxy to a FIDL iterator like:
 ///
@@ -45,16 +44,12 @@ impl FidlIterator for fpkg::BlobInfoIteratorProxy {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::{ControlHandle as _, Responder as _},
-        fuchsia_zircon_status::Status,
-        futures::{
-            future::join,
-            stream::{StreamExt as _, TryStreamExt as _},
-        },
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{ControlHandle as _, Responder as _};
+    use fuchsia_zircon_status::Status;
+    use futures::future::join;
+    use futures::stream::{StreamExt as _, TryStreamExt as _};
 
     struct MockIteratorServer {
         reqs: fpkg::BlobInfoIteratorRequestStream,

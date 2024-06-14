@@ -8,22 +8,17 @@ use core::marker::PhantomData;
 
 use netstack3_base::{ContextPair, Device, DeviceIdContext, WorkQueueReport};
 
-use crate::internal::{
-    base::DeviceSendFrameError,
-    queue::{
-        fifo,
-        rx::{
-            ReceiveDequeContext, ReceiveDequeFrameContext as _, ReceiveQueueBindingsContext,
-            ReceiveQueueContext as _, ReceiveQueueState,
-        },
-        tx::{
-            self, TransmitDequeueContext, TransmitQueueBindingsContext, TransmitQueueCommon,
-            TransmitQueueConfiguration, TransmitQueueContext as _, TransmitQueueState,
-        },
-        DequeueResult, DequeueState, MAX_BATCH_SIZE,
-    },
-    socket::DeviceSocketHandler,
+use crate::internal::base::DeviceSendFrameError;
+use crate::internal::queue::rx::{
+    ReceiveDequeContext, ReceiveDequeFrameContext as _, ReceiveQueueBindingsContext,
+    ReceiveQueueContext as _, ReceiveQueueState,
 };
+use crate::internal::queue::tx::{
+    self, TransmitDequeueContext, TransmitQueueBindingsContext, TransmitQueueCommon,
+    TransmitQueueConfiguration, TransmitQueueContext as _, TransmitQueueState,
+};
+use crate::internal::queue::{fifo, DequeueResult, DequeueState, MAX_BATCH_SIZE};
+use crate::internal::socket::DeviceSocketHandler;
 
 /// An API to interact with device `D` transmit queues.
 pub struct TransmitQueueApi<D, C>(C, PhantomData<D>);

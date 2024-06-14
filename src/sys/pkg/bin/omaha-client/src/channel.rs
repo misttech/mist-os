@@ -4,8 +4,7 @@
 
 use channel_config::ChannelConfigs;
 use serde::Deserialize;
-use std::fs;
-use std::io;
+use std::{fs, io};
 
 const CHANNEL_CONFIG_PATH: &str = "/config/data/channel_config.json";
 

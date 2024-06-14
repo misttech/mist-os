@@ -303,7 +303,7 @@ inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ExampleUseOfErrorSyntaxC
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type {};
+struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> {
@@ -315,14 +315,14 @@ struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailReq
 };
 
 template <>
-struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type {};
+struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, 16> {};
 
 template <>
-struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type {};
+struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> {
@@ -334,14 +334,14 @@ struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRes
 };
 
 template <>
-struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type {};
+struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, 8> {};
 
 template <>
-struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type {};
+struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> {
@@ -353,7 +353,7 @@ struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRes
 };
 
 template <>
-struct IsUnion<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type {};
+struct IsUnion<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult, ::fidl::internal::NaturalCodingConstraintEmpty> final

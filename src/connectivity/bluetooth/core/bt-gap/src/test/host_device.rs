@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_bluetooth_host::{
-        BondingDelegateRequestStream, DiscoverySessionRequestStream, HostControlHandle, HostMarker,
-        HostRequest, HostRequestStream,
-    },
-    fidl_fuchsia_bluetooth_sys::HostInfo as FidlHostInfo,
-    fuchsia_bluetooth::types::{
-        bonding_data::example, Address, BondingData, HostId, HostInfo, Peer, PeerId,
-    },
-    fuchsia_sync::RwLock,
-    futures::{future, future::Either, join, pin_mut, stream::StreamExt, FutureExt},
-    std::sync::Arc,
-    test_util::assert_gt,
+use anyhow::{format_err, Error};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_bluetooth_host::{
+    BondingDelegateRequestStream, DiscoverySessionRequestStream, HostControlHandle, HostMarker,
+    HostRequest, HostRequestStream,
 };
+use fidl_fuchsia_bluetooth_sys::HostInfo as FidlHostInfo;
+use fuchsia_bluetooth::types::bonding_data::example;
+use fuchsia_bluetooth::types::{Address, BondingData, HostId, HostInfo, Peer, PeerId};
+use fuchsia_sync::RwLock;
+use futures::future::Either;
+use futures::stream::StreamExt;
+use futures::{future, join, pin_mut, FutureExt};
+use std::sync::Arc;
+use test_util::assert_gt;
 
-use crate::host_device::{test::FakeHostServer, HostDevice, HostListener};
+use crate::host_device::test::FakeHostServer;
+use crate::host_device::{HostDevice, HostListener};
 
 // An impl that ignores all events
 impl HostListener for () {

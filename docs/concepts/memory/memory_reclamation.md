@@ -284,20 +284,20 @@ pmm drop_user_pt                             : drop all user hardware page table
 
 ### Observing and generating memory pressure
 
-Use the `k pmm mem_avail_state` command to generate memory pressure on the
+Use the `k mem mem_avail_state` command to generate memory pressure on the
 system, by allocating memory to reach the specified memory pressure level. This
 is useful for testing system-wide response to memory pressure:
 
 ```posix-terminal
-k pmm mem_avail_state
-pmm mem_avail_state info                     : dump memory availability state info
-pmm mem_avail_state [step] <state> [<nsecs>] : allocate memory to go to memstate <state>, hold the state for <nsecs> (10s by default). Only works if going to <state> from current state requires allocating memory, can't free up pre-allocated memory. In optional [step] mode, allocation pauses for 1 second at each intermediate memory availability state until <state> is reached.
+k mem avail_state
+mem avail_state info                     : dump memory availability state info
+mem avail_state [step] <state> [<nsecs>] : allocate memory to go to memstate <state>, hold the state for <nsecs> (10s by default). Only works if going to <state> from current state requires allocating memory, can't free up pre-allocated memory. In optional [step] mode, allocation pauses for 1 second at each intermediate memory availability state until <state> is reached.
 ```
 
-`k pmm mem_avail_state info` dumps the current memory pressure state.
+`k mem mem_avail_state info` dumps the current memory pressure state.
 
 ```posix-terminal
-k pmm mem_avail_state info
+k mem avail_state info
 watermarks: [50M, 60M, 150M, 300M]
 debounce: 1M
 current state: 4
@@ -344,7 +344,7 @@ level, which is set to `UINT64_MAX` here.
 
 Lastly, the total `free memory` on the system is currently 7253.5MB.
 
-Use the command `k pmm mem_avail_state X` to transition to memory availability
+Use the command `k mem avail_state X` to transition to memory availability
 state `X`, where `X` is the numerical memory state as described above.
 Optionally provide a duration for which the requested state is to be held. There
 is also an option to "step" through intermediate states, pausing at each of
@@ -353,7 +353,7 @@ them.
 For example,  this triggers a transition to the `Critical` memory state:
 
 ```posix-terminal
-k pmm mem_avail_state 2
+k mem avail_state 2
 memory-pressure: memory availability state - Critical
 pq: MRU generation is 714 set 4.144414945s ago due to "Active ratio", LRU generation is 708
 pq: Pager buckets [3482],[115],317,0,199,0,{6939},0, evict first: 0, live active/inactive totals: 3597/7455
@@ -375,24 +375,24 @@ allocated pages were freed up, and the memory pressure dropped back to `Normal`.
 The `Critical` state transition caused some pager-backed memory to be evicted as
 well, as can be seen by the `[EVICT]` lines.
 
-The `k pmm mem_avail_state` command is a useful tool to test memory pressure
+The `k mem avail_state` command is a useful tool to test memory pressure
 response of the system as a whole. Since it works by allocating actual physical
 memory, it exercises all the reclamation mechanisms the system has at its
 disposal, both within the kernel and in userspace.
 
-These are additional `k pmm oom` commands used to test system response
+These are additional `k mem oom` commands used to test system response
 specifically at the OOM level.
 
 ```none {:.devsite-disable-click-to-copy}l
-pmm oom [<rate>]                             : leak memory until oom is triggered, optionally specify the rate at which to leak (in MB per second)
-pmm oom hard                                 : leak memory aggressively and keep on leaking
-pmm oom signal                               : trigger oom signal without leaking memory
+mem oom [<rate>]                             : leak memory until oom is triggered, optionally specify the rate at which to leak (in MB per second)
+mem oom hard                                 : leak memory aggressively and keep on leaking
+mem oom signal                               : trigger oom signal without leaking memory
 ```
 
-Sample output with `k pmm oom`:
+Sample output with `k mem oom`:
 
 ```posix-terminal
-k pmm oom
+k mem oom
 Disabling VM scanner
 memory-pressure: free memory is 49MB, evicting pages to prevent OOM...
 pq: MRU generation is 13 set 7.979442243s ago due to "Active ratio", LRU generation is 7

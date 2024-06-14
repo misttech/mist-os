@@ -2,20 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        lsm_tree::{
-            merge::{
-                ItemOp::{Discard, Keep, Replace},
-                MergeLayerIterator, MergeResult,
-            },
-            types::{Item, LayerIterator},
-        },
-        object_store::allocator::{AllocatorKey, AllocatorValue},
-    },
-    anyhow::Error,
-    std::collections::HashSet,
-};
+use crate::lsm_tree::merge::ItemOp::{Discard, Keep, Replace};
+use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
+use crate::lsm_tree::types::{Item, LayerIterator};
+use crate::object_store::allocator::{AllocatorKey, AllocatorValue};
+use anyhow::Error;
+use std::collections::HashSet;
 
 pub fn merge(
     left: &MergeLayerIterator<'_, AllocatorKey, AllocatorValue>,
@@ -161,21 +153,13 @@ pub async fn filter_marked_for_deletion(
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{
-            lsm_tree::{
-                cache::NullCache,
-                types::{Item, ItemRef, LayerIterator},
-                LSMTree,
-            },
-            object_handle::INVALID_OBJECT_ID,
-            object_store::allocator::{
-                merge::{filter_tombstones, merge},
-                AllocatorKey, AllocatorValue,
-            },
-        },
-        std::ops::{Bound, Range},
-    };
+    use crate::lsm_tree::cache::NullCache;
+    use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+    use crate::lsm_tree::LSMTree;
+    use crate::object_handle::INVALID_OBJECT_ID;
+    use crate::object_store::allocator::merge::{filter_tombstones, merge};
+    use crate::object_store::allocator::{AllocatorKey, AllocatorValue};
+    use std::ops::{Bound, Range};
 
     // Tests merge logic given (range, delta and object_id) for left, right and expected output.
     async fn test_merge(

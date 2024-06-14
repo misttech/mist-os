@@ -9,19 +9,15 @@ mod service;
 mod watchable_map;
 mod watcher_service;
 
-use {
-    anyhow::Error,
-    fuchsia_async as fasync,
-    fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-    fuchsia_inspect::{Inspector, InspectorConfig},
-    futures::{
-        channel::mpsc,
-        future::{try_join4, BoxFuture},
-        StreamExt, TryFutureExt,
-    },
-    std::sync::Arc,
-    tracing::{error, info},
-};
+use anyhow::Error;
+use fuchsia_async as fasync;
+use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+use fuchsia_inspect::{Inspector, InspectorConfig};
+use futures::channel::mpsc;
+use futures::future::{try_join4, BoxFuture};
+use futures::{StreamExt, TryFutureExt};
+use std::sync::Arc;
+use tracing::{error, info};
 
 const PHY_PATH: &'static str = "/dev/class/wlanphy";
 

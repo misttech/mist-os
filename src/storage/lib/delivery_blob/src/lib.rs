@@ -21,16 +21,12 @@
 //! file.set_len(payload.len() as u64).unwrap();
 //! file.write_all(&payload).unwrap();
 
-use {
-    crate::{
-        compression::{ChunkedArchive, ChunkedDecompressor},
-        format::SerializedType1Blob,
-    },
-    serde::{Deserialize, Serialize},
-    static_assertions::assert_eq_size,
-    thiserror::Error,
-    zerocopy::{AsBytes, Ref},
-};
+use crate::compression::{ChunkedArchive, ChunkedDecompressor};
+use crate::format::SerializedType1Blob;
+use serde::{Deserialize, Serialize};
+use static_assertions::assert_eq_size;
+use thiserror::Error;
+use zerocopy::{AsBytes, Ref};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -365,7 +361,8 @@ impl Type1Blob {
 #[cfg(test)]
 mod tests {
 
-    use {super::*, rand::Rng};
+    use super::*;
+    use rand::Rng;
 
     const DATA_LEN: usize = 500_000;
 

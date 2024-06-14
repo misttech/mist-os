@@ -2,25 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap},
-        error::RoutingError,
-        DictExt, LazyGet, WithAvailability,
-    },
-    async_trait::async_trait,
-    cm_rust::{ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
-    cm_types::{IterablePath, Name, SeparatedPath},
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
-    futures::FutureExt,
-    itertools::Itertools,
-    moniker::{ChildName, Moniker},
-    router_error::RouterError,
-    sandbox::{Capability, Dict, Request, Router, Unit},
-    std::{collections::HashMap, fmt::Debug},
-    tracing::warn,
-};
+use crate::bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap};
+use crate::error::RoutingError;
+use crate::{DictExt, LazyGet, WithAvailability};
+use async_trait::async_trait;
+use cm_rust::{ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon};
+use cm_types::{IterablePath, Name, SeparatedPath};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use futures::FutureExt;
+use itertools::Itertools;
+use moniker::{ChildName, Moniker};
+use router_error::RouterError;
+use sandbox::{Capability, Dict, Request, Router, Unit};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use tracing::warn;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 /// A component's sandbox holds all the routing dictionaries that a component has once its been
 /// resolved.

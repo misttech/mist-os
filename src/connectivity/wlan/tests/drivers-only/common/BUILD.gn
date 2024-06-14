@@ -10,6 +10,8 @@ rustc_library("common") {
   deps = [
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
+    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//sdk/lib/device-watcher/rust",
     "//src/connectivity/wlan/tests/helpers/realm-factory/fidl:test.wlan.realm_rust",
@@ -19,6 +21,8 @@ rustc_library("common") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/testing/realm_client/rust",
+    "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:rand",
     "//third_party/rust_crates:tracing",
   ]
   sources = [

@@ -270,7 +270,10 @@ zx::result<> Vout::SetFrameVisibility(bool frame_visible) {
     case VoutType::kDsi:
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     case VoutType::kHdmi:
-      hdmi_.hdmi_host->ReplaceEncoderPixelColorWithBlack(!frame_visible);
+      // On HDMI video output, when the frames are invisible, the encoder
+      // outputs a **green** background indicating that the display engine
+      // front end is idle.
+      hdmi_.hdmi_host->ReplaceEncoderPixelColorWithGreen(!frame_visible);
       return zx::ok();
   }
 }

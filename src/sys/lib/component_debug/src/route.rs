@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Result},
-    fidl_fuchsia_sys2 as fsys,
-    moniker::{ExtendedMoniker, Moniker},
-    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
-    std::fmt,
-};
+use anyhow::{format_err, Result};
+use fidl_fuchsia_sys2 as fsys;
+use moniker::{ExtendedMoniker, Moniker};
+use prettytable::format::consts::FORMAT_CLEAN;
+use prettytable::{cell, row, Table};
+use std::fmt;
 
 const SUCCESS_SUMMARY: &'static str = "Success";
 
@@ -174,10 +173,11 @@ fn add_report(report: RouteReport, table: &mut Table) {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, assert_matches::assert_matches, fidl::endpoints, fuchsia_async as fasync,
-        futures::TryStreamExt,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints;
+    use fuchsia_async as fasync;
+    use futures::TryStreamExt;
 
     fn route_validator(
         expected_moniker: &'static str,

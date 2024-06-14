@@ -5,23 +5,24 @@
 // Wrappers for BoringSSL primitive types needed for SAE. Mundane does not provide implementations
 // for these types. All calls into BoringSSL are unsafe.
 
-use {
-    anyhow::{format_err, Error},
-    bssl_sys::{
-        BN_CTX_free, BN_CTX_new, BN_add, BN_asc2bn, BN_bin2bn, BN_bn2bin, BN_bn2dec, BN_cmp,
-        BN_copy, BN_equal_consttime, BN_free, BN_is_odd, BN_is_one, BN_is_zero, BN_mod_add,
-        BN_mod_exp, BN_mod_inverse, BN_mod_mul, BN_mod_sqr, BN_mod_sqrt, BN_new, BN_nnmod,
-        BN_num_bits, BN_num_bytes, BN_one, BN_rand_range, BN_rshift1, BN_set_negative, BN_set_u64,
-        BN_sub, BN_zero, EC_GROUP_free, EC_GROUP_get_curve_GFp, EC_GROUP_get_order,
-        EC_GROUP_new_by_curve_name, EC_POINT_add, EC_POINT_free,
-        EC_POINT_get_affine_coordinates_GFp, EC_POINT_invert, EC_POINT_is_at_infinity,
-        EC_POINT_mul, EC_POINT_new, EC_POINT_set_affine_coordinates_GFp, ERR_get_error,
-        ERR_reason_error_string, NID_X9_62_prime256v1, NID_secp384r1, NID_secp521r1, OPENSSL_free,
-        BIGNUM, BN_CTX, EC_GROUP, EC_POINT,
-    },
-    num_derive::{FromPrimitive, ToPrimitive},
-    std::{cmp::Ordering, convert::TryInto, ffi::CString, fmt, ptr::NonNull},
+use anyhow::{format_err, Error};
+use bssl_sys::{
+    BN_CTX_free, BN_CTX_new, BN_add, BN_asc2bn, BN_bin2bn, BN_bn2bin, BN_bn2dec, BN_cmp, BN_copy,
+    BN_equal_consttime, BN_free, BN_is_odd, BN_is_one, BN_is_zero, BN_mod_add, BN_mod_exp,
+    BN_mod_inverse, BN_mod_mul, BN_mod_sqr, BN_mod_sqrt, BN_new, BN_nnmod, BN_num_bits,
+    BN_num_bytes, BN_one, BN_rand_range, BN_rshift1, BN_set_negative, BN_set_u64, BN_sub, BN_zero,
+    EC_GROUP_free, EC_GROUP_get_curve_GFp, EC_GROUP_get_order, EC_GROUP_new_by_curve_name,
+    EC_POINT_add, EC_POINT_free, EC_POINT_get_affine_coordinates_GFp, EC_POINT_invert,
+    EC_POINT_is_at_infinity, EC_POINT_mul, EC_POINT_new, EC_POINT_set_affine_coordinates_GFp,
+    ERR_get_error, ERR_reason_error_string, NID_X9_62_prime256v1, NID_secp384r1, NID_secp521r1,
+    OPENSSL_free, BIGNUM, BN_CTX, EC_GROUP, EC_POINT,
 };
+use num_derive::{FromPrimitive, ToPrimitive};
+use std::cmp::Ordering;
+use std::convert::TryInto;
+use std::ffi::CString;
+use std::fmt;
+use std::ptr::NonNull;
 
 fn ptr_or_error<T>(ptr: *mut T) -> Result<NonNull<T>, Error> {
     match NonNull::new(ptr) {

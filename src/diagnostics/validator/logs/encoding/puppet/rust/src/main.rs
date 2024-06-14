@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    diagnostics_log_encoding::encode::{Encoder, EncodingError},
-    fidl_fuchsia_mem::Buffer,
-    fidl_fuchsia_validate_logs::{EncodingPuppetRequest, EncodingPuppetRequestStream, PuppetError},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon::Vmo,
-    futures::prelude::*,
-    std::io::Cursor,
-    tracing::*,
-};
+use anyhow::{format_err, Error};
+use diagnostics_log_encoding::encode::{Encoder, EncodingError};
+use fidl_fuchsia_mem::Buffer;
+use fidl_fuchsia_validate_logs::{EncodingPuppetRequest, EncodingPuppetRequestStream, PuppetError};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_zircon::Vmo;
+use futures::prelude::*;
+use std::io::Cursor;
+use tracing::*;
 
 const BUFFER_SIZE: usize = 1024;
 

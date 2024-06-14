@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{filesystem::MountedFilesystemInstance, CacheClearableFilesystem, Filesystem},
-    async_trait::async_trait,
-    futures::lock::Mutex,
-    std::{
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
-    tempfile::TempDir,
-};
+use crate::filesystem::MountedFilesystemInstance;
+use crate::{CacheClearableFilesystem, Filesystem};
+use async_trait::async_trait;
+use futures::lock::Mutex;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tempfile::TempDir;
 
 /// Filesystem implementation that records `clear_cache` calls for validating warm and cold
 /// benchmarks.

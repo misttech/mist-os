@@ -5,23 +5,18 @@
 use anyhow::{Context as _, Result};
 use logging::LogFormat;
 use rand::Rng;
-use std::{
-    fs::{create_dir_all, remove_file, rename, File, OpenOptions},
-    io::{ErrorKind, Read, Seek, SeekFrom, Write},
-    path::{Path, PathBuf},
-    str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex, MutexGuard, OnceLock, RwLock,
-    },
-};
+use std::fs::{create_dir_all, remove_file, rename, File, OpenOptions};
+use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, RwLock};
 use tracing::Metadata;
-use tracing_subscriber::{
-    filter::{self, LevelFilter},
-    fmt::{writer::BoxMakeWriter, TestWriter},
-    prelude::*,
-    Layer,
-};
+use tracing_subscriber::filter::{self, LevelFilter};
+use tracing_subscriber::fmt::writer::BoxMakeWriter;
+use tracing_subscriber::fmt::TestWriter;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::Layer;
 
 use crate::EnvironmentContext;
 

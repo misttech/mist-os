@@ -6,17 +6,15 @@
 
 #![deny(missing_docs)]
 
-use {
-    anyhow::{bail, Context, Error},
-    byteorder::{LittleEndian, WriteBytesExt},
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::directory::{readdir_recursive, DirEntry, DirentKind},
-    fuchsia_zircon as zx,
-    futures::StreamExt,
-    remote_block_device::{cache::Cache, RemoteBlockClientSync},
-    std::io::Write,
-};
+use anyhow::{bail, Context, Error};
+use byteorder::{LittleEndian, WriteBytesExt};
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fuchsia_fs::directory::{readdir_recursive, DirEntry, DirentKind};
+use futures::StreamExt;
+use remote_block_device::cache::Cache;
+use remote_block_device::RemoteBlockClientSync;
+use std::io::Write;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 const FACTORYFS_MAGIC: u64 = 0xa55d3ff91e694d21;
 const BLOCK_SIZE: u32 = 4096;
@@ -340,16 +338,14 @@ mod tests {
         SUPERBLOCK_DATA_SIZE,
     };
 
-    use {
-        assert_matches::assert_matches,
-        fidl::endpoints,
-        fidl_fuchsia_io as fio,
-        ramdevice_client::RamdiskClient,
-        vfs::{
-            directory::entry_container::Directory, execution_scope::ExecutionScope,
-            file::vmo::read_only, pseudo_directory,
-        },
-    };
+    use assert_matches::assert_matches;
+    use fidl::endpoints;
+    use fidl_fuchsia_io as fio;
+    use ramdevice_client::RamdiskClient;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::read_only;
+    use vfs::pseudo_directory;
 
     #[test]
     fn test_num_blocks() {

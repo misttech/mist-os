@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {proc_macro::TokenStream, version_history_shared::version_history};
+use proc_macro::TokenStream;
+use version_history_shared::version_history;
 
 #[proc_macro]
 pub fn declare_version_history(_tokens: TokenStream) -> TokenStream {

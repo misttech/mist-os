@@ -2,86 +2,59 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::HashMap,
-    pin::pin,
-    sync::{Arc, Once},
-};
+use std::collections::HashMap;
+use std::pin::pin;
+use std::sync::{Arc, Once};
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_neighbor as fnet_neighbor;
-use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
-use fidl_fuchsia_netemul_network as net;
-use fuchsia_async as fasync;
-use futures::{channel::mpsc, StreamExt as _, TryFutureExt as _};
+use futures::channel::mpsc;
+use futures::{StreamExt as _, TryFutureExt as _};
+use ip_test_macro::ip_test;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
-use net_types::{
-    ethernet::Mac,
-    ip::{AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6},
-    SpecifiedAddr, Witness as _,
-};
-use netstack3_core::{
-    device::{DeviceId, EthernetLinkDevice},
-    error::AddressResolutionFailed,
-    ip::{Ipv6DeviceConfigurationUpdate, StableIidSecret},
-    neighbor::LinkResolutionResult,
-    routes::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
-};
-use tracing::Subscriber;
-use tracing_subscriber::{
-    fmt::{
-        format::{self, FormatEvent, FormatFields},
-        FmtContext,
-    },
-    registry::LookupSpan,
+use net_types::ethernet::Mac;
+use net_types::ip::{AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6};
+use net_types::{SpecifiedAddr, Witness as _};
+use netstack3_core::device::{DeviceId, EthernetLinkDevice};
+use netstack3_core::error::AddressResolutionFailed;
+use netstack3_core::ip::{Ipv6DeviceConfigurationUpdate, StableIidSecret};
+use netstack3_core::neighbor::LinkResolutionResult;
+use netstack3_core::routes::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric};
+use {
+    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_neighbor as fnet_neighbor,
+    fidl_fuchsia_net_stack as fidl_net_stack, fidl_fuchsia_netemul_network as net,
+    fuchsia_async as fasync,
 };
 
-use crate::bindings::{
-    ctx::BindingsCtx,
-    devices::{BindingId, Devices},
-    routes,
-    util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
-    Ctx, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
-};
-
-struct LogFormatter;
-
-impl<S, N> FormatEvent<S, N> for LogFormatter
-where
-    S: Subscriber + for<'a> LookupSpan<'a>,
-    N: for<'a> FormatFields<'a> + 'static,
-{
-    fn format_event(
-        &self,
-        ctx: &FmtContext<'_, S, N>,
-        mut writer: format::Writer<'_>,
-        event: &tracing::Event<'_>,
-    ) -> std::fmt::Result {
-        write!(
-            writer,
-            "[{}] ({}) ",
-            event.metadata().level(),
-            event.metadata().module_path().unwrap_or("")
-        )?;
-        ctx.format_fields(writer.by_ref(), event)?;
-        writeln!(writer)
-    }
-}
-
-static LOGGER_ONCE: Once = Once::new();
+use crate::bindings::ctx::BindingsCtx;
+use crate::bindings::devices::{BindingId, Devices};
+use crate::bindings::util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _};
+use crate::bindings::{routes, Ctx, InspectPublisher, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME};
 
 /// Install a logger for tests.
 pub(crate) fn set_logger_for_test() {
-    // `init` will panic if called multiple times; using a Once makes
+    struct Logger;
+
+    impl log::Log for Logger {
+        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record<'_>) {
+            println!("[{}] ({}) {}", record.level(), record.target(), record.args())
+        }
+
+        fn flush(&self) {}
+    }
+
+    static LOGGER_ONCE: Once = Once::new();
+
+    // log::set_logger will panic if called multiple times; using a Once makes
     // set_logger_for_test idempotent
     LOGGER_ONCE.call_once(|| {
-        tracing_subscriber::fmt()
-            .event_format(LogFormatter)
-            .with_max_level(tracing::Level::TRACE)
-            .init();
+        log::set_logger(&Logger).unwrap();
+        log::set_max_level(log::LevelFilter::Trace);
     })
 }
 
@@ -266,8 +239,10 @@ impl TestStack {
         let inspector = Arc::new(fuchsia_inspect::Inspector::default());
         let netstack = seed.netstack.clone();
         let inspector_cloned = inspector.clone();
-        let task =
-            fasync::Task::spawn(async move { seed.serve(services, &inspector_cloned).await });
+        let task = fasync::Task::spawn(async move {
+            let inspect_publisher = InspectPublisher::new_for_test(&inspector_cloned);
+            seed.serve(services, inspect_publisher).await
+        });
 
         Self {
             netstack,
@@ -1070,22 +1045,11 @@ impl IpExt for Ipv6 {
     const FIDL_IP_VERSION: fidl_net::IpVersion = fidl_net::IpVersion::V6;
 }
 
-// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn add_remove_neighbor_entry_v4() {
-    add_remove_neighbor_entry::<Ipv4>().await
-}
-
-// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn add_remove_neighbor_entry_v6() {
-    add_remove_neighbor_entry::<Ipv6>().await
-}
-
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
+#[fixture::teardown(TestSetup::shutdown)]
+#[ip_test(I)]
+#[fasync::run_singlethreaded]
+async fn add_remove_neighbor_entry<I: IpExt>() {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
         .add_endpoint()
@@ -1137,22 +1101,11 @@ async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     t
 }
 
-// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn remove_dynamic_neighbor_entry_v4() {
-    remove_dynamic_neighbor_entry::<Ipv4>().await
-}
-
-// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn remove_dynamic_neighbor_entry_v6() {
-    remove_dynamic_neighbor_entry::<Ipv6>().await
-}
-
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-async fn remove_dynamic_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
+#[fixture::teardown(TestSetup::shutdown)]
+#[ip_test(I)]
+#[fasync::run_singlethreaded]
+async fn remove_dynamic_neighbor_entry<I: IpExt>() {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
         .add_endpoint()
@@ -1194,21 +1147,12 @@ async fn remove_dynamic_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     t
 }
 
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn clear_entries_v4() {
-    clear_entries::<Ipv4>().await
-}
-
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn clear_entries_v6() {
-    clear_entries::<Ipv6>().await
-}
-
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 #[netstack3_core::context_ip_bounds(I::OtherIp, BindingsCtx)]
-async fn clear_entries<I: Ip + IpExt>() -> TestSetup {
+#[fixture::teardown(TestSetup::shutdown)]
+#[ip_test(I)]
+#[fasync::run_singlethreaded]
+async fn clear_entries<I: IpExt>() {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
         .add_endpoint()

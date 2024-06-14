@@ -4,32 +4,27 @@
 
 use display_types::IMAGE_TILING_TYPE_LINEAR;
 
-use {
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent, LayerId as FidlLayerId},
-    fidl_fuchsia_hardware_display_types::{self as display_types},
-    fidl_fuchsia_io as fio,
-    fuchsia_async::{DurationExt as _, TimeoutExt as _},
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_fs::directory::{WatchEvent, Watcher},
-    fuchsia_sync::RwLock,
-    fuchsia_zircon::{self as zx, HandleBased},
-    futures::{channel::mpsc, future, TryStreamExt},
-    std::{
-        fmt,
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
-};
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent, LayerId as FidlLayerId};
+use fidl_fuchsia_hardware_display_types::{self as display_types};
+use fidl_fuchsia_io as fio;
+use fuchsia_async::{DurationExt as _, TimeoutExt as _};
+use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_fs::directory::{WatchEvent, Watcher};
+use fuchsia_sync::RwLock;
+use fuchsia_zircon::{self as zx, HandleBased};
+use futures::channel::mpsc;
+use futures::{future, TryStreamExt};
+use std::fmt;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
-use crate::{
-    config::{DisplayConfig, LayerConfig},
-    error::{ConfigError, Error, Result},
-    types::{
-        BufferCollectionId, BufferId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId,
-    },
-    INVALID_EVENT_ID,
+use crate::config::{DisplayConfig, LayerConfig};
+use crate::error::{ConfigError, Error, Result};
+use crate::types::{
+    BufferCollectionId, BufferId, DisplayId, DisplayInfo, Event, EventId, ImageId, LayerId,
 };
+use crate::INVALID_EVENT_ID;
 
 const DEV_DIR_PATH: &str = "/dev/class/display-coordinator";
 const TIMEOUT: zx::Duration = zx::Duration::from_seconds(2);
@@ -412,14 +407,15 @@ async fn wait_for_initial_displays(
 #[cfg(test)]
 mod tests {
     use super::{Coordinator, DisplayId, VsyncEvent};
+    use anyhow::{format_err, Context, Result};
+    use assert_matches::assert_matches;
+    use display_mocks::{create_proxy_and_mock, MockCoordinator};
+    use fuchsia_async::TestExecutor;
+    use futures::task::Poll;
+    use futures::{pin_mut, select, FutureExt, StreamExt};
     use {
-        anyhow::{format_err, Context, Result},
-        assert_matches::assert_matches,
-        display_mocks::{create_proxy_and_mock, MockCoordinator},
         fidl_fuchsia_hardware_display as display,
         fidl_fuchsia_hardware_display_types as display_types,
-        fuchsia_async::TestExecutor,
-        futures::{pin_mut, select, task::Poll, FutureExt, StreamExt},
     };
 
     async fn init_with_proxy(proxy: display::CoordinatorProxy) -> Result<Coordinator> {

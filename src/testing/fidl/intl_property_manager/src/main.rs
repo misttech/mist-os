@@ -2,25 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_intl::{
-        LocaleId, Profile, PropertyProviderControlHandle, PropertyProviderRequest,
-        PropertyProviderRequestStream, TimeZoneId,
-    },
-    fidl_fuchsia_test_intl_manager::{PropertyManagerRequest, PropertyManagerRequestStream},
-    fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-    futures::{lock::Mutex, prelude::*},
-    std::{
-        collections::HashMap,
-        fmt::{self, Debug},
-        rc::Rc,
-        sync::{Arc, RwLock},
-    },
-    structopt::StructOpt,
-    tracing::{debug, error, info},
+use anyhow::{Context as _, Error};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_intl::{
+    LocaleId, Profile, PropertyProviderControlHandle, PropertyProviderRequest,
+    PropertyProviderRequestStream, TimeZoneId,
 };
+use fidl_fuchsia_test_intl_manager::{PropertyManagerRequest, PropertyManagerRequestStream};
+use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+use futures::lock::Mutex;
+use futures::prelude::*;
+use std::collections::HashMap;
+use std::fmt::{self, Debug};
+use std::rc::Rc;
+use std::sync::{Arc, RwLock};
+use structopt::StructOpt;
+use tracing::{debug, error, info};
 
 #[derive(Clone)]
 struct Server(Arc<ServerState>);
@@ -284,17 +281,16 @@ async fn main() -> Result<(), Error> {
 
 #[cfg(test)]
 mod test {
-    use {
-        anyhow::{Context as _, Error},
-        fidl_fuchsia_intl::{
-            CalendarId, LocaleId, Profile, PropertyProviderEventStream, PropertyProviderMarker,
-            PropertyProviderProxy, TemperatureUnit, TimeZoneId,
-        },
-        fidl_fuchsia_test_intl_manager::{PropertyManagerMarker, PropertyManagerProxy},
-        fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-        futures::{self, prelude::*},
-        lazy_static::lazy_static,
+    use anyhow::{Context as _, Error};
+    use fidl_fuchsia_intl::{
+        CalendarId, LocaleId, Profile, PropertyProviderEventStream, PropertyProviderMarker,
+        PropertyProviderProxy, TemperatureUnit, TimeZoneId,
     };
+    use fidl_fuchsia_test_intl_manager::{PropertyManagerMarker, PropertyManagerProxy};
+    use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
+    use futures::prelude::*;
+    use futures::{self};
+    use lazy_static::lazy_static;
 
     lazy_static! {
         static ref PROFILE_EMPTY: Profile =

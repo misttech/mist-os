@@ -2,28 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        artifacts,
-        cancel::NamedFutureExt,
-        diagnostics::{self, LogCollectionOutcome},
-        outcome::RunTestSuiteError,
-        outcome::UnexpectedEventError,
-        output::{
-            ArtifactType, DirectoryArtifactType, DynDirectoryArtifact, DynReporter, EntityReporter,
-        },
-        stream_util::StreamUtil,
-    },
-    anyhow::{anyhow, Context as _},
-    fidl::Peered,
-    fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
-    futures::{
-        future::{join_all, BoxFuture, FutureExt, TryFutureExt},
-        stream::{FuturesUnordered, StreamExt, TryStreamExt},
-    },
-    std::{borrow::Borrow, collections::VecDeque, io::Write, path::PathBuf},
-    tracing::{debug, warn},
+use crate::artifacts;
+use crate::cancel::NamedFutureExt;
+use crate::diagnostics::{self, LogCollectionOutcome};
+use crate::outcome::{RunTestSuiteError, UnexpectedEventError};
+use crate::output::{
+    ArtifactType, DirectoryArtifactType, DynDirectoryArtifact, DynReporter, EntityReporter,
 };
+use crate::stream_util::StreamUtil;
+use anyhow::{anyhow, Context as _};
+use fidl::Peered;
+use futures::future::{join_all, BoxFuture, FutureExt, TryFutureExt};
+use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use std::borrow::Borrow;
+use std::collections::VecDeque;
+use std::io::Write;
+use std::path::PathBuf;
+use tracing::{debug, warn};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 /// Given an |artifact| reported over fuchsia.test.manager, create the appropriate artifact in the
 /// reporter. Returns a Future, which when polled to completion, drains the results from |artifact|
@@ -246,7 +242,8 @@ async fn copy_file_to_writer<T: Write>(
 
 #[cfg(test)]
 mod socket_tests {
-    use {super::*, futures::AsyncWriteExt};
+    use super::*;
+    use futures::AsyncWriteExt;
 
     #[fuchsia::test]
     async fn copy_socket() {
@@ -273,21 +270,20 @@ mod socket_tests {
 #[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod file_tests {
-    use {
-        super::*,
-        crate::output::InMemoryDirectoryWriter,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        futures::prelude::*,
-        maplit::hashmap,
-        std::{collections::HashMap, sync::Arc},
-        vfs::{
-            directory::{entry_container::Directory, helper::DirectlyMutable, immutable::Simple},
-            execution_scope::ExecutionScope,
-            file::vmo::read_only,
-            pseudo_directory,
-        },
-    };
+    use super::*;
+    use crate::output::InMemoryDirectoryWriter;
+    use fidl::endpoints::ServerEnd;
+    use futures::prelude::*;
+    use maplit::hashmap;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use vfs::directory::entry_container::Directory;
+    use vfs::directory::helper::DirectlyMutable;
+    use vfs::directory::immutable::Simple;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::read_only;
+    use vfs::pseudo_directory;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn serve_content_over_socket(content: Vec<u8>, socket: fuchsia_zircon::Socket) {
         let mut socket = fidl::AsyncSocket::from_socket(socket);

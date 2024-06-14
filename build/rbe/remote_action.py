@@ -37,6 +37,7 @@ from typing import (
     Callable,
     Dict,
     Iterable,
+    Iterator,
     Optional,
     Sequence,
     Tuple,
@@ -48,7 +49,7 @@ PROJECT_ROOT = fuchsia.project_root_dir()
 
 # Needs to be computed with os.path.relpath instead of Path.relative_to
 # to support testing a fake (test-only) value of PROJECT_ROOT.
-PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=os.curdir)
+PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=Path(os.curdir))
 
 # This is a known path where remote execution occurs.
 # This should only be used for workarounds as a last resort.
@@ -76,6 +77,8 @@ _RETRIABLE_REWRAPPER_STATUSES = {
     _RBE_KILLED_STATUS,
 }
 
+_MAX_CONCURRENT_DOWNLOADS = 4
+
 
 def init_from_main_once() -> int:
     # Support parallel downloads using forkserver method.
@@ -83,11 +86,11 @@ def init_from_main_once() -> int:
     return 0
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
-def _path_or_default(path_or_none, default: Path) -> Path:
+def _path_or_default(path_or_none: Path | None, default: Path) -> Path:
     """Expressions like 'arg or DEFAULT' worked if arg is a string,
     but Path('') is not false-y in Python.
 
@@ -97,7 +100,7 @@ def _path_or_default(path_or_none, default: Path) -> Path:
     return default if path_or_none is None else path_or_none
 
 
-def _write_lines_to_file(path: Path, lines: Iterable[str]):
+def _write_lines_to_file(path: Path, lines: Iterable[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     contents = "\n".join(lines) + "\n"
     path.write_text(contents)
@@ -110,7 +113,7 @@ def _files_match(file1: Path, file2: Path) -> bool:
 
 
 def _detail_diff(
-    file1: Path, file2: Path, project_root_rel: Path = None
+    file1: Path, file2: Path, project_root_rel: Path | None = None
 ) -> cl_utils.SubprocessResult:
     command = [
         _path_or_default(project_root_rel, PROJECT_ROOT_REL)
@@ -124,8 +127,9 @@ def _detail_diff(
 def _detail_diff_filtered(
     file1: Path,
     file2: Path,
-    maybe_transform_pair: Callable[[Path, Path, Path, Path], bool] = None,
-    project_root_rel: Path = None,
+    maybe_transform_pair: Callable[[Path, Path, Path, Path], bool]
+    | None = None,
+    project_root_rel: Path | None = None,
 ) -> cl_utils.SubprocessResult:
     """Show differences between filtered views of two files.
 
@@ -249,12 +253,12 @@ def host_tool_nonsystem_shlibs(executable: Path) -> Iterable[Path]:
         yield lib
 
 
-def relativize_to_exec_root(path: Path, start: Path = None) -> Path:
+def relativize_to_exec_root(path: Path, start: Path | None = None) -> Path:
     return cl_utils.relpath(path, start=(_path_or_default(start, PROJECT_ROOT)))
 
 
 def _reclient_canonical_working_dir_components(
-    subdir_components: Iterable[str],
+    subdir_components: Iterator[str],
 ) -> Iterable[str]:
     """Computes the path used by rewrapper --canonicalize_working_dir=true.
 
@@ -294,7 +298,7 @@ def _file_lines_matching(path: Path, substr: str) -> Iterable[str]:
 
 def _transform_file_by_lines(
     src: Path, dest: Path, line_transform: Callable[[str], str]
-):
+) -> None:
     with open(src) as f:
         new_lines = [line_transform(line.rstrip("\n")) for line in f]
 
@@ -303,13 +307,13 @@ def _transform_file_by_lines(
 
 def rewrite_file_by_lines_in_place(
     path: Path, line_transform: Callable[[str], str]
-):
+) -> None:
     _transform_file_by_lines(path, path, line_transform)
 
 
 def rewrite_depfile(
-    dep_file: Path, transform: Callable[[str], str], output: Path = None
-):
+    dep_file: Path, transform: Callable[[str], str], output: Path | None = None
+) -> None:
     """Apply generic path transformations to a depfile.
 
     e.g. Relativize absolute paths.
@@ -361,17 +365,17 @@ def _should_retry_remote_action(status: cl_utils.SubprocessResult) -> bool:
     return status.returncode in _RETRIABLE_REWRAPPER_STATUSES
 
 
-def _reproxy_log_dir() -> Optional[str]:
+def _reproxy_log_dir() -> str | None:
     # Set by build/rbe/fuchsia-reproxy-wrap.sh.
     return os.environ.get("RBE_proxy_log_dir", None)
 
 
-def _rewrapper_log_dir() -> Optional[str]:
+def _rewrapper_log_dir() -> str | None:
     # Set by build/rbe/fuchsia-reproxy-wrap.sh.
     return os.environ.get("RBE_log_dir", None)
 
 
-def _rewrapper_platform_env() -> Optional[str]:
+def _rewrapper_platform_env() -> str | None:
     return os.environ.get("RBE_platform", None)
 
 
@@ -498,7 +502,7 @@ class ReproxyLogEntry(object):
         return ReproxyLogEntry(textpb.parse(lines))
 
 
-def _diagnose_fail_to_dial(line: str):
+def _diagnose_fail_to_dial(line: str) -> None:
     # Check connection to reproxy.
     if "Fail to dial" in line:
         print(line)
@@ -515,7 +519,7 @@ you may need to wrap your build command with:
         )
 
 
-def _diagnose_rbe_permissions(line: str):
+def _diagnose_rbe_permissions(line: str) -> None:
     # Check for permissions issues.
     if (
         "Error connecting to remote execution client: rpc error: code = PermissionDenied"
@@ -534,7 +538,7 @@ _REPROXY_ERROR_MISSING_FILE_RE = re.compile(
 )
 
 
-def _diagnose_missing_input_file(line: str):
+def _diagnose_missing_input_file(line: str) -> None:
     # Check for missing files.
     # TODO(b/201697587): surface this diagnostic from rewrapper
     match = _REPROXY_ERROR_MISSING_FILE_RE.match(line)
@@ -550,7 +554,7 @@ def _diagnose_missing_input_file(line: str):
         )
 
 
-def _diagnose_reproxy_error_line(line: str):
+def _diagnose_reproxy_error_line(line: str) -> None:
     for check in (
         _diagnose_fail_to_dial,
         _diagnose_rbe_permissions,
@@ -559,7 +563,9 @@ def _diagnose_reproxy_error_line(line: str):
         check(line)
 
 
-def analyze_rbe_logs(rewrapper_pid: int, action_log: Path = None):
+def analyze_rbe_logs(
+    rewrapper_pid: int, action_log: Path | None = None
+) -> None:
     """Attempt to explain failure by examining various logs.
 
     Prints additional diagnostics to stdout.
@@ -571,15 +577,15 @@ def analyze_rbe_logs(rewrapper_pid: int, action_log: Path = None):
     """
     # See build/rbe/fuchsia-reproxy-wrap.sh for the setup of these
     # environment variables.
-    reproxy_logdir = _reproxy_log_dir()
-    if not reproxy_logdir:
+    reproxy_logdir_str = _reproxy_log_dir()
+    if not reproxy_logdir_str:
         return  # give up
-    reproxy_logdir = Path(reproxy_logdir)
+    reproxy_logdir = Path(reproxy_logdir_str)
 
-    rewrapper_logdir = _rewrapper_log_dir()
-    if not rewrapper_logdir:
+    rewrapper_logdir_str = _rewrapper_log_dir()
+    if not rewrapper_logdir_str:
         return  # give up
-    rewrapper_logdir = Path(rewrapper_logdir)
+    rewrapper_logdir = Path(rewrapper_logdir_str)
 
     # The reproxy.ERROR symlink is stable during a build.
     reproxy_errors = reproxy_logdir / "reproxy.ERROR"
@@ -683,7 +689,9 @@ class DownloadStubInfo(object):
     def blob_digest(self) -> str:
         return self._blob_digest
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, DownloadStubInfo):
+            return False
         return (
             self.path == other.path
             and self.type == other.type
@@ -691,7 +699,7 @@ class DownloadStubInfo(object):
             and self._build_id == other._build_id
         )
 
-    def _write(self, output_abspath: Path):
+    def _write(self, output_abspath: Path) -> None:
         """Writes download stub contents to file.
 
         This unconditionally overwrites any existing stub file.
@@ -708,7 +716,7 @@ class DownloadStubInfo(object):
         ]
         _write_lines_to_file(output_abspath, lines)
 
-    def create(self, working_dir_abs: Path, dest: Path = None):
+    def create(self, working_dir_abs: Path, dest: Path | None = None) -> None:
         """Create a download stub file.
 
         The stub file will be backed-up to PATH.dl-stub when it is 'downloaded'.
@@ -762,7 +770,7 @@ class DownloadStubInfo(object):
         self,
         downloader: remotetool.RemoteTool,
         working_dir_abs: Path,
-        dest: Path = None,
+        dest: Path | None = None,
     ) -> cl_utils.SubprocessResult:
         """Retrieves the file or dir referenced by the stub.
 
@@ -777,7 +785,6 @@ class DownloadStubInfo(object):
         e.g. the build system guarantees that action outputs
         are exclusive.  If exclusion is needed, use download_from_stub_path().
 
-
         Args:
           downloader: 'remotetool' instance to use to download.
           working_dir_abs: working dir.
@@ -790,12 +797,12 @@ class DownloadStubInfo(object):
         dest_abs = working_dir_abs / (dest or self.path)
         temp_dl = download_temp_location(dest_abs)
 
-        downloader = {
+        downloader_fn = {
             "dir": downloader.download_dir,
             "file": downloader.download_blob,
         }[self.type]
 
-        status = downloader(
+        status = downloader_fn(
             path=temp_dl,
             digest=self._blob_digest,
             cwd=working_dir_abs,
@@ -845,7 +852,7 @@ def undownload(path: Path) -> bool:
     return False
 
 
-def path_to_download_stub(stub_path: Path) -> Optional[DownloadStubInfo]:
+def path_to_download_stub(stub_path: Path) -> DownloadStubInfo | None:
     if not is_download_stub_file(stub_path):
         return None
 
@@ -853,7 +860,10 @@ def path_to_download_stub(stub_path: Path) -> Optional[DownloadStubInfo]:
 
 
 def download_from_stub_path(
-    stub_path: Path, downloader: remotetool.RemoteTool, working_dir_abs: Path
+    stub_path: Path,
+    downloader: remotetool.RemoteTool,
+    working_dir_abs: Path,
+    verbose: bool = False,
 ) -> cl_utils.SubprocessResult:
     """Possibly downloads a file over a stub link.
 
@@ -865,6 +875,7 @@ def download_from_stub_path(
       stub_path: is a path to a possible download stub.
       downloader: remotetool instance used to download.
       working_dir_abs: current working dir.
+      verbose: if True, print extra debug information.
 
     Returns:
       download exit status, or 0 if there is nothing to download.
@@ -882,7 +893,14 @@ def download_from_stub_path(
 
         stub_info = path_to_download_stub(stub_path)
         if not stub_info:
+            if verbose:
+                msg(
+                    f"    {stub_path} already exists as a normal file (not downloading)"
+                )
             return ok_result
+
+        if verbose:
+            msg(f"Downloading {stub_path}")
 
         return stub_info.download(
             downloader=downloader,
@@ -909,30 +927,30 @@ class RemoteAction(object):
         self,
         rewrapper: Path,
         command: Sequence[str],
-        local_only_command: Sequence[str] = None,
-        options: Sequence[str] = None,
-        exec_root: Optional[Path] = None,
-        working_dir: Optional[Path] = None,
-        cfg: Optional[Path] = None,
-        exec_strategy: Optional[str] = None,
-        inputs: Sequence[Path] = None,
-        input_list_paths: Sequence[Path] = None,
-        output_files: Sequence[Path] = None,
-        output_dirs: Sequence[Path] = None,
-        platform: str = None,
+        local_only_command: Sequence[str] | None = None,
+        options: Sequence[str] | None = None,
+        exec_root: Path | None | None = None,
+        working_dir: Path | None | None = None,
+        cfg: Path | None | None = None,
+        exec_strategy: str | None | None = None,
+        inputs: Sequence[Path] | None = None,
+        input_list_paths: Sequence[Path] | None = None,
+        output_files: Sequence[Path] | None = None,
+        output_dirs: Sequence[Path] | None = None,
+        platform: str | None = None,
         disable: bool = False,
         verbose: bool = False,
         save_temps: bool = False,
-        label: str = None,
+        label: str | None = None,
         remote_log: str = "",
-        fsatrace_path: Optional[Path] = None,
+        fsatrace_path: Path | None = None,
         diagnose_nonzero: bool = False,
         compare_with_local: bool = False,
         check_determinism: bool = False,
         determinism_attempts: int = 1,
-        miscomparison_export_dir: Path = None,
-        post_remote_run_success_action: Callable[[], int] = None,
-        remote_debug_command: Sequence[str] = None,
+        miscomparison_export_dir: Path | None = None,
+        post_remote_run_success_action: Callable[[], int] | None = None,
+        remote_debug_command: Sequence[str] | None = None,
     ):
         """RemoteAction constructor.
 
@@ -1037,9 +1055,11 @@ class RemoteAction(object):
         # but they will be relativized to exec_root for rewrapper.
         # It is more natural to copy input/output paths that are relative to the
         # current working directory.
-        self._inputs = inputs or []
+        self._inputs: list[Path] = list(inputs) if inputs else []
         self._input_list_paths = input_list_paths or []
-        self._output_files = output_files or []
+        self._output_files: list[Path] = (
+            list(output_files) if output_files else []
+        )
         self._output_dirs = output_dirs or []
 
         # Amend input/outputs when logging remotely.
@@ -1057,34 +1077,34 @@ class RemoteAction(object):
             self._inputs.extend([self._fsatrace_path, self._fsatrace_so])
             self._output_files.append(self._fsatrace_remote_trace)
 
-        self._cleanup_files = []
+        self._cleanup_files: list[Path] = []
 
     @property
     def verbose(self) -> bool:
         return self._verbose
 
-    def vmsg(self, text: str):
+    def vmsg(self, text: str) -> None:
         if self.verbose:
             msg(text)
 
     @property
-    def label(self) -> Optional[str]:
+    def label(self) -> str | None:
         return self._label
 
     @property
-    def exec_root(self) -> Optional[str]:
+    def exec_root(self) -> Path:
         return self._exec_root
 
     @property
-    def exec_strategy(self) -> Optional[str]:
+    def exec_strategy(self) -> str | None:
         return self._exec_strategy
 
     @property
-    def config(self) -> str:
+    def config(self) -> Path | None:
         return self._config
 
     @property
-    def _default_auxiliary_file_basename(self) -> str:
+    def _default_auxiliary_file_basename(self) -> str | None:
         # Return a str instead of Path because most callers will want to
         # append a suffix (str + str).
         if self._output_files:
@@ -1092,8 +1112,12 @@ class RemoteAction(object):
         else:  # pick something arbitrary, but deterministic
             return "rbe-action-output"
 
-    def _name_remote_log(self, remote_log: str) -> Path:
+    def _name_remote_log(self, remote_log: str) -> Path | None:
         if remote_log == "<AUTO>":
+            if self._default_auxiliary_file_basename is None:
+                raise ValueError(
+                    "self._default_auxiliary_file_basename is None"
+                )
             return Path(self._default_auxiliary_file_basename + ".remote-log")
 
         if remote_log:
@@ -1107,14 +1131,21 @@ class RemoteAction(object):
 
     @property
     def _fsatrace_local_trace(self) -> Path:
+        if self._default_auxiliary_file_basename is None:
+            raise ValueError("self._default_auxiliary_file_basename is None")
         return Path(self._default_auxiliary_file_basename + ".local-fsatrace")
 
     @property
     def _fsatrace_remote_trace(self) -> Path:
+        if self._default_auxiliary_file_basename is None:
+            raise ValueError("self._default_auxiliary_file_basename is None")
+
         return Path(self._default_auxiliary_file_basename + ".remote-fsatrace")
 
     @property
     def _fsatrace_so(self) -> Path:
+        if self._fsatrace_path is None:
+            raise ValueError("self._fsatrace_path is None")
         # fsatrace needs the corresponding .so to work
         return self._fsatrace_path.with_suffix(".so")
 
@@ -1125,6 +1156,8 @@ class RemoteAction(object):
         # The information contained in this log is the same,
         # but is much easier to find than in the cumulative log.
         # The non-reduced .rpl format is also acceptable.
+        if self._default_auxiliary_file_basename is None:
+            raise ValueError("self._default_auxiliary_file_basename is None")
         return Path(self._default_auxiliary_file_basename + ".rrpl")
 
     @property
@@ -1136,7 +1169,7 @@ class RemoteAction(object):
         """This is the original command that would have been run locally.
         All of the --remote-* flags have been removed at this point.
         """
-        return cl_utils.auto_env_prefix_command(self._local_only_command)
+        return cl_utils.auto_env_prefix_command(list(self._local_only_command))
 
     @property
     def local_only_flags(self) -> Sequence[str]:
@@ -1158,9 +1191,9 @@ exec "${{cmd[@]}}"
 
     @property
     def remote_only_command(self) -> Sequence[str]:
-        return cl_utils.auto_env_prefix_command(self._remote_only_command)
+        return cl_utils.auto_env_prefix_command(list(self._remote_only_command))
 
-    def show_local_remote_command_differences(self):
+    def show_local_remote_command_differences(self) -> None:
         if self._local_only_command == self._remote_only_command:
             return  # no differences to show
 
@@ -1205,11 +1238,11 @@ exec "${{cmd[@]}}"
         return "--preserve_unchanged_output_mtime" in self._options
 
     @property
-    def canonicalize_working_dir(self) -> Optional[bool]:
+    def canonicalize_working_dir(self) -> bool | None:
         return self._rewrapper_known_options.canonicalize_working_dir
 
     @property
-    def download_regex(self) -> Optional[str]:
+    def download_regex(self) -> str | None:
         return self._rewrapper_known_options.download_regex
 
     @property
@@ -1217,7 +1250,7 @@ exec "${{cmd[@]}}"
         return self._rewrapper_known_options.download_outputs
 
     @property
-    def platform(self) -> Optional[str]:
+    def platform(self) -> str | None:
         return self._platform
 
     @property
@@ -1279,7 +1312,7 @@ exec "${{cmd[@]}}"
                 exclude_regex = re.compile(download_regex.removeprefix("-"))
 
                 def need_download_stub(path: Path) -> bool:
-                    return exclude_regex.match(str(path))
+                    return exclude_regex.match(str(path)) is not None
 
             else:
                 include_regex = re.compile(download_regex)
@@ -1338,7 +1371,7 @@ exec "${{cmd[@]}}"
         return self._determinism_attempts
 
     @property
-    def miscomparison_export_dir(self) -> Optional[Path]:
+    def miscomparison_export_dir(self) -> Path | None:
         if self._miscomparison_export_dir:
             return self.working_dir / self._miscomparison_export_dir
         return None
@@ -1418,6 +1451,8 @@ exec "${{cmd[@]}}"
 
     def _generated_inputs_list_file(self) -> Path:
         """This file is generated with a complete list of inputs."""
+        if self._default_auxiliary_file_basename is None:
+            raise ValueError("self._default_auxiliary_file_basename is None")
         inputs_list_file = Path(
             self._default_auxiliary_file_basename + ".inputs"
         )
@@ -1606,6 +1641,10 @@ exec "${{cmd[@]}}"
         """Downloading inputs is useful for running local actions whose inputs
         may have come from the outputs of remote actions that opted to
         not download their outputs.
+
+        Returns:
+          Mapping of path to status.
+          Failures are always included, but successes are optional.
         """
         stub_paths = [
             path
@@ -1631,7 +1670,7 @@ exec "${{cmd[@]}}"
             )
         return download_statuses
 
-    def _update_stub(self, stub_info: DownloadStubInfo):
+    def _update_stub(self, stub_info: DownloadStubInfo) -> None:
         """Write a download stub (or not, depending on conditions)."""
         path = self.working_dir / stub_info.path
         if self.preserve_unchanged_output_mtime and path.exists():
@@ -1710,7 +1749,7 @@ exec "${{cmd[@]}}"
         cfg = self.exec_root / _REPROXY_CFG
         return remotetool.configure_remotetool(cfg)
 
-    def _cleanup(self):
+    def _cleanup(self) -> None:
         self.vmsg("Cleaning up temporary files.")
         with cl_utils.timer_cm("RemoteAction._cleanup()"):
             for f in self._cleanup_files:
@@ -1783,7 +1822,7 @@ exec "${{cmd[@]}}"
             # Assume failure was due to determinism.
             # Outputs were already copied by the check-determinism script.
             # Copy just the inputs.
-            with cl_utils.chdir_cm(self.project_root):
+            with cl_utils.chdir_cm(PROJECT_ROOT):
                 for f in self.inputs_relative_to_project_root:
                     cl_utils.copy_preserve_subpath(f, export_dir)
 
@@ -2217,9 +2256,9 @@ def _download_input_for_mp(
 ) -> Tuple[Path, cl_utils.SubprocessResult]:
     path, downloader, working_dir_abs, verbose = packed_args
     if verbose:
-        msg(f"  Downloading input {path}")
+        msg(f"  Considering input {path}")
 
-    status = download_from_stub_path(path, downloader, working_dir_abs)
+    status = download_from_stub_path(path, downloader, working_dir_abs, verbose)
     if status.returncode != 0:  # alert, but do not fail
         msg(f"Unable to download input {path}.")
 
@@ -2254,32 +2293,41 @@ def download_input_stub_paths_batch(
     parallel: bool = True,
     verbose: bool = False,
 ) -> Dict[Path, cl_utils.SubprocessResult]:
-    """Downloads artifacts from a collection of stubs in parallel."""
+    """Downloads artifacts from a collection of stubs in parallel.
+
+    Returns:
+      Mapping of paths to status, which includes failures,
+      but not necessarily successes.
+    """
+    if verbose:
+        msg(f"Downloading potentially {len(stub_paths)} artifacts")
     download_args = [
         # args for _download_input_for_mp
         (stub_path, downloader, working_dir_abs, verbose)
         for stub_path in stub_paths
     ]
     if not download_args:
+        if verbose:
+            msg("  Nothing to download.")
         return {}
 
     if parallel:
         try:
-            with multiprocessing.Pool() as pool:
+            with multiprocessing.Pool(_MAX_CONCURRENT_DOWNLOADS) as pool:
                 statuses = pool.map(_download_input_for_mp, download_args)
         except OSError as e:  # in case /dev/shm is not writeable (required)
             if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
                 e.errno == errno.EROFS
             ):
-                if len(download_args) > 1:
+                if len(download_args) > 1 and verbose:
                     msg(
-                        "Warning: downloading sequentially instead of in parallel."
+                        f"Warning: downloading sequentially instead of in parallel: {stub_paths}."
                     )
-                statuses = map(_download_input_for_mp, download_args)
+                statuses = list(map(_download_input_for_mp, download_args))
             else:
                 raise e  # Some other error
     else:
-        statuses = map(_download_input_for_mp, download_args)
+        statuses = list(map(_download_input_for_mp, download_args))
 
     return {path: status for path, status in statuses}
 
@@ -2302,7 +2350,7 @@ def download_output_stub_infos_batch(
 
     if parallel:
         try:
-            with multiprocessing.Pool() as pool:
+            with multiprocessing.Pool(_MAX_CONCURRENT_DOWNLOADS) as pool:
                 statuses = pool.map(_download_output_for_mp, download_args)
         except OSError as e:  # in case /dev/shm is not writeable (required)
             if (e.errno == errno.EPERM and e.filename == "/dev/shm") or (
@@ -2312,11 +2360,11 @@ def download_output_stub_infos_batch(
                     msg(
                         "Warning: downloading sequentially instead of in parallel."
                     )
-                statuses = map(_download_output_for_mp, download_args)
+                statuses = list(map(_download_output_for_mp, download_args))
             else:
                 raise e  # Some other error
     else:
-        statuses = map(_download_output_for_mp, download_args)
+        statuses = list(map(_download_output_for_mp, download_args))
 
     return {path: status for path, status in statuses}
 
@@ -2361,9 +2409,9 @@ def _string_split(text: str) -> Sequence[str]:
 
 def inherit_main_arg_parser_flags(
     parser: argparse.ArgumentParser,
-    default_cfg: Path = None,
-    default_bindir: Path = None,
-):
+    default_cfg: Path | None = None,
+    default_bindir: Path | None = None,
+) -> None:
     """Extend an existing argparser with standard flags.
 
     These flags are available for tool-specific remote command wrappers to use.
@@ -2553,28 +2601,37 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 def remote_action_from_args(
     main_args: argparse.Namespace,
-    remote_options: Sequence[str] = None,
-    command: Sequence[str] = None,
+    remote_options: Sequence[str] | None = None,
+    command: Sequence[str] | None = None,
     # These inputs and outputs can come from application-specific logic.
-    inputs: Sequence[Path] = None,
-    input_list_paths: Sequence[Path] = None,
-    output_files: Sequence[Path] = None,
-    output_dirs: Sequence[Path] = None,
-    **kwargs,  # other RemoteAction __init__ params
+    inputs: Sequence[Path] | None = None,
+    input_list_paths: Sequence[Path] | None = None,
+    output_files: Sequence[Path] | None = None,
+    output_dirs: Sequence[Path] | None = None,
+    **kwargs: Any,  # other RemoteAction __init__ params
 ) -> RemoteAction:
     """Construct a remote action based on argparse parameters."""
-    inputs = (inputs or []) + [
-        Path(p) for p in cl_utils.flatten_comma_list(main_args.inputs)
+    inputs = [
+        *(inputs or []),
+        *[Path(p) for p in cl_utils.flatten_comma_list(main_args.inputs)],
     ]
-    input_list_paths = (input_list_paths or []) + [
-        Path(p) for p in cl_utils.flatten_comma_list(main_args.input_list_paths)
+    input_list_paths = [
+        *(input_list_paths or []),
+        *[
+            Path(p)
+            for p in cl_utils.flatten_comma_list(main_args.input_list_paths)
+        ],
     ]
-    output_files = (output_files or []) + [
-        Path(p) for p in cl_utils.flatten_comma_list(main_args.output_files)
+    output_files = [
+        *(output_files or []),
+        *[Path(p) for p in cl_utils.flatten_comma_list(main_args.output_files)],
     ]
-    output_dirs = (output_dirs or []) + [
-        Path(p)
-        for p in cl_utils.flatten_comma_list(main_args.output_directories)
+    output_dirs = [
+        *(output_dirs or []),
+        *[
+            Path(p)
+            for p in cl_utils.flatten_comma_list(main_args.output_directories)
+        ],
     ]
     return RemoteAction(
         rewrapper=main_args.bindir / "rewrapper",
@@ -2667,12 +2724,12 @@ def forward_remote_flags(
     forwarded_flags, filtered_command = _FORWARDED_REMOTE_FLAGS.sift(
         unfiltered_command
     )
-    return script_args + forwarded_flags, filtered_command
+    return [*script_args, *forwarded_flags], filtered_command
 
 
 def auto_relaunch_with_reproxy(
     script: Path, argv: Sequence[str], args: argparse.Namespace
-):
+) -> None:
     """If reproxy is not already running, re-launch with reproxy running.
 
     Args:
@@ -2706,7 +2763,7 @@ def auto_relaunch_with_reproxy(
         return
 
     python = cl_utils.relpath(Path(sys.executable), start=Path(os.curdir))
-    relaunch_args = ["--", str(python), "-S", str(script)] + argv
+    relaunch_args = ["--", str(python), "-S", str(script), *argv]
     # Wrap verbosely when auto-re-launching with reproxy wrapper, because
     # this is typically used for one-off commands during debug.
     # Normal builds should already be wrapped, and should not require auto-re-launching.

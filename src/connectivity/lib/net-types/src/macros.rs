@@ -6,9 +6,11 @@ use assert_matches::assert_matches;
 use proc_macro::TokenStream;
 use proc_macro2::{TokenStream as TokenStream2, TokenTree};
 use quote::{quote, ToTokens as _};
+use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
 use syn::{
-    parse_quote, punctuated::Punctuated, spanned::Spanned, AngleBracketedGenericArguments,
-    GenericArgument, GenericParam, Generics, Ident, Type, TypeParam, TypeParamBound, TypePath,
+    parse_quote, AngleBracketedGenericArguments, GenericArgument, GenericParam, Generics, Ident,
+    Type, TypeParam, TypeParamBound, TypePath,
 };
 
 /// Implements a derive macro for [`net_types::ip::GenericOverIp`].

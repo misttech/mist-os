@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_ui_pointer as fpointer, fuchsia_async::Task, tracing::debug};
+use fidl_fuchsia_ui_pointer as fpointer;
+use fuchsia_async::Task;
+use tracing::debug;
 
 // Returns a Task that continuously listens for touch events and responds to them.
 pub fn autolisten_touch(touch_source: fpointer::TouchSourceProxy) -> Task<()> {

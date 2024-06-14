@@ -4,13 +4,11 @@
 
 use std::cell::Cell;
 
-use crate::{
-    component::Component,
-    core::{Core, CoreContext, ObjectRef, OnAdded, Property},
-    math::{self, Mat},
-    shapes::PathVertex,
-    status_code::StatusCode,
-};
+use crate::component::Component;
+use crate::core::{Core, CoreContext, ObjectRef, OnAdded, Property};
+use crate::math::{self, Mat};
+use crate::shapes::PathVertex;
+use crate::status_code::StatusCode;
 
 #[derive(Debug)]
 pub struct Weight {

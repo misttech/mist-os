@@ -4,7 +4,8 @@
 
 //! This is a shim for `std::fs`, with both real and mock implementations.
 
-use std::{io, path::Path};
+use std::io;
+use std::path::Path;
 
 /// A shim trait between these structs, and `std::fs` operations, so that file
 /// operations can be more easily handled in tests, without writing to temp files
@@ -41,13 +42,11 @@ impl FilesystemProvider for RealFilesystemProvider {
 #[cfg(test)]
 pub(crate) mod mock {
     use super::FilesystemProvider;
-    use std::{
-        cell::RefCell,
-        collections::HashMap,
-        io,
-        path::{Path, PathBuf},
-        rc::Rc,
-    };
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::io;
+    use std::path::{Path, PathBuf};
+    use std::rc::Rc;
 
     /// A mocked filesystem
     pub(crate) struct MockFilesystemProvider {

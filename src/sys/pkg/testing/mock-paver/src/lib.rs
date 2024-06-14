@@ -4,17 +4,16 @@
 
 #![allow(clippy::let_unit_value)]
 
-use {
-    anyhow::{anyhow, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_mem::Buffer,
-    fidl_fuchsia_paver as paver, fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{Status, Vmo, VmoOptions},
-    futures::lock::Mutex as AsyncMutex,
-    futures::{channel::mpsc, prelude::*},
-    std::sync::Arc,
-};
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_mem::Buffer;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{Status, Vmo, VmoOptions};
+use futures::channel::mpsc;
+use futures::lock::Mutex as AsyncMutex;
+use futures::prelude::*;
+use std::sync::Arc;
+use {fidl_fuchsia_paver as paver, fuchsia_async as fasync};
 
 fn verify_buffer(buffer: &mut Buffer) {
     // The paver service requires VMOs to be resizable. Assert that the buffer provided by the
@@ -793,13 +792,11 @@ impl MockPaverService {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_paver as paver,
-        fuchsia_zircon::{self as zx},
-        futures::task::Poll,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_paver as paver;
+    use fuchsia_zircon::{self as zx};
+    use futures::task::Poll;
 
     struct MockPaverForTest {
         pub paver: Arc<MockPaverService>,

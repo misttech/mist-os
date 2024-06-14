@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use fidl_fidl_examples_routing_echo as fecho;
-use fidl_test_echoserver as ftest;
 use fuchsia_component::client::{
     connect_to_protocol, connect_to_protocol_at, connect_to_protocol_at_path,
 };
 use realm_client::{extend_namespace, InstalledNamespace};
 use tracing::info;
+use {fidl_fidl_examples_routing_echo as fecho, fidl_test_echoserver as ftest};
 
 async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;

@@ -20,19 +20,19 @@ import sys
 import cl_utils
 
 from pathlib import Path
-from typing import Iterable, Optional, Sequence, Tuple, Union
+from typing import Iterable, Iterator, Optional, Sequence, Tuple, Union
 
 _SCRIPT_BASENAME = Path(__file__).name
 
 
-def msg(text: str):
+def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
 _VERBOSE = False
 
 
-def vmsg(text: str):
+def vmsg(text: str) -> None:
     if _VERBOSE:
         msg(text)
 
@@ -176,18 +176,18 @@ def _filter_tokens(toks: Iterable[Token]) -> Iterable[Token]:
 class Directive(object):
     """Represents a single linker script directive."""
 
-    def __init__(self, keyword: str, args: Sequence[str] = None):
+    def __init__(self, keyword: str, args: Sequence[str] | None = None):
         self.name = keyword  # function name
         # Some Directive arguments contain other directives,
         # e.g. AS_NEEDED inside INPUT or GROUPS.
-        self.args: Sequence[Union[str, "Directive"]] = args or []
+        self.args: list[str | "Directive"] = list(args) if args else []
 
-    def __str__(self):
+    def __str__(self) -> str:
         args_str = " ".join(str(arg) for arg in self.args)
         return f"{self.name}({args_str})"
 
 
-def _parse_directive(name: str, toks: Iterable[Token]) -> Directive:
+def _parse_directive(name: str, toks: Iterator[Token]) -> Directive:
     """Recursively parse a single linker script directive."""
     # Most directives' args are inside parentheses, but not INCLUDE
     vmsg(f"Parsing {name} directive")
@@ -195,7 +195,7 @@ def _parse_directive(name: str, toks: Iterable[Token]) -> Directive:
 
     if name == "INCLUDE":  # special case
         include_arg = next(toks)  # expect one arg
-        current_directive.args.append(include_arg)
+        current_directive.args.append(include_arg.text)
         return current_directive
 
     # All other directives's args are enclosed in ().
@@ -226,7 +226,7 @@ def _parse_directive(name: str, toks: Iterable[Token]) -> Directive:
 
 
 def _parse_linker_script_directives(
-    toks: Iterable[Token],
+    toks: Iterator[Token],
 ) -> Iterable[Directive]:
     while True:
         try:
@@ -244,10 +244,14 @@ def _parse_linker_script_directives(
 _LINKABLE_EXTENSIONS = (".a", ".so", ".ld", ".dylib")
 
 
-def _flatten_as_needed(arg: Union[str, Directive]) -> Iterable[str]:
-    if isinstance(arg, Directive) and arg.name == "AS_NEEDED":
-        yield from arg.args
-    else:  # is just a str
+def _flatten_as_needed(
+    arg: str | Directive,
+) -> Iterable[str]:
+    if isinstance(arg, Directive):
+        if arg.name == "AS_NEEDED":
+            for a in arg.args:
+                yield from _flatten_as_needed(a)
+    else:  # isinstance(arg, str)
         yield arg
 
 
@@ -256,17 +260,19 @@ class LinkerInvocation(object):
 
     def __init__(
         self,
-        working_dir_abs: Path = None,
-        search_paths: Sequence[Path] = None,
-        l_libs: Sequence[str] = None,  # e.g. "c" from "-lc"
-        direct_files: Sequence[Path] = None,
-        sysroot: Path = None,
+        working_dir_abs: Path | None = None,
+        search_paths: Sequence[Path] | None = None,
+        l_libs: Sequence[str] | None = None,  # e.g. "c" from "-lc"
+        direct_files: Sequence[Path] | None = None,
+        sysroot: Path | None = None,
     ):
         working_dir_abs = working_dir_abs or Path(os.curdir).absolute()
         assert working_dir_abs.is_absolute()
         self._working_dir_abs = working_dir_abs
 
-        self._search_paths = search_paths or []
+        self._search_paths: list[Path] = (
+            list(search_paths) if search_paths else []
+        )
         self._l_libs = l_libs or []
         self._direct_files = direct_files or []
         self._sysroot = sysroot
@@ -295,14 +301,14 @@ class LinkerInvocation(object):
         if text is None:
             return
         directives = _parse_linker_script_directives(
-            _filter_tokens(_lex_linker_script(text))
+            iter(_filter_tokens(_lex_linker_script(text)))
         )
         yield from self.handle_directives(directives)
 
     def _include(self, directive: Directive) -> Iterable[Path]:
         """Include another linker script."""
         for arg in directive.args:
-            p = self.resolve_path(Path(arg.text), check_sysroot=False)
+            p = self.resolve_path(Path(str(arg)), check_sysroot=False)
             if p:
                 # Want the included script, and whatever else it points to.
                 yield p
@@ -337,7 +343,7 @@ class LinkerInvocation(object):
     def _search_dir(self, directive: Directive) -> None:
         """Add a lib search path.  (Mutates self)"""
         for arg in directive.args:
-            self._search_paths.append(Path(arg))
+            self._search_paths.append(Path(str(arg)))
 
     def _ignore(self, directive: Directive) -> None:
         """Ignored directive."""
@@ -486,18 +492,16 @@ class LinkerInvocation(object):
         Yields:
           linker inputs encountered by lld.
         """
-        lld_command = (
-            [
-                str(lld),
-                "-o",
-                "/dev/null",  # Don't want link output
-                "--dependency-file=/dev/stdout",  # avoid temp file
-            ]
-            + ([f"--sysroot={self.sysroot}"] if self.sysroot else [])
-            + [f"-L{path}" for path in self.search_paths]
-            + self.l_libs
-            + [str(f) for f in self.direct_files + inputs]
-        )
+        lld_command = [
+            str(lld),
+            "-o",
+            "/dev/null",  # Don't want link output
+            "--dependency-file=/dev/stdout",  # avoid temp file
+            *([f"--sysroot={self.sysroot}"] if self.sysroot else []),
+            *[f"-L{path}" for path in self.search_paths],
+            *self.l_libs,
+            *[str(f) for f in [*self.direct_files, *inputs]],
+        ]
 
         result = cl_utils.subprocess_call(cmd=lld_command, cwd=self.working_dir)
 

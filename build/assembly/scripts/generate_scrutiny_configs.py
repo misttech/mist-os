@@ -5,6 +5,7 @@
 
 import argparse
 import os
+from typing import TextIO
 
 from assembly import (
     AssemblyInputBundle,
@@ -14,7 +15,7 @@ from depfile import DepFile
 from serialization.serialization import json_load
 
 
-def collect_aib_artifacts(aib, aib_path):
+def collect_aib_artifacts(aib: AssemblyInputBundle, aib_path: str) -> DepFile:
     static_packages = set()
     bootfs_packages = set()
     for pkg in aib.packages:
@@ -58,16 +59,16 @@ def collect_aib_artifacts(aib, aib_path):
 
 
 class Golden:
-    def __init__(self):
-        self.lines = set()
+    def __init__(self) -> None:
+        self.lines: set[str] = set()
 
-    def add_optional(self, names):
+    def add_optional(self, names: set[str]) -> None:
         for name in names:
             name = name.strip()
             if name not in self.lines:
                 self.lines.add("?" + name)
 
-    def add_required(self, names):
+    def add_required(self, names: set[str]) -> None:
         for name in names:
             name = name.strip()
             optional = "?" + name
@@ -75,13 +76,13 @@ class Golden:
                 self.lines.remove(optional)
             self.lines.add(name)
 
-    def write(self, output):
+    def write(self, output: TextIO) -> None:
         lines = sorted(self.lines, key=lambda s: s.removeprefix("?"))
         for line in lines:
             output.write(line + "\n")
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Tool that parses AIBs and generates relevant scrutiny configs for the platform"
     )
@@ -196,3 +197,5 @@ def main():
             DepFile.from_deps(args.static_packages_output.name, deps).write_to(
                 depfile
             )
+
+    return 0

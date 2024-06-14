@@ -2,40 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    events::{
-        router::EventConsumer,
-        types::{Event, EventPayload, LogSinkRequestedPayload},
-    },
-    identity::ComponentIdentity,
-    logs::{
-        budget::BudgetManager,
-        container::LogsArtifactsContainer,
-        debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY},
-        multiplex::{Multiplexer, MultiplexerHandle},
-        stored_message::StoredMessage,
-    },
-    severity_filter::KlogSeverityFilter,
-};
+use crate::events::router::EventConsumer;
+use crate::events::types::{Event, EventPayload, LogSinkRequestedPayload};
+use crate::identity::ComponentIdentity;
+use crate::logs::budget::BudgetManager;
+use crate::logs::container::LogsArtifactsContainer;
+use crate::logs::debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY};
+use crate::logs::multiplex::{Multiplexer, MultiplexerHandle};
+use crate::logs::stored_message::StoredMessage;
+use crate::severity_filter::KlogSeverityFilter;
 use diagnostics_data::LogsData;
 use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, Severity, StreamMode};
-use fuchsia_async as fasync;
-use fuchsia_inspect as inspect;
 use fuchsia_sync::{Mutex, RwLock};
-use fuchsia_trace as ftrace;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use moniker::Moniker;
 use selectors::SelectorExt;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
+use std::collections::{BTreeMap, HashMap};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tracing::{debug, error};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace};
 
 lazy_static! {
     pub static ref INTEREST_CONNECTION_ID: AtomicUsize = AtomicUsize::new(0);
@@ -396,16 +384,14 @@ impl MultiplexerBroker {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage},
-        diagnostics_log_encoding::{
-            encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
-        },
-        moniker::ExtendedMoniker,
-        selectors::FastError,
-        std::{io::Cursor, time::Duration},
-    };
+    use super::*;
+    use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
+    use diagnostics_log_encoding::encode::Encoder;
+    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
+    use moniker::ExtendedMoniker;
+    use selectors::FastError;
+    use std::io::Cursor;
+    use std::time::Duration;
 
     #[fuchsia::test]
     async fn data_repo_filters_logs_by_selectors() {

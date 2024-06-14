@@ -5,17 +5,17 @@
 use async_lock::OnceCell;
 use async_trait::async_trait;
 use fidl::endpoints::RequestStream;
-use fidl_fuchsia_examples_colocated as fcolocated;
 use fidl_fuchsia_process::HandleInfo;
-use fuchsia_async as fasync;
 use fuchsia_runtime::HandleType;
-use fuchsia_zircon as zx;
 use futures::future::{BoxFuture, FutureExt};
 use futures::TryStreamExt;
 use runner::component::{ChannelEpitaph, Controllable};
 use std::sync::Arc;
 use tracing::warn;
 use zx::{AsHandleRef, Koid};
+use {
+    fidl_fuchsia_examples_colocated as fcolocated, fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 /// [`ColocatedProgram `] represents an instance of a program run by the
 /// colocated runner. Its state is held in this struct and its behavior

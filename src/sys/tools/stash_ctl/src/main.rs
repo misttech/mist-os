@@ -8,13 +8,11 @@
 
 use anyhow::{format_err, Error};
 use fidl::endpoints::create_proxy;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
 use futures::FutureExt;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
-use std::env;
-use std::str;
+use std::{env, str};
 
 use fidl_fuchsia_stash::{KeyValue, ListItem, SecureStoreMarker, StoreMarker, Value};
 

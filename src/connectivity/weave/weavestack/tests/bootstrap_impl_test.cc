@@ -54,10 +54,15 @@ class BootstrapImplTest : public gtest::TestLoopFixture {
   TestableBootstrapImpl& bootstrap_impl() { return *bootstrap_impl_; }
 
   void ResetImpl(bool should_serve) {
+    // If the server is already bound, the error handler will be invoked when we destroy the impl.
+    if (bootstrap_.is_bound()) {
+      bootstrap_impl_ = nullptr;
+      RunLoopUntilIdle();
+      last_error_ = ZX_OK;
+    }
     bootstrap_impl_ = std::make_unique<TestableBootstrapImpl>(provider_.context());
     bootstrap_impl_->SetShouldServe(should_serve);
     bootstrap_impl_->Init();
-    RunLoopUntilIdle();
   }
 
   void ReconnectBootstrapPtr() {
@@ -66,7 +71,7 @@ class BootstrapImplTest : public gtest::TestLoopFixture {
     RunLoopUntilIdle();
   }
 
-  zx_status_t last_error() { return last_error_; }
+  zx_status_t last_error() const { return last_error_; }
 
  private:
   sys::testing::ComponentContextProvider provider_;
@@ -80,10 +85,10 @@ class BootstrapImplTest : public gtest::TestLoopFixture {
 TEST_F(BootstrapImplTest, NoServe) {
   ResetImpl(/*should_serve*/ false);
   EXPECT_FALSE(bootstrap().is_bound());
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, last_error());
+  EXPECT_EQ(ZX_OK, last_error());
   ReconnectBootstrapPtr();
   EXPECT_FALSE(bootstrap().is_bound());
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, last_error());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, last_error());
 }
 
 TEST_F(BootstrapImplTest, ImportConfigHappy) {
@@ -116,10 +121,9 @@ TEST_F(BootstrapImplTest, ImportConfigHappy) {
   // Ensure binding is closed and FIDL is no longer serving.
   EXPECT_FALSE(bootstrap().is_bound());
   EXPECT_EQ(ZX_OK, last_error());
-
   ReconnectBootstrapPtr();
   EXPECT_FALSE(bootstrap().is_bound());
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, last_error());
+  EXPECT_EQ(ZX_ERR_NOT_FOUND, last_error());
 }
 
 TEST_F(BootstrapImplTest, ImportConfigFail) {

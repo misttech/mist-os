@@ -76,16 +76,14 @@
 //! // Use sender to send messages to the protocol
 //! ```
 
-use {
-    fuchsia_async::{self as fasync, DurationExt},
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc, future::BoxFuture, Future, StreamExt},
-    std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    tracing::error,
-};
+use fuchsia_async::{self as fasync, DurationExt};
+use fuchsia_zircon as zx;
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::{Future, StreamExt};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tracing::error;
 
 /// A trait for implementing connecting to and sending messages to a FIDL protocol.
 pub trait ConnectedProtocol {
@@ -315,22 +313,20 @@ fn log_first_n_factory(n: u64, mut log_fn: impl FnMut(String)) -> impl FnMut(Str
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        anyhow::{format_err, Context},
-        fidl_test_protocol_connector::{
-            ProtocolFactoryMarker, ProtocolFactoryRequest, ProtocolFactoryRequestStream,
-            ProtocolProxy, ProtocolRequest, ProtocolRequestStream,
-        },
-        fuchsia_async as fasync,
-        fuchsia_component::server as fserver,
-        fuchsia_component_test::{
-            Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref,
-            Route,
-        },
-        futures::{channel::mpsc::Sender, FutureExt, TryStreamExt},
-        std::sync::atomic::AtomicU8,
+    use super::*;
+    use anyhow::{format_err, Context};
+    use fidl_test_protocol_connector::{
+        ProtocolFactoryMarker, ProtocolFactoryRequest, ProtocolFactoryRequestStream, ProtocolProxy,
+        ProtocolRequest, ProtocolRequestStream,
     };
+    use fuchsia_async as fasync;
+    use fuchsia_component::server as fserver;
+    use fuchsia_component_test::{
+        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+    };
+    use futures::channel::mpsc::Sender;
+    use futures::{FutureExt, TryStreamExt};
+    use std::sync::atomic::AtomicU8;
 
     struct ProtocolConnectedProtocol(RealmInstance, Sender<()>);
     impl ConnectedProtocol for ProtocolConnectedProtocol {

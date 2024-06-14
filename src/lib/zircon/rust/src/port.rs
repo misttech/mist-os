@@ -4,15 +4,13 @@
 
 //! Type-safe bindings for Zircon port objects.
 
-use {
-    crate::{
-        guest, ok, AsHandleRef, GPAddr, Handle, HandleBased, HandleRef, Packet, Signals, Status,
-        Time, VcpuContents,
-    },
-    bitflags::bitflags,
-    fuchsia_zircon_sys as sys,
-    std::mem,
+use crate::{
+    guest, ok, AsHandleRef, GPAddr, Handle, HandleBased, HandleRef, Packet, Signals, Status, Time,
+    VcpuContents,
 };
+use bitflags::bitflags;
+use fuchsia_zircon_sys as sys;
+use std::mem;
 
 /// An object representing a Zircon
 /// [port](https://fuchsia.dev/fuchsia-src/concepts/objects/port.md).

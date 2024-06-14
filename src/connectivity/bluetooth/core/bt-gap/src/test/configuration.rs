@@ -2,22 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    fidl_fuchsia_bluetooth_host::{HostRequest, HostRequestStream, HostSetConnectableResponder},
-    fidl_fuchsia_bluetooth_sys::{
-        self as sys, BrEdrSecurityMode, ConfigurationMarker, ConfigurationProxy,
-        ConfigurationRequestStream, LeSecurityMode,
-    },
-    fuchsia_bluetooth::types::HostId,
-    futures::{future, stream::TryStreamExt},
+use assert_matches::assert_matches;
+use fidl_fuchsia_bluetooth_host::{HostRequest, HostRequestStream, HostSetConnectableResponder};
+use fidl_fuchsia_bluetooth_sys::{
+    self as sys, BrEdrSecurityMode, ConfigurationMarker, ConfigurationProxy,
+    ConfigurationRequestStream, LeSecurityMode,
 };
+use fuchsia_bluetooth::types::HostId;
+use futures::future;
+use futures::stream::TryStreamExt;
 
-use crate::{
-    host_dispatcher::{test as hd_test, HostDispatcher},
-    services::configuration,
-    types,
-};
+use crate::host_dispatcher::{test as hd_test, HostDispatcher};
+use crate::services::configuration;
+use crate::types;
 
 #[cfg(test)]
 async fn setup_configuration_test() -> types::Result<(

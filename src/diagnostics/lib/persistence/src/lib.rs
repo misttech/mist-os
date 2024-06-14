@@ -1,15 +1,16 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use std::{borrow::Borrow, collections::HashMap, fmt::Display, ops::Deref};
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::ops::Deref;
 
-use {
-    anyhow::{bail, Error},
-    glob::glob,
-    lazy_static::lazy_static,
-    regex::Regex,
-    serde_derive::Deserialize,
-};
+use anyhow::{bail, Error};
+use glob::glob;
+use lazy_static::lazy_static;
+use regex::Regex;
+use serde_derive::Deserialize;
 
 /// The outer map is service_name; the inner is tag.
 pub type Config = HashMap<ServiceName, HashMap<Tag, TagConfig>>;

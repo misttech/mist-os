@@ -2,22 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::log::*,
-    anyhow::{bail, Error},
-    event_listener::Event,
-    fuchsia_async as fasync,
-    futures::future,
-    fxfs_crypto::{Crypt, UnwrappedKeys, WrappedKeys, XtsCipherSet},
-    std::{
-        cell::UnsafeCell,
-        collections::{btree_map::Entry, BTreeMap},
-        future::Future,
-        pin::pin,
-        sync::{Arc, Mutex},
-        time::Duration,
-    },
-};
+use crate::log::*;
+use anyhow::{bail, Error};
+use event_listener::Event;
+use fuchsia_async as fasync;
+use futures::future;
+use fxfs_crypto::{Crypt, UnwrappedKeys, WrappedKeys, XtsCipherSet};
+use std::cell::UnsafeCell;
+use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::pin;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 /// This timeout controls when entries are moved from `hash` to `pending_purge` and then dumped.
 /// Entries will remain in the cache until they remain inactive from between PURGE_TIMEOUT and 2 *
@@ -294,21 +291,17 @@ impl ToCipherSet for Arc<XtsCipherSet> {
 #[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
-    use {
-        super::{KeyManager, PURGE_TIMEOUT},
-        anyhow::{anyhow, Error},
-        async_trait::async_trait,
-        fuchsia_async::{self as fasync, TestExecutor, Time},
-        fuchsia_zircon as zx,
-        fxfs_crypto::{
-            Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, WrappedKeys,
-            XtsCipherSet, KEY_SIZE, WRAPPED_KEY_SIZE,
-        },
-        std::sync::{
-            atomic::{AtomicU8, Ordering},
-            Arc,
-        },
+    use super::{KeyManager, PURGE_TIMEOUT};
+    use anyhow::{anyhow, Error};
+    use async_trait::async_trait;
+    use fuchsia_async::{self as fasync, TestExecutor, Time};
+    use fuchsia_zircon as zx;
+    use fxfs_crypto::{
+        Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, WrappedKeys, XtsCipherSet,
+        KEY_SIZE, WRAPPED_KEY_SIZE,
     };
+    use std::sync::atomic::{AtomicU8, Ordering};
+    use std::sync::Arc;
 
     const PLAIN_TEXT: &[u8] = b"The quick brown fox jumps over the lazy dog";
     const ERROR_COUNTER: u8 = 0xff;

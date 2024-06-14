@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync,
-    fuchsia_component_test::{RealmBuilder, RealmInstance},
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-};
+use anyhow::{Context, Result};
+use fuchsia_component_test::{RealmBuilder, RealmInstance};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync};
 
 async fn start_driver_test_realm() -> Result<RealmInstance> {
     let builder = RealmBuilder::new().await.context("Failed to create realm builder")?;

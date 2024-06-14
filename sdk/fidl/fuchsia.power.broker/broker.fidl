@@ -137,14 +137,6 @@ open protocol ElementControl {
         status_channel server_end:Status;
     });
 
-    /// Adds an active or passive dependency of this element upon another
-    /// element.
-    flexible AddDependency(LevelDependency) -> () error ModifyDependencyError;
-
-    /// Removes an active or passive dependency of this element upon another
-    /// element.
-    flexible RemoveDependency(LevelDependency) -> () error ModifyDependencyError;
-
     /// Register a token which will permit the bearer to add either an
     /// active or passive dependency upon this element, depending on the
     /// dependency_type specified.
@@ -230,7 +222,10 @@ alias LeaseId = string:64;
 open protocol Lessor {
     /// Request made to indicate client intends to raise the given element
     /// to the given power level and wants to have its direct and transitive
-    /// power dependencies satisfied.
+    /// power dependencies satisfied. When `LeaseControl.WatchStatus` reports
+    /// `LeaseStatus::SATISFIED` this does not indicate the `PowerElement` is at
+    /// the leased `PowerLevel`. Instead this indicates that the dependencies of
+    /// the leased `PowerLevel` are at level required by the `PowerLevel`.
     flexible Lease(resource struct {
         /// Power level of this element to be raised to.
         level PowerLevel;
@@ -248,7 +243,12 @@ type LeaseError = flexible enum {
 
 type LeaseStatus = flexible enum {
     UNKNOWN = 0;
+    /// The dependencies of the leased `PowerLevel` are not at their required
+    /// levels.
     PENDING = 1;
+    /// The `PowerElement` is **not** necessarily at the `PowerLevel` leased,
+    /// but the `PowerElement`s requried by the leased `PowerLevel`' are at
+    /// their required `PowerLevel`s.
     SATISFIED = 2;
 };
 
@@ -261,6 +261,8 @@ open protocol LeaseControl {
     /// If last_status is UNKNOWN, the call will return immediately
     /// with the current status. Otherwise, the call will block
     /// until the current status differs from last_status.
+    // TODO(b/333947976): Remove this method once unused.
+    @available(deprecated=HEAD, note="Use CurrentLevel/RequiredLevel interface instead.")
     flexible WatchStatus(struct {
         last_status LeaseStatus;
     }) -> (struct {

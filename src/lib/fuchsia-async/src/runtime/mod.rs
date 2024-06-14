@@ -18,11 +18,9 @@ mod stub;
 use self::stub as implementation;
 
 // Exports common to all target os.
-pub use implementation::{
-    executor::{Duration, LocalExecutor, SendExecutor, TestExecutor, Time},
-    task::{unblock, Task},
-    timer::Timer,
-};
+pub use implementation::executor::{Duration, LocalExecutor, SendExecutor, TestExecutor, Time};
+pub use implementation::task::{unblock, Task};
+pub use implementation::timer::Timer;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod task_group;

@@ -7,20 +7,18 @@
 //! manager which will run that custom realm, for the sole purposes of integration testing
 //! component manager behavior.
 
+use crate::builtin::runner::BuiltinRunnerFactory;
+use crate::model::resolver::{self, Resolver};
+use ::routing::policy::ScopedPolicyChecker;
+use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
+use anyhow::Error;
+use async_trait::async_trait;
+use fuchsia_component::client as fclient;
+use std::sync::Arc;
+use vfs::directory::entry::OpenRequest;
+use vfs::remote::remote_dir;
 use {
-    crate::{
-        builtin::runner::BuiltinRunnerFactory,
-        model::resolver::{self, Resolver},
-    },
-    ::routing::policy::ScopedPolicyChecker,
-    ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
-    fuchsia_component::client as fclient,
-    fuchsia_zircon as zx,
-    std::sync::Arc,
-    vfs::{directory::entry::OpenRequest, remote::remote_dir},
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
 };
 
 pub static SCHEME: &str = "realm-builder";

@@ -17,7 +17,7 @@ from sdk_common import (
 )
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--id", help="The atom's identifier", required=True)
     parser.add_argument("--out", help="Path to the output file", required=True)
@@ -118,7 +118,7 @@ def main():
     )
 
     v = Validator.from_areas_file_path(areas_file=args.areas_file_path)
-    violations = [*v.detect_violations(args.category, atoms)]
+    violations = list(v.detect_violations(args.category, list(atoms)))
     if violations:
         print("Errors detected!")
         for msg in violations:
@@ -144,6 +144,8 @@ def main():
                 " ".join(os.path.relpath(source) for _, source in extra_files),
             ),
         )
+
+    return 0
 
 
 if __name__ == "__main__":

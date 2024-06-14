@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::ie::rsn::{
-        akm::AKM_PSK,
-        cipher::{CIPHER_CCMP_128, CIPHER_TKIP},
-        rsne::Rsne,
-    },
-    fidl_fuchsia_wlan_common as fidl_common,
-};
+use crate::ie::rsn::akm::AKM_PSK;
+use crate::ie::rsn::cipher::{CIPHER_CCMP_128, CIPHER_TKIP};
+use crate::ie::rsn::rsne::Rsne;
+use fidl_fuchsia_wlan_common as fidl_common;
 
 pub fn fake_wpa2_a_rsne() -> Rsne {
     Rsne {

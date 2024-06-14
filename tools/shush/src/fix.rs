@@ -5,11 +5,9 @@
 use anyhow::{anyhow, Error};
 use rustfix::{Filter, Suggestion};
 
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-    io::BufRead,
-};
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::io::BufRead;
 
 pub fn fix<R: BufRead>(lints: &mut R, filter: &[String], dryrun: bool) -> Result<(), Error> {
     let mut all_lints = String::new();

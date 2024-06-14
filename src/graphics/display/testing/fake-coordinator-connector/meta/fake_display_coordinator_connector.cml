@@ -13,6 +13,11 @@
     },
     capabilities: [
         { protocol: "fuchsia.hardware.display.Provider" },
+        {
+            directory: "dev-display-coordinator",
+            rights: [ "r*" ],
+            path: "/dev-display-coordinator",
+        },
     ],
     use: [
         {
@@ -26,6 +31,10 @@
     expose: [
         {
             protocol: "fuchsia.hardware.display.Provider",
+            from: "self",
+        },
+        {
+            directory: "dev-display-coordinator",
             from: "self",
         },
     ],

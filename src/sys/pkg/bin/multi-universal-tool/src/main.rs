@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Context, std::ffi::OsString};
+use anyhow::Context;
+use std::ffi::OsString;
 
 fn main() -> Result<(), anyhow::Error> {
     let program = find_program(std::env::args_os())

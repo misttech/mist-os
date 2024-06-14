@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    aes::{self, KeyUnwrapIo, KeyWrapIo, SizedKey},
-    keywrap::Algorithm,
-    Error,
-};
+use crate::aes::{self, KeyUnwrapIo, KeyWrapIo, SizedKey};
+use crate::keywrap::Algorithm;
+use crate::Error;
 
 /// RFC 3394 AES key wrapping.
 pub struct NistAes;

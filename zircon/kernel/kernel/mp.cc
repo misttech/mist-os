@@ -61,8 +61,8 @@ void mp_reschedule(cpu_mask_t mask, uint flags) {
 
   LTRACEF("local %u, mask %#x\n", local_cpu, mask);
 
-  // mask out cpus that are not active and the local cpu
-  mask &= mp.active_cpus.load();
+  // mask out cpus that do not have an active scheduler, and the local cpu
+  mask &= Scheduler::PeekActiveMask();
   mask &= ~cpu_num_to_mask(local_cpu);
 
   LTRACEF("local %u, post mask target now 0x%x\n", local_cpu, mask);
@@ -227,7 +227,7 @@ void mp_unplug_current_cpu() {
 
   lockup_secondary_shutdown();
   Scheduler::MigrateUnpinnedThreads();
-  DEBUG_ASSERT(!mp_is_cpu_active(arch_curr_cpu_num()));
+  DEBUG_ASSERT(!Scheduler::PeekIsActive(arch_curr_cpu_num()));
 
   // Now that this CPU is no longer active, it is critical that this thread
   // never block.  If this thread blocks, the scheduler may attempt to select
@@ -367,7 +367,7 @@ void mp_mbx_reschedule_irq(void*) {
 
   CPU_STATS_INC(reschedule_ipis);
 
-  if (mp.active_cpus.load() & cpu_num_to_mask(cpu)) {
+  if (Scheduler::PeekIsActive(cpu)) {
     Thread::Current::preemption_state().PreemptSetPending(cpu_num_to_mask(cpu));
   }
 }
@@ -395,7 +395,8 @@ Event ready_cpu_event;
 
 void mp_signal_curr_cpu_ready() {
   cpu_num_t num = arch_curr_cpu_num();
-  DEBUG_ASSERT_MSG(mp_is_cpu_active(num), "CPU %u cannot be ready if it is not yet active", num);
+  DEBUG_ASSERT_MSG(Scheduler::PeekIsActive(num), "CPU %u cannot be ready if it is not yet active",
+                   num);
   cpu_mask_t mask = cpu_num_to_mask(num);
   cpu_mask_t ready = ready_cpu_mask.fetch_or(mask) | mask;
   int ready_count = ktl::popcount(ready);
@@ -486,7 +487,7 @@ static int cmd_mp(int argc, const cmd_args* argv, uint32_t flags) {
     }
 
     auto target_cpu = static_cast<cpu_num_t>(argv[2].u);
-    if (!mp_is_cpu_active(target_cpu)) {
+    if (!Scheduler::PeekIsActive(target_cpu)) {
       printf("target cpu %u is not active\n", target_cpu);
       return ZX_OK;
     }

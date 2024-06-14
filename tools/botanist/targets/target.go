@@ -59,7 +59,7 @@ type Base interface {
 	// This information will be provided as part of the testbed config. The path
 	// to the testbed config will be available during test runtime via the
 	// FUCHSIA_TESTBED_CONFIG environment variable.
-	TestConfig(netboot bool) (any, error)
+	TestConfig(expectsSSH bool) (any, error)
 }
 
 // FuchsiaTarget is implemented for Fuchsia targets.
@@ -591,6 +591,9 @@ type Options struct {
 	// will be paved. Ignored for QEMU.
 	Netboot bool
 
+	// ExpectsSSH specifies whether we expect to be able to SSH to the target.
+	ExpectsSSH bool
+
 	// SSHKey is a private SSH key file, corresponding to an authorized key to be paved or
 	// to one baked into a boot image.
 	SSHKey string
@@ -760,14 +763,14 @@ type targetPDU struct {
 
 // TargetInfo returns config used to communicate with the target (device
 // properties, serial paths, SSH properties, etc.) for use by subprocesses.
-func TargetInfo(t FuchsiaTarget, netboot bool, pdu *targetPDU) (targetInfo, error) {
+func TargetInfo(t FuchsiaTarget, expectsSSH bool, pdu *targetPDU) (targetInfo, error) {
 	cfg := targetInfo{
 		Type:         "FuchsiaDevice",
 		Nodename:     t.Nodename(),
 		SerialSocket: t.SerialSocketPath(),
 		PDU:          pdu,
 	}
-	if netboot {
+	if !expectsSSH {
 		return cfg, nil
 	}
 

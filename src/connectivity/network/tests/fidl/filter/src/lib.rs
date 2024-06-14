@@ -6,19 +6,15 @@
 
 mod ip_hooks;
 mod matchers;
+mod nat;
 
-use std::{
-    collections::{HashMap, HashSet},
-    num::NonZeroU16,
-    pin::pin,
-};
+use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU16;
+use std::pin::pin;
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::{
     self as fnet_filter_ext, Action, AddressMatcher, AddressMatcherType, AddressRange, Change,
     ChangeCommitError, CommitError, Controller, ControllerId, DeviceClass, Domain, Event,
@@ -31,12 +27,14 @@ use futures::{FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet};
 use net_types::ip::IpInvariant;
-use netstack_testing_common::{
-    realms::{Netstack3, TestSandboxExt as _},
-    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
-};
+use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
+use netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_filter as fnet_filter,
+};
 
 trait TestValue {
     fn test_value() -> Self;

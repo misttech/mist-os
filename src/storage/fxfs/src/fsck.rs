@@ -2,40 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        filesystem::FxFilesystem,
-        fsck::errors::{FsckError, FsckFatal, FsckIssue, FsckWarning},
-        log::*,
-        lsm_tree::{
-            skip_list_layer::SkipListLayer,
-            types::{
-                BoxedLayerIterator, Item, Key, Layer, LayerIterator, OrdUpperBound, RangeKey, Value,
-            },
-        },
-        object_handle::INVALID_OBJECT_ID,
-        object_store::{
-            allocator::{AllocatorKey, AllocatorValue, CoalescingIterator},
-            journal::super_block::SuperBlockInstance,
-            load_store_info,
-            transaction::{lock_keys, LockKey},
-            volume::root_volume,
-        },
-    },
-    anyhow::{anyhow, Context, Error},
-    futures::try_join,
-    fxfs_crypto::Crypt,
-    rustc_hash::FxHashSet as HashSet,
-    std::{
-        collections::BTreeMap,
-        iter::zip,
-        ops::Bound,
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc,
-        },
-    },
+use crate::filesystem::FxFilesystem;
+use crate::fsck::errors::{FsckError, FsckFatal, FsckIssue, FsckWarning};
+use crate::log::*;
+use crate::lsm_tree::skip_list_layer::SkipListLayer;
+use crate::lsm_tree::types::{
+    BoxedLayerIterator, Item, Key, Layer, LayerIterator, OrdUpperBound, RangeKey, Value,
 };
+use crate::object_handle::INVALID_OBJECT_ID;
+use crate::object_store::allocator::{AllocatorKey, AllocatorValue, CoalescingIterator};
+use crate::object_store::journal::super_block::SuperBlockInstance;
+use crate::object_store::load_store_info;
+use crate::object_store::transaction::{lock_keys, LockKey};
+use crate::object_store::volume::root_volume;
+use anyhow::{anyhow, Context, Error};
+use futures::try_join;
+use fxfs_crypto::Crypt;
+use rustc_hash::FxHashSet as HashSet;
+use std::collections::BTreeMap;
+use std::iter::zip;
+use std::ops::Bound;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 pub mod errors;
 
@@ -519,8 +507,7 @@ impl<'a> Fsck<'a> {
                 previous_allocation_end = r.end;
             }
 
-            *observed_owner_allocated_bytes.entry(owner_object_id).or_insert(0) +=
-                (r.end - r.start) as i64;
+            *observed_owner_allocated_bytes.entry(owner_object_id).or_insert(0) += r.end - r.start;
             if !store_object_ids.contains(&owner_object_id) {
                 if filesystem.object_manager().store(owner_object_id).is_none() {
                     self.error(FsckError::AllocationForNonexistentOwner(allocation.into()))?;
@@ -571,7 +558,7 @@ impl<'a> Fsck<'a> {
             observed_allocations.advance().await?;
             continue;
         }
-        let expected_allocated_bytes = observed_owner_allocated_bytes.values().sum::<i64>() as u64;
+        let expected_allocated_bytes = observed_owner_allocated_bytes.values().sum::<u64>();
         self.verbose(format!(
             "Found {} bytes allocated (expected {} bytes). Total device size is {} bytes.",
             allocator.get_allocated_bytes(),

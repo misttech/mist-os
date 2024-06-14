@@ -2,40 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    bpf::{
-        fs::get_bpf_object,
-        program::{Program, ProgramType},
-    },
-    mm::MemoryAccessorExt,
-    task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter},
-    vfs::{
-        buffers::{
-            AncillaryData, InputBuffer, MessageQueue, MessageReadInfo, OutputBuffer,
-            UnixControlData,
-        },
-        default_ioctl,
-        socket::{
-            AcceptQueue, Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags,
-            SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
-            DEFAULT_LISTEN_BACKLOG,
-        },
-        FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr, LookupContext, Message,
-    },
+use crate::bpf::fs::get_bpf_object;
+use crate::bpf::program::{Program, ProgramType};
+use crate::mm::MemoryAccessorExt;
+use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter};
+use crate::vfs::buffers::{
+    AncillaryData, InputBuffer, MessageQueue, MessageReadInfo, OutputBuffer, UnixControlData,
+};
+use crate::vfs::socket::{
+    AcceptQueue, Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
+    SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, DEFAULT_LISTEN_BACKLOG,
+};
+use crate::vfs::{
+    default_ioctl, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr, LookupContext, Message,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::errors::{Errno, EACCES, EINTR, EPERM};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_buffer::UserBuffer;
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error,
-    errors::{Errno, EACCES, EINTR, EPERM},
-    gid_t,
-    open_flags::OpenFlags,
-    socklen_t, uapi, ucred, uid_t,
-    user_address::{UserAddress, UserRef},
-    user_buffer::UserBuffer,
-    vfs::FdEvents,
-    FIONREAD, SOL_SOCKET, SO_ACCEPTCONN, SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE,
-    SO_LINGER, SO_NO_CHECK, SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR,
-    SO_REUSEPORT, SO_SNDBUF,
+    errno, error, gid_t, socklen_t, uapi, ucred, uid_t, FIONREAD, SOL_SOCKET, SO_ACCEPTCONN,
+    SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK, SO_PASSCRED,
+    SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
 };
 use zerocopy::AsBytes;
 
@@ -962,7 +952,8 @@ pub fn resolve_unix_socket_address(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{mm::MemoryAccessor, testing::*};
+    use crate::mm::MemoryAccessor;
+    use crate::testing::*;
 
     #[::fuchsia::test]
     async fn test_socket_send_capacity() {

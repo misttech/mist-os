@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::RelativeTo,
-    anyhow::Result,
-    camino::{Utf8Path, Utf8PathBuf},
-    serde::{Deserialize, Serialize},
-    std::{
-        fs::{create_dir_all, File},
-        slice, vec,
-    },
-    utf8_path::{path_relative_from_file, resolve_path_from_file},
-};
+use crate::RelativeTo;
+use anyhow::Result;
+use camino::{Utf8Path, Utf8PathBuf};
+use serde::{Deserialize, Serialize};
+use std::fs::{create_dir_all, File};
+use std::{slice, vec};
+use utf8_path::{path_relative_from_file, resolve_path_from_file};
 
 /// [PackageManifestList] is a construct that points at a path that contains a
 /// package manifest list. This will be used by the packaging tooling to
@@ -213,7 +209,9 @@ impl Iterator for IntoIter {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, serde_json::json, tempfile::TempDir};
+    use super::*;
+    use serde_json::json;
+    use tempfile::TempDir;
 
     #[test]
     fn test_serialize() {

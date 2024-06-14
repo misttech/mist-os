@@ -11,14 +11,14 @@ use alloc::vec::Vec;
 use core::num::NonZeroU16;
 use core::ops::Range;
 
+use log::debug;
 use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4Addr, Ipv6Addr};
-use packet::{ParsablePacket, ParseBuffer};
-use tracing::debug;
+use packet::{ParsablePacket, ParseBuffer, SliceBufViewMut};
 
 use crate::error::{IpParseResult, ParseError, ParseResult};
 use crate::ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck};
-use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpParseArgs};
+use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpParseArgs, Icmpv6PacketRaw};
 use crate::ip::{IpExt, Ipv4Proto};
 use crate::ipv4::{Ipv4FragmentType, Ipv4Header, Ipv4Packet};
 use crate::ipv6::{Ipv6Header, Ipv6Packet};
@@ -284,11 +284,18 @@ where
     Ok((src_mac, dst_mac, src_ip, dst_ip, ttl, message, code))
 }
 
+/// Overwrite the checksum in an ICMPv6 message, returning the original value.
+///
+/// On `Err`, the provided buf is unmodified.
+pub fn overwrite_icmpv6_checksum(buf: &mut [u8], checksum: [u8; 2]) -> ParseResult<[u8; 2]> {
+    let buf = SliceBufViewMut::new(buf);
+    let mut message = Icmpv6PacketRaw::parse_mut(buf, ())?;
+    Ok(message.overwrite_checksum(checksum))
+}
+
 #[cfg(test)]
 mod crateonly {
     use std::sync::Once;
-
-    static LOGGER_ONCE: Once = Once::new();
 
     /// Install a logger for tests.
     ///
@@ -296,13 +303,29 @@ mod crateonly {
     /// This function sets global program state, so all tests that run after this
     /// function is called will use the logger.
     pub(crate) fn set_logger_for_test() {
-        // `init` will panic if called multiple times; using a Once makes
+        /// log::Log implementation that uses stdout.
+        ///
+        /// Useful when debugging tests.
+        struct Logger;
+
+        impl log::Log for Logger {
+            fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+                true
+            }
+
+            fn log(&self, record: &log::Record<'_>) {
+                println!("{}", record.args())
+            }
+
+            fn flush(&self) {}
+        }
+        static LOGGER_ONCE: Once = Once::new();
+
+        // log::set_logger will panic if called multiple times; using a Once makes
         // set_logger_for_test idempotent
         LOGGER_ONCE.call_once(|| {
-            tracing_subscriber::fmt()
-                .with_writer(std::io::stdout)
-                .with_max_level(tracing::Level::TRACE)
-                .init();
+            log::set_logger(&Logger).unwrap();
+            log::set_max_level(log::LevelFilter::Trace);
         })
     }
 

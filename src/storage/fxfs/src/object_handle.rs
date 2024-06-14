@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::object_store::{PosixAttributes, Timestamp},
-    anyhow::Error,
-    async_trait::async_trait,
-    std::{future::Future, ops::Deref, pin::Pin},
-    storage_device::buffer::{BufferFuture, BufferRef, MutableBufferRef},
-};
+use crate::object_store::{PosixAttributes, Timestamp};
+use anyhow::Error;
+use async_trait::async_trait;
+use std::future::Future;
+use std::ops::Deref;
+use std::pin::Pin;
+use storage_device::buffer::{BufferFuture, BufferRef, MutableBufferRef};
 
 // Some places use Default and assume that zero is an invalid object ID, so this cannot be changed
 // easily.

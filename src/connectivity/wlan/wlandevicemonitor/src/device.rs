@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl_fuchsia_wlan_device as fidl_wlan_dev, fidl_fuchsia_wlan_sme as fidl_wlan_sme,
-    fuchsia_inspect_contrib::inspect_log,
-    futures::{
-        select,
-        stream::{FuturesUnordered, StreamExt, TryStreamExt},
-    },
-    std::{convert::Infallible, pin::pin, sync::Arc},
-    tracing::{error, info},
-};
+use anyhow::{format_err, Error};
+use fuchsia_inspect_contrib::inspect_log;
+use futures::select;
+use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use std::convert::Infallible;
+use std::pin::pin;
+use std::sync::Arc;
+use tracing::{error, info};
+use {fidl_fuchsia_wlan_device as fidl_wlan_dev, fidl_fuchsia_wlan_sme as fidl_wlan_sme};
 
-use crate::{device_watch, inspect, watchable_map::WatchableMap};
+use crate::watchable_map::WatchableMap;
+use crate::{device_watch, inspect};
 
 /// Iface's PHY information.
 #[derive(Debug, PartialEq, Clone)]
@@ -131,16 +130,15 @@ async fn serve_phy(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::watchable_map,
-        fidl::endpoints::create_proxy,
-        fuchsia_async as fasync,
-        fuchsia_inspect::{Inspector, InspectorConfig},
-        fuchsia_zircon::prelude::*,
-        futures::task::Poll,
-        wlan_common::{assert_variant, test_utils::ExpectWithin},
-    };
+    use super::*;
+    use crate::watchable_map;
+    use fidl::endpoints::create_proxy;
+    use fuchsia_async as fasync;
+    use fuchsia_inspect::{Inspector, InspectorConfig};
+    use fuchsia_zircon::prelude::*;
+    use futures::task::Poll;
+    use wlan_common::assert_variant;
+    use wlan_common::test_utils::ExpectWithin;
 
     #[fuchsia::test]
     fn test_serve_phys_exits_when_watching_devices_fails() {

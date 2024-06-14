@@ -18,20 +18,14 @@
 
 use crate::token_registry::TokenRegistry;
 
-use {
-    futures::{
-        channel::oneshot,
-        task::{self, Context, Poll, Waker},
-        Future,
-    },
-    pin_project::pin_project,
-    slab::Slab,
-    std::{
-        future::poll_fn,
-        pin::Pin,
-        sync::{Arc, Mutex},
-    },
-};
+use futures::channel::oneshot;
+use futures::task::{self, Context, Poll, Waker};
+use futures::Future;
+use pin_project::pin_project;
+use slab::Slab;
+use std::future::poll_fn;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex};
 
 #[cfg(target_os = "fuchsia")]
 use {fuchsia_async::EHandle, std::sync::OnceLock};
@@ -380,18 +374,15 @@ pub async fn yield_to_executor() {
 mod tests {
     use super::{yield_to_executor, ExecutionScope};
 
-    use {
-        fuchsia_async::{Task, TestExecutor, Timer},
-        futures::{channel::oneshot, stream::FuturesUnordered, task::Poll, Future, StreamExt},
-        std::{
-            pin::pin,
-            sync::{
-                atomic::{AtomicBool, Ordering},
-                Arc,
-            },
-            time::Duration,
-        },
-    };
+    use fuchsia_async::{Task, TestExecutor, Timer};
+    use futures::channel::oneshot;
+    use futures::stream::FuturesUnordered;
+    use futures::task::Poll;
+    use futures::{Future, StreamExt};
+    use std::pin::pin;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
 
     #[cfg(target_os = "fuchsia")]
     fn run_test<GetTest, GetTestRes>(get_test: GetTest)
@@ -680,20 +671,12 @@ mod tests {
     }
 
     mod mocks {
-        use {
-            futures::{
-                channel::oneshot,
-                task::{Context, Poll},
-                Future,
-            },
-            std::{
-                pin::Pin,
-                sync::{
-                    atomic::{AtomicUsize, Ordering},
-                    Arc,
-                },
-            },
-        };
+        use futures::channel::oneshot;
+        use futures::task::{Context, Poll};
+        use futures::Future;
+        use std::pin::Pin;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
 
         pub(super) struct TaskCounters {
             poll_call_count: Arc<AtomicUsize>,

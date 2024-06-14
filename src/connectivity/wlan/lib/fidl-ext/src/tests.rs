@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{ResponderExt, SendResultExt, WithName},
-    fuchsia_zircon as zx,
-    test_case::test_case,
-};
+use crate::{ResponderExt, SendResultExt, WithName};
+use fuchsia_zircon as zx;
+use test_case::test_case;
 
 // The following type definitions emulate the definition of FIDL requests and responder types.
 // In addition to testing the types defined in this crate, these tests demonstrate how those

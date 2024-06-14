@@ -357,7 +357,7 @@ void arch_late_init_percpu(void) {
   }
 }
 
-void arch_idle_enter(zx_duration_t max_latency) { __asm__ volatile("wfi"); }
+void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) { __asm__ volatile("wfi"); }
 
 void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uintptr_t arg1,
                               uintptr_t arg2) {

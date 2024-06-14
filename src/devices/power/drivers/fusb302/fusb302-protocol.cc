@@ -21,8 +21,10 @@
 
 namespace fusb302 {
 
-Fusb302Protocol::Fusb302Protocol(Fusb302Fifos& fifos)
+Fusb302Protocol::Fusb302Protocol(GoodCrcGenerationMode good_crc_generation_mode,
+                                 Fusb302Fifos& fifos)
     : fifos_(fifos),
+      good_crc_generation_mode_(good_crc_generation_mode),
       good_crc_template_(usb_pd::MessageType::kGoodCrc, /*data_object_count=*/0,
                          usb_pd::MessageId(0), usb_pd::PowerRole::kSink,
                          usb_pd::SpecRevision::kRev2, usb_pd::DataRole::kUpstreamFacingPort),
@@ -39,16 +41,27 @@ zx::result<> Fusb302Protocol::MarkMessageAsRead() {
 
   if (!good_crc_transmission_pending_) {
     // Hardware replied with GoodCRC.
+    ZX_DEBUG_ASSERT_MSG(good_crc_generation_mode_ != GoodCrcGenerationMode::kSoftware,
+                        "Software-generated GoodCRC is only done in MarkMessageAsRead()");
     return zx::ok();
   }
+
   if (read_message_id != next_expected_message_id_) {
     // There is an unacknowledged message, but it's not this one.
     return zx::ok();
   }
 
   StampGoodCrcTemplate();
-  usb_pd::Message good_crc(good_crc_template_, {});
-  return fifos_.TransmitMessage(good_crc);
+
+  switch (good_crc_generation_mode_) {
+    case GoodCrcGenerationMode::kSoftware: {
+      usb_pd::Message good_crc(good_crc_template_, {});
+      return fifos_.TransmitMessage(good_crc);
+    }
+    case GoodCrcGenerationMode::kTracked:
+    case GoodCrcGenerationMode::kAssumed:
+      return zx::ok();
+  }
 }
 
 zx::result<> Fusb302Protocol::DrainReceiveFifo() {
@@ -177,6 +190,16 @@ zx::result<> Fusb302Protocol::Transmit(const usb_pd::Message& message) {
   ZX_DEBUG_ASSERT(transmission_state_ != TransmissionState::kPending);
   ZX_DEBUG_ASSERT(message.header().message_id() == next_transmitted_message_id_);
 
+  if (good_crc_generation_mode_ == GoodCrcGenerationMode::kTracked) {
+    if (good_crc_transmission_pending_) {
+      ZX_DEBUG_ASSERT_MSG(
+          !queued_transmission_.has_value(),
+          "Attempted to transmit multiple messages before hardware-generated GoodCRC");
+      queued_transmission_ = message;
+      return zx::ok();
+    }
+  }
+
   zx::result<> result = fifos_.TransmitMessage(message);
   if (!result.is_ok()) {
     return result.take_error();
@@ -186,6 +209,11 @@ zx::result<> Fusb302Protocol::Transmit(const usb_pd::Message& message) {
 }
 
 void Fusb302Protocol::FullReset() {
+  ZX_DEBUG_ASSERT_MSG(!queued_transmission_.has_value() ||
+                          good_crc_generation_mode_ == GoodCrcGenerationMode::kTracked,
+                      "Transmitted message queued despite not tracking hardware-generated GoodCRC");
+  queued_transmission_.reset();
+
   next_expected_message_id_ = std::nullopt;
   next_transmitted_message_id_.Reset();
   transmission_state_ = TransmissionState::kSuccess;
@@ -193,6 +221,11 @@ void Fusb302Protocol::FullReset() {
 }
 
 void Fusb302Protocol::DidReceiveSoftReset() {
+  ZX_DEBUG_ASSERT_MSG(!queued_transmission_.has_value() ||
+                          good_crc_generation_mode_ == GoodCrcGenerationMode::kTracked,
+                      "Transmitted message queued despite not tracking hardware-generated GoodCRC");
+  queued_transmission_.reset();
+
   // usbpd3.1 6.8.1 "Soft Reset and Protocol error" states that the MessageID
   // counter must be reset before sending the Soft Reset / Accept messages in
   // the soft reset sequence. This implies that Soft Reset message we received
@@ -222,14 +255,29 @@ void Fusb302Protocol::DidTimeoutWaitingForGoodCrc() {
   transmission_state_ = TransmissionState::kTimedOut;
 }
 
-void Fusb302Protocol::DidTransmitGoodCrc() {
-  if (good_crc_transmission_pending_) {
-    // We will not be using the GoodCRC template, but stamping also performs all
-    // GoodCRC-related state updates.
-    StampGoodCrcTemplate();
-  } else {
+void Fusb302Protocol::DidTransmitHardwareGeneratedGoodCrc() {
+  ZX_DEBUG_ASSERT_MSG(
+      UsesHardwareAcceleratedGoodCrcNotifications(),
+      "Received hardware-generated GoodCRC notification in a mode that does not require it.");
+
+  if (!good_crc_transmission_pending_) {
     FDF_LOG(WARNING,
             "Hardware PD layer reported transmitting a GoodCRC, but we didn't need to send one");
+  }
+
+  // We will not be using the GoodCRC template, but stamping also performs all
+  // GoodCRC-related state updates.
+  StampGoodCrcTemplate();
+
+  if (queued_transmission_.has_value()) {
+    ZX_DEBUG_ASSERT_MSG(
+        good_crc_generation_mode_ == GoodCrcGenerationMode::kTracked,
+        "Transmitted message queueing is only needed when tracking hardware-generated GoodCRC");
+    zx::result<> transmit_result = Transmit(queued_transmission_.value());
+    queued_transmission_ = std::nullopt;
+    if (transmit_result.is_error()) {
+      FDF_LOG(WARNING, "Failed to transmit queued PD message: %s", transmit_result.status_string());
+    }
   }
 }
 
@@ -238,7 +286,9 @@ void Fusb302Protocol::StampGoodCrcTemplate() {
   ZX_DEBUG_ASSERT_MSG(next_expected_message_id_.has_value(),
                       "next_expected_message_id_ should be known after having received a message");
 
-  good_crc_template_.set_message_id(next_expected_message_id_.value());
+  if (good_crc_generation_mode_ == GoodCrcGenerationMode::kSoftware) {
+    good_crc_template_.set_message_id(next_expected_message_id_.value());
+  }
   next_expected_message_id_ = next_expected_message_id_.value().Next();
   good_crc_transmission_pending_ = false;
 }

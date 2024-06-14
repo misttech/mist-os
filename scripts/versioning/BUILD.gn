@@ -2,21 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# :bump_api_level increases the platform's API level from N to N+1.
-#
-# A new ABI revision is generated and associated with the new API level, and
-# the golden files used for static compatibility testing are updated.
-#
-# This target is a tool for managing the platform version. It should only be
-# built by an infra bot or a human manually bumping the platform version, as
-# it updates several files in the checkout.
-#
-# To run this tool, use:
-#
-#   fx set core.x64 --with //scripts/versioning:bump_api_level --args=bump_api_level=true
-#   fx build.
-#
-
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/python/python_host_test.gni")
 
@@ -43,62 +28,91 @@ group("tests") {
   ]
 }
 
-action("bump_api_level") {
-  # Generate the golden files and manifest before updating the platform version.
-  deps = [ "//sdk:compatibility_testing_goldens($target_toolchain)" ]
+if (bump_api_level) {
+  # Adds a new in-development API level that is one greater than the highest
+  # existing numbered API level.
+  #
+  # A new ABI revision is generated and associated with the new API level, and
+  # the golden files used for static compatibility checks are generated.
+  #
+  # This target is a tool for managing the platform version. It should only be
+  # built by an infra bot or a human manually bumping the platform version, as
+  # it updates several files in the checkout.
+  #
+  # To use this tool manually, run the following:
+  #   fx set bringup.x64 --with-host //scripts/versioning:bump_api_level --args=bump_api_level=true
+  #   fx build
+  action("bump_api_level") {
+    # Generate the golden files and manifest before updating the platform version.
+    deps = [ "//sdk:compatibility_testing_goldens($target_toolchain)" ]
 
-  script = "//scripts/versioning/update_platform_version.py"
+    script = "//scripts/versioning/update_platform_version.py"
 
-  _version_history_file = "//sdk/version_history.json"
-  _fidl_compatiblity_doc_path =
-      "//docs/development/testing/ctf/fidl_api_compatibility_testing.md"
-  _goldens_manifest = "$root_build_dir/compatibility_testing_goldens.json"
-  _stamp_file = "$target_out_dir/$target_name.status"
-  _next_level = platform_version.in_development_api_level + 1
+    _version_history_file = "//sdk/version_history.json"
+    _fidl_compatiblity_doc_path =
+        "//docs/development/testing/ctf/fidl_api_compatibility_testing.md"
+    _goldens_manifest = "$root_build_dir/compatibility_testing_goldens.json"
+    _stamp_file = "$target_out_dir/$target_name.status"
+    _next_level = platform_version.in_development_api_level + 1
 
-  args = [
-    "--stamp-file",
-    rebase_path(_stamp_file, root_build_dir),
-    "--root-build-dir",
-    ".",
-    "--root-source-dir",
-    rebase_path("//", root_build_dir),
-    "--sdk-version-history",
-    rebase_path(_version_history_file, root_build_dir),
-    "--fidl-compatibility-doc-path",
-    rebase_path(_fidl_compatiblity_doc_path, root_build_dir),
-    "--goldens-manifest",
-    rebase_path(_goldens_manifest, root_build_dir),
-    "--fuchsia-api-level",
-    "$_next_level",
-  ]
+    args = [
+      "--stamp-file",
+      rebase_path(_stamp_file, root_build_dir),
+      "--root-build-dir",
+      ".",
+      "--root-source-dir",
+      rebase_path("//", root_build_dir),
+      "--sdk-version-history",
+      rebase_path(_version_history_file, root_build_dir),
+      "--fidl-compatibility-doc-path",
+      rebase_path(_fidl_compatiblity_doc_path, root_build_dir),
+      "--goldens-manifest",
+      rebase_path(_goldens_manifest, root_build_dir),
+      "--fuchsia-api-level",
+      "$_next_level",
+    ]
 
-  inputs = [
-    _version_history_file,
-    _goldens_manifest,
-  ]
+    inputs = [
+      _version_history_file,
+      _goldens_manifest,
+    ]
 
-  outputs = [ _stamp_file ]
+    outputs = [ _stamp_file ]
 
-  testonly = true
+    testonly = true
+  }
 }
 
-action("freeze_api_level") {
-  script = "//scripts/versioning/freeze_in_development_api_level.py"
+if (freeze_api_level) {
+  # Freezes the current in-development API level, marking it stable in
+  # `//sdk/version_history.json`.
+  #
+  # It results in no in-development API level until ":bump_api_level" is run.
+  #
+  # This target is a tool for managing the platform version. It should only be
+  # built by an infra bot or a human manually bumping the platform version, as
+  # it updates several files in the checkout.
+  #
+  # To use this tool manually, run the following:
+  #   fx set bringup.x64 --with-host //scripts/versioning:freeze_api_level --args=freeze_api_level=true
+  #   fx build
+  action("freeze_api_level") {
+    script = "//scripts/versioning/freeze_in_development_api_level.py"
 
-  _stamp_file = "$target_out_dir/$target_name.status"
-  _version_history_file = "//sdk/version_history.json"
+    _stamp_file = "$target_out_dir/$target_name.status"
+    _version_history_file = "//sdk/version_history.json"
 
-  args = [
-    "--stamp-file",
-    rebase_path(_stamp_file, root_build_dir),
-    "--sdk-version-history",
-    rebase_path(_version_history_file, root_build_dir),
-  ]
+    args = [
+      "--stamp-file",
+      rebase_path(_stamp_file, root_build_dir),
+      "--sdk-version-history",
+      rebase_path(_version_history_file, root_build_dir),
+    ]
 
-  inputs = [ _version_history_file ]
+    inputs = [ _version_history_file ]
 
-  outputs = [ _stamp_file ]
+    outputs = [ _stamp_file ]
 
-  testonly = true
+    testonly = true
+  }
 }

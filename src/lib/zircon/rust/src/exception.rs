@@ -4,10 +4,10 @@
 
 //! Type-safe bindings for Zircon event objects.
 
-use crate::{object_get_property, object_set_property};
-use crate::{ok, Status};
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Process, Thread};
-use crate::{Property, PropertyQuery};
+use crate::{
+    object_get_property, object_set_property, ok, AsHandleRef, Handle, HandleBased, HandleRef,
+    Process, Property, PropertyQuery, Status, Thread,
+};
 use fuchsia_zircon_sys as sys;
 
 /// An object representing a Zircon

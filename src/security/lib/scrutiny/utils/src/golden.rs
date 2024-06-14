@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Context, Result},
-    std::{
-        collections::HashSet,
-        fs::File,
-        io::{BufRead, BufReader, Cursor, Read},
-        path::{Path, PathBuf},
-    },
-};
+use anyhow::{bail, Context, Result};
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Cursor, Read};
+use std::path::{Path, PathBuf};
 
 /// Compares either match or they have a set of mismatch errors.
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -196,7 +192,9 @@ impl GoldenFile {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::io::Write, tempfile::tempdir};
+    use super::*;
+    use std::io::Write;
+    use tempfile::tempdir;
 
     #[test]
     fn test_required_golden_files() {

@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::buffer::{BufferFuture, BufferRef, MutableBufferRef},
-    anyhow::{bail, Error},
-    async_trait::async_trait,
-    futures::channel::oneshot::{channel, Sender},
-    std::{
-        future::Future,
-        mem::ManuallyDrop,
-        ops::{Deref, Range},
-        sync::{Arc, OnceLock},
-    },
-};
+use crate::buffer::{BufferFuture, BufferRef, MutableBufferRef};
+use anyhow::{bail, Error};
+use async_trait::async_trait;
+use futures::channel::oneshot::{channel, Sender};
+use std::future::Future;
+use std::mem::ManuallyDrop;
+use std::ops::{Deref, Range};
+use std::sync::{Arc, OnceLock};
 
 pub mod buffer;
 pub mod buffer_allocator;
@@ -137,7 +133,8 @@ impl Deref for DeviceHolder {
 
 #[cfg(test)]
 mod tests {
-    use {super::DeviceHolder, crate::fake_device::FakeDevice};
+    use super::DeviceHolder;
+    use crate::fake_device::FakeDevice;
 
     #[fuchsia::test]
     async fn test_take_when_dropped() {

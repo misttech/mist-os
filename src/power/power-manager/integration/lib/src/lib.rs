@@ -5,24 +5,24 @@
 pub mod client_connectors;
 mod mocks;
 
+use crate::mocks::activity_service::MockActivityService;
+use crate::mocks::input_settings_service::MockInputSettingsService;
+use crate::mocks::kernel_service::MockKernelService;
+use crate::mocks::system_controller::MockSystemControllerService;
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
+use fidl::AsHandleRef as _;
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
+};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use tracing::*;
 use {
-    crate::mocks::{
-        activity_service::MockActivityService, input_settings_service::MockInputSettingsService,
-        kernel_service::MockKernelService, system_controller::MockSystemControllerService,
-    },
-    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker},
-    fidl::AsHandleRef as _,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_hardware_power_statecontrol as fpower,
     fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel,
     fidl_fuchsia_powermanager_driver_temperaturecontrol as ftemperaturecontrol,
     fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_testing as ftesting,
-    fuchsia_component_test::{
-        Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
-    },
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    std::sync::atomic::{AtomicU64, Ordering},
-    std::sync::Arc,
-    tracing::*,
 };
 
 const POWER_MANAGER_URL: &str = "#meta/power-manager.cm";

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::constants;
-use crate::BlockType;
+use crate::{constants, BlockType};
 use std::cmp::{max, min};
 
 /// Returns the smallest order such that (MIN_ORDER_SHIFT << order) >= size.

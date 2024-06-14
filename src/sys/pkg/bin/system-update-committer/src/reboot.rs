@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context},
-    fidl_fuchsia_hardware_power_statecontrol::{
-        AdminProxy as PowerStateControlProxy, RebootReason,
-    },
-    fuchsia_async as fasync,
-    fuchsia_zircon::Status,
-    tracing::error,
+use anyhow::{anyhow, Context};
+use fidl_fuchsia_hardware_power_statecontrol::{
+    AdminProxy as PowerStateControlProxy, RebootReason,
 };
+use fuchsia_async as fasync;
+use fuchsia_zircon::Status;
+use tracing::error;
 
 /// Waits for a timer to fire and then reboots the system, logging errors instead of failing.
 pub(super) async fn wait_and_reboot(timer: fasync::Timer, proxy: &PowerStateControlProxy) {
@@ -31,13 +29,14 @@ pub(super) async fn wait_and_reboot(timer: fasync::Timer, proxy: &PowerStateCont
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_sync::Mutex,
-        futures::{channel::oneshot, pin_mut, task::Poll},
-        mock_reboot::MockRebootService,
-        std::{sync::Arc, time::Duration},
-    };
+    use super::*;
+    use fuchsia_sync::Mutex;
+    use futures::channel::oneshot;
+    use futures::pin_mut;
+    use futures::task::Poll;
+    use mock_reboot::MockRebootService;
+    use std::sync::Arc;
+    use std::time::Duration;
 
     #[test]
     fn test_wait_and_reboot_success() {

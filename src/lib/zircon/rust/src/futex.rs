@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    sys::{
-        zx_futex_get_owner, zx_futex_requeue, zx_futex_requeue_single_owner, zx_futex_t,
-        zx_futex_wait, zx_futex_wake, zx_futex_wake_handle_close_thread_exit,
-        zx_futex_wake_single_owner, ZX_HANDLE_INVALID, ZX_KOID_INVALID, ZX_OK,
-    },
-    AsHandleRef, Handle, Koid, Status, Thread, Time,
+use crate::sys::{
+    zx_futex_get_owner, zx_futex_requeue, zx_futex_requeue_single_owner, zx_futex_t, zx_futex_wait,
+    zx_futex_wake, zx_futex_wake_handle_close_thread_exit, zx_futex_wake_single_owner,
+    ZX_HANDLE_INVALID, ZX_KOID_INVALID, ZX_OK,
 };
+use crate::{AsHandleRef, Handle, Koid, Status, Thread, Time};
 
 /// A safe wrapper around zx_futex_t, generally called as part of higher-level synchronization
 /// primitives.

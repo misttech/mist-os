@@ -3,21 +3,20 @@
 // found in the LICENSE file.
 
 use anyhow::{Error, Result};
+use carnelian::app::Config;
+use carnelian::color::Color;
+use carnelian::drawing::DisplayRotation;
 #[cfg(feature = "debug_touch_to_update")]
 use carnelian::input;
+use carnelian::render::rive::load_rive;
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::{RiveFacet, TextHorizontalAlignment};
+use carnelian::scene::layout::{CrossAxisAlignment, MainAxisAlignment};
+use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    app::Config,
-    color::Color,
-    drawing::DisplayRotation,
-    make_message,
-    render::{rive::load_rive, Context as RenderContext},
-    scene::{
-        facets::{RiveFacet, TextHorizontalAlignment},
-        layout::{CrossAxisAlignment, MainAxisAlignment},
-        scene::{Scene, SceneBuilder},
-    },
-    App, AppAssistant, AppAssistantPtr, AppSender, AssistantCreatorFunc, LocalBoxFuture, Message,
-    MessageTarget, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
+    make_message, App, AppAssistant, AppAssistantPtr, AppSender, AssistantCreatorFunc,
+    LocalBoxFuture, Message, MessageTarget, Size, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
 };
 use euclid::size2;
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};

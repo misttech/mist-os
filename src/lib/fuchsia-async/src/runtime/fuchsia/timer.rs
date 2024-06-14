@@ -9,22 +9,16 @@
 
 use crate::runtime::{EHandle, Time, WakeupTime};
 use fuchsia_zircon as zx;
-use futures::{
-    stream::FusedStream,
-    task::{AtomicWaker, Context},
-    FutureExt, Stream,
-};
-use std::{
-    cmp,
-    collections::BinaryHeap,
-    future::Future,
-    pin::Pin,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Weak,
-    },
-    task::Poll,
-};
+use futures::stream::FusedStream;
+use futures::task::{AtomicWaker, Context};
+use futures::{FutureExt, Stream};
+use std::cmp;
+use std::collections::BinaryHeap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Weak};
+use std::task::Poll;
 
 impl WakeupTime for std::time::Instant {
     fn into_time(self) -> Time {

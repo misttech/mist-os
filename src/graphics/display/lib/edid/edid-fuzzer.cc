@@ -15,8 +15,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
   }
 
-  const char* err_msg;
-  if (!edid.Init(data, static_cast<uint16_t>(size), &err_msg)) {
+  fit::result<const char*> result = edid.Init(cpp20::span(data, size));
+  if (!result.is_ok()) {
     return 0;
   }
 
@@ -25,9 +25,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   count += edid.is_hdmi() ? 0 : 1;
   for (auto it = edid::timing_iterator(&edid); it.is_valid(); ++it) {
     count++;
-  }
-  for (auto it = edid::audio_data_block_iterator(&edid); it.is_valid(); ++it) {
-    count--;
   }
   edid.Print([](const char* str) {});
 

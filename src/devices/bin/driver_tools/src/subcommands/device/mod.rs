@@ -4,11 +4,9 @@
 
 pub mod args;
 
-use {
-    anyhow::{format_err, Context, Result},
-    args::{BindCommand, DeviceCommand, DeviceSubcommand, RebindCommand, UnbindCommand},
-    fidl_fuchsia_device as fdev, fidl_fuchsia_io as fio,
-};
+use anyhow::{format_err, Context, Result};
+use args::{BindCommand, DeviceCommand, DeviceSubcommand, RebindCommand, UnbindCommand};
+use {fidl_fuchsia_device as fdev, fidl_fuchsia_io as fio};
 
 pub async fn device(cmd: DeviceCommand, dev: fio::DirectoryProxy) -> Result<()> {
     match cmd.subcommand {

@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    string::parse_padded_string, trace_header, ParseError, ParseResult, METADATA_RECORD_TYPE,
-};
+use crate::string::parse_padded_string;
+use crate::{trace_header, ParseError, ParseResult, METADATA_RECORD_TYPE};
 use flyweights::FlyStr;
 use nom::combinator::all_consuming;
 
@@ -199,7 +198,8 @@ metadata_header! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fxt_builder::FxtBuilder, RawTraceRecord};
+    use crate::fxt_builder::FxtBuilder;
+    use crate::RawTraceRecord;
 
     #[test]
     fn basic_provider_info() {

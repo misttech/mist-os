@@ -13,10 +13,8 @@ use {
     },
 };
 
-use crate::{
-    draw::{Frame, MappedImage},
-    runner::{DoubleBufferedFenceLoop, Scene},
-};
+use crate::draw::{Frame, MappedImage};
+use crate::runner::{DoubleBufferedFenceLoop, Scene};
 
 const WHITE: [u8; 4] = [255, 255, 255, 255];
 const BLACK: [u8; 4] = [0, 0, 0, 255];

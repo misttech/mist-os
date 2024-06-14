@@ -1,15 +1,13 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::handler::base::GenerateHandler;
-use crate::handler::base::Request;
+use crate::handler::base::{GenerateHandler, Request};
 use crate::handler::setting_handler::{reply, Command, Payload, SettingHandlerResult, State};
 use anyhow::Error;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Trait for providing a service.
 pub(crate) trait Service {

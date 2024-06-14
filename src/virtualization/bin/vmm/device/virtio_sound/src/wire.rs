@@ -5,10 +5,8 @@
 // Keep all consts and type defs for completeness.
 #![allow(dead_code)]
 
-use {
-    iota::iota,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
-};
+use iota::iota;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 pub use zerocopy::byteorder::little_endian::{U32 as LE32, U64 as LE64};
 

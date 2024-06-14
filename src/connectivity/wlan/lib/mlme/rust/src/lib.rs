@@ -23,28 +23,26 @@ mod minstrel;
 #[allow(unused)] // TODO(https://fxbug.dev/42159791): Remove annotation once used.
 mod probe_sequence;
 
-use {
-    anyhow::{bail, format_err, Error},
-    device::DeviceOps,
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_sync::Mutex,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
-    futures::{
-        channel::{
-            mpsc::{self, TrySendError},
-            oneshot,
-        },
-        select, Future, StreamExt,
-    },
-    std::{cmp, fmt, sync::Arc, time::Duration},
-    tracing::info,
-    wlan_ffi_transport::{
-        BufferProvider, EthernetTxEvent, EthernetTxEventSender, WlanRxEvent, WlanRxEventSender,
-    },
-    wlan_fidl_ext::{ResponderExt, SendResultExt},
-    wlan_trace as wtrace,
+use anyhow::{bail, format_err, Error};
+pub use ddk_converter::*;
+use device::DeviceOps;
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc::{self, TrySendError};
+use futures::channel::oneshot;
+use futures::{select, Future, StreamExt};
+use std::sync::Arc;
+use std::time::Duration;
+use std::{cmp, fmt};
+use tracing::info;
+use wlan_ffi_transport::{
+    BufferProvider, EthernetTxEvent, EthernetTxEventSender, WlanRxEvent, WlanRxEventSender,
 };
-pub use {ddk_converter::*, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, wlan_common as common};
+use wlan_fidl_ext::{ResponderExt, SendResultExt};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_trace as trace, fuchsia_zircon as zx, wlan_trace as wtrace,
+};
+pub use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, wlan_common as common};
 
 // TODO(https://fxbug.dev/42084990): This trait is migratory and reads both newer and deprecated fields that
 //                         encode the same information (and prioritizes the newer fields). Remove
@@ -425,13 +423,11 @@ async fn main_loop_impl<T: MlmeImpl>(
 
 #[cfg(test)]
 pub mod test_utils {
-    use {
-        super::*,
-        crate::device::FakeDevice,
-        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-        ieee80211::{MacAddr, MacAddrBytes},
-        wlan_common::channel,
-    };
+    use super::*;
+    use crate::device::FakeDevice;
+    use ieee80211::{MacAddr, MacAddrBytes};
+    use wlan_common::channel;
+    use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme};
 
     pub struct FakeMlme {
         device: FakeDevice,
@@ -564,13 +560,13 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{device::FakeDevice, test_utils::FakeMlme, *},
-        fuchsia_async::TestExecutor,
-        std::task::Poll,
-        wlan_common::assert_variant,
-        wlan_ffi_transport::FakeFfiBufferProvider,
-    };
+    use super::device::FakeDevice;
+    use super::test_utils::FakeMlme;
+    use super::*;
+    use fuchsia_async::TestExecutor;
+    use std::task::Poll;
+    use wlan_common::assert_variant;
+    use wlan_ffi_transport::FakeFfiBufferProvider;
 
     // The following type definitions emulate the definition of FIDL requests and responder types.
     // In addition to testing `unbounded_send_or_respond_with_error`, these tests demonstrate how

@@ -22,9 +22,10 @@ _ARGS_GN_TEMPLATE = r"""# Auto-generated - DO NOT EDIT
 target_cpu = "{cpu}"
 build_info_board = "{cpu}"
 build_info_product = "bringup"
-is_debug = false
+compilation_mode = "opt"
 
 cxx_rbe_enable = {cxx_rbe_enable}
+link_rbe_enable = {link_rbe_enable}
 rust_rbe_enable = {rust_rbe_enable}
 universe_package_labels = [{sdk_labels_list}]
 """
@@ -86,9 +87,9 @@ def command_args_to_string(
 
 def run_command(
     args: List,
+    capture_output: bool = False,
     env: Optional[Dict[str, str]] = None,
     cwd: Optional[Path | str] = None,
-    capture_output: bool = False,
 ):
     """Run a command.
 
@@ -115,6 +116,7 @@ def run_command(
 
 def run_checked_command(
     args: List,
+    capture_output: bool,
     env: Optional[Dict[str, str]] = None,
     cwd: Optional[Path | str] = None,
 ):
@@ -129,7 +131,7 @@ def run_checked_command(
         stdout + stderr, then return False.
     """
     try:
-        ret = run_command(args, env=env, cwd=cwd, capture_output=True)
+        ret = run_command(args, env=env, cwd=cwd, capture_output=capture_output)
         if ret.returncode == 0:
             return True
     except KeyboardInterrupt:
@@ -153,7 +155,6 @@ def main():
     )
     parser.add_argument(
         "--prebuilt-host-tools-dir",
-        required=True,
         help="Build directory containing host tools.",
     )
     parser.add_argument(
@@ -182,6 +183,11 @@ def main():
         help="Enable remote builds with RBE for C++ targets.",
     )
     parser.add_argument(
+        "--link-rbe-enable",
+        action="store_true",
+        help="Enable remote builds with RBE for linking C++ targets.",
+    )
+    parser.add_argument(
         "--rust-rbe-enable",
         action="store_true",
         help="Enable remote builds with RBE for Rust targets.",
@@ -206,10 +212,15 @@ def main():
         "--host-tag", help="Fuchsia host os/cpu tag used to find prebuilts."
     )
     parser.add_argument(
+        "--verbose", action="store_true", help="Print more information."
+    )
+    parser.add_argument(
         "--clean", action="store_true", help="Force clean build."
     )
     parser.add_argument(
-        "--verbose", action="store_true", help="Print more information."
+        "--setup-only",
+        action="store_true",
+        help="Only setup the output directory. Do not build.",
     )
 
     args = parser.parse_args()
@@ -277,6 +288,7 @@ def main():
     args_gn_content = _ARGS_GN_TEMPLATE.format(
         cpu=target_cpu,
         cxx_rbe_enable="true" if args.cxx_rbe_enable else "false",
+        link_rbe_enable="true" if args.link_rbe_enable else "false",
         rust_rbe_enable="true" if args.rust_rbe_enable else "false",
         sdk_labels_list=f'"{args.sdk_collection_label}"',
     )
@@ -286,13 +298,12 @@ def main():
     if args.compress_debuginfo:
         args_gn_content += f'compress_debuginfo = "{args.compress_debuginfo}"\n'
 
-    # Reuse host tools from the top-level build. This assumes that
-    # sub-builds cannot use host tools that were not already built by
-    # the top-level build, as there is no way to inject dependencies
-    # between the two build graphs.
-    args_gn_content += (
-        f'host_tools_base_path_override = "{args.prebuilt_host_tools_dir}"\n'
-    )
+    if args.prebuilt_host_tools_dir:
+        # Reuse host tools from the top-level build. This assumes that
+        # sub-builds cannot use host tools that were not already built by
+        # the top-level build, as there is no way to inject dependencies
+        # between the two build graphs.
+        args_gn_content += f'host_tools_base_path_override = "{args.prebuilt_host_tools_dir}"\n'
 
     args_gn_content += "sdk_inside_sub_build = true\n"
 
@@ -300,11 +311,6 @@ def main():
     # as ints.
     if api_level == "PLATFORM":
         gn_api_level = '"PLATFORM"'
-
-        # The host architecture is built at the PLATFORM level as part of the
-        # main build, so only sub-builds for other target CPU architectures
-        # should reach here.
-        assert f"{target_cpu}" != f"{get_host_arch()}"
     else:
         gn_api_level = int(api_level)
 
@@ -323,38 +329,41 @@ def main():
                 "gen",
                 build_dir,
             ],
+            capture_output=not args.verbose,
         ):
             return 1
 
-    # Adjust the NINJA_STATUS environment variable before launching Ninja
-    # in order to add a prefix distinguishing its build actions from
-    # the top-level ones.
-    ninja_status = os.environ.get("NINJA_STATUS", "[%f/%t](%r) ")
+    if not args.setup_only:
+        # Adjust the NINJA_STATUS environment variable before launching Ninja
+        # in order to add a prefix distinguishing its build actions from
+        # the top-level ones.
+        ninja_status = os.environ.get("NINJA_STATUS", "[%f/%t](%r) ")
 
-    status_prefix = f"IDK_SUBBUILD_api_{api_level}_{target_cpu} "
-    ninja_status = status_prefix + ninja_status
-    ninja_env = {"NINJA_STATUS": ninja_status}
+        status_prefix = f"IDK_SUBBUILD_api_{api_level}_{target_cpu} "
+        ninja_status = status_prefix + ninja_status
+        ninja_env = {"NINJA_STATUS": ninja_status}
 
-    if not run_checked_command(
-        [
-            *ninja_cmd_prefix,
-            "-C",
-            build_dir,
-            "-j",
-            args.parallelism,
-            "-l",
-            args.max_load_average,
-            sdk_label_to_ninja_target(args.sdk_collection_label),
-        ],
-        env=os.environ | ninja_env,
-    ):
-        return 1
+        if not run_checked_command(
+            [
+                *ninja_cmd_prefix,
+                "-C",
+                build_dir,
+                "-j",
+                args.parallelism,
+                "-l",
+                args.max_load_average,
+                sdk_label_to_ninja_target(args.sdk_collection_label),
+            ],
+            capture_output=not args.verbose,
+            env=os.environ | ninja_env,
+        ):
+            return 1
 
-    base_exported_dir = sdk_label_to_exported_dir(
-        args.sdk_collection_label, build_dir
-    )
-    api_level_path = base_exported_dir / "api_level"
-    api_level_path.write_text(str(api_level))
+        base_exported_dir = sdk_label_to_exported_dir(
+            args.sdk_collection_label, build_dir
+        )
+        api_level_path = base_exported_dir / "api_level"
+        api_level_path.write_text(str(api_level))
 
     # Write stamp file if needed.
     if args.stamp_file:

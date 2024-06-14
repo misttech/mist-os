@@ -5,7 +5,8 @@
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
 use tracing::{Callsite, Metadata};
-use tracing_core::{field, subscriber::Interest};
+use tracing_core::field;
+use tracing_core::subscriber::Interest;
 
 pub static PLACEHOLDER_TEXT: Lazy<String> = Lazy::new(|| "x".repeat(32000));
 pub static PROCESS_ID: Lazy<zx::Koid> =

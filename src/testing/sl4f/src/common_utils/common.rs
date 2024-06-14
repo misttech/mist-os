@@ -12,9 +12,7 @@ use std::fs::read_dir;
 use std::path::{Path, PathBuf};
 
 pub mod macros {
-    pub use crate::fx_err_and_bail;
-    pub use crate::parse_arg;
-    pub use crate::with_line;
+    pub use crate::{fx_err_and_bail, parse_arg, with_line};
 }
 
 #[macro_export]

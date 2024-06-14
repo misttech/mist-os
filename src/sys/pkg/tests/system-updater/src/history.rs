@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::*,
-    assert_matches::assert_matches,
-    chrono::prelude::*,
-    fidl_fuchsia_pkg::PackageUrl,
-    fidl_fuchsia_update_installer::{
-        CompleteData, FetchData, InstallationProgress, Options, State, UpdateInfo, UpdateResult,
-    },
-    pretty_assertions::assert_eq,
-    serde_json::json,
+use super::*;
+use assert_matches::assert_matches;
+use chrono::prelude::*;
+use fidl_fuchsia_pkg::PackageUrl;
+use fidl_fuchsia_update_installer::{
+    CompleteData, FetchData, InstallationProgress, Options, State, UpdateInfo, UpdateResult,
 };
+use pretty_assertions::assert_eq;
+use serde_json::json;
 
 #[fasync::run_singlethreaded(test)]
 async fn succeeds_without_writable_data() {

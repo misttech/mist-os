@@ -623,7 +623,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
 
   {
     TRACE_DURATION("gfx", "App::InitializeServices[display_power]");
-    display_power_manager_.emplace(display_manager_.value());
+    display_power_manager_.emplace(display_manager_.value(), inspect_node_);
     FX_CHECK(app_context_->outgoing()->AddPublicService(display_power_manager_->GetHandler()) ==
              ZX_OK);
   }

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl_fuchsia_hwinfo as hwinfo,
-    fidl_fuchsia_intl::RegulatoryDomain,
-    fidl_fuchsia_location_namedplace::{
-        RegulatoryRegionConfiguratorMarker, RegulatoryRegionConfiguratorProxy,
-    },
-    fuchsia_component::client::connect_to_protocol,
+use anyhow::{format_err, Context as _, Error};
+use fidl_fuchsia_hwinfo as hwinfo;
+use fidl_fuchsia_intl::RegulatoryDomain;
+use fidl_fuchsia_location_namedplace::{
+    RegulatoryRegionConfiguratorMarker, RegulatoryRegionConfiguratorProxy,
 };
+use fuchsia_component::client::connect_to_protocol;
 
 /// Read region code using fuchsia.hwinfo API, then set it using the fuchsia.location.namedplace API.
 /// Caller must have access to fuchsia.hwinfo.Product and fuchsia.location.namedplace.RegulatoryRegionConfigurator
@@ -66,12 +64,14 @@ fn validate_region_code(region_code: &str) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_hwinfo as hwinfo;
-    use fidl_fuchsia_location_namedplace as regulatory;
-    use fuchsia_async as fasync;
     use fuchsia_async::TimeoutExt;
     use fuchsia_zircon::Duration;
-    use futures::{channel::mpsc, StreamExt, TryStreamExt};
+    use futures::channel::mpsc;
+    use futures::{StreamExt, TryStreamExt};
+    use {
+        fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_location_namedplace as regulatory,
+        fuchsia_async as fasync,
+    };
 
     fn create_mock_hwinfo_server(
         mock_info: hwinfo::ProductInfo,

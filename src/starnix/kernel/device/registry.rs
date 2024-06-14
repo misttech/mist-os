@@ -2,37 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::kobject::{
-        Bus, Class, Device, DeviceMetadata, KObject, KObjectBased, KObjectHandle, UEventAction,
-        UEventContext,
-    },
-    fs::{
-        devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node},
-        sysfs::{
-            BusCollectionDirectory, ClassCollectionDirectory, DeviceSysfsOps, SysfsDirectory,
-            SYSFS_BLOCK, SYSFS_BUS, SYSFS_CLASS, SYSFS_DEVICES,
-        },
-    },
-    task::CurrentTask,
-    vfs::{FileOps, FsNode, FsStr},
+use crate::device::kobject::{
+    Bus, Class, Device, DeviceMetadata, KObject, KObjectBased, KObjectHandle, UEventAction,
+    UEventContext,
 };
+use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
+use crate::fs::sysfs::{
+    BusCollectionDirectory, ClassCollectionDirectory, DeviceSysfsOps, SysfsDirectory, SYSFS_BLOCK,
+    SYSFS_BUS, SYSFS_CLASS, SYSFS_DEVICES,
+};
+use crate::task::CurrentTask;
+use crate::vfs::{FileOps, FsNode, FsStr};
 use starnix_logging::{log_error, log_warn, track_stub};
-use starnix_uapi::{
-    device_type::{DeviceType, DYN_MAJOR},
-    errno, error,
-    errors::Errno,
-    open_flags::OpenFlags,
-};
+use starnix_uapi::device_type::{DeviceType, DYN_MAJOR};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{errno, error};
 
 use starnix_sync::{
     DeviceOpen, FileOpsCore, LockBefore, Locked, MappedMutexGuard, Mutex, MutexGuard, RwLock,
 };
-use std::{
-    collections::btree_map::{BTreeMap, Entry},
-    ops::Deref,
-    sync::Arc,
-};
+use std::collections::btree_map::{BTreeMap, Entry};
+use std::ops::Deref;
+use std::sync::Arc;
 
 use dyn_clone::{clone_trait_object, DynClone};
 use range_map::RangeMap;
@@ -531,7 +523,10 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{device::mem::DevNull, fs::sysfs::DeviceDirectory, testing::*, vfs::*};
+    use crate::device::mem::DevNull;
+    use crate::fs::sysfs::DeviceDirectory;
+    use crate::testing::*;
+    use crate::vfs::*;
     use starnix_uapi::device_type::{INPUT_MAJOR, MEM_MAJOR};
 
     #[::fuchsia::test]

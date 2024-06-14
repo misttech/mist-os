@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::Client,
-    crate::client::EventQueue,
-    crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
-    anyhow::Error,
-    fuchsia_wayland_core as wl,
-    zwp_relative_pointer_v1_server_protocol::{
-        ZwpRelativePointerManagerV1, ZwpRelativePointerManagerV1Request, ZwpRelativePointerV1,
-        ZwpRelativePointerV1Event, ZwpRelativePointerV1Request,
-    },
+use crate::client::{Client, EventQueue};
+use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
+use anyhow::Error;
+use fuchsia_wayland_core as wl;
+use zwp_relative_pointer_v1_server_protocol::{
+    ZwpRelativePointerManagerV1, ZwpRelativePointerManagerV1Request, ZwpRelativePointerV1,
+    ZwpRelativePointerV1Event, ZwpRelativePointerV1Request,
 };
 
 /// An implementation of the zwp_relative_pointer_v1 global.

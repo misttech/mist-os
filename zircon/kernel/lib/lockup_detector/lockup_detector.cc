@@ -25,6 +25,7 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <ktl/array.h>
 #include <ktl/atomic.h>
@@ -58,11 +59,11 @@ LockupDetectorState gLockupDetectorPerCpuState[SMP_MAX_CPUS];
 namespace {
 
 inline zx_duration_t TicksToDuration(zx_ticks_t ticks) {
-  return platform_get_ticks_to_time_ratio().Scale(ticks);
+  return timer_get_ticks_to_time_ratio().Scale(ticks);
 }
 
 inline zx_ticks_t DurationToTicks(zx_duration_t duration) {
-  return platform_get_ticks_to_time_ratio().Inverse().Scale(duration);
+  return timer_get_ticks_to_time_ratio().Inverse().Scale(duration);
 }
 
 class TA_CAP("mutex") FatalConditionReporterRole {
@@ -407,7 +408,7 @@ void DoHeartbeatAndCheckPeerCpus(Timer* timer, zx_time_t now_mono, void* arg) {
 
   // Now, check each of the lockup conditions for each of our peers.
   for (cpu_num_t cpu = 0; cpu < percpu::processor_count(); ++cpu) {
-    if (cpu == current_cpu || !mp_is_cpu_online(cpu) || !mp_is_cpu_active(cpu)) {
+    if (cpu == current_cpu || !mp_is_cpu_online(cpu) || !Scheduler::PeekIsActive(cpu)) {
       continue;
     }
     LockupDetectorState& state = gLockupDetectorPerCpuState[cpu];
@@ -509,8 +510,8 @@ void lockup_primary_init() {
       if (CriticalSectionLockupChecker::IsEnabled()) {
         dprintf(
             INFO,
-            "lockup_detector: critical section threshold %" PRId64
-            " ms, fatal threshold %" PRId64 " ms\n",
+            "lockup_detector: critical section threshold %" PRId64 " ms, fatal threshold %" PRId64
+            " ms\n",
             TicksToDuration(CriticalSectionLockupChecker::threshold_ticks()) / ZX_MSEC(1),
             TicksToDuration(CriticalSectionLockupChecker::fatal_threshold_ticks()) / ZX_MSEC(1));
       } else {
@@ -608,7 +609,7 @@ void lockup_status() {
          TicksToDuration(ticks) / ZX_MSEC(1));
   if (ticks != 0) {
     for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
-      if (!mp_is_cpu_active(i)) {
+      if (!Scheduler::PeekIsActive(i)) {
         printf("CPU-%u is not active, skipping\n", i);
         continue;
       }
@@ -635,7 +636,7 @@ void lockup_status() {
          HeartbeatLockupChecker::threshold() / ZX_MSEC(1));
 
   for (cpu_num_t cpu = 0; cpu < percpu::processor_count(); ++cpu) {
-    if (!mp_is_cpu_online(cpu) || !mp_is_cpu_active(cpu)) {
+    if (!mp_is_cpu_online(cpu) || !Scheduler::PeekIsActive(cpu)) {
       continue;
     }
 

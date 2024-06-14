@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::{client::QueryResponseFut, endpoints::Proxy as _},
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    futures::io::AsyncRead,
-    std::{
-        cmp::min,
-        convert::TryInto as _,
-        future::Future as _,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::Proxy as _;
+use futures::io::AsyncRead;
+use std::cmp::min;
+use std::convert::TryInto as _;
+use std::future::Future as _;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 /// Wraps a `fidl_fuchsia_io::FileProxy` and implements `futures::io::AsyncRead`, which allows one
 /// to perform asynchronous file reads that don't block the current thread while waiting for data.
@@ -130,18 +127,16 @@ pub enum AsyncReaderError {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::file,
-        assert_matches::assert_matches,
-        fidl::endpoints,
-        fuchsia_async as fasync,
-        futures::{
-            future::poll_fn, io::AsyncReadExt as _, join, StreamExt as _, TryStreamExt as _,
-        },
-        std::convert::TryFrom as _,
-        tempfile::TempDir,
-    };
+    use super::*;
+    use crate::file;
+    use assert_matches::assert_matches;
+    use fidl::endpoints;
+    use fuchsia_async as fasync;
+    use futures::future::poll_fn;
+    use futures::io::AsyncReadExt as _;
+    use futures::{join, StreamExt as _, TryStreamExt as _};
+    use std::convert::TryFrom as _;
+    use tempfile::TempDir;
 
     #[fasync::run_singlethreaded(test)]
     async fn exclusive_ownership() {

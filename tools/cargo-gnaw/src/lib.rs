@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{build::BuildScript, graph::GnBuildGraph, target::GnTarget, types::*},
-    anyhow::{Context, Result},
-    argh::FromArgs,
-    camino::Utf8PathBuf,
-    cargo_metadata::{CargoOpt, DependencyKind, Package},
-    serde_derive::{Deserialize, Serialize},
-    std::collections::{BTreeMap, HashMap, HashSet},
-    std::{
-        fs::File,
-        io::{self, Read, Write},
-        path::PathBuf,
-        process::Command,
-    },
-};
+use crate::build::BuildScript;
+use crate::graph::GnBuildGraph;
+use crate::target::GnTarget;
+use crate::types::*;
+use anyhow::{Context, Result};
+use argh::FromArgs;
+use camino::Utf8PathBuf;
+use cargo_metadata::{CargoOpt, DependencyKind, Package};
+use serde_derive::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fs::File;
+use std::io::{self, Read, Write};
+use std::path::PathBuf;
+use std::process::Command;
 
 mod build;
 mod cfg;

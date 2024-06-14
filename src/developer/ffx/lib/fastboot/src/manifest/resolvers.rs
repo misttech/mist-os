@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    common::done_time,
-    file_resolver::resolvers::{Resolver, TarResolver},
-    file_resolver::FileResolver,
-};
+use crate::common::done_time;
+use crate::file_resolver::resolvers::{Resolver, TarResolver};
+use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
 use std::fs::{create_dir_all, File};
 use std::io::{copy, Write};
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tempfile::{tempdir, TempDir};
 use walkdir::WalkDir;
 use zip::ZipArchive;

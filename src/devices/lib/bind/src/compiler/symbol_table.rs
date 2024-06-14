@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use crate::compiler::{dependency_graph, CompilerError};
-use crate::linter;
-use crate::make_identifier;
 use crate::parser::common::{CompoundIdentifier, Include};
 use crate::parser::{self, bind_library};
+use crate::{linter, make_identifier};
 use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;

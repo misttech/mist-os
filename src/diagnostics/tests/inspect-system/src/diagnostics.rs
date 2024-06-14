@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{fmt::Display, sync::atomic::AtomicUsize};
+use std::fmt::Display;
+use std::sync::atomic::AtomicUsize;
 
 static NEXT_ID: AtomicUsize = AtomicUsize::new(1000);
 

@@ -5,9 +5,8 @@
 use anyhow::{format_err, Error};
 use clap::arg_enum;
 use eui48::MacAddress;
-use fidl_fuchsia_wlan_common as wlan_common;
-use fidl_fuchsia_wlan_policy as wlan_policy;
 use structopt::StructOpt;
+use {fidl_fuchsia_wlan_common as wlan_common, fidl_fuchsia_wlan_policy as wlan_policy};
 
 arg_enum! {
     #[derive(PartialEq, Copy, Clone, Debug)]
@@ -375,7 +374,8 @@ pub enum Opt {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, test_case::test_case};
+    use super::*;
+    use test_case::test_case;
 
     /// Tests that a WEP network config will be correctly translated for save and remove network.
     #[fuchsia::test]

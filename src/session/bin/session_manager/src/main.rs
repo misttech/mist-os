@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, fidl_fuchsia_component as fcomponent,
-    fuchsia_component::client::connect_to_protocol, fuchsia_component::server::ServiceFs,
-    session_manager_config::Config, session_manager_lib::session_manager::SessionManager,
-    tracing::info,
-};
+use anyhow::Error;
+use fidl_fuchsia_component as fcomponent;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use session_manager_config::Config;
+use session_manager_lib::session_manager::SessionManager;
+use tracing::info;
 
 // If we find a file at this path, we won't automatically launch the session on
 // startup, regardless of what the `autolaunch` structured config value says.

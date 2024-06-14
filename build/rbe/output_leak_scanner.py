@@ -30,7 +30,7 @@ import fuchsia
 import cl_utils
 
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 _SCRIPT_BASENAME = Path(__file__).name
 
@@ -41,7 +41,7 @@ PROJECT_ROOT = fuchsia.project_root_dir()
 _REMOTE_PROJECT_ROOT = Path("/b/f/w")
 
 
-def error_msg(text: str, label: str = None):
+def error_msg(text: str, label: str | None = None) -> None:
     label_text = f"[{label}]" if label else ""
     print(f"[{_SCRIPT_BASENAME}]{label_text}: Error: {text}")
 
@@ -111,24 +111,26 @@ class PathPattern(object):
         return self._text
 
     @property
-    def re_text(self) -> re.Pattern:
+    def re_text(self) -> re.Pattern[str]:
         return self._re_text
 
     @property
-    def re_bin(self) -> re.Pattern:
+    def re_bin(self) -> re.Pattern[bytes]:
         return self._re_bin
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, PathPattern):
+            return False
         # equivalence of compiled re is implied
         return self.text == other.text
 
 
 # define for easy mocking
-def _open_read_text(f) -> io.TextIOBase:
+def _open_read_text(f: Path) -> io.TextIOBase:
     return open(f, "rt")
 
 
-def _open_read_binary(f) -> io.RawIOBase:
+def _open_read_binary(f: Path) -> io.RawIOBase:
     return open(f, "rb", 0)
 
 
@@ -173,7 +175,7 @@ def file_contains_subpath(
 
 
 def paths_with_build_dir_leaks(
-    paths: Iterable[Path], pattern: re.Pattern
+    paths: Iterable[Path], pattern: re.Pattern[str]
 ) -> Iterable[Path]:
     for path in paths:
         if pattern.search(str(path)):
@@ -196,7 +198,7 @@ def _c_compiler_flag_expects_abspath(tok: str) -> bool:
 
 
 def tokens_with_build_dir_leaks(
-    command: Iterable[str], pattern: re.Pattern
+    command: Iterable[str], pattern: re.Pattern[str]
 ) -> Iterable[str]:
     # TODO: lex --KEY=VALUE tokens into parts and match against the parts
     for token in command:
@@ -210,7 +212,7 @@ def preflight_checks(
     paths: Iterable[Path],
     command: Iterable[str],
     pattern: PathPattern,
-    label: str = None,
+    label: str | None = None,
 ) -> int:
     """Checks output paths and command for build dir leaks."""
     exit_code = 0
@@ -245,8 +247,8 @@ If this command requires an absolute path, mark this action in GN with
 def postflight_checks(
     outputs: Iterable[Path],
     subpath: PathPattern,
-    label: str = None,
-):
+    label: str | None = None,
+) -> int:
     exit_code = 0
     # Command succeeded, scan its declared outputs.
     for f in outputs:
@@ -310,7 +312,7 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
 
     # Invoke the original command.
     command_exit_code = subprocess.call(
-        cl_utils.auto_env_prefix_command(command), cwd=working_dir
+        cl_utils.auto_env_prefix_command(list(command)), cwd=working_dir
     )
     if command_exit_code != 0:
         return command_exit_code

@@ -2,21 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_zircon::DurationNum;
+use ieee80211::{Bssid, Ssid};
+use std::pin::pin;
+use wlan_common::bss::Protection;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_hw_sim::event::{action, branch, Handler};
+use wlan_hw_sim::*;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap as fidl_tap,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_zircon::DurationNum,
-    ieee80211::{Bssid, Ssid},
-    std::pin::pin,
-    wlan_common::{
-        bss::Protection,
-        channel::{Cbw, Channel},
-    },
-    wlan_hw_sim::{
-        event::{action, branch, Handler},
-        *,
-    },
 };
 
 fn scan_and_associate<'h>(

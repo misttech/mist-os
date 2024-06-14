@@ -4,10 +4,9 @@
 
 use anyhow::{Context, Result};
 use fidl::endpoints::{create_endpoints, DiscoverableProtocolMarker, ProtocolMarker};
-use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_testing_harness as fharness;
 use fuchsia_component::client::connect_to_protocol;
 use realm_proxy_client::RealmProxyClient;
+use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_testing_harness as fharness};
 
 /// Creates a new test realm with an archivist inside.
 /// `options_fn` is called with a default RealmOptions struct and can modify any options

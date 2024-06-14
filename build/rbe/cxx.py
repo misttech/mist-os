@@ -12,7 +12,7 @@ import enum
 import cl_utils
 
 from pathlib import Path
-from typing import AbstractSet, Iterable, Optional, Sequence, Tuple
+from typing import AbstractSet, Any, Iterable, Optional, Sequence, Tuple
 
 
 def _remove_suffix(text: str, suffix: str) -> str:
@@ -32,7 +32,9 @@ def _cxx_command_scanner() -> Tuple[argparse.ArgumentParser, Sequence[str]]:
 
     single_dash_longopts = []
 
-    def _add_single_dash_longopt_argument(name: str, *args, **kwargs):
+    def _add_single_dash_longopt_argument(
+        name: str, *args: Any, **kwargs: Any
+    ) -> None:
         """Add a single-dash option that will be internally treated as a
         double-dash long-option to avoid unwanted prefix-matching behavior.
         See _interpret_single_dash_longopts().
@@ -242,14 +244,14 @@ class CompilerTool(object):
     type: Compiler
 
 
-def _find_compiler_from_command(command: Iterable[str]) -> Optional[Path]:
+def _find_compiler_from_command(command: Iterable[str]) -> CompilerTool:
     for tok in command:
         if "clang" in tok:  # matches clang++
             return CompilerTool(tool=Path(tok), type=Compiler.CLANG)
         # 'g++' matches 'clang++', so this clause must come second:
         if "gcc" in tok or "g++" in tok:
             return CompilerTool(tool=Path(tok), type=Compiler.GCC)
-    return None  # or raise error
+    raise LookupError(f"No clang or gcc in {command}")
 
 
 def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
@@ -435,7 +437,7 @@ _LINKER_DRIVER_PARSER = _linker_driver_arg_parser()
 
 # These are flags that are joined with their arguments with
 # no separator (no '=' or space).
-_CPP_FUSED_FLAGS = {"-I", "-D", "-L", "-U", "-isystem"}
+_CPP_FUSED_FLAGS = ["-I", "-D", "-L", "-U", "-isystem"]
 
 
 def expand_forwarded_driver_flags(args: Iterable[str]) -> Iterable[str]:
@@ -494,15 +496,14 @@ def _interpret_single_dash_longopts(
       transformed command-line arguments, with some double-dash substitutions.
     """
 
-    def rewrite_opt(str) -> str:
+    def rewrite_opt(str: str) -> str:
         for prefix in single_dash_longopts:
-            if opt.startswith(prefix):
-                return "-" + opt  # interpret as double-dash
+            if str.startswith(prefix):
+                return "-" + str  # interpret as double-dash
 
-        return opt
+        return str
 
-    for opt in opts:
-        yield rewrite_opt(opt)
+    return [rewrite_opt(opt) for opt in opts]
 
 
 def _restore_single_dash_longopts(
@@ -513,7 +514,7 @@ def _restore_single_dash_longopts(
     This is useful for viewing the original form for testing.
     """
 
-    def rewrite_opt(str) -> str:
+    def rewrite_opt(str: str) -> str:
         for prefix in single_dash_longopts:
             if opt.startswith("-" + prefix):  # double-dashed
                 return opt[1:]  # restore single-dash
@@ -534,7 +535,7 @@ class CxxAction(object):
         self._command = command  # keep a copy of the original command
 
         # Expand response files before parsing any flags.
-        rsp_files = []
+        rsp_files: list[Path] = []
         rsp_expanded_args = cl_utils.expand_response_files(command, rsp_files)
         self._response_files = rsp_files
 
@@ -548,9 +549,11 @@ class CxxAction(object):
             self._attributes,
             remaining_args,
         ) = _CXX_COMMAND_SCANNER.parse_known_args(
-            _interpret_single_dash_longopts(
-                _SINGLE_DASH_LONGOPTS,
-                _assign_explicit_flag_defaults(argparseable_args),
+            list(
+                _interpret_single_dash_longopts(
+                    _SINGLE_DASH_LONGOPTS,
+                    _assign_explicit_flag_defaults(argparseable_args),
+                )
             )
         )
         self._compiler = _find_compiler_from_command(argparseable_args)
@@ -578,9 +581,11 @@ class CxxAction(object):
                 self._linker_driver_flags.extend(forwarded_flags)
 
         # Linker driver flags may contain response files, so expand them.
-        linker_rsp_files = []
-        expanded_linker_driver_flags = cl_utils.expand_response_files(
-            self.linker_driver_flags, linker_rsp_files
+        linker_rsp_files: list[Path] = []
+        expanded_linker_driver_flags = list(
+            cl_utils.expand_response_files(
+                self.linker_driver_flags, linker_rsp_files
+            )
         )
         self._linker_response_files = linker_rsp_files
 
@@ -593,8 +598,8 @@ class CxxAction(object):
         # were done separately.
         # Note: this version does not expand response files first,
         # to minimize differences relative to the original command.
-        command_after_preprocessing = cl_utils.expand_fused_flags(
-            self._command, _CPP_FUSED_FLAGS
+        command_after_preprocessing = list(
+            cl_utils.expand_fused_flags(self._command, _CPP_FUSED_FLAGS)
         )
         (
             self._cpp_attributes,
@@ -674,7 +679,7 @@ class CxxAction(object):
             yield self.linker_just_symbols
 
     @property
-    def response_files(self) -> Sequence[Path]:
+    def response_files(self) -> list[Path]:
         return self._response_files
 
     @property
@@ -768,7 +773,10 @@ class CxxAction(object):
 
     @property
     def any_profile(self) -> bool:
-        return self.profile_generate or self.profile_instr_generate
+        return (
+            self.profile_generate is not None
+            or self.profile_instr_generate is not None
+        )
 
     @property
     def lto(self) -> Optional[str]:
@@ -797,6 +805,7 @@ class CxxAction(object):
         name of the corresponding output from --save-temps.
         """
         # replaces .o with .i or .ii
+        assert self.output_file is not None
         return self.output_file.with_suffix(self.preprocessed_suffix)
 
     @property
@@ -808,6 +817,7 @@ class CxxAction(object):
         Returns:
           A Path stem, to which extensions like .ii can be appended.
         """
+        assert self.output_file is not None
         name = self.output_file.name
         return Path(_remove_suffix(name, "".join(self.output_file.suffixes)))
 

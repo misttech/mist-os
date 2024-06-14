@@ -8,12 +8,10 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{ChildOptions, ChildRef, RealmBuilder};
 use futures::prelude::*;
 use std::fs;
-use vfs::{
-    directory::{spawn_directory_with_options, DirectoryOptions},
-    file::vmo::read_only,
-    pseudo_directory,
-    test_utils::assertions::reexport::StreamExt,
-};
+use vfs::directory::{spawn_directory_with_options, DirectoryOptions};
+use vfs::file::vmo::read_only;
+use vfs::pseudo_directory;
+use vfs::test_utils::assertions::reexport::StreamExt;
 
 pub(crate) async fn create_config_data(builder: &RealmBuilder) -> Result<ChildRef, Error> {
     let config_data_dir = pseudo_directory! {

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::realm::{get_all_instances, Instance},
-    anyhow::{bail, Result},
-    fidl_fuchsia_sys2 as fsys,
-    moniker::Moniker,
-};
+use crate::realm::{get_all_instances, Instance};
+use anyhow::{bail, Result};
+use fidl_fuchsia_sys2 as fsys;
+use moniker::Moniker;
 
 /// Retrieves a list of CML instances that match a given string query.
 ///
@@ -141,7 +139,8 @@ pub async fn get_cml_moniker_from_query(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::test_utils::serve_realm_query_instances};
+    use super::*;
+    use crate::test_utils::serve_realm_query_instances;
 
     fn setup_fake_realm_query() -> fsys::RealmQueryProxy {
         setup_fake_realm_query_with_entries(vec![

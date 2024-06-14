@@ -2,22 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::driver_utils::{connect_proxy, get_driver_alias, map_topo_paths_to_class_paths, Driver};
+use crate::MIN_INTERVAL_FOR_SYSLOG_MS;
+use anyhow::{format_err, Error, Result};
+use async_trait::async_trait;
+use diagnostics_hierarchy::LinearHistogramParams;
+use fuchsia_inspect::{
+    self as inspect, ArrayProperty, HistogramProperty, IntLinearHistogramProperty, Property,
+};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use std::cell::Cell;
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::rc::Rc;
+use tracing::{error, info, warn};
 use {
-    crate::driver_utils::{connect_proxy, get_driver_alias, map_topo_paths_to_class_paths, Driver},
-    crate::MIN_INTERVAL_FOR_SYSLOG_MS,
-    anyhow::{format_err, Error, Result},
-    async_trait::async_trait,
-    diagnostics_hierarchy::LinearHistogramParams,
     fidl_fuchsia_hardware_power_sensor as fpower,
     fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_power_metrics as fmetrics,
-    fidl_fuchsia_ui_activity as factivity, fuchsia_async as fasync,
-    fuchsia_inspect::{
-        self as inspect, ArrayProperty, HistogramProperty, IntLinearHistogramProperty, Property,
-    },
-    fuchsia_zircon as zx,
-    futures::{stream::FuturesUnordered, StreamExt},
-    std::{cell::Cell, cmp::Ordering, collections::HashMap, rc::Rc},
-    tracing::{error, info, warn},
+    fidl_fuchsia_ui_activity as factivity, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 // The fuchsia.hardware.temperature.Device is composed into fuchsia.hardware.thermal.Device, and
@@ -743,13 +746,13 @@ impl InspectData {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        diagnostics_assertions::{assert_data_tree, HistogramAssertion},
-        futures::{task::Poll, FutureExt, TryStreamExt},
-        std::{cell::OnceCell, pin::Pin},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::{assert_data_tree, HistogramAssertion};
+    use futures::task::Poll;
+    use futures::{FutureExt, TryStreamExt};
+    use std::cell::OnceCell;
+    use std::pin::Pin;
 
     fn setup_fake_temperature_driver(
         mut get_temperature: impl FnMut() -> f32 + 'static,

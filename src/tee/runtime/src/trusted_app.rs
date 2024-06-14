@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::BTreeMap, ops::AddAssign};
+use std::collections::BTreeMap;
+use std::ops::AddAssign;
 
 use crate::params::ParamAdapter;
 use crate::ta_loader::{SessionContext, TAInterface};

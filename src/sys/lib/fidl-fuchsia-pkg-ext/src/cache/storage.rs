@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{OpenBlobError, TruncateBlobError, WriteBlobError},
-    anyhow::Context as _,
-    fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
-    fuchsia_zircon_status::Status,
-};
+use super::{OpenBlobError, TruncateBlobError, WriteBlobError};
+use anyhow::Context as _;
+use fuchsia_zircon_status::Status;
+use {fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 pub(super) fn into_blob_writer_and_closer(
     fidl: fpkg::BlobWriter,
@@ -171,7 +169,8 @@ impl Writer for FxBlob {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, futures::stream::TryStreamExt as _};
+    use super::*;
+    use futures::stream::TryStreamExt as _;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_proxy_chunks_writes() {

@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::serialized_types::{types::LATEST_VERSION, DEFAULT_MAX_SERIALIZED_RECORD_SIZE},
-    byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt},
-    fprint::TypeFingerprint,
-    serde::{Deserialize, Serialize},
-};
+use crate::serialized_types::types::LATEST_VERSION;
+use crate::serialized_types::DEFAULT_MAX_SERIALIZED_RECORD_SIZE;
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use fprint::TypeFingerprint;
+use serde::{Deserialize, Serialize};
 
 /// [Version] are themselves serializable both alone and as part
 /// of other [Versioned] structures.

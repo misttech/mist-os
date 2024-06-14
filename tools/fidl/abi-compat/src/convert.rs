@@ -5,17 +5,14 @@
 //! This module implements the conversion between the IR representation and the
 //! comparison representation.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    rc::Rc,
-};
+use std::collections::{BTreeMap, BTreeSet};
+use std::rc::Rc;
 
 use anyhow::{anyhow, bail, Context as _, Result};
 use flyweights::FlyStr;
 use itertools::Itertools;
 
-use crate::compare;
-use crate::ir;
+use crate::{compare, ir};
 
 #[derive(Clone)]
 pub struct Context {
@@ -506,7 +503,11 @@ pub fn convert_platform(ir: Rc<ir::IR>) -> Result<compare::Platform> {
     let mut platform = compare::Platform::default();
     platform.api_level = match ir.available.get("fuchsia") {
         None => bail!("missing API level for 'fuchsia'"),
-        Some(api_level) => FlyStr::new(api_level),
+        Some(levels) => match &levels[..] {
+            [] => bail!("empty API level list for 'fuchsia'"),
+            [api_level] => FlyStr::new(api_level),
+            _ => FlyStr::new("PLATFORM"),
+        },
     };
 
     let context = Context::new(ir.clone(), platform.api_level.clone());

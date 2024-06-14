@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_inspect::{Node, NumericProperty as _, Property as _, UintProperty},
-    fuchsia_inspect_contrib::inspectable::InspectableU64,
-    std::collections::VecDeque,
-};
+use fuchsia_inspect::{Node, NumericProperty as _, Property as _, UintProperty};
+use fuchsia_inspect_contrib::inspectable::InspectableU64;
+use std::collections::VecDeque;
 
 /// A `Node` with a bounded number of child `Node`s.
 ///
@@ -95,7 +93,9 @@ impl<V> BoundedNode<V> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, diagnostics_assertions::assert_data_tree, fuchsia_inspect::Inspector};
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::Inspector;
 
     struct Item {
         _node: Node,

@@ -559,94 +559,6 @@ type Foo = struct {};
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(VersioningInheritanceTests, GoodLegacyParentNotRemovedChildFalse) {
-  TestLibrary library(R"FIDL(
-@available(added=2, deprecated=4)
-library example;
-
-@available(removed=6, legacy=false)
-type Foo = struct {};
-)FIDL");
-  library.SelectVersion("example", "LEGACY");
-  ASSERT_COMPILED(library);
-  ASSERT_FALSE(library.HasStruct("Foo"));
-}
-
-TEST(VersioningInheritanceTests, GoodLegacyParentNotRemovedChildTrue) {
-  TestLibrary library(R"FIDL(
-@available(added=2, deprecated=4)
-library example;
-
-@available(removed=6, legacy=true)
-type Foo = struct {};
-)FIDL");
-  library.SelectVersion("example", "LEGACY");
-  ASSERT_COMPILED(library);
-  ASSERT_TRUE(library.HasStruct("Foo"));
-}
-
-TEST(VersioningInheritanceTests, GoodLegacyParentFalseChildFalse) {
-  TestLibrary library(R"FIDL(
-@available(added=2, deprecated=4, removed=6, legacy=false)
-library example;
-
-@available(legacy=false)
-type Foo = struct {};
-)FIDL");
-  library.SelectVersion("example", "LEGACY");
-  ASSERT_COMPILED(library);
-  ASSERT_FALSE(library.HasStruct("Foo"));
-}
-
-TEST(VersioningInheritanceTests, BadLegacyParentFalseChildTrue) {
-  TestLibrary library(R"FIDL(
-@available(added=2, deprecated=4, removed=6, legacy=false)
-library example;
-
-@available(legacy=true)
-type Foo = struct {};
-)FIDL");
-  library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrLegacyConflictsWithParent, "legacy", "true", "removed", "6",
-                     "example.fidl:2:35");
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
-TEST(VersioningInheritanceTests, BadLegacyParentFalseChildTrueMethod) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0183.test.fidl");
-  library.SelectVersion("test", "HEAD");
-  library.ExpectFail(ErrLegacyConflictsWithParent, "legacy", "true", "removed", "3",
-                     "bad/fi-0183.test.fidl:7:12");
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
-TEST(VersioningInheritanceTests, GoodLegacyParentTrueChildTrue) {
-  TestLibrary library(R"FIDL(
-@available(added=2, deprecated=4, removed=6, legacy=true)
-library example;
-
-@available(legacy=true)
-type Foo = struct {};
-)FIDL");
-  library.SelectVersion("example", "LEGACY");
-  ASSERT_COMPILED(library);
-  ASSERT_TRUE(library.HasStruct("Foo"));
-}
-
-TEST(VersioningInheritanceTests, GoodLegacyParentTrueChildFalse) {
-  TestLibrary library(R"FIDL(
-@available(added=2, deprecated=4, removed=6, legacy=true)
-library example;
-
-@available(legacy=false)
-type Foo = struct {};
-)FIDL");
-  library.SelectVersion("example", "LEGACY");
-  ASSERT_COMPILED(library);
-  ASSERT_FALSE(library.HasStruct("Foo"));
-}
-
 TEST(VersioningInheritanceTests, GoodMemberInheritsFromParent) {
   TestLibrary library(R"FIDL(
 @available(added=1)
@@ -668,7 +580,7 @@ type Foo = struct {
 
 TEST(VersioningInheritanceTests, GoodComplexInheritance) {
   // The following libraries all define a struct Bar with effective availability
-  // @available(added=2, deprecated=3, removed=4, legacy=true) in different ways.
+  // @available(added=2, deprecated=3, removed=4) in different ways.
 
   std::vector<const char*> sources;
 
@@ -677,13 +589,13 @@ TEST(VersioningInheritanceTests, GoodComplexInheritance) {
 @available(added=1)
 library example;
 
-@available(added=2, deprecated=3, removed=4, legacy=true)
+@available(added=2, deprecated=3, removed=4)
 type Bar = struct {};
 )FIDL");
 
   // Fully inherit from library declaration.
   sources.push_back(R"FIDL(
-@available(added=2, deprecated=3, removed=4, legacy=true)
+@available(added=2, deprecated=3, removed=4)
 library example;
 
 type Bar = struct {};
@@ -694,7 +606,7 @@ type Bar = struct {};
 @available(added=1, deprecated=3)
 library example;
 
-@available(added=2, removed=4, legacy=true)
+@available(added=2, removed=4)
 type Bar = struct {};
 )FIDL");
 
@@ -703,7 +615,7 @@ type Bar = struct {};
 @available(added=1)
 library example;
 
-@available(added=2, deprecated=3, removed=4, legacy=true)
+@available(added=2, deprecated=3, removed=4)
 type Foo = struct {
     member @generated_name("Bar") struct {};
 };
@@ -715,7 +627,7 @@ type Foo = struct {
 library example;
 
 type Foo = struct {
-    @available(added=2, deprecated=3, removed=4, legacy=true)
+    @available(added=2, deprecated=3, removed=4)
     member @generated_name("Bar") struct {};
 };
 )FIDL");
@@ -727,14 +639,14 @@ library example;
 
 @available(deprecated=3)
 type Foo = struct {
-    @available(removed=4, legacy=true)
+    @available(removed=4)
     member @generated_name("Bar") struct {};
 };
 )FIDL");
 
   // Inherit from multiple, backward.
   sources.push_back(R"FIDL(
-@available(added=1, removed=4, legacy=true)
+@available(added=1, removed=4)
 library example;
 
 @available(deprecated=3)
@@ -751,7 +663,7 @@ library example;
 
 @available(added=2)
 type Foo = struct {
-    @available(deprecated=3, removed=4, legacy=true)
+    @available(deprecated=3, removed=4)
     member @generated_name("Bar") struct {};
 };
 )FIDL");
@@ -765,7 +677,7 @@ library example;
 type Foo = struct {
     @available(deprecated=3)
     member1 struct {
-        @available(removed=4, legacy=true)
+        @available(removed=4)
         member2 struct {
             member3 @generated_name("Bar") struct {};
         };
@@ -780,21 +692,21 @@ library example;
 
 @available(added=2)
 type Foo = struct {
-    @available(deprecated=3, removed=4, legacy=true)
+    @available(deprecated=3, removed=4)
     member1 vector<vector<vector<@generated_name("Bar") struct{}>>>;
 };
 )FIDL");
 
-  for (std::string version : {"1", "2", "3", "4", "LEGACY"}) {
+  for (std::string version : {"1", "2", "3", "4"}) {
     SCOPED_TRACE(version);
     for (auto& source : sources) {
       TestLibrary library(source);
       library.SelectVersion("example", version);
       ASSERT_COMPILED(library);
       auto bar = library.LookupStruct("Bar");
-      EXPECT_EQ(bar != nullptr, version == "2" || version == "3" || version == "LEGACY");
+      EXPECT_EQ(bar != nullptr, version == "2" || version == "3");
       if (bar) {
-        EXPECT_EQ(bar->availability.is_deprecated(), version == "3" || version == "LEGACY");
+        EXPECT_EQ(bar->availability.is_deprecated(), version == "3");
       }
     }
   }
@@ -869,21 +781,6 @@ type Foo = struct {           // L6
                      "example.fidl:5:12", "removed", "before", "added");
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.position().line, 8);
-}
-
-TEST(VersioningInheritanceTests, BadLegacyConflictsWithRemoved) {
-  TestLibrary library(R"FIDL(  // L1
-@available(added=1, removed=2) // L2
-library example;               // L3
-                               // L4
-@available(legacy=true)        // L5
-type Foo = struct {};
-)FIDL");
-  library.SelectVersion("example", "HEAD");
-  library.ExpectFail(ErrLegacyConflictsWithParent, "legacy", "true", "removed", "2",
-                     "example.fidl:2:21");
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-  EXPECT_EQ(library.errors()[0]->span.position().line, 5);
 }
 
 }  // namespace

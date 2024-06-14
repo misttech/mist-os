@@ -4,10 +4,10 @@
 
 //! Bucketting related functionality.
 
-use {
-    crate::processed::Process, crate::processed::Vmo, crate::raw::BucketDefinition,
-    serde::Serialize, std::collections::HashMap, std::collections::HashSet,
-};
+use crate::processed::{Process, Vmo};
+use crate::raw::BucketDefinition;
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 
 /// Contains the result of a bucketting.
 #[derive(Serialize, PartialEq, Debug)]
@@ -90,11 +90,8 @@ pub fn compute_buckets(
 
 #[cfg(test)]
 mod tests {
-    use crate::bucket::compute_buckets;
-    use crate::bucket::Bucket;
-    use crate::bucket::Process;
-    use crate::processed::RetainedMemory;
-    use crate::processed::Vmo;
+    use crate::bucket::{compute_buckets, Bucket, Process};
+    use crate::processed::{RetainedMemory, Vmo};
     use crate::raw::BucketDefinition;
     use std::collections::{HashMap, HashSet};
 

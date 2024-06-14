@@ -2,30 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context as _,
-    argh::FromArgs,
-    async_net::{TcpListener, TcpStream},
-    fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    futures::prelude::*,
-    hyper::{
-        server::{accept::from_stream, Server},
-        service::{make_service_fn, service_fn},
-    },
-    mock_omaha_server::{
-        handle_request, OmahaServerBuilder, PrivateKeyAndId, PrivateKeys, ResponseAndMetadata,
-    },
-    std::{
-        collections::HashMap,
-        convert::Infallible,
-        io,
-        net::{Ipv6Addr, SocketAddr},
-        pin::Pin,
-        sync::Arc,
-        task::{Context, Poll},
-    },
+use anyhow::Context as _;
+use argh::FromArgs;
+use async_net::{TcpListener, TcpStream};
+use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
+use futures::prelude::*;
+use hyper::server::accept::from_stream;
+use hyper::server::Server;
+use hyper::service::{make_service_fn, service_fn};
+use mock_omaha_server::{
+    handle_request, OmahaServerBuilder, PrivateKeyAndId, PrivateKeys, ResponseAndMetadata,
 };
+use std::collections::HashMap;
+use std::convert::Infallible;
+use std::io;
+use std::net::{Ipv6Addr, SocketAddr};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 
 #[derive(FromArgs)]
 /// Arguments for mock-omaha-server.

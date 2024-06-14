@@ -5,42 +5,30 @@
 use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
-use net_types::{
-    ethernet::Mac,
-    ip::{Ipv6, Ipv6Addr, Subnet},
-    LinkLocalAddress as _, NonMappedAddr, Witness as _,
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ipv6, Ipv6Addr, Subnet};
+use net_types::{LinkLocalAddress as _, NonMappedAddr, Witness as _};
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
-use packet_formats::{
-    icmp::{
-        ndp::{
-            options::{NdpOptionBuilder, PrefixInformation},
-            OptionSequenceBuilder, RouterAdvertisement,
-        },
-        IcmpPacketBuilder, IcmpUnusedCode,
-    },
-    ip::Ipv6Proto,
-    ipv6::Ipv6PacketBuilder,
-    utils::NonZeroDuration,
-};
+use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
+use packet_formats::icmp::ndp::{OptionSequenceBuilder, RouterAdvertisement};
+use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::ip::Ipv6Proto;
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::utils::NonZeroDuration;
 
+use netstack3_base::testutil::{TestAddrs, TestIpExt as _};
 use netstack3_base::{FrameDestination, InstantContext as _};
-use netstack3_core::{
-    device::{EthernetCreationProperties, EthernetLinkDevice},
-    testutil::{
-        CtxPairExt as _, FakeCtx, TestAddrs, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
-        IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-    },
+use netstack3_core::device::{EthernetCreationProperties, EthernetLinkDevice};
+use netstack3_core::testutil::{CtxPairExt as _, FakeCtx, DEFAULT_INTERFACE_METRIC};
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_ip::device::testutil::with_assigned_ipv6_addr_subnets;
+use netstack3_ip::device::{
+    InnerSlaacTimerId, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    SlaacConfiguration, StableIidSecret, TemporarySlaacAddressConfiguration,
+    SLAAC_MIN_REGEN_ADVANCE,
 };
-use netstack3_ip::{
-    self as ip,
-    device::{
-        testutil::with_assigned_ipv6_addr_subnets, InnerSlaacTimerId, IpDeviceConfigurationUpdate,
-        Ipv6DeviceConfigurationUpdate, SlaacConfiguration, StableIidSecret,
-        TemporarySlaacAddressConfiguration, SLAAC_MIN_REGEN_ADVANCE,
-    },
-    icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-};
+use netstack3_ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
+use netstack3_ip::{self as ip};
 
 const SECRET_KEY: StableIidSecret = StableIidSecret::ALL_ONES;
 

@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{any::TypeId, collections::HashMap, fmt};
+use std::any::TypeId;
+use std::collections::HashMap;
+use std::fmt;
 
-use crate::{core::AsAny, status_code::StatusCode};
+use crate::core::AsAny;
+use crate::status_code::StatusCode;
 
 pub trait ImportStackObject: AsAny + fmt::Debug {
     fn resolve(&self) -> StatusCode {

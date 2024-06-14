@@ -6,18 +6,14 @@
 #![doc(hidden)]
 
 use super::common::{Executor, Task};
-use fuchsia_sync::Mutex;
-use fuchsia_sync::MutexGuard;
+use fuchsia_sync::{Mutex, MutexGuard};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use std::{
-    borrow::Borrow,
-    fmt,
-    future::Future,
-    hash,
-    ops::Deref,
-    sync::{Arc, Weak},
-    task::{Context, Poll, Waker},
-};
+use std::borrow::Borrow;
+use std::future::Future;
+use std::ops::Deref;
+use std::sync::{Arc, Weak};
+use std::task::{Context, Poll, Waker};
+use std::{fmt, hash};
 
 /// A unique handle to a scope.
 ///
@@ -146,12 +142,20 @@ impl ScopeRef {
     pub(crate) unsafe fn cancel<R>(&self, task_id: usize) -> Option<R> {
         let mut state = self.lock();
         state.join_wakers.remove(&task_id);
-        state.all_tasks.get(&task_id).and_then(|task| {
-            if task.future.cancel() {
-                self.inner.executor.ready_tasks.push(task.clone());
-            }
-            task.future.take_result()
-        })
+        state
+            .all_tasks
+            .get(&task_id)
+            .and_then(|task| {
+                if task.future.cancel() {
+                    self.inner.executor.ready_tasks.push(task.clone());
+                }
+                task.future.take_result()
+            })
+            .and_then(|result| {
+                // If we took the result we can remove the task.
+                state.all_tasks.remove(&task_id);
+                Some(result)
+            })
     }
 
     /// Polls for a join result for the given task ID.
@@ -360,5 +364,20 @@ mod tests {
         drop(scope);
         assert_eq!(executor.run_until_stalled(&mut child_task), Poll::Pending);
         assert_eq!(executor.run_until_stalled(&mut grandchild_task), Poll::Pending);
+    }
+
+    #[test]
+    fn completed_task_is_cleaned_up_after_cancel() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().new_child();
+        let task = scope.spawn(async { 1 });
+        assert_eq!(executor.run_until_stalled(&mut std::future::pending::<()>()), Poll::Pending);
+        assert_eq!(scope.lock().all_tasks.len(), 1);
+
+        // Running the executor after cancelling the task isn't currently
+        // necessary, but we might decide to do async cleanup in the future.
+        assert_eq!(Some(1), task.cancel());
+        assert_eq!(executor.run_until_stalled(&mut std::future::pending::<()>()), Poll::Pending);
+        assert_eq!(scope.lock().all_tasks.len(), 0);
     }
 }

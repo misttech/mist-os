@@ -35,18 +35,16 @@ pub use session::{parse_full_session, SessionParser};
 pub use string::StringRef;
 pub use thread::{ProcessKoid, ThreadKoid};
 
-use crate::{
-    blob::{RawBlobRecord, RawLargeBlobRecord},
-    error::ParseResult,
-    init::InitRecord,
-    log::RawLogRecord,
-    metadata::{MetadataRecord, TraceInfoMetadataRecord},
-    objects::{RawKernelObjRecord, RawUserspaceObjRecord},
-    scheduling::RawSchedulingRecord,
-    session::ResolveCtx,
-    string::StringRecord,
-    thread::ThreadRecord,
-};
+use crate::blob::{RawBlobRecord, RawLargeBlobRecord};
+use crate::error::ParseResult;
+use crate::init::InitRecord;
+use crate::log::RawLogRecord;
+use crate::metadata::{MetadataRecord, TraceInfoMetadataRecord};
+use crate::objects::{RawKernelObjRecord, RawUserspaceObjRecord};
+use crate::scheduling::RawSchedulingRecord;
+use crate::session::ResolveCtx;
+use crate::string::StringRecord;
+use crate::thread::ThreadRecord;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TraceRecord {

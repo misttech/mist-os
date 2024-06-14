@@ -2,21 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::colors::ColorScheme,
-    anyhow::Error,
-    carnelian::{color::Color, Size},
-    pty::ServerPty,
-    std::{cell::RefCell, fs::File, io::Write, rc::Rc},
-    term_model::{
-        clipboard::Clipboard,
-        config::Config,
-        event::EventListener,
-        grid::Scroll,
-        term::{color::Rgb, SizeInfo, TermMode},
-        Term,
-    },
-};
+use crate::colors::ColorScheme;
+use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::Size;
+use pty::ServerPty;
+use std::cell::RefCell;
+use std::fs::File;
+use std::io::Write;
+use std::rc::Rc;
+use term_model::clipboard::Clipboard;
+use term_model::config::Config;
+use term_model::event::EventListener;
+use term_model::grid::Scroll;
+use term_model::term::color::Rgb;
+use term_model::term::{SizeInfo, TermMode};
+use term_model::Term;
 
 /// Empty type for term model config.
 #[derive(Default)]
@@ -160,7 +161,9 @@ impl<T> Write for Terminal<T> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync, term_model::event::Event};
+    use super::*;
+    use fuchsia_async as fasync;
+    use term_model::event::Event;
 
     #[derive(Default)]
     struct TestListener;

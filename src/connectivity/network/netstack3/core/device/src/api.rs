@@ -7,42 +7,37 @@
 use alloc::fmt::Debug;
 use core::marker::PhantomData;
 
+use log::debug;
 use net_types::ip::{Ipv4, Ipv6};
 use netstack3_base::{
     AnyDevice, ContextPair, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
     Inspector, RecvFrameContext, ReferenceNotifiers, ReferenceNotifiersExt as _,
     RemoveResourceResultWithContext, ResourceCounterContext, TimerContext,
 };
-use netstack3_ip::{
-    self as ip,
-    device::{
-        IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
-        IpDeviceTimerId, Ipv6DeviceConfigurationContext,
-    },
-    RawMetric,
+use netstack3_ip::device::{
+    IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceTimerId,
+    Ipv6DeviceConfigurationContext,
 };
+use netstack3_ip::{self as ip, RawMetric};
 use packet::BufferMut;
-use tracing::debug;
 
-use crate::internal::{
-    base::{
-        DeviceCollectionContext, DeviceCounters, DeviceLayerStateTypes, DeviceLayerTypes,
-        DeviceReceiveFrameSpec, OriginTrackerContext,
-    },
-    config::{
-        ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationContext,
-        DeviceConfigurationUpdate, DeviceConfigurationUpdateError, NdpConfiguration,
-        NdpConfigurationUpdate,
-    },
-    ethernet::EthernetLinkDevice,
-    id::{
-        for_any_device_id, BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, DeviceId,
-        DeviceProvider,
-    },
-    loopback::LoopbackDevice,
-    pure_ip::PureIpDevice,
-    state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
+use crate::internal::base::{
+    DeviceCollectionContext, DeviceCounters, DeviceLayerStateTypes, DeviceLayerTypes,
+    DeviceReceiveFrameSpec, OriginTrackerContext,
 };
+use crate::internal::config::{
+    ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationContext,
+    DeviceConfigurationUpdate, DeviceConfigurationUpdateError, NdpConfiguration,
+    NdpConfigurationUpdate,
+};
+use crate::internal::ethernet::EthernetLinkDevice;
+use crate::internal::id::{
+    for_any_device_id, BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, DeviceId,
+    DeviceProvider,
+};
+use crate::internal::loopback::LoopbackDevice;
+use crate::internal::pure_ip::PureIpDevice;
+use crate::internal::state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner};
 
 /// Pending device configuration update.
 ///
@@ -176,7 +171,7 @@ where
             ip::device::clear_ipv6_device_state(core_ctx, bindings_ctx, &device);
         };
 
-        tracing::debug!("removing {device:?}");
+        debug!("removing {device:?}");
         let primary = core_ctx.remove(&device).expect("tried to remove device not in stack");
         assert_eq!(device, primary);
         core::mem::drop(device);

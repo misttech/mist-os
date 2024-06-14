@@ -528,9 +528,12 @@
                 "fuchsia.power.system.ActivityGovernor",
             ],
             from: "parent",
-            to: [ "#timekeeper" ],
+            to: [
+                "#exceptions",
+                "#timekeeper",
+            ],
 
-            // Only used if the structured config option is set
+            // Only used by timekeeper if the structured config option is set
             // for timekeeper:
             //      `power_topology_integration_enabled: true`
             // See:

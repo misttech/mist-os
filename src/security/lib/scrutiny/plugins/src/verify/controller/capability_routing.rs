@@ -2,29 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::verify::{
-        collection::V2ComponentModel, CapabilityRouteResults, ErrorResult, OkResult,
-        ResultsBySeverity, ResultsForCapabilityType, WarningResult,
-    },
-    anyhow::{anyhow, Context, Result},
-    cm_fidl_analyzer::{
-        component_instance::ComponentInstanceForAnalyzer,
-        component_model::{AnalyzerModelError, ComponentModelForAnalyzer},
-        route::{CapabilityRouteError, VerifyRouteResult},
-        BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker,
-        ModelMappingVisitor,
-    },
-    cm_rust::CapabilityTypeName,
-    routing::error::{ComponentInstanceError, RoutingError},
-    scrutiny::{model::controller::DataController, model::model::*},
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    },
+use crate::verify::collection::V2ComponentModel;
+use crate::verify::{
+    CapabilityRouteResults, ErrorResult, OkResult, ResultsBySeverity, ResultsForCapabilityType,
+    WarningResult,
 };
+use anyhow::{anyhow, Context, Result};
+use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
+use cm_fidl_analyzer::component_model::{AnalyzerModelError, ComponentModelForAnalyzer};
+use cm_fidl_analyzer::route::{CapabilityRouteError, VerifyRouteResult};
+use cm_fidl_analyzer::{
+    BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker, ModelMappingVisitor,
+};
+use cm_rust::CapabilityTypeName;
+use routing::error::{ComponentInstanceError, RoutingError};
+use scrutiny::model::controller::DataController;
+use scrutiny::model::model::*;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 /// Generic verification result type. Variants implement serialization.
 enum ResultBySeverity {

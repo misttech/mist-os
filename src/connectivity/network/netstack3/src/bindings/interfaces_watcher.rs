@@ -4,21 +4,27 @@
 
 use std::collections::{HashMap, VecDeque};
 
-use super::{devices::BindingId, util::IntoFidl};
 use fidl::prelude::*;
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces::{
     self as finterfaces, StateRequest, StateRequestStream, WatcherRequest, WatcherRequestStream,
     WatcherWatchResponder,
 };
-use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
-use fuchsia_zircon as zx;
+use futures::channel::mpsc;
+use futures::sink::SinkExt as _;
+use futures::task::Poll;
 use futures::{
-    channel::mpsc, ready, sink::SinkExt as _, task::Poll, Future, FutureExt as _, StreamExt as _,
-    TryFutureExt as _, TryStreamExt as _,
+    ready, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
+use log::{debug, error, warn};
 use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::IpAddressState;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as finterfaces_ext,
+    fuchsia_zircon as zx,
+};
+
+use crate::bindings::devices::BindingId;
+use crate::bindings::util::{IntoFidl, ResultExt as _};
 
 /// Possible errors when serving `fuchsia.net.interfaces/State`.
 #[derive(thiserror::Error, Debug)]
@@ -166,9 +172,7 @@ impl Future for Watcher {
             let next_request = self.as_mut().stream.poll_next_unpin(cx)?;
             match ready!(next_request) {
                 Some(WatcherRequest::Watch { responder }) => match self.events.pop_front() {
-                    Some(e) => responder
-                        .send(&e)
-                        .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}")),
+                    Some(e) => responder.send(&e).unwrap_or_log("failed to respond"),
                     None => match &self.responder {
                         Some(existing) => {
                             existing
@@ -227,14 +231,14 @@ impl Watcher {
         if let Some(responder) = responder.take() {
             match responder.send(&event) {
                 Ok(()) => (),
-                Err(e) => tracing::error!("error sending event {:?} to watcher: {:?}", event, e),
+                Err(e) => error!("error sending event {:?} to watcher: {:?}", event, e),
             }
             return;
         }
         match events.push(event) {
             Ok(()) => (),
             Err(event) => {
-                tracing::warn!("failed to enqueue event {:?} on watcher, closing channel", event);
+                warn!("failed to enqueue event {:?} on watcher, closing channel", event);
                 stream.control_handle().shutdown();
             }
         }
@@ -459,7 +463,7 @@ impl Worker {
                     Some(Ok(())) => {}
                     Some(Err(e)) => {
                         if !e.is_closed() {
-                            tracing::error!("error operating interface watcher {:?}", e);
+                            error!("error operating interface watcher {:?}", e);
                         }
                     }
                     // This should not be observable since we check if our
@@ -483,13 +487,13 @@ impl Worker {
                             responder: None,
                         }),
                         Err(status) => {
-                            tracing::warn!("failed to construct events for watcher: {}", status);
+                            warn!("failed to construct events for watcher: {}", status);
                             stream.control_handle().shutdown_with_epitaph(status);
                         }
                     }
                 }
                 Action::Sink(Some(SinkAction::Event(e))) => {
-                    tracing::debug!("consuming event {:?}", e);
+                    debug!("consuming event {:?}", e);
 
                     #[cfg(test)]
                     {
@@ -517,7 +521,7 @@ impl Worker {
                     };
 
                     match Self::consume_event(&mut interface_state, e)? {
-                        None => tracing::debug!("not publishing No-Op event."),
+                        None => debug!("not publishing No-Op event."),
                         Some((event, changed_address_properties)) => {
                             let num_published = current_watchers
                                 .iter_mut()
@@ -558,7 +562,7 @@ impl Worker {
                                     should_push.then_some(())
                                 })
                                 .count();
-                            tracing::debug!(
+                            debug!(
                                 "published event to {} of {} watchers",
                                 num_published,
                                 current_watchers.len()
@@ -909,15 +913,11 @@ mod tests {
     use fixture::fixture;
     use futures::Stream;
     use itertools::Itertools as _;
-    use net_types::{
-        ip::{AddrSubnet, IpAddress as _, Ipv6, Ipv6Addr},
-        Witness as _,
-    };
-    use std::{
-        convert::{TryFrom as _, TryInto as _},
-        num::NonZeroU64,
-        pin::pin,
-    };
+    use net_types::ip::{AddrSubnet, IpAddress as _, Ipv6, Ipv6Addr};
+    use net_types::Witness as _;
+    use std::convert::{TryFrom as _, TryInto as _};
+    use std::num::NonZeroU64;
+    use std::pin::pin;
     use test_case::test_case;
 
     impl WorkerWatcherSink {

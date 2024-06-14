@@ -18,7 +18,7 @@ import test_utils
 class TraceImportingTest(unittest.TestCase):
     """Trace importing tests"""
 
-    def setUp(self):
+    def setUp(self) -> None:
         # A second dirname is required to account for the .pyz archive which
         # contains the test and a third one since data is a sibling of the test.
         self._runtime_deps_path: str = os.path.join(
@@ -334,8 +334,8 @@ class TraceImportingTest(unittest.TestCase):
         events: List[trace_model.Event] = list(model.all_events())
         self.assertEqual(len(events), 4)
 
-        flow_events: List[trace_model.Event] = list(
-            trace_utils.filter_events(events, type=trace_model.FlowEvent)
+        flow_events: List[trace_model.FlowEvent] = list(
+            trace_utils.filter_events(events, type=trace_model.FlowEvent)  # type: ignore[arg-type]
         )
         flow_events.sort(key=lambda x: x.start)
         self.assertEqual(len(flow_events), 3)
@@ -352,44 +352,56 @@ class TraceImportingTest(unittest.TestCase):
         thread: trace_model.Thread = process.threads[0]
         self.assertEqual(len(model.processes), 1)
         self.assertEqual(len(process.threads), 1)
-        flow_events: List[trace_model.Event] = list(
-            trace_utils.filter_events(thread.events, type=trace_model.FlowEvent)
+        flow_events: List[trace_model.FlowEvent] = list(
+            trace_utils.filter_events(thread.events, type=trace_model.FlowEvent)  # type: ignore[arg-type]
         )
         self.assertEqual(len(flow_events), 6)
         self.assertEqual(
             flow_events[0]
             .enclosing_duration.start.to_epoch_delta()
-            .to_milliseconds_f(),
+            .to_milliseconds_f()
+            if flow_events[0].enclosing_duration is not None
+            else None,
             10.0,
         )
         self.assertEqual(
             flow_events[1]
             .enclosing_duration.start.to_epoch_delta()
-            .to_milliseconds_f(),
+            .to_milliseconds_f()
+            if flow_events[1].enclosing_duration is not None
+            else None,
             20.0,
         )
         self.assertEqual(
             flow_events[2]
             .enclosing_duration.start.to_epoch_delta()
-            .to_milliseconds_f(),
+            .to_milliseconds_f()
+            if flow_events[2].enclosing_duration is not None
+            else None,
             40.0,
         )
         self.assertEqual(
             flow_events[3]
             .enclosing_duration.start.to_epoch_delta()
-            .to_milliseconds_f(),
+            .to_milliseconds_f()
+            if flow_events[3].enclosing_duration is not None
+            else None,
             50.0,
         )
         self.assertEqual(
             flow_events[4]
             .enclosing_duration.start.to_epoch_delta()
-            .to_milliseconds_f(),
+            .to_milliseconds_f()
+            if flow_events[4].enclosing_duration is not None
+            else None,
             60.0,
         )
         self.assertEqual(
             flow_events[5]
             .enclosing_duration.start.to_epoch_delta()
-            .to_milliseconds_f(),
+            .to_milliseconds_f()
+            if flow_events[5].enclosing_duration is not None
+            else None,
             70.0,
         )
 

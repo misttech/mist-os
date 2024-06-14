@@ -9,11 +9,9 @@ mod cache;
 mod collection;
 mod loader;
 
-pub use {
-    asset::{Asset, AssetId},
-    collection::{AssetCollection, AssetCollectionBuilder},
-    loader::{AssetLoader, AssetLoaderImpl},
-};
+pub use asset::{Asset, AssetId};
+pub use collection::{AssetCollection, AssetCollectionBuilder};
+pub use loader::{AssetLoader, AssetLoaderImpl};
 
 #[cfg(test)]
 pub(crate) use collection::AssetCollectionError;

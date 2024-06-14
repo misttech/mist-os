@@ -4,10 +4,10 @@
 
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
-use component_debug::{
-    cli::doctor::write_result_table, cli::run_cmd, config::resolve_raw_config_overrides,
-    doctor::validate_routes,
-};
+use component_debug::cli::doctor::write_result_table;
+use component_debug::cli::run_cmd;
+use component_debug::config::resolve_raw_config_overrides;
+use component_debug::doctor::validate_routes;
 use ffx_component::rcs::{
     connect_to_lifecycle_controller, connect_to_realm_query, connect_to_route_validator,
 };

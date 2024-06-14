@@ -22,75 +22,61 @@ pub(crate) mod demux;
 pub(crate) mod isn;
 
 use alloc::collections::{hash_map, HashMap};
-use core::{
-    convert::Infallible as Never,
-    fmt::{self, Debug},
-    marker::PhantomData,
-    num::{NonZeroU16, NonZeroUsize},
-    ops::{Deref, DerefMut, RangeInclusive},
-};
+use core::convert::Infallible as Never;
+use core::fmt::{self, Debug};
+use core::marker::PhantomData;
+use core::num::{NonZeroU16, NonZeroUsize};
+use core::ops::{Deref, DerefMut, RangeInclusive};
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use net_types::{
-    ip::{
-        GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4,
-        Ipv4Addr, Ipv6, Ipv6Addr,
-    },
-    AddrAndPortFormatter, AddrAndZone, SpecifiedAddr, ZonedAddr,
+use log::{debug, error, trace};
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddr, IpAddress, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
+    Ipv6Addr,
 };
-use netstack3_base::{
-    socket::{
-        self, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnIpAddr, DualStackListenerIpAddr,
-        DualStackLocalIp, DualStackRemoteIp, EitherStack, IncompatibleError, InsertError, Inserter,
-        ListenerAddr, ListenerAddrInfo, ListenerIpAddr, MaybeDualStack, NotDualStackCapableError,
-        RemoveResult, SetDualStackEnabledError, ShutdownType, SocketDeviceUpdate,
-        SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpExt, SocketMapAddrSpec,
-        SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
-        SocketMapStateSpec, SocketMapUpdateSharingPolicy, SocketZonedAddrExt as _,
-        UpdateSharingError,
-    },
-    socketmap::{IterShadows as _, SocketMap},
-    sync::RwLock,
-    ExistsError, Inspector, InspectorDeviceExt, LocalAddressError, PortAllocImpl,
-    RemoveResourceResult, ZonedAddressError,
+use net_types::{AddrAndPortFormatter, AddrAndZone, SpecifiedAddr, ZonedAddr};
+use netstack3_base::socket::{
+    self, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnIpAddr, DualStackListenerIpAddr,
+    DualStackLocalIp, DualStackRemoteIp, EitherStack, IncompatibleError, InsertError, Inserter,
+    ListenerAddr, ListenerAddrInfo, ListenerIpAddr, MaybeDualStack, NotDualStackCapableError,
+    RemoveResult, SetDualStackEnabledError, ShutdownType, SocketDeviceUpdate,
+    SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpExt, SocketMapAddrSpec,
+    SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
+    SocketMapStateSpec, SocketMapUpdateSharingPolicy, SocketZonedAddrExt as _, UpdateSharingError,
 };
+use netstack3_base::socketmap::{IterShadows as _, SocketMap};
+use netstack3_base::sync::RwLock;
 use netstack3_base::{
     AnyDevice, BidirectionalConverter as _, ContextPair, CoreTimerContext, CounterContext, CtxPair,
-    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, HandleableTimer, Instant,
-    InstantBindingsTypes, OwnedOrRefsBidirectionalConverter, ReferenceNotifiersExt as _,
-    RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
-    WeakDeviceIdentifier,
+    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError, HandleableTimer,
+    Inspector, InspectorDeviceExt, Instant, InstantBindingsTypes, LocalAddressError,
+    OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
+    RemoveResourceResult, RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes,
+    TimerContext, TracingContext, WeakDeviceIdentifier, ZonedAddressError,
 };
-use netstack3_ip::{
-    self as ip,
-    icmp::IcmpErrorCode,
-    socket::{
-        DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
-        IpSockCreationError, IpSocketHandler,
-    },
-    IpExt, TransportIpContext,
+use netstack3_filter::Tuple;
+use netstack3_ip::icmp::IcmpErrorCode;
+use netstack3_ip::socket::{
+    DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
+    IpSockCreationError, IpSocketHandler,
 };
+use netstack3_ip::{self as ip, BaseTransportIpContext, IpExt, TransportIpContext};
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
-use tracing::{debug, error, trace};
 
-use crate::internal::{
-    base::{
-        BufferSizes, ConnectionError, Control, Mss, OptionalBufferSizes, SocketOptions, TcpCounters,
-    },
-    buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload},
-    segment::Segment,
-    seqnum::SeqNum,
-    socket::{
-        accept_queue::{AcceptQueue, ListenerNotifier},
-        demux::tcp_serialize_segment,
-        isn::IsnGenerator,
-    },
-    state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
+use crate::internal::base::{
+    BufferSizes, ConnectionError, Control, Mss, OptionalBufferSizes, SocketOptions, TcpCounters,
 };
+use crate::internal::buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload};
+use crate::internal::segment::Segment;
+use crate::internal::seqnum::SeqNum;
+use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
+use crate::internal::socket::demux::tcp_serialize_segment;
+use crate::internal::socket::isn::IsnGenerator;
+use crate::internal::state::{CloseError, CloseReason, Closed, Initial, State, Takeable};
 
 /// A marker trait for dual-stack socket features.
 ///
@@ -124,6 +110,11 @@ pub trait DualStackBaseIpExt:
     /// be just [`ListenerIpAddr`] for [`Ipv4`], but a [`DualStackListenerIpAddr`]
     /// for [`Ipv6`].
     type ListenerIpAddr: Send + Sync + Debug + Clone;
+
+    /// The type for the original destination address of a connection. For
+    /// [`Ipv4`], this is always an [`Ipv4Addr`], and for [`Ipv6`], it is an
+    /// [`EitherStack<Ipv6Addr, Ipv4Addr>`].
+    type OriginalDstAddr;
 
     /// IP options unique to a particular IP version.
     type DualStackIpOptions: Send + Sync + Debug + Default + Clone + Copy;
@@ -184,6 +175,12 @@ pub trait DualStackBaseIpExt:
         demux_id: Self::DemuxSocketId<CC::WeakDeviceId, BC>,
     ) where
         Self::OtherVersion: DualStackBaseIpExt;
+
+    /// Take the original destination of the socket's connection and return an
+    /// address that is always in this socket's stack. For [`Ipv4`], this is a
+    /// no-op, but for [`Ipv6`] it may require mapping a dual-stack IPv4 address
+    /// into the IPv6 address space.
+    fn get_original_dst(addr: Self::OriginalDstAddr) -> Self::Addr;
 }
 
 impl DualStackBaseIpExt for Ipv4 {
@@ -192,6 +189,7 @@ impl DualStackBaseIpExt for Ipv4 {
     type ConnectionAndAddr<D: WeakDeviceIdentifier, BT: TcpBindingsTypes> =
         (Connection<Ipv4, Ipv4, D, BT>, ConnAddr<ConnIpAddr<Ipv4Addr, NonZeroU16, NonZeroU16>, D>);
     type ListenerIpAddr = ListenerIpAddr<Ipv4Addr, NonZeroU16>;
+    type OriginalDstAddr = Ipv4Addr;
     type DualStackIpOptions = ();
 
     fn as_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
@@ -258,6 +256,10 @@ impl DualStackBaseIpExt for Ipv4 {
             EitherStack::OtherStack(id) => destroy_socket(core_ctx, bindings_ctx, id),
         }
     }
+
+    fn get_original_dst(addr: Self::OriginalDstAddr) -> Self::Addr {
+        addr
+    }
 }
 
 /// Socket options that are accessible on IPv6 sockets.
@@ -277,6 +279,7 @@ impl DualStackBaseIpExt for Ipv6 {
     >;
     type DualStackIpOptions = Ipv6Options;
     type ListenerIpAddr = DualStackListenerIpAddr<Ipv6Addr, NonZeroU16>;
+    type OriginalDstAddr = EitherStack<Ipv6Addr, Ipv4Addr>;
 
     fn as_dual_stack_ip_socket<D: WeakDeviceIdentifier, BT: TcpBindingsTypes>(
         id: &Self::DemuxSocketId<D, BT>,
@@ -383,6 +386,13 @@ impl DualStackBaseIpExt for Ipv6 {
         demux_id: Self::DemuxSocketId<CC::WeakDeviceId, BC>,
     ) {
         destroy_socket(core_ctx, bindings_ctx, demux_id)
+    }
+
+    fn get_original_dst(addr: Self::OriginalDstAddr) -> Self::Addr {
+        match addr {
+            EitherStack::ThisStack(addr) => addr,
+            EitherStack::OtherStack(addr) => *addr.to_ipv6_mapped(),
+        }
     }
 }
 
@@ -589,7 +599,7 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         + OwnedOrRefsBidirectionalConverter<
             ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
             ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
-        >;
+        > + OwnedOrRefsBidirectionalConverter<I::OriginalDstAddr, I::Addr>;
 
     /// The core context that will give access to both versions of the IP layer.
     type DualStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
@@ -634,6 +644,9 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         > + OwnedOrRefsBidirectionalConverter<
             ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
             ListenerAddr<DualStackListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
+        > + OwnedOrRefsBidirectionalConverter<
+            I::OriginalDstAddr,
+            EitherStack<I::Addr, <I::OtherVersion as Ip>::Addr>,
         >;
 
     /// Calls the function with mutable access to the set with all TCP sockets.
@@ -840,12 +853,7 @@ impl<A: IpAddress, D> From<SocketAddr<A, D>>
     for IpAddr<SocketAddr<Ipv4Addr, D>, SocketAddr<Ipv6Addr, D>>
 {
     fn from(addr: SocketAddr<A, D>) -> IpAddr<SocketAddr<Ipv4Addr, D>, SocketAddr<Ipv6Addr, D>> {
-        let IpInvariant(addr) = <A::Version as Ip>::map_ip(
-            addr,
-            |i| IpInvariant(IpAddr::V4(i)),
-            |i| IpInvariant(IpAddr::V6(i)),
-        );
-        addr
+        <A::Version as Ip>::map_ip_in(addr, |i| IpAddr::V4(i), |i| IpAddr::V6(i))
     }
 }
 
@@ -1929,14 +1937,17 @@ where
                 .resolve_addr_with_device(bound_device.clone())
                 .map_err(LocalAddressError::Zone)?;
 
-            let mut assigned_to = core_ctx.get_devices_with_assigned_addr(addr.clone().into());
-
-            if !assigned_to.any(|d| {
-                required_device.as_ref().map_or(true, |device| device == &EitherDeviceId::Strong(d))
-            }) {
-                return Err(LocalAddressError::AddressMismatch);
-            }
-
+            core_ctx.with_devices_with_assigned_addr(addr.clone().into(), |mut assigned_to| {
+                if !assigned_to.any(|d| {
+                    required_device
+                        .as_ref()
+                        .map_or(true, |device| device == &EitherDeviceId::Strong(d))
+                }) {
+                    Err(LocalAddressError::AddressMismatch)
+                } else {
+                    Ok(())
+                }
+            })?;
             (Some(addr), required_device)
         }
         None => (None, bound_device.clone().map(EitherDeviceId::Weak)),
@@ -4170,6 +4181,89 @@ where
         })
     }
 
+    /// Gets the original destination address for the socket, if it is connected
+    /// and has a destination in the specified stack.
+    ///
+    /// Note that this always returns the original destination in the IP stack
+    /// in which the socket is; for example, for a dual-stack IPv6 socket that
+    /// is connected to an IPv4 address, this will return the IPv4-mapped IPv6
+    /// version of that address.
+    pub fn get_original_destination(
+        &mut self,
+        id: &TcpApiSocketId<I, C>,
+    ) -> Result<(SpecifiedAddr<I::Addr>, NonZeroU16), OriginalDestinationError> {
+        self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, state| {
+            let TcpSocketState { socket_state, .. } = state;
+            let conn = match socket_state {
+                TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => conn,
+                TcpSocketStateInner::Bound(BoundSocketState::Listener(_))
+                | TcpSocketStateInner::Unbound(_) => {
+                    return Err(OriginalDestinationError::NotConnected)
+                }
+            };
+
+            fn tuple<I: IpExt>(
+                ConnIpAddr { local, remote }: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
+            ) -> Tuple<I> {
+                let (local_addr, local_port) = local;
+                let (remote_addr, remote_port) = remote;
+                Tuple {
+                    protocol: IpProto::Tcp.into(),
+                    src_addr: local_addr.addr(),
+                    dst_addr: remote_addr.addr(),
+                    src_port_or_id: local_port.get(),
+                    dst_port_or_id: remote_port.get(),
+                }
+            }
+
+            let (addr, port) = match core_ctx {
+                MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                    let (_conn, addr) = converter.convert(conn);
+                    let tuple: Tuple<I> = tuple(addr.ip);
+                    core_ctx
+                        .get_original_destination(&tuple)
+                        .ok_or(OriginalDestinationError::NotFound)
+                }
+                MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(conn) {
+                    EitherStack::ThisStack((_conn, addr)) => {
+                        let tuple: Tuple<I> = tuple(addr.ip);
+                        let (addr, port) = core_ctx
+                            .get_original_destination(&tuple)
+                            .ok_or(OriginalDestinationError::NotFound)?;
+                        let addr = I::get_original_dst(
+                            converter.convert_back(EitherStack::ThisStack(addr)),
+                        );
+                        Ok((addr, port))
+                    }
+                    EitherStack::OtherStack((_conn, addr)) => {
+                        let tuple: Tuple<I::OtherVersion> = tuple(addr.ip);
+                        let (addr, port) = core_ctx
+                            .get_original_destination(&tuple)
+                            .ok_or(OriginalDestinationError::NotFound)?;
+                        let addr = I::get_original_dst(
+                            converter.convert_back(EitherStack::OtherStack(addr)),
+                        );
+                        Ok((addr, port))
+                    }
+                },
+            }?;
+
+            // TCP connections always have a specified destination address and
+            // port, but this invariant is not upheld in the type system here
+            // because we are retrieving the destination from the connection
+            // tracking table.
+            let addr = SpecifiedAddr::new(addr).ok_or_else(|| {
+                error!("original destination for socket {id:?} had unspecified addr (port {port})");
+                OriginalDestinationError::UnspecifiedDestinationAddr
+            })?;
+            let port = NonZeroU16::new(port).ok_or_else(|| {
+                error!("original destination for socket {id:?} had unspecified port (addr {addr})");
+                OriginalDestinationError::UnspecifiedDestinationPort
+            })?;
+            Ok((addr, port))
+        })
+    }
+
     /// Provides access to shared and per-socket TCP stats via a visitor.
     pub fn inspect<N>(&mut self, inspector: &mut N)
     where
@@ -4689,6 +4783,23 @@ pub enum BindError {
     LocalAddressError(#[from] LocalAddressError),
 }
 
+/// Possible errors when retrieving the original destination of a socket.
+#[derive(GenericOverIp)]
+#[generic_over_ip()]
+pub enum OriginalDestinationError {
+    /// Cannot retrieve original destination for an unconnected socket.
+    NotConnected,
+    /// The socket's original destination could not be found in the connection
+    /// tracking table.
+    NotFound,
+    /// The socket's original destination had an unspecified address, which is
+    /// invalid for TCP.
+    UnspecifiedDestinationAddr,
+    /// The socket's original destination had an unspecified port, which is
+    /// invalid for TCP.
+    UnspecifiedDestinationPort,
+}
+
 fn connect_inner<CC, BC, SockI, WireI>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -4970,8 +5081,8 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
     segment: Segment<SendPayload<'a>>,
 ) where
-    WireI: Ip + IpExt,
-    SockI: Ip + IpExt + DualStackIpExt,
+    WireI: IpExt,
+    SockI: IpExt + DualStackIpExt,
     CC: CounterContext<TcpCounters<SockI>>
         + IpSocketHandler<WireI, BC, DeviceId = D::Strong, WeakDeviceId = D>,
     BC: TcpBindingsTypes,
@@ -5021,58 +5132,54 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
 
 #[cfg(test)]
 mod tests {
-    use alloc::{format, rc::Rc, string::String, sync::Arc, vec, vec::Vec};
-    use core::{cell::RefCell, ffi::CStr, num::NonZeroU16, time::Duration};
+    use alloc::rc::Rc;
+    use alloc::string::String;
+    use alloc::sync::Arc;
+    use alloc::vec::Vec;
+    use alloc::{format, vec};
+    use core::cell::RefCell;
+    use core::ffi::CStr;
+    use core::num::NonZeroU16;
+    use core::time::Duration;
 
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
-    use net_types::{
-        ip::{Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu},
-        LinkLocalAddr,
+    use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu};
+    use net_types::LinkLocalAddr;
+    use netstack3_base::sync::{DynDebugReferences, Mutex};
+    use netstack3_base::testutil::{
+        new_rng, run_with_many_seeds, set_logger_for_test, FakeCoreCtx, FakeCryptoRng,
+        FakeDeviceId, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeStrongDeviceId, FakeTimerCtx,
+        FakeWeakDeviceId, InstantAndData, MultipleDevicesId, PendingFrameData, StepResult,
+        TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
     };
     use netstack3_base::{
-        sync::{DynDebugReferences, Mutex},
-        testutil::{
-            new_rng, run_with_many_seeds, set_logger_for_test, FakeCoreCtx, FakeCryptoRng,
-            FakeInstant, FakeNetwork, FakeNetworkSpec, FakeTimerCtx, InstantAndData,
-            PendingFrameData, StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
-        },
-        ContextProvider, Instant as _, InstantContext, ReferenceNotifiers,
+        ContextProvider, Instant as _, InstantContext, LinkDevice, ReferenceNotifiers,
+        StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
     };
-    use netstack3_base::{
-        testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
-        LinkDevice, StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
-    };
-    use netstack3_filter::TransportPacketSerializer;
-    use netstack3_ip::{
-        device::IpDeviceStateIpExt,
-        icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
-        nud::{testutil::FakeLinkResolutionNotifier, LinkResolutionContext},
-        socket::{
-            testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
-            IpSockSendError, Mms, MmsError, SendOptions,
-        },
-        testutil::DualStackSendIpPacketMeta,
-        HopLimits, IpTransportContext,
-    };
+    use netstack3_filter::{TransportPacketSerializer, Tuple};
+    use netstack3_ip::device::IpDeviceStateIpExt;
+    use netstack3_ip::icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode};
+    use netstack3_ip::nud::testutil::FakeLinkResolutionNotifier;
+    use netstack3_ip::nud::LinkResolutionContext;
+    use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
+    use netstack3_ip::socket::{IpSockSendError, Mms, MmsError, SendOptions};
+    use netstack3_ip::testutil::DualStackSendIpPacketMeta;
+    use netstack3_ip::{BaseTransportIpContext, HopLimits, IpTransportContext};
     use packet::{Buf, BufferMut, ParseBuffer as _};
-    use packet_formats::{
-        icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
-        tcp::{TcpParseArgs, TcpSegment},
-    };
+    use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
+    use packet_formats::tcp::{TcpParseArgs, TcpSegment};
     use rand::Rng as _;
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::{
-        base::{ConnectionError, DEFAULT_FIN_WAIT2_TIMEOUT},
-        buffer::{
-            testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer, WriteBackClientBuffers},
-            RingBuffer,
-        },
-        state::{TimeWait, MSL},
+    use crate::internal::base::{ConnectionError, DEFAULT_FIN_WAIT2_TIMEOUT};
+    use crate::internal::buffer::testutil::{
+        ClientBuffers, ProvidedBuffers, TestSendBuffer, WriteBackClientBuffers,
     };
+    use crate::internal::buffer::RingBuffer;
+    use crate::internal::state::{TimeWait, MSL};
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
         type SingleStackConverter: OwnedOrRefsBidirectionalConverter<
@@ -5185,9 +5292,12 @@ mod tests {
         }
     }
 
+    type InnerCoreCtx<D> =
+        FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>;
+
     struct TcpCoreCtx<D: FakeStrongDeviceId, BT: TcpBindingsTypes> {
         tcp: FakeDualStackTcpState<D, BT>,
-        ip_socket_ctx: FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+        ip_socket_ctx: InnerCoreCtx<D>,
     }
 
     impl<D: FakeStrongDeviceId, BT: TcpBindingsTypes> ContextProvider for TcpCoreCtx<D, BT> {
@@ -5418,31 +5528,29 @@ mod tests {
     }
 
     /// Delegate implementation to inner context.
-    impl<I, D, BC> TransportIpContext<I, BC> for TcpCoreCtx<D, BC>
+    impl<I, D, BC> BaseTransportIpContext<I, BC> for TcpCoreCtx<D, BC>
     where
         I: TcpTestIpExt,
         D: FakeStrongDeviceId,
         BC: TcpTestBindingsTypes<D>,
-        FakeDualStackIpSocketCtx<D>: TransportIpContext<I, BC, DeviceId = Self::DeviceId>,
     {
-        type DevicesWithAddrIter<'a> = <FakeDualStackIpSocketCtx<D> as TransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
+        type DevicesWithAddrIter<'a> = <InnerCoreCtx<D> as BaseTransportIpContext<I, BC>>::DevicesWithAddrIter<'a>
             where Self: 'a;
 
-        fn get_devices_with_assigned_addr(
+        fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
             &mut self,
             addr: SpecifiedAddr<I::Addr>,
-        ) -> Self::DevicesWithAddrIter<'_> {
-            TransportIpContext::<I, BC>::get_devices_with_assigned_addr(
-                &mut self.ip_socket_ctx.state,
+            cb: F,
+        ) -> O {
+            BaseTransportIpContext::<I, BC>::with_devices_with_assigned_addr(
+                &mut self.ip_socket_ctx,
                 addr,
+                cb,
             )
         }
 
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-            TransportIpContext::<I, BC>::get_default_hop_limits(
-                &mut self.ip_socket_ctx.state,
-                device,
-            )
+            BaseTransportIpContext::<I, BC>::get_default_hop_limits(&mut self.ip_socket_ctx, device)
         }
 
         fn confirm_reachable_with_destination(
@@ -5451,11 +5559,18 @@ mod tests {
             dst: SpecifiedAddr<I::Addr>,
             device: Option<&Self::DeviceId>,
         ) {
-            TransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                &mut self.ip_socket_ctx.state,
+            BaseTransportIpContext::<I, BC>::confirm_reachable_with_destination(
+                &mut self.ip_socket_ctx,
                 bindings_ctx,
                 dst,
                 device,
+            )
+        }
+
+        fn get_original_destination(&mut self, tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
+            BaseTransportIpContext::<I, BC>::get_original_destination(
+                &mut self.ip_socket_ctx,
+                tuple,
             )
         }
     }
@@ -5937,7 +6052,7 @@ mod tests {
     ///   - the client socket from local.
     ///   - the send end of the client socket.
     ///   - the accepted socket from remote.
-    fn bind_listen_connect_accept_inner<I: Ip + TcpTestIpExt>(
+    fn bind_listen_connect_accept_inner<I: TcpTestIpExt>(
         listen_addr: I::Addr,
         BindConfig { client_port, server_port, client_reuse_addr }: BindConfig,
         seed: u128,
@@ -6158,7 +6273,7 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false }, I::UNSPECIFIED_ADDRESS)]
     #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false }, I::UNSPECIFIED_ADDRESS)]
     #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true }, I::UNSPECIFIED_ADDRESS)]
@@ -6167,10 +6282,8 @@ mod tests {
     #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
     #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
     #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
-    fn bind_listen_connect_accept<I: Ip + TcpTestIpExt>(
-        bind_config: BindConfig,
-        listen_addr: I::Addr,
-    ) where
+    fn bind_listen_connect_accept<I: TcpTestIpExt>(bind_config: BindConfig, listen_addr: I::Addr)
+    where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
             TcpBindingsCtx<FakeDeviceId>,
@@ -6230,10 +6343,10 @@ mod tests {
         assert_counters(REMOTE, ExpectedCounters { tx: 3, rx: 4, passive_open: 1, active_open: 0 });
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(*<I as TestIpExt>::TEST_ADDRS.local_ip; "same addr")]
     #[test_case(I::UNSPECIFIED_ADDRESS; "any addr")]
-    fn bind_conflict<I: Ip + TcpTestIpExt>(conflict_addr: I::Addr)
+    fn bind_conflict<I: TcpTestIpExt>(conflict_addr: I::Addr)
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -6258,11 +6371,11 @@ mod tests {
             .expect("able to rebind to a free address");
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(const_unwrap_option(NonZeroU16::new(u16::MAX)), Ok(const_unwrap_option(NonZeroU16::new(u16::MAX))); "ephemeral available")]
     #[test_case(const_unwrap_option(NonZeroU16::new(100)), Err(LocalAddressError::FailedToAllocateLocalPort);
                 "no ephemeral available")]
-    fn bind_picked_port_all_others_taken<I: Ip + TcpTestIpExt>(
+    fn bind_picked_port_all_others_taken<I: TcpTestIpExt>(
         available_port: NonZeroU16,
         expected_result: Result<NonZeroU16, LocalAddressError>,
     ) where
@@ -6307,8 +6420,8 @@ mod tests {
         assert_eq!(result, Err(ConnectError::NoPort));
     }
 
-    #[ip_test]
-    fn bind_to_non_existent_address<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn bind_to_non_existent_address<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -6533,8 +6646,8 @@ mod tests {
 
     // The test verifies that if client tries to connect to a closed port on
     // server, the connection is aborted and RST is received.
-    #[ip_test]
-    fn connect_reset<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn connect_reset<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -6620,8 +6733,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn retransmission<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn retransmission<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -6643,8 +6756,8 @@ mod tests {
 
     const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1845));
 
-    #[ip_test]
-    fn listener_with_bound_device_conflict<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn listener_with_bound_device_conflict<I: TcpTestIpExt>()
     where
         TcpCoreCtx<MultipleDevicesId, TcpBindingsCtx<MultipleDevicesId>>:
             TcpContext<I, TcpBindingsCtx<MultipleDevicesId>>,
@@ -6729,12 +6842,12 @@ mod tests {
         assert_matches!(api.set_device(&socket, set_device), Err(SetDeviceError::ZoneChange));
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(*<I as TestIpExt>::TEST_ADDRS.local_ip, true; "specified bound")]
     #[test_case(I::UNSPECIFIED_ADDRESS, true; "unspecified bound")]
     #[test_case(*<I as TestIpExt>::TEST_ADDRS.local_ip, false; "specified listener")]
     #[test_case(I::UNSPECIFIED_ADDRESS, false; "unspecified listener")]
-    fn bound_socket_info<I: Ip + TcpTestIpExt>(ip_addr: I::Addr, listen: bool)
+    fn bound_socket_info<I: TcpTestIpExt>(ip_addr: I::Addr, listen: bool)
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -6764,8 +6877,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn connection_info<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn connection_info<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -6924,7 +7037,7 @@ mod tests {
         );
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     // Assuming instant delivery of segments:
     // - If peer calls close, then the timeout we need to wait is in
     // TIME_WAIT, which is 2MSL.
@@ -6932,7 +7045,7 @@ mod tests {
     // - If not, we will be in the FIN_WAIT2 state and waiting for its
     // timeout.
     #[test_case(false, DEFAULT_FIN_WAIT2_TIMEOUT; "peer doesn't call close")]
-    fn connection_close_peer_calls_close<I: Ip + TcpTestIpExt>(
+    fn connection_close_peer_calls_close<I: TcpTestIpExt>(
         peer_calls_close: bool,
         expected_time_to_close: Duration,
     ) where
@@ -6998,8 +7111,8 @@ mod tests {
         }
     }
 
-    #[ip_test]
-    fn connection_shutdown_then_close_peer_doesnt_call_close<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn connection_shutdown_then_close_peer_doesnt_call_close<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -7047,8 +7160,8 @@ mod tests {
         assert_eq!(weak_local.upgrade(), None);
     }
 
-    #[ip_test]
-    fn connection_shutdown_then_close<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn connection_shutdown_then_close<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -7112,8 +7225,8 @@ mod tests {
         }
     }
 
-    #[ip_test]
-    fn remove_unbound<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn remove_unbound<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7130,8 +7243,8 @@ mod tests {
         assert_eq!(weak_unbound.upgrade(), None);
     }
 
-    #[ip_test]
-    fn remove_bound<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn remove_bound<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7150,8 +7263,8 @@ mod tests {
         assert_eq!(weak_socket.upgrade(), None);
     }
 
-    #[ip_test]
-    fn shutdown_listener<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn shutdown_listener<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -7300,8 +7413,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn set_buffer_size<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn set_buffer_size<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7399,8 +7512,8 @@ mod tests {
         step_and_increment_buffer_sizes_until_idle(&mut net, &local_connection, &remote_connection);
     }
 
-    #[ip_test]
-    fn set_reuseaddr_unbound<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn set_reuseaddr_unbound<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7428,12 +7541,12 @@ mod tests {
         api.listen(&first_bound, const_unwrap_option(NonZeroUsize::new(10))).expect("can listen");
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case([true, true], Ok(()); "allowed with set")]
     #[test_case([false, true], Err(LocalAddressError::AddressInUse); "first unset")]
     #[test_case([true, false], Err(LocalAddressError::AddressInUse); "second unset")]
     #[test_case([false, false], Err(LocalAddressError::AddressInUse); "both unset")]
-    fn reuseaddr_multiple_bound<I: Ip + TcpTestIpExt>(
+    fn reuseaddr_multiple_bound<I: TcpTestIpExt>(
         set_reuseaddr: [bool; 2],
         expected: Result<(), LocalAddressError>,
     ) where
@@ -7458,8 +7571,8 @@ mod tests {
         assert_eq!(second_bind_result, expected.map_err(From::from));
     }
 
-    #[ip_test]
-    fn toggle_reuseaddr_bound_different_addrs<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn toggle_reuseaddr_bound_different_addrs<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7485,8 +7598,8 @@ mod tests {
         api.set_reuseaddr(&first, false).expect("can un-set");
     }
 
-    #[ip_test]
-    fn unset_reuseaddr_bound_unspecified_specified<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn unset_reuseaddr_bound_unspecified_specified<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7511,8 +7624,8 @@ mod tests {
         assert_matches!(api.set_reuseaddr(&second, false), Err(SetReuseAddrError::AddrInUse));
     }
 
-    #[ip_test]
-    fn reuseaddr_allows_binding_under_connection<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn reuseaddr_allows_binding_under_connection<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7573,12 +7686,12 @@ mod tests {
         });
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case([true, true]; "specified specified")]
     #[test_case([false, true]; "any specified")]
     #[test_case([true, false]; "specified any")]
     #[test_case([false, false]; "any any")]
-    fn set_reuseaddr_bound_allows_other_bound<I: Ip + TcpTestIpExt>(bind_specified: [bool; 2])
+    fn set_reuseaddr_bound_allows_other_bound<I: TcpTestIpExt>(bind_specified: [bool; 2])
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7619,8 +7732,8 @@ mod tests {
         api.bind(&second, second_addr, Some(PORT_1)).expect("can bind");
     }
 
-    #[ip_test]
-    fn clear_reuseaddr_listener<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn clear_reuseaddr_listener<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
@@ -7859,8 +7972,8 @@ mod tests {
         })
     }
 
-    #[ip_test]
-    fn icmp_destination_unreachable_listener<I: Ip + TcpTestIpExt + IcmpIpExt>()
+    #[ip_test(I)]
+    fn icmp_destination_unreachable_listener<I: TcpTestIpExt + IcmpIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<I, TcpBindingsCtx<FakeDeviceId>>
             + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>
@@ -7938,8 +8051,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn time_wait_reuse<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn time_wait_reuse<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -8113,8 +8226,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn conn_addr_not_available<I: Ip + TcpTestIpExt + IcmpIpExt>()
+    #[ip_test(I)]
+    fn conn_addr_not_available<I: TcpTestIpExt + IcmpIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -8277,8 +8390,8 @@ mod tests {
         });
     }
 
-    #[ip_test]
-    fn closed_not_in_demux<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn closed_not_in_demux<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
@@ -8319,8 +8432,8 @@ mod tests {
         }
     }
 
-    #[ip_test]
-    fn tcp_accept_queue_clean_up_closed<I: Ip + TcpTestIpExt>()
+    #[ip_test(I)]
+    fn tcp_accept_queue_clean_up_closed<I: TcpTestIpExt>()
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,

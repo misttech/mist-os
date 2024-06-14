@@ -7,9 +7,11 @@ use std::ops::ControlFlow;
 use async_utils::stream::OneOrMany;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use futures::StreamExt as _;
-use tracing::error;
+use log::error;
 
-use crate::bindings::{socket::SocketWorkerProperties, Ctx};
+use crate::bindings::socket::SocketWorkerProperties;
+use crate::bindings::util::ResultExt as _;
+use crate::bindings::Ctx;
 
 pub(crate) struct SocketWorker<Data> {
     ctx: Ctx,
@@ -223,7 +225,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                     continue;
                 }
                 Some(Err(e)) => {
-                    tracing::error!("got error while polling for requests: {}", e);
+                    error!("got error while polling for requests: {}", e);
                     // Continuing implicitly drops the request stream that
                     // produced the error, which would otherwise be re-enqueued
                     // below.
@@ -240,9 +242,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
                 }
                 ControlFlow::Break(close_responder) => {
                     let respond_close = move || {
-                        close_responder
-                            .send(Ok(()))
-                            .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                        close_responder.send(Ok(())).unwrap_or_log("failed to respond");
                         request_stream.control_handle().shutdown();
                     };
                     if request_streams.is_empty() {

@@ -5,9 +5,8 @@
 use anyhow::{anyhow, bail, Context, Error};
 use argh::FromArgs;
 use std::collections::{BTreeMap, HashMap};
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::process;
+use std::{fs, process};
 use tracing::{error, info};
 
 use rayon::prelude::*;

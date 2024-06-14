@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::model::component::ComponentInstance;
+use ::routing::capability_source::{BuiltinCapabilities, NamespaceCapabilities};
+use ::routing::component_instance::TopInstanceInterface;
+use cm_util::TaskGroup;
+use errors::RebootError;
+use fidl::endpoints::{self};
+use fuchsia_component::client;
+use futures::lock::Mutex;
+use std::sync::Arc;
+use vfs::directory::entry::OpenRequest;
+use vfs::path::Path;
+use vfs::ToObjectRequest;
 use {
-    crate::model::component::ComponentInstance,
-    ::routing::{
-        capability_source::{BuiltinCapabilities, NamespaceCapabilities},
-        component_instance::TopInstanceInterface,
-    },
-    cm_util::TaskGroup,
-    errors::RebootError,
-    fidl::endpoints::{self},
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync,
-    fuchsia_component::client,
-    fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    std::sync::Arc,
-    vfs::{directory::entry::OpenRequest, path::Path, ToObjectRequest},
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 /// A special instance identified with component manager, at the top of the tree.

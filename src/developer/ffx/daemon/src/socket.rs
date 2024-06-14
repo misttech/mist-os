@@ -4,7 +4,8 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, path::PathBuf};
+use std::fmt::Display;
+use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
 enum SocketStatus {

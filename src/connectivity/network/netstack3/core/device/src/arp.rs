@@ -7,10 +7,9 @@
 use alloc::fmt::Debug;
 use core::time::Duration;
 
-use net_types::{
-    ip::{Ipv4, Ipv4Addr},
-    SpecifiedAddr, UnicastAddr, Witness as _,
-};
+use log::{debug, trace, warn};
+use net_types::ip::{Ipv4, Ipv4Addr};
+use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
     CoreTimerContext, Counter, CounterContext, DeviceIdContext, EventContext, FrameDestination,
     InstantBindingsTypes, LinkDevice, SendFrameContext, TimerContext, TracingContext,
@@ -22,12 +21,9 @@ use netstack3_ip::nud::{
     NudUserConfig,
 };
 use packet::{BufferMut, InnerPacketBuilder, Serializer};
-use packet_formats::{
-    arp::{ArpOp, ArpPacket, ArpPacketBuilder, HType},
-    utils::NonZeroDuration,
-};
+use packet_formats::arp::{ArpOp, ArpPacket, ArpPacketBuilder, HType};
+use packet_formats::utils::NonZeroDuration;
 use ref_cast::RefCast;
-use tracing::{debug, trace, warn};
 
 /// A link device whose addressing scheme is supported by ARP.
 ///
@@ -631,31 +627,27 @@ impl<D: ArpDevice, BC: NudBindingsTypes<D> + TimerContext> ArpState<D, BC> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
+    use alloc::vec::Vec;
     use core::iter;
 
     use net_types::ethernet::Mac;
-    use netstack3_base::{
-        socket::SocketIpAddr,
-        testutil::{
-            assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant,
-            FakeLinkDeviceId, FakeNetworkSpec, FakeWeakDeviceId, WithFakeFrameContext,
-        },
-        CtxPair, InstantContext as _, IntoCoreTimerCtx, TimerHandler,
+    use netstack3_base::socket::SocketIpAddr;
+    use netstack3_base::testutil::{
+        assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant, FakeLinkDeviceId,
+        FakeNetworkSpec, FakeWeakDeviceId, WithFakeFrameContext,
+    };
+    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, TimerHandler};
+    use netstack3_ip::nud::testutil::{
+        assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr, assert_neighbor_unknown,
     };
     use netstack3_ip::nud::{
-        testutil::{
-            assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
-            assert_neighbor_unknown,
-        },
         DelegateNudContext, DynamicNeighborState, NudCounters, NudIcmpContext, Reachable, Stale,
         UseDelegateNudContext,
     };
     use packet::{Buf, ParseBuffer};
-    use packet_formats::{
-        arp::{peek_arp_types, ArpHardwareType, ArpNetworkType},
-        ipv4::Ipv4FragmentType,
-    };
+    use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
+    use packet_formats::ipv4::Ipv4FragmentType;
     use test_case::test_case;
 
     use super::*;

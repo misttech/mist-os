@@ -295,7 +295,6 @@ class Availability final {
   // Named arguments for Init.
   struct InitArgs {
     std::optional<Version> added, deprecated, removed;
-    std::optional<Legacy> legacy;
     bool replaced;
   };
 
@@ -315,28 +314,22 @@ class Availability final {
       kAfterParentRemoved,
     };
 
-    enum class LegacyStatus : uint8_t {
-      kOk,
-      // Child marked `legacy=false` or `legacy=true`, but was never removed
-      // (neither directly nor through inheritance from parent).
-      kNeverRemoved,
-      // Child legacy is kYes but Parent legacy is kNo, and both are removed.
-      kWithoutParent,
-    };
-
     Status added = Status::kOk;
     Status deprecated = Status::kOk;
     Status removed = Status::kOk;
-    LegacyStatus legacy = LegacyStatus::kOk;
 
     bool Ok() const {
-      return added == Status::kOk && deprecated == Status::kOk && removed == Status::kOk &&
-             legacy == LegacyStatus::kOk;
+      return added == Status::kOk && deprecated == Status::kOk && removed == Status::kOk;
     }
   };
 
   // Must be called second. Inherits unset fields from `parent`.
   InheritResult Inherit(const Availability& parent);
+
+  // Optionally call this after Inherit to mark the availability as legacy=true.
+  // TODO(https://fxbug.dev/42085274): This is temporary for the transition from
+  // the LEGACY model to the RFC-0232 model. It will be removed.
+  void SetLegacy();
 
   // Must be called third. Narrows the availability to the given range, which
   // must be a subset of range().
@@ -360,23 +353,26 @@ class Availability final {
 // A version selection is an assignment of versions to platforms.
 class VersionSelection final {
  public:
-  // Inserts a platform version. Must not be "unversioned". Returns true on
-  // success, and false if a version was already inserted for this platform.
-  bool Insert(Platform platform, Version version);
+  // Inserts versions. The platform must not be "unversioned". The version set
+  // must be nonempty. Returns false if already called for this platform.
+  bool Insert(Platform platform, std::set<Version> versions);
 
-  // Returns true if a version was inserted for the given platform.
+  // Returns true if versions were inserted for the given platform.
   bool Contains(const Platform& platform) const;
 
   // Returns the version for the given platform. Always returns HEAD for the
   // unversioned platform. Otherwise, assumes the platform was inserted.
   Version Lookup(const Platform& platform) const;
 
+  // TODO(https://fxbug.dev/42085274): Remove.
+  const std::set<Version>& LookupSet(const Platform& platform) const;
+
   // Iterator over the (platform, version) pairs.
   auto begin() const { return map_.begin(); }
   auto end() const { return map_.end(); }
 
  private:
-  std::map<Platform, Version, Platform::Compare> map_;
+  std::map<Platform, std::set<Version>, Platform::Compare> map_;
 };
 
 }  // namespace fidlc

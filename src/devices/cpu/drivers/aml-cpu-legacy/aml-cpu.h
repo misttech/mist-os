@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.cpu.ctrl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/mmio/mmio.h>
 
@@ -36,9 +37,12 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
         power_domain_index_(power_domain_index),
         cluster_core_count_(cluster_core_count),
         relative_performance_(relative_performance),
+        outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
         current_operating_point_(fuchsia_cpuctrl::wire::kDeviceOperatingPointP0) {}
 
   static zx_status_t Create(void* context, zx_device_t* device);
+
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> AddService();
 
   // Implements DDK Device Ops
   void DdkRelease();
@@ -72,6 +76,10 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   size_t power_domain_index_;
   uint32_t cluster_core_count_;
   const uint8_t relative_performance_;
+
+  // for service bindings
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_cpu_ctrl::Device> bindings_;
 
   std::mutex lock_;
   uint32_t current_operating_point_ __TA_GUARDED(lock_);

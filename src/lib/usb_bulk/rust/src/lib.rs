@@ -13,10 +13,8 @@
 //! See tests for examples using the Zedmon power monitor.
 
 use fuchsia_async::unblock;
-use futures::{
-    io::{AsyncRead, AsyncWrite},
-    task::{Context, Poll},
-};
+use futures::io::{AsyncRead, AsyncWrite};
+use futures::task::{Context, Poll};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -86,7 +84,8 @@ pub struct AsyncInterface {
 }
 
 impl Interface {
-    fn close(&mut self) {
+    // This shouldn't be called more than once, since it deletes the underlying C++ object.
+    unsafe fn close(&mut self) {
         // Foreign function call requires unsafe block.
         unsafe {
             usb::interface_close(self.interface);
@@ -131,7 +130,10 @@ impl Open<Interface> for Interface {
 
 impl Drop for Interface {
     fn drop(&mut self) {
-        self.close();
+        // Unsafe: This is the only call to this function
+        unsafe {
+            self.close();
+        }
     }
 }
 
@@ -181,8 +183,9 @@ impl Drop for AsyncInterface {
         let mut write_guard =
             IFACE_REGISTRY.write().expect("could not acquire write lock on interface registry");
         if let Some(iface) = (*write_guard).remove(&self.serial) {
-            let mut iface = iface.lock().unwrap();
-            iface.close();
+            // To be clear, when the Interface is dropped, it will close and clean up the
+            // C++ object.
+            drop(iface);
         }
     }
 }

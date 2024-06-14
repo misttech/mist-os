@@ -4,9 +4,11 @@
 
 use anyhow::{anyhow, Error};
 use blocking::Unblock;
-use fidl::{endpoints::Proxy, Socket};
+use fidl::endpoints::Proxy;
+use fidl::Socket;
 use fidl_fuchsia_audio_controller as fac;
-use futures::{future::Either, AsyncReadExt, AsyncWrite, FutureExt, TryFutureExt};
+use futures::future::Either;
+use futures::{AsyncReadExt, AsyncWrite, FutureExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, ErrorKind};
 

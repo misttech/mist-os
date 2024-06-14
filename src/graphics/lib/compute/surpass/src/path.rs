@@ -15,16 +15,16 @@
 // [1]: https://raphlinus.github.io/graphics/curves/2019/12/23/flatten-quadbez.html
 // [2]: http://www.caffeineowl.com/graphics/2d/vectorial/bezierintro.html
 
-use std::{cell::RefCell, f32, rc::Rc};
+use std::cell::RefCell;
+use std::f32;
+use std::rc::Rc;
 
 use rayon::prelude::*;
 
-use crate::{
-    extend::{ExtendTuple3, ExtendVec},
-    lines::GeomId,
-    transform::GeomPresTransform,
-    Point, PIXEL_WIDTH,
-};
+use crate::extend::{ExtendTuple3, ExtendVec};
+use crate::lines::GeomId;
+use crate::transform::GeomPresTransform;
+use crate::{Point, PIXEL_WIDTH};
 
 // Pixel accuracy should be within 0.5 of a sub-pixel.
 pub const MAX_ERROR: f32 = 1.0 / PIXEL_WIDTH as f32;

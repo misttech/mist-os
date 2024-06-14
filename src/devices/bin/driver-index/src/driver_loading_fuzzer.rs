@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::resolved_driver::ResolvedDriver,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::SinkExt,
-    futures::StreamExt,
-    rand::{rngs::SmallRng, seq::SliceRandom, RngCore, SeedableRng},
-};
+use crate::resolved_driver::ResolvedDriver;
+use futures::{SinkExt, StreamExt};
+use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
+use rand::{RngCore, SeedableRng};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct Session {
     sender: futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,
@@ -38,6 +37,11 @@ impl Session {
     }
 
     pub async fn run(mut self) {
+        if self.max_delay.into_millis() == 0 {
+            push_drivers(&self.sender, self.shuffled_boot_drivers).await;
+            return;
+        }
+
         let max_load_delay = self.max_delay / self.shuffled_boot_drivers.len() as i64;
 
         let mut driver_buffer: Vec<ResolvedDriver> = vec![];
@@ -45,7 +49,7 @@ impl Session {
             // Add a 30% chance of injecting a delay between driver loads.
             let should_delay = (self.rng.next_u32() % 10) < 3;
             if should_delay {
-                push_drivers(&self.sender, driver_buffer.clone()).await;
+                push_drivers(&self.sender, driver_buffer).await;
                 driver_buffer = vec![];
 
                 // Generate a delay between [0, max_load_delay).
@@ -73,11 +77,8 @@ async fn push_drivers(
     mut sender: &futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,
     drivers: Vec<ResolvedDriver>,
 ) {
-    if let Err(e) = sender.send(drivers.clone()).await {
+    if let Err(e) = sender.send(drivers).await {
         tracing::error!("Failed to send drivers to the Indexer: {}", e);
-        for driver in drivers {
-            tracing::error!("     {}", driver.component_url);
-        }
     }
 }
 

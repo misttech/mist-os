@@ -4,26 +4,26 @@
 
 pub mod validation;
 
-use alloc::{format, string::ToString as _, sync::Arc, vec::Vec};
-use core::{
-    fmt::Debug,
-    hash::{Hash, Hasher},
-    num::NonZeroU16,
-    ops::RangeInclusive,
-};
+use alloc::format;
+use alloc::string::ToString as _;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use core::fmt::Debug;
+use core::hash::{Hash, Hasher};
+use core::num::NonZeroU16;
+use core::ops::RangeInclusive;
 
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip};
-use netstack3_base::{CoreTimerContext, Inspectable, Inspector as _};
+use netstack3_base::{CoreTimerContext, Inspectable, InspectableValue, Inspector as _};
 use packet_formats::ip::IpExt;
 
-use crate::{
-    conntrack,
-    context::{FilterBindingsContext, FilterBindingsTypes},
-    logic::{nat::NatConfig, FilterTimerId},
-    matchers::PacketMatcher,
-    state::validation::ValidRoutines,
-};
+use crate::conntrack;
+use crate::context::{FilterBindingsContext, FilterBindingsTypes};
+use crate::logic::nat::NatConfig;
+use crate::logic::FilterTimerId;
+use crate::matchers::PacketMatcher;
+use crate::state::validation::ValidRoutines;
 
 /// The action to take on a packet.
 #[derive(Derivative)]
@@ -215,13 +215,13 @@ impl<I: IpExt, DeviceClass: Debug> Inspectable for Rule<I, DeviceClass, ()> {
                 transport_protocol,
             } = matcher;
 
-            fn record_matcher<Inspector: netstack3_base::Inspector, M: Debug>(
+            fn record_matcher<Inspector: netstack3_base::Inspector, M: InspectableValue>(
                 inspector: &mut Inspector,
                 name: &str,
                 matcher: &Option<M>,
             ) {
                 if let Some(matcher) = matcher {
-                    inspector.record_string(name, format!("{matcher:?}"))
+                    inspector.record_inspectable_value(name, matcher);
                 }
             }
 
@@ -336,7 +336,7 @@ pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     /// that have any references in order to report them in inspect data.
     pub(crate) uninstalled_routines: Vec<UninstalledRoutine<I, BT::DeviceClass, ()>>,
     /// Connection tracking state.
-    pub(crate) conntrack: conntrack::Table<I, BT, NatConfig>,
+    pub conntrack: conntrack::Table<I, BT, NatConfig>,
 }
 
 impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {

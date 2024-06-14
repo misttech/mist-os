@@ -28,6 +28,7 @@ struct LogBuffer;
 //
 // This class is implicitly convertible to cpp17::optional<cpp17::string_view>.
 // NOLINT is used as implicit conversions are intentional here.
+// This is deprecated. Please use applicable Builder classes instead.
 class NullSafeStringView final {
  public:
   //  Constructs a NullSafeStringView from a cpp17::string_view.
@@ -47,6 +48,15 @@ class NullSafeStringView final {
     } else {
       string_view_ = cpp17::string_view(input);
     }
+  }
+
+  // Creates a NullSafeStringView fro, an optional<cpp17::string_view>.
+  // This is not a constructor to prevent accidental misuse.
+  static NullSafeStringView CreateFromOptional(cpp17::optional<cpp17::string_view> string_view) {
+    if (!string_view) {
+      return NullSafeStringView(nullptr);
+    }
+    return NullSafeStringView(*string_view);
   }
 
   // Constructs a NullSafeStringView from an std::string.
@@ -82,8 +92,6 @@ void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value);
 static void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, const char* value) {
   WriteKeyValue(buffer, key, cpp17::string_view(value));
 }
-
-bool FlushRecord(LogBuffer* buffer);
 
 template <typename... Args>
 constexpr size_t ArgsSize(Args... args) {
@@ -201,7 +209,81 @@ struct LogBuffer final {
   void Encode(KeyValue<const char*, bool> value) {
     syslog_runtime::WriteKeyValue(this, value.key, value.value);
   }
+
+  // Writes the log to a socket.
+  bool Flush();
 };
+
+/// Constructs a LogBuffer
+class LogBufferBuilder {
+ public:
+  explicit LogBufferBuilder(fuchsia_logging::LogSeverity severity) : severity_(severity) {}
+
+  /// Sets the file name and line number for the log message
+  LogBufferBuilder& SetFile(cpp17::string_view file, unsigned int line) {
+    file_name_ = file;
+    line_ = line;
+    return *this;
+  }
+
+  /// Sets the condition for the log message
+  /// This is used by test frameworks that want
+  /// to print an assertion message when a test fails.
+  /// This prepends the string "Check failed: "<<condition<<". "
+  /// to whatever message the user passes.
+  LogBufferBuilder& WithCondition(cpp17::string_view condition) {
+    condition_ = condition;
+    return *this;
+  }
+
+  /// Sets the message for the log message
+  LogBufferBuilder& WithMsg(cpp17::string_view msg) {
+    msg_ = msg;
+    return *this;
+  }
+
+#ifdef __Fuchsia__
+  /// Sets the socket for the log message
+  LogBufferBuilder& WithSocket(zx_handle_t socket) {
+    socket_ = socket;
+    return *this;
+  }
+
+  /// Builds the LogBuffer
+  LogBuffer Build() {
+    LogBuffer buffer;
+    if (socket_) {
+      BeginRecordWithSocket(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_),
+                            line_, NullSafeStringView::CreateFromOptional(msg_),
+                            NullSafeStringView::CreateFromOptional(condition_), socket_);
+    } else {
+      BeginRecord(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_), line_,
+                  NullSafeStringView::CreateFromOptional(msg_),
+                  NullSafeStringView::CreateFromOptional(condition_));
+    }
+    return buffer;
+  }
+#else
+  /// Builds the LogBuffer
+  LogBuffer Build() {
+    LogBuffer buffer;
+    BeginRecord(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_), line_,
+                NullSafeStringView::CreateFromOptional(msg_),
+                NullSafeStringView::CreateFromOptional(condition_));
+    return buffer;
+  }
+#endif
+ private:
+  cpp17::optional<cpp17::string_view> file_name_;
+  unsigned int line_ = 0;
+  cpp17::optional<cpp17::string_view> msg_;
+  cpp17::optional<cpp17::string_view> condition_;
+#ifdef __Fuchsia__
+  zx_handle_t socket_ = ZX_HANDLE_INVALID;
+#endif
+  fuchsia_logging::LogSeverity severity_;
+};
+
 }  // namespace syslog_runtime
 
 namespace fuchsia_logging {
@@ -364,21 +446,27 @@ fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
 #define FX_NOTIMPLEMENTED() FX_LOGS(ERROR) << "Not implemented in: " << __PRETTY_FUNCTION__
 
 template <typename Msg, typename... Args>
-void fx_slog_internal(fuchsia_logging::LogSeverity flag, const char* file, int line, Msg msg,
+void fx_slog_internal(fuchsia_logging::LogSeverity severity, const char* file, int line, Msg msg,
                       Args... args) {
-  syslog_runtime::LogBuffer buffer;
-  syslog_runtime::BeginRecord(&buffer, flag, file, line, msg, nullptr);
+  syslog_runtime::LogBufferBuilder builder(severity);
+  if (file) {
+    builder.SetFile(file, line);
+  }
+  if (msg != nullptr) {
+    builder.WithMsg(msg);
+  }
+  auto buffer = builder.Build();
   (void)std::initializer_list<int>{(buffer.Encode(args), 0)...};
-  syslog_runtime::FlushRecord(&buffer);
+  buffer.Flush();
 }
 
-#define FX_SLOG_ETC(flag, args...)                         \
-  do {                                                     \
-    if (::fuchsia_logging::ShouldCreateLogMessage(flag)) { \
-      fx_slog_internal(flag, __FILE__, __LINE__, args);    \
-    }                                                      \
+#define FX_SLOG_ETC(severity, args...)                         \
+  do {                                                         \
+    if (::fuchsia_logging::ShouldCreateLogMessage(severity)) { \
+      fx_slog_internal(severity, __FILE__, __LINE__, args);    \
+    }                                                          \
   } while (0)
 
-#define FX_SLOG(flag, msg...) FX_SLOG_ETC(::fuchsia_logging::LOG_##flag, msg)
+#define FX_SLOG(severity, msg...) FX_SLOG_ETC(::fuchsia_logging::LOG_##severity, msg)
 
 #endif  // LIB_SYSLOG_CPP_MACROS_H_

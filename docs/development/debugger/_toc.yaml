@@ -8,8 +8,6 @@
 toc:
 - title: "zxdb: The Fuchsia debugger"
   path: /docs/development/debugger/README.md
-- title: "Set up and run the debugger"
-  path: /docs/development/debugger/running.md
 - title: "Commands and interaction model"
   path: /docs/development/debugger/commands.md
 - title: "Debug tests using zxdb"
@@ -34,3 +32,5 @@ toc:
   path: /docs/development/debugger/exceptions.md
 - title: "Developing and debugging the debugger"
   path: /docs/development/debugger/developing.md
+- title: "Troubleshooting zxdb"
+  path: /docs/development/debugger/troubleshooting.md

@@ -3,20 +3,19 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_images2 as fimages2;
 use fidl_fuchsia_math::SizeU;
-use fidl_fuchsia_sysmem2 as fsysmem2;
-use fidl_fuchsia_ui_composition as fuicomp;
 use fsysmem2::{AllocatorBindSharedCollectionRequest, BufferCollectionSetConstraintsRequest};
 use fuchsia_vulkan::{
     device_pointers, entry_points, instance_pointers, BufferCollectionCreateInfoFUCHSIA,
     BufferCollectionFUCHSIA, FuchsiaExtensionPointers, ImageConstraintsInfoFUCHSIA,
     STRUCTURE_TYPE_BUFFER_COLLECTION_CREATE_INFO_FUCHSIA,
 };
-use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use std::mem;
-use vk_sys as vk;
+use {
+    fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
+    fidl_fuchsia_ui_composition as fuicomp, fuchsia_zircon as zx, vk_sys as vk,
+};
 
 /// `BufferCollectionTokens` contains all the buffer collection tokens required to initialize a
 /// `Loader`.

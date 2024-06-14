@@ -143,7 +143,7 @@ template("_fidl_cpp_codegen_impl") {
 #    A list of labels which are allowed to depend on the generated code.
 #
 template("fidl_cpp_codegen") {
-  if (current_toolchain == fidl_toolchain) {
+  if (is_fidl_toolchain) {
     _fidl_cpp_codegen_impl(target_name) {
       forward_variables_from(invoker, "*")
     }
@@ -274,7 +274,7 @@ template("_fidl_cpp_library_impl") {
 #    If true, the generated library only has a source file.
 #
 template("fidl_cpp_library") {
-  if (current_toolchain != fidl_toolchain) {
+  if (!is_fidl_toolchain) {
     if (invoker.library_name == "zx") {
       # The zx FIDL library isn't generated with C++ fidlgens.
       not_needed(invoker, "*")
@@ -360,7 +360,7 @@ template("fidl_cpp_family") {
   if (enable_hlcpp) {
     library_name_slashes = string_replace(library_name, ".", "/")
   }
-  if (current_toolchain == fidl_toolchain) {
+  if (is_fidl_toolchain) {
     not_needed(invoker, [ "sdk_category" ])
   }
 

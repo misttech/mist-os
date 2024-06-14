@@ -22,7 +22,14 @@
             durability: "transient",
         },
     ],
+    capabilities: [],
     use: [
+        {
+            directory: "memfs",
+            from: "#memfs",
+            rights: [ "rw*" ],
+            path: "/cache",
+        },
         {
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
         },

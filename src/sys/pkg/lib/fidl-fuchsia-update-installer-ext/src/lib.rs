@@ -16,22 +16,19 @@ pub use state::{
 pub mod options;
 pub use options::{Initiator, Options};
 
-use {
-    fidl::endpoints::{ClientEnd, ServerEnd},
-    fidl_fuchsia_update_installer::{
-        InstallerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
-        RebootControllerMarker, UpdateNotStartedReason,
-    },
-    fuchsia_url::AbsolutePackageUrl,
-    futures::{
-        prelude::*,
-        task::{Context, Poll},
-    },
-    pin_project::pin_project,
-    std::{fmt, pin::Pin},
-    thiserror::Error,
-    tracing::info,
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use fidl_fuchsia_update_installer::{
+    InstallerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream, RebootControllerMarker,
+    UpdateNotStartedReason,
 };
+use fuchsia_url::AbsolutePackageUrl;
+use futures::prelude::*;
+use futures::task::{Context, Poll};
+use pin_project::pin_project;
+use std::fmt;
+use std::pin::Pin;
+use thiserror::Error;
+use tracing::info;
 
 /// Describes the errors encountered by UpdateAttempt.
 #[derive(Debug, Error)]
@@ -173,15 +170,13 @@ impl Stream for UpdateAttempt {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fidl_fuchsia_update_installer::{
-            InstallationProgress, InstallerMarker, InstallerRequest, MonitorProxy,
-        },
-        fuchsia_async as fasync,
-        futures::stream::StreamExt,
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_update_installer::{
+        InstallationProgress, InstallerMarker, InstallerRequest, MonitorProxy,
     };
+    use fuchsia_async as fasync;
+    use futures::stream::StreamExt;
 
     const TEST_URL: &str = "fuchsia-pkg://fuchsia.com/update/0";
 

@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    ramdevice_client::RamdiskClient,
-    remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient},
-};
+use ramdevice_client::RamdiskClient;
+use remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 
 #[fuchsia::test]
 async fn test_multiple_sessions() {

@@ -6,7 +6,8 @@ use anyhow::{format_err, Error};
 use fidl::endpoints::{create_request_stream, Responder};
 use fidl_fuchsia_bluetooth_gatt2 as gatt;
 use fuchsia_bluetooth::types::Uuid;
-use futures::{channel::mpsc, SinkExt, StreamExt};
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
 use tracing::{info, warn};
 
 use crate::host_dispatcher::HostDispatcher;
@@ -163,10 +164,9 @@ mod tests {
     use async_helpers::hanging_get::asynchronous as hanging_get;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth::{Appearance, PeerId};
-    use fuchsia_async as fasync;
-    use fuchsia_inspect as inspect;
     use futures::FutureExt;
     use std::collections::HashMap;
+    use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
     use crate::host_dispatcher::{NameReplace, DEFAULT_DEVICE_NAME};
     use crate::store::stash::Stash;

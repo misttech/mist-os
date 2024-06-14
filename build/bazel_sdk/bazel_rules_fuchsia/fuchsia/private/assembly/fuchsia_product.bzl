@@ -113,6 +113,8 @@ def _fuchsia_product_assembly_impl(ctx):
         platform_artifacts.root,
         "--outdir",
         out_dir.path,
+        "--package-validation",
+        ctx.attr.package_validation,
     ]
     if ctx.attr.package_mode:
         ffx_invocation.extend(["--mode", ctx.attr.package_mode])
@@ -202,6 +204,13 @@ fuchsia_product_assembly = rule(
             doc = "Platform artifacts to use for this product.",
             providers = [FuchsiaProductAssemblyBundleInfo],
             mandatory = True,
+        ),
+        "package_validation": attr.string(
+            doc = """Whether package validation errors should be treated as
+            errors or warnings. Ignoring validation errors may lead to a buggy
+            or nonfunctional product!""",
+            default = "error",
+            values = ["error", "warning"],
         ),
         "_sdk_manifest": attr.label(
             allow_single_file = True,

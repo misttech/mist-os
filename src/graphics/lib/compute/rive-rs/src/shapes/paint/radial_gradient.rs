@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    core::{Core, ObjectRef, OnAdded},
-    shapes::paint::LinearGradient,
-};
+use crate::core::{Core, ObjectRef, OnAdded};
+use crate::shapes::paint::LinearGradient;
 
 #[derive(Debug, Default)]
 pub struct RadialGradient {

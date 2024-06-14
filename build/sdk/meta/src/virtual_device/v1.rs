@@ -4,17 +4,12 @@
 
 //! Representation of the virtual_device metadata.
 
-use {
-    crate::{
-        common::{
-            AudioModel, CpuArchitecture, DataUnits, ElementType, Envelope, PointingDevice,
-            ScreenUnits,
-        },
-        json::{schema, JsonObject},
-    },
-    serde::{Deserialize, Serialize},
-    std::collections::HashMap,
+use crate::common::{
+    AudioModel, CpuArchitecture, DataUnits, ElementType, Envelope, PointingDevice, ScreenUnits,
 };
+use crate::json::{schema, JsonObject};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Specifics for a CPU.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]

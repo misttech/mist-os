@@ -15,6 +15,10 @@
 #include <iomanip>
 #include <optional>
 
+#if defined(__linux__)
+#include <linux/netfilter_ipv4.h>
+#endif
+
 #include "addr.h"
 #include "log.h"
 #include "packet.h"
@@ -183,6 +187,11 @@ const struct Command {
     {"set-icmp6-filter", "\"xxxx..\"",
      "set ICMP6_FILTER option with 256-bit hex number (big-endian)", &SockScripter::SetIcmp6Filter},
     {"log-icmp6-filter", nullptr, "log ICMP6_FILTER option value", &SockScripter::LogIcmp6Filter},
+
+    {"log-original-destination", nullptr, "log SOL_IP: SO_ORIGINAL_DST option value",
+     &SockScripter::LogOriginalDestination},
+    {"log-original-destination6", nullptr, "log SOL_IPV6: SO_ORIGINAL_DST option value",
+     &SockScripter::LogOriginalDestination6},
 
     {"join4", "<mcast-ip>-<local-intf-Addr>",
      "join IPv4 mcast group (IP_ADD_MEMBERSHIP) on local interface", &SockScripter::Join4},
@@ -882,6 +891,44 @@ bool SockScripter::LogIcmp6Filter(char* arg) {
 
   LOG(INFO) << "IPPROTO_IPV6: ICMP6_FILTER - " << IcmpFilterString(filter);
   return true;
+}
+
+bool SockScripter::LogOriginalDestination(char* arg) {
+#ifdef SO_ORIGINAL_DST
+  sockaddr_in addr;
+  socklen_t addr_len = sizeof(addr);
+
+  if (api_->getsockopt(sockfd_, SOL_IP, SO_ORIGINAL_DST, &addr, &addr_len) < 0) {
+    LOG(ERROR) << "Error getting SOL_IP: SO_ORIGINAL_DST -"
+               << "[" << errno << "]" << strerror(errno);
+    return false;
+  }
+  LOG(INFO) << "SOL_IP: SO_ORIGINAL_DST - "
+            << Format(reinterpret_cast<const sockaddr_storage&>(addr));
+  return true;
+#else
+  LOG(ERROR) << "SO_ORIGINAL_DST not defined on this platform";
+  return false;
+#endif
+}
+
+bool SockScripter::LogOriginalDestination6(char* arg) {
+#ifdef SO_ORIGINAL_DST
+  sockaddr_in6 addr;
+  socklen_t addr_len = sizeof(addr);
+
+  if (api_->getsockopt(sockfd_, SOL_IPV6, SO_ORIGINAL_DST, &addr, &addr_len) < 0) {
+    LOG(ERROR) << "Error getting SOL_IPV6: SO_ORIGINAL_DST -"
+               << "[" << errno << "]" << strerror(errno);
+    return false;
+  }
+  LOG(INFO) << "SOL_IPV6: SO_ORIGINAL_DST - "
+            << Format(reinterpret_cast<const sockaddr_storage&>(addr));
+  return true;
+#else
+  LOG(ERROR) << "SO_ORIGINAL_DST not defined on this platform";
+  return false;
+#endif
 }
 
 bool SockScripter::Bind(char* arg) {

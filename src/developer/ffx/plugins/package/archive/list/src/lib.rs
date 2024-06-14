@@ -8,7 +8,8 @@ use ffx_package_archive_list_args::ListCommand;
 use ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader, FarListReader};
 use ffx_writer::Writer;
 use humansize::{file_size_opts, FileSize as _};
-use prettytable::{cell, format::TableFormat, row, Row, Table};
+use prettytable::format::TableFormat;
+use prettytable::{cell, row, Row, Table};
 
 #[ffx_plugin()]
 pub async fn cmd_list(cmd: ListCommand, mut writer: Writer) -> Result<()> {
@@ -85,9 +86,11 @@ fn print_list_table(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_package_archive_utils::{test_utils::create_mockreader, MockFarListReader};
+    use ffx_package_archive_utils::test_utils::create_mockreader;
+    use ffx_package_archive_utils::MockFarListReader;
     use ffx_writer::Format;
-    use std::{collections::HashMap, path::PathBuf};
+    use std::collections::HashMap;
+    use std::path::PathBuf;
 
     #[test]
     fn test_list_empty() -> Result<()> {

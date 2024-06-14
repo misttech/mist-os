@@ -3,28 +3,23 @@
 // found in the LICENSE file.
 
 use super::super::timer::{TimeWaker, TimerHandle, TimerHeap};
-use super::{
-    instrumentation::{Collector, LocalCollector, WakeupReason},
-    packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration},
-    time::Time,
-    ScopeRef,
-};
+use super::instrumentation::{Collector, LocalCollector, WakeupReason};
+use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
+use super::time::Time;
+use super::ScopeRef;
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx};
-use std::{
-    any::Any,
-    cell::RefCell,
-    fmt,
-    future::Future,
-    mem::ManuallyDrop,
-    panic::Location,
-    sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering},
-    sync::{Arc, Weak},
-    task::{Context, RawWaker, RawWakerVTable, Waker},
-    u64, usize,
-};
+use std::any::Any;
+use std::cell::RefCell;
+use std::future::Future;
+use std::mem::ManuallyDrop;
+use std::panic::Location;
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, Weak};
+use std::task::{Context, RawWaker, RawWakerVTable, Waker};
+use std::{fmt, u64, usize};
 
 pub(crate) const TASK_READY_WAKEUP_ID: u64 = u64::MAX - 1;
 
@@ -795,17 +790,11 @@ fn waker_drop(weak_raw: *const ()) {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{LocalExecutor, Task},
-        std::{
-            future::poll_fn,
-            sync::{
-                atomic::{AtomicU32, Ordering},
-                Arc,
-            },
-            task::Poll,
-        },
-    };
+    use crate::{LocalExecutor, Task};
+    use std::future::poll_fn;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::Arc;
+    use std::task::Poll;
 
     async fn yield_to_executor() {
         let mut done = false;

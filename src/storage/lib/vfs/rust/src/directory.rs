@@ -4,12 +4,12 @@
 
 //! Module holding different kinds of pseudo directories and their building blocks.
 
-use {
-    crate::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
-    fidl::endpoints::{create_endpoints, ServerEnd},
-    fidl_fuchsia_io as fio,
-    std::sync::Arc,
-};
+use crate::directory::entry_container::Directory;
+use crate::execution_scope::ExecutionScope;
+use crate::path::Path;
+use fidl::endpoints::{create_endpoints, ServerEnd};
+use fidl_fuchsia_io as fio;
+use std::sync::Arc;
 
 #[macro_use]
 pub mod test_utils;

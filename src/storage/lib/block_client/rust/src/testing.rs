@@ -2,20 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{BlockClient, BufferSlice, MutableBufferSlice, VmoId},
-    anyhow::{anyhow, ensure, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_hardware_block as block, fuchsia_zircon as zx,
-    std::{
-        collections::BTreeMap,
-        ops::Range,
-        sync::{
-            atomic::{self, AtomicU32},
-            Mutex,
-        },
-    },
-};
+use crate::{BlockClient, BufferSlice, MutableBufferSlice, VmoId};
+use anyhow::{anyhow, ensure, Error};
+use async_trait::async_trait;
+use std::collections::BTreeMap;
+use std::ops::Range;
+use std::sync::atomic::{self, AtomicU32};
+use std::sync::Mutex;
+use {fidl_fuchsia_hardware_block as block, fuchsia_zircon as zx};
 
 type VmoRegistry = BTreeMap<u16, zx::Vmo>;
 

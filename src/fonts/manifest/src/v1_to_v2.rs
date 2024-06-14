@@ -4,12 +4,10 @@
 
 //! Utilities for conversion from Font Manifest v1 to v2.
 
-use {
-    crate::{v2, Family as FamilyV1, Font as FontV1, FontsManifest as FontsManifestV1},
-    anyhow::{format_err, Error},
-    itertools::Itertools,
-    std::path::{Path, PathBuf},
-};
+use crate::{v2, Family as FamilyV1, Font as FontV1, FontsManifest as FontsManifestV1};
+use anyhow::{format_err, Error};
+use itertools::Itertools;
+use std::path::{Path, PathBuf};
 
 impl TryFrom<FontsManifestV1> for v2::FontsManifest {
     type Error = Error;
@@ -121,11 +119,9 @@ fn font_to_typeface(font: &FontV1) -> v2::Typeface {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        char_set::CharSet,
-        fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width},
-    };
+    use super::*;
+    use char_set::CharSet;
+    use fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width};
 
     #[test]
     fn test_v1_to_v2() -> Result<(), Error> {

@@ -5,17 +5,14 @@
 //! Module containing methods for generating code to "lower" from the high level, typed,
 //! generated AT command and response types to the low level generic ASTs.
 
-use {
-    super::{
-        common::{to_initial_capital, type_names::*, write_indent, write_newline, TABSTOP},
-        error::Result,
-    },
-    crate::definition::{
-        Argument, Arguments, Command, Definition, DelimitedArguments, PossiblyOptionType,
-        PrimitiveType, Type,
-    },
-    std::io,
+use super::common::type_names::*;
+use super::common::{to_initial_capital, write_indent, write_newline, TABSTOP};
+use super::error::Result;
+use crate::definition::{
+    Argument, Arguments, Command, Definition, DelimitedArguments, PossiblyOptionType,
+    PrimitiveType, Type,
 };
+use std::io;
 
 /// Entry point to generate `lower` methods at a given indentation.
 pub fn codegen<W: io::Write>(sink: &mut W, indent: u64, definitions: &[Definition]) -> Result {
@@ -216,11 +213,23 @@ fn codegen_encode_string<W: io::Write>(
                 dst_name,
                 src_name
             )?;
-            write_indented!(sink, indent, "let {} = i64::to_string(&{}_int);\n", dst_name, dst_name)?;
+            write_indented!(
+                sink,
+                indent,
+                "let {} = i64::to_string(&{}_int);\n",
+                dst_name,
+                dst_name
+            )?;
         }
         PrimitiveType::NamedType(_type_name) => {
             write_indented!(sink, indent, "let {}_int = *{} as i64;\n", dst_name, src_name)?;
-            write_indented!(sink, indent, "let {} = i64::to_string(&{}_int);\n", dst_name, dst_name)?;
+            write_indented!(
+                sink,
+                indent,
+                "let {} = i64::to_string(&{}_int);\n",
+                dst_name,
+                dst_name
+            )?;
         }
         PrimitiveType::String => {
             write_indented!(sink, indent, "let {} = {}.clone();\n", dst_name, src_name)?;

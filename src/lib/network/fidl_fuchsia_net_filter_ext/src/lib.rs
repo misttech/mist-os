@@ -14,22 +14,20 @@
 #[cfg(target_os = "fuchsia")]
 pub mod sync;
 
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    num::{NonZeroU16, NonZeroU64},
-    ops::RangeInclusive,
-};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::num::{NonZeroU16, NonZeroU64};
+use std::ops::RangeInclusive;
 
 use async_utils::fold::FoldWhile;
 use fidl::marker::SourceBreaking;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
+use fidl_fuchsia_net_ext::IntoExt;
 use futures::{Stream, StreamExt as _, TryStreamExt as _};
 use thiserror::Error;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_interfaces as fnet_interfaces,
+};
 
 /// Conversion errors from `fnet_filter` FIDL types to the
 /// equivalents defined in this module.
@@ -517,7 +515,7 @@ impl TryFrom<fnet_filter::InterfaceMatcher> for InterfaceMatcher {
 /// This type witnesses to the invariant that the prefix length of the subnet is
 /// no greater than the number of bits in the IP address, and that no host bits
 /// in the network address are set.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Subnet(fnet::Subnet);
 
 impl Subnet {
@@ -558,6 +556,37 @@ impl TryFrom<fnet::Subnet> for Subnet {
             net_types::ip::SubnetError::PrefixTooLong => FidlConversionError::SubnetPrefixTooLong,
             net_types::ip::SubnetError::HostBitsSet => FidlConversionError::SubnetHostBitsSet,
         })
+    }
+}
+
+impl Debug for Subnet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let fnet::Subnet { addr, prefix_len } = self.0;
+
+        match addr {
+            fnet::IpAddress::Ipv4(v4) => {
+                let subnet = net_types::ip::Subnet::<net_types::ip::Ipv4Addr>::new(
+                    v4.into_ext(),
+                    prefix_len,
+                );
+
+                match subnet {
+                    Ok(inner) => inner.fmt(f),
+                    Err(err) => err.fmt(f),
+                }
+            }
+            fnet::IpAddress::Ipv6(v6) => {
+                let subnet = net_types::ip::Subnet::<net_types::ip::Ipv6Addr>::new(
+                    v6.into_ext(),
+                    prefix_len,
+                );
+
+                match subnet {
+                    Ok(inner) => inner.fmt(f),
+                    Err(err) => err.fmt(f),
+                }
+            }
+        }
     }
 }
 
@@ -619,7 +648,7 @@ impl TryFrom<fnet_filter::AddressRange> for AddressRange {
 }
 
 /// Extension type for [`fnet_filter::AddressMatcherType`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum AddressMatcherType {
     Subnet(Subnet),
     Range(AddressRange),
@@ -644,6 +673,15 @@ impl TryFrom<fnet_filter::AddressMatcherType> for AddressMatcherType {
             fnet_filter::AddressMatcherType::__SourceBreaking { .. } => {
                 Err(FidlConversionError::UnknownUnionVariant(type_names::ADDRESS_MATCHER_TYPE))
             }
+        }
+    }
+}
+
+impl Debug for AddressMatcherType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AddressMatcherType::Subnet(subnet) => subnet.fmt(f),
+            AddressMatcherType::Range(address_range) => address_range.fmt(f),
         }
     }
 }
@@ -728,7 +766,7 @@ impl TryFrom<fnet_filter::PortMatcher> for PortMatcher {
 }
 
 /// Extension type for [`fnet_filter::TransportProtocol`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum TransportProtocolMatcher {
     Tcp { src_port: Option<PortMatcher>, dst_port: Option<PortMatcher> },
     Udp { src_port: Option<PortMatcher>, dst_port: Option<PortMatcher> },
@@ -793,8 +831,46 @@ impl TryFrom<fnet_filter::TransportProtocol> for TransportProtocolMatcher {
     }
 }
 
+impl Debug for TransportProtocolMatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Omit empty fields.
+        match self {
+            TransportProtocolMatcher::Tcp { src_port, dst_port } => {
+                let mut debug_struct = f.debug_struct("Tcp");
+
+                // Omit empty fields.
+                if let Some(port) = &src_port {
+                    let _ = debug_struct.field("src_port", port);
+                }
+
+                if let Some(port) = &dst_port {
+                    let _ = debug_struct.field("dst_port", port);
+                }
+
+                debug_struct.finish()
+            }
+            TransportProtocolMatcher::Udp { src_port, dst_port } => {
+                let mut debug_struct = f.debug_struct("Udp");
+
+                // Omit empty fields.
+                if let Some(port) = &src_port {
+                    let _ = debug_struct.field("src_port", port);
+                }
+
+                if let Some(port) = &dst_port {
+                    let _ = debug_struct.field("dst_port", port);
+                }
+
+                debug_struct.finish()
+            }
+            TransportProtocolMatcher::Icmp => f.write_str("Icmp"),
+            TransportProtocolMatcher::Icmpv6 => f.write_str("Icmpv6"),
+        }
+    }
+}
+
 /// Extension type for [`fnet_filter::Matchers`].
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct Matchers {
     pub in_interface: Option<InterfaceMatcher>,
     pub out_interface: Option<InterfaceMatcher>,
@@ -837,6 +913,38 @@ impl TryFrom<fnet_filter::Matchers> for Matchers {
             dst_addr: dst_addr.map(TryInto::try_into).transpose()?,
             transport_protocol: transport_protocol.map(TryInto::try_into).transpose()?,
         })
+    }
+}
+
+impl Debug for Matchers {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut debug_struct = f.debug_struct("Matchers");
+
+        let Matchers { in_interface, out_interface, src_addr, dst_addr, transport_protocol } =
+            &self;
+
+        // Omit empty fields.
+        if let Some(matcher) = in_interface {
+            let _ = debug_struct.field("in_interface", matcher);
+        }
+
+        if let Some(matcher) = out_interface {
+            let _ = debug_struct.field("out_interface", matcher);
+        }
+
+        if let Some(matcher) = src_addr {
+            let _ = debug_struct.field("src_addr", matcher);
+        }
+
+        if let Some(matcher) = dst_addr {
+            let _ = debug_struct.field("dst_addr", matcher);
+        }
+
+        if let Some(matcher) = transport_protocol {
+            let _ = debug_struct.field("transport_protocol", matcher);
+        }
+
+        debug_struct.finish()
     }
 }
 
@@ -1637,7 +1745,9 @@ mod tests {
 
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
-    use futures::{channel::mpsc, task::Poll, FutureExt as _, SinkExt as _};
+    use futures::channel::mpsc;
+    use futures::task::Poll;
+    use futures::{FutureExt as _, SinkExt as _};
     use net_declare::{fidl_ip, fidl_subnet};
     use test_case::test_case;
 

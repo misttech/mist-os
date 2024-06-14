@@ -4,7 +4,9 @@
 
 //! Common utilities for implementing file nodes and connections.
 
-use {crate::file::FileOptions, fidl_fuchsia_io as fio, fuchsia_zircon_status::Status};
+use crate::file::FileOptions;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
 
 /// Validate that the requested flags for a new connection are valid. This includes permission
 /// handling, only allowing certain operations.
@@ -98,9 +100,13 @@ pub fn get_backing_memory_validate_flags(
 #[cfg(test)]
 mod tests {
     use super::new_connection_validate_options;
-    use crate::{file::FileOptions, protocols::ToFileOptions, test_utils::build_flag_combinations};
+    use crate::file::FileOptions;
+    use crate::protocols::ToFileOptions;
+    use crate::test_utils::build_flag_combinations;
 
-    use {assert_matches::assert_matches, fidl_fuchsia_io as fio, fuchsia_zircon_status::Status};
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_io as fio;
+    use fuchsia_zircon_status::Status;
 
     fn io_flags_to_rights(flags: fio::OpenFlags) -> (bool, bool, bool) {
         return (

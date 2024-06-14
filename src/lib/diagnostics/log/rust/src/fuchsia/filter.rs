@@ -1,14 +1,16 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use diagnostics_log_encoding::{encode::TestRecord, Severity, SeverityExt};
+use diagnostics_log_encoding::encode::TestRecord;
+use diagnostics_log_encoding::{FromSeverity as _, Severity, SeverityExt};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
 use fuchsia_zircon as zx;
-use std::sync::{Mutex, RwLock};
-use std::{future::Future, sync::Arc};
-use tracing::{subscriber::Subscriber, Metadata};
+use std::future::Future;
+use std::sync::{Arc, Mutex, RwLock};
+use tracing::subscriber::Subscriber;
+use tracing::Metadata;
 use tracing_subscriber::layer::{Context, Layer};
 
 use crate::OnInterestChanged;
@@ -45,6 +47,8 @@ impl InterestFilter {
 
         let listener = Arc::new(Mutex::new(None));
         let filter = Self { min_severity: min_severity.clone(), listener: listener.clone() };
+        // Keep the max level from the log frontend synchronized.
+        log::set_max_level(log::LevelFilter::from_severity(&default_severity));
         (filter, Self::listen_to_interest_changes(listener, default_severity, min_severity, proxy))
     }
 
@@ -75,6 +79,7 @@ impl InterestFilter {
                 *min_severity_guard = interest.min_severity.unwrap_or(default_severity);
                 interest.min_severity.unwrap_or(default_severity)
             };
+            log::set_max_level(log::LevelFilter::from_severity(&new_min_severity));
             let callback_guard = listener.lock().unwrap();
             if let Some(callback) = &*callback_guard {
                 callback.on_changed(&new_min_severity);
@@ -108,9 +113,11 @@ mod tests {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
-    use futures::{channel::mpsc, StreamExt, TryStreamExt};
+    use futures::channel::mpsc;
+    use futures::{StreamExt, TryStreamExt};
     use tracing::{debug, error, info, trace, warn, Event};
-    use tracing_subscriber::{layer::SubscriberExt, Registry};
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::Registry;
 
     struct SeverityTracker {
         counts: Arc<Mutex<SeverityCount>>,
@@ -209,7 +216,7 @@ mod tests {
         // After overriding to info, filtering is at info level. The mpsc channel is used to
         // get a signal as to when the filter has processed the update.
         send_interest_change(&mut requests, Some(Severity::Info)).await;
-        let _ = recv.next().await;
+        recv.next().await.unwrap();
 
         let mut expected = SeverityCount::default();
         error!("oops");
@@ -232,7 +239,7 @@ mod tests {
 
         // After resetting to default, filtering is at warn level.
         send_interest_change(&mut requests, None).await;
-        let _ = recv.next().await;
+        recv.next().await.unwrap();
 
         error!("oops");
         expected.num_error += 1;
@@ -276,5 +283,32 @@ mod tests {
         }
         let filter = t.join().unwrap();
         assert_eq!(*filter.min_severity.read().unwrap(), Severity::Trace);
+    }
+
+    #[fuchsia::test(logging = false)]
+    async fn log_frontend_tracks_severity() {
+        // Manually set to a known value.
+        log::set_max_level(log::LevelFilter::Off);
+
+        let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>().unwrap();
+        let (filter, on_changes) = InterestFilter::new(
+            proxy,
+            Interest { min_severity: Some(Severity::Warn), ..Default::default() },
+            false,
+        );
+        // Log frontend tracks the default min_severity.
+        assert_eq!(log::max_level(), log::LevelFilter::Warn);
+
+        let (send, mut recv) = mpsc::unbounded();
+        filter.set_interest_listener(InterestChangedListener(send));
+        let _on_changes_task = fuchsia_async::Task::spawn(on_changes);
+
+        send_interest_change(&mut requests, Some(Severity::Trace)).await;
+        recv.next().await.unwrap();
+        assert_eq!(log::max_level(), log::LevelFilter::Trace);
+
+        send_interest_change(&mut requests, Some(Severity::Info)).await;
+        recv.next().await.unwrap();
+        assert_eq!(log::max_level(), log::LevelFilter::Info);
     }
 }

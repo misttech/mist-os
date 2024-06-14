@@ -6,7 +6,8 @@ use crate::input::common::CAMERA_WATCHER_TIMEOUT;
 use crate::tests::fakes::base::Service;
 
 use anyhow::{format_err, Error};
-use fidl::{endpoints::ServerEnd, prelude::*};
+use fidl::endpoints::ServerEnd;
+use fidl::prelude::*;
 use fidl_fuchsia_camera3::{
     DeviceRequest, DeviceWatcherMarker, DeviceWatcherRequest, WatchDevicesEvent,
 };

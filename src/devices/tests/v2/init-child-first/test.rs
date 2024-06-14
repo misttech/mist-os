@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_driver_test as fdt;
-use fuchsia_async as fasync;
+use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync};
 
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};

@@ -6,14 +6,12 @@ use crate::parser::common::{
     compound_identifier, condition_value, many_until_eof, map_err, skip_ws, using_list, ws,
     BindParserError, CompoundIdentifier, Include, NomSpan, Span, Value,
 };
-use nom::{
-    branch::alt,
-    bytes::complete::tag,
-    combinator::{opt, value},
-    multi::{many1, separated_nonempty_list},
-    sequence::{delimited, preceded, terminated, tuple},
-    IResult,
-};
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::combinator::{opt, value};
+use nom::multi::{many1, separated_nonempty_list};
+use nom::sequence::{delimited, preceded, terminated, tuple};
+use nom::IResult;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast<'a> {

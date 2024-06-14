@@ -2,23 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    bt_avctp::{AvcCommandResponse, AvcCommandType, AvcResponseType, Error as AvctpError},
-    fuchsia_sync::RwLock,
-    futures::{
-        ready,
-        stream::{FusedStream, StreamExt},
-        Stream,
-    },
-    packet_encoding::{Decodable, Encodable},
-    std::{
-        pin::Pin,
-        sync::Arc,
-        task::{Context, Poll},
-    },
-    tracing::trace,
-};
+use anyhow::format_err;
+use bt_avctp::{AvcCommandResponse, AvcCommandType, AvcResponseType, Error as AvctpError};
+use fuchsia_sync::RwLock;
+use futures::stream::{FusedStream, StreamExt};
+use futures::{ready, Stream};
+use packet_encoding::{Decodable, Encodable};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use tracing::trace;
 
 use crate::packets::PacketEncodable;
 use crate::peer::{

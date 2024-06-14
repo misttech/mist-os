@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{metrics, paver},
-    anyhow::{Context, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_hardware_power_statecontrol::{
-        AdminMarker as PowerStateControlMarker, AdminProxy as PowerStateControlProxy,
-    },
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_paver::{BootManagerProxy, DataSinkProxy},
-    fidl_fuchsia_pkg::{PackageCacheProxy, PackageResolverProxy, RetainedPackagesProxy},
-    fidl_fuchsia_space::ManagerProxy as SpaceManagerProxy,
-    fuchsia_component::client::connect_to_protocol,
-    futures::{future::BoxFuture, prelude::*},
+use super::{metrics, paver};
+use anyhow::{Context, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_hardware_power_statecontrol::{
+    AdminMarker as PowerStateControlMarker, AdminProxy as PowerStateControlProxy,
 };
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_paver::{BootManagerProxy, DataSinkProxy};
+use fidl_fuchsia_pkg::{PackageCacheProxy, PackageResolverProxy, RetainedPackagesProxy};
+use fidl_fuchsia_space::ManagerProxy as SpaceManagerProxy;
+use fuchsia_component::client::connect_to_protocol;
+use futures::future::BoxFuture;
+use futures::prelude::*;
 
 /// A trait to provide the ability to create a metrics client.
 pub trait CobaltConnector {

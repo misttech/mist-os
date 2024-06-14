@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_trace::{Arg, TraceFutureArgs},
-    std::ffi::CStr,
-};
+use fuchsia_trace::{Arg, TraceFutureArgs};
+use std::ffi::CStr;
 
 pub use fuchsia_trace::{
     duration, flow_begin, flow_end, flow_step, ArgValue, Id, TraceCategoryContext, TraceFutureExt,

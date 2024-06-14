@@ -2,20 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    bt_test_harness::{
-        emulator::{add_le_peer, default_le_peer},
-        low_energy_central::CentralHarness,
-    },
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_bluetooth::{
-        constants::INTEGRATION_TIMEOUT,
-        expectation::asynchronous::{ExpectableExt, ExpectableStateExt},
-        types::Address,
-    },
-    futures::TryFutureExt,
-};
+use anyhow::{format_err, Error};
+use bt_test_harness::emulator::{add_le_peer, default_le_peer};
+use bt_test_harness::low_energy_central::CentralHarness;
+use fidl_fuchsia_hardware_bluetooth::{AdvertisingData, PeerSetLeAdvertisementRequest};
+use fuchsia_async::{DurationExt, TimeoutExt};
+use fuchsia_bluetooth::constants::INTEGRATION_TIMEOUT;
+use fuchsia_bluetooth::expectation::asynchronous::{ExpectableExt, ExpectableStateExt};
+use fuchsia_bluetooth::types::Address;
+use futures::TryFutureExt;
 
 mod expect {
     use bt_test_harness::low_energy_central::{CentralState, ScanStateChange};
@@ -65,8 +60,26 @@ async fn start_scan(central: &CentralHarness) -> Result<(), Error> {
 #[test_harness::run_singlethreaded_test]
 async fn test_enable_scan(central: CentralHarness) {
     let address = Address::Random([1, 0, 0, 0, 0, 0]);
-    let fut = add_le_peer(central.aux().as_ref(), default_le_peer(&address));
-    let _peer = fut.await.unwrap();
+    let fut = add_le_peer(central.aux().as_ref(), default_le_peer(&address), None);
+    let peer = fut.await.unwrap();
+    let request = PeerSetLeAdvertisementRequest {
+        le_address: Some(address.into()),
+        advertisement: Some(AdvertisingData {
+            data: Some(vec![
+                // Flags field set to "general discoverable"
+                0x02, 0x01, 0x02, // Complete local name set to "Fake"
+                0x05, 0x09, 'F' as u8, 'a' as u8, 'k' as u8, 'e' as u8,
+            ]),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }),
+        scan_response: Some(AdvertisingData {
+            data: None,
+            __source_breaking: fidl::marker::SourceBreaking,
+        }),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+    let _ = peer.set_le_advertisement(&request).await.unwrap();
+
     start_scan(&central).await.unwrap();
     let _ = central
         .when_satisfied(

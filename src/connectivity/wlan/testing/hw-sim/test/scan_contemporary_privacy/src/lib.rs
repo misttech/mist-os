@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_test_wlan_realm::WlanConfig,
-    ieee80211::{Bssid, MacAddrBytes, Ssid},
-    lazy_static::lazy_static,
-    std::pin::pin,
-    wlan_common::{
-        bss::Protection,
-        channel::{Cbw, Channel},
-    },
-    wlan_hw_sim::{event::action, *},
-};
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use fidl_test_wlan_realm::WlanConfig;
+use ieee80211::{Bssid, MacAddrBytes, Ssid};
+use lazy_static::lazy_static;
+use std::pin::pin;
+use wlan_common::bss::Protection;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_hw_sim::event::action;
+use wlan_hw_sim::*;
 
 lazy_static! {
     static ref BSS_WPA1: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);

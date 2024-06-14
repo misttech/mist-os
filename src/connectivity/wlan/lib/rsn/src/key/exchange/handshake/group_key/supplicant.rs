@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::key::exchange::compute_mic_from_buf;
-use crate::key::exchange::{
-    handshake::group_key::{self, Config, GroupKeyHandshakeFrame},
-    Key,
-};
-use crate::key::{gtk::Gtk, igtk::Igtk};
-use crate::key_data;
+use crate::key::exchange::handshake::group_key::{self, Config, GroupKeyHandshakeFrame};
+use crate::key::exchange::{compute_mic_from_buf, Key};
+use crate::key::gtk::Gtk;
+use crate::key::igtk::Igtk;
 use crate::key_data::kde::GtkInfoTx;
 use crate::rsna::{
     Dot11VerifiedKeyFrame, IgtkSupport, ProtectionType, SecAssocUpdate, UnverifiedKeyData,
     UpdateSink,
 };
-use crate::{format_rsn_err, Error};
+use crate::{format_rsn_err, key_data, Error};
 use bytes::Bytes;
 use eapol::KeyFrameBuf;
 use zerocopy::ByteSlice;

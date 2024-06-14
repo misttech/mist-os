@@ -5,8 +5,7 @@
 //! Type-safe bindings for Zircon version-string call.
 
 use fuchsia_zircon_sys as sys;
-use std::slice;
-use std::str;
+use std::{slice, str};
 
 /// Return a version string describing the system (kernel).
 /// This string never changes.

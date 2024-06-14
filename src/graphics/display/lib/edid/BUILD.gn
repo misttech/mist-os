@@ -13,6 +13,8 @@ source_set("edid") {
     "edid.cc",
     "edid.h",
     "eisa_vid_lut.cc",
+    "internal/iterators.cc",
+    "internal/iterators.h",
     "timings.cc",
     "timings.h",
   ]
@@ -34,7 +36,7 @@ fuchsia_library_fuzzer("edid-fuzzer") {
   sources = [ "edid-fuzzer.cc" ]
   deps = [
     ":edid",
-    "//src/devices/testing/no_ddk",
+    "//src/devices/testing/mock-ddk",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
   ]
   include_dirs = [ ".." ]
@@ -48,7 +50,8 @@ test("edid-test") {
   ]
   deps = [
     ":edid",
-    "//src/devices/testing/no_ddk",
+    "//src/devices/testing/mock-ddk",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//src/graphics/display/lib/edid-values",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",

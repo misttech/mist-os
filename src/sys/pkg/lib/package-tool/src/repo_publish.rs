@@ -2,40 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        args::{RepoPMListCommand, RepoPublishCommand},
-        write_depfile,
-    },
-    anyhow::{anyhow, format_err, Context, Result},
-    camino::{Utf8Path, Utf8PathBuf},
-    chrono::{TimeZone, Utc},
-    fuchsia_async as fasync,
-    fuchsia_lockfile::Lockfile,
-    fuchsia_pkg::{PackageManifest, PackageManifestError, PackageManifestList},
-    fuchsia_repo::{
-        package_manifest_watcher::PackageManifestWatcher,
-        repo_builder::RepoBuilder,
-        repo_client::{RepoClient, RepositoryPackage},
-        repo_keys::RepoKeys,
-        repository::{Error as RepoError, PmRepository, RepoProvider as _},
-    },
-    futures::{AsyncReadExt as _, StreamExt as _},
-    sdk_metadata::get_repositories,
-    std::{
-        collections::BTreeSet,
-        fs::{create_dir_all, File},
-        io::{BufReader, BufWriter},
-    },
-    tempfile::TempDir,
-    tracing::{error, info, warn},
-    tuf::{
-        metadata::{MetadataPath, MetadataVersion, RawSignedMetadata, RootMetadata},
-        pouf::Pouf1,
-        repository::RepositoryProvider as _,
-        Error as TufError,
-    },
-};
+use crate::args::{RepoPMListCommand, RepoPublishCommand};
+use crate::write_depfile;
+use anyhow::{anyhow, format_err, Context, Result};
+use camino::{Utf8Path, Utf8PathBuf};
+use chrono::{TimeZone, Utc};
+use fuchsia_async as fasync;
+use fuchsia_lockfile::Lockfile;
+use fuchsia_pkg::{PackageManifest, PackageManifestError, PackageManifestList};
+use fuchsia_repo::package_manifest_watcher::PackageManifestWatcher;
+use fuchsia_repo::repo_builder::RepoBuilder;
+use fuchsia_repo::repo_client::{RepoClient, RepositoryPackage};
+use fuchsia_repo::repo_keys::RepoKeys;
+use fuchsia_repo::repository::{Error as RepoError, PmRepository, RepoProvider as _};
+use futures::{AsyncReadExt as _, StreamExt as _};
+use sdk_metadata::get_repositories;
+use std::collections::BTreeSet;
+use std::fs::{create_dir_all, File};
+use std::io::{BufReader, BufWriter};
+use tempfile::TempDir;
+use tracing::{error, info, warn};
+use tuf::metadata::{MetadataPath, MetadataVersion, RawSignedMetadata, RootMetadata};
+use tuf::pouf::Pouf1;
+use tuf::repository::RepositoryProvider as _;
+use tuf::Error as TufError;
 
 /// Time in seconds after which the attempt to get a lock file is considered failed.
 const LOCK_TIMEOUT_SEC: u64 = 2 * 60;
@@ -421,19 +411,18 @@ fn read_repo_keys_if_exists(deps: &mut BTreeSet<Utf8PathBuf>, path: &Utf8Path) -
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::convert_to_depfile_filepath,
-        assembly_partitions_config::PartitionsConfig,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        fuchsia_repo::{repository::CopyMode, test_utils},
-        futures::FutureExt,
-        pretty_assertions::assert_eq,
-        sdk_metadata::{ProductBundle, ProductBundleV2, Repository},
-        std::io::Write,
-        tuf::metadata::Metadata as _,
-    };
+    use super::*;
+    use crate::convert_to_depfile_filepath;
+    use assembly_partitions_config::PartitionsConfig;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use fuchsia_repo::repository::CopyMode;
+    use fuchsia_repo::test_utils;
+    use futures::FutureExt;
+    use pretty_assertions::assert_eq;
+    use sdk_metadata::{ProductBundle, ProductBundleV2, Repository};
+    use std::io::Write;
+    use tuf::metadata::Metadata as _;
 
     struct TestEnv {
         _tmp: tempfile::TempDir,

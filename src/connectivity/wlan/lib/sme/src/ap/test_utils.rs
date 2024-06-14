@@ -5,7 +5,8 @@
 use fidl_fuchsia_wlan_mlme::EapolResultCode;
 use std::sync::{Arc, Mutex};
 use wlan_common::ie::rsn::rsne::{RsnCapabilities, Rsne};
-use wlan_rsn::{rsna::UpdateSink, Error, NegotiatedProtection};
+use wlan_rsn::rsna::UpdateSink;
+use wlan_rsn::{Error, NegotiatedProtection};
 
 use crate::ap::authenticator::Authenticator;
 

@@ -3,18 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use futures::{
-    future::FusedFuture,
-    stream::{FuturesUnordered, StreamExt, TryStream},
-    Future,
-};
+use futures::future::FusedFuture;
+use futures::stream::{FuturesUnordered, StreamExt, TryStream};
+use futures::Future;
 use pin_project::pin_project;
-use std::{
-    mem,
-    num::NonZeroUsize,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::mem;
+use std::num::NonZeroUsize;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 impl<T: ?Sized + TryStream> TryStreamUtilExt for T where T: TryStream {}
 
@@ -147,10 +143,8 @@ mod tests {
     use super::*;
     use anyhow::anyhow;
     use fuchsia_async::Timer;
-    use futures::{
-        future::ready,
-        stream::{iter, once},
-    };
+    use futures::future::ready;
+    use futures::stream::{iter, once};
     use std::time::Duration;
 
     async fn sleep_for_a_year() {

@@ -10,6 +10,7 @@ group("tests") {
 
   deps = [
     "generate_idk:tests",
+    "generate_version_history:tests",
     "meta:tests($host_toolchain)",
     "sdk_common:tests",
     "tests",
@@ -154,30 +155,35 @@ group("sdk_versioned_shared_libraries") {
 }
 
 python_binary("create_atom_manifest") {
+  enable_mypy = true
   visibility = [ "*" ]
   main_source = "create_atom_manifest.py"
   deps = [ "//build/sdk/sdk_common" ]
 }
 
 python_binary("create_molecule_manifest") {
+  enable_mypy = true
   visibility = [ "*" ]
   main_source = "create_molecule_manifest.py"
   deps = [ "//build/sdk/sdk_common" ]
 }
 
-python_binary("generate_archive_manifest") {
+python_binary("generate_archive_manifest_from_sdk_manifest") {
+  enable_mypy = true
   visibility = [ "*" ]
-  main_source = "generate_archive_manifest.py"
+  main_source = "generate_archive_manifest_from_sdk_manifest.py"
   deps = [ "//build/sdk/sdk_common" ]
 }
 
-python_binary("generate_idk_archive_manifest") {
+python_binary("generate_archive_manifest_from_idk_directory") {
+  enable_mypy = true
   visibility = [ "*" ]
-  main_source = "generate_idk_archive_manifest.py"
+  main_source = "generate_archive_manifest_from_idk_directory.py"
 }
 
-python_binary("generate_meta") {
+python_binary("generate_idk_meta_manifest_json") {
+  enable_mypy = true
   visibility = [ "*" ]
-  main_source = "generate_meta.py"
+  main_source = "generate_idk_meta_manifest_json.py"
   deps = [ "//build/sdk/sdk_common" ]
 }

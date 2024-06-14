@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::update::{paver, BuildInfo, SystemInfo},
-    anyhow::{anyhow, Context as _},
-    epoch::EpochFile,
-    fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_paver::{Asset, BootManagerProxy, DataSinkProxy},
-    fuchsia_inspect as inspect,
-    serde::{Deserialize, Serialize},
-    std::str::FromStr,
-    tracing::{error, info, warn},
-    update_package::{SystemVersion, UpdatePackage},
-};
+use crate::update::{paver, BuildInfo, SystemInfo};
+use anyhow::{anyhow, Context as _};
+use epoch::EpochFile;
+use fidl_fuchsia_paver::{Asset, BootManagerProxy, DataSinkProxy};
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use tracing::{error, info, warn};
+use update_package::{SystemVersion, UpdatePackage};
+use {fidl_fuchsia_mem as fmem, fuchsia_inspect as inspect};
 
 /// The version of the OS.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -261,18 +258,16 @@ fn sha256_hash_ignore_trailing_zeros(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::update::environment::NamespaceBuildInfo,
-        fidl_fuchsia_paver::Configuration,
-        fuchsia_hash::Hash,
-        fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage},
-        fuchsia_zircon::Vmo,
-        mock_paver::{hooks as mphooks, MockPaverServiceBuilder},
-        omaha_client::version::Version as SemanticVersion,
-        pretty_assertions::assert_eq,
-        std::sync::Arc,
-    };
+    use super::*;
+    use crate::update::environment::NamespaceBuildInfo;
+    use fidl_fuchsia_paver::Configuration;
+    use fuchsia_hash::Hash;
+    use fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage};
+    use fuchsia_zircon::Vmo;
+    use mock_paver::{hooks as mphooks, MockPaverServiceBuilder};
+    use omaha_client::version::Version as SemanticVersion;
+    use pretty_assertions::assert_eq;
+    use std::sync::Arc;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn version_for_invalid_update_package() {

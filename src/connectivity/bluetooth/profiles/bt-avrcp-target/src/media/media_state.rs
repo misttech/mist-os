@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
-use fidl_fuchsia_media as fidl_media_types;
 use fidl_fuchsia_media_sessions2::{self as fidl_media, SessionControlProxy, SessionInfoDelta};
 use std::fmt::Debug;
 use tracing::{info, trace, warn};
+use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fidl_fuchsia_media as fidl_media_types};
 
 use crate::media::media_types::{
     avrcp_repeat_mode_to_media, avrcp_shuffle_mode_to_media, media_repeat_mode_to_avrcp,

@@ -2,19 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::composite_node_spec_manager::CompositeNodeSpecManager;
+use crate::driver_loading_fuzzer::Session;
+use crate::match_common::{node_to_device_property, node_to_device_property_no_autobind};
+use crate::resolved_driver::{DriverPackageType, ResolvedDriver};
+use bind::interpreter::decode_bind_rules::DecodedRules;
+use fidl_fuchsia_pkg_ext::BlobId;
+use fuchsia_zircon::Status;
+use futures::StreamExt;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
+use std::str::FromStr;
 use {
-    crate::composite_node_spec_manager::CompositeNodeSpecManager,
-    crate::driver_loading_fuzzer::Session,
-    crate::match_common::{node_to_device_property, node_to_device_property_no_autobind},
-    crate::resolved_driver::{DriverPackageType, ResolvedDriver},
-    bind::interpreter::decode_bind_rules::DecodedRules,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_framework as fdf,
-    fidl_fuchsia_driver_index as fdi,
-    fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_async as fasync,
-    fuchsia_zircon::Status,
-    futures::StreamExt,
-    std::{cell::RefCell, collections::HashMap, ops::Deref, ops::DerefMut, rc::Rc, str::FromStr},
+    fidl_fuchsia_driver_index as fdi, fuchsia_async as fasync,
 };
 
 fn ignore_peer_closed(err: fidl::Error) -> Result<(), fidl::Error> {
@@ -189,16 +192,14 @@ impl Indexer {
         self: Rc<Self>,
         mut receiver: futures::channel::mpsc::UnboundedReceiver<Vec<ResolvedDriver>>,
     ) {
-        while let Some(drivers) = receiver.next().await {
-            let mut drivers_clone = drivers.clone();
-            self.boot_repo.borrow_mut().append(&mut drivers_clone);
+        while let Some(mut drivers) = receiver.next().await {
             tracing::info!("Loaded drivers into the driver index:");
-            for driver in drivers {
+            for driver in &drivers {
                 tracing::info!("     {}", driver.component_url);
                 let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
                 composite_node_spec_manager.new_driver_available(driver);
             }
-
+            self.boot_repo.borrow_mut().append(&mut drivers);
             self.report_driver_load();
         }
     }
@@ -427,7 +428,7 @@ impl Indexer {
         let resolved_driver = resolve.unwrap();
 
         let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
-        composite_node_spec_manager.new_driver_available(resolved_driver.clone());
+        composite_node_spec_manager.new_driver_available(&resolved_driver);
 
         let mut ephemeral_drivers = self.ephemeral_drivers.borrow_mut();
         let existing = ephemeral_drivers.insert(component_url.clone(), resolved_driver);

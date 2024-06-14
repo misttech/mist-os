@@ -17,13 +17,14 @@
 #include <utility>
 #include <vector>
 
+#include "src/developer/forensics/testing/stubs/fidl_server.h"
 #include "src/developer/forensics/testing/stubs/power_broker_element_control.h"
 #include "src/developer/forensics/testing/stubs/power_broker_lessor.h"
 
 namespace forensics::stubs {
 
 // Stores added elements until the ElementControl channel is dropped.
-class PowerBrokerTopologyBase : public fidl::testing::TestBase<fuchsia_power_broker::Topology> {
+class PowerBrokerTopologyBase : public FidlServer<fuchsia_power_broker::Topology> {
  public:
   using ConstructLessorFn = std::function<std::unique_ptr<PowerBrokerLessorBase>(
       fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end)>;
@@ -31,15 +32,6 @@ class PowerBrokerTopologyBase : public fidl::testing::TestBase<fuchsia_power_bro
   virtual ~PowerBrokerTopologyBase() = default;
 
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
-  }
 
   bool ElementInTopology(const std::string& element_name) const {
     return added_elements_.count(element_name) > 0;
@@ -49,6 +41,8 @@ class PowerBrokerTopologyBase : public fidl::testing::TestBase<fuchsia_power_bro
       const std::string& element_name) const;
 
   bool IsLeaseActive(const std::string& element_name) const;
+
+  void SetLeaseStatus(const std::string& element_name, fuchsia_power_broker::LeaseStatus status);
 
  protected:
   explicit PowerBrokerTopologyBase(fidl::ServerEnd<fuchsia_power_broker::Topology> server_end,
@@ -112,8 +106,7 @@ class PowerBrokerTopologyDelaysResponse : public PowerBrokerTopologyBase {
   std::queue<QueuedResponse> queued_responses_;
 };
 
-class PowerBrokerTopologyClosesConnection
-    : public fidl::testing::TestBase<fuchsia_power_broker::Topology> {
+class PowerBrokerTopologyClosesConnection : public FidlServer<fuchsia_power_broker::Topology> {
  public:
   PowerBrokerTopologyClosesConnection(fidl::ServerEnd<fuchsia_power_broker::Topology> server_end,
                                       async_dispatcher_t* dispatcher)
@@ -125,15 +118,6 @@ class PowerBrokerTopologyClosesConnection
   }
 
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
-  }
 
   fidl::ServerBinding<fuchsia_power_broker::Topology> binding_;
 };

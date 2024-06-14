@@ -8,14 +8,13 @@ use diagnostics_data::LogsData;
 use ffx_config::TestEnv;
 use ffx_isolate::Isolate;
 use fuchsia_async::TimeoutExt;
-use futures::{channel::mpsc::TrySendError, Stream, StreamExt};
+use futures::channel::mpsc::TrySendError;
+use futures::{Stream, StreamExt};
 use serde::Deserialize;
-use std::{
-    io::{BufRead, BufReader},
-    process::{Command, Stdio},
-    sync::Mutex,
-    time::Duration,
-};
+use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
+use std::sync::Mutex;
+use std::time::Duration;
 use tempfile::TempDir;
 use tracing::info;
 

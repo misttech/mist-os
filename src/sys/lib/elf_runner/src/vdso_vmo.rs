@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::VdsoError,
-    fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
-    lazy_static::lazy_static,
-    std::collections::HashMap,
-    std::ffi::{CStr, CString},
-};
+use crate::error::VdsoError;
+use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::ffi::{CStr, CString};
 
 fn take_vdso_vmos() -> Result<HashMap<CString, zx::Vmo>, VdsoError> {
     let mut vmos = HashMap::new();

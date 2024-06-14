@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor},
-    mutable_state::{state_accessor, state_implementation},
-    signals::{SignalInfo, SignalState},
-    task::{
-        set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
-        Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState,
-        PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue,
-        ThreadGroup, ThreadState, UtsNamespaceHandle, Waiter, ZombieProcess,
-    },
-    vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString},
+use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor};
+use crate::mutable_state::{state_accessor, state_implementation};
+use crate::signals::{RunState, SignalInfo, SignalState};
+use crate::task::{
+    set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
+    EventHandler, Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
+    PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState,
+    SeccompStateValue, ThreadGroup, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
+    ZombieProcess,
 };
+use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon::{
@@ -23,32 +22,29 @@ use macro_rules_attribute::apply;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_debug, log_warn, set_zx_name};
 use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, TaskRelease};
+use starnix_uapi::auth::{
+    Credentials, FsCred, PtraceAccessMode, CAP_KILL, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
+    PTRACE_MODE_REALCREDS,
+};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::{
+    OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
+};
+use starnix_uapi::signals::{
+    sigaltstack_contains_pointer, SigSet, Signal, UncheckedSignal, SIGCONT,
+};
+use starnix_uapi::stats::TaskTimeStats;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    auth::{
-        Credentials, FsCred, PtraceAccessMode, CAP_KILL, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
-        PTRACE_MODE_REALCREDS,
-    },
-    errno, error,
-    errors::Errno,
-    from_status_like_fdio,
-    ownership::{OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef},
-    pid_t, robust_list_head,
-    signals::{SigSet, Signal, UncheckedSignal, SIGCONT},
-    stats::TaskTimeStats,
-    ucred,
-    user_address::{UserAddress, UserRef},
+    errno, error, from_status_like_fdio, pid_t, robust_list_head, sigaction, sigaltstack, ucred,
     CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
-use std::{
-    cmp,
-    ffi::CString,
-    fmt,
-    mem::MaybeUninit,
-    sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
-        Arc,
-    },
-};
+use std::ffi::CString;
+use std::mem::MaybeUninit;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::Arc;
+use std::{cmp, fmt};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExitStatus {
@@ -330,7 +326,7 @@ pub struct TaskMutableState {
 
     /// Signal handler related state. This is grouped together for when atomicity is needed during
     /// signal sending and delivery.
-    pub signals: SignalState,
+    signals: SignalState,
 
     /// The exit status that this task exited with.
     exit_status: Option<ExitStatus>,
@@ -468,6 +464,106 @@ impl TaskMutableState {
             dirty: false,
         });
     }
+
+    /// Returns the task's currently active signal mask.
+    pub fn signal_mask(&self) -> SigSet {
+        self.signals.mask()
+    }
+
+    /// Returns true if `signal` is currently blocked by this task's signal mask.
+    pub fn is_signal_masked(&self, signal: Signal) -> bool {
+        self.signals.mask().has_signal(signal)
+    }
+
+    /// Returns true if `signal` is blocked by the saved signal mask.
+    ///
+    /// Note that the current signal mask may still not be blocking the signal.
+    pub fn is_signal_masked_by_saved_mask(&self, signal: Signal) -> bool {
+        self.signals.saved_mask().is_some_and(|mask| mask.has_signal(signal))
+    }
+
+    /// Enqueues a signal at the back of the task's signal queue.
+    pub fn enqueue_signal(&mut self, signal: SignalInfo) {
+        self.signals.enqueue(signal);
+    }
+
+    /// Enqueues the signal, allowing the signal to skip straight to the front of the task's queue.
+    ///
+    /// `enqueue_signal` is the more common API to use.
+    ///
+    /// Note that this will not guarantee that the signal is dequeued before any process-directed
+    /// signals.
+    pub fn enqueue_signal_front(&mut self, signal: SignalInfo) {
+        self.signals.enqueue(signal);
+    }
+
+    /// Sets the current signal mask of the task.
+    pub fn set_signal_mask(&mut self, mask: SigSet) {
+        self.signals.set_mask(mask);
+    }
+
+    /// Sets a temporary signal mask for the task.
+    ///
+    /// This mask should be removed by a matching call to `restore_signal_mask`.
+    pub fn set_temporary_signal_mask(&mut self, mask: SigSet) {
+        self.signals.set_temporary_mask(mask);
+    }
+
+    /// Removes the currently active, temporary, signal mask and restores the
+    /// previously active signal mask.
+    pub fn restore_signal_mask(&mut self) {
+        self.signals.restore_mask();
+    }
+
+    /// Returns true if the task's current `RunState` is blocked.
+    pub fn is_blocked(&self) -> bool {
+        self.signals.run_state.is_blocked()
+    }
+
+    /// Sets the task's `RunState` to `run_state`.
+    pub fn set_run_state(&mut self, run_state: RunState) {
+        self.signals.run_state = run_state;
+    }
+
+    pub fn run_state(&self) -> RunState {
+        self.signals.run_state.clone()
+    }
+
+    pub fn on_signal_stack(&self, stack_pointer_register: u64) -> bool {
+        self.signals
+            .alt_stack
+            .map(|signal_stack| sigaltstack_contains_pointer(&signal_stack, stack_pointer_register))
+            .unwrap_or(false)
+    }
+
+    pub fn set_sigaltstack(&mut self, stack: Option<sigaltstack>) {
+        self.signals.alt_stack = stack;
+    }
+
+    pub fn sigaltstack(&self) -> Option<sigaltstack> {
+        self.signals.alt_stack
+    }
+
+    pub fn wait_on_signal(&mut self, waiter: &Waiter) {
+        self.signals.signal_wait.wait_async(waiter);
+    }
+
+    pub fn signals_mut(&mut self) -> &mut SignalState {
+        &mut self.signals
+    }
+
+    pub fn wait_on_signal_fd_events(
+        &self,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> WaitCanceler {
+        self.signals.signal_wait.wait_async_fd_events(waiter, events, handler)
+    }
+
+    pub fn notify_signal_waiters(&self) {
+        self.signals.signal_wait.notify_all();
+    }
 }
 
 #[apply(state_implementation!)]
@@ -561,6 +657,91 @@ impl TaskMutableState<Base = Task> {
     pub fn set_exit_status_if_not_already(&mut self, status: ExitStatus) {
         self.set_flags(TaskFlags::EXITED, true);
         self.exit_status.get_or_insert(status);
+    }
+
+    /// Returns the number of pending signals for this task, without considering the signal mask.
+    pub fn pending_signal_count(&self) -> usize {
+        self.signals.num_queued() + self.base.thread_group.pending_signals.lock().num_queued()
+    }
+
+    /// Returns `true` if `signal` is pending for this task, without considering the signal mask.
+    pub fn has_signal_pending(&self, signal: Signal) -> bool {
+        self.signals.has_queued(signal)
+            || self.base.thread_group.pending_signals.lock().has_queued(signal)
+    }
+
+    /// The set of pending signals for the task, including the signals pending for the thread
+    /// group.
+    pub fn pending_signals(&self) -> SigSet {
+        self.signals.pending() | self.base.thread_group.pending_signals.lock().pending()
+    }
+
+    /// The set of pending signals for the task specifically, not including the signals pending
+    /// for the thread group.
+    pub fn task_specific_pending_signals(&self) -> SigSet {
+        self.signals.pending()
+    }
+
+    /// Returns true if any currently pending signal is allowed by `mask`.
+    pub fn is_any_signal_allowed_by_mask(&self, mask: SigSet) -> bool {
+        self.signals.is_any_allowed_by_mask(mask)
+            || self.base.thread_group.pending_signals.lock().is_any_allowed_by_mask(mask)
+    }
+
+    /// Returns whether or not a signal is pending for this task, taking the current
+    /// signal mask into account.
+    pub fn is_any_signal_pending(&self) -> bool {
+        let mask = self.signal_mask();
+        self.signals.is_any_pending()
+            || self.base.thread_group.pending_signals.lock().is_any_allowed_by_mask(mask)
+    }
+
+    /// Returns the next pending signal that passes `predicate`.
+    fn take_next_signal_where<F>(&mut self, predicate: F) -> Option<SignalInfo>
+    where
+        F: Fn(&SignalInfo) -> bool,
+    {
+        if let Some(signal) =
+            self.base.thread_group.pending_signals.lock().take_next_where(&predicate)
+        {
+            Some(signal)
+        } else {
+            self.signals.take_next_where(&predicate)
+        }
+    }
+
+    /// Removes and returns the next pending `signal` for this task.
+    ///
+    /// Returns `None` if `siginfo` is a blocked signal, or no such signal is pending.
+    pub fn take_specific_signal(&mut self, siginfo: SignalInfo) -> Option<SignalInfo> {
+        let signal_mask = self.signal_mask();
+        if signal_mask.has_signal(siginfo.signal) {
+            return None;
+        }
+
+        let predicate = |s: &SignalInfo| s.signal == siginfo.signal;
+        self.take_next_signal_where(predicate)
+    }
+
+    /// Removes and returns a pending signal that is unblocked by the current signal mask.
+    ///
+    /// Returns `None` if there are no unblocked signals pending.
+    pub fn take_any_signal(&mut self) -> Option<SignalInfo> {
+        self.take_signal_with_mask(self.signal_mask())
+    }
+
+    /// Removes and returns a pending signal that is unblocked by `signal_mask`.
+    ///
+    /// Returns `None` if there are no signals pending that are unblocked by `signal_mask`.
+    pub fn take_signal_with_mask(&mut self, signal_mask: SigSet) -> Option<SignalInfo> {
+        let predicate = |s: &SignalInfo| !signal_mask.has_signal(s.signal) || s.force;
+        self.take_next_signal_where(predicate)
+    }
+
+    #[cfg(test)]
+    pub fn queued_signal_count(&self, signal: Signal) -> usize {
+        self.signals.queued_count(signal)
+            + self.base.thread_group.pending_signals.lock().queued_count(signal)
     }
 }
 
@@ -1169,9 +1350,10 @@ impl Task {
             return true;
         }
 
-        // TODO(lindkvist): This check should also verify that the sessions are the same.
         if Signal::try_from(unchecked_signal) == Ok(SIGCONT) {
-            return true;
+            let target_session = target.thread_group.read().process_group.session.leader;
+            let self_session = self.thread_group.read().process_group.session.leader;
+            return target_session == self_session;
         }
 
         false
@@ -1273,6 +1455,10 @@ impl Task {
         let logging_span =
             self.logging_span.get_or_init(|| starnix_logging::Span::new(&debug_info));
         logging_span.update(debug_info);
+    }
+
+    pub fn get_signal_action(&self, signal: Signal) -> sigaction {
+        self.thread_group.signal_actions.get(signal)
     }
 }
 
@@ -1411,10 +1597,10 @@ impl From<&Task> for FsCred {
 mod test {
     use super::*;
     use crate::testing::*;
-    use starnix_uapi::{
-        auth::Capabilities, auth::CAP_SYS_ADMIN, resource_limits::Resource, rlimit,
-        signals::SIGCHLD, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM,
-    };
+    use starnix_uapi::auth::{Capabilities, CAP_SYS_ADMIN};
+    use starnix_uapi::resource_limits::Resource;
+    use starnix_uapi::signals::SIGCHLD;
+    use starnix_uapi::{rlimit, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
 
     #[::fuchsia::test]
     async fn test_tid_allocation() {

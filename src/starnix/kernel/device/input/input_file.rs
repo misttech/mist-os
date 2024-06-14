@@ -2,26 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_core::{
-    fileops_impl_nonseekable,
-    mm::MemoryAccessorExt,
-    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        FileObject, FileOps,
-    },
-};
+use starnix_core::fileops_impl_nonseekable;
+use starnix_core::mm::MemoryAccessorExt;
+use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
+use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
+use starnix_core::vfs::{FileObject, FileOps};
 use starnix_logging::{log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    error,
-    errors::Errno,
-    uapi,
-    user_address::{UserAddress, UserRef},
-    vfs::FdEvents,
-    ABS_CNT, ABS_X, ABS_Y, BTN_MISC, BTN_TOOL_FINGER, BTN_TOUCH, FF_CNT, INPUT_PROP_CNT,
-    INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT, MSC_CNT, REL_CNT, SW_CNT,
+    error, uapi, ABS_CNT, ABS_X, ABS_Y, BTN_MISC, BTN_TOOL_FINGER, BTN_TOUCH, FF_CNT,
+    INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT, MSC_CNT, REL_CNT, SW_CNT,
 };
 
 use fuchsia_inspect::NumericProperty;

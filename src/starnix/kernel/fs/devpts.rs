@@ -2,50 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::{
-        kobject::DeviceMetadata,
-        terminal::{TTYState, Terminal},
-        DeviceMode, DeviceOps,
-    },
-    fs::devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_node},
-    mm::MemoryAccessorExt,
-    task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_dir_readonly, CacheMode, DirEntryHandle,
-        DirectoryEntryType, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
-        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
-    },
+use crate::device::kobject::DeviceMetadata;
+use crate::device::terminal::{TTYState, Terminal};
+use crate::device::{DeviceMode, DeviceOps};
+use crate::fs::devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_node};
+use crate::mm::MemoryAccessorExt;
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    fileops_impl_nonseekable, fs_node_impl_dir_readonly, CacheMode, DirEntryHandle,
+    DirectoryEntryType, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    SpecialNode, VecDirectory, VecDirectoryEntry,
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
     DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::{DeviceType, TTY_ALT_MAJOR};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::signals::SIGWINCH;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{
-    auth::FsCred,
-    device_type::{DeviceType, TTY_ALT_MAJOR},
-    errno, error,
-    errors::Errno,
-    file_mode::mode,
-    ino_t,
-    open_flags::OpenFlags,
-    pid_t,
-    signals::SIGWINCH,
-    statfs, uapi,
-    user_address::{UserAddress, UserRef},
-    vfs::default_statfs,
-    vfs::FdEvents,
-    DEVPTS_SUPER_MAGIC, FIOASYNC, FIOCLEX, FIONBIO, FIONCLEX, FIONREAD, FIOQSIZE, TCFLSH, TCGETA,
-    TCGETS, TCGETX, TCSBRK, TCSBRKP, TCSETA, TCSETAF, TCSETAW, TCSETS, TCSETSF, TCSETSW, TCSETX,
-    TCSETXF, TCSETXW, TCXONC, TIOCCBRK, TIOCCONS, TIOCEXCL, TIOCGETD, TIOCGICOUNT, TIOCGLCKTRMIOS,
-    TIOCGPGRP, TIOCGPTLCK, TIOCGPTN, TIOCGRS485, TIOCGSERIAL, TIOCGSID, TIOCGSOFTCAR, TIOCGWINSZ,
-    TIOCLINUX, TIOCMBIC, TIOCMBIS, TIOCMGET, TIOCMIWAIT, TIOCMSET, TIOCNOTTY, TIOCNXCL, TIOCOUTQ,
-    TIOCPKT, TIOCSBRK, TIOCSCTTY, TIOCSERCONFIG, TIOCSERGETLSR, TIOCSERGETMULTI, TIOCSERGSTRUCT,
-    TIOCSERGWILD, TIOCSERSETMULTI, TIOCSERSWILD, TIOCSETD, TIOCSLCKTRMIOS, TIOCSPGRP, TIOCSPTLCK,
-    TIOCSRS485, TIOCSSERIAL, TIOCSSOFTCAR, TIOCSTI, TIOCSWINSZ, TIOCVHANGUP,
+    errno, error, ino_t, pid_t, statfs, uapi, DEVPTS_SUPER_MAGIC, FIOASYNC, FIOCLEX, FIONBIO,
+    FIONCLEX, FIONREAD, FIOQSIZE, TCFLSH, TCGETA, TCGETS, TCGETX, TCSBRK, TCSBRKP, TCSETA, TCSETAF,
+    TCSETAW, TCSETS, TCSETSF, TCSETSW, TCSETX, TCSETXF, TCSETXW, TCXONC, TIOCCBRK, TIOCCONS,
+    TIOCEXCL, TIOCGETD, TIOCGICOUNT, TIOCGLCKTRMIOS, TIOCGPGRP, TIOCGPTLCK, TIOCGPTN, TIOCGRS485,
+    TIOCGSERIAL, TIOCGSID, TIOCGSOFTCAR, TIOCGWINSZ, TIOCLINUX, TIOCMBIC, TIOCMBIS, TIOCMGET,
+    TIOCMIWAIT, TIOCMSET, TIOCNOTTY, TIOCNXCL, TIOCOUTQ, TIOCPKT, TIOCSBRK, TIOCSCTTY,
+    TIOCSERCONFIG, TIOCSERGETLSR, TIOCSERGETMULTI, TIOCSERGSTRUCT, TIOCSERGWILD, TIOCSERSETMULTI,
+    TIOCSERSWILD, TIOCSETD, TIOCSLCKTRMIOS, TIOCSPGRP, TIOCSPTLCK, TIOCSRS485, TIOCSSERIAL,
+    TIOCSSOFTCAR, TIOCSTI, TIOCSWINSZ, TIOCVHANGUP,
 };
 use std::sync::{Arc, Weak};
 
@@ -884,19 +876,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fs::tmpfs::TmpFs,
-        testing::*,
-        vfs::{
-            buffers::{VecInputBuffer, VecOutputBuffer},
-            MountInfo, NamespaceNode,
-        },
-    };
-    use starnix_uapi::{
-        auth::Credentials,
-        file_mode::FileMode,
-        signals::{SIGCHLD, SIGTTOU},
-    };
+    use crate::fs::tmpfs::TmpFs;
+    use crate::testing::*;
+    use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::{MountInfo, NamespaceNode};
+    use starnix_uapi::auth::Credentials;
+    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::signals::{SIGCHLD, SIGTTOU};
 
     fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::NoCell + Copy>(
         locked: &mut Locked<'_, Unlocked>,
@@ -1350,7 +1336,7 @@ mod tests {
             ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &task2_pgid),
             error!(EINTR)
         );
-        assert!(task2.read().signals.has_queued(SIGTTOU));
+        assert!(task2.read().has_signal_pending(SIGTTOU));
 
         // Set the foregound process to task2 process group
         ioctl::<i32>(&mut locked, &task1, &opened_replica, TIOCSPGRP, &task2_pgid).unwrap();

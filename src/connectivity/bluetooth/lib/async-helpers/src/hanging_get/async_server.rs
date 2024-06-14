@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::responding_channel as responding,
-    async_utils::{
-        hanging_get::error::HangingGetServerError,
-        stream::{StreamItem, WithEpitaph},
-    },
-    core::hash::Hash,
-    futures::{channel::mpsc, select, SinkExt, StreamExt},
-    std::collections::HashMap,
-};
+use crate::responding_channel as responding;
+use async_utils::hanging_get::error::HangingGetServerError;
+use async_utils::stream::{StreamItem, WithEpitaph};
+use core::hash::Hash;
+use futures::channel::mpsc;
+use futures::{select, SinkExt, StreamExt};
+use std::collections::HashMap;
 
 /// Default value that can be passed to `HangingGetBroker::new` by clients.
 /// If passed in, this will be used for all MPSC channels created by the broker.
@@ -426,13 +423,12 @@ mod subscriber_key {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        async_utils::hanging_get::test_util::TestObserver,
-        fuchsia_async as fasync,
-        futures::channel::oneshot,
-        std::{pin::pin, task::Poll},
-    };
+    use super::*;
+    use async_utils::hanging_get::test_util::TestObserver;
+    use fuchsia_async as fasync;
+    use futures::channel::oneshot;
+    use std::pin::pin;
+    use std::task::Poll;
 
     const TEST_CHANNEL_SIZE: usize = 128;
 

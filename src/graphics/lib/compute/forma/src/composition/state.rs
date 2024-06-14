@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    cell::{RefCell, RefMut},
-    mem,
-    rc::Rc,
-};
+use std::cell::{RefCell, RefMut};
+use std::mem;
+use std::rc::Rc;
 
 use rustc_hash::FxHashMap;
-use surpass::{painter::Props, GeomId, LinesBuilder, Order};
+use surpass::painter::Props;
+use surpass::{GeomId, LinesBuilder, Order};
 
 use super::interner::Interner;
 

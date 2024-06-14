@@ -9,16 +9,16 @@ The script for running LLVM Unit Test running for Fuchsia.
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-import fcntl
-import hashlib
 import glob
+import hashlib
+import io
 import json
 import logging
 import os
 import platform
+import shlex
 import shutil
 import subprocess
-import struct
 import sys
 from pathlib import Path
 from typing import ClassVar, List, Optional
@@ -27,7 +27,8 @@ from typing import ClassVar, List, Optional
 def check_call_with_logging(
     args, *, stdout_handler, stderr_handler, check=True, text=True, **kwargs
 ):
-    stdout_handler(f"Subprocess: {args}")
+    stdout_handler(f"Subprocess: {shlex.join(str(arg) for arg in args)}")
+
     with subprocess.Popen(
         args,
         text=text,
@@ -51,8 +52,49 @@ def check_call_with_logging(
             executor_err.result()
     retcode = process.poll()
     if check and retcode:
-        subprocess.CalledProcessError(retcode, process.args)
+        raise subprocess.CalledProcessError(retcode, process.args)
     return subprocess.CompletedProcess(process.args, retcode)
+
+
+def check_output_with_logging(
+    args, *, stdout_handler, stderr_handler, check=True, text=True, **kwargs
+):
+    stdout_handler(f"Subprocess: {shlex.join(str(arg) for arg in args)}")
+
+    buf = io.StringIO()
+
+    with subprocess.Popen(
+        args,
+        text=text,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        **kwargs,
+    ) as process:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+
+            def exhaust_stdout(handler, buf, pipe):
+                for line in pipe:
+                    handler(line.rstrip())
+                    buf.write(line)
+                    buf.write("\n")
+
+            def exhaust_stderr(handler, pipe):
+                for line in pipe:
+                    handler(line.rstrip())
+
+            executor_out = executor.submit(
+                exhaust_stdout, stdout_handler, buf, process.stdout
+            )
+            executor_err = executor.submit(
+                exhaust_stderr, stderr_handler, process.stderr
+            )
+            executor_out.result()
+            executor_err.result()
+    retcode = process.poll()
+    if check and retcode:
+        raise subprocess.CalledProcessError(retcode, process.args)
+
+    return buf.getvalue()
 
 
 def atomic_link(link: Path, target: Path):
@@ -70,14 +112,13 @@ def atomic_link(link: Path, target: Path):
             os.remove(tmp_file)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TestEnvironment:
-    build_dir: str
-    sdk_dir: str
+    build_dir: Path
+    sdk_dir: Path
     target: str
-    toolchain_dir: str
-    abi_revision: str
-    local_pb_path: str
+    toolchain_dir: Path
+    local_pb_path: Optional[Path]
     use_local_pb: bool
     verbose: bool = False
 
@@ -118,14 +159,17 @@ class TestEnvironment:
 
     @classmethod
     def from_args(cls, args):
+        local_pb_path = args.local_product_bundle_path
+        if local_pb_path is not None:
+            local_pb_path = Path(local_pb_path).absolute()
+
         return cls(
-            str(Path(args.build_dir).absolute()),
-            str(Path(args.sdk).absolute()),
-            args.target,
-            str(Path(args.toolchain_dir).absolute()),
-            args.abi_revision,
-            args.local_product_bundle_path,
-            args.use_local_product_bundle_if_exists,
+            build_dir=Path(args.build_dir).absolute(),
+            sdk_dir=Path(args.sdk).absolute(),
+            target=args.target,
+            toolchain_dir=Path(args.toolchain_dir).absolute(),
+            local_pb_path=local_pb_path,
+            use_local_pb=args.use_local_product_bundle_if_exists,
             verbose=args.verbose,
         )
 
@@ -133,14 +177,17 @@ class TestEnvironment:
     def read_from_file(cls):
         with open(cls.env_file_path(), encoding="utf-8") as f:
             test_env = json.load(f)
+            local_pb_path = test_env["local_pb_path"]
+            if local_pb_path is not None:
+                local_pb_path = Path(local_pb_path)
+
             return cls(
-                str(Path(test_env["build_dir"])),
-                str(Path(test_env["sdk_dir"])),
-                test_env["target"],
-                str(Path(test_env["toolchain_dir"])),
-                test_env["abi_revision"],
-                test_env["local_pb_path"],
-                test_env["use_local_pb"],
+                build_dir=Path(test_env["build_dir"]),
+                sdk_dir=Path(test_env["sdk_dir"]),
+                target=test_env["target"],
+                toolchain_dir=Path(test_env["toolchain_dir"]),
+                local_pb_path=local_pb_path,
+                use_local_pb=test_env["use_local_pb"],
                 verbose=test_env["verbose"],
             )
 
@@ -209,10 +256,25 @@ class TestEnvironment:
 
     def write_to_file(self):
         with open(self.env_file_path(), "w", encoding="utf-8") as f:
-            json.dump(self.__dict__, f)
+            local_pb_path = self.local_pb_path
+            if local_pb_path is not None:
+                local_pb_path = str(local_pb_path)
+
+            json.dump(
+                {
+                    "build_dir": str(self.build_dir),
+                    "sdk_dir": str(self.sdk_dir),
+                    "target": self.target,
+                    "toolchain_dir": str(self.toolchain_dir),
+                    "local_pb_path": local_pb_path,
+                    "use_local_pb": self.use_local_pb,
+                    "verbose": self.verbose,
+                },
+                f,
+            )
 
     def setup_logging(self, log_to_file=False):
-        fs = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
+        fs = logging.Formatter("%(asctime)s %(levelname)s:%(name)s:%(message)s")
         if log_to_file:
             logfile_handler = logging.FileHandler(
                 self.tmp_dir().joinpath("log")
@@ -274,10 +336,6 @@ class TestEnvironment:
         if machine == "arm":
             return "aarch64-unknown-linux-gnu"
         raise Exception(f"Unrecognized host architecture {machine}")
-
-    @property
-    def pm_lockfile_path(self):
-        return self.tmp_dir().joinpath("pm.lock")
 
     @property
     def ffx_daemon_log_path(self):
@@ -366,7 +424,6 @@ class TestEnvironment:
                 self.tool_path("ffx"),
                 "daemon",
                 "stop",
-                #    "-w",
             ],
             env=self.ffx_cmd_env(),
             stdout_handler=self.subprocess_logger.debug,
@@ -421,33 +478,59 @@ class TestEnvironment:
             self.local_pb_path = os.path.join(self.tmp_dir(), "local_pb")
         else:
             self.local_pb_path = os.path.abspath(self.local_pb_path)
-        if not self.use_local_pb or not os.path.exists(self.local_pb_path):
+
+        if self.use_local_pb and os.path.exists(self.local_pb_path):
+            self.env_logger.info(
+                'Using existing emulator image at "%s"' % self.local_pb_path
+            )
+        else:
             shutil.rmtree(self.local_pb_path, ignore_errors=True)
-            self.env_logger.info("Download emulator image")
-            product_bundle = "minimal." + self.triple_to_arch(self.target)
+
+            # Look up the product bundle transfer manifest.
+            self.env_logger.info(
+                "Looking up the product bundle transfer manifest..."
+            )
+            product_name = "minimal." + self.triple_to_arch(self.target)
             sdk_version = self.read_sdk_version()
-            output = subprocess.check_output(
+
+            output = check_output_with_logging(
                 [
                     ffx_path,
+                    "--machine",
+                    "json",
                     "product",
                     "lookup",
-                    product_bundle,
+                    product_name,
                     sdk_version,
                     "--base-url",
-                    "gs://fuchsia/development/%s" % sdk_version,
+                    "gs://fuchsia/development/" + sdk_version,
                 ],
                 env=ffx_env,
-            )
-            outputs = str(output, encoding="utf-8").splitlines()
-            gs_url = outputs[-1].strip()
-            check_call_with_logging(
-                [ffx_path, "product", "download", gs_url, self.local_pb_path],
                 stdout_handler=self.subprocess_logger.debug,
                 stderr_handler=self.subprocess_logger.debug,
             )
-        else:
-            self.env_logger.info(
-                'Using existing emulator image at "%s"' % self.local_pb_path
+
+            try:
+                transfer_manifest_url = json.loads(output)[
+                    "transfer_manifest_url"
+                ]
+            except Exception as e:
+                print(e)
+                raise Exception("Unable to parse transfer manifest") from e
+
+            # Download the product bundle.
+            self.env_logger.info("Downloading the product bundle...")
+            check_call_with_logging(
+                [
+                    ffx_path,
+                    "product",
+                    "download",
+                    transfer_manifest_url,
+                    self.local_pb_path,
+                ],
+                env=ffx_env,
+                stdout_handler=self.subprocess_logger.debug,
+                stderr_handler=self.subprocess_logger.debug,
             )
 
         # Start emulator
@@ -477,24 +560,25 @@ class TestEnvironment:
         self.env_logger.info("Creating package repo...")
         check_call_with_logging(
             [
-                self.tool_path("pm"),
-                "newrepo",
-                "-repo",
+                ffx_path,
+                "repository",
+                "create",
                 self.repo_dir(),
             ],
+            env=ffx_env,
             stdout_handler=self.subprocess_logger.debug,
             stderr_handler=self.subprocess_logger.debug,
         )
 
-        # Add repo
+        # Add repository
         check_call_with_logging(
             [
                 ffx_path,
                 "repository",
                 "add-from-pm",
-                self.repo_dir(),
                 "--repository",
                 self.TEST_REPO_NAME,
+                self.repo_dir(),
             ],
             env=ffx_env,
             stdout_handler=self.subprocess_logger.debug,
@@ -503,7 +587,14 @@ class TestEnvironment:
 
         # Start repository server
         check_call_with_logging(
-            [ffx_path, "repository", "server", "start", "--address", "[::]:0"],
+            [
+                ffx_path,
+                "repository",
+                "server",
+                "start",
+                "--address",
+                "[::]:0",
+            ],
             env=ffx_env,
             stdout_handler=self.subprocess_logger.debug,
             stderr_handler=self.subprocess_logger.debug,
@@ -523,9 +614,6 @@ class TestEnvironment:
             stdout_handler=self.subprocess_logger.debug,
             stderr_handler=self.subprocess_logger.debug,
         )
-
-        # Create lockfiles
-        self.pm_lockfile_path.touch()
 
         # Write to file
         self.write_to_file()
@@ -573,7 +661,6 @@ class TestEnvironment:
     MANIFEST_TEMPLATE = """
     meta/package={package_dir}/meta/package
     meta/{package_name}.cm={package_dir}/meta/{package_name}.cm
-    meta/fuchsia.abi/abi-revision={package_dir}/meta/abi-revision
     bin/{exe_name}={bin_path}
     lib/libc++.so.2={libcxx_path}
     lib/libc++abi.so.1={libcxx_abi_path}
@@ -631,11 +718,13 @@ class TestEnvironment:
         package_name = f"{exe_name}_{build_id}"
 
         package_dir = self.packages_dir.joinpath(package_name)
-        cml_path = package_dir.joinpath("meta", f"{package_name}.cml")
-        cm_path = package_dir.joinpath("meta", f"{package_name}.cm")
-        abi_revision_path = package_dir.joinpath("meta", "abi-revision")
+        package_dir.mkdir(parents=True, exist_ok=True)
+        meta_dir = package_dir.joinpath("meta")
+        meta_dir.mkdir(parents=True, exist_ok=True)
+        meta_package_path = meta_dir.joinpath("package")
+        cml_path = meta_dir.joinpath(f"{package_name}.cml")
+        cm_path = meta_dir.joinpath(f"{package_name}.cm")
         manifest_path = package_dir.joinpath(f"{package_name}.manifest")
-        far_path = package_dir.joinpath(f"{package_name}-0.far")
         gtest_json_path = ""
 
         arguments = args.arguments
@@ -670,20 +759,6 @@ class TestEnvironment:
             log_handler=runner_logger,
         )
         runner_logger.info(f"Stripped Bin path: {stripped_binary}")
-
-        # Set up package
-        check_call_with_logging(
-            [
-                self.tool_path("pm"),
-                "-o",
-                package_dir,
-                "-n",
-                package_name,
-                "init",
-            ],
-            stdout_handler=runner_logger.info,
-            stderr_handler=runner_logger.warning,
-        )
 
         runner_logger.info("Writing CML...")
 
@@ -731,14 +806,13 @@ class TestEnvironment:
             stderr_handler=runner_logger.warning,
         )
 
-        runner_logger.info("Write abi-revision")
-        with open(abi_revision_path, "wb") as f:
-            revision = int(self.abi_revision, 16)
-            f.write(struct.pack("<Q", revision))
+        runner_logger.info("Writing meta/package...")
+        with open(meta_package_path, "w", encoding="utf-8") as f:
+            json.dump({"name": package_name, "version": "0"}, f)
 
         runner_logger.info("Writing manifest...")
 
-        # Write, build, and archive manifest
+        # Write package manifest
         with open(manifest_path, "w", encoding="utf-8") as manifest:
             manifest.write(
                 self.MANIFEST_TEMPLATE.format(
@@ -765,29 +839,35 @@ class TestEnvironment:
                 manifest.write(
                     f"lib/{os.path.basename(shared_lib)}={stripped_shared_lib}\n"
                 )
-        runner_logger.info("Compiling and archiving manifest...")
+
+        runner_logger.info("Determining API level...")
+        out = check_output_with_logging(
+            [
+                self.tool_path("ffx"),
+                "--machine",
+                "json",
+                "version",
+            ],
+            env=self.ffx_cmd_env(),
+            stdout_handler=self.subprocess_logger.debug,
+            stderr_handler=self.subprocess_logger.debug,
+        )
+        api_level = json.loads(out)["tool_version"]["api_level"]
+
+        runner_logger.info("Compiling manifest...")
 
         check_call_with_logging(
             [
-                self.tool_path("pm"),
-                "-o",
-                package_dir,
-                "-m",
-                manifest_path,
+                self.tool_path("ffx"),
+                "package",
                 "build",
-            ],
-            stdout_handler=runner_logger.info,
-            stderr_handler=runner_logger.warning,
-        )
-        check_call_with_logging(
-            [
-                self.tool_path("pm"),
+                manifest_path,
                 "-o",
                 package_dir,
-                "-m",
-                manifest_path,
-                "archive",
+                "--api-level",
+                str(api_level),
             ],
+            env=self.ffx_cmd_env(),
             stdout_handler=runner_logger.info,
             stderr_handler=runner_logger.warning,
         )
@@ -795,25 +875,19 @@ class TestEnvironment:
         runner_logger.info("Publishing package to repo...")
 
         # Publish package to repo
-        with open(self.pm_lockfile_path, "w") as pm_lockfile:
-            fcntl.lockf(pm_lockfile.fileno(), fcntl.LOCK_EX)
-            check_call_with_logging(
-                [
-                    self.tool_path("pm"),
-                    "publish",
-                    "-a",
-                    "-repo",
-                    self.repo_dir(),
-                    "-f",
-                    far_path,
-                ],
-                stdout_handler=runner_logger.info,
-                stderr_handler=runner_logger.warning,
-            )
-            # This lock should be released automatically when the pm
-            # lockfile is closed, but we'll be polite and unlock it now
-            # since the spec leaves some wiggle room.
-            fcntl.lockf(pm_lockfile.fileno(), fcntl.LOCK_UN)
+        check_call_with_logging(
+            [
+                self.tool_path("ffx"),
+                "repository",
+                "publish",
+                "--package",
+                os.path.join(package_dir, "package_manifest.json"),
+                self.repo_dir(),
+            ],
+            env=self.ffx_cmd_env(),
+            stdout_handler=runner_logger.info,
+            stderr_handler=runner_logger.warning,
+        )
 
         runner_logger.info("Running ffx test...")
         # Rewrite the gtest_output path to the actual output directory.
@@ -946,6 +1020,7 @@ class TestEnvironment:
         During cleanup, this function will stop the emulator, package server, and
         update server, then delete all temporary files. If an error is encountered
         while stopping any running processes, the temporary files will not be deleted.
+        Passing --cleanup will force the process to delete the files anyway.
         """
 
         self.env_logger.debug("Reporting logs...")
@@ -1087,11 +1162,6 @@ def main():
         "--toolchain-dir",
         help="the toolchain directory",
         required=True,
-    )
-    start_parser.add_argument(
-        "--abi-revision",
-        help="the 64-bit abi revision in hex string",
-        default="0x099D5AB9C26B64DA",
     )
     start_parser.add_argument(
         "--local-product-bundle-path",

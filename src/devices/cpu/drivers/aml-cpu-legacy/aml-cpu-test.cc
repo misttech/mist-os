@@ -369,11 +369,14 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
   FakeAmlThermal thermal_;
 
   async::Loop loop_;
+  std::shared_ptr<MockDevice> parent_;
   std::unique_ptr<AmlCpuTest> dut_;
   CpuCtrlSyncClient cpu_client_;
 };
 
 void AmlCpuTestFixture::SetUp() {
+  parent_ = MockDevice::FakeRootParent();
+
   auto thermal_eps = fidl::Endpoints<fuchsia_thermal::Device>::Create();
 
   ASSERT_OK(thermal_.Init(std::move(thermal_eps.server)));

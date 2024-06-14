@@ -2,27 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        codec::CodecInterface,
-        config::{Config, Device},
-        configurator::Configurator,
-        dai::DaiInterface,
-        indexes::StreamConfigIndex,
-        signal::SignalInterface,
-    },
-    anyhow::{anyhow, Context, Error},
-    async_trait::async_trait,
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::prelude::*,
-    fidl_fuchsia_hardware_audio::*,
-    fidl_fuchsia_hardware_audio_signalprocessing::*,
-    fidl_fuchsia_media::AudioDeviceEnumeratorMarker,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{lock::Mutex, select, StreamExt},
-    std::collections::HashMap,
-    std::sync::Arc,
-};
+use crate::codec::CodecInterface;
+use crate::config::{Config, Device};
+use crate::configurator::Configurator;
+use crate::dai::DaiInterface;
+use crate::indexes::StreamConfigIndex;
+use crate::signal::SignalInterface;
+use anyhow::{anyhow, Context, Error};
+use async_trait::async_trait;
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::prelude::*;
+use fidl_fuchsia_hardware_audio::*;
+use fidl_fuchsia_hardware_audio_signalprocessing::*;
+use fidl_fuchsia_media::AudioDeviceEnumeratorMarker;
+use futures::lock::Mutex;
+use futures::{select, StreamExt};
+use std::collections::HashMap;
+use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct CodecState {
     /// Codec manufacturer name.
@@ -874,21 +871,17 @@ impl Configurator for DefaultConfigurator {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            discover::{find_codecs, find_dais},
-            indexes::{
-                STREAM_CONFIG_INDEX_HEADSET_OUT, STREAM_CONFIG_INDEX_MICS,
-                STREAM_CONFIG_INDEX_SPEAKERS,
-            },
-            testing::tests::get_dev_proxy,
-        },
-        anyhow::Result,
-        assert_matches::assert_matches,
-        fixture::fixture,
-        futures::{future, task::Poll},
+    use super::*;
+    use crate::discover::{find_codecs, find_dais};
+    use crate::indexes::{
+        STREAM_CONFIG_INDEX_HEADSET_OUT, STREAM_CONFIG_INDEX_MICS, STREAM_CONFIG_INDEX_SPEAKERS,
     };
+    use crate::testing::tests::get_dev_proxy;
+    use anyhow::Result;
+    use assert_matches::assert_matches;
+    use fixture::fixture;
+    use futures::future;
+    use futures::task::Poll;
 
     // Integration tests using //src/media/audio/drivers/testing/realm devices.
 
@@ -1510,6 +1503,8 @@ mod tests {
                 }
                 CodecRequest::Stop { responder: _ } => {}
                 CodecRequest::Start { responder: _ } => {}
+                CodecRequest::IsBridgeable { responder: _ } => {}
+                CodecRequest::SetBridgedMode { enable_bridged_mode: _, control_handle: _ } => {}
                 CodecRequest::GetDaiFormats { responder } => {
                     let formats = &[DaiSupportedFormats {
                         number_of_channels: vec![2],

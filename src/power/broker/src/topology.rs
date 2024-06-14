@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 /// Manages the Power Element Topology, keeping track of element dependencies.
-use fidl_fuchsia_power_broker::{self as fpb, PowerLevel};
+use fidl_fuchsia_power_broker::{self as fpb};
 use fuchsia_inspect::Node as INode;
 use fuchsia_inspect_contrib::graph::{
     Digraph as IGraph, DigraphOpts as IGraphOpts, Edge as IGraphEdge, Metadata as IGraphMeta,
@@ -14,6 +14,42 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 use uuid::Uuid;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct IndexedPowerLevel {
+    pub level: fpb::PowerLevel,
+    pub index: usize,
+}
+
+impl IndexedPowerLevel {
+    pub const MIN: IndexedPowerLevel = IndexedPowerLevel { level: fpb::PowerLevel::MIN, index: 0 };
+
+    #[cfg(test)]
+    pub const MAX: IndexedPowerLevel = Self { level: fpb::PowerLevel::MAX, index: usize::MAX };
+
+    #[cfg(test)]
+    pub const fn from_same_level_and_index(level_and_index: u8) -> Self {
+        Self { level: level_and_index, index: level_and_index as usize }
+    }
+}
+
+impl fmt::Display for IndexedPowerLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.level)
+    }
+}
+
+impl std::cmp::PartialOrd for IndexedPowerLevel {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.index.partial_cmp(&other.index)
+    }
+}
+
+impl std::cmp::Ord for IndexedPowerLevel {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.index.cmp(&other.index)
+    }
+}
 
 /// If true, use non-random IDs for ease of debugging.
 const ID_DEBUG_MODE: bool = false;
@@ -51,7 +87,7 @@ impl Into<String> for ElementID {
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct ElementLevel {
     pub element_id: ElementID,
-    pub level: PowerLevel,
+    pub level: IndexedPowerLevel,
 }
 
 impl fmt::Display for ElementLevel {
@@ -60,9 +96,9 @@ impl fmt::Display for ElementLevel {
     }
 }
 
-/// Power dependency from one element's PowerLevel to another.
-/// The Element and PowerLevel specified by `dependent` depends on
-/// the Element and PowerLevel specified by `requires`.
+/// Power dependency from one element's IndexedPowerLevel to another.
+/// The Element and IndexedPowerLevel specified by `dependent` depends on
+/// the Element and IndexedPowerLevel specified by `requires`.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct Dependency {
     pub dependent: ElementLevel,
@@ -81,8 +117,7 @@ pub struct Element {
     id: ElementID,
     #[allow(dead_code)]
     name: String,
-    // Sorted ascending.
-    valid_levels: Vec<PowerLevel>,
+    valid_levels: Vec<IndexedPowerLevel>,
     inspect_vertex: Rc<RefCell<IGraphVertex<ElementID>>>,
     inspect_edges: Rc<RefCell<HashMap<ElementID, IGraphEdge>>>,
 }
@@ -91,7 +126,7 @@ impl Element {
     fn new(
         id: ElementID,
         name: String,
-        mut valid_levels: Vec<PowerLevel>,
+        mut valid_levels: Vec<IndexedPowerLevel>,
         inspect_vertex: IGraphVertex<ElementID>,
     ) -> Self {
         valid_levels.sort();
@@ -151,8 +186,8 @@ pub enum InspectError {
 #[derive(Debug)]
 pub struct Topology {
     elements: HashMap<ElementID, Element>,
-    active_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
-    passive_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
+    assertive_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
+    opportunistic_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
     unsatisfiable_element_id: ElementID,
     inspect_graph: IGraph<ElementID>,
     _inspect_node: INode, // keeps inspect_graph alive
@@ -160,14 +195,14 @@ pub struct Topology {
 
 impl Topology {
     const TOPOLOGY_UNSATISFIABLE_ELEMENT: &'static str = "TOPOLOGY_UNSATISFIABLE_ELEMENT";
-    const TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS: [PowerLevel; 2] =
-        [PowerLevel::MIN, PowerLevel::MAX];
+    const TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS: [fpb::PowerLevel; 2] =
+        [fpb::PowerLevel::MIN, fpb::PowerLevel::MAX];
 
     pub fn new(inspect_node: INode, inspect_max_event: usize) -> Self {
         let mut topology = Topology {
             elements: HashMap::new(),
-            active_dependencies: HashMap::new(),
-            passive_dependencies: HashMap::new(),
+            assertive_dependencies: HashMap::new(),
+            opportunistic_dependencies: HashMap::new(),
             unsatisfiable_element_id: ElementID::from(""),
             inspect_graph: IGraph::new(
                 &inspect_node,
@@ -212,7 +247,7 @@ impl Topology {
     pub fn add_element(
         &mut self,
         name: &str,
-        valid_levels: Vec<PowerLevel>,
+        valid_levels: Vec<fpb::PowerLevel>,
     ) -> Result<ElementID, AddElementError> {
         let id: ElementID = if ID_DEBUG_MODE {
             ElementID::from(name)
@@ -228,6 +263,11 @@ impl Topology {
                 IGraphMeta::new("required_level", "unset").track_events(),
             ],
         );
+        let valid_levels = valid_levels
+            .iter()
+            .enumerate()
+            .map(|(index, level)| IndexedPowerLevel { level: *level, index })
+            .collect();
         self.elements.insert(
             id.clone(),
             Element::new(id.clone(), name.into(), valid_levels, inspect_vertex),
@@ -247,26 +287,51 @@ impl Topology {
         }
     }
 
-    pub fn minimum_level(&self, element_id: &ElementID) -> PowerLevel {
+    pub fn minimum_level(&self, element_id: &ElementID) -> IndexedPowerLevel {
         let Some(elem) = self.elements.get(element_id) else {
-            return PowerLevel::MIN;
+            return IndexedPowerLevel::MIN;
         };
         match elem.valid_levels.first().copied() {
             Some(level) => level,
-            None => PowerLevel::MIN,
+            None => IndexedPowerLevel::MIN,
         }
     }
 
-    pub fn is_valid_level(&self, element_id: &ElementID, level: PowerLevel) -> bool {
+    pub fn is_valid_level(&self, element_id: &ElementID, level: IndexedPowerLevel) -> bool {
         let Some(elem) = self.elements.get(element_id) else {
             return false;
         };
         elem.valid_levels.contains(&level)
     }
 
-    /// Gets direct, active dependencies for the given Element and PowerLevel.
-    pub fn direct_active_dependencies(&self, element_level: &ElementLevel) -> Vec<Dependency> {
-        self.active_dependencies
+    pub fn get_level_index(
+        &self,
+        element_id: &ElementID,
+        level: fpb::PowerLevel,
+    ) -> Option<&IndexedPowerLevel> {
+        let Some(elem) = self.elements.get(element_id) else {
+            return Some(&IndexedPowerLevel::MIN);
+        };
+        elem.valid_levels.iter().find(|l| l.level == level)
+    }
+
+    fn decrement_element_level_index(
+        &self,
+        element_id: &ElementID,
+        level: &IndexedPowerLevel,
+    ) -> IndexedPowerLevel {
+        if level.index < 1 {
+            return IndexedPowerLevel::MIN;
+        }
+        let Some(elem) = self.elements.get(element_id) else {
+            return IndexedPowerLevel::MIN;
+        };
+        return elem.valid_levels[level.index - 1];
+    }
+
+    /// Gets direct, assertive dependencies for the given Element and PowerLevel.
+    pub fn direct_assertive_dependencies(&self, element_level: &ElementLevel) -> Vec<Dependency> {
+        self.assertive_dependencies
             .get(&element_level)
             .unwrap_or(&Vec::<ElementLevel>::new())
             .iter()
@@ -277,9 +342,12 @@ impl Topology {
             .collect()
     }
 
-    /// Gets direct, passive dependencies for the given Element and PowerLevel.
-    pub fn direct_passive_dependencies(&self, element_level: &ElementLevel) -> Vec<Dependency> {
-        self.passive_dependencies
+    /// Gets direct, opportunistic dependencies for the given Element and IndexedPowerLevel.
+    pub fn direct_opportunistic_dependencies(
+        &self,
+        element_level: &ElementLevel,
+    ) -> Vec<Dependency> {
+        self.opportunistic_dependencies
             .get(&element_level)
             .unwrap_or(&Vec::<ElementLevel>::new())
             .iter()
@@ -291,38 +359,39 @@ impl Topology {
     }
 
     /// Gets direct and transitive dependencies for the given Element and
-    /// PowerLevel. All transitive active dependencies will be returned, but
-    /// whenever a passive dependency is encountered, transitive dependencies
+    /// IndexedPowerLevel. All transitive assertive dependencies will be returned, but
+    /// whenever a opportunistic dependency is encountered, transitive dependencies
     /// downstream of that dependency will be ignored.
-    pub fn all_active_and_passive_dependencies(
+    pub fn all_assertive_and_opportunistic_dependencies(
         &self,
         element_level: &ElementLevel,
     ) -> (Vec<Dependency>, Vec<Dependency>) {
-        // For active dependencies, we need to inspect the required level of
-        // every active dependency encountered for any transitive active
+        // For assertive dependencies, we need to inspect the required level of
+        // every assertive dependency encountered for any transitive assertive
         // dependencies.
-        let mut active_dependencies = Vec::<Dependency>::new();
-        // For passive dependencies, we need to inspect the required level of
-        // every active dependency encountered for any passive dependencies.
-        // However, we do not examine the transitive dependencies of passive
+        let mut assertive_dependencies = Vec::<Dependency>::new();
+        // For opportunistic dependencies, we need to inspect the required level of
+        // every assertive dependency encountered for any opportunistic dependencies.
+        // However, we do not examine the transitive dependencies of opportunistic
         // dependencies, as they have no effect and can be ignored.
-        let mut passive_dependencies = Vec::<Dependency>::new();
+        let mut opportunistic_dependencies = Vec::<Dependency>::new();
         let mut element_levels_to_inspect = vec![element_level.clone()];
         while let Some(element_level) = element_levels_to_inspect.pop() {
             if element_level.level != self.minimum_level(&element_level.element_id) {
                 let mut lower_element_level = element_level.clone();
-                lower_element_level.level = element_level.level - 1;
+                lower_element_level.level = self
+                    .decrement_element_level_index(&element_level.element_id, &element_level.level);
                 element_levels_to_inspect.push(lower_element_level);
             }
-            for dep in self.direct_active_dependencies(&element_level) {
+            for dep in self.direct_assertive_dependencies(&element_level) {
                 element_levels_to_inspect.push(dep.requires.clone());
-                active_dependencies.push(dep);
+                assertive_dependencies.push(dep);
             }
-            for dep in self.direct_passive_dependencies(&element_level) {
-                passive_dependencies.push(dep);
+            for dep in self.direct_opportunistic_dependencies(&element_level) {
+                opportunistic_dependencies.push(dep);
             }
         }
-        (active_dependencies, passive_dependencies)
+        (assertive_dependencies, opportunistic_dependencies)
     }
 
     /// Elements that have any type of dependency on the provided ElementID are 'invalidated'
@@ -330,11 +399,11 @@ impl Topology {
     /// will never be turned on.
     fn invalidate_dependent_elements(&mut self, invalid_element_id: &ElementID) {
         // Prior to removing any dependencies that are no longer valid, ensure that we add a
-        // passive dependency to the unsatisfiable element, which forces *future* leases into the
+        // opportunistic dependency to the unsatisfiable element, which forces *future* leases into the
         // contingent state and prevents the broker from attempting to turn on other dependent
-        // elements. Existing activated leases will remain active.
-        let active_dependents_of_invalid_elements: Vec<ElementLevel> = self
-            .active_dependencies
+        // elements. Existing leases will remain unaffected.
+        let assertive_dependents_of_invalid_elements: Vec<ElementLevel> = self
+            .assertive_dependencies
             .iter()
             .filter_map(|(dependent, requires)| {
                 if requires
@@ -347,27 +416,27 @@ impl Topology {
                 }
             })
             .collect();
-        for dependent in active_dependents_of_invalid_elements {
-            self.add_passive_dependency(&Dependency {
+        for dependent in assertive_dependents_of_invalid_elements {
+            self.add_opportunistic_dependency(&Dependency {
                 dependent: dependent.clone(),
                 requires: ElementLevel {
                     element_id: self.unsatisfiable_element_id.clone(),
-                    level: PowerLevel::MAX,
+                    level: IndexedPowerLevel { level: fpb::PowerLevel::MAX, index: 1 },
                 },
             })
-            .expect("failed to replace active dependency with unsatisfiable dependency");
-            for requires in self.active_dependencies.get(&dependent).unwrap().clone() {
+            .expect("failed to replace assertive dependency with unsatisfiable dependency");
+            for requires in self.assertive_dependencies.get(&dependent).unwrap().clone() {
                 if requires.element_id == *invalid_element_id {
-                    self.remove_active_dependency(&Dependency {
+                    self.remove_assertive_dependency(&Dependency {
                         dependent: dependent.clone(),
                         requires: requires.clone(),
                     })
-                    .expect("failed to remove invalid active dependency");
+                    .expect("failed to remove invalid assertive dependency");
                 }
             }
         }
-        let passive_dependents_of_invalid_elements: Vec<ElementLevel> = self
-            .passive_dependencies
+        let opportunistic_dependents_of_invalid_elements: Vec<ElementLevel> = self
+            .opportunistic_dependencies
             .iter()
             .filter_map(|(dependent, requires)| {
                 if requires
@@ -380,27 +449,27 @@ impl Topology {
                 }
             })
             .collect();
-        for dependent in passive_dependents_of_invalid_elements {
-            self.add_passive_dependency(&Dependency {
+        for dependent in opportunistic_dependents_of_invalid_elements {
+            self.add_opportunistic_dependency(&Dependency {
                 dependent: dependent.clone(),
                 requires: ElementLevel {
                     element_id: self.unsatisfiable_element_id.clone(),
-                    level: PowerLevel::MAX,
+                    level: IndexedPowerLevel { level: fpb::PowerLevel::MAX, index: 1 },
                 },
             })
-            .expect("failed to replace passive dependency with unsatisfiable dependency");
-            for requires in self.passive_dependencies.get(&dependent).unwrap().clone() {
+            .expect("failed to replace opportunistic dependency with unsatisfiable dependency");
+            for requires in self.opportunistic_dependencies.get(&dependent).unwrap().clone() {
                 if requires.element_id == *invalid_element_id {
-                    self.remove_passive_dependency(&Dependency {
+                    self.remove_opportunistic_dependency(&Dependency {
                         dependent: dependent.clone(),
                         requires: requires.clone(),
                     })
-                    .expect("failed to remove invalid passive dependency");
+                    .expect("failed to remove invalid opportunistic dependency");
                 }
             }
         }
-        self.active_dependencies.retain(|key, _| key.element_id != *invalid_element_id);
-        self.passive_dependencies.retain(|key, _| key.element_id != *invalid_element_id);
+        self.assertive_dependencies.retain(|key, _| key.element_id != *invalid_element_id);
+        self.opportunistic_dependencies.retain(|key, _| key.element_id != *invalid_element_id);
     }
 
     /// Checks that a dependency is valid. Returns ModifyDependencyError if not.
@@ -426,11 +495,14 @@ impl Topology {
         Ok(())
     }
 
-    /// Adds an active dependency to the Topology.
-    pub fn add_active_dependency(&mut self, dep: &Dependency) -> Result<(), ModifyDependencyError> {
+    /// Adds an assertive dependency to the Topology.
+    pub fn add_assertive_dependency(
+        &mut self,
+        dep: &Dependency,
+    ) -> Result<(), ModifyDependencyError> {
         self.check_valid_dependency(dep)?;
         let required_levels =
-            self.active_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
+            self.assertive_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if required_levels.contains(&dep.requires) {
             return Err(ModifyDependencyError::AlreadyExists);
         }
@@ -439,8 +511,8 @@ impl Topology {
         Ok(())
     }
 
-    /// Removes an active dependency from the Topology.
-    pub fn remove_active_dependency(
+    /// Removes an assertive dependency from the Topology.
+    pub fn remove_assertive_dependency(
         &mut self,
         dep: &Dependency,
     ) -> Result<(), ModifyDependencyError> {
@@ -451,7 +523,7 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         let required_levels =
-            self.active_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
+            self.assertive_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if !required_levels.contains(&dep.requires) {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
@@ -460,19 +532,19 @@ impl Topology {
         Ok(())
     }
 
-    /// Adds a passive dependency to the Topology.
-    pub fn add_passive_dependency(
+    /// Adds a opportunistic dependency to the Topology.
+    pub fn add_opportunistic_dependency(
         &mut self,
         dep: &Dependency,
     ) -> Result<(), ModifyDependencyError> {
         self.check_valid_dependency(dep)?;
-        let active_required_levels =
-            self.active_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
-        if active_required_levels.contains(&dep.requires) {
+        let assertive_required_levels =
+            self.assertive_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
+        if assertive_required_levels.contains(&dep.requires) {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         let required_levels =
-            self.passive_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
+            self.opportunistic_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if required_levels.contains(&dep.requires) {
             return Err(ModifyDependencyError::AlreadyExists);
         }
@@ -481,8 +553,8 @@ impl Topology {
         Ok(())
     }
 
-    /// Removes an passive dependency from the Topology.
-    pub fn remove_passive_dependency(
+    /// Removes an opportunistic dependency from the Topology.
+    pub fn remove_opportunistic_dependency(
         &mut self,
         dep: &Dependency,
     ) -> Result<(), ModifyDependencyError> {
@@ -493,7 +565,7 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         let required_levels =
-            self.passive_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
+            self.opportunistic_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if !required_levels.contains(&dep.requires) {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
@@ -505,7 +577,7 @@ impl Topology {
     fn add_inspect_for_dependency(
         &mut self,
         dep: &Dependency,
-        is_active: bool,
+        is_assertive: bool,
     ) -> Result<(), ModifyDependencyError> {
         let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
         let (Some(dp), Some(rq)) = (self.elements.get(dp_id), self.elements.get(rq_id)) else {
@@ -525,7 +597,10 @@ impl Topology {
                 )
             })
             .meta()
-            .set(dp_level.to_string(), format!("{}{}", rq_level, if is_active { "" } else { "p" }));
+            .set(
+                dp_level.to_string(),
+                format!("{}{}", rq_level, if is_assertive { "" } else { "p" }),
+            );
         Ok(())
     }
 
@@ -554,14 +629,19 @@ impl Topology {
 mod tests {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use fidl_fuchsia_power_broker::BinaryPowerLevel;
     use lazy_static::lazy_static;
     use power_broker_client::BINARY_POWER_LEVELS;
 
     lazy_static! {
         static ref TOPOLOGY_UNSATISFIABLE_MAX_LEVEL: String =
-            format!("{}p", PowerLevel::MAX.to_string());
+            format!("{}p", fpb::PowerLevel::MAX.to_string());
     }
+
+    const BINARY_POWER_LEVEL_ON: IndexedPowerLevel = IndexedPowerLevel { level: 1, index: 1 };
+
+    const ONE: IndexedPowerLevel = IndexedPowerLevel::from_same_level_and_index(1);
+    const TWO: IndexedPowerLevel = IndexedPowerLevel::from_same_level_and_index(2);
+    const THREE: IndexedPowerLevel = IndexedPowerLevel::from_same_level_and_index(3);
 
     #[fuchsia::test]
     fn test_add_remove_elements() {
@@ -625,17 +705,11 @@ mod tests {
                         },
         }}}});
 
-        t.add_active_dependency(&Dependency {
-            dependent: ElementLevel {
-                element_id: water.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: earth.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+        t.add_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
         })
-        .expect("add_active_dependency failed");
+        .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
            test: {
                 "fuchsia.inspect.Graph": {
@@ -691,29 +765,17 @@ mod tests {
                         },
         }}}});
 
-        let extra_add_dep_res = t.add_active_dependency(&Dependency {
-            dependent: ElementLevel {
-                element_id: water.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: earth.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+        let extra_add_dep_res = t.add_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
         });
         assert!(matches!(extra_add_dep_res, Err(ModifyDependencyError::AlreadyExists { .. })));
 
-        t.remove_active_dependency(&Dependency {
-            dependent: ElementLevel {
-                element_id: water.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: earth.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+        t.remove_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
         })
-        .expect("remove_active_dependency failed");
+        .expect("remove_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
            test: {
                 "fuchsia.inspect.Graph": {
@@ -769,15 +831,9 @@ mod tests {
                         },
         }}}});
 
-        let extra_remove_dep_res = t.remove_active_dependency(&Dependency {
-            dependent: ElementLevel {
-                element_id: water.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: earth.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+        let extra_remove_dep_res = t.remove_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
         });
         assert!(matches!(extra_remove_dep_res, Err(ModifyDependencyError::NotFound { .. })));
 
@@ -824,27 +880,15 @@ mod tests {
                         },
         }}}});
 
-        let element_not_found_res = t.add_active_dependency(&Dependency {
-            dependent: ElementLevel {
-                element_id: air.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: water.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+        let element_not_found_res = t.add_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: air.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
         });
         assert!(matches!(element_not_found_res, Err(ModifyDependencyError::NotFound { .. })));
 
-        let req_element_not_found_res = t.add_active_dependency(&Dependency {
-            dependent: ElementLevel {
-                element_id: earth.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: fire.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+        let req_element_not_found_res = t.add_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: fire.clone(), level: BINARY_POWER_LEVEL_ON },
         });
         assert!(matches!(req_element_not_found_res, Err(ModifyDependencyError::NotFound { .. })));
 
@@ -885,17 +929,11 @@ mod tests {
                         },
         }}}});
 
-        t.add_active_dependency(&Dependency {
-            dependent: ElementLevel {
-                element_id: water.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
-            requires: ElementLevel {
-                element_id: earth.clone(),
-                level: BinaryPowerLevel::On.into_primitive(),
-            },
+        t.add_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: water.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
         })
-        .expect("add_active_dependency failed");
+        .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
             t.get_unsatisfiable_element().id.to_string() => {
                 meta: {
@@ -974,25 +1012,25 @@ mod tests {
         let d = t.add_element("D", v012_u8.clone()).expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
-            dependent: ElementLevel { element_id: b.clone(), level: 1 },
-            requires: ElementLevel { element_id: a.clone(), level: 1 },
+            dependent: ElementLevel { element_id: b.clone(), level: ONE },
+            requires: ElementLevel { element_id: a.clone(), level: ONE },
         };
-        t.add_active_dependency(&ba).expect("add_active_dependency failed");
+        t.add_assertive_dependency(&ba).expect("add_assertive_dependency failed");
         let cb = Dependency {
-            dependent: ElementLevel { element_id: c.clone(), level: 1 },
-            requires: ElementLevel { element_id: b.clone(), level: 1 },
+            dependent: ElementLevel { element_id: c.clone(), level: ONE },
+            requires: ElementLevel { element_id: b.clone(), level: ONE },
         };
-        t.add_active_dependency(&cb).expect("add_active_dependency failed");
+        t.add_assertive_dependency(&cb).expect("add_assertive_dependency failed");
         let cd = Dependency {
-            dependent: ElementLevel { element_id: c.clone(), level: 1 },
-            requires: ElementLevel { element_id: d.clone(), level: 1 },
+            dependent: ElementLevel { element_id: c.clone(), level: ONE },
+            requires: ElementLevel { element_id: d.clone(), level: ONE },
         };
-        t.add_active_dependency(&cd).expect("add_active_dependency failed");
+        t.add_assertive_dependency(&cd).expect("add_assertive_dependency failed");
         let cd2 = Dependency {
-            dependent: ElementLevel { element_id: c.clone(), level: 2 },
-            requires: ElementLevel { element_id: d.clone(), level: 2 },
+            dependent: ElementLevel { element_id: c.clone(), level: TWO },
+            requires: ElementLevel { element_id: d.clone(), level: TWO },
         };
-        t.add_active_dependency(&cd2).expect("add_active_dependency failed");
+        t.add_assertive_dependency(&cd2).expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
             test: {
                 "fuchsia.inspect.Graph": {
@@ -1058,17 +1096,17 @@ mod tests {
         }}}});
 
         let mut a_deps =
-            t.direct_active_dependencies(&ElementLevel { element_id: a.clone(), level: 1 });
+            t.direct_assertive_dependencies(&ElementLevel { element_id: a.clone(), level: ONE });
         a_deps.sort();
         assert_eq!(a_deps, []);
 
         let mut b_deps =
-            t.direct_active_dependencies(&ElementLevel { element_id: b.clone(), level: 1 });
+            t.direct_assertive_dependencies(&ElementLevel { element_id: b.clone(), level: ONE });
         b_deps.sort();
         assert_eq!(b_deps, [ba]);
 
         let mut c_deps =
-            t.direct_active_dependencies(&ElementLevel { element_id: c.clone(), level: 1 });
+            t.direct_assertive_dependencies(&ElementLevel { element_id: c.clone(), level: ONE });
         let mut want_c_deps = [cb, cd];
         c_deps.sort();
         want_c_deps.sort();
@@ -1076,7 +1114,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_all_active_and_passive_dependencies() {
+    fn test_all_assertive_and_opportunistic_dependencies() {
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
         let mut t = Topology::new(inspect_node, 0);
@@ -1154,48 +1192,57 @@ mod tests {
                         },
         }}}});
 
-        // C has direct active dependencies on B and D.
-        // B only has passive dependencies on A.
-        // D only has an active dependency on A.
+        // C has direct assertive dependencies on B and D.
+        // B only has opportunistic dependencies on A.
+        // D only has an assertive dependency on A.
         //
-        // C has a transitive passive dependency on A[3] (through B[5]).
-        // C has an *implicit* transitive passive dependency on A[2] (through B[1]).
-        // C has an *implicit* transitive active dependency on A (through D[1]).
+        // C has a transitive opportunistic dependency on A[3] (through B[5]).
+        // C has an *implicit* transitive opportunistic dependency on A[2] (through B[1]).
+        // C has an *implicit* transitive assertive dependency on A (through D[1]).
         //
         // A    B    C    D    E
         // 1 <=========== 1 => 1
         // 2 <- 1
         // 3 <- 5 <= 1 => 3
         let b1_a2 = Dependency {
-            dependent: ElementLevel { element_id: b.clone(), level: 1 },
-            requires: ElementLevel { element_id: a.clone(), level: 2 },
+            dependent: ElementLevel { element_id: b.clone(), level: ONE },
+            requires: ElementLevel { element_id: a.clone(), level: TWO },
         };
-        t.add_passive_dependency(&b1_a2).expect("add_passive_dependency failed");
+        t.add_opportunistic_dependency(&b1_a2).expect("add_opportunistic_dependency failed");
         let b5_a3 = Dependency {
-            dependent: ElementLevel { element_id: b.clone(), level: 5 },
-            requires: ElementLevel { element_id: a.clone(), level: 3 },
+            dependent: ElementLevel {
+                element_id: b.clone(),
+                level: IndexedPowerLevel { level: 5, index: 2 },
+            },
+            requires: ElementLevel { element_id: a.clone(), level: THREE },
         };
-        t.add_passive_dependency(&b5_a3).expect("add_passive_dependency failed");
+        t.add_opportunistic_dependency(&b5_a3).expect("add_opportunistic_dependency failed");
         let c1_b5 = Dependency {
-            dependent: ElementLevel { element_id: c.clone(), level: 1 },
-            requires: ElementLevel { element_id: b.clone(), level: 5 },
+            dependent: ElementLevel { element_id: c.clone(), level: ONE },
+            requires: ElementLevel {
+                element_id: b.clone(),
+                level: IndexedPowerLevel { level: 5, index: 2 },
+            },
         };
-        t.add_active_dependency(&c1_b5).expect("add_active_dependency failed");
+        t.add_assertive_dependency(&c1_b5).expect("add_assertive_dependency failed");
         let c1_d3 = Dependency {
-            dependent: ElementLevel { element_id: c.clone(), level: 1 },
-            requires: ElementLevel { element_id: d.clone(), level: 3 },
+            dependent: ElementLevel { element_id: c.clone(), level: ONE },
+            requires: ElementLevel {
+                element_id: d.clone(),
+                level: IndexedPowerLevel { level: 3, index: 2 },
+            },
         };
-        t.add_active_dependency(&c1_d3).expect("add_active_dependency failed");
+        t.add_assertive_dependency(&c1_d3).expect("add_assertive_dependency failed");
         let d1_a1 = Dependency {
-            dependent: ElementLevel { element_id: d.clone(), level: 1 },
-            requires: ElementLevel { element_id: a.clone(), level: 1 },
+            dependent: ElementLevel { element_id: d.clone(), level: ONE },
+            requires: ElementLevel { element_id: a.clone(), level: ONE },
         };
-        t.add_active_dependency(&d1_a1).expect("add_active_dependency failed");
+        t.add_assertive_dependency(&d1_a1).expect("add_assertive_dependency failed");
         let d1_e1 = Dependency {
-            dependent: ElementLevel { element_id: d.clone(), level: 1 },
-            requires: ElementLevel { element_id: e.clone(), level: 1 },
+            dependent: ElementLevel { element_id: d.clone(), level: ONE },
+            requires: ElementLevel { element_id: e.clone(), level: ONE },
         };
-        t.add_active_dependency(&d1_e1).expect("add_active_dependency failed");
+        t.add_assertive_dependency(&d1_e1).expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
             test: {
                 "fuchsia.inspect.Graph": {
@@ -1281,39 +1328,55 @@ mod tests {
                         },
         }}}});
 
-        let (a_active_deps, a_passive_deps) = t
-            .all_active_and_passive_dependencies(&ElementLevel { element_id: a.clone(), level: 1 });
-        assert_eq!(a_active_deps, []);
-        assert_eq!(a_passive_deps, []);
+        let (a_assertive_deps, a_opportunistic_deps) = t
+            .all_assertive_and_opportunistic_dependencies(&ElementLevel {
+                element_id: a.clone(),
+                level: ONE,
+            });
+        assert_eq!(a_assertive_deps, []);
+        assert_eq!(a_opportunistic_deps, []);
 
-        let (b1_active_deps, b1_passive_deps) = t
-            .all_active_and_passive_dependencies(&ElementLevel { element_id: b.clone(), level: 1 });
-        assert_eq!(b1_active_deps, []);
-        assert_eq!(b1_passive_deps, [b1_a2.clone()]);
+        let (b1_assertive_deps, b1_opportunistic_deps) = t
+            .all_assertive_and_opportunistic_dependencies(&ElementLevel {
+                element_id: b.clone(),
+                level: ONE,
+            });
+        assert_eq!(b1_assertive_deps, []);
+        assert_eq!(b1_opportunistic_deps, [b1_a2.clone()]);
 
-        let (b5_active_deps, mut b5_passive_deps) = t
-            .all_active_and_passive_dependencies(&ElementLevel { element_id: b.clone(), level: 5 });
-        let mut want_b5_passive_deps = [b5_a3.clone(), b1_a2.clone()];
-        b5_passive_deps.sort();
-        want_b5_passive_deps.sort();
-        assert_eq!(b5_active_deps, []);
-        assert_eq!(b5_passive_deps, want_b5_passive_deps);
+        let (b5_assertive_deps, mut b5_opportunistic_deps) = t
+            .all_assertive_and_opportunistic_dependencies(&ElementLevel {
+                element_id: b.clone(),
+                level: IndexedPowerLevel { level: 5, index: 2 },
+            });
+        let mut want_b5_opportunistic_deps = [b5_a3.clone(), b1_a2.clone()];
+        b5_opportunistic_deps.sort();
+        want_b5_opportunistic_deps.sort();
+        assert_eq!(b5_assertive_deps, []);
+        assert_eq!(b5_opportunistic_deps, want_b5_opportunistic_deps);
 
-        let (mut c_active_deps, mut c_passive_deps) = t
-            .all_active_and_passive_dependencies(&ElementLevel { element_id: c.clone(), level: 1 });
-        let mut want_c_active_deps = [c1_b5.clone(), c1_d3.clone(), d1_a1.clone(), d1_e1.clone()];
-        c_active_deps.sort();
-        want_c_active_deps.sort();
-        assert_eq!(c_active_deps, want_c_active_deps);
-        let mut want_c_passive_deps = [b5_a3.clone(), b1_a2.clone()];
-        c_passive_deps.sort();
-        want_c_passive_deps.sort();
-        assert_eq!(c_passive_deps, want_c_passive_deps);
+        let (mut c_assertive_deps, mut c_opportunistic_deps) = t
+            .all_assertive_and_opportunistic_dependencies(&ElementLevel {
+                element_id: c.clone(),
+                level: ONE,
+            });
+        let mut want_c_assertive_deps =
+            [c1_b5.clone(), c1_d3.clone(), d1_a1.clone(), d1_e1.clone()];
+        c_assertive_deps.sort();
+        want_c_assertive_deps.sort();
+        assert_eq!(c_assertive_deps, want_c_assertive_deps);
+        let mut want_c_opportunistic_deps = [b5_a3.clone(), b1_a2.clone()];
+        c_opportunistic_deps.sort();
+        want_c_opportunistic_deps.sort();
+        assert_eq!(c_opportunistic_deps, want_c_opportunistic_deps);
 
-        t.remove_active_dependency(&c1_d3).expect("remove_direct_dep failed");
-        let (c_active_deps, c_passive_deps) = t
-            .all_active_and_passive_dependencies(&ElementLevel { element_id: c.clone(), level: 1 });
-        assert_eq!(c_active_deps, [c1_b5.clone()]);
-        assert_eq!(c_passive_deps, [b5_a3.clone(), b1_a2.clone()]);
+        t.remove_assertive_dependency(&c1_d3).expect("remove_direct_dep failed");
+        let (c_assertive_deps, c_opportunistic_deps) = t
+            .all_assertive_and_opportunistic_dependencies(&ElementLevel {
+                element_id: c.clone(),
+                level: ONE,
+            });
+        assert_eq!(c_assertive_deps, [c1_b5.clone()]);
+        assert_eq!(c_opportunistic_deps, [b5_a3.clone(), b1_a2.clone()]);
     }
 }

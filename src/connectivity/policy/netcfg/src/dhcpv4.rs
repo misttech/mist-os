@@ -2,24 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::HashSet, num::NonZeroU64, pin::Pin};
+use std::collections::HashSet;
+use std::num::NonZeroU64;
+use std::pin::Pin;
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt as _};
 use fidl_fuchsia_net_ext::FromExt as _;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_name as fnet_name;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_name as fnet_name,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_zircon as zx,
+};
 
 use anyhow::Context as _;
 use async_utils::stream::{StreamMap, Tagged, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use fuchsia_async::TimeoutExt as _;
-use futures::{channel::oneshot, stream::StreamExt as _, FutureExt};
-use net_types::{ip::Ipv4Addr, SpecifiedAddr};
+use futures::channel::oneshot;
+use futures::stream::StreamExt as _;
+use futures::FutureExt;
+use net_types::ip::Ipv4Addr;
+use net_types::SpecifiedAddr;
 use tracing::{info, warn};
 use zx::HandleBased;
 

@@ -9,18 +9,14 @@ use fidl_fuchsia_testing_proxy::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use futures::{
-    channel::mpsc,
-    future::{select, FutureExt, TryFutureExt},
-    io::AsyncReadExt,
-    lock::Mutex,
-    stream::{StreamExt, TryStreamExt},
-};
-use std::{
-    collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
-    sync::Arc,
-};
+use futures::channel::mpsc;
+use futures::future::{select, FutureExt, TryFutureExt};
+use futures::io::AsyncReadExt;
+use futures::lock::Mutex;
+use futures::stream::{StreamExt, TryStreamExt};
+use std::collections::HashMap;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
+use std::sync::Arc;
 use tracing::{error, info, warn};
 
 #[fuchsia::main]
@@ -214,9 +210,11 @@ mod test {
     use fidl_fuchsia_testing_proxy::{TcpProxyControlMarker, TcpProxyControlProxy};
     use fuchsia_async::DurationExt;
     use fuchsia_zircon as zx;
-    use hyper::server::{accept::from_stream, Server};
+    use hyper::server::accept::from_stream;
+    use hyper::server::Server;
     use hyper::{Body, Response, Uri};
-    use std::{convert::Infallible, net::SocketAddr};
+    use std::convert::Infallible;
+    use std::net::SocketAddr;
 
     fn launch_data_proxy_control() -> TcpProxyControlProxy {
         let control = TcpProxyControl::new();

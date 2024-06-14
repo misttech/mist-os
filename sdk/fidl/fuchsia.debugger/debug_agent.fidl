@@ -215,11 +215,11 @@ open protocol DebugAgent {
     /// exception will be immediately released, which may result in the process
     /// crashing.
     @available(added=HEAD)
-    flexible -> OnFatalException(struct {
+    flexible -> OnFatalException(table {
         /// The faulting thread's koid.
-        thread zx.Koid;
+        1: thread zx.Koid;
         /// A stack trace from the faulting thread in symbolizer markup format.
-        backtrace string:MAX;
+        2: backtrace string:MAX;
     });
 };
 

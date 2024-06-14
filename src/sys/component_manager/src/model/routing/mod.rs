@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod bedrock;
+pub mod legacy;
 pub mod open;
 pub mod providers;
 pub mod router_ext;
@@ -9,29 +11,28 @@ pub mod service;
 pub use ::routing::error::RoutingError;
 pub use open::*;
 
-use {
-    crate::{
-        capability::CapabilitySource,
-        model::{
-            component::{ComponentInstance, WeakComponentInstance},
-            storage,
-        },
-    },
-    ::routing::{component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper},
-    async_trait::async_trait,
-    cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
-    cm_types::{Availability, Name},
-    errors::ModelError,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio,
-    router_error::{Explain, RouterError},
-    std::{collections::BTreeMap, sync::Arc},
-    tracing::{info, warn},
-    vfs::{directory::entry::OpenRequest, path::Path, ToObjectRequest},
-};
+use crate::capability::CapabilitySource;
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use crate::model::storage;
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::mapper::NoopRouteMapper;
+use async_trait::async_trait;
+use cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl};
+use cm_types::{Availability, Name};
+use errors::ModelError;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
+use router_error::{Explain, RouterError};
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use tracing::{info, warn};
+use vfs::directory::entry::OpenRequest;
+use vfs::path::Path;
+use vfs::ToObjectRequest;
 
 pub type RouteRequest = ::routing::RouteRequest;
 pub type RouteSource = ::routing::RouteSource<ComponentInstance>;
+pub use bedrock::{RouteRequest as BedrockRouteRequest, UseRouteRequest as BedrockUseRouteRequest};
 
 #[async_trait]
 pub trait Route {

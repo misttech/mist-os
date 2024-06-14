@@ -13,22 +13,22 @@ namespace memory {
 const std::vector<const NameMatch> Summary::kNameMatches = {
     // To prevent the [bootfs-libraries] regex from catching ld.so.1-internal-heap,
     // this regex must be before the [bootfs-libraries] regex.
-    {"ld\\.so\\.1-internal-heap|(^stack: msg of.*)", "[process-bootstrap]"},
-    {"blob-[0-9a-f]+", "[blobs]"},
-    {"inactive-blob-[0-9a-f]+", "[inactive blobs]"},
-    {"thrd_t:0x.*|initial-thread|pthread_t:0x.*", "[stacks]"},
-    {"data[0-9]*:.*", "[data]"},
-    {"bss[0-9]*:.*", "[bss]"},
-    {"relro:.*", "[relro]"},
-    {"", "[unnamed]"},
-    {"scudo:.*", "[scudo]"},
-    {".*\\.so.*", "[bootfs-libraries]"}};
+    {.regex = "ld\\.so\\.1-internal-heap|(^stack: msg of.*)", .name = "[process-bootstrap]"},
+    {.regex = "blob-[0-9a-f]+", .name = "[blobs]"},
+    {.regex = "inactive-blob-[0-9a-f]+", .name = "[inactive blobs]"},
+    {.regex = "thrd_t:0x.*|initial-thread|pthread_t:0x.*", .name = "[stacks]"},
+    {.regex = "data[0-9]*:.*", .name = "[data]"},
+    {.regex = "bss[0-9]*:.*", .name = "[bss]"},
+    {.regex = "relro:.*", .name = "[relro]"},
+    {.regex = "", .name = "[unnamed]"},
+    {.regex = "scudo:.*", .name = "[scudo]"},
+    {.regex = ".*\\.so.*", .name = "[bootfs-libraries]"}};
 
 Namer::Namer(const std::vector<const NameMatch>& name_matches) {
   regex_matches_.reserve(name_matches.size());
   for (size_t i = 0; i < name_matches.size(); i++) {
-    regex_matches_.push_back(
-        RegexMatch{std::make_unique<re2::RE2>(name_matches[i].regex), name_matches[i].name});
+    regex_matches_.push_back(RegexMatch{.regex = std::make_unique<re2::RE2>(name_matches[i].regex),
+                                        .name = name_matches[i].name});
   }
 }
 
@@ -139,6 +139,8 @@ ProcessSummary::ProcessSummary(const zx_info_kmem_stats_t& kmem, uint64_t vmo_by
       kmem.other_bytes + kmem_vmo_bytes;
 }
 
-const Sizes& ProcessSummary::GetSizes(std::string name) const { return name_to_sizes_.at(name); }
+const Sizes& ProcessSummary::GetSizes(const std::string& name) const {
+  return name_to_sizes_.at(name);
+}
 
 }  // namespace memory

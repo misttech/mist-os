@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result, bind::compiler::symbol_table::get_deprecated_key_identifier,
-    fidl_fuchsia_driver_framework as fdf, std::io::Write,
-};
+use anyhow::Result;
+use bind::compiler::symbol_table::get_deprecated_key_identifier;
+use fidl_fuchsia_driver_framework as fdf;
+use std::io::Write;
 
 pub fn node_property_key_to_string(key: &fdf::NodePropertyKey) -> String {
     match key {

@@ -2,36 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::hash_map::{self, HashMap},
-    fmt::{self, Debug, Display},
-    num::NonZeroU64,
-    ops::{Deref as _, DerefMut as _},
-};
+use std::collections::hash_map::{self, HashMap};
+use std::fmt::{self, Debug, Display};
+use std::num::NonZeroU64;
+use std::ops::{Deref as _, DerefMut as _};
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fuchsia_zircon as zx;
-use net_types::{
-    ethernet::Mac,
-    ip::{IpAddr, Mtu},
-    SpecifiedAddr, UnicastAddr,
+use log::warn;
+use net_types::ethernet::Mac;
+use net_types::ip::{IpAddr, Mtu};
+use net_types::{SpecifiedAddr, UnicastAddr};
+use netstack3_core::device::{
+    DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceProvider, DeviceSendFrameError,
+    LoopbackDeviceId,
 };
-use netstack3_core::{
-    device::{
-        DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceProvider, DeviceSendFrameError,
-        LoopbackDeviceId,
-    },
-    sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
-    types::WorkQueueReport,
+use netstack3_core::sync::{Mutex as CoreMutex, RwLock as CoreRwLock};
+use netstack3_core::types::WorkQueueReport;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network,
+    fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_zircon as zx,
 };
-use tracing::warn;
 
-use crate::bindings::{
-    interfaces_admin, neighbor_worker, util::NeedsDataNotifier, BindingsCtx, Ctx,
-};
+use crate::bindings::util::NeedsDataNotifier;
+use crate::bindings::{interfaces_admin, neighbor_worker, BindingsCtx, Ctx};
 
 pub(crate) const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 

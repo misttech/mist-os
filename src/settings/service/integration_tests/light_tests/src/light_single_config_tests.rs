@@ -4,7 +4,8 @@
 
 use fidl_fuchsia_settings::{LightError, LightGroup, LightState, LightType, LightValue};
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
-use futures::{channel::mpsc, StreamExt};
+use futures::channel::mpsc;
+use futures::StreamExt;
 use light_realm::{assert_fidl_light_group_eq, assert_lights_eq, HardwareLight, LightRealm};
 use std::collections::HashMap;
 

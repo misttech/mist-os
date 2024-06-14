@@ -98,7 +98,10 @@ pub(crate) const MODELS: [(&'static str, &'static str, u32, &'static str); 70] =
 
 #[cfg(test)]
 mod test {
-    use {super::super::xorg_conf_parser, super::*, std::collections::HashMap, std::fs};
+    use super::super::xorg_conf_parser;
+    use super::*;
+    use std::collections::HashMap;
+    use std::fs;
 
     fn model_to_string(m: &xorg_conf_parser::MouseModel) -> String {
         format!(r#"("{}", "{}", {}, "{}"),"#, m.vendor_id, m.product_id, m.cpi, m.identifier,)

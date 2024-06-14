@@ -25,15 +25,6 @@ board_configuration_label = "//boards/x64"
 board_name = "x64"
 board_description = "A generic x64 device"
 
-_bootfs_deps = [
-  # Use legacy serial for bootfs.
-  "//boards/kernel_cmdline:serial-legacy",
-]
-
-board_bootfs_labels += _bootfs_deps
-board_recovery_bootfs_labels += _bootfs_deps
-board_zedboot_bootfs_labels += _bootfs_deps
-
 # Supports both physical and virtual devices.
 board_is_emu = true
 

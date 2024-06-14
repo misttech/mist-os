@@ -2,31 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::MemoryAccessorExt,
-    task::CurrentTask,
-    vfs::socket::{iptables_utils, SocketDomain, SocketHandle, SocketType},
-};
-use fidl_fuchsia_net_filter as fnet_filter;
+use crate::mm::MemoryAccessorExt;
+use crate::task::CurrentTask;
+use crate::vfs::socket::iptables_utils::{self, write_string_to_ascii_buffer};
+use crate::vfs::socket::{SocketDomain, SocketHandle, SocketType};
+use fidl_fuchsia_net_filter_ext::sync::Controller;
 use fidl_fuchsia_net_filter_ext::{
-    sync::Controller, Change, CommitError, ControllerCreationError, ControllerId, Namespace,
-    PushChangesError, Resource, ResourceId, Routine,
+    Change, CommitError, ControllerCreationError, ControllerId, Namespace, PushChangesError,
+    Resource, ResourceId, Routine,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_logging::{log_debug, log_warn, track_stub};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::{
-    c_char, errno, error, errors::Errno, ip6t_get_entries, ip6t_getinfo, ip6t_replace,
-    ipt_get_entries, ipt_getinfo, ipt_replace, nf_inet_hooks_NF_INET_NUMHOOKS,
-    user_buffer::UserBuffer, xt_counters, xt_counters_info, xt_get_revision, IP6T_SO_GET_ENTRIES,
-    IP6T_SO_GET_INFO, IP6T_SO_GET_REVISION_MATCH, IP6T_SO_GET_REVISION_TARGET, IPT_SO_GET_ENTRIES,
-    IPT_SO_GET_INFO, IPT_SO_GET_REVISION_MATCH, IPT_SO_GET_REVISION_TARGET,
+    c_char, errno, error, ip6t_get_entries, ip6t_getinfo, ip6t_replace, ipt_get_entries,
+    ipt_getinfo, nf_inet_hooks_NF_INET_NUMHOOKS, xt_counters, xt_counters_info, xt_get_revision,
+    IP6T_SO_GET_ENTRIES, IP6T_SO_GET_INFO, IP6T_SO_GET_REVISION_MATCH, IP6T_SO_GET_REVISION_TARGET,
+    IPT_SO_GET_ENTRIES, IPT_SO_GET_INFO, IPT_SO_GET_REVISION_MATCH, IPT_SO_GET_REVISION_TARGET,
     IPT_SO_SET_ADD_COUNTERS, IPT_SO_SET_REPLACE, SOL_IP, SOL_IPV6,
 };
 use std::collections::HashMap;
 use thiserror::Error;
 use zerocopy::{AsBytes, FromBytes};
+use {fidl_fuchsia_net_filter as fnet_filter, fuchsia_zircon as zx};
 
 const NAMESPACE_ID_PREFIX: &str = "starnix";
 
@@ -301,7 +301,13 @@ impl IpTables {
     }
 
     fn replace_ipv4_table(&mut self, bytes: Vec<u8>) -> Result<(), Errno> {
-        let table = iptables_utils::parse_ipt_replace(&bytes)?;
+        let table = match iptables_utils::IpTable::from_ipt_replace(bytes) {
+            Ok(table) => table,
+            Err(e) => {
+                log_warn!("Iptables: encountered error while parsing rules: {e}");
+                return error!(EINVAL);
+            }
+        };
         let changes = Self::create_changes(table.namespace, table.routines);
 
         match self.get_controller() {
@@ -362,16 +368,21 @@ impl IpTables {
             }
         };
 
+        let entries = table.parser.entries_bytes().to_vec();
+        let replace_info = table.parser.replace_info;
+        let mut name: IpTablesName = [0; 32usize];
+        write_string_to_ascii_buffer(replace_info.name, &mut name).map_err(|_| errno!(EINVAL))?;
+
         self.ipv4.insert(
-            table.ipt_replace.name,
+            name,
             IpTable {
-                valid_hooks: table.ipt_replace.valid_hooks,
-                hook_entry: table.ipt_replace.hook_entry,
-                underflow: table.ipt_replace.underflow,
-                num_entries: table.ipt_replace.num_entries,
-                size: table.ipt_replace.size,
-                entries: bytes[std::mem::size_of::<ipt_replace>()..].to_vec(),
-                num_counters: table.ipt_replace.num_counters,
+                num_entries: replace_info.num_entries as u32,
+                size: replace_info.size as u32,
+                entries,
+                num_counters: replace_info.num_counters,
+                valid_hooks: replace_info.valid_hooks,
+                hook_entry: replace_info.hook_entry,
+                underflow: replace_info.underflow,
                 counters: vec![],
             },
         );

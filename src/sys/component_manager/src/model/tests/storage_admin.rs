@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::testing::routing_test_helpers::RoutingTestBuilder,
-    ::routing_test_helpers::storage_admin::CommonStorageAdminTest,
-};
+use crate::model::testing::routing_test_helpers::RoutingTestBuilder;
+use ::routing_test_helpers::storage_admin::CommonStorageAdminTest;
 
 #[fuchsia::test]
 async fn storage_to_one_child_admin_to_another() {

@@ -4,11 +4,9 @@
 
 //! Generic state machine implementation with compile time checked state transitions.
 
-use std::{
-    fmt::Debug,
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
-};
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 pub use wlan_statemachine_macro::statemachine;
 

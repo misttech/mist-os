@@ -42,7 +42,8 @@ pub enum ResolveError {
 
 impl From<fidl_fuchsia_pkg::ResolveError> for ResolveError {
     fn from(e: fidl_fuchsia_pkg::ResolveError) -> Self {
-        use {fidl_fuchsia_pkg::ResolveError as ferror, ResolveError::*};
+        use fidl_fuchsia_pkg::ResolveError as ferror;
+        use ResolveError::*;
         match e {
             ferror::Internal => Internal,
             ferror::AccessDenied => AccessDenied,
@@ -61,7 +62,8 @@ impl From<fidl_fuchsia_pkg::ResolveError> for ResolveError {
 
 impl From<ResolveError> for fidl_fuchsia_pkg::ResolveError {
     fn from(e: ResolveError) -> Self {
-        use {fidl_fuchsia_pkg::ResolveError as ferror, ResolveError::*};
+        use fidl_fuchsia_pkg::ResolveError as ferror;
+        use ResolveError::*;
         match e {
             Internal => ferror::Internal,
             AccessDenied => ferror::AccessDenied,

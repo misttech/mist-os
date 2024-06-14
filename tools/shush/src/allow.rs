@@ -3,26 +3,20 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Result};
-use syn::{
-    spanned::Spanned,
-    visit::{self, Visit},
-};
+use syn::spanned::Spanned;
+use syn::visit::{self, Visit};
 
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap, HashSet},
-    fs,
-    io::BufRead,
-    path::Path,
-};
+use std::borrow::Cow;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fs;
+use std::io::BufRead;
+use std::path::Path;
 
-use crate::{
-    api::Api,
-    issues::IssueTemplate,
-    lint::{filter_lints, Lint, LintFile},
-    owners::FileOwnership,
-    span::Span,
-};
+use crate::api::Api;
+use crate::issues::IssueTemplate;
+use crate::lint::{filter_lints, Lint, LintFile};
+use crate::owners::FileOwnership;
+use crate::span::Span;
 
 pub fn allow(
     lints: &mut impl BufRead,

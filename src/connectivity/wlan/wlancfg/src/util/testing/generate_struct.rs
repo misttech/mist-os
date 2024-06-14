@@ -3,23 +3,20 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
+use crate::client::types;
+use crate::config_management::{Credential, HistoricalListsByBssid};
+use crate::util::pseudo_energy::EwmaSignalData;
+use ieee80211::{Bssid, MacAddrBytes, Ssid};
+use rand::distributions::{Alphanumeric, DistString};
+use rand::{Rng as _, RngCore};
+use wlan_common::channel::{Cbw, Channel};
+use wlan_common::random_fidl_bss_description;
+use wlan_common::scan::Compatibility;
+use wlan_common::security::{wep, wpa, SecurityAuthenticator, SecurityDescriptor};
 use {
-    crate::{
-        client::types,
-        config_management::{Credential, HistoricalListsByBssid},
-        util::pseudo_energy::EwmaSignalData,
-    },
     fidl_fuchsia_wlan_common_security as fidl_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddrBytes, Ssid},
-    rand::{Rng as _, RngCore},
-    wlan_common::{
-        channel::{Cbw, Channel},
-        random_fidl_bss_description,
-        scan::Compatibility,
-        security::{wep, wpa, SecurityAuthenticator, SecurityDescriptor},
-    },
 };
 
 pub fn generate_ssid(ssid: &str) -> types::Ssid {
@@ -28,6 +25,11 @@ pub fn generate_ssid(ssid: &str) -> types::Ssid {
 
 pub fn generate_security_type_detailed() -> types::SecurityTypeDetailed {
     types::SecurityTypeDetailed::from_primitive(rand::thread_rng().gen_range(0..11)).unwrap()
+}
+
+/// Generate a random string of length 16
+pub fn generate_string() -> String {
+    Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
 }
 
 pub fn generate_random_channel() -> Channel {

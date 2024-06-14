@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::{MirrorConfigError, RepositoryParseError, RepositoryUrlParseError},
-    fidl_fuchsia_pkg as fidl,
-    http::Uri,
-    http_uri_ext::HttpUriExt as _,
-    serde::{Deserialize, Serialize},
-    std::{fmt, mem},
-};
+use crate::errors::{MirrorConfigError, RepositoryParseError, RepositoryUrlParseError};
+use fidl_fuchsia_pkg as fidl;
+use http::Uri;
+use http_uri_ext::HttpUriExt as _;
+use serde::{Deserialize, Serialize};
+use std::{fmt, mem};
 
 /// Convenience wrapper for the FIDL RepositoryStorageType.
 #[derive(Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -568,7 +566,10 @@ impl From<RepositoryUrl> for fidl::RepositoryUrl {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, proptest::prelude::*, serde_json::json};
+    use super::*;
+    use assert_matches::assert_matches;
+    use proptest::prelude::*;
+    use serde_json::json;
     fn verify_json_serde<T>(expected_value: T, expected_json: serde_json::Value)
     where
         T: PartialEq + std::fmt::Debug,
@@ -1334,7 +1335,8 @@ mod hex_serde {
 }
 
 mod uri_serde {
-    use {http::Uri, serde::Deserialize};
+    use http::Uri;
+    use serde::Deserialize;
 
     pub fn serialize<S>(uri: &http::Uri, serializer: S) -> Result<S::Ok, S::Error>
     where

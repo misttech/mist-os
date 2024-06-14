@@ -2,22 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Result},
-    scrutiny::{
-        model::controller::{DataController, HintDataType},
-        model::model::*,
-    },
-    scrutiny_utils::{blobfs::*, bootfs::*, fs::tempdir, fvm::*, usage::*, zbi::*},
-    serde::{Deserialize, Serialize},
-    serde_json::{json, value::Value},
-    std::collections::HashMap,
-    std::fs::{self, File},
-    std::io::{prelude::*, Cursor},
-    std::path::PathBuf,
-    std::sync::Arc,
-    tracing::info,
-};
+use anyhow::{Context, Result};
+use scrutiny::model::controller::{DataController, HintDataType};
+use scrutiny::model::model::*;
+use scrutiny_utils::blobfs::*;
+use scrutiny_utils::bootfs::*;
+use scrutiny_utils::fs::tempdir;
+use scrutiny_utils::fvm::*;
+use scrutiny_utils::usage::*;
+use scrutiny_utils::zbi::*;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use serde_json::value::Value;
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::prelude::*;
+use std::io::Cursor;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tracing::info;
 
 #[derive(Deserialize, Serialize)]
 pub struct ZbiExtractRequest {

@@ -2,29 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::{DurationExt, Task, TimeoutExt},
-    fuchsia_bluetooth::types::{A2dpDirection, Channel},
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{Duration, DurationNum, Status},
-    futures::{io, stream::Stream, FutureExt},
-    std::{
-        fmt,
-        pin::Pin,
-        sync::Arc,
-        sync::RwLock,
-        sync::Weak,
-        task::{Context, Poll},
-    },
-};
+use fuchsia_async::{DurationExt, Task, TimeoutExt};
+use fuchsia_bluetooth::types::{A2dpDirection, Channel};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{Duration, DurationNum, Status};
+use futures::stream::Stream;
+use futures::{io, FutureExt};
+use std::fmt;
+use std::pin::Pin;
+use std::sync::{Arc, RwLock, Weak};
+use std::task::{Context, Poll};
 
-use crate::{
-    types::{
-        EndpointType, Error, ErrorCode, MediaCodecType, MediaType, Result as AvdtpResult,
-        ServiceCapability, ServiceCategory, StreamEndpointId, StreamInformation,
-    },
-    Peer, SimpleResponder,
+use crate::types::{
+    EndpointType, Error, ErrorCode, MediaCodecType, MediaType, Result as AvdtpResult,
+    ServiceCapability, ServiceCategory, StreamEndpointId, StreamInformation,
 };
+use crate::{Peer, SimpleResponder};
 
 pub type StreamEndpointUpdateCallback = Box<dyn Fn(&StreamEndpoint) -> () + Sync + Send>;
 
@@ -544,18 +537,14 @@ impl io::AsyncWrite for MediaStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        tests::{expect_remote_recv, recv_remote, setup_peer},
-        Request,
-    };
+    use crate::tests::{expect_remote_recv, recv_remote, setup_peer};
+    use crate::Request;
 
     use assert_matches::assert_matches;
     use fidl::endpoints::create_request_stream;
-    use fidl_fuchsia_bluetooth_bredr as bredr;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
     use futures::io::AsyncWriteExt;
     use futures::stream::StreamExt;
+    use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const REMOTE_ID_VAL: u8 = 1;
     const REMOTE_ID: StreamEndpointId = StreamEndpointId(REMOTE_ID_VAL);

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_media::*;
-use std::{fs, io, path::Path};
+use std::path::Path;
+use std::{fs, io};
 use stream_processor_test::*;
 
 /// Represents an CVSD elementary stream.

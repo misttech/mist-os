@@ -2,30 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    constants,
-    diagnostics::GlobalConnectionStats,
-    identity::ComponentIdentity,
-    inspect::collector::{self as collector, InspectData},
-};
+use crate::constants;
+use crate::diagnostics::GlobalConnectionStats;
+use crate::identity::ComponentIdentity;
+use crate::inspect::collector::{self as collector, InspectData};
 use diagnostics_data::{self as schema, InspectHandleName};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_inspect::TreeProxy;
-use fidl_fuchsia_io as fio;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
-use fuchsia_trace as ftrace;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::{channel::oneshot, FutureExt, Stream};
-use inspect_fidl_load as deprecated_inspect;
+use futures::channel::oneshot;
+use futures::{FutureExt, Stream};
 use lazy_static::lazy_static;
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 use std::time::Duration;
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
 use tracing::warn;
+use {fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as deprecated_inspect};
 
 #[derive(Debug, Clone)]
 pub enum InspectHandle {

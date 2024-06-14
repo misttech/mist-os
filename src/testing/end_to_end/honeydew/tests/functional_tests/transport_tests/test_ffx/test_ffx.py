@@ -35,12 +35,9 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for FFX.get_target_information()."""
         self.device.ffx.get_target_information()
 
-    def test_get_target_list(self) -> None:
-        """Test case for FFX.get_target_list()."""
-        asserts.assert_true(
-            len(self.device.ffx.get_target_list()) >= 1,
-            msg=f"{self.device.device_name} is not connected",
-        )
+    def test_get_target_info_from_target_list(self) -> None:
+        """Test case for FFX.get_target_info_from_target_list()."""
+        self.device.ffx.get_target_info_from_target_list()
 
     def test_get_target_name(self) -> None:
         """Test case for FFX.get_target_name()."""

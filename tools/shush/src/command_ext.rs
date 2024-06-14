@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    io::Write,
-    process::{Command, Output, Stdio},
-};
+use std::io::Write;
+use std::process::{Command, Output, Stdio};
 
 use anyhow::{bail, Result};
 

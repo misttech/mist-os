@@ -700,15 +700,13 @@ TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
   runtime().RunUntil([&]() { return FakeTimer::current_deadline_ != 0; });
   zx_time_t last_deadline = FakeTimer::current_deadline_;
 
-  RunInEnvironmentTypeContext(
-      [](Environment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
+  RunInEnvironmentTypeContext([&data](Environment& env) {
+    ASSERT_TRUE(env.power_broker().GetLeaseRequested());
+    env.device_state().Inject(data, kDataLen);
+  });
 
-  RunInEnvironmentTypeContext(
-      [&data](Environment& env) { env.device_state().Inject(data, kDataLen); });
-
-  // // Verify that the timer was canceled and set again by driver, also the wake lease was not
-  // // dropped.
-  runtime().RunUntil([&]() { return FakeTimer::cancel_called_; });
+  // Verify that the timer was set again by driver, also the wake lease was not
+  // dropped.
   runtime().RunUntil([&]() {
     return FakeTimer::current_deadline_ != 0 && FakeTimer::current_deadline_ != last_deadline;
   });
@@ -718,10 +716,22 @@ TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
 
   // Fire the timer and verify that the wake lease has been dropped.
   fake_timer.FireTimer();
+
+  // Verify that the deadline has been cleared.
+  EXPECT_EQ(FakeTimer::current_deadline_, 0);
+
   runtime().RunUntil([&]() {
     return RunInEnvironmentTypeContext<bool>(
                [](Environment& env) { return env.power_broker().GetLeaseRequested(); }) == false;
   });
+
+  RunInEnvironmentTypeContext(
+      [&data](Environment& env) { env.device_state().Inject(data, kDataLen); });
+
+  // The driver is able to set the timer and acquire lease again.
+  runtime().RunUntil([&]() { return FakeTimer::current_deadline_ != 0; });
+  RunInEnvironmentTypeContext(
+      [](Environment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
 }
 
 TEST_F(AmlUartHarnessWithPower, PowerLevelUpdate) {

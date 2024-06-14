@@ -78,7 +78,8 @@ pub(crate) enum ResolverError {
 
 impl From<&ResolverError> for fcomponent_resolution::ResolverError {
     fn from(err: &ResolverError) -> fcomponent_resolution::ResolverError {
-        use {fcomponent_resolution::ResolverError as ferror, ResolverError::*};
+        use fcomponent_resolution::ResolverError as ferror;
+        use ResolverError::*;
         match err {
             InvalidUrl(_)
             | PackageHashNotSupported
@@ -109,7 +110,8 @@ impl From<ResolverError> for fcomponent_resolution::ResolverError {
 
 impl From<&ResolverError> for fpkg::ResolveError {
     fn from(err: &ResolverError) -> fpkg::ResolveError {
-        use {fpkg::ResolveError as ferror, ResolverError::*};
+        use fpkg::ResolveError as ferror;
+        use ResolverError::*;
         match err {
             InvalidUrl(_) | PackageHashNotSupported | AbsoluteUrlRequired => ferror::InvalidUrl,
             ComponentNotFound(_)

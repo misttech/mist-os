@@ -10,7 +10,8 @@ use fidl_fuchsia_logger::{
 use fuchsia_async::Task;
 use futures::prelude::*;
 use logmessage_measure_tape::Measurable as _;
-use std::{sync::Arc, task::Poll};
+use std::sync::Arc;
+use std::task::Poll;
 use thiserror::Error;
 use tracing::{debug, error, trace};
 
@@ -226,12 +227,10 @@ mod tests {
     use crate::identity::ComponentIdentity;
     use diagnostics_message::{fx_log_packet_t, LoggerMessage, METADATA_SIZE};
     use fidl::endpoints::ServerEnd;
-    use fidl_fuchsia_logger::LogLevelFilter;
-    use fidl_fuchsia_logger::LogListenerSafeRequest;
-    use fuchsia_async as fasync;
-    use fuchsia_zircon as zx;
+    use fidl_fuchsia_logger::{LogLevelFilter, LogListenerSafeRequest};
     use libc::c_char;
     use moniker::ExtendedMoniker;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fuchsia::test]
     async fn normal_behavior_test() {

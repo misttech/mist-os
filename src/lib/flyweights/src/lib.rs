@@ -8,21 +8,17 @@
 #![warn(missing_docs)]
 
 use once_cell::sync::Lazy;
-use serde::{
-    de::{Deserializer, Visitor},
-    ser::Serializer,
-    Deserialize, Serialize,
-};
-use std::{
-    borrow::Borrow,
-    collections::HashSet,
-    fmt::{Debug, Display, Formatter, Result as FmtResult},
-    hash::{Hash, Hasher},
-    mem::{size_of, ManuallyDrop},
-    ops::Deref,
-    ptr::NonNull,
-    sync::{Arc, Mutex},
-};
+use serde::de::{Deserializer, Visitor};
+use serde::ser::Serializer;
+use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
+use std::collections::HashSet;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::hash::{Hash, Hasher};
+use std::mem::{size_of, ManuallyDrop};
+use std::ops::Deref;
+use std::ptr::NonNull;
+use std::sync::{Arc, Mutex};
 
 /// The global string cache for `FlyStr`.
 ///

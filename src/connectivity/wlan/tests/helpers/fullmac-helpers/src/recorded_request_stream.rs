@@ -1,10 +1,8 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    fidl_fuchsia_wlan_fullmac::{self as fidl_fullmac, WlanFullmacImplBridgeRequest},
-    futures::StreamExt,
-};
+use fidl_fuchsia_wlan_fullmac::{self as fidl_fullmac, WlanFullmacImplBridgeRequest};
+use futures::StreamExt;
 
 // Wrapper type for WlanFullmacImplBridgeRequest types without the responder.
 #[derive(Clone, Debug, PartialEq)]

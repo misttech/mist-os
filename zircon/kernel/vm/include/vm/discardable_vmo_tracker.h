@@ -47,9 +47,8 @@ class DiscardableVmoTracker final
   zx_status_t UnlockDiscardableLocked() TA_REQ(cow_->lock()) TA_EXCL(DiscardableVmosLock::Get());
 
   // Returns whether this object qualifies for reclamation based on whether its state is
-  // kReclaimable *and* it has been in this state for at least |min_duration_since_reclaimable|.
-  bool IsEligibleForReclamationLocked(zx_duration_t min_duration_since_reclaimable) const
-      TA_REQ(cow_->lock());
+  // kReclaimable.
+  bool IsEligibleForReclamationLocked() const TA_REQ(cow_->lock());
 
   // Whether the VMO has been discarded and not locked again yet.
   bool WasDiscardedLocked() const TA_REQ(cow_->lock()) {
@@ -67,17 +66,6 @@ class DiscardableVmoTracker final
   // That is fine since these numbers are only used for accounting.
   using DiscardablePageCounts = VmCowPages::DiscardablePageCounts;
   static DiscardablePageCounts DebugDiscardablePageCounts() TA_EXCL(DiscardableVmosLock::Get());
-
-  // Walks through the LRU reclaimable list of discardable vmos and discards pages from each, until
-  // |target_pages| have been discarded, or the list of candidates is exhausted. Only vmos that have
-  // become reclaimable more than |min_duration_since_reclaimable| in the past will be discarded;
-  // this prevents discarding reclaimable vmos that were recently accessed. The discarded pages are
-  // appended to the |freed_list| passed in; the caller takes ownership of the discarded pages and
-  // is responsible for freeing them. Returns the total number of pages discarded.
-  static uint64_t ReclaimPagesFromDiscardableVmos(uint64_t target_pages,
-                                                  zx_duration_t min_duration_since_reclaimable,
-                                                  list_node_t* freed_list)
-      TA_EXCL(DiscardableVmosLock::Get());
 
   // Accessors for private members.
   DiscardableState discardable_state_locked() const TA_REQ(cow_->lock()) {

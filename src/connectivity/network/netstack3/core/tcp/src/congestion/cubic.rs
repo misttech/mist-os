@@ -18,11 +18,13 @@
 //!
 //! Reference: https://doc.rust-lang.org/reference/expressions/operator-expr.html#type-cast-expressions
 
-use core::{num::NonZeroU32, time::Duration};
+use core::num::NonZeroU32;
+use core::time::Duration;
 
 use netstack3_base::Instant;
 
-use crate::internal::{base::Mss, congestion::CongestionControlParams};
+use crate::internal::base::Mss;
+use crate::internal::congestion::CongestionControlParams;
 
 /// Per RFC 8312 (https://tools.ietf.org/html/rfc8312#section-4.5):
 ///  Parameter beta_cubic SHOULD be set to 0.7.
@@ -243,7 +245,8 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
 
 #[cfg(test)]
 mod tests {
-    use netstack3_base::{testutil::FakeInstantCtx, InstantContext as _};
+    use netstack3_base::testutil::FakeInstantCtx;
+    use netstack3_base::InstantContext as _;
     use test_case::test_case;
 
     use super::*;

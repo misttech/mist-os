@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::{endpoints::ControlHandle, prelude::*, Event, MethodType, Status};
+use fidl::endpoints::ControlHandle;
+use fidl::prelude::*;
+use fidl::{Event, MethodType, Status};
 use fidl_fidl_serversuite::{
     AjarTargetControlHandle, AjarTargetRequest, AjarTargetRequestStream, AnyTarget,
     ClosedTargetControlHandle, ClosedTargetRequest, ClosedTargetRequestStream,
@@ -15,11 +17,9 @@ use fidl_fidl_serversuite::{
     SERVER_SUITE_VERSION,
 };
 use fuchsia_component::server::ServiceFs;
-use futures::{
-    future::{BoxFuture, Fuse},
-    prelude::*,
-    select,
-};
+use futures::future::{BoxFuture, Fuse};
+use futures::prelude::*;
+use futures::select;
 use tracing::info;
 
 const DISABLED_TESTS: &[Test] = &[

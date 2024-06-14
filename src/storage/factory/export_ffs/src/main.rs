@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    argh::FromArgs,
-    export_ffs::export_directory,
-    fidl::endpoints::{ClientEnd, Proxy as _},
-    fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-};
+use anyhow::{Context as _, Error};
+use argh::FromArgs;
+use export_ffs::export_directory;
+use fidl::endpoints::{ClientEnd, Proxy as _};
+use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// A command line tool for generating factoryfs partitions by flattening existing directory
 /// structures.

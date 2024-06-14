@@ -38,10 +38,10 @@ pub use internal::socket::isn::IsnGenerator;
 pub use internal::socket::{
     AcceptError, BindError, BoundInfo, ConnectError, ConnectionInfo, DemuxState,
     DualStackDemuxIdConverter, DualStackIpExt, Ipv6Options, Ipv6SocketIdToIpv4DemuxIdConverter,
-    ListenError, NoConnection, SetDeviceError, SetReuseAddrError, SocketAddr, SocketInfo, Sockets,
-    TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext, TcpDemuxContext, TcpDualStackContext,
-    TcpIpTransportContext, TcpSocketId, TcpSocketSet, TcpSocketState, TcpTimerId, UnboundInfo,
-    WeakTcpSocketId,
+    ListenError, NoConnection, OriginalDestinationError, SetDeviceError, SetReuseAddrError,
+    SocketAddr, SocketInfo, Sockets, TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext,
+    TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpSocketId, TcpSocketSet,
+    TcpSocketState, TcpTimerId, UnboundInfo, WeakTcpSocketId,
 };
 pub use internal::state::Takeable;
 

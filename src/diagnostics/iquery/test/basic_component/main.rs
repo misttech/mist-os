@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_inspect::{component, health::Reporter};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
 use inspect_runtime::PublishOptions;
 
 #[fuchsia::main(logging_tags = [ "iquery_basic_component" ])]

@@ -79,10 +79,6 @@ struct mp_ipi_task
 struct mp_state {
   // cpus that are currently online
   ktl::atomic<cpu_mask_t> online_cpus;
-  // cpus that are currently schedulable
-  ktl::atomic<cpu_mask_t> active_cpus;
-  // cpus that are currently idle.
-  ktl::atomic<cpu_mask_t> idle_cpus;
 
   SpinLock ipi_task_lock{"mp_state:ipi_task_lock"_intern};
   // list of outstanding tasks for CPUs to execute.  Should only be
@@ -94,16 +90,6 @@ struct mp_state {
 };
 
 extern struct mp_state mp;
-
-// idle/busy is used to track if the cpu is running anything or has a non empty run queue
-// idle == (cpu run queue empty & cpu running idle thread)
-// busy == !idle
-static inline cpu_mask_t mp_get_idle_mask() { return mp.idle_cpus.load(); }
-static inline void mp_set_cpu_idle(cpu_num_t cpu) { mp.idle_cpus.fetch_or(cpu_num_to_mask(cpu)); }
-static inline void mp_set_cpu_busy(cpu_num_t cpu) { mp.idle_cpus.fetch_and(~cpu_num_to_mask(cpu)); }
-static inline bool mp_is_cpu_idle(cpu_num_t cpu) {
-  return mp_get_idle_mask() & cpu_num_to_mask(cpu);
-}
 
 // tracks if a cpu is online and initialized
 static inline void mp_set_curr_cpu_online(bool online) {
@@ -117,25 +103,6 @@ static inline void mp_set_curr_cpu_online(bool online) {
 static inline cpu_mask_t mp_get_online_mask() { return mp.online_cpus.load(); }
 static inline bool mp_is_cpu_online(cpu_num_t cpu) {
   return mp_get_online_mask() & cpu_num_to_mask(cpu);
-}
-
-// tracks if a cpu is active and schedulable
-//
-// Note: this is not the function you are looking for.  Mutations of the active
-// bit for CPU X needs to synchronize with internals of Scheduler X's behavior.
-// Users should call through `Scheduler::SetCurrCpuActive` instead.
-static inline void mp_set_curr_cpu_active(bool active) {
-  if (active) {
-    mp.active_cpus.fetch_or(cpu_num_to_mask(arch_curr_cpu_num()));
-  } else {
-    mp.active_cpus.fetch_and(~cpu_num_to_mask(arch_curr_cpu_num()));
-  }
-  arch_set_blocking_disallowed(!active);
-}
-
-static inline cpu_mask_t mp_get_active_mask() { return mp.active_cpus.load(); }
-static inline bool mp_is_cpu_active(cpu_num_t cpu) {
-  return mp_get_active_mask() & cpu_num_to_mask(cpu);
 }
 
 // We say a CPU is "ready" once it is active and generally ready for tasks.

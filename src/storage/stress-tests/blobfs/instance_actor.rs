@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fs_management::filesystem::ServingSingleVolumeFilesystem,
-    storage_stress_test_utils::fvm::FvmInstance,
-    stress_test::actor::{Actor, ActorError},
-};
+use async_trait::async_trait;
+use fs_management::filesystem::ServingSingleVolumeFilesystem;
+use storage_stress_test_utils::fvm::FvmInstance;
+use stress_test::actor::{Actor, ActorError};
 
 /// An actor that kills blobfs and destroys the ramdisk
 pub struct InstanceActor {

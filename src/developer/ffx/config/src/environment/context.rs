@@ -2,25 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    api::{value::ValueStrategy, ConfigError, ConfigValue},
-    is_analytics_disabled,
-    storage::Config,
-    BuildOverride, ConfigMap, ConfigQuery, Environment,
-};
+use crate::api::value::ValueStrategy;
+use crate::api::{ConfigError, ConfigValue};
+use crate::storage::Config;
+use crate::{is_analytics_disabled, BuildOverride, ConfigMap, ConfigQuery, Environment};
 use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use errors::ffx_error;
 use ffx_config_domain::ConfigDomain;
 use sdk::{Sdk, SdkRoot};
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::Read,
-    path::{Path, PathBuf},
-    process::Command,
-    sync::Arc,
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::Arc;
 use thiserror::Error;
 use tracing::{debug, error, trace};
 

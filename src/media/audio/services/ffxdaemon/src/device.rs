@@ -2,31 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    error::ControllerError,
-    ring_buffer::{AudioDeviceRingBuffer, HardwareRingBuffer, RingBuffer},
-    wav_socket::WavSocket,
-};
+use crate::error::ControllerError;
+use crate::ring_buffer::{AudioDeviceRingBuffer, HardwareRingBuffer, RingBuffer};
+use crate::wav_socket::WavSocket;
 use anyhow::{anyhow, Context, Error};
 use async_trait::async_trait;
 use fidl::endpoints::{create_proxy, ServerEnd};
-use fidl_fuchsia_audio_controller as fac;
-use fidl_fuchsia_audio_device as fadevice;
-use fidl_fuchsia_hardware_audio as fhaudio;
-use fuchsia_audio::{
-    device::{DevfsSelector, RegistrySelector, Selector},
-    stop_listener, Format,
-};
+use fuchsia_audio::device::{DevfsSelector, RegistrySelector, Selector};
+use fuchsia_audio::{stop_listener, Format};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use fuchsia_zircon::{self as zx};
 use futures::{AsyncWriteExt, StreamExt};
-use std::{
-    collections::{btree_map, BTreeMap},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Mutex, Weak,
-    },
-    time::Duration,
+use std::collections::{btree_map, BTreeMap};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, Weak};
+use std::time::Duration;
+use {
+    fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
+    fidl_fuchsia_hardware_audio as fhaudio,
 };
 
 // TODO(https://fxbug.dev/332322792): Replace with an integer conversion.

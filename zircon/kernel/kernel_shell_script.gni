@@ -50,7 +50,7 @@ template("kernel_shell_script") {
 #     - Optional: As for zbi_test(). By default it will include the standard
 #     kernel ZBI, but if overriden the kernel ZBI must be listed explicitly.
 #     - Type: list(label)
-#     - Default: [ ":kernel(:kernel_$current_cpu)" ]
+#     - Default: [ "//zircon/kernel(//zircon/kernel:kernel_$current_cpu)" ]
 #
 #   * script
 #     - Required: This is a list of strings, each a kernel shell command line.
@@ -58,7 +58,7 @@ template("kernel_shell_script") {
 #     space with `+` as expected for the `kernel.shell.script` boot option.
 #     - Type: list(string)
 #
-#   * deps, disabled, environments, visibility
+#   * disabled, environments, visibility
 #     - Optional: See zbi_test().
 #
 template("kernel_shell_script_test") {
@@ -76,7 +76,7 @@ template("kernel_shell_script_test") {
     if (defined(invoker.deps)) {
       deps = invoker.deps
     } else {
-      deps = [ ":kernel(:kernel_$current_cpu)" ]
+      deps = [ "//zircon/kernel(//zircon/kernel:kernel_$current_cpu)" ]
     }
 
     deps += [ ":$script_target" ]

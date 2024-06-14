@@ -7,30 +7,26 @@
 //! - [Package](https://fuchsia.dev/fuchsia-src/concepts/packages/package?hl=en)
 //! - [TUF](https://theupdateframework.io/)
 
-use {
-    crate::{
-        range::{ContentRange, Range},
-        repository::{Error, RepoProvider, RepositorySpec},
-        resource::Resource,
-    },
-    anyhow::{anyhow, Context as _, Result},
-    futures::{future::BoxFuture, AsyncRead, FutureExt as _, TryStreamExt as _},
-    hyper::{
-        client::{connect::Connect, Client},
-        header::{CONTENT_LENGTH, CONTENT_RANGE, RANGE},
-        Body, Method, Request, StatusCode, Uri,
-    },
-    std::{collections::BTreeSet, fmt::Debug, time::SystemTime},
-    tuf::{
-        metadata::{MetadataPath, MetadataVersion, TargetPath},
-        pouf::Pouf1,
-        repository::{
-            HttpRepository as TufHttpRepository, HttpRepositoryBuilder as TufHttpRepositoryBuilder,
-            RepositoryProvider as TufRepositoryProvider,
-        },
-    },
-    url::Url,
+use crate::range::{ContentRange, Range};
+use crate::repository::{Error, RepoProvider, RepositorySpec};
+use crate::resource::Resource;
+use anyhow::{anyhow, Context as _, Result};
+use futures::future::BoxFuture;
+use futures::{AsyncRead, FutureExt as _, TryStreamExt as _};
+use hyper::client::connect::Connect;
+use hyper::client::Client;
+use hyper::header::{CONTENT_LENGTH, CONTENT_RANGE, RANGE};
+use hyper::{Body, Method, Request, StatusCode, Uri};
+use std::collections::BTreeSet;
+use std::fmt::Debug;
+use std::time::SystemTime;
+use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
+use tuf::pouf::Pouf1;
+use tuf::repository::{
+    HttpRepository as TufHttpRepository, HttpRepositoryBuilder as TufHttpRepositoryBuilder,
+    RepositoryProvider as TufRepositoryProvider,
 };
+use url::Url;
 
 #[derive(Debug)]
 pub struct HttpRepository<C>
@@ -232,22 +228,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            manager::RepositoryManager,
-            repo_client::RepoClient,
-            repository::repo_tests::{self, TestEnv as _},
-            server::RepositoryServer,
-            test_utils::make_pm_repository,
-            util::CHUNK_SIZE,
-        },
-        assert_matches::assert_matches,
-        camino::Utf8Path,
-        fuchsia_async as fasync,
-        fuchsia_hyper::{new_client, HyperConnector},
-        std::{fs::File, io::Write, net::Ipv4Addr, sync::Arc},
-    };
+    use super::*;
+    use crate::manager::RepositoryManager;
+    use crate::repo_client::RepoClient;
+    use crate::repository::repo_tests::{self, TestEnv as _};
+    use crate::server::RepositoryServer;
+    use crate::test_utils::make_pm_repository;
+    use crate::util::CHUNK_SIZE;
+    use assert_matches::assert_matches;
+    use camino::Utf8Path;
+    use fuchsia_async as fasync;
+    use fuchsia_hyper::{new_client, HyperConnector};
+    use std::fs::File;
+    use std::io::Write;
+    use std::net::Ipv4Addr;
+    use std::sync::Arc;
 
     struct TestEnv {
         tmp: tempfile::TempDir,

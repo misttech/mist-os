@@ -2,22 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        args::{
-            PackageArchiveAddCommand, PackageArchiveCreateCommand, PackageArchiveExtractCommand,
-            PackageArchiveRemoveCommand,
-        },
-        to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME, PACKAGE_MANIFEST_NAME,
-    },
-    anyhow::anyhow,
-    anyhow::{Context as _, Result},
-    camino::Utf8Path,
-    fuchsia_pkg::PackageBuilder,
-    fuchsia_pkg::{PackageManifest, SubpackageInfo},
-    std::{collections::BTreeSet, fs::File},
-    tempfile::TempDir,
+use crate::args::{
+    PackageArchiveAddCommand, PackageArchiveCreateCommand, PackageArchiveExtractCommand,
+    PackageArchiveRemoveCommand,
 };
+use crate::{to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME, PACKAGE_MANIFEST_NAME};
+use anyhow::{anyhow, Context as _, Result};
+use camino::Utf8Path;
+use fuchsia_pkg::{PackageBuilder, PackageManifest, SubpackageInfo};
+use std::collections::BTreeSet;
+use std::fs::File;
+use tempfile::TempDir;
 
 pub async fn cmd_package_archive_create(cmd: PackageArchiveCreateCommand) -> Result<()> {
     let package_manifest = PackageManifest::try_load_from(&cmd.package_manifest)
@@ -213,14 +208,14 @@ pub async fn cmd_package_archive_remove(cmd: PackageArchiveRemoveCommand) -> Res
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::convert_to_depfile_filepath,
-        camino::Utf8PathBuf,
-        fuchsia_archive::Utf8Reader,
-        pretty_assertions::assert_eq,
-        std::{collections::BTreeMap, io::Write, process::Command},
-    };
+    use super::*;
+    use crate::convert_to_depfile_filepath;
+    use camino::Utf8PathBuf;
+    use fuchsia_archive::Utf8Reader;
+    use pretty_assertions::assert_eq;
+    use std::collections::BTreeMap;
+    use std::io::Write;
+    use std::process::Command;
 
     const PM_BIN: &str = concat!(env!("ROOT_OUT_DIR"), "/test_data/package-tool/pm");
 

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::TestEnv,
-    fidl_fuchsia_pkg::{PackageIndexIteratorMarker, PackageIndexIteratorProxy},
-    fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_hash::Hash,
-    fuchsia_pkg::PackagePath,
-    fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
-};
+use crate::TestEnv;
+use fidl_fuchsia_pkg::{PackageIndexIteratorMarker, PackageIndexIteratorProxy};
+use fidl_fuchsia_pkg_ext::BlobId;
+use fuchsia_hash::Hash;
+use fuchsia_pkg::PackagePath;
+use fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder};
 
 /// Sets up the test environment and writes the packages out to base.
 async fn setup_test_env(static_packages: &[&Package]) -> TestEnv {

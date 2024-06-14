@@ -3,16 +3,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    rustc_lexer::{Token, TokenKind},
-    std::{
-        borrow::Cow,
-        collections::HashSet,
-        fs::File,
-        io::{self, BufRead, BufReader, BufWriter, Write},
-        iter::{self, Iterator, Peekable},
-    },
-};
+use rustc_lexer::{Token, TokenKind};
+use std::borrow::Cow;
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::iter::{self, Iterator, Peekable};
 
 fn main() {
     let mut done = HashSet::new();

@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_bluetooth_gatt2::{
-        self as fidl_gatt, Characteristic as FidlCharacteristic, ServiceInfo, ServiceKind,
-    },
-    fuchsia_bluetooth::assigned_numbers::{
-        find_characteristic_number, find_descriptor_number, find_service_uuid,
-    },
-    fuchsia_bluetooth::types::Uuid,
-    std::fmt,
+use fidl_fuchsia_bluetooth_gatt2::{
+    self as fidl_gatt, Characteristic as FidlCharacteristic, ServiceInfo, ServiceKind,
 };
+use fuchsia_bluetooth::assigned_numbers::{
+    find_characteristic_number, find_descriptor_number, find_service_uuid,
+};
+use fuchsia_bluetooth::types::Uuid;
+use std::fmt;
 
 // TODO(armansito): Make these objects stateful so that GATT operations can be performed through
 // them. Later, move these into a public bluetooth crate as a developer API.

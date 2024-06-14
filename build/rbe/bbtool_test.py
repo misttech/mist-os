@@ -5,6 +5,7 @@
 
 import contextlib
 import io
+from typing import Any
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -14,7 +15,7 @@ import cl_utils
 
 
 class MainArgParserTests(unittest.TestCase):
-    def test_fetch_reproxy_log(self):
+    def test_fetch_reproxy_log(self) -> None:
         args = bbtool._MAIN_ARG_PARSER.parse_args(
             ["--bbid", "1234", "fetch_reproxy_log"]
         )
@@ -23,7 +24,7 @@ class MainArgParserTests(unittest.TestCase):
 
 
 class BuildBucketToolTests(unittest.TestCase):
-    def test_get_json_fields_success(self):
+    def test_get_json_fields_success(self) -> None:
         bb = bbtool.BuildBucketTool()
         with mock.patch.object(
             cl_utils,
@@ -34,7 +35,7 @@ class BuildBucketToolTests(unittest.TestCase):
             self.assertEqual(bb_json, dict())
         mock_call.assert_called_once()
 
-    def test_get_json_fields_error(self):
+    def test_get_json_fields_error(self) -> None:
         bb = bbtool.BuildBucketTool()
         with mock.patch.object(
             cl_utils,
@@ -45,7 +46,7 @@ class BuildBucketToolTests(unittest.TestCase):
                 bb.get_json_fields("6432")
         mock_call.assert_called_once()
 
-    def test_download_reproxy_log_success(self):
+    def test_download_reproxy_log_success(self) -> None:
         bb = bbtool.BuildBucketTool()
         with mock.patch.object(
             cl_utils,
@@ -57,7 +58,7 @@ class BuildBucketToolTests(unittest.TestCase):
             )
         mock_call.assert_called_once()
 
-    def test_download_reproxy_log_error(self):
+    def test_download_reproxy_log_error(self) -> None:
         bb = bbtool.BuildBucketTool()
         with mock.patch.object(
             cl_utils,
@@ -68,7 +69,7 @@ class BuildBucketToolTests(unittest.TestCase):
                 bb.download_reproxy_log("1271", "reproxy_3.1415926.rrpl")
         mock_call.assert_called_once()
 
-    def test_fetch_reproxy_log_cached_already_cached(self):
+    def test_fetch_reproxy_log_cached_already_cached(self) -> None:
         log_name = "reproxy_1.4142.rrpl"
         bb = bbtool.BuildBucketTool()
         with mock.patch.object(Path, "mkdir") as mock_mkdir:
@@ -80,7 +81,7 @@ class BuildBucketToolTests(unittest.TestCase):
         mock_mkdir.assert_called_once()
         mock_exists.assert_called_with()
 
-    def test_fetch_reproxy_log_cached_download_success(self):
+    def test_fetch_reproxy_log_cached_download_success(self) -> None:
         log_name = "reproxy_9.6142.rrpl"
         log_contents = "\n"
         bb = bbtool.BuildBucketTool()
@@ -104,7 +105,7 @@ class BuildBucketToolTests(unittest.TestCase):
         mock_exists.assert_called_with()
         mock_write.assert_called_with(log_contents)
 
-    def test_fetch_reproxy_log_cached_download_error(self):
+    def test_fetch_reproxy_log_cached_download_error(self) -> None:
         log_name = "reproxy_7.0123.rrpl"
         bb = bbtool.BuildBucketTool()
         with mock.patch.object(Path, "mkdir") as mock_mkdir:
@@ -121,10 +122,10 @@ class BuildBucketToolTests(unittest.TestCase):
         mock_mkdir.assert_called_once()
         mock_exists.assert_called_with()
 
-    def test_get_rbe_build_info_no_child(self):
+    def test_get_rbe_build_info_no_child(self) -> None:
         bb = bbtool.BuildBucketTool()
         bbid = "8888"
-        build_json = {"output": {"properties": {}}}
+        build_json: dict[str, Any] = {"output": {"properties": {}}}
         with mock.patch.object(
             bbtool.BuildBucketTool, "get_json_fields", return_value=build_json
         ) as mock_get_json:
@@ -132,7 +133,7 @@ class BuildBucketToolTests(unittest.TestCase):
             self.assertEqual(rbe_build_id, bbid)
             self.assertEqual(rbe_build_json, build_json)
 
-    def test_get_rbe_build_info_with_child(self):
+    def test_get_rbe_build_info_with_child(self) -> None:
         bb = bbtool.BuildBucketTool()
         parent_bbid = "9977"
         child_bbid = "0404"
@@ -153,7 +154,7 @@ class BuildBucketToolTests(unittest.TestCase):
 
 
 class FetchReproxyLogFromBbidTests(unittest.TestCase):
-    def test_lookup_and_fetch(self):
+    def test_lookup_and_fetch(self) -> None:
         bb_json = {
             "output": {"properties": {"rpl_files": ["reproxy_2.718.rrpl"]}}
         }
@@ -177,8 +178,8 @@ class FetchReproxyLogFromBbidTests(unittest.TestCase):
         mock_rbe_build_info.assert_called_once()
         mock_fetch_log.assert_called_once()
 
-    def test_no_rpl_files(self):
-        bb_json = {"output": {"properties": {}}}
+    def test_no_rpl_files(self) -> None:
+        bb_json: dict[str, Any] = {"output": {"properties": {}}}
         with mock.patch.object(
             bbtool.BuildBucketTool,
             "get_rbe_build_info",
@@ -193,7 +194,7 @@ class FetchReproxyLogFromBbidTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def test_e2e_bbid_to_log_only(self):
+    def test_e2e_bbid_to_log_only(self) -> None:
         bb = bbtool._BB_TOOL
         bbid = "b991918261"
         reproxy_log_path = Path("/path/to/cache/foobar.rrpl")
@@ -216,7 +217,7 @@ class MainTests(unittest.TestCase):
             bbpath=bb, bbid=bbid.lstrip("b"), verbose=False
         )
 
-    def test_e2e_bb_error(self):
+    def test_e2e_bb_error(self) -> None:
         bbid = "b99669966"
         with mock.patch.object(
             bbtool.BuildBucketTool,

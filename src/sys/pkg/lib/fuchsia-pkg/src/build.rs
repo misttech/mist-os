@@ -178,7 +178,8 @@ fn get_external_content_infos<'a, 'b>(
 #[cfg(test)]
 mod test_build_with_file_system {
     use super::*;
-    use crate::{test::*, MetaPackage};
+    use crate::test::*;
+    use crate::MetaPackage;
     use assert_matches::assert_matches;
     use maplit::{btreemap, hashmap};
     use proptest::prelude::*;
@@ -442,7 +443,8 @@ mod test_build_with_file_system {
 #[cfg(test)]
 mod test_build {
     use super::*;
-    use crate::{test::*, MetaPackage};
+    use crate::test::*;
+    use crate::MetaPackage;
     use proptest::prelude::*;
     use rand::SeedableRng as _;
     use std::io::Write;

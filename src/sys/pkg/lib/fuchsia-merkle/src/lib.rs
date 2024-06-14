@@ -6,10 +6,8 @@
 
 #![deny(missing_docs)]
 
-use {
-    futures::{AsyncRead, AsyncReadExt as _},
-    std::io::{self, Read},
-};
+use futures::{AsyncRead, AsyncReadExt as _};
+use std::io::{self, Read};
 
 pub use fuchsia_hash::{Hash, HASH_SIZE};
 

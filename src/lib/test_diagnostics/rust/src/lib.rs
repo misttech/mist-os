@@ -4,17 +4,16 @@
 
 //! This crate provides helper functions to collect test diagnostics.
 
-use {
-    fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    futures::{
-        channel::mpsc,
-        prelude::*,
-        ready,
-        task::{Context, Poll},
-    },
-    std::{cell::RefCell, io::Write, pin::Pin, sync::Arc},
-};
+use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc;
+use futures::prelude::*;
+use futures::ready;
+use futures::task::{Context, Poll};
+use std::cell::RefCell;
+use std::io::Write;
+use std::pin::Pin;
+use std::sync::Arc;
 
 pub use crate::diagnostics::LogStream;
 
@@ -248,10 +247,11 @@ mod tests {
     /// Host side executor doesn't have a fake timer, so these tests only run on device for now.
     #[cfg(target_os = "fuchsia")]
     mod stdout {
-        use {
-            super::*, fuchsia_async::TestExecutor, fuchsia_zircon::DurationNum,
-            pretty_assertions::assert_eq, std::ops::Add,
-        };
+        use super::*;
+        use fuchsia_async::TestExecutor;
+        use fuchsia_zircon::DurationNum;
+        use pretty_assertions::assert_eq;
+        use std::ops::Add;
 
         struct MutexBytes(Arc<Mutex<Vec<u8>>>);
 

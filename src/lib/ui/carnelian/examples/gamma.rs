@@ -2,24 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    carnelian::{
-        color::Color,
-        drawing::path_for_rectangle,
-        make_app_assistant,
-        render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, Style},
-        scene::{
-            facets::Facet,
-            scene::{Scene, SceneBuilder, SceneOrder},
-            LayerGroup,
-        },
-        App, AppAssistant, Point, Rect, Size, ViewAssistant, ViewAssistantContext,
-        ViewAssistantPtr, ViewKey,
-    },
-    euclid::{size2, vec2, Transform2D},
-    fuchsia_zircon::Event,
+use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::drawing::path_for_rectangle;
+use carnelian::render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, Style};
+use carnelian::scene::facets::Facet;
+use carnelian::scene::scene::{Scene, SceneBuilder, SceneOrder};
+use carnelian::scene::LayerGroup;
+use carnelian::{
+    make_app_assistant, App, AppAssistant, Point, Rect, Size, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
 };
+use euclid::{size2, vec2, Transform2D};
+use fuchsia_zircon::Event;
 
 const BLACK_COLOR: Color = Color { r: 0, g: 0, b: 0, a: 255 };
 const TRANSLUCENT_COLOR: Color = Color { r: 0, g: 0, b: 0, a: 127 };

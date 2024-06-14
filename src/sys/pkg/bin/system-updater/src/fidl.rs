@@ -2,24 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        install_manager::InstallManagerControlHandle,
-        update::{Config, ControlRequest, RebootController, UpdateAttempt, UpdateHistory},
-    },
-    anyhow::{anyhow, Context, Error},
-    event_queue::{ClosedClient, Notify},
-    fidl_fuchsia_update_installer::{
-        InstallerRequest, InstallerRequestStream, MonitorProxy, MonitorProxyInterface,
-        RebootControllerRequest, UpdateResult,
-    },
-    fidl_fuchsia_update_installer_ext::State,
-    fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-    fuchsia_sync::Mutex,
-    futures::prelude::*,
-    std::sync::Arc,
-    tracing::{error, info},
+use crate::install_manager::InstallManagerControlHandle;
+use crate::update::{Config, ControlRequest, RebootController, UpdateAttempt, UpdateHistory};
+use anyhow::{anyhow, Context, Error};
+use event_queue::{ClosedClient, Notify};
+use fidl_fuchsia_update_installer::{
+    InstallerRequest, InstallerRequestStream, MonitorProxy, MonitorProxyInterface,
+    RebootControllerRequest, UpdateResult,
 };
+use fidl_fuchsia_update_installer_ext::State;
+use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+use fuchsia_sync::Mutex;
+use futures::prelude::*;
+use std::sync::Arc;
+use tracing::{error, info};
 
 pub enum IncomingService {
     Installer(InstallerRequestStream),

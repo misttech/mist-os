@@ -4,14 +4,14 @@
 
 use anyhow::{format_err, Result};
 use circuit::multi_stream::multi_stream_node_connection_to_async;
-use fidl_fuchsia_hardware_overnet as overnet_usb;
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::{AsyncReadExt, StreamExt, TryStreamExt};
 use overnet_core::Router;
 use std::path::PathBuf;
 use std::sync::Weak;
+use {
+    fidl_fuchsia_hardware_overnet as overnet_usb, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+};
 
 static USB_DEVICE_PATH: &str = "/dev/class/overnet-usb";
 

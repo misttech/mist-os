@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{Action, ActionKey, ActionNotifier},
-    crate::model::component::ComponentInstance,
-    cm_util::AbortHandle,
-    errors::ActionError,
-    fuchsia_async as fasync,
-    futures::{
-        channel::oneshot,
-        future::{join_all, BoxFuture, FutureExt},
-        select,
-    },
-    std::collections::HashMap,
-    std::sync::{Arc, Mutex},
-};
+use super::{Action, ActionKey, ActionNotifier};
+use crate::model::component::ComponentInstance;
+use cm_util::AbortHandle;
+use errors::ActionError;
+use fuchsia_async as fasync;
+use futures::channel::oneshot;
+use futures::future::{join_all, BoxFuture, FutureExt};
+use futures::select;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// Represents a task that implements an action.
 pub struct ActionTask {
@@ -207,14 +203,12 @@ impl ActionSet {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        crate::model::actions::{DestroyAction, ShutdownAction, ShutdownType},
-        crate::model::testing::test_helpers::ActionsTest,
-        assert_matches::assert_matches,
-        errors::StopActionError,
-        fuchsia_async as fasync,
-    };
+    use super::*;
+    use crate::model::actions::{DestroyAction, ShutdownAction, ShutdownType};
+    use crate::model::testing::test_helpers::ActionsTest;
+    use assert_matches::assert_matches;
+    use errors::StopActionError;
+    use fuchsia_async as fasync;
 
     async fn register_action_in_new_task<A>(
         action: A,

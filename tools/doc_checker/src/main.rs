@@ -5,19 +5,15 @@
 //! doc_checker is a CLI tool to check markdown files for correctness in
 //! the Fuchsia project.
 
-pub(crate) use crate::{
-    checker::{DocCheck, DocCheckError, DocLine, DocYamlCheck, ErrorLevel},
-    md_element::DocContext,
-};
+pub(crate) use crate::checker::{DocCheck, DocCheckError, DocLine, DocYamlCheck, ErrorLevel};
+pub(crate) use crate::md_element::DocContext;
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
 use glob::glob;
 use serde_yaml::Value;
-use std::{
-    fs::{self, File},
-    io::BufReader,
-    path::PathBuf,
-};
+use std::fs::{self, File};
+use std::io::BufReader;
+use std::path::PathBuf;
 mod checker;
 mod include_checker;
 mod link_checker;

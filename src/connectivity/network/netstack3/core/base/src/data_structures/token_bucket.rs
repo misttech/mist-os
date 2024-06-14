@@ -351,10 +351,8 @@ pub(crate) mod tests {
 pub(crate) mod benchmarks {
     use super::*;
 
-    use crate::{
-        bench,
-        testutil::{Bencher, FakeInstantCtx},
-    };
+    use crate::bench;
+    use crate::testutil::{Bencher, FakeInstantCtx};
 
     fn bench_try_take<B: Bencher>(b: &mut B, enforced_rate: u64, try_rate: u32) {
         let sleep = SECOND / try_rate;

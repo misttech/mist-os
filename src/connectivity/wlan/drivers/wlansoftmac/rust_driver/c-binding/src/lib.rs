@@ -4,17 +4,15 @@
 
 //! C bindings for wlansoftmac-rust crate.
 
-use {
-    diagnostics_log::PublishOptions,
-    fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_async::LocalExecutor,
-    fuchsia_zircon as zx,
-    std::{ffi::c_void, sync::Once},
-    wlan_ffi_transport::{
-        BufferProvider, EthernetRx, FfiBufferProvider, FfiEthernetRx, FfiWlanTx, WlanTx,
-    },
-    wlan_mlme::device::Device,
+use diagnostics_log::PublishOptions;
+use fuchsia_async::LocalExecutor;
+use std::ffi::c_void;
+use std::sync::Once;
+use wlan_ffi_transport::{
+    BufferProvider, EthernetRx, FfiBufferProvider, FfiEthernetRx, FfiWlanTx, WlanTx,
 };
+use wlan_mlme::device::Device;
+use {fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx};
 
 static LOGGER_ONCE: Once = Once::new();
 

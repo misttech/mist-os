@@ -2,57 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    async_utils::hanging_get::client::HangingGetStream,
-    bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol},
-    fidl_fuchsia_bluetooth_bredr as bredr,
-    fidl_fuchsia_bluetooth_hfp::{NetworkInformation, PeerHandlerProxy},
-    fuchsia_async::Task,
-    fuchsia_bluetooth::{
-        profile::{Attribute, ProtocolDescriptor},
-        types::PeerId,
-    },
-    fuchsia_inspect::{self as inspect, Property},
-    fuchsia_inspect_derive::{AttachError, Inspect},
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc::{self, Sender},
-        future::{self, Either, Future},
-        select,
-        stream::{empty, Empty},
-        FutureExt, SinkExt, StreamExt,
-    },
-    profile_client::ProfileEvent,
-    std::{fmt, sync::Arc},
-    tracing::{error, info, warn},
-    vigil::{DropWatch, Vigil},
-};
+use anyhow::format_err;
+use async_utils::hanging_get::client::HangingGetStream;
+use bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol};
+use fidl_fuchsia_bluetooth_hfp::{NetworkInformation, PeerHandlerProxy};
+use fuchsia_async::Task;
+use fuchsia_bluetooth::profile::{Attribute, ProtocolDescriptor};
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc::{self, Sender};
+use futures::future::{self, Either, Future};
+use futures::stream::{empty, Empty};
+use futures::{select, FutureExt, SinkExt, StreamExt};
+use profile_client::ProfileEvent;
+use std::fmt;
+use std::sync::Arc;
+use tracing::{error, info, warn};
+use vigil::{DropWatch, Vigil};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_zircon as zx};
 
-use super::{
-    calls::{Call, CallAction, Calls},
-    gain_control::GainControl,
-    indicators::{AgIndicator, AgIndicators, HfIndicator},
-    procedure::ProcedureMarker,
-    ringer::Ringer,
-    sco_state::{InspectableScoState, ScoActive, ScoState},
-    service_level_connection::ServiceLevelConnection,
-    slc_request::SlcRequest,
-    update::AgUpdate,
-    ConnectionBehavior, PeerRequest,
-};
+use super::calls::{Call, CallAction, Calls};
+use super::gain_control::GainControl;
+use super::indicators::{AgIndicator, AgIndicators, HfIndicator};
+use super::procedure::ProcedureMarker;
+use super::ringer::Ringer;
+use super::sco_state::{InspectableScoState, ScoActive, ScoState};
+use super::service_level_connection::ServiceLevelConnection;
+use super::slc_request::SlcRequest;
+use super::update::AgUpdate;
+use super::{ConnectionBehavior, PeerRequest};
 
-use crate::{
-    a2dp,
-    audio::AudioControl,
-    config::AudioGatewayFeatureSupport,
-    error::Error,
-    features::CodecId,
-    hfp,
-    inspect::PeerTaskInspect,
-    sco_connector::{ScoConnection, ScoConnector},
-};
+use crate::audio::AudioControl;
+use crate::config::AudioGatewayFeatureSupport;
+use crate::error::Error;
+use crate::features::CodecId;
+use crate::inspect::PeerTaskInspect;
+use crate::sco_connector::{ScoConnection, ScoConnector};
+use crate::{a2dp, hfp};
 
 const CONNECTION_INIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
@@ -881,47 +869,39 @@ fn stream_item_map_or_log<T, E: fmt::Debug>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        async_test_helpers::run_while,
-        async_utils::PollExt,
-        at_commands::{self as at, SerDe},
-        bt_hfp::call::Number,
-        bt_rfcomm::{profile::build_rfcomm_protocol, ServerChannel},
-        core::task::Poll,
-        fidl::AsHandleRef,
-        fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequestStream, ScoErrorCode},
-        fidl_fuchsia_bluetooth_hfp::{
-            CallDirection, CallRequest, CallRequestStream, CallState, NextCall, PeerHandlerMarker,
-            PeerHandlerRequest, PeerHandlerRequestStream, PeerHandlerWatchNextCallResponder,
-            SignalStrength,
-        },
-        fuchsia_async as fasync,
-        fuchsia_bluetooth::types::Channel,
-        futures::{
-            future::ready,
-            stream::{FusedStream, Stream},
-        },
-        proptest::prelude::*,
-        std::{collections::HashSet, pin::pin},
+    use super::*;
+    use assert_matches::assert_matches;
+    use async_test_helpers::run_while;
+    use async_utils::PollExt;
+    use at_commands::{self as at, SerDe};
+    use bt_hfp::call::Number;
+    use bt_rfcomm::profile::build_rfcomm_protocol;
+    use bt_rfcomm::ServerChannel;
+    use core::task::Poll;
+    use fidl::AsHandleRef;
+    use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequestStream, ScoErrorCode};
+    use fidl_fuchsia_bluetooth_hfp::{
+        CallDirection, CallRequest, CallRequestStream, CallState, NextCall, PeerHandlerMarker,
+        PeerHandlerRequest, PeerHandlerRequestStream, PeerHandlerWatchNextCallResponder,
+        SignalStrength,
     };
+    use fuchsia_async as fasync;
+    use fuchsia_bluetooth::types::Channel;
+    use futures::future::ready;
+    use futures::stream::{FusedStream, Stream};
+    use proptest::prelude::*;
+    use std::collections::HashSet;
+    use std::pin::pin;
 
-    use crate::{
-        audio::TestAudioControl,
-        features::{AgFeatures, HfFeatures},
-        peer::{
-            indicators::{AgIndicatorsReporting, HfIndicators},
-            service_level_connection::{
-                tests::{
-                    create_and_connect_slc, create_and_initialize_slc,
-                    expect_data_received_by_peer, expect_peer_ready, serialize_at_response,
-                },
-                SlcState,
-            },
-        },
-        sco_connector::tests::connection_for_codec,
+    use crate::audio::TestAudioControl;
+    use crate::features::{AgFeatures, HfFeatures};
+    use crate::peer::indicators::{AgIndicatorsReporting, HfIndicators};
+    use crate::peer::service_level_connection::tests::{
+        create_and_connect_slc, create_and_initialize_slc, expect_data_received_by_peer,
+        expect_peer_ready, serialize_at_response,
     };
+    use crate::peer::service_level_connection::SlcState;
+    use crate::sco_connector::tests::connection_for_codec;
 
     fn arb_signal() -> impl Strategy<Value = Option<SignalStrength>> {
         proptest::option::of(prop_oneof![

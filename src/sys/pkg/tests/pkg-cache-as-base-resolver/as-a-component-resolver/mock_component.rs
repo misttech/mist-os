@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_test_ping::{PingRequest, PingRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-};
+use fidl_test_ping::{PingRequest, PingRequestStream};
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
 
 enum IncomingRequest {
     Ping(PingRequestStream),

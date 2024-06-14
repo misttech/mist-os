@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::subcommands::{
-        descriptor::args::DescriptorCommand, feature::args::FeatureCommand, get::args::GetCommand,
-        read::args::ReadCommand,
-    },
-    argh::{ArgsInfo, FromArgs},
-};
+use super::subcommands::descriptor::args::DescriptorCommand;
+use super::subcommands::feature::args::FeatureCommand;
+use super::subcommands::get::args::GetCommand;
+use super::subcommands::read::args::ReadCommand;
+use argh::{ArgsInfo, FromArgs};
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(

@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl_fuchsia_images2 as fimages2;
-use fidl_fuchsia_sysmem as fsysmem;
-use vk_sys as vk;
+use {fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem as fsysmem, vk_sys as vk};
 
 pub fn drm_modifier_to_sysmem_modifier_2(
     modifier: u64,

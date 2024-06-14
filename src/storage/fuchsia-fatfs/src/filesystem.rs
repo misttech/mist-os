@@ -1,26 +1,19 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{
-        directory::FatDirectory,
-        refs::FatfsDirRef,
-        types::{Dir, Disk, FileSystem},
-        util::fatfs_error_to_status,
-        FATFS_INFO_NAME, MAX_FILENAME_LEN,
-    },
-    anyhow::Error,
-    fatfs::{DefaultTimeProvider, FsOptions, LossyOemCpConverter},
-    fidl_fuchsia_io as fio,
-    fuchsia_async::{Task, Time, Timer},
-    fuchsia_zircon::{AsHandleRef, Event},
-    fuchsia_zircon::{Duration, Status},
-    std::{
-        marker::PhantomPinned,
-        pin::Pin,
-        sync::{Arc, LockResult, Mutex, MutexGuard},
-    },
-};
+use crate::directory::FatDirectory;
+use crate::refs::FatfsDirRef;
+use crate::types::{Dir, Disk, FileSystem};
+use crate::util::fatfs_error_to_status;
+use crate::{FATFS_INFO_NAME, MAX_FILENAME_LEN};
+use anyhow::Error;
+use fatfs::{DefaultTimeProvider, FsOptions, LossyOemCpConverter};
+use fidl_fuchsia_io as fio;
+use fuchsia_async::{Task, Time, Timer};
+use fuchsia_zircon::{AsHandleRef, Duration, Event, Status};
+use std::marker::PhantomPinned;
+use std::pin::Pin;
+use std::sync::{Arc, LockResult, Mutex, MutexGuard};
 
 pub struct FatFilesystemInner {
     filesystem: Option<FileSystem>,
@@ -187,16 +180,14 @@ impl FatFilesystem {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            node::Node,
-            tests::{TestDiskContents, TestFatDisk},
-        },
-        fidl::endpoints::Proxy,
-        scopeguard::defer,
-        vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
-    };
+    use super::*;
+    use crate::node::Node;
+    use crate::tests::{TestDiskContents, TestFatDisk};
+    use fidl::endpoints::Proxy;
+    use scopeguard::defer;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K
 

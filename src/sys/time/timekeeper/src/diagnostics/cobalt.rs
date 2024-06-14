@@ -2,48 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        diagnostics::{Diagnostics, Event},
-        enums::{
-            ClockCorrectionStrategy, ClockUpdateReason, InitialClockState, StartClockSource, Track,
-        },
-        MonitorTrack, PrimaryTrack,
-    },
-    anyhow::{format_err, Context as _, Error},
-    cobalt_client::traits::AsEventCodes,
-    fidl_contrib::{
-        protocol_connector::ConnectedProtocol, protocol_connector::ProtocolSender,
-        ProtocolConnector,
-    },
-    fidl_fuchsia_metrics::{
-        MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
-    },
-    fuchsia_async as fasync,
-    fuchsia_cobalt_builders::MetricEventExt,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::{future, FutureExt as _},
-    std::sync::Arc,
-    time_metrics_registry::{
-        RealTimeClockEventsMigratedMetricDimensionEventType as RtcEvent,
-        TimeMetricDimensionDirection as Direction, TimeMetricDimensionExperiment as Experiment,
-        TimeMetricDimensionIteration as Iteration, TimeMetricDimensionRole as CobaltRole,
-        TimeMetricDimensionTrack as CobaltTrack,
-        TimekeeperLifecycleEventsMigratedMetricDimensionEventType as LifecycleEvent,
-        TimekeeperTimeSourceEventsMigratedMetricDimensionEventType as TimeSourceEvent,
-        TimekeeperTrackEventsMigratedMetricDimensionEventType as TrackEvent, PROJECT_ID,
-        REAL_TIME_CLOCK_EVENTS_MIGRATED_METRIC_ID, TIMEKEEPER_CLOCK_CORRECTION_MIGRATED_METRIC_ID,
-        TIMEKEEPER_FREQUENCY_ABS_ESTIMATE_MIGRATED_METRIC_ID,
-        TIMEKEEPER_LIFECYCLE_EVENTS_MIGRATED_METRIC_ID,
-        TIMEKEEPER_MONITOR_DIFFERENCE_MIGRATED_METRIC_ID,
-        TIMEKEEPER_SQRT_COVARIANCE_MIGRATED_METRIC_ID,
-        TIMEKEEPER_TIME_SOURCE_EVENTS_MIGRATED_METRIC_ID,
-        TIMEKEEPER_TRACK_EVENTS_MIGRATED_METRIC_ID,
-    },
-    time_util::time_at_monotonic,
+use crate::diagnostics::{Diagnostics, Event};
+use crate::enums::{
+    ClockCorrectionStrategy, ClockUpdateReason, InitialClockState, StartClockSource, Track,
 };
+use crate::{MonitorTrack, PrimaryTrack};
+use anyhow::{format_err, Context as _, Error};
+use cobalt_client::traits::AsEventCodes;
+use fidl_contrib::protocol_connector::{ConnectedProtocol, ProtocolSender};
+use fidl_contrib::ProtocolConnector;
+use fidl_fuchsia_metrics::{
+    MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
+};
+use fuchsia_cobalt_builders::MetricEventExt;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_sync::Mutex;
+use futures::{future, FutureExt as _};
+use std::sync::Arc;
+use time_metrics_registry::{
+    RealTimeClockEventsMigratedMetricDimensionEventType as RtcEvent,
+    TimeMetricDimensionDirection as Direction, TimeMetricDimensionExperiment as Experiment,
+    TimeMetricDimensionIteration as Iteration, TimeMetricDimensionRole as CobaltRole,
+    TimeMetricDimensionTrack as CobaltTrack,
+    TimekeeperLifecycleEventsMigratedMetricDimensionEventType as LifecycleEvent,
+    TimekeeperTimeSourceEventsMigratedMetricDimensionEventType as TimeSourceEvent,
+    TimekeeperTrackEventsMigratedMetricDimensionEventType as TrackEvent, PROJECT_ID,
+    REAL_TIME_CLOCK_EVENTS_MIGRATED_METRIC_ID, TIMEKEEPER_CLOCK_CORRECTION_MIGRATED_METRIC_ID,
+    TIMEKEEPER_FREQUENCY_ABS_ESTIMATE_MIGRATED_METRIC_ID,
+    TIMEKEEPER_LIFECYCLE_EVENTS_MIGRATED_METRIC_ID,
+    TIMEKEEPER_MONITOR_DIFFERENCE_MIGRATED_METRIC_ID,
+    TIMEKEEPER_SQRT_COVARIANCE_MIGRATED_METRIC_ID,
+    TIMEKEEPER_TIME_SOURCE_EVENTS_MIGRATED_METRIC_ID, TIMEKEEPER_TRACK_EVENTS_MIGRATED_METRIC_ID,
+};
+use time_util::time_at_monotonic;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// The number of parts in a million.
 const ONE_MILLION: i64 = 1_000_000;
@@ -322,16 +314,15 @@ impl Diagnostics for CobaltDiagnostics {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::enums::{
-            FrequencyDiscardReason, InitializeRtcOutcome, Role, SampleValidationError,
-            TimeSourceError, WriteRtcOutcome,
-        },
-        fidl_fuchsia_metrics::MetricEventPayload,
-        futures::{channel::mpsc, FutureExt, StreamExt},
-        test_util::{assert_geq, assert_leq},
+    use super::*;
+    use crate::enums::{
+        FrequencyDiscardReason, InitializeRtcOutcome, Role, SampleValidationError, TimeSourceError,
+        WriteRtcOutcome,
     };
+    use fidl_fuchsia_metrics::MetricEventPayload;
+    use futures::channel::mpsc;
+    use futures::{FutureExt, StreamExt};
+    use test_util::{assert_geq, assert_leq};
 
     const TEST_EXPERIMENT: Experiment = Experiment::B;
     const MONITOR_OFFSET: zx::Duration = zx::Duration::from_seconds(444);

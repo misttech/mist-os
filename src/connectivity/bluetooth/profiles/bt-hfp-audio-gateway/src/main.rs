@@ -8,14 +8,18 @@ use battery_client::BatteryClient;
 use fidl_fuchsia_media as media;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
-use futures::{channel::mpsc, future};
-use std::{collections::HashSet, pin::pin};
+use futures::channel::mpsc;
+use futures::future;
+use std::collections::HashSet;
+use std::pin::pin;
 use tracing::{debug, error, info, warn};
 
-use crate::{
-    config::AudioGatewayFeatureSupport, features::CodecId, fidl_service::run_services, hfp::Hfp,
-    profile::register_audio_gateway, sco_connector::ScoConnector,
-};
+use crate::config::AudioGatewayFeatureSupport;
+use crate::features::CodecId;
+use crate::fidl_service::run_services;
+use crate::hfp::Hfp;
+use crate::profile::register_audio_gateway;
+use crate::sco_connector::ScoConnector;
 
 mod a2dp;
 mod audio;

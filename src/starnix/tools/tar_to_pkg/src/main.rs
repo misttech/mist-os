@@ -6,15 +6,12 @@
 // package.  The ext4 metadata is stored in a file named "metadata.v1" whilst all the files
 // (not directories or symbolic links) are stored in files named with their inode numbers.
 
-use {
-    anyhow::Error,
-    argh::FromArgs,
-    std::{fs::File, path::Path},
-    tar_img_extract::{
-        docker_archive::DockerArchive, tar_img_extract_docker_archive, tar_img_extract_tarball,
-        InputFormat,
-    },
-};
+use anyhow::Error;
+use argh::FromArgs;
+use std::fs::File;
+use std::path::Path;
+use tar_img_extract::docker_archive::DockerArchive;
+use tar_img_extract::{tar_img_extract_docker_archive, tar_img_extract_tarball, InputFormat};
 
 fn tar_to_pkg(
     image_path: &str,

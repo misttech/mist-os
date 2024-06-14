@@ -11,8 +11,7 @@ pub use self::sysmem::*;
 pub use self::view_ref_pair::*;
 pub use self::view_token_pair::*;
 
-use fidl::endpoints::ClientEnd;
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_images::{
     ImageInfo, ImagePipe2Marker, MemoryType, PixelFormat, PresentationInfo, Tiling,
 };
@@ -952,10 +951,10 @@ impl HostImageCycler {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl::endpoints::create_proxy_and_stream, fuchsia_async as fasync,
-        futures::prelude::*,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_async as fasync;
+    use futures::prelude::*;
 
     /// Returns `true` if the received session command matches the test expectation.
     ///

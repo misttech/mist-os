@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{error::Error, fmt};
+use std::error::Error;
+use std::fmt;
 
-use crate::{path::MAX_ERROR, AffineTransform, Point, MAX_HEIGHT, MAX_WIDTH};
+use crate::path::MAX_ERROR;
+use crate::{AffineTransform, Point, MAX_HEIGHT, MAX_WIDTH};
 
 const MAX_SCALING_FACTOR_X: f32 = 1.0 + MAX_ERROR as f32 / MAX_WIDTH as f32;
 const MAX_SCALING_FACTOR_Y: f32 = 1.0 + MAX_ERROR as f32 / MAX_HEIGHT as f32;

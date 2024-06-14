@@ -4,23 +4,19 @@
 
 use std::cell::Cell;
 
-use crate::{
-    component::Component,
-    component_dirt::ComponentDirt,
-    container_component::ContainerComponent,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    dyn_vec::DynVec,
-    math,
-    node::Node,
-    option_cell::OptionCell,
-    renderer::{GradientBuilder, GradientType},
-    shapes::{
-        paint::{shape_paint_mutator::ShapePaintMutator, GradientStop, RadialGradient},
-        ShapePaintContainer,
-    },
-    status_code::StatusCode,
-    TransformComponent,
-};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::container_component::ContainerComponent;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::dyn_vec::DynVec;
+use crate::node::Node;
+use crate::option_cell::OptionCell;
+use crate::renderer::{GradientBuilder, GradientType};
+use crate::shapes::paint::shape_paint_mutator::ShapePaintMutator;
+use crate::shapes::paint::{GradientStop, RadialGradient};
+use crate::shapes::ShapePaintContainer;
+use crate::status_code::StatusCode;
+use crate::{math, TransformComponent};
 
 #[derive(Debug)]
 pub struct LinearGradient {

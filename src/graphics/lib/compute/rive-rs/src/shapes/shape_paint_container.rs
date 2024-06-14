@@ -4,15 +4,11 @@
 
 use std::cell::Cell;
 
-use crate::{
-    core::{Core, Object, ObjectRef, OnAdded},
-    dyn_vec::DynVec,
-    shapes::{
-        paint::{ShapePaint, Stroke},
-        PathSpace, Shape,
-    },
-    Artboard,
-};
+use crate::core::{Core, Object, ObjectRef, OnAdded};
+use crate::dyn_vec::DynVec;
+use crate::shapes::paint::{ShapePaint, Stroke};
+use crate::shapes::{PathSpace, Shape};
+use crate::Artboard;
 
 #[derive(Debug, Default)]
 pub struct ShapePaintContainer {

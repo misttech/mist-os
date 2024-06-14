@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::logs::{error::LogsError, repository::LogsRepository};
+use crate::logs::error::LogsError;
+use crate::logs::repository::LogsRepository;
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker};
-use fidl_fuchsia_diagnostics as fdiagnostics;
-use fuchsia_async as fasync;
-use futures::{channel::mpsc, StreamExt};
+use futures::channel::mpsc;
+use futures::StreamExt;
 use std::sync::Arc;
 use tracing::warn;
+use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_async as fasync};
 
 pub struct LogSettingsServer {
     /// The repository holding the logs.

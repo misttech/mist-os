@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Error, std::fs, std::io::Write};
+use anyhow::Error;
+use std::fs;
+use std::io::Write;
 
 const FILE_NAME: &'static str = "/custom_artifacts/artifact.txt";
 const FILE_CONTENTS: &'static str = "Hello, world!";

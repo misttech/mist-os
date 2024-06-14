@@ -15,9 +15,9 @@ import tempfile
 import cl_utils
 
 from pathlib import Path
-from typing import AbstractSet, Dict, Iterable, Optional, Sequence, Tuple
+from typing import AbstractSet, Iterable, Mapping, Optional, Sequence, Tuple
 
-_RUSTC_FUSED_FLAGS = {"-C", "-L", "-Z"}
+_RUSTC_FUSED_FLAGS = ["-C", "-L", "-Z"]
 
 
 def _remove_prefix(base: str, prefix: str) -> str:
@@ -109,7 +109,7 @@ class CrateType(enum.Enum):
     STATICLIB = 6  # "staticlib"
 
 
-def parse_crate_type(crate_type) -> CrateType:
+def parse_crate_type(crate_type: str) -> CrateType:
     return {
         "rlib": CrateType.RLIB,
         "bin": CrateType.BINARY,
@@ -149,7 +149,7 @@ def find_direct_inputs(command: Iterable[str]) -> Iterable[RustcInput]:
             yield RustcInput(file=Path(tok), type=InputType.LINKABLE)
 
 
-def find_compiler_from_command(command: Iterable[str]) -> Path:
+def find_compiler_from_command(command: Iterable[str]) -> Path | None:
     for tok in command:
         if "rustc" in tok:
             return Path(tok)
@@ -163,7 +163,7 @@ class _ScanDepsCommandTransformer(object):
         self._emit_metadata = emit_metadata
         self._depfile_name = depfile_name
         self._replaced_emit = False
-        self._aux_rspfiles = []
+        self._aux_rspfiles: list[Path] = []
 
     @property
     def emit_metadata(self) -> bool:
@@ -328,7 +328,6 @@ class _ScanDepsCommandTransformer(object):
         self,
         rspfile_lines: Iterable[str],
     ) -> Iterable[str]:
-        new_lines = []
         # transform rspfile one line at a time
         for line in rspfile_lines:
             yield self._rustc_dep_only_command_rspfile_line(line)
@@ -379,7 +378,7 @@ def rustc_dep_only_command(
     aux_rspfiles = transformer._aux_rspfiles
 
     if not transformer._replaced_emit:
-        return aux_toks + transformer._replacement_emit_args, aux_rspfiles
+        return [*aux_toks, *transformer._replacement_emit_args], aux_rspfiles
 
     return aux_toks, aux_rspfiles
 
@@ -387,13 +386,13 @@ def rustc_dep_only_command(
 class RustAction(object):
     """This is a rustc compile action."""
 
-    def __init__(self, command: Sequence[str], working_dir: Path = None):
+    def __init__(self, command: Sequence[str], working_dir: Path | None = None):
         # keep a copy of the original command
         self._original_command = command
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
 
         # expand response files
-        rsp_files = []
+        rsp_files: list[Path] = []
         self._rsp_expanded_command = list(
             cl_utils.expand_response_files(self.original_command, rsp_files)
         )
@@ -435,15 +434,15 @@ class RustAction(object):
             cl_utils.flatten_comma_list(self._attributes.extern),
             convert_type=Path,
         )
-        self._extern: Dict[str, Path] = {
-            k: v[-1]  # last value wins
+        self._extern: dict[str, Path] = {
+            k: Path(v[-1])  # last value wins
             for k, v in raw_extern.items()
             if v  # ignore empty lists
         }
 
         # post-process some flags
-        self._c_sysroot: Path = None
-        self._use_ld: Path = None
+        self._c_sysroot: Path | None = None
+        self._use_ld: Path | None = None
         self._want_sysroot_libgcc = False
         self._link_arg_files: Sequence[Path] = []
         for arg in self._link_arg_flags:
@@ -463,7 +462,7 @@ class RustAction(object):
                 # needs to be relativized.
                 continue
             if is_linkable(arg):
-                self._link_arg_files.append(arg)
+                self._link_arg_files.append(Path(arg))
 
     @property
     def env(self) -> Sequence[str]:
@@ -482,11 +481,11 @@ class RustAction(object):
         return self._working_dir
 
     @property
-    def output_file(self) -> Optional[Path]:
+    def output_file(self) -> Path | None:
         return self._attributes.output  # usually this is the -o file
 
     @property
-    def compiler(self) -> Path:
+    def compiler(self) -> Path | None:
         return self._compiler
 
     @property
@@ -529,7 +528,7 @@ class RustAction(object):
         return self._response_files
 
     @property
-    def emit(self) -> Dict[str, str]:
+    def emit(self) -> Mapping[str, Sequence[str]]:
         return self._emit
 
     @property
@@ -644,7 +643,7 @@ class RustAction(object):
         ]
 
     @property
-    def externs(self) -> Dict[str, Path]:
+    def externs(self) -> dict[str, Path]:
         return self._extern
 
     def extern_paths(self) -> Iterable[Path]:
@@ -669,7 +668,7 @@ class RustAction(object):
 
     def extra_output_files(self) -> Iterable[Path]:
         base = self._auxiliary_output_path
-        if self.emit_metadata:
+        if self.emit_metadata and self.rmeta:
             yield self.rmeta
         if self.emit_llvm_ir:
             yield Path(base + ".ll")

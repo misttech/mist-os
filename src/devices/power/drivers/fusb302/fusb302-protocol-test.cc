@@ -48,7 +48,7 @@ const uint8_t kTxOffTxToken = 0xfe;
 // datasheet.
 constexpr uint8_t kSopRxToken = 0b1110'0000;
 
-class Fusb302ProtocolTest : public zxtest::Test {
+class Fusb302ProtocolTestBase : public zxtest::Test {
  public:
   void SetUp() override {
     fdf::Logger::SetGlobalInstance(&logger_);
@@ -60,12 +60,12 @@ class Fusb302ProtocolTest : public zxtest::Test {
                                                    &mock_i2c_);
 
     fifos_.emplace(mock_i2c_client_);
-    protocol_.emplace(fifos_.value());
+    protocol_.emplace(GoodCrcGenerationMode::kSoftware, fifos_.value());
   }
 
   void TearDown() override {
-    fdf::Logger::SetGlobalInstance(nullptr);
     mock_i2c_.VerifyAndClear();
+    fdf::Logger::SetGlobalInstance(nullptr);
   }
 
  protected:
@@ -122,12 +122,6 @@ class Fusb302ProtocolTest : public zxtest::Test {
   // kTxOffTxToken and kTxOnTxToken are shared between a piggy-backed message
   // and its main message, they will not be covered by these methods.
 
-  void MockWriteGoodCrcToFifo(usb_pd::MessageId message_id) {
-    mock_i2c_.ExpectWriteStop({kFifosAddress, kSync1TxToken, kSync1TxToken, kSync1TxToken,
-                               kSync2TxToken, kPackSymTxToken | 2, 0x41,
-                               static_cast<uint8_t>(0x00 | (static_cast<uint8_t>(message_id) << 1)),
-                               kJamCrcTxToken, kEopTxToken, kTxOffTxToken, kTxOnTxToken});
-  }
   void MockWriteSoftResetToFifo(usb_pd::MessageId message_id) {
     mock_i2c_.ExpectWriteStop({kFifosAddress, kSync1TxToken, kSync1TxToken, kSync1TxToken,
                                kSync2TxToken, kPackSymTxToken | 2, 0x4d,
@@ -183,7 +177,38 @@ class Fusb302ProtocolTest : public zxtest::Test {
   std::optional<Fusb302Protocol> protocol_;
 };
 
-TEST_F(Fusb302ProtocolTest, Transmit) {
+class Fusb302ProtocolSoftwareGoodCrcTest : public Fusb302ProtocolTestBase {
+ public:
+  void SetUp() override {
+    Fusb302ProtocolTestBase::SetUp();
+    protocol_.emplace(GoodCrcGenerationMode::kSoftware, fifos_.value());
+  }
+
+  void MockWriteGoodCrcToFifo(usb_pd::MessageId message_id) {
+    mock_i2c_.ExpectWriteStop({kFifosAddress, kSync1TxToken, kSync1TxToken, kSync1TxToken,
+                               kSync2TxToken, kPackSymTxToken | 2, 0x41,
+                               static_cast<uint8_t>(0x00 | (static_cast<uint8_t>(message_id) << 1)),
+                               kJamCrcTxToken, kEopTxToken, kTxOffTxToken, kTxOnTxToken});
+  }
+};
+
+class Fusb302ProtocolTrackedGoodCrcTest : public Fusb302ProtocolTestBase {
+ public:
+  void SetUp() override {
+    Fusb302ProtocolTestBase::SetUp();
+    protocol_.emplace(GoodCrcGenerationMode::kTracked, fifos_.value());
+  }
+};
+
+class Fusb302ProtocolAssumedGoodCrcTest : public Fusb302ProtocolTestBase {
+ public:
+  void SetUp() override {
+    Fusb302ProtocolTestBase::SetUp();
+    protocol_.emplace(GoodCrcGenerationMode::kAssumed, fifos_.value());
+  }
+};
+
+TEST_F(Fusb302ProtocolTestBase, Transmit) {
   MockTransmitFifoEmpty();
   MockNoBmcTransmissionDetected();
   MockWritePowerRequestToFifo(usb_pd::MessageId(0));
@@ -195,7 +220,7 @@ TEST_F(Fusb302ProtocolTest, Transmit) {
   EXPECT_EQ(TransmissionState::kPending, protocol_->transmission_state());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoOneMessage) {
+TEST_F(Fusb302ProtocolTestBase, DrainReceiveFifoOneMessage) {
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(0));
   MockReceiveFifoEmpty();
@@ -210,7 +235,7 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoOneMessage) {
   EXPECT_EQ(0x2701912c, protocol_->FirstUnreadMessage().data_objects()[0]);
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoOneMessageMidStream) {
+TEST_F(Fusb302ProtocolTestBase, DrainReceiveFifoOneMessageMidStream) {
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(3));
   MockReceiveFifoEmpty();
@@ -225,7 +250,7 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoOneMessageMidStream) {
   EXPECT_EQ(0x2701912c, protocol_->FirstUnreadMessage().data_objects()[0]);
 }
 
-TEST_F(Fusb302ProtocolTest, MarkMessageAsReadAfterHardwareRepliedGoodCrc) {
+TEST_F(Fusb302ProtocolAssumedGoodCrcTest, MarkMessageAsReadAfterHardwareRepliedGoodCrc) {
   MockReceiveFifoNotEmpty();
   MockReceiveGetSinkCapabilities(usb_pd::MessageId(0));
   MockReceiveFifoEmpty();
@@ -233,19 +258,35 @@ TEST_F(Fusb302ProtocolTest, MarkMessageAsReadAfterHardwareRepliedGoodCrc) {
   EXPECT_OK(protocol_->DrainReceiveFifo());
   EXPECT_TRUE(protocol_->HasUnreadMessage());
 
-  protocol_->DidTransmitGoodCrc();
+  // Not expected to generate any I2C activity.
+  EXPECT_OK(protocol_->MarkMessageAsRead());
+  EXPECT_FALSE(protocol_->HasUnreadMessage());
+
+  ASSERT_EQ(TransmissionState::kSuccess, protocol_->transmission_state());
+  EXPECT_EQ(usb_pd::MessageId(0), protocol_->next_transmitted_message_id());
+}
+
+TEST_F(Fusb302ProtocolTrackedGoodCrcTest, MarkMessageAsReadAfterHardwareRepliedGoodCrc) {
+  MockReceiveFifoNotEmpty();
+  MockReceiveGetSinkCapabilities(usb_pd::MessageId(0));
+  MockReceiveFifoEmpty();
+
+  EXPECT_OK(protocol_->DrainReceiveFifo());
+  EXPECT_TRUE(protocol_->HasUnreadMessage());
+
+  protocol_->DidTransmitHardwareGeneratedGoodCrc();
 
   // Not expected to generate any I2C activity.
   EXPECT_OK(protocol_->MarkMessageAsRead());
   EXPECT_FALSE(protocol_->HasUnreadMessage());
 
-  // Verify that DidTransmitGoodCrc() / MarkMessageAsRead() did not change the
+  // Verify that DidTransmitHardwareGeneratedGoodCrc() did not change the
   // outgoing message flow state.
   ASSERT_EQ(TransmissionState::kSuccess, protocol_->transmission_state());
   EXPECT_EQ(usb_pd::MessageId(0), protocol_->next_transmitted_message_id());
 }
 
-TEST_F(Fusb302ProtocolTest, MarkMessageAsReadTransmitsGoodCrc) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest, MarkMessageAsReadTransmitsGoodCrc) {
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(0));
   MockReceiveFifoEmpty();
@@ -260,13 +301,13 @@ TEST_F(Fusb302ProtocolTest, MarkMessageAsReadTransmitsGoodCrc) {
   EXPECT_OK(protocol_->MarkMessageAsRead());
   EXPECT_FALSE(protocol_->HasUnreadMessage());
 
-  // Verify that DidTransmitGoodCrc() / MarkMessageAsRead() did not change the
-  // outgoing message flow state.
+  // Verify that MarkMessageAsRead() did not change the outgoing message flow
+  // state.
   ASSERT_EQ(TransmissionState::kSuccess, protocol_->transmission_state());
   EXPECT_EQ(usb_pd::MessageId(0), protocol_->next_transmitted_message_id());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoIgnoresRepeatedMessageIdAfterSync) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest, DrainReceiveFifoIgnoresRepeatedMessageIdAfterSync) {
   // Get the PD protocol to sync up Message ID 4.
   {
     MockReceiveFifoNotEmpty();
@@ -290,7 +331,7 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoIgnoresRepeatedMessageIdAfterSync) {
   EXPECT_FALSE(protocol_->HasUnreadMessage());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoIgnoresMismatchedMessageIdAfterSync) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest, DrainReceiveFifoIgnoresMismatchedMessageIdAfterSync) {
   // Get the PD protocol to sync up Message ID 4.
   {
     MockReceiveFifoNotEmpty();
@@ -314,7 +355,7 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoIgnoresMismatchedMessageIdAfterSync)
   EXPECT_FALSE(protocol_->HasUnreadMessage());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoValidMessageAfterMismatchedMessageId) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest, DrainReceiveFifoValidMessageAfterMismatchedMessageId) {
   // Get the PD protocol to sync up Message ID 4.
   {
     MockReceiveFifoNotEmpty();
@@ -344,7 +385,7 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoValidMessageAfterMismatchedMessageId
   EXPECT_EQ(usb_pd::MessageId(5), protocol_->FirstUnreadMessage().header().message_id());
 }
 
-TEST_F(Fusb302ProtocolTest, MarkMessageAsReadSendingGoodCrcUpdatesReceiveCounter) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest, MarkMessageAsReadSendingGoodCrcUpdatesReceiveCounter) {
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(0));
   MockReceiveFifoEmpty();
@@ -372,12 +413,13 @@ TEST_F(Fusb302ProtocolTest, MarkMessageAsReadSendingGoodCrcUpdatesReceiveCounter
             protocol_->FirstUnreadMessage().header().message_type());
 }
 
-TEST_F(Fusb302ProtocolTest, DidTransmitGoodCrcUpdatesReceiveCounter) {
+TEST_F(Fusb302ProtocolTrackedGoodCrcTest,
+       DidTransmitHardwareGeneratedGoodCrcUpdatesReceiveCounter) {
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(0));
   MockReceiveFifoEmpty();
 
-  // Validates that DidTransmitGoodCrc() or MarkMessageAsRead() incremented the
+  // Validates that DidTransmitHardwareGeneratedGoodCrc() or MarkMessageAsRead() incremented the
   // receiving-side MessageID.
   MockReceiveFifoNotEmpty();
   MockReceiveGetSinkCapabilities(usb_pd::MessageId(1));
@@ -388,7 +430,7 @@ TEST_F(Fusb302ProtocolTest, DidTransmitGoodCrcUpdatesReceiveCounter) {
   EXPECT_EQ(usb_pd::MessageType::kSourceCapabilities,
             protocol_->FirstUnreadMessage().header().message_type());
 
-  protocol_->DidTransmitGoodCrc();
+  protocol_->DidTransmitHardwareGeneratedGoodCrc();
   EXPECT_OK(protocol_->MarkMessageAsRead());
 
   EXPECT_OK(protocol_->DrainReceiveFifo());
@@ -397,7 +439,7 @@ TEST_F(Fusb302ProtocolTest, DidTransmitGoodCrcUpdatesReceiveCounter) {
             protocol_->FirstUnreadMessage().header().message_type());
 }
 
-TEST_F(Fusb302ProtocolTest, TransmitIgnoresPendingGoodCrc) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest, TransmitWithUnreadMessageIgnoredPendingGoodCrc) {
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(0));
   MockReceiveFifoEmpty();
@@ -416,7 +458,26 @@ TEST_F(Fusb302ProtocolTest, TransmitIgnoresPendingGoodCrc) {
   EXPECT_EQ(TransmissionState::kPending, protocol_->transmission_state());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoGoodCrcUpdatesTransmissionState) {
+TEST_F(Fusb302ProtocolAssumedGoodCrcTest, TransmitWithUnreadMessage) {
+  MockReceiveFifoNotEmpty();
+  MockReceiveSourceCapabilities(usb_pd::MessageId(0));
+  MockReceiveFifoEmpty();
+
+  MockTransmitFifoEmpty();
+  MockNoBmcTransmissionDetected();
+  MockWritePowerRequestToFifo(usb_pd::MessageId(0));
+
+  EXPECT_OK(protocol_->DrainReceiveFifo());
+  EXPECT_TRUE(protocol_->HasUnreadMessage());
+
+  usb_pd::Message request(usb_pd::MessageType::kRequestPower, usb_pd::MessageId(0),
+                          usb_pd::PowerRole::kSink, usb_pd::SpecRevision::kRev2,
+                          usb_pd::DataRole::kUpstreamFacingPort, MockPowerRequestDataObjects());
+  EXPECT_OK(protocol_->Transmit(request));
+  EXPECT_EQ(TransmissionState::kPending, protocol_->transmission_state());
+}
+
+TEST_F(Fusb302ProtocolTestBase, DrainReceiveFifoGoodCrcUpdatesTransmissionState) {
   MockTransmitFifoEmpty();
   MockNoBmcTransmissionDetected();
   MockWritePowerRequestToFifo(usb_pd::MessageId(0));
@@ -436,7 +497,7 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoGoodCrcUpdatesTransmissionState) {
   EXPECT_EQ(usb_pd::MessageId(1), protocol_->next_transmitted_message_id());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoSoftResetWithOutOfOrderMessageId) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest, DrainReceiveFifoSoftResetWithOutOfOrderMessageId) {
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(0));
   MockReceiveFifoEmpty();
@@ -465,7 +526,8 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoSoftResetWithOutOfOrderMessageId) {
             protocol_->FirstUnreadMessage().header().message_type());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoSoftResetWithOutOfOrderMessageIdCreatesPendingGoodCrc) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest,
+       DrainReceiveFifoSoftResetWithOutOfOrderMessageIdCreatesPendingGoodCrc) {
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(0));
   MockReceiveFifoEmpty();
@@ -500,7 +562,7 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoSoftResetWithOutOfOrderMessageIdCrea
   EXPECT_OK(protocol_->MarkMessageAsRead());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoSoftResetDropsPreviousMessages) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest, DrainReceiveFifoSoftResetDropsPreviousMessages) {
   MockReceiveFifoNotEmpty();
   MockReceiveSourceCapabilities(usb_pd::MessageId(0));
   MockReceiveFifoNotEmpty();
@@ -522,7 +584,7 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoSoftResetDropsPreviousMessages) {
   EXPECT_FALSE(protocol_->HasUnreadMessage());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoQueueingOrder) {
+TEST_F(Fusb302ProtocolTestBase, DrainReceiveFifoQueueingOrder) {
   MockReceiveFifoNotEmpty();
   MockReceiveAccept(usb_pd::MessageId(0));
   MockReceiveFifoNotEmpty();
@@ -541,7 +603,8 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoQueueingOrder) {
             protocol_->FirstUnreadMessage().header().message_type());
 }
 
-TEST_F(Fusb302ProtocolTest, DrainReceiveFifoWithMultipleMessagesSetsPendingCrcToLastMessage) {
+TEST_F(Fusb302ProtocolSoftwareGoodCrcTest,
+       DrainReceiveFifoWithMultipleMessagesSetsPendingCrcToLastMessage) {
   MockReceiveFifoNotEmpty();
   MockReceiveAccept(usb_pd::MessageId(0));
   MockReceiveFifoNotEmpty();
@@ -577,7 +640,8 @@ TEST_F(Fusb302ProtocolTest, DrainReceiveFifoWithMultipleMessagesSetsPendingCrcTo
   EXPECT_FALSE(protocol_->HasUnreadMessage());
 }
 
-TEST_F(Fusb302ProtocolTest, DidTransmitGoodCrcAfterDrainReceiveFifoWithMultipleMessages) {
+TEST_F(Fusb302ProtocolTrackedGoodCrcTest,
+       DidTransmitHardwareGeneratedGoodCrcAfterDrainReceiveFifoWithMultipleMessages) {
   MockReceiveFifoNotEmpty();
   MockReceiveAccept(usb_pd::MessageId(0));
   MockReceiveFifoNotEmpty();
@@ -587,7 +651,7 @@ TEST_F(Fusb302ProtocolTest, DidTransmitGoodCrcAfterDrainReceiveFifoWithMultipleM
   MockReceiveFifoEmpty();
 
   EXPECT_OK(protocol_->DrainReceiveFifo());
-  protocol_->DidTransmitGoodCrc();
+  protocol_->DidTransmitHardwareGeneratedGoodCrc();
 
   ASSERT_TRUE(protocol_->HasUnreadMessage());
   EXPECT_EQ(usb_pd::MessageType::kAccept, protocol_->FirstUnreadMessage().header().message_type());
@@ -612,7 +676,7 @@ TEST_F(Fusb302ProtocolTest, DidTransmitGoodCrcAfterDrainReceiveFifoWithMultipleM
   EXPECT_FALSE(protocol_->HasUnreadMessage());
 }
 
-TEST_F(Fusb302ProtocolTest, TransmitAfterDrainReceiveFifoWithMultipleMessages) {
+TEST_F(Fusb302ProtocolTrackedGoodCrcTest, TransmitAfterDrainReceiveFifoWithMultipleMessages) {
   MockReceiveFifoNotEmpty();
   MockReceiveAccept(usb_pd::MessageId(0));
   MockReceiveFifoNotEmpty();
@@ -626,7 +690,7 @@ TEST_F(Fusb302ProtocolTest, TransmitAfterDrainReceiveFifoWithMultipleMessages) {
   MockWriteSinkCapabilitiesToFifo(usb_pd::MessageId(0));
 
   EXPECT_OK(protocol_->DrainReceiveFifo());
-  protocol_->DidTransmitGoodCrc();
+  protocol_->DidTransmitHardwareGeneratedGoodCrc();
 
   ASSERT_TRUE(protocol_->HasUnreadMessage());
   EXPECT_EQ(usb_pd::MessageType::kAccept, protocol_->FirstUnreadMessage().header().message_type());

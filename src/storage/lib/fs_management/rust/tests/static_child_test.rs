@@ -4,12 +4,11 @@
 
 //! Test launching filesystems as static child components in a custom environment.
 
-use {
-    fidl_fuchsia_fxfs::MountOptions,
-    fidl_fuchsia_io as fio,
-    fs_management::{filesystem::Filesystem, Blobfs, ComponentType, Fxfs, Minfs},
-    ramdevice_client::RamdiskClient,
-};
+use fidl_fuchsia_fxfs::MountOptions;
+use fidl_fuchsia_io as fio;
+use fs_management::filesystem::Filesystem;
+use fs_management::{Blobfs, ComponentType, Fxfs, Minfs};
+use ramdevice_client::RamdiskClient;
 
 #[fuchsia::test]
 async fn blobfs_static_child() {

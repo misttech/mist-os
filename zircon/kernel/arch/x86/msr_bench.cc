@@ -395,7 +395,7 @@ int BenchmarkState::Run() {
 
       const StageResults& result = ctx.results[stage];
       const zx_ticks_t ticks_duration = result.end - result.start;
-      const zx_time_t time_duration = platform_get_ticks_to_time_ratio().Scale(ticks_duration);
+      const zx_time_t time_duration = timer_get_ticks_to_time_ratio().Scale(ticks_duration);
       if ((time_duration > 0) && (time_duration <= ktl::numeric_limits<uint32_t>::max())) {
         printf(" %12ld |",
                affine::Ratio{ZX_SEC(1), static_cast<uint32_t>(time_duration)}.Scale(result.count));
@@ -444,7 +444,7 @@ int BenchmarkState::RunContext(CpuContext& ctx) {
             arch::Yield();
           }
 
-          zx_ticks_t ticks = platform_get_ticks_to_time_ratio().Inverse().Scale(kMeasurementTime);
+          zx_ticks_t ticks = timer_get_ticks_to_time_ratio().Inverse().Scale(kMeasurementTime);
           ticks_deadline_.store(current_ticks() + ticks);
           ready_to_start_count_.fetch_add(1);
         } else {

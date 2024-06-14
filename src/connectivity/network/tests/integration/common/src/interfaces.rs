@@ -13,10 +13,8 @@ use anyhow::Context as _;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::future::{FusedFuture, Future, FutureExt as _, TryFutureExt as _};
-use std::{
-    collections::{HashMap, HashSet},
-    pin::pin,
-};
+use std::collections::{HashMap, HashSet};
+use std::pin::pin;
 
 /// Waits for a non-loopback interface to come up with an ID not in `exclude_ids`.
 ///

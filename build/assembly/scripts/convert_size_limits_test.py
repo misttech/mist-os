@@ -7,6 +7,7 @@ import convert_size_limits
 import os
 import sys
 import json
+from typing import Any
 from parameterized import parameterized, param
 
 
@@ -168,13 +169,13 @@ class ConvertTest(unittest.TestCase):
     )
     def test_run_main(
         self,
-        name,
-        size_limits,
-        image_assembly_config,
-        expected_output,
-        max_blob_contents_size,
-        return_value,
-    ):
+        name: str,
+        size_limits: dict[str, Any],
+        image_assembly_config: dict[str, Any],
+        expected_output: dict[str, Any],
+        max_blob_contents_size: int,
+        return_value: int,
+    ) -> None:
         self.maxDiff = None  # Do not truncate the diff result.
         with tempfile.TemporaryDirectory() as tmpdir:
             platform_aibs_path = os.path.join(tmpdir, "platform_aibs.json")

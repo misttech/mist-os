@@ -33,7 +33,8 @@
 //! health.set_ok();
 //! ```
 
-use super::{health, stats::InspectorExt, Inspector, InspectorConfig};
+use super::stats::InspectorExt;
+use super::{health, Inspector, InspectorConfig};
 use fuchsia_sync::Mutex;
 use inspect_format::constants;
 use lazy_static::lazy_static;

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::{ArgsInfo, FromArgs},
-    camino::Utf8PathBuf,
-    chrono::{DateTime, Utc},
-    fuchsia_repo::repository::CopyMode,
-    std::path::PathBuf,
-    version_history::ApiLevel,
-};
+use argh::{ArgsInfo, FromArgs};
+use camino::Utf8PathBuf;
+use chrono::{DateTime, Utc};
+use fuchsia_repo::repository::CopyMode;
+use std::path::PathBuf;
+use version_history::ApiLevel;
 
 #[derive(Eq, ArgsInfo, FromArgs, PartialEq, Debug)]
 /// create a package archive from a package_manifest.json

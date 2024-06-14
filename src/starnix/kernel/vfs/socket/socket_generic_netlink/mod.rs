@@ -3,35 +3,30 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use futures::{
-    channel::mpsc,
-    future::{join, Future},
-    stream::{FuturesUnordered, StreamExt},
-};
+use futures::channel::mpsc;
+use futures::future::{join, Future};
+use futures::stream::{FuturesUnordered, StreamExt};
 use linux_uapi::{NLM_F_ACK, NLM_F_CAPPED};
-use netlink::{messaging::Sender, multicast_groups::ModernGroup, NETLINK_LOG_TAG};
+use netlink::messaging::Sender;
+use netlink::multicast_groups::ModernGroup;
+use netlink::NETLINK_LOG_TAG;
 use netlink_packet_core::{
     ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload, NETLINK_HEADER_LEN,
 };
-use netlink_packet_generic::{
-    constants::GENL_ID_CTRL,
-    ctrl::{
-        nlas::{GenlCtrlAttrs, McastGrpAttrs},
-        GenlCtrl, GenlCtrlCmd,
-    },
-    GenlMessage,
-};
+use netlink_packet_generic::constants::GENL_ID_CTRL;
+use netlink_packet_generic::ctrl::nlas::{GenlCtrlAttrs, McastGrpAttrs};
+use netlink_packet_generic::ctrl::{GenlCtrl, GenlCtrlCmd};
+use netlink_packet_generic::GenlMessage;
 use netlink_packet_utils::Emitable;
 use starnix_logging::track_stub;
 use starnix_sync::Mutex;
-use std::{
-    collections::{HashMap, HashSet},
-    ops::DerefMut,
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
+use std::ops::DerefMut;
+use std::sync::Arc;
 
 use starnix_logging::{log_error, log_info, log_warn};
-use starnix_uapi::{error, errors::Errno};
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
 
 mod messages;
 mod nl80211;
@@ -517,7 +512,8 @@ mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use super::{test_utils::*, *};
+    use super::test_utils::*;
+    use super::*;
     use assert_matches::assert_matches;
     use fuchsia_async::TestExecutor;
     use futures::pin_mut;

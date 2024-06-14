@@ -6,7 +6,8 @@ use anyhow::Error;
 
 use crate::factory_store::types::{FactoryStoreProvider, ListFilesRequest, ReadFileRequest};
 
-use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_factory::{
     AlphaFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderMarker,

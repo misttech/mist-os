@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    bones::SkeletalComponent,
-    component::Component,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    dyn_vec::{DynVec, DynVecIter},
-    status_code::StatusCode,
-    TransformComponent,
-};
+use crate::bones::SkeletalComponent;
+use crate::component::Component;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::dyn_vec::{DynVec, DynVecIter};
+use crate::status_code::StatusCode;
+use crate::TransformComponent;
 
 #[derive(Debug, Default)]
 pub struct Bone {

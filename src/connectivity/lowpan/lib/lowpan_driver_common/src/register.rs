@@ -36,10 +36,8 @@ where
 #[async_trait()]
 impl<T: Driver> ServeTo<DriverRequestStream> for T {
     async fn serve_to(&self, request_stream: DriverRequestStream) -> anyhow::Result<()> {
-        use std::sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        };
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
         let legacy_joining_protocol_in_use_flag: Arc<AtomicBool> = Arc::default();
 
         request_stream
@@ -120,8 +118,7 @@ where
     R: fidl_fuchsia_factory_lowpan::FactoryRegisterProxyInterface,
     D: Driver + 'a,
 {
-    use fidl_fuchsia_factory_lowpan::FactoryDriverMarker;
-    use fidl_fuchsia_factory_lowpan::FactoryDriverRequest;
+    use fidl_fuchsia_factory_lowpan::{FactoryDriverMarker, FactoryDriverRequest};
 
     let (client_ep, server_ep) = create_endpoints::<FactoryDriverMarker>();
 

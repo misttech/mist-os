@@ -16,7 +16,9 @@
 //! * Modularity.
 
 use alloc::borrow::Cow;
-use core::{borrow::Borrow, fmt::Debug, hash::Hash};
+use core::borrow::Borrow;
+use core::fmt::Debug;
+use core::hash::Hash;
 
 pub(crate) mod link;
 
@@ -84,27 +86,26 @@ pub trait DeviceIdContext<D: Device> {
 ///
 /// It is provided as a blanket implementation for [`DeviceIdContext`]s that
 /// fulfill the conversion.
-#[allow(missing_docs)]
 pub trait DeviceIdAnyCompatContext<D: Device>:
     DeviceIdContext<D>
-    + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId_, WeakDeviceId = Self::WeakDeviceId_>
+    + DeviceIdContext<
+        AnyDevice,
+        DeviceId: From<<Self as DeviceIdContext<D>>::DeviceId>,
+        WeakDeviceId: From<<Self as DeviceIdContext<D>>::WeakDeviceId>,
+    >
 {
-    type DeviceId_: StrongDeviceIdentifier<Weak = Self::WeakDeviceId_>
-        + From<<Self as DeviceIdContext<D>>::DeviceId>;
-    type WeakDeviceId_: WeakDeviceIdentifier<Strong = Self::DeviceId_>
-        + From<<Self as DeviceIdContext<D>>::WeakDeviceId>;
 }
 
 impl<CC, D> DeviceIdAnyCompatContext<D> for CC
 where
     D: Device,
-    CC: DeviceIdContext<D> + DeviceIdContext<AnyDevice>,
-    <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId:
-        From<<CC as DeviceIdContext<D>>::WeakDeviceId>,
-    <CC as DeviceIdContext<AnyDevice>>::DeviceId: From<<CC as DeviceIdContext<D>>::DeviceId>,
+    CC: DeviceIdContext<D>
+        + DeviceIdContext<
+            AnyDevice,
+            DeviceId: From<<CC as DeviceIdContext<D>>::DeviceId>,
+            WeakDeviceId: From<<CC as DeviceIdContext<D>>::WeakDeviceId>,
+        >,
 {
-    type DeviceId_ = <CC as DeviceIdContext<AnyDevice>>::DeviceId;
-    type WeakDeviceId_ = <CC as DeviceIdContext<AnyDevice>>::WeakDeviceId;
 }
 
 /// A device id that might be either in its strong or weak form.

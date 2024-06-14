@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use futures::{
-    stream::Stream,
-    task::{Context, Poll},
-};
+use futures::stream::Stream;
+use futures::task::{Context, Poll};
 use std::pin::Pin;
 
 /// An extension trait providing additional combinator methods for Streams.

@@ -72,10 +72,6 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/devices/board/drivers/vim3:vim3-driver",
-
-    #------------------
-    #------------------
     "//src/devices/board/lib/acpi",
 
     #------------------

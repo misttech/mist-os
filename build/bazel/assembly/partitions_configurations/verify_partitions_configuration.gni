@@ -44,7 +44,7 @@ template("verify_partitions_configuration") {
          "bazel_partitions_config_target is required")
 
   _bazel_partitions_config_target = "${target_name}.bazel_partitions_config"
-  _bazel_partitions_config_file = "${target_name}/bazel_partitions_config.json"
+  _bazel_partitions_config_dir = "${target_name}.bazel_partitions_config"
 
   bazel_action(_bazel_partitions_config_target) {
     forward_variables_from(invoker,
@@ -58,10 +58,13 @@ template("verify_partitions_configuration") {
     bazel_targets = [ invoker.bazel_partitions_config_target ]
     copy_outputs = [
       {
-        bazel = "{{BAZEL_TARGET_OUT_PATH}}_partitions.json"
-        ninja = _bazel_partitions_config_file
+        bazel = "{{BAZEL_TARGET_OUT_PATH}}"
+        ninja = _bazel_partitions_config_dir
       },
     ]
+    allow_directory_in_outputs = true
+    directory_timestamp_outputs =
+        [ "$_bazel_partitions_config_dir/partitions_config.json" ]
   }
 
   action(target_name) {
@@ -74,16 +77,27 @@ template("verify_partitions_configuration") {
         get_label_info(invoker.gn_partitions_config_target, "target_out_dir")
     _gn_partitions_config_name =
         get_label_info(invoker.gn_partitions_config_target, "name")
-    _gn_partitions_config_file =
-        "${_gn_partitions_config_out_dir}/${_gn_partitions_config_name}.json"
+    _gn_partitions_config_file = "${_gn_partitions_config_out_dir}/${_gn_partitions_config_name}/partitions_config.json"
 
     depfile = "${target_gen_dir}/${target_name}.d"
 
     inputs = [
+      "${target_out_dir}/${_bazel_partitions_config_dir}/partitions_config.json",
       _gn_partitions_config_file,
-      "${target_out_dir}/${_bazel_partitions_config_file}",
     ]
     outputs = [ "${target_out_dir}/${target_name}/diff" ]
+
+    script = "//build/bazel/assembly/partitions_configurations/verify_partitions_configuration.py"
+    args = [
+      "--partitions_config1",
+      rebase_path(inputs[0], root_build_dir),
+      "--partitions_config2",
+      rebase_path(inputs[1], root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+    ]
 
     deps = [
       ":${_bazel_partitions_config_target}",
@@ -92,21 +106,5 @@ template("verify_partitions_configuration") {
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
-
-    script = "//build/bazel/assembly/partitions_configurations/verify_partitions_configuration.py"
-    args = [
-      "--partitions_config1",
-      rebase_path(inputs[0], root_build_dir),
-      "--root_dir1",
-      ".",
-      "--partitions_config2",
-      rebase_path(inputs[1], root_build_dir),
-      "--root_dir2",
-      bazel_main_top_dir_rebased + "/workspace",
-      "--depfile",
-      rebase_path(depfile, root_build_dir),
-      "--output",
-      rebase_path(outputs[0], root_build_dir),
-    ]
   }
 }

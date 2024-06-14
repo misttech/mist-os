@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::HandleBased,
-    std::{
-        cell::UnsafeCell,
-        collections::{hash_map::Entry, HashMap, VecDeque},
-        marker::PhantomData,
-        mem::ManuallyDrop,
-        ops::Deref,
-        sync::{Arc, Condvar, Mutex, OnceLock, Weak},
-    },
-};
+use fidl::HandleBased;
+use std::cell::UnsafeCell;
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, VecDeque};
+use std::marker::PhantomData;
+use std::mem::ManuallyDrop;
+use std::ops::Deref;
+use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
 
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::zx_handle_t;
@@ -196,11 +193,9 @@ pub async fn unblock<T: 'static + Send>(f: impl FnOnce() -> T + Send + 'static) 
 #[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
-    use {
-        super::{clones, TempClonable},
-        fuchsia_zircon as zx,
-        std::sync::Arc,
-    };
+    use super::{clones, TempClonable};
+    use fuchsia_zircon as zx;
+    use std::sync::Arc;
 
     #[test]
     fn test_temp_clone() {

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {carnelian::input, pty::key_util::CodePoint, pty::key_util::HidUsage};
+use carnelian::input;
+use pty::key_util::{CodePoint, HidUsage};
 
 /// Converts the given keyboard event into a String suitable to send to the shell.
 /// If the conversion fails for any reason None is returned instead of an Error

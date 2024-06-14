@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::error::ModelError,
-    crate::model::collection::DataCollection,
-    anyhow::{Error, Result},
-    scrutiny_config::ModelConfig,
-    serde::{Deserialize, Serialize},
-    std::{
-        any::{Any, TypeId},
-        collections::HashMap,
-        sync::{Arc, Mutex},
-    },
-};
+use super::error::ModelError;
+use crate::model::collection::DataCollection;
+use anyhow::{Error, Result};
+use scrutiny_config::ModelConfig;
+use serde::{Deserialize, Serialize};
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// The DataModel is the public facing data abstraction which acts as the
 /// driver for the underlying data store. It is the job of the data model to

@@ -3,28 +3,28 @@
 // found in the LICENSE file.
 
 #![cfg(test)]
-use {
-    assert_matches::assert_matches,
-    fidl_fuchsia_paver::Configuration,
-    fidl_fuchsia_update as fidl_update,
-    fidl_fuchsia_update_ext::{
-        InstallationErrorData, InstallationProgress, InstallingData, State, UpdateInfo,
-    },
-    fidl_fuchsia_update_installer as fidl_installer,
-    fidl_fuchsia_update_installer_ext::{self as installer},
-    fuchsia_async::{self as fasync, TimeoutExt as _},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{self as zx, EventPair, HandleBased, Peered},
-    futures::{channel::mpsc, lock::Mutex as AsyncMutex, prelude::*},
-    mock_installer::{
-        CapturedRebootControllerRequest, CapturedUpdateInstallerRequest, MockUpdateInstallerService,
-    },
-    mock_paver::{MockPaverService, MockPaverServiceBuilder, PaverEvent},
-    mock_reboot::{MockRebootService, RebootReason},
-    pretty_assertions::assert_eq,
-    std::{sync::Arc, time::Duration},
+use assert_matches::assert_matches;
+use fidl_fuchsia_paver::Configuration;
+use fidl_fuchsia_update_ext::{
+    InstallationErrorData, InstallationProgress, InstallingData, State, UpdateInfo,
 };
+use fidl_fuchsia_update_installer_ext::{self as installer};
+use fuchsia_async::{self as fasync, TimeoutExt as _};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{self as zx, EventPair, HandleBased, Peered};
+use futures::channel::mpsc;
+use futures::lock::Mutex as AsyncMutex;
+use futures::prelude::*;
+use mock_installer::{
+    CapturedRebootControllerRequest, CapturedUpdateInstallerRequest, MockUpdateInstallerService,
+};
+use mock_paver::{MockPaverService, MockPaverServiceBuilder, PaverEvent};
+use mock_reboot::{MockRebootService, RebootReason};
+use pretty_assertions::assert_eq;
+use std::sync::Arc;
+use std::time::Duration;
+use {fidl_fuchsia_update as fidl_update, fidl_fuchsia_update_installer as fidl_installer};
 
 const BINARY_PATH: &str = "/pkg/bin/update";
 

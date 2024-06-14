@@ -9,12 +9,11 @@ use async_trait::async_trait;
 use ffx_config::global_env_context;
 use fuchsia_async::Task;
 use futures::{FutureExt, StreamExt};
-use std::{cell::Cell, process::Stdio};
+use std::cell::Cell;
+use std::process::Stdio;
 use symbol_index::ensure_symbol_index_registered;
-use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    process::Command,
-};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::Command;
 
 // TODO(https://fxbug.dev/42072442): Remove this.
 /// No-op symbolizer used for testing

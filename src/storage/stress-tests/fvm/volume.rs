@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy},
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_zircon as zx,
-    remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient},
-    storage_stress_test_utils::fvm::{get_volume_path, Guid},
-};
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy};
+use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_zircon as zx;
+use remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
+use storage_stress_test_utils::fvm::{get_volume_path, Guid};
 
 fn fidl_to_status(result: Result<i32, fidl::Error>) -> Result<(), zx::Status> {
     match result {

@@ -187,7 +187,7 @@ class TraceUtilsTest(unittest.TestCase):
         )
 
     def test_standard_metrics_set(self) -> None:
-        values = [0, 10]
+        values: list[float] = [0, 10]
         unit = trace_metrics.Unit.milliseconds
 
         results = trace_utils.standard_metrics_set(

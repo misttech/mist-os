@@ -20,20 +20,15 @@
 
 use anyhow::{format_err, Error};
 use fuchsia_sync::Mutex;
-use futures::{
-    channel::oneshot,
-    future::FusedFuture,
-    ready,
-    task::{Context, Poll},
-    Future, FutureExt,
-};
+use futures::channel::oneshot;
+use futures::future::FusedFuture;
+use futures::task::{Context, Poll};
+use futures::{ready, Future, FutureExt};
 use slab::Slab;
 use std::collections::VecDeque;
 use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Weak,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Weak};
 
 type BoxRevokeFn = Box<dyn FnOnce() -> Permit + Send>;
 

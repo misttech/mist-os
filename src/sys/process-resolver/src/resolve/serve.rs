@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 use crate::resolve::get_binary_and_loader_from_pkg_dir;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_pkg as fpkg;
 use fidl_fuchsia_process::{ResolverRequest, ResolverRequestStream};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_url::AbsoluteComponentUrl;
-use fuchsia_zircon as zx;
 use futures::prelude::*;
 use tracing::warn;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg, fuchsia_zircon as zx};
 
 pub async fn serve(mut stream: ResolverRequestStream) {
     let pkg_resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()

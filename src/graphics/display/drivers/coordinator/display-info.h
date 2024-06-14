@@ -48,30 +48,32 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
   // Should be called after init_done is set to true.
   void InitializeInspect(inspect::Node* parent_node);
 
+  // Guaranteed to be >= 0 and < 2^16.
   // Returns zero if the information is not available.
-  uint32_t GetHorizontalSizeMm() const;
+  int GetHorizontalSizeMm() const;
 
+  // Guaranteed to be >= 0 and < 2^16.
   // Returns zero if the information is not available.
-  uint32_t GetVerticalSizeMm() const;
+  int GetVerticalSizeMm() const;
 
   // Returns an empty view if the information is not available.
+  // The returned string view is guaranteed to be of static storage duration.
   std::string_view GetManufacturerName() const;
 
-  // Returns an empty view if the information is not available.
-  std::string_view GetMonitorName() const;
+  // Returns an empty string if the information is not available.
+  std::string GetMonitorName() const;
 
   // Returns an empty string if the information is not available.
-  std::string_view GetMonitorSerial() const;
+  std::string GetMonitorSerial() const;
 
   struct Edid {
     edid::Edid base;
     fbl::Vector<display::DisplayTiming> timings;
-    fbl::Vector<audio_types_audio_stream_format_range_t> audio;
   };
 
   // Exactly one of `edid` and `mode` can be non-nullopt.
   std::optional<Edid> edid;
-  std::optional<display_mode_t> mode;
+  std::optional<DisplayTiming> mode;
 
   fbl::Vector<CoordinatorPixelFormat> pixel_formats;
 
@@ -123,7 +125,6 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
 
  private:
   DisplayInfo();
-  void PopulateDisplayAudio();
   inspect::Node node;
   inspect::ValueList properties;
 };

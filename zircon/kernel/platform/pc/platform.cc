@@ -458,16 +458,6 @@ void platform_init(void) {
   printf("smbios: manufacturer=\"%s\" product=\"%s\"\n", manufacturer, product);
 }
 
-void platform_prep_suspend(void) {
-  pc_prep_suspend_timer();
-  pc_suspend_debug();
-}
-
-void platform_resume(void) {
-  pc_resume_debug();
-  pc_resume_timer();
-}
-
 zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }

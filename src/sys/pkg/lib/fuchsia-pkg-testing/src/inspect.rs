@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    diagnostics_hierarchy::DiagnosticsHierarchy,
-    diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
-};
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
 
 /// Get the Inspect `NodeHierarchy` for the component under test running in the nested environment.
 pub async fn get_inspect_hierarchy(

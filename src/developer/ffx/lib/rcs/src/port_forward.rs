@@ -10,13 +10,12 @@ use anyhow::{anyhow, Result};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt;
-use fidl_fuchsia_posix_socket as fsock;
 use fidl_fuchsia_sys2::OpenDirType;
-use fuchsia_async as fasync;
 use futures::Stream;
 use std::net::SocketAddr;
 use std::ops::Deref;
 use std::time::Duration;
+use {fidl_fuchsia_posix_socket as fsock, fuchsia_async as fasync};
 
 /// Connect to `fuchsia.posix.socket.Provider` from the perspective of RCS.
 async fn socket_provider(

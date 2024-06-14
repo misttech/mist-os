@@ -16,6 +16,7 @@
 
 #include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/utils/errors.h"
+#include "src/developer/forensics/utils/promise_timeout.h"
 #include "src/lib/fidl/cpp/contrib/fpromise/client.h"
 
 namespace forensics::exceptions::handler {
@@ -23,25 +24,6 @@ namespace {
 
 namespace fpb = fuchsia_power_broker;
 namespace fps = fuchsia_power_system;
-
-class SagEventHandler : public fidl::AsyncEventHandler<fps::ActivityGovernor> {
- public:
-  void on_fidl_error(const fidl::UnbindInfo error) override { FX_LOGS(ERROR) << error; }
-
-  void handle_unknown_event(
-      const fidl::UnknownEventMetadata<fps::ActivityGovernor> metadata) override {
-    FX_LOGS(ERROR) << "Unexpected event ordinal: " << metadata.event_ordinal;
-  }
-};
-
-class TopologyEventHandler : public fidl::AsyncEventHandler<fpb::Topology> {
- public:
-  void on_fidl_error(const fidl::UnbindInfo error) override { FX_LOGS(ERROR) << error; }
-
-  void handle_unknown_event(const fidl::UnknownEventMetadata<fpb::Topology> metadata) override {
-    FX_LOGS(ERROR) << "Unexpected event ordinal: " << metadata.event_ordinal;
-  }
-};
 
 fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Lessor> server_end,
                                const std::string& element_name) {
@@ -67,6 +49,32 @@ fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Le
   return schema;
 }
 
+fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WaitForLeaseSatisfied(
+    fidl::Client<fpb::LeaseControl> lease_control, fpb::LeaseStatus last_status) {
+  return fidl_fpromise::as_promise(lease_control->WatchStatus(last_status))
+      .then([lease_control = std::move(lease_control)](
+                const fpromise::result<fuchsia_power_broker::LeaseControlWatchStatusResponse,
+                                       fidl::Status>& result) mutable
+            -> fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> {
+        if (result.is_error()) {
+          FX_LOGS(ERROR) << "Failed to watch lease status: " << result.error().FormatDescription();
+
+          // We failed to wait for the lease to become satisfied, but we'll optimistically hold onto
+          // the lease and hope it becomes satisfied in time to prevent a possible system
+          // suspension.
+          return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
+              fpromise::ok(std::move(lease_control)));
+        }
+
+        if (const fpb::LeaseStatus status = result.value().status();
+            status != fpb::LeaseStatus::kSatisfied) {
+          return WaitForLeaseSatisfied(std::move(lease_control), status);
+        }
+        return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
+            fpromise::ok(std::move(lease_control)));
+      });
+}
+
 }  // namespace
 
 WakeLease::WakeLease(async_dispatcher_t* dispatcher, const std::string& power_element_name,
@@ -75,28 +83,24 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, const std::string& power_el
     : dispatcher_(dispatcher),
       power_element_name_(power_element_name),
       add_power_element_called_(false),
-      sag_event_handler_(std::make_unique<SagEventHandler>()),
-      sag_(std::move(sag_client_end), dispatcher_, sag_event_handler_.get()),
-      topology_event_handler_(std::make_unique<TopologyEventHandler>()),
-      topology_(std::move(topology_client_end), dispatcher_, topology_event_handler_.get()) {}
+      sag_(std::move(sag_client_end), dispatcher_, &sag_event_handler_),
+      topology_(std::move(topology_client_end), dispatcher_, &topology_event_handler_) {}
 
-fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> WakeLease::Acquire() {
+fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::Acquire(
+    const zx::duration timeout) {
+  return MakePromiseTimeout<fidl::Client<fpb::LeaseControl>>(UnsafeAcquire().wrap_with(scope_),
+                                                             dispatcher_, timeout);
+}
+
+fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::UnsafeAcquire() {
   if (add_power_element_called_) {
     return DoAcquireLease();
   }
 
-  auto self = ptr_factory_.GetWeakPtr();
   return AddPowerElement()
-      .and_then([self]() -> fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> {
-        if (!self) {
-          return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
-              fpromise::error(Error::kLogicError));
-        }
-
-        return self->DoAcquireLease();
-      })
+      .and_then([this]() { return DoAcquireLease(); })
       .or_else([](const Error& add_element_error) {
-        return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
+        return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
             fpromise::error(add_element_error));
       });
 }
@@ -111,14 +115,9 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
   //
   // TODO(https://fxbug.dev/341104129): connect to SAG here instead of injecting the connection in
   // the constructor. Disconnect once no longer needed.
-  auto self = ptr_factory_.GetWeakPtr();
   sag_->GetPowerElements().Then(
-      [self, completer = std::move(bridge.completer)](
+      [this, completer = std::move(bridge.completer)](
           fidl::Result<fps::ActivityGovernor::GetPowerElements>& result) mutable {
-        if (!self) {
-          return;
-        }
-
         if (result.is_error()) {
           FX_LOGS(ERROR) << "Failed to retrieve power elements: "
                          << result.error_value().FormatDescription();
@@ -142,64 +141,53 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
 
         fpb::ElementSchema schema =
             BuildSchema(std::move(result->execution_state()->passive_dependency_token()).value(),
-                        std::move(endpoints->server), self->power_element_name_);
+                        std::move(endpoints->server), power_element_name_);
 
         // TODO(https://fxbug.dev/341104129): connect to topology here instead of injecting the
         // connection in the constructor. Disconnect once no longer needed.
-        self->topology_->AddElement(std::move(schema))
-            .Then([self, completer = std::move(completer),
-                   client_end = std::move(endpoints->client)](
-                      fidl::Result<fpb::Topology::AddElement>& result) mutable {
-              if (!self) {
-                return;
-              }
+        topology_->AddElement(std::move(schema))
+            .Then(
+                [this, completer = std::move(completer), client_end = std::move(endpoints->client)](
+                    fidl::Result<fpb::Topology::AddElement>& result) mutable {
+                  if (result.is_error()) {
+                    FX_LOGS(ERROR) << "Failed to add element to topology: "
+                                   << result.error_value().FormatDescription();
+                    completer.complete_error(Error::kBadValue);
+                    return;
+                  }
 
-              if (result.is_error()) {
-                FX_LOGS(ERROR) << "Failed to add element to topology: "
-                               << result.error_value().FormatDescription();
-                completer.complete_error(Error::kBadValue);
-                return;
-              }
-
-              self->element_control_channel_ = std::move(result.value().element_control_channel());
-              self->lessor_ = fidl::Client<fpb::Lessor>(std::move(client_end), self->dispatcher_);
-              completer.complete_ok();
-            });
+                  element_control_channel_ = std::move(result.value().element_control_channel());
+                  lessor_ = fidl::Client<fpb::Lessor>(std::move(client_end), dispatcher_);
+                  completer.complete_ok();
+                });
       });
 
   return bridge.consumer.promise_or(fpromise::error(Error::kLogicError))
       .wrap_with(add_power_element_barrier_);
 }
 
-fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> WakeLease::DoAcquireLease() {
-  auto self = ptr_factory_.GetWeakPtr();
+fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::DoAcquireLease() {
   return add_power_element_barrier_.sync().then(
-      [self](const fpromise::result<>& result) mutable
-      -> fpromise::promise<fidl::ClientEnd<fpb::LeaseControl>, Error> {
-        if (!self) {
-          return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
-              fpromise::error(Error::kLogicError));
-        }
-
-        if (!self->lessor_.is_valid()) {
+      [this](const fpromise::result<>& result) mutable
+      -> fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> {
+        if (!lessor_.is_valid()) {
           // Power element addition must have failed.
           FX_LOGS(ERROR) << "Failed to acquire wake lease because Lessor client is not valid.";
-          return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
+          return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
               fpromise::error(Error::kBadValue));
         }
 
-        return fidl_fpromise::as_promise(self->lessor_->Lease(kPowerLevelActive))
-            .and_then([](fpb::LessorLeaseResponse& result) {
-              // TODO(https://fxbug.dev/341104129): Call LeaseControl::WatchStatus to wait until
-              // LeaseStatus is SATISFIED.
-              return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>,
-                                                   fidl::ErrorsIn<fpb::Lessor::Lease>>(
-                  fpromise::ok(std::move(result.lease_control())));
-            })
+        return fidl_fpromise::as_promise(lessor_->Lease(kPowerLevelActive))
             .or_else([](const fidl::ErrorsIn<fpb::Lessor::Lease>& error) {
               FX_LOGS(ERROR) << "Failed to acquire wake lease: " << error.FormatDescription();
-              return fpromise::make_result_promise<fidl::ClientEnd<fpb::LeaseControl>, Error>(
+              return fpromise::make_result_promise<fpb::LessorLeaseResponse, Error>(
                   fpromise::error(Error::kBadValue));
+            })
+            .and_then([this](fpb::LessorLeaseResponse& result) {
+              fidl::Client<fpb::LeaseControl> lease_control(
+                  std::move(result.lease_control()), dispatcher_, &lease_control_event_handler_);
+
+              return WaitForLeaseSatisfied(std::move(lease_control), fpb::LeaseStatus::kUnknown);
             });
       });
 }

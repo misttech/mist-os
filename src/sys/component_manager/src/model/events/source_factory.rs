@@ -2,21 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::{BuiltinCapability, CapabilityProvider, FrameworkCapability},
-        model::{
-            component::{
-                manager::ComponentManagerInstance, WeakComponentInstance, WeakExtendedInstance,
-            },
-            events::{
-                registry::EventRegistry, source::EventSource, stream_provider::EventStreamProvider,
-            },
-        },
-    },
-    ::routing::capability_source::InternalCapability,
-    std::sync::{Arc, Weak},
-};
+use crate::capability::{BuiltinCapability, CapabilityProvider, FrameworkCapability};
+use crate::model::component::manager::ComponentManagerInstance;
+use crate::model::component::{WeakComponentInstance, WeakExtendedInstance};
+use crate::model::events::registry::EventRegistry;
+use crate::model::events::source::EventSource;
+use crate::model::events::stream_provider::EventStreamProvider;
+use ::routing::capability_source::InternalCapability;
+use std::sync::{Arc, Weak};
 
 /// Allows to create `EventSource`s and tracks all the created ones.
 pub struct EventSourceFactory {

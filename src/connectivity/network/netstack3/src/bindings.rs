@@ -17,6 +17,7 @@ mod filter;
 mod inspect;
 mod interfaces_admin;
 mod interfaces_watcher;
+mod multicast_admin;
 mod name_worker;
 mod neighbor_worker;
 mod netdevice_worker;
@@ -30,32 +31,34 @@ mod timers;
 mod util;
 mod verifier_worker;
 
-use std::{
-    collections::HashMap,
-    convert::{Infallible as Never, TryFrom as _},
-    ffi::CStr,
-    fmt::Debug,
-    future::Future,
-    num::NonZeroU16,
-    ops::Deref,
-    pin::pin,
-    sync::Arc,
-    time::Duration,
-};
+use std::collections::HashMap;
+use std::convert::{Infallible as Never, TryFrom as _};
+use std::ffi::CStr;
+use std::fmt::Debug;
+use std::future::Future;
+use std::num::NonZeroU16;
+use std::ops::Deref;
+use std::pin::pin;
+use std::sync::Arc;
+use std::time::Duration;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-use fuchsia_async as fasync;
 use fuchsia_inspect::health::Reporter as _;
-use fuchsia_zircon as zx;
-use futures::{channel::mpsc, select, FutureExt as _, StreamExt as _};
+use futures::channel::mpsc;
+use futures::{select, FutureExt as _, StreamExt as _};
+use log::{debug, error, info, warn};
 use packet::{Buf, BufferMut};
-use rand::{rngs::OsRng, CryptoRng, RngCore};
-use tracing::{error, info};
+use rand::rngs::OsRng;
+use rand::{CryptoRng, RngCore};
 use util::{ConversionContext, IntoFidl as _};
+use {
+    fidl_fuchsia_hardware_network as fhardware_network,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 use devices::{
     BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
@@ -65,34 +68,37 @@ use devices::{
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
-use net_types::{
-    ethernet::Mac,
-    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Mtu},
-    SpecifiedAddr,
+use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
+use crate::bindings::util::TaskWaitGroup;
+use net_types::ethernet::Mac;
+use net_types::ip::{
+    AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Mtu,
 };
+use net_types::SpecifiedAddr;
+use netstack3_core::device::{
+    DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
+    EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, PureIpDeviceId,
+    ReceiveQueueBindingsContext, TransmitQueueBindingsContext, WeakDeviceId,
+};
+use netstack3_core::error::ExistsError;
+use netstack3_core::filter::FilterBindingsTypes;
+use netstack3_core::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+use netstack3_core::inspect::{InspectableValue, Inspector};
+use netstack3_core::ip::{
+    AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
+    Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
+    Lifetime, SlaacConfiguration,
+};
+use netstack3_core::routes::RawMetric;
+use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
+use netstack3_core::udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId};
 use netstack3_core::{
-    device::{
-        DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
-        EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
-        PureIpDeviceId, ReceiveQueueBindingsContext, TransmitQueueBindingsContext, WeakDeviceId,
-    },
-    error::ExistsError,
-    filter::FilterBindingsTypes,
-    icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId},
-    inspect::{InspectableValue, Inspector},
-    ip::{
-        AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
-        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
-        Lifetime, SlaacConfiguration,
-    },
-    neighbor,
-    routes::RawMetric,
-    sync::{DynDebugReferences, RwLock as CoreRwLock},
-    udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
-    DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext, IpExt,
-    ReferenceNotifiers, RngContext, StackState, TimerBindingsTypes, TimerContext, TimerId,
+    neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
+    IpExt, ReferenceNotifiers, RngContext, StackState, TimerBindingsTypes, TimerContext, TimerId,
     TracingContext,
 };
+
+pub(crate) use inspect::InspectPublisher;
 
 mod ctx {
     use super::*;
@@ -219,8 +225,6 @@ mod ctx {
 }
 
 pub(crate) use ctx::{BindingsCtx, Ctx, NetstackSeed};
-
-use crate::bindings::{interfaces_watcher::AddressPropertiesUpdate, util::TaskWaitGroup};
 
 /// Extends the methods available to [`DeviceId`].
 trait DeviceIdExt {
@@ -554,7 +558,7 @@ fn send_netdevice_frame(
     if *phy_up && *admin_enabled {
         handler
             .send(frame.as_ref(), frame_type)
-            .unwrap_or_else(|e| tracing::warn!("failed to send frame to {:?}: {:?}", handler, e))
+            .unwrap_or_else(|e| warn!("failed to send frame to {:?}: {:?}", handler, e))
     }
     Ok(())
 }
@@ -731,14 +735,12 @@ impl<T> ReferenceReceiver<T> {
         T: 'a,
     {
         let Self { receiver, debug_references: refs } = self;
-        tracing::debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
+        debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
         // If we get stuck trying to remove the resource, log the remaining refs
         // at a low frequency to aid debugging.
         let interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
             .map(move |()| {
-                tracing::warn!(
-                    "{resource_name} {resource_id:?} removal is pending references: {refs:?}"
-                )
+                warn!("{resource_name} {resource_id:?} removal is pending references: {refs:?}")
             })
             .collect::<()>();
 
@@ -1099,6 +1101,8 @@ pub(crate) enum Service {
     FilterState(fidl_fuchsia_net_filter::StateRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
+    MulticastAdminV4(fidl_fuchsia_net_multicast_admin::Ipv4RoutingTableControllerRequestStream),
+    MulticastAdminV6(fidl_fuchsia_net_multicast_admin::Ipv6RoutingTableControllerRequestStream),
     NeighborController(fidl_fuchsia_net_neighbor::ControllerRequestStream),
     Neighbor(fidl_fuchsia_net_neighbor::ViewRequestStream),
     PacketSocket(fidl_fuchsia_posix_socket_packet::ProviderRequestStream),
@@ -1171,7 +1175,7 @@ impl NetstackSeed {
     pub(crate) async fn serve<S: futures::Stream<Item = Service>>(
         self,
         services: S,
-        inspector: &fuchsia_inspect::Inspector,
+        inspect_publisher: InspectPublisher<'_>,
     ) {
         info!("serving netstack with netstack3");
 
@@ -1227,7 +1231,7 @@ impl NetstackSeed {
                     Ok(()) => (),
                     Err(e) => {
                         if !e.is_closed() {
-                            tracing::error!("error {e:?} collecting watchers");
+                            error!("error {e:?} collecting watchers");
                         }
                     }
                 })
@@ -1263,6 +1267,7 @@ impl NetstackSeed {
         }
         .fuse();
 
+        let inspector = inspect_publisher.inspector();
         let inspect_nodes = {
             // The presence of the health check node is useful even though the
             // status will always be OK because the same node exists
@@ -1419,7 +1424,7 @@ impl NetstackSeed {
                             )
                             .await
                             .unwrap_or_else(|e| {
-                                tracing::error!(
+                                error!(
                                     "error serving {}: {e:?}",
                                     fnet_routes_admin::RouteTableProviderV4Marker::DEBUG_NAME
                                 );
@@ -1433,7 +1438,7 @@ impl NetstackSeed {
                             )
                             .await
                             .unwrap_or_else(|e| {
-                                tracing::error!(
+                                error!(
                                     "error serving {}: {e:?}",
                                     fnet_routes_admin::RouteTableProviderV6Marker::DEBUG_NAME
                                 );
@@ -1446,7 +1451,7 @@ impl NetstackSeed {
                         )
                         .await
                         .unwrap_or_else(|e| {
-                            tracing::error!(
+                            error!(
                                 "error serving {}: {e:?}",
                                 fidl_fuchsia_net_root::RoutesV4Marker::DEBUG_NAME
                             );
@@ -1458,7 +1463,7 @@ impl NetstackSeed {
                         )
                         .await
                         .unwrap_or_else(|e| {
-                            tracing::error!(
+                            error!(
                                 "error serving {}: {e:?}",
                                 fidl_fuchsia_net_root::RoutesV6Marker::DEBUG_NAME
                             );
@@ -1474,11 +1479,25 @@ impl NetstackSeed {
                                 .await
                         }
                         Service::InterfacesAdmin(installer) => {
-                            tracing::debug!(
+                            debug!(
                                 "serving {}",
                                 fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME
                             );
                             interfaces_admin::serve(netstack.clone(), installer).await;
+                        }
+                        Service::MulticastAdminV4(controller) => {
+                            debug!(
+                                "serving {}",
+                                fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME
+                            );
+                            multicast_admin::serve_table_controller::<Ipv4>(controller).await;
+                        }
+                        Service::MulticastAdminV6(controller) => {
+                            debug!(
+                                "serving {}",
+                                fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME
+                            );
+                            multicast_admin::serve_table_controller::<Ipv6>(controller).await;
                         }
                         Service::DebugInterfaces(debug_interfaces) => {
                             debug_interfaces
@@ -1536,6 +1555,10 @@ impl NetstackSeed {
                 })
                 .await
         };
+
+        // We just let this be destroyed on drop because it's effectively tied
+        // to the lifecycle of the entire component.
+        let _inspect_task = inspect_publisher.publish();
 
         {
             let services_fut = services_fut.fuse();

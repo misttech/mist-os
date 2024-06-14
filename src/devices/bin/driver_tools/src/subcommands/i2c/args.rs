@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::subcommands::{
-        ping::args::PingCommand, read::args::ReadCommand, transact::args::TransactCommand,
-        write::args::WriteCommand,
-    },
-    argh::{ArgsInfo, FromArgs},
-};
+use super::subcommands::ping::args::PingCommand;
+use super::subcommands::read::args::ReadCommand;
+use super::subcommands::transact::args::TransactCommand;
+use super::subcommands::write::args::WriteCommand;
+use argh::{ArgsInfo, FromArgs};
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "i2c", description = "Perform reads and writes on an I2C device")]

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    filter::LogFilterCriteria,
-    log_socket_stream::{JsonDeserializeError, LogsDataStream},
-    DetailedDateTime, LogCommand, LogError, LogProcessingResult, TimeFormat,
-};
+use crate::filter::LogFilterCriteria;
+use crate::log_socket_stream::{JsonDeserializeError, LogsDataStream};
+use crate::{DetailedDateTime, LogCommand, LogError, LogProcessingResult, TimeFormat};
 use anyhow::Result;
 use async_trait::async_trait;
 use diagnostics_data::{
@@ -14,9 +12,13 @@ use diagnostics_data::{
     LogsData, Timestamp, Timezone,
 };
 use ffx_writer::ToolIO;
-use futures_util::{future::Either, select, stream::FuturesUnordered, StreamExt};
+use futures_util::future::Either;
+use futures_util::stream::FuturesUnordered;
+use futures_util::{select, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, io::Write, time::Duration};
+use std::fmt::Display;
+use std::io::Write;
+use std::time::Duration;
 use thiserror::Error;
 
 pub const TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%3f";

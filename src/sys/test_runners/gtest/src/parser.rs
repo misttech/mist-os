@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_io as fio,
-    serde::{Deserialize, Serialize},
-    test_runners_lib::{cases::TestCaseInfo, errors::*},
-};
+use anyhow::Error;
+use fidl_fuchsia_io as fio;
+use serde::{Deserialize, Serialize};
+use test_runners_lib::cases::TestCaseInfo;
+use test_runners_lib::errors::*;
 
 /// In `gtest_list_test` output, provides info about individual test cases.
 /// Example: For test FOO.Bar, this contains info about Bar.

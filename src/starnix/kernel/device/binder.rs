@@ -4,34 +4,31 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::{
-    device::{mem::new_null_file, remote_binder::RemoteBinderDevice, DeviceOps},
-    fs::fuchsia::new_remote_file,
-    mm::{
-        vmo::round_up_to_increment, DesiredAddress, MappingName, MappingOptions, MemoryAccessor,
-        MemoryAccessorExt, ProtectionFlags,
-    },
-    mutable_state::Guard,
-    security,
-    task::{
-        CurrentTask, EventHandler, Kernel, SchedulerPolicy, SimpleWaiter, Task, WaitCanceler,
-        WaitQueue, Waiter,
-    },
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer, VecInputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_dir_readonly, BinderDriverReleaser, CacheMode,
-        DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject, FileOps, FileSystem,
-        FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode,
-        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
-        VecDirectory, VecDirectoryEntry,
-    },
+use crate::device::mem::new_null_file;
+use crate::device::remote_binder::RemoteBinderDevice;
+use crate::device::DeviceOps;
+use crate::fs::fuchsia::new_remote_file;
+use crate::mm::vmo::round_up_to_increment;
+use crate::mm::{
+    DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt, ProtectionFlags,
+};
+use crate::mutable_state::Guard;
+use crate::security;
+use crate::task::{
+    CurrentTask, EventHandler, Kernel, SchedulerPolicy, SimpleWaiter, Task, WaitCanceler,
+    WaitQueue, Waiter,
+};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
+use crate::vfs::{
+    fileops_impl_nonseekable, fs_node_impl_dir_readonly, BinderDriverReleaser, CacheMode,
+    DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode, VecDirectory,
+    VecDirectoryEntry,
 };
 use bitflags::bitflags;
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
     log_error, log_trace, log_warn, trace_duration, track_stub, CATEGORY_STARNIX,
@@ -41,9 +38,21 @@ use starnix_sync::{
     ResourceAccessorAddFile, RwLock, Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::arc_key::ArcKey;
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::{Errno, EINTR};
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::{
+    release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, TempRef,
+    WeakRef,
+};
+use starnix_uapi::union::struct_with_union_into_bytes;
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_buffer::UserBuffer;
+use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{
-    arc_key::ArcKey,
-    auth::FsCred,
     binder_buffer_object, binder_driver_command_protocol,
     binder_driver_command_protocol_BC_ACQUIRE, binder_driver_command_protocol_BC_ACQUIRE_DONE,
     binder_driver_command_protocol_BC_CLEAR_DEATH_NOTIFICATION,
@@ -66,33 +75,18 @@ use starnix_uapi::{
     binder_driver_return_protocol_BR_TRANSACTION_SEC_CTX, binder_fd_array_object,
     binder_object_header, binder_transaction_data,
     binder_transaction_data__bindgen_ty_2__bindgen_ty_1, binder_transaction_data_sg,
-    binder_uintptr_t, binder_version, binder_write_read,
-    device_type::DeviceType,
-    errno, errno_from_code, error,
-    errors::{Errno, EINTR},
-    file_mode::mode,
-    flat_binder_object,
-    open_flags::OpenFlags,
-    ownership::{
-        release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, TempRef,
-        WeakRef,
-    },
-    pid_t, statfs, transaction_flags_TF_ONE_WAY, uapi,
-    union::struct_with_union_into_bytes,
-    user_address::{UserAddress, UserRef},
-    user_buffer::UserBuffer,
-    vfs::{default_statfs, FdEvents},
-    BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
-    BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
+    binder_uintptr_t, binder_version, binder_write_read, errno, errno_from_code, error,
+    flat_binder_object, pid_t, statfs, transaction_flags_TF_ONE_WAY, uapi, BINDERFS_SUPER_MAGIC,
+    BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER,
+    BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
 };
-use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
-    ffi::CStr,
-    mem::MaybeUninit,
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::ffi::CStr;
+use std::mem::MaybeUninit;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes, NoCell};
+use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_zircon as zx};
 
 // The name used to track the duration of a local binder ioctl.
 const NAME_BINDER_IOCTL: &'static CStr = c"binder_ioctl";
@@ -4590,21 +4584,19 @@ impl BinderFs {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::{
-        mm::PAGE_SIZE,
-        testing::*,
-        vfs::{anon_fs, Anon},
-    };
+    use crate::mm::PAGE_SIZE;
+    use crate::testing::*;
+    use crate::vfs::{anon_fs, Anon};
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};
     use fuchsia_async as fasync;
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
+    use starnix_uapi::errors::{EBADF, EINVAL};
+    use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::{
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
-        errors::{EBADF, EINVAL},
-        file_mode::FileMode,
         BINDER_TYPE_WEAK_HANDLE,
     };
     use std::sync::Weak;
@@ -7061,7 +7053,7 @@ pub mod tests {
                     return;
                 };
                 // Wait for the task to start waiting.
-                while !task.read().signals.run_state.is_blocked() {
+                while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
                 // Do the kick.

@@ -2,29 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::ap::authenticator::Authenticator;
+use crate::ap::event::*;
+use crate::ap::remote_client::RemoteClient;
+use crate::ap::{aid, Context, RsnCfg};
+use anyhow::{ensure, format_err};
+use fuchsia_zircon::{self as zx, DurationNum};
+use ieee80211::MacAddr;
+use std::sync::{Arc, Mutex};
+use tracing::error;
+use wlan_common::ie::rsn::rsne;
+use wlan_common::ie::{intersect, SupportedRate};
+use wlan_common::mac::{Aid, CapabilityInfo};
+use wlan_common::timer::EventId;
+use wlan_rsn::gtk::GtkProvider;
+use wlan_rsn::nonce::NonceReader;
+use wlan_rsn::rsna::{SecAssocStatus, SecAssocUpdate, UpdateSink};
+use wlan_rsn::{NegotiatedProtection, ProtectionInfo};
+use wlan_statemachine::*;
 use {
-    crate::ap::{
-        aid, authenticator::Authenticator, event::*, remote_client::RemoteClient, Context, RsnCfg,
-    },
-    anyhow::{ensure, format_err},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon::{self as zx, DurationNum},
-    ieee80211::MacAddr,
-    std::sync::{Arc, Mutex},
-    tracing::error,
-    wlan_common::{
-        ie::{intersect, rsn::rsne, SupportedRate},
-        mac::{Aid, CapabilityInfo},
-        timer::EventId,
-    },
-    wlan_rsn::{
-        gtk::GtkProvider,
-        nonce::NonceReader,
-        rsna::{SecAssocStatus, SecAssocUpdate, UpdateSink},
-        NegotiatedProtection, ProtectionInfo,
-    },
-    wlan_statemachine::*,
 };
 
 // This is not specified by 802.11, but we need some way of kicking out clients that authenticate
@@ -829,27 +827,19 @@ impl States {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            ap::{create_rsn_cfg, test_utils::MockAuthenticator},
-            test_utils, MlmeRequest, MlmeSink, MlmeStream,
-        },
-        futures::channel::mpsc,
-        ieee80211::{MacAddrBytes, Ssid},
-        lazy_static::lazy_static,
-        wlan_common::{
-            assert_variant,
-            ie::rsn::{
-                akm::AKM_PSK,
-                cipher::{CIPHER_CCMP_128, CIPHER_GCMP_256},
-                rsne::Rsne,
-            },
-            test_utils::fake_features::fake_mac_sublayer_support,
-            timer,
-        },
-        wlan_rsn::key::exchange::Key,
-    };
+    use super::*;
+    use crate::ap::create_rsn_cfg;
+    use crate::ap::test_utils::MockAuthenticator;
+    use crate::{test_utils, MlmeRequest, MlmeSink, MlmeStream};
+    use futures::channel::mpsc;
+    use ieee80211::{MacAddrBytes, Ssid};
+    use lazy_static::lazy_static;
+    use wlan_common::ie::rsn::akm::AKM_PSK;
+    use wlan_common::ie::rsn::cipher::{CIPHER_CCMP_128, CIPHER_GCMP_256};
+    use wlan_common::ie::rsn::rsne::Rsne;
+    use wlan_common::test_utils::fake_features::fake_mac_sublayer_support;
+    use wlan_common::{assert_variant, timer};
+    use wlan_rsn::key::exchange::Key;
 
     lazy_static! {
         static ref AP_ADDR: MacAddr = [6u8; 6].into();

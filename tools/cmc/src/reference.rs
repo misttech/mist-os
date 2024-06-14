@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{error::Error, util},
-    std::{fs, path::PathBuf},
-};
+use crate::error::Error;
+use crate::util;
+use std::fs;
+use std::path::PathBuf;
 
 enum ComponentManifest {
     Cml(cml::Document),
@@ -231,15 +231,15 @@ fn get_nearest_match<'a>(reference: &'a str, candidates: &'a Vec<String>) -> &'a
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::compile::compile,
-        crate::features::FeatureSet,
-        assert_matches::assert_matches,
-        serde_json::json,
-        std::{fmt::Display, fs::File, io::Write},
-        tempfile::TempDir,
-    };
+    use super::*;
+    use crate::compile::compile;
+    use crate::features::FeatureSet;
+    use assert_matches::assert_matches;
+    use serde_json::json;
+    use std::fmt::Display;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::TempDir;
 
     fn tmp_file(tmp_dir: &TempDir, name: &str, contents: impl Display) -> PathBuf {
         let path = tmp_dir.path().join(name);

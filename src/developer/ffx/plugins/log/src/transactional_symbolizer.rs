@@ -7,27 +7,23 @@ use ffx_config::global_env_context;
 use futures::{ready, select, Future, FutureExt, Stream, StreamExt};
 use log_command::log_formatter::{LogEntry, Symbolize};
 use pin_project::pin_project;
-use std::{
-    borrow::Cow,
-    cell::{Cell, RefCell},
-    collections::VecDeque,
-    fmt::{Debug, Display},
-    future::poll_fn,
-    mem::swap,
-    ops::Deref,
-    pin::{pin, Pin},
-    process::Stdio,
-    task::Poll,
-};
+use std::borrow::Cow;
+use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
+use std::fmt::{Debug, Display};
+use std::future::poll_fn;
+use std::mem::swap;
+use std::ops::Deref;
+use std::pin::{pin, Pin};
+use std::process::Stdio;
+use std::task::Poll;
 use symbol_index::ensure_symbol_index_registered;
-use tokio::{
-    io::{AsyncBufReadExt, AsyncRead, AsyncWrite, BufReader, Lines},
-    process::{Child, ChildStdin, ChildStdout, Command},
-};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, BufReader, Lines};
+use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
-use crate::{
-    condition_variable::LocalConditionVariable, error::LogError, mutex::LocalOrderedMutex,
-};
+use crate::condition_variable::LocalConditionVariable;
+use crate::error::LogError;
+use crate::mutex::LocalOrderedMutex;
 
 /// Connection to a symbolizer.
 pub trait SymbolizerProcess {
@@ -616,10 +612,8 @@ mod tests {
     use fuchsia_sync::Mutex;
     use log_command::log_formatter::LogData;
     use std::fmt::Write;
-    use std::{
-        sync::Arc,
-        task::{Context, Wake},
-    };
+    use std::sync::Arc;
+    use std::task::{Context, Wake};
     use tokio::io::{duplex, AsyncWriteExt, DuplexStream};
 
     /// Size of duplex buffer

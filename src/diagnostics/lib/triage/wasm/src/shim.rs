@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Error},
-    fuchsia_triage::{
-        ActionResultFormatter, ActionTagDirective, DiagnosticData, ParseResult, Source,
-    },
-    num_traits::cast::FromPrimitive,
-    std::collections::HashMap,
+use anyhow::{bail, Error};
+use fuchsia_triage::{
+    ActionResultFormatter, ActionTagDirective, DiagnosticData, ParseResult, Source,
 };
+use num_traits::cast::FromPrimitive;
+use std::collections::HashMap;
 
 /// Unique identifier to resources too expensive to pass between Rust/JS layer.
 pub type Handle = i32;

@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_zbi_abi::{ZBI_ALIGNMENT_BYTES, ZBI_FLAGS_CRC32},
-    fuchsia_zircon as zx,
-    lazy_static::lazy_static,
-    std::{
-        collections::{HashMap, HashSet},
-        mem::size_of,
-    },
-    thiserror::Error,
-    tracing::info,
-    zerocopy::Ref,
-};
+use fuchsia_zbi_abi::{ZBI_ALIGNMENT_BYTES, ZBI_FLAGS_CRC32};
+use fuchsia_zircon as zx;
+use lazy_static::lazy_static;
+use std::collections::{HashMap, HashSet};
+use std::mem::size_of;
+use thiserror::Error;
+use tracing::info;
+use zerocopy::Ref;
 
 pub use fuchsia_zbi_abi::{
     zbi_container_header, zbi_header_t, ZbiType, ZBI_CONTAINER_MAGIC, ZBI_FLAGS_VERSION,
@@ -477,11 +473,10 @@ impl ZbiParser {
 }
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        zerocopy::{byteorder::little_endian::U32, AsBytes},
-    };
+    use super::*;
+    use anyhow::Error;
+    use zerocopy::byteorder::little_endian::U32;
+    use zerocopy::AsBytes;
 
     fn check_item_bytes(builder: &ZbiBuilder, parser: &ZbiParser) {
         for (zbi_type, items) in &parser.items {

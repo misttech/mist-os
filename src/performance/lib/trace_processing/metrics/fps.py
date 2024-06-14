@@ -54,7 +54,10 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
         # This method looks for a possible race between trace event start in Scenic and magma.
         # We can safely skip these events. See https://fxbug.dev/322849857 for more details.
         model = trace_utils.adjust_to_common_process_start(
-            model, [("scenic.cm", ""), ("driver_host.cm", "DeviceThread")]
+            model,
+            _SCENIC_RENDER_EVENT_NAME,
+            category=_EVENT_CATEGORY,
+            type=trace_model.DurationEvent,
         )
 
         all_events: Iterator[trace_model.Event] = model.all_events()
@@ -77,7 +80,7 @@ class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
 
         if len(vsync_events) < 2:
             _LOGGER.info(
-                "Less than two vsync events are present. Perhaps the trace "
+                "Fewer than two vsync events are present. Perhaps the trace "
                 "duration is too short to provide fps information"
             )
             return []

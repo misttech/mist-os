@@ -6,13 +6,11 @@
 
 #![deny(missing_docs)]
 
-use {
-    fuchsia_runtime::vmar_root_self,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    shared_buffer::SharedBuffer,
-    std::ffi::CString,
-    std::ops::{Deref, DerefMut},
-};
+use fuchsia_runtime::vmar_root_self;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use shared_buffer::SharedBuffer;
+use std::ffi::CString;
+use std::ops::{Deref, DerefMut};
 
 mod immutable;
 pub use immutable::{Error as ImmutableMappingError, ImmutableMapping};

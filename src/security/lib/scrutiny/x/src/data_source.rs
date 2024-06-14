@@ -6,8 +6,7 @@ use super::api;
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::hash;
-use std::rc::Rc;
-use std::rc::Weak;
+use std::rc::{Rc, Weak};
 
 /// Internal subset of [`api::DataSource`] API that is independent of data source trees. Most
 /// implementations only need to implement this trait, and clients that instantiate this trait
@@ -185,8 +184,7 @@ impl api::DataSource for DataSource {
 mod tests {
     use super::super::api;
     use super::super::api::DataSource as _;
-    use super::DataSource;
-    use super::DataSourceInfo;
+    use super::{DataSource, DataSourceInfo};
 
     #[fuchsia::test]
     fn test_add_child() {

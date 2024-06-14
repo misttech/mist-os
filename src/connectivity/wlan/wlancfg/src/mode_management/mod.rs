@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        client::{
-            connection_selection::ConnectionSelectionRequester,
-            roaming::local_roam_manager::LocalRoamManagerApi,
-        },
-        config_management::SavedNetworksManagerApi,
-        telemetry::TelemetrySender,
-        util::listener,
-    },
-    anyhow::Error,
-    fuchsia_async as fasync,
-    futures::{channel::mpsc, lock::Mutex, Future},
-    std::{convert::Infallible, sync::Arc},
-};
+use crate::client::connection_selection::ConnectionSelectionRequester;
+use crate::client::roaming::local_roam_manager::LocalRoamManagerApi;
+use crate::config_management::SavedNetworksManagerApi;
+use crate::telemetry::TelemetrySender;
+use crate::util::listener;
+use anyhow::Error;
+use fuchsia_async as fasync;
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::Future;
+use std::convert::Infallible;
+use std::sync::Arc;
 
 pub mod device_monitor;
 mod iface_manager;
@@ -159,12 +156,10 @@ impl<T: PartialEq> EventHistory<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async::TestExecutor,
-        rand::Rng,
-        test_util::{assert_gt, assert_lt},
-    };
+    use super::*;
+    use fuchsia_async::TestExecutor;
+    use rand::Rng;
+    use test_util::{assert_gt, assert_lt};
 
     #[fuchsia::test]
     fn test_event_retention() {

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
-    storage_stress_test_utils::{data::FileFactory, io::Directory},
-    stress_test::actor::{Actor, ActorError},
-    tracing::info,
-};
+use async_trait::async_trait;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::Status;
+use storage_stress_test_utils::data::FileFactory;
+use storage_stress_test_utils::io::Directory;
+use stress_test::actor::{Actor, ActorError};
+use tracing::info;
 
 // Performs operations on blobs expected to exist on disk
 pub struct BlobActor {

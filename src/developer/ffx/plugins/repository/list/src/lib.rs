@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    ffx_core::ffx_plugin,
-    ffx_repository_list_args::ListCommand,
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy},
-    fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositorySpec},
-    prettytable::{cell, format::TableFormat, row, table, Cell, Table},
-    std::collections::BTreeSet,
-};
+use anyhow::{Context as _, Result};
+use ffx_core::ffx_plugin;
+use ffx_repository_list_args::ListCommand;
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy};
+use fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositorySpec};
+use prettytable::format::TableFormat;
+use prettytable::{cell, row, table, Cell, Table};
+use std::collections::BTreeSet;
 
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn list(
@@ -136,16 +135,14 @@ fn cell_for_aliases(aliases: &BTreeSet<String>) -> Cell {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        fidl_fuchsia_developer_ffx::{
-            FileSystemRepositorySpec, PmRepositorySpec, RepositoryConfig,
-            RepositoryIteratorRequest, RepositoryRegistryRequest, RepositorySpec,
-        },
-        fuchsia_async as fasync,
-        futures::StreamExt,
-        pretty_assertions::assert_eq,
+    use super::*;
+    use fidl_fuchsia_developer_ffx::{
+        FileSystemRepositorySpec, PmRepositorySpec, RepositoryConfig, RepositoryIteratorRequest,
+        RepositoryRegistryRequest, RepositorySpec,
     };
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
+    use pretty_assertions::assert_eq;
 
     fn fake_repos() -> RepositoryRegistryProxy {
         setup_fake_repos(move |req| {

@@ -7,15 +7,11 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
-#include <filesystem>
 #include <optional>
 
 #include <re2/re2.h>
 
 #include "third_party/rapidjson/include/rapidjson/document.h"
-#include "third_party/rapidjson/include/rapidjson/ostreamwrapper.h"
-#include "third_party/rapidjson/include/rapidjson/rapidjson.h"
-#include "third_party/rapidjson/include/rapidjson/writer.h"
 
 namespace memory {
 

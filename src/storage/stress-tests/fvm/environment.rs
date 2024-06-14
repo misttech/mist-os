@@ -2,19 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        instance_actor::InstanceActor, volume::VolumeConnection, volume_actor::VolumeActor, Args,
-    },
-    async_trait::async_trait,
-    fuchsia_zircon::Vmo,
-    futures::lock::Mutex,
-    rand::{rngs::SmallRng, Rng, SeedableRng},
-    std::sync::Arc,
-    std::time::Duration,
-    storage_stress_test_utils::fvm::{FvmInstance, Guid},
-    stress_test::{actor::ActorRunner, environment::Environment, random_seed},
-};
+use crate::instance_actor::InstanceActor;
+use crate::volume::VolumeConnection;
+use crate::volume_actor::VolumeActor;
+use crate::Args;
+use async_trait::async_trait;
+use fuchsia_zircon::Vmo;
+use futures::lock::Mutex;
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
+use std::sync::Arc;
+use std::time::Duration;
+use storage_stress_test_utils::fvm::{FvmInstance, Guid};
+use stress_test::actor::ActorRunner;
+use stress_test::environment::Environment;
+use stress_test::random_seed;
 
 // All partitions in this test have their type set to this arbitrary GUID.
 const TYPE_GUID: Guid =

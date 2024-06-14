@@ -7,11 +7,9 @@
 //! libraries.
 
 use anyhow::{anyhow, Result};
-use std::{
-    fs::File,
-    io::{BufRead, Write},
-    path::PathBuf,
-};
+use std::fs::File;
+use std::io::{BufRead, Write};
+use std::path::PathBuf;
 
 // Provides access to ffx_config properties.
 pub mod config;

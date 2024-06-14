@@ -5,16 +5,13 @@
 //! Tests for AT command responses.
 #![cfg(test)]
 
-use {
-    crate::{
-        highlevel, lowlevel,
-        lowlevel::write_to::WriteTo as _,
-        parser::response_parser,
-        serde::{internal::SerDeOne, success},
-        translate,
-    },
-    std::{collections::HashMap, io::Cursor},
-};
+use crate::lowlevel::write_to::WriteTo as _;
+use crate::parser::response_parser;
+use crate::serde::internal::SerDeOne;
+use crate::serde::success;
+use crate::{highlevel, lowlevel, translate};
+use std::collections::HashMap;
+use std::io::Cursor;
 
 fn cr_lf_delimit(str: &str) -> String {
     format!("\r\n{}\r\n", str)

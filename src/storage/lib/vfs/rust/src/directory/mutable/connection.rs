@@ -4,55 +4,47 @@
 
 //! Connection to a directory that can be modified by the client though a FIDL connection.
 
-use crate::{
-    common::{
-        decode_extended_attribute_value, encode_extended_attribute_value,
-        extended_attributes_sender,
-    },
-    directory::{
-        connection::{BaseConnection, ConnectionState, DerivedConnection},
-        entry_container::MutableDirectory,
-    },
-    execution_scope::ExecutionScope,
-    name::validate_name,
-    node::OpenNode,
-    path::Path,
-    token_registry::{TokenInterface, TokenRegistry, Tokenizable},
-    ObjectRequestRef, ProtocolsExt,
+use crate::common::{
+    decode_extended_attribute_value, encode_extended_attribute_value, extended_attributes_sender,
 };
+use crate::directory::connection::{BaseConnection, ConnectionState};
+use crate::directory::entry_container::MutableDirectory;
+use crate::execution_scope::ExecutionScope;
+use crate::name::validate_name;
+use crate::node::OpenNode;
+use crate::path::Path;
+use crate::token_registry::{TokenInterface, TokenRegistry, Tokenizable};
+use crate::{ObjectRequestRef, ProtocolsExt};
 
-use {
-    anyhow::Error,
-    fidl::{endpoints::ServerEnd, Handle},
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    futures::{pin_mut, TryStreamExt as _},
-    pin_project::pin_project,
-    std::{future::Future, pin::Pin, sync::Arc},
-    storage_trace::{self as trace, TraceFutureExt},
-};
+use anyhow::Error;
+use fidl::endpoints::ServerEnd;
+use fidl::Handle;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use futures::{pin_mut, TryStreamExt as _};
+use pin_project::pin_project;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use storage_trace::{self as trace, TraceFutureExt};
 
 #[pin_project]
-pub struct MutableConnection {
-    base: BaseConnection<Self>,
+pub struct MutableConnection<DirectoryType: MutableDirectory> {
+    base: BaseConnection<DirectoryType>,
 }
 
-impl DerivedConnection for MutableConnection {
-    type Directory = dyn MutableDirectory;
-}
-
-impl MutableConnection {
+impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     pub fn create(
         scope: ExecutionScope,
-        directory: Arc<impl MutableDirectory>,
+        directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         // Ensure we close the directory if we fail to prepare the connection.
-        let directory = OpenNode::new(directory as Arc<dyn MutableDirectory>);
+        let directory = OpenNode::new(directory);
 
         let connection = MutableConnection {
-            base: BaseConnection::<Self>::new(scope, directory, protocols.to_directory_options()?),
+            base: BaseConnection::new(scope, directory, protocols.to_directory_options()?),
         };
 
         let object_request = object_request.take();
@@ -258,11 +250,10 @@ impl MutableConnection {
             return Err(Status::INVALID_ARGS);
         }
 
-        let (dst_parent, _flags) =
-            match self.base.scope.token_registry().get_owner(dst_parent_token)? {
-                None => return Err(Status::NOT_FOUND),
-                Some(entry) => entry,
-            };
+        let dst_parent = match self.base.scope.token_registry().get_owner(dst_parent_token)? {
+            None => return Err(Status::NOT_FOUND),
+            Some(entry) => entry,
+        };
 
         dst_parent.clone().rename(self.base.directory.clone(), src, dst).await
     }
@@ -324,9 +315,9 @@ impl MutableConnection {
     }
 }
 
-impl TokenInterface for MutableConnection {
-    fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags) {
-        (self.base.directory.clone(), self.base.options.to_io1())
+impl<DirectoryType: MutableDirectory> TokenInterface for MutableConnection<DirectoryType> {
+    fn get_node(&self) -> Arc<dyn MutableDirectory> {
+        self.base.directory.clone()
     }
 
     fn token_registry(&self) -> &TokenRegistry {
@@ -336,23 +327,16 @@ impl TokenInterface for MutableConnection {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            directory::{
-                dirents_sink,
-                entry_container::{Directory, DirectoryWatcher},
-                traversal_position::TraversalPosition,
-            },
-            node::{IsDirectory, Node},
-            ToObjectRequest,
-        },
-        async_trait::async_trait,
-        std::{
-            any::Any,
-            sync::{Mutex, Weak},
-        },
-    };
+    use super::*;
+    use crate::directory::dirents_sink;
+    use crate::directory::entry_container::{Directory, DirectoryWatcher};
+    use crate::directory::traversal_position::TraversalPosition;
+    use crate::node::{IsDirectory, Node};
+    use crate::ToObjectRequest;
+    use futures::future::BoxFuture;
+    use std::any::Any;
+    use std::future::ready;
+    use std::sync::{Mutex, Weak};
 
     #[derive(Debug, PartialEq)]
     enum MutableDirectoryAction {
@@ -383,7 +367,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Node for MockDirectory {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
             unimplemented!("Not implemented");
@@ -401,7 +384,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Directory for MockDirectory {
         fn open(
             self: Arc<Self>,
@@ -445,15 +427,15 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl MutableDirectory for MockDirectory {
-        async fn link(
+        fn link<'a>(
             self: Arc<Self>,
             path: String,
             _source_dir: Arc<dyn Any + Send + Sync>,
-            _source_name: &str,
-        ) -> Result<(), Status> {
-            self.fs.handle_event(MutableDirectoryAction::Link { id: self.id, path })
+            _source_name: &'a str,
+        ) -> BoxFuture<'a, Result<(), Status>> {
+            let result = self.fs.handle_event(MutableDirectoryAction::Link { id: self.id, path });
+            Box::pin(ready(result))
         }
 
         async fn unlink(
@@ -487,19 +469,20 @@ mod tests {
             self.fs.handle_event(MutableDirectoryAction::Sync)
         }
 
-        async fn rename(
+        fn rename(
             self: Arc<Self>,
             src_dir: Arc<dyn MutableDirectory>,
             src_name: Path,
             dst_name: Path,
-        ) -> Result<(), Status> {
+        ) -> BoxFuture<'static, Result<(), Status>> {
             let src_dir = src_dir.into_any().downcast::<MockDirectory>().unwrap();
-            self.fs.handle_event(MutableDirectoryAction::Rename {
+            let result = self.fs.handle_event(MutableDirectoryAction::Rename {
                 id: src_dir.id,
                 src_name: src_name.into_string(),
                 dst_dir: self.id,
                 dst_name: dst_name.into_string(),
-            })
+            });
+            Box::pin(ready(result))
         }
     }
 

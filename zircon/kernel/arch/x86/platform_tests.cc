@@ -27,6 +27,7 @@
 #include <hwreg/x86msr.h>
 #include <kernel/cpu.h>
 #include <kernel/deadline.h>
+#include <kernel/scheduler.h>
 #include <ktl/array.h>
 #include <ktl/unique_ptr.h>
 
@@ -427,7 +428,7 @@ bool test_nmi_spam() {
   constexpr zx_duration_t kDuration = ZX_MSEC(100);
   const Deadline deadline = Deadline::after(kDuration);
   do {
-    apic_send_mask_ipi(X86_INT_NMI, mp_get_active_mask(), DELIVERY_MODE_NMI);
+    apic_send_mask_ipi(X86_INT_NMI, Scheduler::PeekActiveMask(), DELIVERY_MODE_NMI);
   } while (current_time() < deadline.when());
 
   END_TEST;

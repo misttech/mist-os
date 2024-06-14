@@ -22,6 +22,7 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "src/devices/bin/driver_manager/bind/bind_manager.h"
+#include "src/devices/bin/driver_manager/bootup_tracker.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
@@ -149,6 +150,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   void RequestRebindFromDriverIndex(std::string spec, std::optional<std::string> driver_url_suffix,
                                     fit::callback<void(zx::result<>)> callback) override;
 
+  void OnBindingStateChanged() override { bootup_tracker_->NotifyBindingChanged(); }
+
   zx::result<> CreateDriverHostComponent(std::string moniker,
                                          fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
                                          std::shared_ptr<bool> exposed_dir_connected,
@@ -171,6 +174,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   driver_manager::Runner runner_;
 
   NodeRemovalTracker removal_tracker_;
+
+  std::shared_ptr<BootupTracker> bootup_tracker_;
 
   fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>> driver_hosts_;
 

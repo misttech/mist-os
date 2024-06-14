@@ -15,7 +15,7 @@ class VerifyGoldenGoProtoFileTests(unittest.TestCase):
     checked-in goldens for significant differences.
     """
 
-    def test_filter_line(self):
+    def test_filter_line(self) -> None:
         cases = [
             ("// \tprotoc v1.2.3", "// \tprotoc \n"),
             ("// \tprotoc-gen-go v1.2.3", "// \tprotoc-gen-go \n"),

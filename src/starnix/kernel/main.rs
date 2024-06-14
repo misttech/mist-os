@@ -9,26 +9,24 @@
 
 // Avoid unused crate warnings on non-test/non-debug builds because this needs to be an
 // unconditional dependency for rustdoc generation.
-use extended_pstate as _;
-use tracing_mutex as _;
+use {extended_pstate as _, tracing_mutex as _};
 
 use anyhow::{Context as _, Error};
 use fidl::endpoints::ControlHandle;
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_process_lifecycle as flifecycle;
-use fidl_fuchsia_starnix_container as fstarcontainer;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
-use fuchsia_runtime as fruntime;
-use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
 use starnix_kernel_runner::{
-    create_component_from_stream, serve_component_runner, serve_container_controller, Container,
-    ContainerServiceConfig,
+    create_component_from_stream, serve_component_runner, serve_container_controller,
+    serve_memory_attribution_provider, Container, ContainerServiceConfig,
 };
 use starnix_logging::{log_debug, trace_instant, CATEGORY_STARNIX, NAME_START_KERNEL};
+use {
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_memory_attribution as fattribution,
+    fidl_fuchsia_process_lifecycle as flifecycle, fidl_fuchsia_starnix_container as fstarcontainer,
+    fuchsia_async as fasync, fuchsia_runtime as fruntime, fuchsia_zircon as zx,
+};
 
 /// Overrides the `zxio_maybe_faultable_copy` weak symbol found in zxio.
 #[no_mangle]
@@ -97,6 +95,18 @@ enum KernelServices {
     ///
     /// This service is also exposed via the container itself.
     ContainerController(fstarcontainer::ControllerRequestStream),
+
+    /// This service lets clients read which memory resources are used to run the
+    /// various starnix programs in the container.
+    ///
+    /// It provides a finer grained attribution than possible with Zircon process level
+    /// tooling, because all starnix processes in a container share the same handle table.
+    /// This protocol lets the kernel report exactly which VMOs it used to run a starnix
+    /// program, out of VMOs in the shared handle table.
+    ///
+    /// The starnix runner connects to this protocol to report memory attribution
+    /// information for each container it runs.
+    MemoryAttributionProvider(fattribution::ProviderRequestStream),
 }
 
 async fn build_container(
@@ -138,7 +148,8 @@ async fn main() -> Result<(), Error> {
     fs.dir("svc")
         .add_fidl_service_at("fuchsia.starnix.container.Runner", KernelServices::ContainerRunner)
         .add_fidl_service(KernelServices::ComponentRunner)
-        .add_fidl_service(KernelServices::ContainerController);
+        .add_fidl_service(KernelServices::ContainerController)
+        .add_fidl_service(KernelServices::MemoryAttributionProvider);
 
     let inspector = fuchsia_inspect::component::inspector();
     #[cfg(target_arch = "x86_64")]
@@ -183,6 +194,11 @@ async fn main() -> Result<(), Error> {
                 serve_container_controller(stream, &container.wait().await.system_task())
                     .await
                     .expect("failed to start container controller");
+            }
+            KernelServices::MemoryAttributionProvider(stream) => {
+                serve_memory_attribution_provider(stream, &container.wait().await.kernel)
+                    .await
+                    .expect("failed to start memory attribution provider");
             }
         }
     })

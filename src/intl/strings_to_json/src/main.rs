@@ -8,17 +8,12 @@
 //! compatible `strings.xml` file for a target language, and produces a Fuchsia localized resource.
 //! Please see the `README.md` file in this program's directory for more information.
 
-use {
-    anyhow::Context,
-    anyhow::Error,
-    anyhow::Result,
-    intl_strings::{json, parser, veprintln},
-    std::env,
-    std::fs::File,
-    std::io,
-    std::path::PathBuf,
-    structopt::StructOpt,
-};
+use anyhow::{Context, Error, Result};
+use intl_strings::{json, parser, veprintln};
+use std::fs::File;
+use std::path::PathBuf;
+use std::{env, io};
+use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(

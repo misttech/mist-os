@@ -24,11 +24,13 @@ use assembly_manifest::Image;
 use assembly_partitions_config::PartitionsConfig;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_merkle::Hash;
-use fuchsia_repo::{repo_client::RepoClient, repository::FileSystemRepository};
+use fuchsia_repo::repo_client::RepoClient;
+use fuchsia_repo::repository::FileSystemRepository;
 use pathdiff::diff_utf8_paths;
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::collections::HashSet;
 use std::str::FromStr;
-use std::{cell::RefCell, collections::HashSet};
 
 /// Description of the data needed to set up (flash) a device.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]

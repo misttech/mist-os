@@ -47,7 +47,6 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         self.test_duration = self.user_params.get("test_duration", 0)
 
         self.create_blackout_component()
-        self.dut.register_for_on_device_boot(fn=self.create_blackout_component)
 
     def teardown_class(self) -> None:
         self.dut.ffx.run(
@@ -107,6 +106,7 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         test_method_execution_frequency=test_case_revive.TestMethodExecutionFrequency.POST_ONLY,
     )
     def _test_do_verification(self) -> None:
+        self.create_blackout_component()
         _LOGGER.info("Blackout: Running device verification")
         res = asyncio.run(
             self.blackout_proxy.verify(

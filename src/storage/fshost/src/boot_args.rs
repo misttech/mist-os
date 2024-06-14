@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_boot::{ArgumentsMarker, BoolPair},
-    fs_management::{BlobCompression, BlobEvictionPolicy},
-    fuchsia_component::client::connect_to_protocol,
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_boot::{ArgumentsMarker, BoolPair};
+use fs_management::{BlobCompression, BlobEvictionPolicy};
+use fuchsia_component::client::connect_to_protocol;
 
 #[derive(Default)]
 pub struct BootArgs {

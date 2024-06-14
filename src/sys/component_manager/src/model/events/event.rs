@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {hooks::Event as ComponentEvent, moniker::ExtendedMoniker};
+use hooks::Event as ComponentEvent;
+use moniker::ExtendedMoniker;
 
 /// Created for a particular component event.
 /// Contains the Event that occurred along with a means to resume/unblock the component manager.

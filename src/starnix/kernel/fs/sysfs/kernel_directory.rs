@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder, StubEmptyFile},
-};
+use crate::task::CurrentTask;
+use crate::vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder, StubEmptyFile};
 use starnix_logging::bug_ref;
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;

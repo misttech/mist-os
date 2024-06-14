@@ -4,15 +4,14 @@
 
 //! Type-safe bindings for Zircon stream objects.
 
-use {
-    crate::{
-        object_get_property, object_set_property, ok, AsHandleRef, Handle, HandleBased, HandleRef,
-        Property, PropertyQuery, Status, Vmo,
-    },
-    bitflags::bitflags,
-    fuchsia_zircon_sys as sys,
-    std::{io::SeekFrom, mem::MaybeUninit},
+use crate::{
+    object_get_property, object_set_property, ok, AsHandleRef, Handle, HandleBased, HandleRef,
+    Property, PropertyQuery, Status, Vmo,
 };
+use bitflags::bitflags;
+use fuchsia_zircon_sys as sys;
+use std::io::SeekFrom;
+use std::mem::MaybeUninit;
 
 /// An object representing a Zircon [stream](https://fuchsia.dev/fuchsia-src/concepts/objects/stream.md).
 ///

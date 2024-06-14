@@ -2,26 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::Cell, iter};
+use std::cell::Cell;
+use std::iter;
 
 use once_cell::unsync::OnceCell;
 
-use crate::{
-    bones::{
-        skinnable::{self, Skinnable},
-        Tendon,
-    },
-    component::Component,
-    component_dirt::ComponentDirt,
-    container_component::ContainerComponent,
-    core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property},
-    dyn_vec::DynVec,
-    math::Mat,
-    option_cell::OptionCell,
-    shapes::PathVertex,
-    status_code::StatusCode,
-    TransformComponent,
-};
+use crate::bones::skinnable::{self, Skinnable};
+use crate::bones::Tendon;
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::container_component::ContainerComponent;
+use crate::core::{Core, CoreContext, Object, ObjectRef, OnAdded, Property};
+use crate::dyn_vec::DynVec;
+use crate::math::Mat;
+use crate::option_cell::OptionCell;
+use crate::shapes::PathVertex;
+use crate::status_code::StatusCode;
+use crate::TransformComponent;
 
 #[derive(Debug)]
 pub struct Skin {

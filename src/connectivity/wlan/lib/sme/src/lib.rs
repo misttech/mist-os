@@ -8,13 +8,12 @@ pub mod serve;
 #[cfg(test)]
 pub mod test_utils;
 
-use {
-    fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_mlme::{self as fidl_mlme, MlmeEvent},
-    futures::channel::mpsc,
-    thiserror::Error,
-    wlan_common::{sink::UnboundedSink, timer},
-};
+use fidl_fuchsia_wlan_common as fidl_common;
+use fidl_fuchsia_wlan_mlme::{self as fidl_mlme, MlmeEvent};
+use futures::channel::mpsc;
+use thiserror::Error;
+use wlan_common::sink::UnboundedSink;
+use wlan_common::timer;
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Config {

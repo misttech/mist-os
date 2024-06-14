@@ -12,7 +12,6 @@ group("tests") {
       "nelson:tests",
       "qemu-arm64:tests",
       "sherlock:tests",
-      "vim3:tests",
       "vim3-devicetree:tests",
     ]
   }

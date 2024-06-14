@@ -14,6 +14,24 @@
 
 namespace fidlc {
 
+TargetVersions::TargetVersions(std::string_view string) {
+  for (size_t i = 0, j = 0; j != std::string::npos; i = j + 1) {
+    j = string.find(',', i);
+    auto length = j == std::string::npos ? j : j - i;
+    set.insert(Version::Parse(string.substr(i, length)).value());
+  }
+}
+
+std::string TargetVersions::ToString() const {
+  std::string result;
+  for (auto version : set) {
+    if (!result.empty())
+      result.push_back('_');
+    result.append(version.ToString());
+  }
+  return result;
+}
+
 void SharedAmongstLibraries::UseLibraryZx() {
   TestLibrary zx_lib(this, "zx.fidl", R"FIDL(
 library zx;

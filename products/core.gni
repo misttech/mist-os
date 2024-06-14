@@ -25,7 +25,6 @@
 
 include_shell_commands_package = true
 
-product_bootfs_labels = []
 legacy_base_package_labels = []
 legacy_cache_package_labels = []
 core_realm_shards = []

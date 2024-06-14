@@ -1,13 +1,11 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::util::is_set,
-    bitfield::bitfield,
-    fidl_fuchsia_hardware_pci::Capability as FidlCapability,
-    std::fmt,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref},
-};
+use crate::util::is_set;
+use bitfield::bitfield;
+use fidl_fuchsia_hardware_pci::Capability as FidlCapability;
+use std::fmt;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref};
 
 // Capability types are documented in PCI Local Bus Specification v3.0 Appendix H
 enum CapabilityType {

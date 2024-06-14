@@ -4,15 +4,11 @@
 
 use fuchsia_async as fasync;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
-use fuchsia_inspect::{
-    reader::snapshot::{Snapshot, SnapshotTree},
-    Inspector, InspectorConfig, NumericProperty,
-};
+use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
+use fuchsia_inspect::{Inspector, InspectorConfig, NumericProperty};
 use futures::FutureExt;
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 enum InspectorState {
     Running,

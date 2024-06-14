@@ -61,6 +61,8 @@ class Fusb302Signals {
   fidl::ClientEnd<fuchsia_hardware_i2c::Device>& i2c_;
   Fusb302Sensors& sensors_;
   Fusb302Protocol& protocol_;
+
+  const bool goodcrc_interrupts_enabled_;
 };
 
 }  // namespace fusb302

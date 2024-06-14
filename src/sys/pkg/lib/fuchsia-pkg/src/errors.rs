@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_merkle::Hash,
-    fuchsia_url::errors::{PackagePathSegmentError, ResourcePathError},
-    std::{io, path::PathBuf},
-    tempfile::PersistError,
-    thiserror::Error,
-};
+use fuchsia_merkle::Hash;
+use fuchsia_url::errors::{PackagePathSegmentError, ResourcePathError};
+use std::io;
+use std::path::PathBuf;
+use tempfile::PersistError;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum PackageBuildManifestError {

@@ -4,7 +4,9 @@
 
 //! Support for property test usage.
 
-use std::{any::Any, fmt::Debug, str::FromStr as _};
+use std::any::Any;
+use std::fmt::Debug;
+use std::str::FromStr as _;
 
 use proptest::test_runner::{FailurePersistence, PersistedSeed};
 

@@ -21,7 +21,6 @@ rustc_library("block_adapter_lib") {
     "//src/storage/lib/block_client/rust:remote-block-device",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
   ]
 }

@@ -80,13 +80,15 @@ func isSupported(decl mixer.Declaration) bool {
 		return false
 	}
 
+	seen_structs := make(map[string]bool)
 	switch decl := decl.(type) {
 	case *mixer.StructDecl:
 		if decl.IsResourceType() {
 			return false
 		}
+		seen_structs[decl.Name()] = true
 		for _, fieldName := range decl.FieldNames() {
-			if !isSupportedStructField(decl.Field(fieldName)) {
+			if !isSupportedStructField(decl.Field(fieldName), seen_structs) {
 				return false
 			}
 		}
@@ -101,11 +103,7 @@ func isSupported(decl mixer.Declaration) bool {
 }
 
 // check whether dynfidl supports the layout specified by the decl as the field of a struct
-func isSupportedStructField(decl mixer.Declaration) bool {
-	if decl.IsNullable() {
-		return false
-	}
-
+func isSupportedStructField(decl mixer.Declaration, seen_structs map[string]bool) bool {
 	switch decl := decl.(type) {
 	case *mixer.BoolDecl, *mixer.IntegerDecl, *mixer.StringDecl:
 		return true
@@ -114,7 +112,11 @@ func isSupportedStructField(decl mixer.Declaration) bool {
 			return false
 		}
 		for _, fieldName := range decl.FieldNames() {
-			if !isSupportedStructField(decl.Field(fieldName)) {
+			if seen_structs[fieldName] {
+				continue
+			}
+			seen_structs[fieldName] = true
+			if !isSupportedStructField(decl.Field(fieldName), seen_structs) {
 				return false
 			}
 		}
@@ -131,10 +133,6 @@ func isSupportedStructField(decl mixer.Declaration) bool {
 
 // check whether dynfidl supports the layout specified by the decl as an element in a vector
 func isSupportedVectorElement(decl mixer.Declaration) bool {
-	if decl.IsNullable() {
-		return false
-	}
-
 	switch decl := decl.(type) {
 	case *mixer.BoolDecl, *mixer.IntegerDecl, *mixer.StringDecl:
 		return true
@@ -172,6 +170,7 @@ const (
 	basicVariant
 	vectorVariant
 	structVariant
+	boxVariant
 	unsupportedVariant
 )
 
@@ -183,6 +182,8 @@ func (v outerVariant) String() string {
 		return "Vector"
 	case structVariant:
 		return "Struct"
+	case boxVariant:
+		return "Box"
 	case unsupportedVariant:
 		return "UNSUPPORTED"
 	default:
@@ -219,27 +220,59 @@ func visit(value ir.Value, decl mixer.Declaration) visitResult {
 			OuterVariant:        vectorVariant,
 			InnerEnumAndVariant: "VectorField::UInt8Vector",
 		}
+	case nil:
+		switch decl.(type) {
+		case *mixer.StringDecl, *mixer.VectorDecl:
+			return visitResult{
+				ValueStr:            "",
+				OuterVariant:        vectorVariant,
+				InnerEnumAndVariant: "VectorField::Null",
+			}
+		default:
+			return visitResult{
+				ValueStr:            "Box::default()",
+				OuterVariant:        boxVariant,
+				InnerEnumAndVariant: "",
+			}
+		}
 	case ir.Record:
 		decl := decl.(*mixer.StructDecl)
 		valueStr := "Structure::default()"
-		for _, field := range value.Fields {
-			fieldResult := visit(field.Value, decl.Field(field.Key.Name))
-			if fieldResult.InnerEnumAndVariant != "" {
+		outerVariant := structVariant
+		if decl.IsNullable() {
+			valueStr = "Box::default().set_present()"
+			outerVariant = boxVariant
+		}
+		for _, name := range decl.FieldNames() {
+			var v ir.Value = nil
+			for _, field := range value.Fields {
+				if field.Key.Name == name {
+					v = field.Value
+					break
+				}
+			}
+			fieldResult := visit(v, decl.Field(name))
+			if fieldResult.ValueStr == "" {
+				valueStr += fmt.Sprintf(
+					".field(Field::%s(%s))",
+					fieldResult.OuterVariant,
+					fieldResult.InnerEnumAndVariant)
+			} else if fieldResult.InnerEnumAndVariant == "" {
+				valueStr += fmt.Sprintf(
+					".field(Field::%s(%s))",
+					fieldResult.OuterVariant,
+					fieldResult.ValueStr)
+			} else {
 				valueStr += fmt.Sprintf(
 					".field(Field::%s(%s(%s)))",
 					fieldResult.OuterVariant,
 					fieldResult.InnerEnumAndVariant,
 					fieldResult.ValueStr)
-			} else {
-				valueStr += fmt.Sprintf(
-					".field(Field::%s(%s))",
-					fieldResult.OuterVariant,
-					fieldResult.ValueStr)
 			}
 		}
 		return visitResult{
 			ValueStr:            valueStr,
-			OuterVariant:        structVariant,
+			OuterVariant:        outerVariant,
 			InnerEnumAndVariant: "",
 		}
 	case []ir.Value:

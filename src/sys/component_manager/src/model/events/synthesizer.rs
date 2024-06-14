@@ -2,20 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::events::{
-        dispatcher::EventDispatcherScope, event::Event, registry::ComponentEventRoute,
-    },
-    ::routing::event::EventFilter,
-    cm_types::Name,
-    cm_util::TaskGroup,
-    errors::ModelError,
-    futures::{channel::mpsc, future::join_all, SinkExt},
-    hooks::{Event as HookEvent, EventType},
-    moniker::ExtendedMoniker,
-    std::{collections::HashMap, sync::Arc},
-    tracing::error,
-};
+use crate::model::events::dispatcher::EventDispatcherScope;
+use crate::model::events::event::Event;
+use crate::model::events::registry::ComponentEventRoute;
+use ::routing::event::EventFilter;
+use cm_types::Name;
+use cm_util::TaskGroup;
+use errors::ModelError;
+use futures::channel::mpsc;
+use futures::future::join_all;
+use futures::SinkExt;
+use hooks::{Event as HookEvent, EventType};
+use moniker::ExtendedMoniker;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::error;
 
 /// Implementors of this trait know how to synthesize an event.
 pub trait ComponentManagerEventSynthesisProvider: Send + Sync {

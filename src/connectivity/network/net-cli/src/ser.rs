@@ -7,7 +7,8 @@
 //! protocols.
 
 use fidl_fuchsia_net_routes_ext as froutes_ext;
-use net_types::{ip::IpAddress as _, Witness as _};
+use net_types::ip::IpAddress as _;
+use net_types::Witness as _;
 use thiserror::Error;
 
 #[derive(serde::Serialize, Ord, PartialOrd, Eq, PartialEq)]

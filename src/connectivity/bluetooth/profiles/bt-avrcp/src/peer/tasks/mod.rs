@@ -3,28 +3,24 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
-use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon as zx;
-use futures::{
-    future::FutureExt,
-    stream::{SelectAll, StreamExt, TryStreamExt},
-};
+use futures::future::FutureExt;
+use futures::stream::{SelectAll, StreamExt, TryStreamExt};
 use notification_stream::NotificationStream;
 use packet_encoding::{Decodable, Encodable};
 use rand::Rng;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::{error, info, trace, warn};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 mod notification_stream;
 
-use crate::packets::Error as PacketError;
 use crate::packets::{
     AddressedPlayerChangedNotificationResponse, AvailablePlayersChangedNotificationResponse,
-    BrowseableItem, GetFolderItemsCommand, GetFolderItemsResponse, MediaPlayerItem,
-    NotificationEventId, PduId, PlaybackPosChangedNotificationResponse,
+    BrowseableItem, Error as PacketError, GetFolderItemsCommand, GetFolderItemsResponse,
+    MediaPlayerItem, NotificationEventId, PduId, PlaybackPosChangedNotificationResponse,
     PlaybackStatusChangedNotificationResponse, SetBrowsedPlayerCommand, SetBrowsedPlayerResponse,
     TrackChangedNotificationResponse, VendorDependentPreamble, VolumeChangedNotificationResponse,
 };

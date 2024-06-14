@@ -4,32 +4,26 @@
 
 #![recursion_limit = "256"]
 
-use {
-    anyhow::{anyhow, Context, Error},
-    bt_rfcomm::ServerChannel,
-    fidl::endpoints::create_request_stream,
-    fidl_fuchsia_bluetooth_bredr::*,
-    fidl_fuchsia_bluetooth_rfcomm_test::RfcommTestMarker,
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::types::{PeerId, Uuid},
-    fuchsia_component::client::connect_to_protocol,
-    futures::{
-        channel::{
-            mpsc::{channel, SendError},
-            oneshot,
-        },
-        lock::Mutex,
-        select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt,
-    },
-    rustyline::{error::ReadlineError, CompletionType, Config, Editor},
-    std::{sync::Arc, thread},
-    test_rfcomm_client::RfcommManager,
-};
+use anyhow::{anyhow, Context, Error};
+use bt_rfcomm::ServerChannel;
+use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_bluetooth_bredr::*;
+use fidl_fuchsia_bluetooth_rfcomm_test::RfcommTestMarker;
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::types::{PeerId, Uuid};
+use fuchsia_component::client::connect_to_protocol;
+use futures::channel::mpsc::{channel, SendError};
+use futures::channel::oneshot;
+use futures::lock::Mutex;
+use futures::{select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt};
+use rustyline::error::ReadlineError;
+use rustyline::{CompletionType, Config, Editor};
+use std::sync::Arc;
+use std::thread;
+use test_rfcomm_client::RfcommManager;
 
-use crate::{
-    commands::{Cmd, CmdHelper, ReplControl},
-    types::*,
-};
+use crate::commands::{Cmd, CmdHelper, ReplControl};
+use crate::types::*;
 
 mod commands;
 mod types;

@@ -20,23 +20,19 @@ use std::collections::{HashMap, HashSet};
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use futures::channel::{mpsc, oneshot};
 use futures::{
-    channel::{mpsc, oneshot},
     stream, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
-use net_types::{
-    ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-        Subnet,
-    },
-    SpecifiedAddr,
+use log::{debug, error, info, warn};
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
 };
+use net_types::SpecifiedAddr;
 use netstack3_core::routes::AddableMetric;
 
-use crate::bindings::{
-    util::{EntryAndTableId, TryIntoFidlWithContext},
-    BindingsCtx, Ctx, IpExt,
-};
+use crate::bindings::util::{EntryAndTableId, TryIntoFidlWithContext};
+use crate::bindings::{BindingsCtx, Ctx, IpExt};
 
 pub(crate) mod admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
@@ -100,12 +96,11 @@ impl ChangeEither {
 
 impl<A: IpAddress> From<Change<A>> for ChangeEither {
     fn from(change: Change<A>) -> Self {
-        let IpInvariant(change) = A::Version::map_ip(
+        A::Version::map_ip_in(
             change,
-            |change| IpInvariant(ChangeEither::V4(change)),
-            |change| IpInvariant(ChangeEither::V6(change)),
-        );
-        change
+            |change| ChangeEither::V4(change),
+            |change| ChangeEither::V6(change),
+        )
     }
 }
 
@@ -207,7 +202,7 @@ impl<A: IpAddress> Table<A> {
         } else {
             TableModifyResult::NoChange
         };
-        tracing::info!(
+        info!(
             "insert operation of route {route:?} into table with set {set:?} had result {result:?}",
         );
         result
@@ -274,23 +269,23 @@ impl<A: IpAddress> Table<A> {
 
         let result = {
             if !removed_from_table.is_empty() {
-                tracing::info!(
+                info!(
                     "remove operation on routing table resulted in removal of \
                      {} routes from the table:",
                     removed_from_table.len()
                 );
                 for (route, generation) in &removed_from_table {
-                    tracing::info!("  removed route {route:?} (generation {generation:?})");
+                    info!("  removed route {route:?} (generation {generation:?})");
                 }
                 TableModifyResult::TableChanged(removed_from_table)
             } else if removed_any_from_set {
-                tracing::info!(
+                info!(
                     "remove operation on routing table removed routes from set \
                     {set:?}, but not the overall table"
                 );
                 TableModifyResult::SetChanged
             } else {
-                tracing::info!(
+                info!(
                     "remove operation on routing table from set {set:?} \
                      resulted in no change"
                 );
@@ -317,10 +312,10 @@ impl<A: IpAddress> Table<A> {
             }
         });
 
-        tracing::info!("route set removal ({set:?}) removed {} routes:", removed_from_table.len());
+        info!("route set removal ({set:?}) removed {} routes:", removed_from_table.len());
 
         for (route, generation) in &removed_from_table {
-            tracing::info!("  removed route {route:?} (generation {generation:?})");
+            info!("  removed route {route:?} (generation {generation:?})");
         }
 
         removed_from_table
@@ -448,7 +443,7 @@ where
                         }| futures::future::ready(responder))
                         .for_each(|responder| futures::future::ready(
                             responder.send(Err(ChangeError::TableRemoved)).unwrap_or_else(|err| {
-                                tracing::error!("failed to respond to the change request: {err:?}");
+                                error!("failed to respond to the change request: {err:?}");
                             })
                         )).await;
                     } else {
@@ -494,7 +489,7 @@ where
                         // Since the other end dropped the receiver, no one will
                         // observe the result of this route change, so we have to
                         // log any errors ourselves.
-                        tracing::error!("error while handling route change: {:?}", e);
+                        error!("error while handling route change: {:?}", e);
                     }
                 },
             };
@@ -713,7 +708,7 @@ async fn handle_route_change<I>(
 where
     I: IpExt + FidlRouteAdminIpExt,
 {
-    tracing::debug!("routes::handle_change {change:?}");
+    debug!("routes::handle_change {change:?}");
 
     fn one_table<I: Ip>(
         tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
@@ -894,7 +889,7 @@ impl ChangeSink {
         let item = RouteWorkItem { change, responder: None };
         match sender.unbounded_send(item) {
             Ok(()) => (),
-            Err(e) => tracing::warn!(
+            Err(e) => warn!(
                 "failed to send route change {:?} because route change sink is closed",
                 e.into_inner().change
             ),
@@ -928,7 +923,7 @@ impl ChangeSink {
         match sender.unbounded_send(item) {
             Ok(()) => receiver.map(|r| r.expect("responder should not be dropped")).left_future(),
             Err(e) => {
-                tracing::warn!("failed to send an table op to ChangeRunner: {e:?}");
+                warn!("failed to send an table op to ChangeRunner: {e:?}");
                 futures::future::ready(Err(TableError::ShuttingDown)).right_future()
             }
         }
@@ -955,10 +950,10 @@ impl ChangeSink {
             sender: &'a mpsc::UnboundedSender<TableWorkItem<I>>,
         }
 
-        let ChangeSender { sender } = I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(ChangeSink { v4, v6: _ })| ChangeSender { sender: &v4.table_work_sink },
-            |IpInvariant(ChangeSink { v4: _, v6 })| ChangeSender { sender: &v6.table_work_sink },
+        let ChangeSender { sender } = I::map_ip_out(
+            self,
+            |ChangeSink { v4, v6: _ }| ChangeSender { sender: &v4.table_work_sink },
+            |ChangeSink { v4: _, v6 }| ChangeSender { sender: &v6.table_work_sink },
         );
         sender
     }
@@ -972,14 +967,10 @@ impl ChangeSink {
             sender: &'a mpsc::UnboundedSender<RouteWorkItem<A>>,
         }
 
-        let ChangeSender { sender } = I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(ChangeSink { v4, v6: _ })| ChangeSender {
-                sender: &v4.main_table_route_work_sink,
-            },
-            |IpInvariant(ChangeSink { v4: _, v6 })| ChangeSender {
-                sender: &v6.main_table_route_work_sink,
-            },
+        let ChangeSender { sender } = I::map_ip_out(
+            self,
+            |ChangeSink { v4, v6: _ }| ChangeSender { sender: &v4.main_table_route_work_sink },
+            |ChangeSink { v4: _, v6 }| ChangeSender { sender: &v6.main_table_route_work_sink },
         );
         sender
     }

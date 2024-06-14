@@ -16,7 +16,7 @@ source_set("board_info_provider") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_hlcpp",
   ]
 
@@ -32,7 +32,7 @@ source_set("channel_control") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.update.channelcontrol:fuchsia.update.channelcontrol_hlcpp",
   ]
 
@@ -50,7 +50,7 @@ source_set("cobalt") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//src/developer/forensics/utils/cobalt",
   ]
@@ -71,7 +71,7 @@ source_set("crash_reporter") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//zircon/system/ulib/zx",
   ]
@@ -92,7 +92,7 @@ source_set("data_provider") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
     "//sdk/lib/fidl/cpp",
@@ -117,7 +117,7 @@ source_set("device_id_provider") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
   ]
 
@@ -138,7 +138,7 @@ source_set("diagnostics") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
   ]
 
@@ -153,6 +153,17 @@ source_set("fidl_server") {
   testonly = true
 
   sources = [ "fidl_server.h" ]
+
+  public_deps = [
+    "//sdk/lib/fidl/cpp/wire",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
+source_set("fidl_server_hlcpp") {
+  testonly = true
+
+  sources = [ "fidl_server_hlcpp.h" ]
 
   public_deps = [
     "//sdk/lib/fidl/cpp",
@@ -170,7 +181,7 @@ source_set("intl_provider") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
   ]
 
@@ -189,7 +200,7 @@ source_set("last_reboot_info_provider") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
   ]
 
@@ -205,7 +216,7 @@ source_set("loader") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.net.http:fuchsia.net.http_hlcpp",
   ]
 
@@ -225,7 +236,7 @@ source_set("product_info_provider") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_hlcpp",
   ]
 
@@ -241,7 +252,7 @@ source_set("network_reachability_provider") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
   ]
 
@@ -257,6 +268,8 @@ source_set("power_broker") {
 
   sources = [
     "power_broker_element_control.h",
+    "power_broker_lease_control.cc",
+    "power_broker_lease_control.h",
     "power_broker_lessor.cc",
     "power_broker_lessor.h",
     "power_broker_topology.cc",
@@ -264,6 +277,7 @@ source_set("power_broker") {
   ]
 
   public_deps = [
+    ":fidl_server",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/lib/fidl/cpp:cpp",
     "//sdk/lib/fit",
@@ -285,7 +299,7 @@ source_set("reboot_methods_watcher_register") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_hlcpp",
   ]
 }
@@ -299,7 +313,7 @@ source_set("screenshot") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
   ]
 
@@ -319,6 +333,7 @@ source_set("system_activity_governor") {
   ]
 
   public_deps = [
+    ":fidl_server",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/syslog/cpp:cpp",
   ]
@@ -335,7 +350,7 @@ source_set("ui_state_provider") {
   ]
 
   public_deps = [
-    ":fidl_server",
+    ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_hlcpp",
   ]
 }
@@ -349,4 +364,18 @@ source_set("utc_clock_ready_watcher") {
   ]
 
   public_deps = [ "//src/developer/forensics/utils:utc_clock_ready_watcher" ]
+}
+
+source_set("wake_lease") {
+  testonly = true
+
+  sources = [
+    "wake_lease.cc",
+    "wake_lease.h",
+  ]
+
+  public_deps = [
+    ":power_broker",
+    "//src/developer/forensics/exceptions/handler:lib",
+  ]
 }

@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::{btree_map, hash_map, BTreeMap, HashMap},
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use derivative::Derivative;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
 use net_types::ip::{Ipv4, Ipv6};
+use {fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
 
 use super::CommitError;
 

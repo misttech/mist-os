@@ -4,9 +4,9 @@
 
 use anyhow::{anyhow, Context};
 use fidl::endpoints::{ClientEnd, Proxy};
-use fidl_fuchsia_power_broker as fbroker;
-use fidl_fuchsia_power_system as fsystem;
-use rand::{distributions::Alphanumeric, Rng};
+use rand::distributions::Alphanumeric;
+use rand::Rng;
+use {fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem};
 
 /// A power element representing the session.
 ///

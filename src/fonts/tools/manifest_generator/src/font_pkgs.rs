@@ -4,19 +4,13 @@
 
 //! Deserialization for `.font_pkgs.json` files.
 
-use {
-    crate::{
-        merge::{TryMerge, TryMergeGroups},
-        serde_ext::{self, LoadError},
-    },
-    anyhow::Error,
-    rayon::prelude::*,
-    serde::Deserialize,
-    std::{
-        collections::BTreeMap,
-        path::{Path, PathBuf},
-    },
-};
+use crate::merge::{TryMerge, TryMergeGroups};
+use crate::serde_ext::{self, LoadError};
+use anyhow::Error;
+use rayon::prelude::*;
+use serde::Deserialize;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 /// Possible versions of [FontPackageListing].
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -158,7 +152,8 @@ impl TryMerge for FontPackageEntry {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, pretty_assertions::assert_eq};
+    use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_merge() -> Result<(), Error> {

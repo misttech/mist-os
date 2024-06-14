@@ -7,32 +7,28 @@
 
 use alloc::vec::Vec;
 
-use lock_order::{
-    lock::{LockLevelFor, UnlockedAccessMarkerFor},
-    relation::LockBefore,
-    wrap::prelude::*,
-};
+use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
+use lock_order::relation::LockBefore;
+use log::error;
 use netstack3_base::DeviceIdContext;
+use netstack3_device::ethernet::EthernetDeviceCounters;
+use netstack3_device::loopback::{
+    LoopbackDevice, LoopbackDeviceId, LoopbackRxQueueMeta, LoopbackTxQueueMeta,
+    LoopbackWeakDeviceId,
+};
+use netstack3_device::queue::{
+    BufVecU8Allocator, DequeueState, ReceiveDequeContext, ReceiveQueueContext,
+    ReceiveQueueFullError, ReceiveQueueHandler, ReceiveQueueState, ReceiveQueueTypes,
+    TransmitDequeueContext, TransmitQueueCommon, TransmitQueueContext, TransmitQueueState,
+};
+use netstack3_device::socket::{ParseSentFrameError, SentFrame};
+use netstack3_device::{DeviceLayerTypes, DeviceSendFrameError, IpLinkDeviceState, WeakDeviceId};
 use packet::Buf;
 
-use crate::{
-    device::{
-        self,
-        ethernet::EthernetDeviceCounters,
-        loopback::{
-            LoopbackDevice, LoopbackDeviceId, LoopbackRxQueueMeta, LoopbackTxQueueMeta,
-            LoopbackWeakDeviceId,
-        },
-        queue::{
-            BufVecU8Allocator, DequeueState, ReceiveDequeContext, ReceiveQueueContext,
-            ReceiveQueueFullError, ReceiveQueueHandler, ReceiveQueueState, ReceiveQueueTypes,
-            TransmitDequeueContext, TransmitQueueCommon, TransmitQueueContext, TransmitQueueState,
-        },
-        socket::{ParseSentFrameError, SentFrame},
-        DeviceLayerTypes, DeviceSendFrameError, IpLinkDeviceState,
-    },
-    BindingsContext, BindingsTypes, CoreCtx,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::device::integration;
+use crate::{BindingsContext, BindingsTypes, CoreCtx};
 
 impl<BT: BindingsTypes, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = LoopbackDeviceId<BT>;
@@ -42,7 +38,7 @@ impl<BT: BindingsTypes, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BT, L
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
     ReceiveQueueTypes<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type Meta = LoopbackRxQueueMeta;
+    type Meta = LoopbackRxQueueMeta<WeakDeviceId<BC>>;
     type Buffer = Buf<Vec<u8>>;
 }
 
@@ -57,52 +53,43 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
         device_id: &LoopbackDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_device_state(self, device_id, |mut state| {
-            let mut x = state.lock::<crate::lock_ordering::LoopbackRxQueue>();
-            cb(&mut x)
-        })
+        let mut state = integration::device_state(self, device_id);
+        let mut x = state.lock::<crate::lock_ordering::LoopbackRxQueue>();
+        cb(&mut x)
     }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
     ReceiveDequeContext<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type ReceiveQueueCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::LoopbackRxDequeue>;
+    type ReceiveQueueCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::LoopbackRxDequeue>>;
 
     fn with_dequed_frames_and_rx_queue_ctx<
         O,
-        F: FnOnce(
-            &mut DequeueState<LoopbackRxQueueMeta, Buf<Vec<u8>>>,
-            &mut Self::ReceiveQueueCtx<'_>,
-        ) -> O,
+        F: FnOnce(&mut DequeueState<Self::Meta, Buf<Vec<u8>>>, &mut Self::ReceiveQueueCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &LoopbackDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_device_state_and_core_ctx(
-            self,
-            device_id,
-            |mut core_ctx_and_resource| {
-                let (mut x, mut locked) =
-                    core_ctx_and_resource
-                        .lock_with_and::<crate::lock_ordering::LoopbackRxDequeue, _>(|c| c.right());
-                cb(&mut x, &mut locked.cast_core_ctx())
-            },
-        )
+        let mut core_ctx_and_resource = integration::device_state_and_core_ctx(self, device_id);
+        let (mut x, mut locked) = core_ctx_and_resource
+            .lock_with_and::<crate::lock_ordering::LoopbackRxDequeue, _>(|c| c.right());
+        cb(&mut x, &mut locked.cast_core_ctx())
     }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     TransmitQueueCommon<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type Meta = LoopbackTxQueueMeta;
+    type Meta = LoopbackTxQueueMeta<WeakDeviceId<BC>>;
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
 
     fn parse_outgoing_frame<'a, 'b>(
         buf: &'a [u8],
-        LoopbackTxQueueMeta: &'b Self::Meta,
+        _meta: &'b Self::Meta,
     ) -> Result<SentFrame<&'a [u8]>, ParseSentFrameError> {
         SentFrame::try_parse_as_ethernet(buf)
     }
@@ -119,10 +106,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         device_id: &LoopbackDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_device_state(self, device_id, |mut state| {
-            let mut x = state.lock::<crate::lock_ordering::LoopbackTxQueue>();
-            cb(&mut x)
-        })
+        let mut state = integration::device_state(self, device_id);
+        let mut x = state.lock::<crate::lock_ordering::LoopbackTxQueue>();
+        cb(&mut x)
     }
 
     fn send_frame(
@@ -142,9 +128,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         // the socket lock will result in a deadlock.
         match ReceiveQueueHandler::queue_rx_frame(self, bindings_ctx, device_id, meta.into(), buf) {
             Ok(()) => {}
-            Err(ReceiveQueueFullError((LoopbackRxQueueMeta, _frame))) => {
+            Err(ReceiveQueueFullError((_meta, _frame))) => {
                 // RX queue is full - there is nothing further we can do here.
-                tracing::error!("dropped RX frame on loopback device due to full RX queue")
+                error!("dropped RX frame on loopback device due to full RX queue")
             }
         }
 
@@ -155,7 +141,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>>
     TransmitDequeueContext<LoopbackDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type TransmitQueueCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::LoopbackTxDequeue>;
+    type TransmitQueueCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::LoopbackTxDequeue>>;
 
     fn with_dequed_packets_and_tx_queue_ctx<
         O,
@@ -165,16 +152,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        device::integration::with_device_state_and_core_ctx(
-            self,
-            device_id,
-            |mut core_ctx_and_resource| {
-                let (mut x, mut locked) =
-                    core_ctx_and_resource
-                        .lock_with_and::<crate::lock_ordering::LoopbackTxDequeue, _>(|c| c.right());
-                cb(&mut x, &mut locked.cast_core_ctx())
-            },
-        )
+        let mut core_ctx_and_resource = integration::device_state_and_core_ctx(self, device_id);
+        let (mut x, mut locked) = core_ctx_and_resource
+            .lock_with_and::<crate::lock_ordering::LoopbackTxDequeue, _>(|c| c.right());
+        cb(&mut x, &mut locked.cast_core_ctx())
     }
 }
 
@@ -191,23 +172,24 @@ impl<BT: DeviceLayerTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<LoopbackDev
 impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
     for crate::lock_ordering::LoopbackRxQueue
 {
-    type Data = ReceiveQueueState<LoopbackRxQueueMeta, Buf<Vec<u8>>>;
+    type Data = ReceiveQueueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>;
 }
 
 impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
     for crate::lock_ordering::LoopbackRxDequeue
 {
-    type Data = DequeueState<LoopbackRxQueueMeta, Buf<Vec<u8>>>;
+    type Data = DequeueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>;
 }
 
 impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
     for crate::lock_ordering::LoopbackTxQueue
 {
-    type Data = TransmitQueueState<LoopbackTxQueueMeta, Buf<Vec<u8>>, BufVecU8Allocator>;
+    type Data =
+        TransmitQueueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>, BufVecU8Allocator>;
 }
 
 impl<BT: DeviceLayerTypes> LockLevelFor<IpLinkDeviceState<LoopbackDevice, BT>>
     for crate::lock_ordering::LoopbackTxDequeue
 {
-    type Data = DequeueState<LoopbackTxQueueMeta, Buf<Vec<u8>>>;
+    type Data = DequeueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>;
 }

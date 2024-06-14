@@ -6,8 +6,7 @@ use crate::error::{Error, Result};
 use crate::protocol;
 
 use std::collections::VecDeque;
-use std::sync::Arc;
-use std::sync::Mutex as SyncMutex;
+use std::sync::{Arc, Mutex as SyncMutex};
 use tokio::sync::oneshot;
 
 /// Indicates whether a stream is open or closed, and if closed, why it closed.

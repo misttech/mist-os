@@ -6,8 +6,7 @@ use std::io::{self, Read, Write};
 
 use thiserror::Error;
 
-use fuchsia_trace as ftrace;
-use fuchsia_zircon as zx;
+use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
 
 use crate::{Fixed, NewId, ObjectId};
 

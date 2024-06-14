@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Context as _, fidl_fuchsia_io as fio, std::collections::HashSet, std::sync::Arc};
+use anyhow::Context as _;
+use fidl_fuchsia_io as fio;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 // Keeping the types as parameters instead of erasing them makes it easier to ensure that all of the
 // RootDirs created by pkg-cache are using BootfsThenBlobfs.

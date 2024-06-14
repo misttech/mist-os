@@ -2,25 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context},
-    bt_avctp::{AvcPeer, AvcResponseType},
-    fidl::endpoints::{create_endpoints, create_proxy, create_request_stream},
-    fidl_fuchsia_bluetooth_avrcp::{
-        AbsoluteVolumeHandlerMarker, AbsoluteVolumeHandlerRequest,
-        AbsoluteVolumeHandlerRequestStream, ControllerMarker, PeerManagerMarker,
-        TargetHandlerMarker,
-    },
-    fidl_fuchsia_bluetooth_bredr as bredr,
-    fixture::fixture,
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::profile::{l2cap_connect_parameters, Psm},
-    fuchsia_bluetooth::types::{Channel, Uuid},
-    fuchsia_component_test::Capability,
-    fuchsia_zircon as zx,
-    futures::{join, stream::StreamExt, TryFutureExt},
-    mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember},
+use anyhow::{format_err, Context};
+use bt_avctp::{AvcPeer, AvcResponseType};
+use fidl::endpoints::{create_endpoints, create_proxy, create_request_stream};
+use fidl_fuchsia_bluetooth_avrcp::{
+    AbsoluteVolumeHandlerMarker, AbsoluteVolumeHandlerRequest, AbsoluteVolumeHandlerRequestStream,
+    ControllerMarker, PeerManagerMarker, TargetHandlerMarker,
 };
+use fixture::fixture;
+use fuchsia_bluetooth::profile::{l2cap_connect_parameters, Psm};
+use fuchsia_bluetooth::types::{Channel, Uuid};
+use fuchsia_component_test::Capability;
+use futures::stream::StreamExt;
+use futures::{join, TryFutureExt};
+use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// AVRCP component URL.
 const AVRCP_URL: &str = "fuchsia-pkg://fuchsia.com/bt-avrcp-integration-tests#meta/bt-avrcp.cm";

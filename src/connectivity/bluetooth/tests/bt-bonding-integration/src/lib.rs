@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    bt_test_harness::host::{self as host, HostHarness},
-    fidl_fuchsia_bluetooth_sys as sys,
-    fuchsia_bluetooth::{
-        expectation::{self, asynchronous::ExpectableExt},
-        types::{Address, BondingData, LeBondData, OneOrBoth, PeerId},
-    },
-};
+use anyhow::Error;
+use bt_test_harness::host::{self as host, HostHarness};
+use fidl_fuchsia_bluetooth_sys as sys;
+use fuchsia_bluetooth::expectation::asynchronous::ExpectableExt;
+use fuchsia_bluetooth::expectation::{self};
+use fuchsia_bluetooth::types::{Address, BondingData, LeBondData, OneOrBoth, PeerId};
 
 // TODO(https://fxbug.dev/42072596): Add tests for BR/EDR and dual mode bond data.
 

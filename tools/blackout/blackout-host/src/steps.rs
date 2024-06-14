@@ -4,20 +4,16 @@
 
 //! test steps
 
-use {
-    crate::{BlackoutError, CommandError, RebootError, Seed},
-    anyhow::{bail, ensure, Context},
-    async_trait::async_trait,
-    serde_json::Value,
-    std::{
-        fs::OpenOptions,
-        io::Write,
-        path::{Path, PathBuf},
-        sync::Arc,
-        thread::sleep,
-        time::Duration,
-    },
-};
+use crate::{BlackoutError, CommandError, RebootError, Seed};
+use anyhow::{bail, ensure, Context};
+use async_trait::async_trait;
+use serde_json::Value;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::thread::sleep;
+use std::time::Duration;
 
 /// Type of reboot to perform.
 #[derive(Clone, Debug)]
@@ -388,16 +384,12 @@ impl TestStep for VerifyStep {
 mod tests {
     use super::{Runner, SetupStep, TestStep, VerifyStep};
     use crate::{BlackoutError, CommandError};
-    use {
-        async_trait::async_trait,
-        fuchsia_async as fasync,
-        std::{
-            os::unix::process::ExitStatusExt,
-            process::ExitStatus,
-            sync::{Arc, Mutex},
-            time::Duration,
-        },
-    };
+    use async_trait::async_trait;
+    use fuchsia_async as fasync;
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::ExitStatus;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
 
     #[derive(Debug, PartialEq, Clone, Copy)]
     enum ExpectedCommand {

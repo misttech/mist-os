@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl::prelude::*,
-    fidl::AsyncChannel,
-    fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_inspect::{component, health::Reporter},
-    fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
-    fuchsia_zircon as zx,
-    futures::TryStreamExt,
-    tracing::{debug, info},
-};
+use anyhow::Error;
+use fidl::prelude::*;
+use fidl::AsyncChannel;
+use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
+use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use futures::TryStreamExt;
+use tracing::{debug, info};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

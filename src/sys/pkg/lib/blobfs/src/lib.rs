@@ -6,20 +6,18 @@
 
 //! Typesafe wrappers around the /blob filesystem.
 
-use {
-    fidl::endpoints::{Proxy as _, ServerEnd},
-    fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
-    fuchsia_hash::{Hash, ParseHashError},
-    fuchsia_zircon::{self as zx, AsHandleRef as _, Status},
-    futures::{stream, StreamExt as _},
-    std::collections::HashSet,
-    thiserror::Error,
-    tracing::{error, info, warn},
-    vfs::{
-        common::send_on_open_with_error, execution_scope::ExecutionScope, file::StreamIoConnection,
-        ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest as _,
-    },
-};
+use fidl::endpoints::{Proxy as _, ServerEnd};
+use fuchsia_hash::{Hash, ParseHashError};
+use fuchsia_zircon::{self as zx, AsHandleRef as _, Status};
+use futures::{stream, StreamExt as _};
+use std::collections::HashSet;
+use thiserror::Error;
+use tracing::{error, info, warn};
+use vfs::common::send_on_open_with_error;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::StreamIoConnection;
+use vfs::{ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest as _};
+use {fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 pub mod mock;
 pub use mock::Mock;
@@ -536,11 +534,14 @@ impl Client {
 #[cfg(test)]
 #[allow(clippy::bool_assert_comparison)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, blobfs_ramdisk::BlobfsRamdisk,
-        fuchsia_async as fasync, futures::stream::TryStreamExt, maplit::hashset,
-        std::io::Write as _, std::sync::Arc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use blobfs_ramdisk::BlobfsRamdisk;
+    use fuchsia_async as fasync;
+    use futures::stream::TryStreamExt;
+    use maplit::hashset;
+    use std::io::Write as _;
+    use std::sync::Arc;
 
     #[fasync::run_singlethreaded(test)]
     async fn list_known_blobs_empty() {

@@ -6,18 +6,14 @@
 
 #![warn(missing_docs)]
 
-use {
-    fidl_fuchsia_logger::{
-        LogFilterOptions, LogListenerSafeMarker, LogListenerSafeRequest,
-        LogListenerSafeRequestStream, LogMessage, LogProxy,
-    },
-    fuchsia_async as fasync,
-    futures::{
-        channel::mpsc::{channel, Receiver, Sender},
-        sink::SinkExt,
-        stream::StreamExt,
-    },
+use fidl_fuchsia_logger::{
+    LogFilterOptions, LogListenerSafeMarker, LogListenerSafeRequest, LogListenerSafeRequestStream,
+    LogMessage, LogProxy,
 };
+use fuchsia_async as fasync;
+use futures::channel::mpsc::{channel, Receiver, Sender};
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 
 /// Test that all of the expected message arrive over `proxy`, with no unexpected ones appearing.
 /// Returns once all expected messages have been observed.

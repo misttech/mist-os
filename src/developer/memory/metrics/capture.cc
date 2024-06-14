@@ -17,6 +17,8 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <optional>
+
 #include <task-utils/walker.h>
 
 namespace memory {
@@ -238,8 +240,8 @@ zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, Cap
   // ZX_INFO_KMEM_STATS_EXTENDED is more expensive to collect than ZX_INFO_KMEM_STATS, so only query
   // it for the more detailed capture levels. Use kmem_extended_ to populate the shared fields in
   // kmem_ (kmem_extended_ is a superset of kmem_), avoiding the need for a redundant syscall.
-  zx_status_t err =
-      os.GetKernelMemoryStatsExtended(state.stats_client, capture->kmem_extended_, &capture->kmem_);
+  zx_status_t err = os.GetKernelMemoryStatsExtended(
+      state.stats_client, capture->kmem_extended_.emplace(), &capture->kmem_);
   if (err != ZX_OK) {
     return err;
   }
@@ -247,7 +249,12 @@ zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, Cap
   // Some Fuchsia systems use ZRAM, ie. compressed RAM. ZX_INFO_KMEM_STATS_COMPRESSION retrieves
   // information about this compression, so we can get an accurate view of the actual physical
   // memory used.
-  err = os.GetKernelMemoryStatsCompression(state.stats_client, capture->kmem_compression_);
+  err =
+      os.GetKernelMemoryStatsCompression(state.stats_client, capture->kmem_compression_.emplace());
+  // Assume compression is disabled when there is no storage.
+  if (!capture->kmem_compression_->compressed_storage_bytes) {
+    capture->kmem_compression_ = std::nullopt;
+  }
   if (err != ZX_OK) {
     return err;
   }

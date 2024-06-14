@@ -4,10 +4,9 @@
 
 //! Utility functions for fuchsia.io nodes.
 
-use {
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status, futures::prelude::*,
-    thiserror::Error,
-};
+use futures::prelude::*;
+use thiserror::Error;
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 /// An error encountered while opening a node
 #[derive(Debug, Clone, Error)]
@@ -292,7 +291,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::OpenFlags, assert_matches::assert_matches, fuchsia_async as fasync};
+    use super::*;
+    use crate::OpenFlags;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
 
     // open_in_namespace
 

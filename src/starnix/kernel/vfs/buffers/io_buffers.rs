@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::{
-        read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessorExt,
-        NumberOfElementsRead, TaskMemoryAccessor, UNIFIED_ASPACES_ENABLED,
-    },
-    task::{CurrentTask, Task},
+use crate::mm::{
+    read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessorExt, NumberOfElementsRead,
+    TaskMemoryAccessor, UNIFIED_ASPACES_ENABLED,
 };
+use crate::task::{CurrentTask, Task};
 use smallvec::{smallvec, SmallVec};
-use starnix_uapi::{
-    errno, error,
-    errors::{Errno, ENOTSUP},
-    user_address::UserAddress,
-    user_buffer::{UserBuffer, UserBuffers},
-};
-use std::{
-    mem::MaybeUninit,
-    ops::{Deref, DerefMut},
-};
+use starnix_uapi::errors::{Errno, ENOTSUP};
+use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
+use starnix_uapi::{errno, error};
+use std::mem::MaybeUninit;
+use std::ops::{Deref, DerefMut};
 use zerocopy::FromBytes;
 
 /// The callback for `OutputBuffer::write_each`. The callback is passed the buffers to write to in
@@ -867,10 +861,8 @@ impl VecInputBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        mm::{MemoryAccessor as _, PAGE_SIZE},
-        testing::*,
-    };
+    use crate::mm::{MemoryAccessor as _, PAGE_SIZE};
+    use crate::testing::*;
     use usercopy::slice_to_maybe_uninit_mut;
 
     #[::fuchsia::test]

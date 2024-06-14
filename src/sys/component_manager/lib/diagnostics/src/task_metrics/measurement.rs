@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::task_metrics::constants::*,
-    core::cmp::Reverse,
-    fuchsia_inspect::{self as inspect, ArrayProperty},
-    fuchsia_zircon as zx,
-    injectable_time::TimeSource,
-    std::cmp::max,
-    std::cmp::{Eq, Ord, PartialEq, PartialOrd},
-    std::collections::BinaryHeap,
-    std::ops::{AddAssign, SubAssign},
-    std::sync::Arc,
-};
+use crate::task_metrics::constants::*;
+use core::cmp::Reverse;
+use fuchsia_inspect::{self as inspect, ArrayProperty};
+use fuchsia_zircon as zx;
+use injectable_time::TimeSource;
+use std::cmp::{max, Eq, Ord, PartialEq, PartialOrd};
+use std::collections::BinaryHeap;
+use std::ops::{AddAssign, SubAssign};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Default, PartialOrd, Eq, Ord, PartialEq)]
 pub struct Measurement {

@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        feedback_data_provider::{facade::FeedbackDataProviderFacade, types::*},
-        server::Facade,
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    serde_json::Value,
-};
+use crate::feedback_data_provider::facade::FeedbackDataProviderFacade;
+use crate::feedback_data_provider::types::*;
+use crate::server::Facade;
+use anyhow::Error;
+use async_trait::async_trait;
+use serde_json::Value;
 
 #[async_trait(?Send)]
 impl Facade for FeedbackDataProviderFacade {

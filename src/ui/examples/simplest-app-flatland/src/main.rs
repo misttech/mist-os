@@ -4,27 +4,25 @@
 mod internal_message;
 mod touch;
 
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_element::{
+    GraphicalPresenterMarker, GraphicalPresenterProxy, ViewControllerMarker, ViewControllerProxy,
+    ViewSpec,
+};
+use fidl_fuchsia_ui_pointer::EventPhase;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::{self as component};
+use fuchsia_scenic::ViewRefPair;
+use futures::channel::mpsc::{unbounded, UnboundedSender};
+use futures::prelude::*;
+use internal_message::InternalMessage;
+use std::env;
+use tracing::{error, warn};
 use {
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_element::{
-        GraphicalPresenterMarker, GraphicalPresenterProxy, ViewControllerMarker,
-        ViewControllerProxy, ViewSpec,
-    },
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as fapp, fidl_fuchsia_ui_composition as fland,
-    fidl_fuchsia_ui_pointer as fptr,
-    fidl_fuchsia_ui_pointer::EventPhase,
-    fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync,
-    fuchsia_component::{self as component, client::connect_to_protocol},
-    fuchsia_scenic::ViewRefPair,
+    fidl_fuchsia_ui_pointer as fptr, fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync,
     fuchsia_trace as trace,
-    futures::{
-        channel::mpsc::{unbounded, UnboundedSender},
-        prelude::*,
-    },
-    internal_message::InternalMessage,
-    std::env,
-    tracing::{error, warn},
 };
 
 const IMAGE_ID: fland::ContentId = fland::ContentId { value: 2 };

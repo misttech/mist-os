@@ -120,7 +120,9 @@ TEST_F(MagmaImageTesting, SpecifyIntelYf) {
   };
 
   magma_image_info_t image_info = {};
-  ASSERT_EQ(MAGMA_STATUS_INVALID_ARGS,
+  // In this test, fuchsia.sysmem2.Error.CONSTRAINTS_INTERSECTION_EMPTY is the underlying cause of
+  // the MAGMA_STATUS_INTERNAL_ERROR.
+  ASSERT_EQ(MAGMA_STATUS_INTERNAL_ERROR,
             magma_image::CreateDrmImage(physical_device_index, &create_info, &image_info, &buffer,
                                         &token));
   EXPECT_FALSE(token);

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::Error,
-    crate::util,
-    crate::util::write_depfile,
-    std::fs,
-    std::io::{BufRead, BufReader, Write},
-    std::path::PathBuf,
-    std::str::FromStr,
-};
+use crate::error::Error;
+use crate::util;
+use crate::util::write_depfile;
+use std::fs;
+use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
+use std::str::FromStr;
 
 /// read in the provided list of json files, merge them, and pretty-print the merged result to
 /// stdout if output is None or to the provided path if output is Some.

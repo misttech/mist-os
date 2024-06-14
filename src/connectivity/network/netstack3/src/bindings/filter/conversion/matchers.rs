@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
-use net_types::ip::{GenericOverIp, Ip, IpInvariant};
+use net_types::ip::{GenericOverIp, Ip};
 use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+};
 
 use super::{ConversionResult, IpVersionMismatchError, IpVersionStrictness, TryConvertToCoreState};
 
@@ -205,10 +206,10 @@ impl TryConvertToCoreState for fnet_filter_ext::TransportProtocolMatcher {
         let matcher = match self {
             fnet_filter_ext::TransportProtocolMatcher::Tcp { src_port, dst_port } => {
                 netstack3_core::filter::TransportProtocolMatcher {
-                    proto: I::map_ip(
-                        IpInvariant(()),
-                        |IpInvariant(())| Ipv4Proto::Proto(IpProto::Tcp),
-                        |IpInvariant(())| Ipv6Proto::Proto(IpProto::Tcp),
+                    proto: I::map_ip_out(
+                        (),
+                        |()| Ipv4Proto::Proto(IpProto::Tcp),
+                        |()| Ipv6Proto::Proto(IpProto::Tcp),
                     ),
                     src_port: src_port.map(into_core_port_matcher),
                     dst_port: dst_port.map(into_core_port_matcher),
@@ -216,20 +217,20 @@ impl TryConvertToCoreState for fnet_filter_ext::TransportProtocolMatcher {
             }
             fnet_filter_ext::TransportProtocolMatcher::Udp { src_port, dst_port } => {
                 netstack3_core::filter::TransportProtocolMatcher {
-                    proto: I::map_ip(
-                        IpInvariant(()),
-                        |IpInvariant(())| Ipv4Proto::Proto(IpProto::Udp),
-                        |IpInvariant(())| Ipv6Proto::Proto(IpProto::Udp),
+                    proto: I::map_ip_out(
+                        (),
+                        |()| Ipv4Proto::Proto(IpProto::Udp),
+                        |()| Ipv6Proto::Proto(IpProto::Udp),
                     ),
                     src_port: src_port.map(into_core_port_matcher),
                     dst_port: dst_port.map(into_core_port_matcher),
                 }
             }
             fnet_filter_ext::TransportProtocolMatcher::Icmp => {
-                let Wrap(result) = I::map_ip::<_, Wrap<I>>(
-                    IpInvariant(()),
-                    |IpInvariant(())| Wrap(Ok(ConversionResult::State(Ipv4Proto::Icmp))),
-                    |IpInvariant(())| Wrap(ip_version_strictness.mismatch_result()),
+                let Wrap(result) = I::map_ip_out::<_, Wrap<I>>(
+                    (),
+                    |()| Wrap(Ok(ConversionResult::State(Ipv4Proto::Icmp))),
+                    |()| Wrap(ip_version_strictness.mismatch_result()),
                 );
                 let proto = match result? {
                     ConversionResult::State(proto) => proto,
@@ -242,10 +243,10 @@ impl TryConvertToCoreState for fnet_filter_ext::TransportProtocolMatcher {
                 }
             }
             fnet_filter_ext::TransportProtocolMatcher::Icmpv6 => {
-                let Wrap(result) = I::map_ip::<_, Wrap<I>>(
-                    IpInvariant(()),
-                    |IpInvariant(())| Wrap(ip_version_strictness.mismatch_result()),
-                    |IpInvariant(())| Wrap(Ok(ConversionResult::State(Ipv6Proto::Icmpv6))),
+                let Wrap(result) = I::map_ip_out::<_, Wrap<I>>(
+                    (),
+                    |()| Wrap(ip_version_strictness.mismatch_result()),
+                    |()| Wrap(Ok(ConversionResult::State(Ipv6Proto::Icmpv6))),
                 );
                 let proto = match result? {
                     ConversionResult::State(proto) => proto,

@@ -12,8 +12,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::net::{Ipv6Addr, SocketAddr};
 use std::sync::Arc;
-use std::task::Waker;
-use std::task::{Context, Poll};
+use std::task::{Context, Poll, Waker};
 
 const MAX_DNS_RESPONSE_SIZE: usize = 2048;
 

@@ -5,6 +5,7 @@
 #include <zircon/compiler.h>
 #include <zircon/syscalls.h>
 
+#include "data-constants.h"
 #include "private.h"
 
 __EXPORT uint32_t _zx_system_get_page_size(void) { return DATA_CONSTANTS.page_size; }

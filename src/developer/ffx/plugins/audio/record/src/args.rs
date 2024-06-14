@@ -5,10 +5,9 @@
 use anyhow::Result;
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
-use fidl_fuchsia_audio_controller as fac;
-use fidl_fuchsia_media as fmedia;
 use fuchsia_audio::Format;
 use std::time::Duration;
+use {fidl_fuchsia_audio_controller as fac, fidl_fuchsia_media as fmedia};
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

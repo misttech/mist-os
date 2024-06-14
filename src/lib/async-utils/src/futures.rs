@@ -6,7 +6,8 @@
 
 use std::pin::Pin;
 
-use futures::{future::FusedFuture, task, Future};
+use futures::future::FusedFuture;
+use futures::{task, Future};
 
 /// Future for the [`FutureExt::replace_value`] method.
 #[derive(Debug)]
@@ -157,7 +158,8 @@ mod tests {
 
     #[test]
     fn yield_to_executor_once() {
-        use futures::{future::FusedFuture as _, FutureExt as _};
+        use futures::future::FusedFuture as _;
+        use futures::FutureExt as _;
 
         let (waker, count) = futures_test::task::new_count_waker();
         let mut context = std::task::Context::from_waker(&waker);

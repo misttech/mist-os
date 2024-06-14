@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_bluetooth_avrcp::{PeerManagerMarker, PeerManagerRequest, TargetHandlerProxy},
-    fidl_fuchsia_component::{BinderMarker, BinderProxy},
-    fidl_fuchsia_media_sessions2::{DiscoveryMarker, DiscoveryRequest, SessionsWatcherProxy},
-    fidl_fuchsia_power_battery::{BatteryManagerMarker, BatteryManagerRequest},
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-    },
-    futures::{channel::mpsc, SinkExt, StreamExt},
-    realmbuilder_mock_helpers::mock_component,
-    std::collections::HashSet,
-    tracing::info,
+use anyhow::Error;
+use fidl_fuchsia_bluetooth_avrcp::{PeerManagerMarker, PeerManagerRequest, TargetHandlerProxy};
+use fidl_fuchsia_component::{BinderMarker, BinderProxy};
+use fidl_fuchsia_media_sessions2::{DiscoveryMarker, DiscoveryRequest, SessionsWatcherProxy};
+use fidl_fuchsia_power_battery::{BatteryManagerMarker, BatteryManagerRequest};
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
+use realmbuilder_mock_helpers::mock_component;
+use std::collections::HashSet;
+use tracing::info;
 
 /// AVRCP-Target component URL.
 const AVRCP_TARGET_URL: &str =

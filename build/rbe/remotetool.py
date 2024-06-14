@@ -24,7 +24,7 @@ import cl_utils
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = fuchsia.project_root_dir()
-PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=os.curdir)
+PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=Path(os.curdir))
 
 _REPROXY_CFG = _SCRIPT_DIR / "fuchsia-reproxy.cfg"
 
@@ -123,7 +123,9 @@ class ShowActionResult(object):
     inputs: Dict[Path, str]
     output_files: Dict[Path, str]
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ShowActionResult):
+            return False
         return (
             self.command == other.command
             and self.platform == other.platform
@@ -231,10 +233,12 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
 
 
 class RemoteTool(object):
-    def __init__(self, reproxy_cfg: Path):
+    def __init__(self, reproxy_cfg: Dict[str, str]):
         self._reproxy_cfg = reproxy_cfg
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, RemoteTool):
+            return False
         return self.config == other.config
 
     @property
@@ -245,7 +249,7 @@ class RemoteTool(object):
         self,
         args: Sequence[str],
         show_command: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> cl_utils.SubprocessResult:
         """Runs `remotetool` using the given reproxy configuration.
 
@@ -273,13 +277,12 @@ class RemoteTool(object):
             # This could change to a different credential helper in the future.
             auto_args.append("--use_application_default_credentials=true")
 
-        command = (
-            [
-                str(PROJECT_ROOT_REL / _HOST_REMOTETOOL),
-            ]
-            + auto_args
-            + args
-        )
+        command = [
+            str(PROJECT_ROOT_REL / _HOST_REMOTETOOL),
+            *auto_args,
+            *args,
+        ]
+
         command_str = cl_utils.command_quoted_str(command)
         if show_command:
             print(command_str)
@@ -293,13 +296,15 @@ class RemoteTool(object):
             raise subprocess.CalledProcessError(result.returncode, command)
         return result
 
-    def _show_action(self, digest: str, **kwargs) -> cl_utils.SubprocessResult:
+    def _show_action(
+        self, digest: str, **kwargs: Any
+    ) -> cl_utils.SubprocessResult:
         args = ["--operation", "show_action", "--digest", digest]
         final_kwargs = kwargs
         final_kwargs["quiet"] = True
         return self.run(args, **final_kwargs)
 
-    def show_action(self, digest: str, **kwargs) -> ShowActionResult:
+    def show_action(self, digest: str, **kwargs: Any) -> ShowActionResult:
         """Reads parameters of a remote action using `remotetool`.
 
         Results of querying 'show_action' are cached.
@@ -319,6 +324,7 @@ class RemoteTool(object):
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_file = cache_dir / (hash + ".stdout")
 
+        show_action_output: Sequence[str] | list[str]
         if cache_file.exists():
             show_action_output = cache_file.read_text().splitlines()
         else:
@@ -332,7 +338,7 @@ class RemoteTool(object):
         return parse_show_action_output(show_action_output)
 
     def download_blob(
-        self, path: Path, digest: str, **kwargs
+        self, path: Path, digest: str, **kwargs: Any
     ) -> cl_utils.SubprocessResult:
         """Downloads a remote artifact.
 
@@ -358,7 +364,7 @@ class RemoteTool(object):
         return self.run(args, **final_kwargs)
 
     def download_dir(
-        self, path: Path, digest: str, **kwargs
+        self, path: Path, digest: str, **kwargs: Any
     ) -> cl_utils.SubprocessResult:
         """Downloads a remote directory of artifacts.
 

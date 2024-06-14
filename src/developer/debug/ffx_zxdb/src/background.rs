@@ -5,11 +5,10 @@
 use anyhow::Result;
 use async_io::Async;
 use fuchsia_async::Task;
-use futures_util::{future::FutureExt, io::AsyncReadExt};
-use signal_hook::{
-    consts::signal::{SIGINT, SIGTERM},
-    low_level::pipe,
-};
+use futures_util::future::FutureExt;
+use futures_util::io::AsyncReadExt;
+use signal_hook::consts::signal::{SIGINT, SIGTERM};
+use signal_hook::low_level::pipe;
 use std::os::unix::net::UnixStream;
 
 use crate::debug_agent::DebugAgentSocket;

@@ -6,12 +6,10 @@ pub mod args;
 
 mod subcommands;
 
-use {
-    anyhow::{Context, Result},
-    args::{I2cCommand, I2cSubCommand},
-    fidl_fuchsia_io as fio,
-    std::io::Write,
-};
+use anyhow::{Context, Result};
+use args::{I2cCommand, I2cSubCommand};
+use fidl_fuchsia_io as fio;
+use std::io::Write;
 
 pub async fn i2c(
     cmd: &I2cCommand,
@@ -41,14 +39,13 @@ pub async fn i2c(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        argh::FromArgs,
-        fidl_fuchsia_hardware_i2c as fi2c, fuchsia_async as fasync,
-        fuchsia_component::server::{FidlService, ServiceFs},
-        futures::{future, lock::Mutex, Future, FutureExt, StreamExt, TryStreamExt},
-        std::sync::Arc,
-    };
+    use super::*;
+    use argh::FromArgs;
+    use fuchsia_component::server::{FidlService, ServiceFs};
+    use futures::lock::Mutex;
+    use futures::{future, Future, FutureExt, StreamExt, TryStreamExt};
+    use std::sync::Arc;
+    use {fidl_fuchsia_hardware_i2c as fi2c, fuchsia_async as fasync};
 
     enum I2cDeviceRequestStream {
         I2cDeviceA(fi2c::DeviceRequestStream),

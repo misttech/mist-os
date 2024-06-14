@@ -65,8 +65,11 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
 BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
     "embeddable_eng",
     "bootstrap_eng",
+    "kernel_oom_reboot_timeout_low",
+    "kernel_oom_behavior_jobkill",
     "kernel_pmm_checker_enabled",
     "kernel_pmm_checker_enabled_auto",
+    "kernel_serial_legacy",
     "power_framework_testing_sag",
 ]
 
@@ -189,12 +192,14 @@ ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_A
     "core_realm_eng",
     "example_assembly_bundle",
     "full_package_drivers",
+    "intel_hda",
     "standard_eng",
     "networking_test_collection",
     "pkgfs_disable_executability_restrictions",
     "sensors_playback",
     "system_update_checker",
     "testing_support",
+    "topology_test_daemon",
     "ui_eng",
     "ui_eng.icu_default_{}".format(icu_flavors.default_git_commit),
     "ui_eng.icu_latest_{}".format(icu_flavors.latest_git_commit),

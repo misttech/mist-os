@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    init::Ticks,
-    session::ResolveCtx,
-    string::parse_padded_string,
-    thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef},
-    trace_header, ParseResult, Provider, LOG_RECORD_TYPE,
-};
+use crate::init::Ticks;
+use crate::session::ResolveCtx;
+use crate::string::parse_padded_string;
+use crate::thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef};
+use crate::{trace_header, ParseResult, Provider, LOG_RECORD_TYPE};
 use flyweights::FlyStr;
 use nom::combinator::all_consuming;
 
@@ -65,7 +63,8 @@ trace_header! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fxt_builder::FxtBuilder, RawTraceRecord};
+    use crate::fxt_builder::FxtBuilder;
+    use crate::RawTraceRecord;
     use std::num::NonZeroU8;
 
     #[test]

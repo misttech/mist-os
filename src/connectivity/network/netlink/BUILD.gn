@@ -50,6 +50,7 @@ rustc_library("netlink") {
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
+    "//src/connectivity/lib/ip-test-macro",
     "//src/connectivity/lib/net-declare",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

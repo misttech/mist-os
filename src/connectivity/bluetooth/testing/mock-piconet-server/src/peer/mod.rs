@@ -17,10 +17,8 @@ use tracing::{info, warn};
 mod search;
 pub mod service;
 
-use self::{
-    search::SearchSet,
-    service::{RegistrationHandle, ServiceSet},
-};
+use self::search::SearchSet;
+use self::service::{RegistrationHandle, ServiceSet};
 use crate::profile::{build_l2cap_descriptor, parse_service_definitions};
 use crate::types::ServiceRecord;
 
@@ -245,20 +243,16 @@ mod tests {
     use super::*;
 
     use assert_matches::assert_matches;
-    use bt_rfcomm::{
-        profile::{is_rfcomm_protocol, server_channel_from_protocol},
-        ServerChannel,
-    };
+    use bt_rfcomm::profile::{is_rfcomm_protocol, server_channel_from_protocol};
+    use bt_rfcomm::ServerChannel;
     use fidl::endpoints::{create_proxy_and_stream, RequestStream};
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::profile::ProtocolDescriptor;
     use futures::task::Poll;
     use std::pin::pin;
 
-    use crate::{
-        profile::tests::{a2dp_service_definition, rfcomm_service_definition},
-        types::RegisteredServiceId,
-    };
+    use crate::profile::tests::{a2dp_service_definition, rfcomm_service_definition};
+    use crate::types::RegisteredServiceId;
 
     fn create_mock_peer(id: PeerId) -> Result<(MockPeer, bredr::PeerObserverRequestStream), Error> {
         let (proxy, stream) = create_proxy_and_stream::<bredr::PeerObserverMarker>().unwrap();

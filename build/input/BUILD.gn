@@ -14,7 +14,6 @@ group("bootfs") {
   deps = [
     "board:bootfs_labels",
     "dev:bootfs_labels",
-    "product:bootfs_labels",
   ]
 }
 
@@ -28,11 +27,6 @@ group("recovery_bootfs") {
     "board:recovery_bootfs_labels",
     "dev:recovery_bootfs_labels",
   ]
-}
-
-group("system_image") {
-  testonly = fuchsia_zbi_testonly
-  deps = [ "board:system_image_deps" ]
 }
 
 group("zedboot_bootfs") {

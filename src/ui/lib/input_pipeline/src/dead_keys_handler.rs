@@ -44,11 +44,9 @@ use async_trait::async_trait;
 use core::fmt;
 use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning};
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon as zx;
-use rust_icu_sys as usys;
-use rust_icu_unorm2 as unorm;
 use std::cell::RefCell;
 use std::rc::Rc;
+use {fuchsia_zircon as zx, rust_icu_sys as usys, rust_icu_unorm2 as unorm};
 
 // There probably is a more general method of determining whether the characters
 // are combining characters. But somehow it escapes me now.

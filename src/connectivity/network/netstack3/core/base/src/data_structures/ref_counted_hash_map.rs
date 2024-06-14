@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use alloc::collections::hash_map::{Entry, HashMap};
-use core::{hash::Hash, num::NonZeroUsize};
+use core::hash::Hash;
+use core::num::NonZeroUsize;
 
 /// The result of inserting an element into a [`RefCountedHashMap`].
 #[derive(Debug, Eq, PartialEq)]

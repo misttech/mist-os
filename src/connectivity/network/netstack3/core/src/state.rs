@@ -4,33 +4,31 @@
 
 //! Structs containing the entire stack state.
 
-use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use netstack3_base::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair};
+use netstack3_device::{DeviceId, DeviceLayerState};
+use netstack3_ip::icmp::IcmpState;
+use netstack3_ip::nud::NudCounters;
+use netstack3_ip::{self as ip, IpLayerIpExt, IpLayerTimerId, IpStateInner, Ipv4State, Ipv6State};
+use netstack3_tcp::TcpCounters;
+use netstack3_udp::UdpCounters;
 
-use crate::{
-    api::CoreApi,
-    context::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair},
-    device::{DeviceId, DeviceLayerState, WeakDeviceId},
-    ip::{
-        self, icmp::IcmpState, nud::NudCounters, IpLayerIpExt, IpLayerTimerId, IpStateInner,
-        Ipv4State, Ipv6State,
-    },
-    socket::datagram,
-    time::TimerId,
-    transport::{self, tcp::TcpCounters, udp::UdpCounters, TransportLayerState},
-    BindingsContext, BindingsTypes, CoreCtx,
-};
+use crate::api::CoreApi;
+use crate::time::TimerId;
+use crate::transport::{TransportLayerState, TransportStateBuilder};
+use crate::{BindingsContext, BindingsTypes, CoreCtx};
 
 /// A builder for [`StackState`].
 #[derive(Default, Clone)]
 pub struct StackStateBuilder {
-    transport: transport::TransportStateBuilder,
+    transport: TransportStateBuilder,
     ipv4: ip::Ipv4StateBuilder,
     ipv6: ip::Ipv6StateBuilder,
 }
 
 impl StackStateBuilder {
     /// Get the builder for the transport layer state.
-    pub fn transport_builder(&mut self) -> &mut transport::TransportStateBuilder {
+    pub fn transport_builder(&mut self) -> &mut TransportStateBuilder {
         &mut self.transport
     }
 
@@ -78,10 +76,10 @@ impl<BT: BindingsTypes> StackState<BT> {
     }
 
     pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| state.device.nud_counters::<Ipv4>(),
-            |IpInvariant(state)| state.device.nud_counters::<Ipv6>(),
+        I::map_ip_out(
+            self,
+            |state| state.device.nud_counters::<Ipv4>(),
+            |state| state.device.nud_counters::<Ipv6>(),
         )
     }
 
@@ -97,9 +95,7 @@ impl<BT: BindingsTypes> StackState<BT> {
         I::map_ip((), |()| &self.ipv4.inner, |()| &self.ipv6.inner)
     }
 
-    pub(crate) fn inner_icmp_state<I: ip::IpExt + datagram::DualStackIpExt>(
-        &self,
-    ) -> &IcmpState<I, WeakDeviceId<BT>, BT> {
+    pub(crate) fn inner_icmp_state<I: ip::IpExt>(&self) -> &IcmpState<I, BT> {
         I::map_ip((), |()| &self.ipv4.icmp.inner, |()| &self.ipv6.icmp.inner)
     }
 }
@@ -134,9 +130,7 @@ impl<BT: BindingsTypes> StackState<BT> {
         self.inner_ip_state::<I>()
     }
     /// Accessor for common ICMP state for `I`.
-    pub fn common_icmp<I: ip::IpExt + datagram::DualStackIpExt>(
-        &self,
-    ) -> &IcmpState<I, WeakDeviceId<BT>, BT> {
+    pub fn common_icmp<I: ip::IpExt>(&self) -> &IcmpState<I, BT> {
         self.inner_icmp_state::<I>()
     }
 }

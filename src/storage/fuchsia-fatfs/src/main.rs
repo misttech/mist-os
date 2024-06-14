@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Error, fuchsia_component::server::MissingStartupHandle, fuchsia_runtime::HandleType};
+use anyhow::Error;
+use fuchsia_component::server::MissingStartupHandle;
+use fuchsia_runtime::HandleType;
 
 mod component;
 

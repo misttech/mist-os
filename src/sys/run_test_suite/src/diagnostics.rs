@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::trace::duration,
-    anyhow::Error,
-    diagnostics_data::{LogTextDisplayOptions, LogTextPresenter, LogsData, Severity},
-    fidl_fuchsia_diagnostics::LogInterestSelector,
-    fidl_fuchsia_test_manager::LogsIteratorOption,
-    futures::{Stream, TryStreamExt},
-    std::io::Write,
-};
+use crate::trace::duration;
+use anyhow::Error;
+use diagnostics_data::{LogTextDisplayOptions, LogTextPresenter, LogsData, Severity};
+use fidl_fuchsia_diagnostics::LogInterestSelector;
+use fidl_fuchsia_test_manager::LogsIteratorOption;
+use futures::{Stream, TryStreamExt};
+use std::io::Write;
 
 /// Configuration for display of text-based (unstructured)
 /// logs.
@@ -129,10 +127,8 @@ pub fn get_type() -> LogsIteratorOption {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        diagnostics_data::{BuilderArgs, LogsDataBuilder},
-    };
+    use super::*;
+    use diagnostics_data::{BuilderArgs, LogsDataBuilder};
 
     #[fuchsia::test]
     async fn filter_low_severity() {

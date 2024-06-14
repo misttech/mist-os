@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {char_collection::CharCollection, std::cmp::Ordering};
+use char_collection::CharCollection;
+use std::cmp::Ordering;
 
 type BitmapElement = u64;
 const BITMAP_ELEMENT_SIZE: usize = 64;
@@ -175,7 +176,8 @@ impl From<&CharCollection> for CharSet {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, char_collection::char_collect};
+    use super::*;
+    use char_collection::char_collect;
 
     #[test]
     fn test_charset() {

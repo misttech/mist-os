@@ -8,10 +8,8 @@ use fidl_fuchsia_bluetooth_bredr::AudioOffloadExtProxy;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::Node;
 use fuchsia_inspect_derive::AttachError;
-use futures::{
-    future::{BoxFuture, Shared},
-    FutureExt,
-};
+use futures::future::{BoxFuture, Shared};
+use futures::FutureExt;
 use std::time::Duration;
 use thiserror::Error;
 
@@ -135,11 +133,9 @@ pub trait MediaTask: Send {
 pub mod tests {
     use super::*;
 
-    use futures::{
-        channel::{mpsc, oneshot},
-        stream::StreamExt,
-        Future, TryFutureExt,
-    };
+    use futures::channel::{mpsc, oneshot};
+    use futures::stream::StreamExt;
+    use futures::{Future, TryFutureExt};
     use std::fmt;
     use std::sync::{Arc, Mutex};
 

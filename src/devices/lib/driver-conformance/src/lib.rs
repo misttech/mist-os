@@ -6,26 +6,22 @@ pub mod args;
 pub mod parser;
 pub mod results;
 
-use {
-    anyhow::{anyhow, Result},
-    args::{ConformanceCommand, ConformanceSubCommand, TestCommand},
-    driver_connector::DriverConnector,
-    errors::ffx_bail,
-    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_test_manager as ftm,
-    fuchsia_driver_dev::{
-        get_devices_by_driver, get_driver_by_device, get_driver_by_filter, Device,
-    },
-    futures::FutureExt,
-    parser::{FilterTests, ValidateAgainstMetadata},
-    signal_hook::{
-        consts::signal::{SIGINT, SIGTERM},
-        iterator::Signals,
-    },
-    std::collections::HashSet,
-    std::fs,
-    std::io::stdout,
-    std::path::{Path, PathBuf},
+use anyhow::{anyhow, Result};
+use args::{ConformanceCommand, ConformanceSubCommand, TestCommand};
+use driver_connector::DriverConnector;
+use errors::ffx_bail;
+use fuchsia_driver_dev::{
+    get_devices_by_driver, get_driver_by_device, get_driver_by_filter, Device,
 };
+use futures::FutureExt;
+use parser::{FilterTests, ValidateAgainstMetadata};
+use signal_hook::consts::signal::{SIGINT, SIGTERM};
+use signal_hook::iterator::Signals;
+use std::collections::HashSet;
+use std::fs;
+use std::io::stdout;
+use std::path::{Path, PathBuf};
+use {fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_test_manager as ftm};
 
 impl From<parser::TestInfo> for run_test_suite_lib::TestParams {
     fn from(item: parser::TestInfo) -> Self {
@@ -372,14 +368,12 @@ pub async fn conformance(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        flate2::read::GzDecoder,
-        std::collections::HashMap,
-        std::fs::File,
-        std::io::{Read, Write},
-        tar::Archive,
-    };
+    use super::*;
+    use flate2::read::GzDecoder;
+    use std::collections::HashMap;
+    use std::fs::File;
+    use std::io::{Read, Write};
+    use tar::Archive;
 
     #[test]
     fn test_process_test_list() {

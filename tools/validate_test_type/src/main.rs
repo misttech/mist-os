@@ -4,20 +4,16 @@
 
 use std::collections::BTreeSet;
 
-use {
-    anyhow::{anyhow, format_err, Context, Error, Result},
-    camino::Utf8PathBuf,
-    rayon::prelude::*,
-    serde::{Deserialize, Serialize},
-    std::{
-        cmp::{Eq, PartialEq},
-        collections::HashMap,
-        fmt::Debug,
-        fs,
-        io::Read,
-    },
-    structopt::StructOpt,
-};
+use anyhow::{anyhow, format_err, Context, Error, Result};
+use camino::Utf8PathBuf;
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::cmp::{Eq, PartialEq};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::fs;
+use std::io::Read;
+use structopt::StructOpt;
 
 mod hermeticity;
 mod opts;

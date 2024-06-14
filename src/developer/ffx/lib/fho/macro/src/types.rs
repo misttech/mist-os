@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::errors::ParseError;
-use syn::{spanned::Spanned, ExprCall};
+use syn::spanned::Spanned;
+use syn::ExprCall;
 
 fn attr_name(attr: &syn::Attribute) -> Result<String, ParseError> {
     if attr.path.segments.len() == 1 {

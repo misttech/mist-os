@@ -20,6 +20,7 @@ def main() -> int:
     parser.add_argument(
         "--version-history-path",
         type=Path,
+        required=True,
         help="Path to the version history JSON file",
     )
 
@@ -48,11 +49,19 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
 
     all_numbered_api_levels = [int(level) for level in api_levels]
 
+    sunset_api_levels: list[int] = [
+        int(level)
+        for level in api_levels
+        if api_levels[level]["status"] == "sunset"
+    ]
     supported_api_levels: list[int] = [
         int(level)
         for level in api_levels
         if api_levels[level]["status"] == "supported"
     ]
+
+    # TODO(https://fxbug.dev/326277078): Remove this and rename
+    # `in_development_special_api_levels` when adding "NEXT".`
     in_development_api_levels: list[int] = [
         int(level)
         for level in api_levels
@@ -63,27 +72,48 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         len(in_development_api_levels) < 2
     ), f"Should be at most one in-development API level. Found: {in_development_api_levels}"
 
-    # Sometimes, there actually *isn't* an "in development" API level, and GN
-    # doesn't support null values. As a hack, if there's no in-development API
-    # level, just say that the greatest supported level is "in-development",
-    # even though it isn't.
-    #
-    # TODO: https://fxbug.dev/305961460 - Remove this special case.
+    # The current numbered "in-development" API level or the highest numbered
+    # API level when there is no such API level, which can happen during API
+    # freezes before a new API level is introduced.
+    # TODO(https://fxbug.dev/305961460): This is only used for a deprecated GN
+    # arg. Remove the thiis local variable entirely once the GN arg is unused.
     if not in_development_api_levels:
-        in_development_api_level: int = max(supported_api_levels)
+        deprecated_in_development_api_level: int = max(supported_api_levels)
     else:
-        in_development_api_level = in_development_api_levels[0]
+        deprecated_in_development_api_level = in_development_api_levels[0]
+
+    # Exclude "PLATFORM" because it represents a set of other API levels.
+    special_api_levels = data["data"]["special_api_levels"]
+    in_development_special_api_levels: list[str] = [
+        str(level)
+        for level in special_api_levels
+        if level != "PLATFORM"
+        and special_api_levels[level]["status"] == "in-development"
+    ]
+
+    build_time_supported_api_levels = (
+        supported_api_levels + in_development_api_levels
+    )
+    runtime_supported_api_levels = (
+        sunset_api_levels + build_time_supported_api_levels
+    )
+    # The special API levels cannot currently be targeted in the IDK and thus
+    # must be added here.
+    runtime_supported_api_levels += in_development_special_api_levels
 
     return {
+        # All numbered API levels in the JSON file.
+        # TODO(https://fxbug.dev/326277078): Add that these levels are all
+        # frozen once "NEXT" is implemented.
         "all_numbered_api_levels": all_numbered_api_levels,
         # TODO: https://fxbug.dev/305961460 - Remove this.
-        "in_development_api_level": in_development_api_level,
+        "in_development_api_level": deprecated_in_development_api_level,
         # API levels that the IDK supports targeting.
-        "build_time_supported_api_levels": (
-            supported_api_levels + in_development_api_levels
-        ),
+        "build_time_supported_api_levels": build_time_supported_api_levels,
+        # API levels that the platform build supports at runtime.
+        "runtime_supported_api_levels": runtime_supported_api_levels,
         # API levels whose contents should not change anymore.
-        "frozen_api_levels": supported_api_levels,
+        "frozen_api_levels": sunset_api_levels + supported_api_levels,
     }
 
 

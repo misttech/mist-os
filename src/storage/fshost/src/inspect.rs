@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_io::{DirectoryProxy, NodeAttributes, OpenFlags},
-    fuchsia_fs::directory::{open_directory, open_file, readdir, DirentKind},
-    fuchsia_zircon as zx,
-    futures::{future::BoxFuture, FutureExt, TryFutureExt},
-};
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_io::{DirectoryProxy, NodeAttributes, OpenFlags};
+use fuchsia_fs::directory::{open_directory, open_file, readdir, DirentKind};
+use fuchsia_zircon as zx;
+use futures::future::BoxFuture;
+use futures::{FutureExt, TryFutureExt};
 
 pub async fn register_migration_status(root: &fuchsia_inspect::Node, status: zx::Status) {
     match status {

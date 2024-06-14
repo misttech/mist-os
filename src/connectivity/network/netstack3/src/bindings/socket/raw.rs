@@ -2,53 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::num::NonZeroU8;
 use std::ops::ControlFlow;
 
-use fidl::{
-    encoding::Decode as _,
-    endpoints::{ProtocolMarker, RequestStream},
-};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_raw as fpraw;
-use fuchsia_zircon as zx;
+use fidl::encoding::Decode as _;
+use fidl::endpoints::{ProtocolMarker, RequestStream};
 use futures::StreamExt as _;
-use net_types::{
-    ip::{Ip, IpVersion, Ipv4, Ipv6},
-    SpecifiedAddr,
+use log::error;
+use net_types::ip::{Ip, IpInvariant, IpVersion, Ipv4, Ipv6};
+use net_types::SpecifiedAddr;
+use netstack3_core::ip::{
+    IpSockCreateAndSendError, IpSockSendError, RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError,
+    RawIpSocketProtocol, RawIpSocketSendToError, RawIpSocketsBindingsContext,
+    RawIpSocketsBindingsTypes,
 };
-use netstack3_core::{
-    ip::{
-        IpSockCreateAndSendError, IpSockSendError, RawIpSocketProtocol, RawIpSocketSendToError,
-        RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
-    },
-    socket::StrictlyZonedAddr,
-    sync::Mutex,
-    IpExt,
-};
+use netstack3_core::socket::StrictlyZonedAddr;
+use netstack3_core::sync::Mutex;
+use netstack3_core::IpExt;
 use packet::Buf;
 use packet_formats::ip::IpPacket as _;
-use tracing::error;
 use zerocopy::ByteSlice;
 use zx::{HandleBased, Peered};
-
-use crate::bindings::{
-    socket::{
-        queue::{BodyLen, MessageQueue},
-        IntoErrno, IpSockAddrExt, SockAddr,
-    },
-    util::{
-        AllowBindingIdFromWeak, RemoveResourceResultExt, TryFromFidl, TryFromFidlWithContext,
-        TryIntoFidlWithContext,
-    },
-    BindingsCtx, Ctx,
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
+    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fpraw,
+    fuchsia_zircon as zx,
 };
 
-use super::{
-    worker::{self, CloseResponder, SocketWorker, SocketWorkerHandler, TaskSpawnerCollection},
-    SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
+use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::socket::{IntoErrno, IpSockAddrExt, SockAddr};
+use crate::bindings::util::{
+    AllowBindingIdFromWeak, IntoCore, IntoFidl, RemoveResourceResultExt, ResultExt as _,
+    TryFromFidl, TryFromFidlWithContext, TryIntoFidlWithContext,
 };
+use crate::bindings::{BindingsCtx, Ctx};
+
+use super::worker::{
+    self, CloseResponder, SocketWorker, SocketWorkerHandler, TaskSpawnerCollection,
+};
+use super::{SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
 
 type DeviceId = netstack3_core::device::DeviceId<BindingsCtx>;
 type WeakDeviceId = netstack3_core::device::WeakDeviceId<BindingsCtx>;
@@ -103,7 +95,12 @@ struct ReceivedIpPacket<I: Ip> {
 
 impl<I: IpExt> ReceivedIpPacket<I> {
     fn new<B: ByteSlice>(packet: &I::Packet<B>, device: WeakDeviceId) -> Self {
-        ReceivedIpPacket { src_addr: packet.src_ip(), data: packet.to_vec(), device }
+        // NB: Match Linux, and only provide the packet header for IPv4.
+        let data = match I::VERSION {
+            IpVersion::V4 => packet.to_vec(),
+            IpVersion::V6 => packet.body().to_vec(),
+        };
+        ReceivedIpPacket { src_addr: packet.src_ip(), data, device }
     }
 }
 
@@ -181,28 +178,6 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
     }
 }
 
-/// On Error, logs the `Errno` with additional debugging context.
-///
-/// The provided result is passed through unchanged.
-///
-/// Implemented as a macro to avoid erasing the callsite information.
-macro_rules! maybe_log_error {
-    ($operation:expr, $result:expr) => {
-        match $result {
-            Ok(val) => Ok(val),
-            Err(errno) => {
-                crate::bindings::socket::log_errno!(
-                    errno,
-                    "raw IP socket failed to handle {}: {:?}",
-                    $operation,
-                    errno
-                );
-                Err(errno)
-            }
-        }
-    };
-}
-
 struct RequestHandler<'a, I: IpExt> {
     ctx: &'a mut Ctx,
     data: &'a mut SocketWorkerState<I>,
@@ -236,14 +211,12 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 return ControlFlow::Continue(Some(stream));
             }
             fpraw::SocketRequest::Describe { responder } => {
-                responder
-                    .send(Self::describe(data))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
+                responder.send(Self::describe(data)).unwrap_or_log("failed to respond");
             }
             fpraw::SocketRequest::Close { responder } => return ControlFlow::Break(responder),
             fpraw::SocketRequest::Query { responder } => responder
                 .send(fpraw::SOCKET_PROTOCOL_NAME.as_bytes())
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetReuseAddress { value: _, responder } => {
                 respond_not_supported!("raw::SetReuseAddress", responder)
             }
@@ -305,16 +278,11 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 respond_not_supported!("raw::GetAcceptConn", responder)
             }
             fpraw::SocketRequest::SetBindToDevice { value, responder } => responder
-                .send(maybe_log_error!(
-                    "set_bindtodevice",
-                    handle_set_device::<I>(ctx, data, value)
-                ))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+                .send(handle_set_device::<I>(ctx, data, value).log_error("raw::SetBindToDevice"))
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetBindToDevice { responder } => {
                 let name = handle_get_device(ctx, data);
-                responder
-                    .send(Ok(name.as_deref().unwrap_or("")))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                responder.send(Ok(name.as_deref().unwrap_or(""))).unwrap_or_log("failed to respond")
             }
             fpraw::SocketRequest::SetBindToInterfaceIndex { value: _, responder } => {
                 respond_not_supported!("raw::SetBindToInterfaceIndex", responder)
@@ -352,12 +320,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetIpTypeOfService { responder } => {
                 respond_not_supported!("raw::GetIpTypeOfService", responder)
             }
-            fpraw::SocketRequest::SetIpTtl { value: _, responder } => {
-                respond_not_supported!("raw::SetIpTtl", responder)
-            }
-            fpraw::SocketRequest::GetIpTtl { responder } => {
-                respond_not_supported!("raw::GetIpTtl", responder)
-            }
+            fpraw::SocketRequest::SetIpTtl { value, responder } => responder
+                .send(
+                    handle_set_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V4, value)
+                        .log_error("raw::SetIpTtl"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpTtl { responder } => responder
+                .send(
+                    handle_get_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V4)
+                        .log_error("raw::GetIpTtl"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpPacketInfo { value: _, responder } => {
                 respond_not_supported!("raw::SetIpPacketInfo", responder)
             }
@@ -382,12 +356,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetIpMulticastInterface { responder } => {
                 respond_not_supported!("raw::GetIpMulticastInterface", responder)
             }
-            fpraw::SocketRequest::SetIpMulticastTtl { value: _, responder } => {
-                respond_not_supported!("raw::SetIpMulticastTtl", responder)
-            }
-            fpraw::SocketRequest::GetIpMulticastTtl { responder } => {
-                respond_not_supported!("raw::GetIpMulticastTtl", responder)
-            }
+            fpraw::SocketRequest::SetIpMulticastTtl { value, responder } => responder
+                .send(
+                    handle_set_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V4, value)
+                        .log_error("raw::SetIpMulticastTtl"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpMulticastTtl { responder } => responder
+                .send(
+                    handle_get_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V4)
+                        .log_error("raw::GetIpMulticastTtl"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpMulticastLoopback { value: _, responder } => {
                 respond_not_supported!("raw::SetIpMulticastLoopback", responder)
             }
@@ -425,24 +405,36 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetIpv6MulticastInterface { responder } => {
                 respond_not_supported!("raw::GetIpv6MulticastInterface", responder)
             }
-            fpraw::SocketRequest::SetIpv6UnicastHops { value: _, responder } => {
-                respond_not_supported!("raw::SetIpv6UnicastHops", responder)
-            }
-            fpraw::SocketRequest::GetIpv6UnicastHops { responder } => {
-                respond_not_supported!("raw::GetIpv6UnicastHops", responder)
-            }
+            fpraw::SocketRequest::SetIpv6UnicastHops { value, responder } => responder
+                .send(
+                    handle_set_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V6, value)
+                        .log_error("raw::SetIpv6UnicastHops"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpv6UnicastHops { responder } => responder
+                .send(
+                    handle_get_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V6)
+                        .log_error("raw::GetIpv6UnicastHops"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpv6ReceiveHopLimit { value: _, responder } => {
                 respond_not_supported!("raw::SetIpv6ReceiveHopLimit", responder)
             }
             fpraw::SocketRequest::GetIpv6ReceiveHopLimit { responder } => {
                 respond_not_supported!("raw::GetIpv6ReceiveHopLimit", responder)
             }
-            fpraw::SocketRequest::SetIpv6MulticastHops { value: _, responder } => {
-                respond_not_supported!("raw::SetIpv6MulticastHops", responder)
-            }
-            fpraw::SocketRequest::GetIpv6MulticastHops { responder } => {
-                respond_not_supported!("raw::GetIpv6MulticastHops", responder)
-            }
+            fpraw::SocketRequest::SetIpv6MulticastHops { value, responder } => responder
+                .send(
+                    handle_set_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V6, value)
+                        .log_error("raw::SetIpv6MulticastHops"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpv6MulticastHops { responder } => responder
+                .send(
+                    handle_get_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V6)
+                        .log_error("raw::GetIpv6MulticastHops"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpv6MulticastLoopback { value: _, responder } => {
                 respond_not_supported!("raw::SetIpv6MulticastLoopback", responder)
             }
@@ -483,21 +475,19 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 flags,
                 responder,
             } => {
-                let result = maybe_log_error!(
-                    "recvmsg",
-                    handle_recvmsg(ctx, data, want_addr, data_len, want_control, flags)
-                );
+                let result = handle_recvmsg(ctx, data, want_addr, data_len, want_control, flags)
+                    .log_error("raw::RecvMsg");
                 responder
                     .send(result.as_ref().map(RecvMsgResponse::borrowed).map_err(|e| *e))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                    .unwrap_or_log("failed to respond")
             }
             fpraw::SocketRequest::SendMsg { addr, data: msg, control, flags, responder } => {
                 responder
-                    .send(maybe_log_error!(
-                        "sendmsg",
+                    .send(
                         handle_sendmsg(ctx, data, addr, msg, control, flags)
-                    ))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                            .log_error("raw::SendMsg"),
+                    )
+                    .unwrap_or_log("failed to respond")
             }
             fpraw::SocketRequest::GetInfo { responder } => {
                 respond_not_supported!("raw::GetInfo", responder)
@@ -508,11 +498,12 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetIpHeaderIncluded { responder } => {
                 respond_not_supported!("raw::GetIpHeaderIncluded", responder)
             }
-            fpraw::SocketRequest::SetIcmpv6Filter { filter: _, responder } => {
-                respond_not_supported!("raw::SetIcmpv6Filter", responder)
-            }
+            fpraw::SocketRequest::SetIcmpv6Filter { filter, responder } => responder
+                .send(handle_set_icmpv6_filter(ctx, data, filter).log_error("raw::SetIcmpv6Filter"))
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetIcmpv6Filter { responder } => {
-                respond_not_supported!("raw::GetIcmpv6Filter", responder)
+                let result = handle_get_icmpv6_filter(ctx, data).log_error("raw::GetIcmpv6Filter");
+                responder.send(result.as_ref().map_err(|e| *e)).unwrap_or_log("failed to respond");
             }
             fpraw::SocketRequest::SetIpv6Checksum { config: _, responder } => {
                 respond_not_supported!("raw::SetIpv6Checksum", responder)
@@ -546,21 +537,18 @@ pub(crate) async fn serve(
                 Ok(req) => req,
                 Err(e) => {
                     if !e.is_closed() {
-                        tracing::error!(
-                            "{} request error {e:?}",
-                            fpraw::ProviderMarker::DEBUG_NAME
-                        );
+                        error!("{} request error {e:?}", fpraw::ProviderMarker::DEBUG_NAME);
                     }
                     return;
                 }
             };
             match req {
                 fpraw::ProviderRequest::Socket { responder, domain, proto } => responder
-                    .send(maybe_log_error!(
-                        "create",
+                    .send(
                         handle_create_socket(ctx.clone(), domain, proto, &spawner)
-                    ))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+                            .log_error("raw::create"),
+                    )
+                    .unwrap_or_log("failed to respond"),
             }
         })
         .collect::<()>()
@@ -743,6 +731,102 @@ fn handle_get_device<I: IpExt>(ctx: &mut Ctx, socket: &SocketWorkerState<I>) -> 
     device.map(|core_id| core_id.bindings_id().name.clone())
 }
 
+/// Handler for a [`fpraw::SocketRequest::SetIcmpv6Filter`] request.
+fn handle_set_icmpv6_filter<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    filter: fpraw::Icmpv6Filter,
+) -> Result<(), fposix::Errno> {
+    I::map_ip_in(
+        (IpInvariant(filter), &socket.id),
+        |_| Err(fposix::Errno::Enoprotoopt),
+        |(IpInvariant(filter), id)| {
+            let _old_filter = ctx
+                .api()
+                .raw_ip_socket()
+                .set_icmp_filter(id, Some(filter.into_core()))
+                .map_err(IntoErrno::into_errno)?;
+            Ok(())
+        },
+    )
+}
+
+/// Handler for a [`fpraw::SocketRequest::GetIcmpv6Filter`] request.
+fn handle_get_icmpv6_filter<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+) -> Result<fpraw::Icmpv6Filter, fposix::Errno> {
+    I::map_ip_in(
+        (IpInvariant(ctx), &socket.id),
+        |_| Err(fposix::Errno::Enoprotoopt),
+        |(IpInvariant(ctx), id)| match ctx.api().raw_ip_socket().get_icmp_filter(id) {
+            Err(e) => Err(e.into_errno()),
+            Ok(filter) => Ok(filter.into_fidl()),
+        },
+    )
+}
+
+/// The type of hop limit to set/get.
+enum HopLimitType {
+    Unicast,
+    Multicast,
+}
+
+/// Handler for the following requests:
+///  - [`fpraw::SocketRequest::SetIpTtl`]
+///  - [`fpraw::SocketRequest::SetIpMulticastTtl`]
+///  - [`fpraw::SocketRequest::SetIpv6UnicastHops`]
+///  - [`fpraw::SocketRequest::SetIpv6MulticastHops`]
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_set_hop_limit<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    hop_limit_type: HopLimitType,
+    ip_version: IpVersion,
+    value: fposix_socket::OptionalUint8,
+) -> Result<(), fposix::Errno> {
+    if I::VERSION != ip_version {
+        return Err(fposix::Errno::Enoprotoopt);
+    }
+    let value: Option<u8> = value.into_core();
+    let _old_value = match hop_limit_type {
+        HopLimitType::Unicast => ctx
+            .api()
+            .raw_ip_socket()
+            .set_unicast_hop_limit(&socket.id, value.and_then(NonZeroU8::new)),
+        HopLimitType::Multicast => ctx
+            .api()
+            .raw_ip_socket()
+            .set_multicast_hop_limit(&socket.id, value.and_then(NonZeroU8::new)),
+    };
+    Ok(())
+}
+
+/// Handler for the following requests:
+///  - [`fpraw::SocketRequest::GetIpTtl`]
+///  - [`fpraw::SocketRequest::GetIpMulticastTtl`]
+///  - [`fpraw::SocketRequest::GetIpv6UnicastHops`]
+///  - [`fpraw::SocketRequest::GetIpv6MulticastHops`]
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_get_hop_limit<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    hop_limit_type: HopLimitType,
+    ip_version: IpVersion,
+) -> Result<u8, fposix::Errno> {
+    if I::VERSION != ip_version {
+        return Err(fposix::Errno::Enoprotoopt);
+    }
+    match hop_limit_type {
+        HopLimitType::Unicast => {
+            Ok(ctx.api().raw_ip_socket().get_unicast_hop_limit(&socket.id).into())
+        }
+        HopLimitType::Multicast => {
+            Ok(ctx.api().raw_ip_socket().get_multicast_hop_limit(&socket.id).into())
+        }
+    }
+}
+
 impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I> {
     type Error = fposix::Errno;
 
@@ -760,11 +844,64 @@ impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I
     }
 }
 
+mod icmp_filter_conversion_constants {
+    // NB: An ICMP filter is a 256 bit value where bit `n` determines if
+    // ICMP messages with type `n` should be filtered. The FIDL types
+    // represent this as 8 u32s, while the core types represent this as
+    // 32 u8s.
+    pub(super) const NUM_FIDL_ELEMENTS: usize = 8;
+    pub(super) const NUM_CORE_ELEMENTS: usize = 32;
+    pub(super) const CORE_FIDL_ELEMENT_RATIO: usize = NUM_CORE_ELEMENTS / NUM_FIDL_ELEMENTS;
+}
+
+impl IntoCore<RawIpSocketIcmpFilter<Ipv6>> for fpraw::Icmpv6Filter {
+    fn into_core(self) -> RawIpSocketIcmpFilter<Ipv6> {
+        use icmp_filter_conversion_constants::*;
+        let mut core_filter = [0u8; NUM_CORE_ELEMENTS];
+        // NB: Chunk the core_filter up so that each chunk has enough bytes
+        // for a FIDL element.
+        let filter_chunks = core_filter.chunks_exact_mut(CORE_FIDL_ELEMENT_RATIO);
+        for (i, chunk) in filter_chunks.enumerate() {
+            // NB: Use little endian byte order here, as returned by the
+            // `RawIpSocketIcmpFilter` type.
+            chunk.clone_from_slice(&self.blocked_types[i].to_le_bytes());
+        }
+        RawIpSocketIcmpFilter::new(core_filter)
+    }
+}
+
+impl IntoFidl<fpraw::Icmpv6Filter> for Option<RawIpSocketIcmpFilter<Ipv6>> {
+    fn into_fidl(self) -> fpraw::Icmpv6Filter {
+        use icmp_filter_conversion_constants::*;
+        let mut fidl_filter = fpraw::Icmpv6Filter { blocked_types: [0; NUM_FIDL_ELEMENTS] };
+        if let Some(core_filter) = self {
+            let core_filter: [u8; NUM_CORE_ELEMENTS] = core_filter.into_bytes();
+            // NB: Chunk the core_filter up so that each chunk has enough bytes
+            // for a FIDL element.
+            let filter_chunks = core_filter.chunks_exact(CORE_FIDL_ELEMENT_RATIO);
+            debug_assert!(filter_chunks.remainder().is_empty());
+            for (i, chunk) in filter_chunks.enumerate() {
+                // NB: The bytes from `core_filter` that correspond to the FIDL
+                // element at index `i`.
+                let bytes: [u8; CORE_FIDL_ELEMENT_RATIO] =
+                    chunk.try_into().unwrap_or_else(|_: core::array::TryFromSliceError| {
+                        unreachable!("the slice must have {CORE_FIDL_ELEMENT_RATIO} bytes")
+                    });
+                // NB: Use little endian byte order here, as returned by the
+                // `RawIpSocketIcmpFilter` type.
+                fidl_filter.blocked_types[i] = u32::from_le_bytes(bytes)
+            }
+        }
+        fidl_filter
+    }
+}
+
 impl IntoErrno for RawIpSocketSendToError {
     fn into_errno(self) -> fposix::Errno {
         match self {
             RawIpSocketSendToError::ProtocolRaw => fposix::Errno::Einval,
             RawIpSocketSendToError::MappedRemoteIp => fposix::Errno::Enetunreach,
+            RawIpSocketSendToError::InvalidBody => fposix::Errno::Einval,
             RawIpSocketSendToError::Ip(inner) => match inner {
                 // MTU errors result in `Emsgsize` for sendto, but `Einval` for
                 // send.
@@ -779,6 +916,14 @@ impl IntoErrno for RawIpSocketSendToError {
     }
 }
 
+impl IntoErrno for RawIpSocketIcmpFilterError {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            RawIpSocketIcmpFilterError::ProtocolNotIcmp => fposix::Errno::Eopnotsupp,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -787,7 +932,7 @@ mod tests {
     use packet_formats::ip::IpProto;
     use test_case::test_case;
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(
         fpraw::ProtocolAssociation::Unassociated(fpraw::Empty),
         Ok(RawIpSocketProtocol::Raw);
@@ -798,25 +943,49 @@ mod tests {
         Err(fposix::Errno::Einval);
         "associated_with_iana_reserved_protocol"
     )]
-    fn raw_protocol_from_fidl<I: Ip + IpExt>(
+    fn raw_protocol_from_fidl<I: IpExt>(
         fidl: fpraw::ProtocolAssociation,
         expected_result: Result<RawIpSocketProtocol<I>, fposix::Errno>,
     ) {
         assert_eq!(RawIpSocketProtocol::<I>::try_from_fidl(fidl), expected_result);
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(fpraw::ProtocolAssociation::Associated(6), IpProto::Tcp)]
     #[test_case(fpraw::ProtocolAssociation::Associated(17), IpProto::Udp)]
-    fn protocol_from_fidl<I: Ip + IpExt>(
-        fidl: fpraw::ProtocolAssociation,
-        expected_proto: IpProto,
-    ) {
+    fn protocol_from_fidl<I: IpExt>(fidl: fpraw::ProtocolAssociation, expected_proto: IpProto) {
         assert_eq!(
             RawIpSocketProtocol::<I>::try_from_fidl(fidl)
                 .expect("conversion should succeed")
                 .proto(),
             expected_proto.into(),
         );
+    }
+
+    #[test_case(
+        [
+            u32::from_le_bytes([0, 1, 2, 3]), u32::from_le_bytes([4, 5, 6, 7 ]),
+            u32::from_le_bytes([8, 9, 10, 11]), u32::from_le_bytes([12, 13, 14, 15]),
+            u32::from_le_bytes([16, 17, 18, 19]), u32::from_le_bytes([20, 21, 22, 23]),
+            u32::from_le_bytes([24, 25, 26, 27]), u32::from_le_bytes([28, 29, 30, 31]),
+        ],
+        [
+             0,  1,  2,  3,  4,  5,  6,  7,
+             8,  9, 10, 11, 12, 13, 14, 15,
+            16, 17, 18, 19, 20, 21, 22, 23,
+            24, 25, 26, 27, 28, 29, 30, 31
+        ]
+    )]
+    fn icmp_filter_to_from_fidl(fidl_raw: [u32; 8], core_raw: [u8; 32]) {
+        let fidl = fpraw::Icmpv6Filter { blocked_types: fidl_raw };
+        let core: RawIpSocketIcmpFilter<Ipv6> = fidl.into_core();
+        assert_eq!(core.clone().into_bytes(), core_raw);
+        assert_eq!(Some(core).into_fidl().blocked_types, fidl_raw);
+    }
+
+    #[test]
+    fn icmp_filter_from_none() {
+        let core_filter: Option<RawIpSocketIcmpFilter<Ipv6>> = None;
+        assert_eq!(core_filter.into_fidl().blocked_types, [0; 8])
     }
 }

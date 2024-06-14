@@ -1,49 +1,36 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{
-        file::FatFile,
-        filesystem::{FatFilesystem, FatFilesystemInner},
-        node::{Closer, FatNode, Node, WeakFatNode},
-        refs::{FatfsDirRef, FatfsFileRef},
-        types::{Dir, DirEntry, File},
-        util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time},
-    },
-    async_trait::async_trait,
-    fatfs::validate_filename,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::Status,
-    libc::{S_IRUSR, S_IWUSR},
-    std::{
-        borrow::Borrow,
-        cell::UnsafeCell,
-        collections::HashMap,
-        fmt::Debug,
-        hash::{Hash, Hasher},
-        pin::Pin,
-        sync::{Arc, RwLock},
-    },
-    vfs::{
-        attributes,
-        directory::{
-            dirents_sink::{self, AppendResult, Sink},
-            entry::{DirectoryEntry, EntryInfo, OpenRequest},
-            entry_container::{Directory, DirectoryWatcher, MutableDirectory},
-            mutable::connection::MutableConnection,
-            traversal_position::TraversalPosition,
-            watchers::{
-                event_producers::{SingleNameEventProducer, StaticVecEventProducer},
-                Watchers,
-            },
-        },
-        execution_scope::ExecutionScope,
-        file::FidlIoConnection,
-        path::Path,
-        ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
-    },
-};
+use crate::file::FatFile;
+use crate::filesystem::{FatFilesystem, FatFilesystemInner};
+use crate::node::{Closer, FatNode, Node, WeakFatNode};
+use crate::refs::{FatfsDirRef, FatfsFileRef};
+use crate::types::{Dir, DirEntry, File};
+use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
+use fatfs::validate_filename;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::Status;
+use futures::future::BoxFuture;
+use libc::{S_IRUSR, S_IWUSR};
+use std::borrow::Borrow;
+use std::cell::UnsafeCell;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
+use std::pin::Pin;
+use std::sync::{Arc, RwLock};
+use vfs::directory::dirents_sink::{self, AppendResult, Sink};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry_container::{Directory, DirectoryWatcher, MutableDirectory};
+use vfs::directory::mutable::connection::MutableConnection;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::directory::watchers::event_producers::{SingleNameEventProducer, StaticVecEventProducer};
+use vfs::directory::watchers::Watchers;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::FidlIoConnection;
+use vfs::path::Path;
+use vfs::{attributes, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest};
 
 fn check_open_flags_for_existing_entry(flags: fio::OpenFlags) -> Result<(), Status> {
     if flags.intersects(fio::OpenFlags::CREATE_IF_ABSENT) {
@@ -725,7 +712,6 @@ impl Debug for FatDirectory {
     }
 }
 
-#[async_trait]
 impl MutableDirectory for FatDirectory {
     async fn unlink(self: Arc<Self>, name: &str, must_be_directory: bool) -> Result<(), Status> {
         let fs_lock = self.filesystem.lock().unwrap();
@@ -805,42 +791,44 @@ impl MutableDirectory for FatDirectory {
         Ok(())
     }
 
-    async fn rename(
+    fn rename(
         self: Arc<Self>,
         src_dir: Arc<dyn MutableDirectory>,
         src_path: Path,
         dst_path: Path,
-    ) -> Result<(), Status> {
-        let src_dir =
-            src_dir.into_any().downcast::<FatDirectory>().map_err(|_| Status::INVALID_ARGS)?;
-        if self.is_deleted() {
-            // Can't rename into a deleted folder.
-            return Err(Status::NOT_FOUND);
-        }
+    ) -> BoxFuture<'static, Result<(), Status>> {
+        Box::pin(async move {
+            let src_dir =
+                src_dir.into_any().downcast::<FatDirectory>().map_err(|_| Status::INVALID_ARGS)?;
+            if self.is_deleted() {
+                // Can't rename into a deleted folder.
+                return Err(Status::NOT_FOUND);
+            }
 
-        let src_name = src_path.peek().unwrap();
-        validate_filename(src_name).map_err(fatfs_error_to_status)?;
-        let dst_name = dst_path.peek().unwrap();
-        validate_filename(dst_name).map_err(fatfs_error_to_status)?;
+            let src_name = src_path.peek().unwrap();
+            validate_filename(src_name).map_err(fatfs_error_to_status)?;
+            let dst_name = dst_path.peek().unwrap();
+            validate_filename(dst_name).map_err(fatfs_error_to_status)?;
 
-        let mut closer = Closer::new(&self.filesystem);
-        let filesystem = self.filesystem.lock().unwrap();
+            let mut closer = Closer::new(&self.filesystem);
+            let filesystem = self.filesystem.lock().unwrap();
 
-        // Figure out if src is a directory.
-        let entry = src_dir.find_child(&filesystem, &src_name)?;
-        if entry.is_none() {
-            // No such src (if we don't return NOT_FOUND here, fatfs will return it when we
-            // call rename() later).
-            return Err(Status::NOT_FOUND);
-        }
-        let src_is_dir = entry.unwrap().is_dir();
-        if (dst_path.is_dir() || src_path.is_dir()) && !src_is_dir {
-            // The caller wanted a directory (src or dst), but src is not a directory. This is
-            // an error.
-            return Err(Status::NOT_DIR);
-        }
+            // Figure out if src is a directory.
+            let entry = src_dir.find_child(&filesystem, &src_name)?;
+            if entry.is_none() {
+                // No such src (if we don't return NOT_FOUND here, fatfs will return it when we
+                // call rename() later).
+                return Err(Status::NOT_FOUND);
+            }
+            let src_is_dir = entry.unwrap().is_dir();
+            if (dst_path.is_dir() || src_path.is_dir()) && !src_is_dir {
+                // The caller wanted a directory (src or dst), but src is not a directory. This is
+                // an error.
+                return Err(Status::NOT_DIR);
+            }
 
-        self.rename_locked(&filesystem, &src_dir, src_name, dst_name, src_is_dir, &mut closer)
+            self.rename_locked(&filesystem, &src_dir, src_name, dst_name, src_is_dir, &mut closer)
+        })
     }
 }
 
@@ -854,7 +842,6 @@ impl DirectoryEntry for FatDirectory {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for FatDirectory {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let fs_lock = self.filesystem.lock().unwrap();
@@ -922,7 +909,6 @@ impl vfs::node::Node for FatDirectory {
     }
 }
 
-#[async_trait]
 impl Directory for FatDirectory {
     fn open(
         self: Arc<Self>,
@@ -1109,14 +1095,13 @@ impl Directory for FatDirectory {
 #[cfg(test)]
 mod tests {
     // We only test things here that aren't covered by fs_tests.
-    use {
-        super::*,
-        crate::tests::{TestDiskContents, TestFatDisk},
-        assert_matches::assert_matches,
-        futures::TryStreamExt,
-        scopeguard::defer,
-        vfs::{directory::dirents_sink::Sealed, node::Node as _},
-    };
+    use super::*;
+    use crate::tests::{TestDiskContents, TestFatDisk};
+    use assert_matches::assert_matches;
+    use futures::TryStreamExt;
+    use scopeguard::defer;
+    use vfs::directory::dirents_sink::Sealed;
+    use vfs::node::Node as _;
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K
 

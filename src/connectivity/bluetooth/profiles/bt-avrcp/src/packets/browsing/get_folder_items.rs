@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
-    packet_encoding::{Decodable, Encodable},
-    std::collections::HashSet,
-};
+use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
+use packet_encoding::{Decodable, Encodable};
+use std::collections::HashSet;
 
 use crate::packets::{
     adjust_byte_size, AdvancedDecodable, CharsetId, Error, FolderType, ItemType,

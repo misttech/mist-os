@@ -8,7 +8,8 @@ use std::fmt::{self, Debug, Formatter};
 use std::marker::PhantomData;
 
 use boringssl::{self, CStackWrapper};
-use hash::{inner::Digest, Hasher, Sha256, Sha384, Sha512};
+use hash::inner::Digest;
+use hash::{Hasher, Sha256, Sha384, Sha512};
 
 /// A Hash-based Message Authentication Code (HMAC).
 ///

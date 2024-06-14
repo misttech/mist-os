@@ -12,8 +12,8 @@ pub struct LegacyAdvertisingState {
     pub address_type: Option<fidl_fuchsia_bluetooth::AddressType>,
     pub interval_min: Option<u16>,
     pub interval_max: Option<u16>,
-    pub advertising_data: Option<Vec<u8>>,
-    pub scan_response: Option<Vec<u8>>,
+    pub advertising_data: Option<fidl::AdvertisingData>,
+    pub scan_response: Option<fidl::AdvertisingData>,
 }
 
 impl From<fidl::LegacyAdvertisingState> for LegacyAdvertisingState {

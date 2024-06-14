@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_ir_lib::fidl::*,
-    fidlgen_banjo_lib::backends::*,
-    std::{fs::File, io::BufReader, path::PathBuf, str::FromStr},
-    structopt::StructOpt,
-};
+use anyhow::Error;
+use fidl_ir_lib::fidl::*;
+use fidlgen_banjo_lib::backends::*;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::PathBuf;
+use std::str::FromStr;
+use structopt::StructOpt;
 
 #[derive(Debug)]
 enum BackendName {

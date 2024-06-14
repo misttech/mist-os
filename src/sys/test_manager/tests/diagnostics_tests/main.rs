@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    diagnostics_assertions::{assert_data_tree, AnyProperty},
-    diagnostics_reader::{ArchiveReader, Inspect, Logs, Severity},
-    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync,
-    fuchsia_component_test::ScopedInstance,
-    futures::{future, StreamExt},
-    tracing::debug,
-};
+use diagnostics_assertions::{assert_data_tree, AnyProperty};
+use diagnostics_reader::{ArchiveReader, Inspect, Logs, Severity};
+use fuchsia_component_test::ScopedInstance;
+use futures::{future, StreamExt};
+use tracing::debug;
+use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
 
 const URL: &'static str =
     "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/diagnostics-publisher.cm";

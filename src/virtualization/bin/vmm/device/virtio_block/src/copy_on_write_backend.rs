@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::backend::{BlockBackend, DeviceAttrs, Request, Sector},
-    anyhow::{anyhow, Error},
-    async_trait::async_trait,
-    fuchsia_trace as ftrace,
-    futures::future::try_join_all,
-    std::cell::RefCell,
-};
+use crate::backend::{BlockBackend, DeviceAttrs, Request, Sector};
+use anyhow::{anyhow, Error};
+use async_trait::async_trait;
+use fuchsia_trace as ftrace;
+use futures::future::try_join_all;
+use std::cell::RefCell;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TargetBackend {
@@ -197,12 +195,10 @@ impl BlockBackend for CopyOnWriteBackend {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::backend_test::{BackendController, BackendTest},
-        crate::file_backend::tests::{FileBackendController, FileBackendTest},
-        crate::memory_backend::{self, MemoryBackend},
-    };
+    use super::*;
+    use crate::backend_test::{BackendController, BackendTest};
+    use crate::file_backend::tests::{FileBackendController, FileBackendTest};
+    use crate::memory_backend::{self, MemoryBackend};
 
     struct CopyOnWriteBackendController {
         backing: FileBackendController,

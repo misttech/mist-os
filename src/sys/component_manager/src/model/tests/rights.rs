@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::{CapabilityProvider, FrameworkCapability},
-        model::{component::WeakComponentInstance, testing::routing_test_helpers::*},
-    },
-    ::routing::capability_source::InternalCapability,
-    ::routing_test_helpers::{rights::CommonRightsTest, RoutingTestModel},
-    async_trait::async_trait,
-    cm_rust::*,
-    cm_rust_testing::*,
-    cm_util::TaskGroup,
-    errors::CapabilityProviderError,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    vfs::{directory::entry::OpenRequest, remote::remote_dir},
-};
+use crate::capability::{CapabilityProvider, FrameworkCapability};
+use crate::model::component::WeakComponentInstance;
+use crate::model::testing::routing_test_helpers::*;
+use ::routing::capability_source::InternalCapability;
+use ::routing_test_helpers::rights::CommonRightsTest;
+use ::routing_test_helpers::RoutingTestModel;
+use async_trait::async_trait;
+use cm_rust::*;
+use cm_rust_testing::*;
+use cm_util::TaskGroup;
+use errors::CapabilityProviderError;
+use vfs::directory::entry::OpenRequest;
+use vfs::remote::remote_dir;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn offer_increasing_rights() {

@@ -4,14 +4,12 @@
 
 //! Type-safe bindings for Zircon processes.
 
-use crate::ok;
 use crate::sys::{zx_handle_t, zx_rights_t};
 use crate::{
-    object_get_info, object_get_info_vec, object_get_property, object_set_property, ObjectQuery,
-    Topic, VmoInfo,
+    object_get_info, object_get_info_vec, object_get_property, object_set_property, ok,
+    AsHandleRef, Handle, HandleBased, HandleRef, Koid, ObjectQuery, Property, PropertyQuery,
+    Status, Task, Thread, Topic, VmoInfo,
 };
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Koid, Status, Task, Thread};
-use crate::{Property, PropertyQuery};
 use bitflags::bitflags;
 use fuchsia_zircon_sys::{
     self as sys, zx_info_maps_type_t, zx_koid_t, zx_time_t, zx_vaddr_t, zx_vm_option_t,

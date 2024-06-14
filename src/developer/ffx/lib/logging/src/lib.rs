@@ -43,7 +43,8 @@ where
         event: &tracing::Event<'_>,
     ) -> std::fmt::Result {
         use tracing_log::NormalizeEvent;
-        use tracing_subscriber::fmt::{time::FormatTime, FormatFields};
+        use tracing_subscriber::fmt::time::FormatTime;
+        use tracing_subscriber::fmt::FormatFields;
 
         let normalized_meta = event.normalized_metadata();
         let meta = normalized_meta.as_ref().unwrap_or_else(|| event.metadata());

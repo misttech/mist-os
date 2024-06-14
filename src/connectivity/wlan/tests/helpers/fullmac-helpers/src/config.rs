@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use test_realm_helpers::constants::DEFAULT_CLIENT_STA_ADDR;
+use wlan_common::ie::fake_ht_capabilities;
+use zerocopy::AsBytes;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    test_realm_helpers::constants::DEFAULT_CLIENT_STA_ADDR, wlan_common::ie::fake_ht_capabilities,
-    zerocopy::AsBytes,
 };
 
 /// Contains all the configuration required for the fullmac driver.
@@ -23,6 +24,7 @@ pub struct FullmacDriverConfig {
 }
 
 impl Default for FullmacDriverConfig {
+    /// By default, the driver is configured as a client.
     fn default() -> Self {
         Self {
             query_info: default_fullmac_query_info(),
@@ -30,6 +32,18 @@ impl Default for FullmacDriverConfig {
             security_support: default_security_support(),
             spectrum_management_support: default_spectrum_management_support(),
             sme_legacy_privacy_support: default_sme_legacy_privacy_support(),
+        }
+    }
+}
+
+impl FullmacDriverConfig {
+    pub fn default_ap() -> Self {
+        Self {
+            query_info: fidl_fullmac::WlanFullmacQueryInfo {
+                role: fidl_common::WlanMacRole::Ap,
+                ..default_fullmac_query_info()
+            },
+            ..Default::default()
         }
     }
 }
@@ -86,11 +100,13 @@ fn default_fullmac_band_capability() -> fidl_fullmac::WlanFullmacBandCapability 
         },
         vht_supported: false,
         vht_caps: fidl_ieee80211::VhtCapabilities { bytes: [0; 12] },
-        operating_channel_count: 14,
+        operating_channel_count: 11,
         operating_channel_list: [0; 256],
     };
 
-    for i in 0..14 {
+    // By default, the fullmac fake driver supports 2 GHz channels in the US.
+    // Specifically, channels 12-14 are avoided or not allowed in the US.
+    for i in 0..11 {
         cap.operating_channel_list[i] = (i + 1) as u8;
     }
     cap

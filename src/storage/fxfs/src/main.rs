@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fuchsia_async as fasync,
-    fuchsia_component::server::MissingStartupHandle,
-    fuchsia_runtime::HandleType,
-    fxfs::{log::*, serialized_types::LATEST_VERSION},
-    fxfs_platform::component::Component,
-};
+use anyhow::Error;
+use fuchsia_async as fasync;
+use fuchsia_component::server::MissingStartupHandle;
+use fuchsia_runtime::HandleType;
+use fxfs::log::*;
+use fxfs::serialized_types::LATEST_VERSION;
+use fxfs_platform::component::Component;
 
 #[fasync::run(6)]
 async fn main() -> Result<(), Error> {

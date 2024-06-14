@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        descriptor::EventDescriptor,
-        events::{event_name, EventStream},
-        matcher::EventMatcher,
-    },
-    anyhow::{format_err, Error},
-};
+use crate::descriptor::EventDescriptor;
+use crate::events::{event_name, EventStream};
+use crate::matcher::EventMatcher;
+use anyhow::{format_err, Error};
 
 /// Determines whether an EventGroup allows events to be verified in any order
 /// or only in the order specified in the group.

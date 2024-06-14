@@ -2,53 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        device::BlockServer,
-        errors::map_to_status,
-        file::FxFile,
-        node::{FxNode, GetResult, OpenedNode},
-        symlink::FxSymlink,
-        volume::{info_to_filesystem_info, FxVolume, RootDir},
-    },
-    anyhow::{bail, Error},
-    async_trait::async_trait,
-    either::{Left, Right},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::FutureExt,
-    fxfs::{
-        errors::FxfsError,
-        filesystem::SyncOptions,
-        log::*,
-        object_store::{
-            self,
-            directory::{self, ReplacedChild},
-            transaction::{lock_keys, LockKey, Options, Transaction},
-            Directory, ObjectDescriptor, ObjectStore, Timestamp,
-        },
-    },
-    fxfs_macros::ToWeakNode,
-    std::{
-        any::Any,
-        sync::{Arc, Mutex},
-    },
-    vfs::{
-        attributes,
-        common::rights_to_posix_mode_bits,
-        directory::{
-            dirents_sink::{self, AppendResult, Sink},
-            entry::{DirectoryEntry, EntryInfo, OpenRequest},
-            entry_container::{Directory as VfsDirectory, DirectoryWatcher, MutableDirectory},
-            mutable::connection::MutableConnection,
-            traversal_position::TraversalPosition,
-            watchers::{event_producers::SingleNameEventProducer, Watchers},
-        },
-        execution_scope::ExecutionScope,
-        path::Path,
-        symlink, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
-    },
+use crate::fuchsia::device::BlockServer;
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::file::FxFile;
+use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
+use crate::fuchsia::symlink::FxSymlink;
+use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume, RootDir};
+use anyhow::{bail, Error};
+use either::{Left, Right};
+use fidl::endpoints::ServerEnd;
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use fxfs::errors::FxfsError;
+use fxfs::filesystem::SyncOptions;
+use fxfs::log::*;
+use fxfs::object_store::directory::{self, ReplacedChild};
+use fxfs::object_store::transaction::{lock_keys, LockKey, Options, Transaction};
+use fxfs::object_store::{self, Directory, ObjectDescriptor, ObjectStore, Timestamp};
+use fxfs_macros::ToWeakNode;
+use std::any::Any;
+use std::sync::{Arc, Mutex};
+use vfs::common::rights_to_posix_mode_bits;
+use vfs::directory::dirents_sink::{self, AppendResult, Sink};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry_container::{
+    Directory as VfsDirectory, DirectoryWatcher, MutableDirectory,
 };
+use vfs::directory::mutable::connection::MutableConnection;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::directory::watchers::event_producers::SingleNameEventProducer;
+use vfs::directory::watchers::Watchers;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::{attributes, symlink, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[derive(ToWeakNode)]
 pub struct FxDirectory {
@@ -313,42 +300,8 @@ impl FxDirectory {
             .map_err(map_to_status)?;
         Ok(())
     }
-}
 
-impl Drop for FxDirectory {
-    fn drop(&mut self) {
-        self.volume().cache().remove(self);
-    }
-}
-
-impl FxNode for FxDirectory {
-    fn object_id(&self) -> u64 {
-        self.directory.object_id()
-    }
-
-    fn parent(&self) -> Option<Arc<FxDirectory>> {
-        self.parent.as_ref().map(|p| p.lock().unwrap().clone())
-    }
-
-    fn set_parent(&self, parent: Arc<FxDirectory>) {
-        match &self.parent {
-            Some(p) => *p.lock().unwrap() = parent,
-            None => panic!("Called set_parent on root node"),
-        }
-    }
-
-    // If these ever do anything, BlobDirectory might need to be fixed.
-    fn open_count_add_one(&self) {}
-    fn open_count_sub_one(self: Arc<Self>) {}
-
-    fn object_descriptor(&self) -> ObjectDescriptor {
-        ObjectDescriptor::Directory
-    }
-}
-
-#[async_trait]
-impl MutableDirectory for FxDirectory {
-    async fn link(
+    async fn link_impl(
         self: Arc<Self>,
         name: String,
         source_dir: Arc<dyn Any + Send + Sync>,
@@ -384,6 +337,157 @@ impl MutableDirectory for FxDirectory {
             _ => return Err(zx::Status::NOT_SUPPORTED),
         };
         self.link_object(transaction, &name, source_id, ObjectDescriptor::File).await
+    }
+
+    async fn rename_impl(
+        self: Arc<Self>,
+        src_dir: Arc<dyn MutableDirectory>,
+        src_name: Path,
+        dst_name: Path,
+    ) -> Result<(), zx::Status> {
+        if !src_name.is_single_component() || !dst_name.is_single_component() {
+            return Err(zx::Status::INVALID_ARGS);
+        }
+        let (src, dst) = (src_name.peek().unwrap(), dst_name.peek().unwrap());
+        let src_dir =
+            src_dir.into_any().downcast::<FxDirectory>().map_err(|_| Err(zx::Status::NOT_DIR))?;
+
+        // Acquire the transaction that locks |src_dir|, |src_name|, |self|, and |dst_name| if they
+        // exist, and also the ID and type of dst and src.
+        let replace_context = self
+            .directory
+            .acquire_context_for_replace(Some((src_dir.directory(), src)), dst, false)
+            .await
+            .map_err(map_to_status)?;
+        let mut transaction = replace_context.transaction;
+
+        if self.is_deleted() {
+            return Err(zx::Status::NOT_FOUND);
+        }
+
+        let (moved_id, moved_descriptor) =
+            replace_context.src_id_and_descriptor.ok_or(zx::Status::NOT_FOUND)?;
+
+        // Make sure the dst path is compatible with the moved node.
+        if let ObjectDescriptor::File = moved_descriptor {
+            if src_name.is_dir() || dst_name.is_dir() {
+                return Err(zx::Status::NOT_DIR);
+            }
+        }
+
+        // Now that we've ensured that the dst path is compatible with the moved node, we can check
+        // for the trivial case.
+        if src_dir.object_id() == self.object_id() && src == dst {
+            return Ok(());
+        }
+
+        if let Some((_, dst_descriptor)) = replace_context.dst_id_and_descriptor.as_ref() {
+            // dst is being overwritten; make sure it's a file iff src is.
+            match (&moved_descriptor, dst_descriptor) {
+                (ObjectDescriptor::Directory, ObjectDescriptor::Directory) => {}
+                (
+                    ObjectDescriptor::File | ObjectDescriptor::Symlink,
+                    ObjectDescriptor::File | ObjectDescriptor::Symlink,
+                ) => {}
+                (ObjectDescriptor::Directory, _) => return Err(zx::Status::NOT_DIR),
+                (ObjectDescriptor::File | ObjectDescriptor::Symlink, _) => {
+                    return Err(zx::Status::NOT_FILE)
+                }
+                _ => return Err(zx::Status::IO_DATA_INTEGRITY),
+            }
+        }
+
+        let moved_node = src_dir
+            .volume()
+            .get_or_load_node(moved_id, moved_descriptor.clone(), Some(src_dir.clone()))
+            .await
+            .map_err(map_to_status)?;
+
+        if let ObjectDescriptor::Directory = moved_descriptor {
+            // Lastly, ensure that self isn't a (transitive) child of the moved node.
+            let mut node_opt = Some(self.clone());
+            while let Some(node) = node_opt {
+                if node.object_id() == moved_node.object_id() {
+                    return Err(zx::Status::INVALID_ARGS);
+                }
+                node_opt = node.parent();
+            }
+        }
+
+        let replace_result = directory::replace_child(
+            &mut transaction,
+            Some((src_dir.directory(), src)),
+            (self.directory(), dst),
+        )
+        .await
+        .map_err(map_to_status)?;
+
+        transaction
+            .commit_with_callback(|_| {
+                moved_node.set_parent(self.clone());
+                src_dir.did_remove(src);
+
+                match replace_result {
+                    ReplacedChild::None => {}
+                    ReplacedChild::ObjectWithRemainingLinks(..) | ReplacedChild::Object(_) => {
+                        self.did_remove(dst);
+                    }
+                    ReplacedChild::Directory(id) => {
+                        self.did_remove(dst);
+                        self.volume().mark_directory_deleted(id);
+                    }
+                }
+                self.did_add(dst, Some(moved_node));
+            })
+            .await
+            .map_err(map_to_status)?;
+
+        if let ReplacedChild::Object(id) = replace_result {
+            self.volume().maybe_purge_file(id).await.map_err(map_to_status)?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for FxDirectory {
+    fn drop(&mut self) {
+        self.volume().cache().remove(self);
+    }
+}
+
+impl FxNode for FxDirectory {
+    fn object_id(&self) -> u64 {
+        self.directory.object_id()
+    }
+
+    fn parent(&self) -> Option<Arc<FxDirectory>> {
+        self.parent.as_ref().map(|p| p.lock().unwrap().clone())
+    }
+
+    fn set_parent(&self, parent: Arc<FxDirectory>) {
+        match &self.parent {
+            Some(p) => *p.lock().unwrap() = parent,
+            None => panic!("Called set_parent on root node"),
+        }
+    }
+
+    // If these ever do anything, BlobDirectory might need to be fixed.
+    fn open_count_add_one(&self) {}
+    fn open_count_sub_one(self: Arc<Self>) {}
+
+    fn object_descriptor(&self) -> ObjectDescriptor {
+        ObjectDescriptor::Directory
+    }
+}
+
+impl MutableDirectory for FxDirectory {
+    fn link<'a>(
+        self: Arc<Self>,
+        name: String,
+        source_dir: Arc<dyn Any + Send + Sync>,
+        source_name: &'a str,
+    ) -> BoxFuture<'a, Result<(), zx::Status>> {
+        Box::pin(self.link_impl(name, source_dir, source_name))
     }
 
     async fn unlink(
@@ -496,113 +600,13 @@ impl MutableDirectory for FxDirectory {
             .map_err(map_to_status)
     }
 
-    async fn rename(
+    fn rename(
         self: Arc<Self>,
         src_dir: Arc<dyn MutableDirectory>,
         src_name: Path,
         dst_name: Path,
-    ) -> Result<(), zx::Status> {
-        if !src_name.is_single_component() || !dst_name.is_single_component() {
-            return Err(zx::Status::INVALID_ARGS);
-        }
-        let (src, dst) = (src_name.peek().unwrap(), dst_name.peek().unwrap());
-        let src_dir =
-            src_dir.into_any().downcast::<FxDirectory>().map_err(|_| Err(zx::Status::NOT_DIR))?;
-
-        // Acquire the transaction that locks |src_dir|, |src_name|, |self|, and |dst_name| if they
-        // exist, and also the ID and type of dst and src.
-        let replace_context = self
-            .directory
-            .acquire_context_for_replace(Some((src_dir.directory(), src)), dst, false)
-            .await
-            .map_err(map_to_status)?;
-        let mut transaction = replace_context.transaction;
-
-        if self.is_deleted() {
-            return Err(zx::Status::NOT_FOUND);
-        }
-
-        let (moved_id, moved_descriptor) =
-            replace_context.src_id_and_descriptor.ok_or(zx::Status::NOT_FOUND)?;
-
-        // Make sure the dst path is compatible with the moved node.
-        if let ObjectDescriptor::File = moved_descriptor {
-            if src_name.is_dir() || dst_name.is_dir() {
-                return Err(zx::Status::NOT_DIR);
-            }
-        }
-
-        // Now that we've ensured that the dst path is compatible with the moved node, we can check
-        // for the trivial case.
-        if src_dir.object_id() == self.object_id() && src == dst {
-            return Ok(());
-        }
-
-        if let Some((_, dst_descriptor)) = replace_context.dst_id_and_descriptor.as_ref() {
-            // dst is being overwritten; make sure it's a file iff src is.
-            match (&moved_descriptor, dst_descriptor) {
-                (ObjectDescriptor::Directory, ObjectDescriptor::Directory) => {}
-                (
-                    ObjectDescriptor::File | ObjectDescriptor::Symlink,
-                    ObjectDescriptor::File | ObjectDescriptor::Symlink,
-                ) => {}
-                (ObjectDescriptor::Directory, _) => return Err(zx::Status::NOT_DIR),
-                (ObjectDescriptor::File | ObjectDescriptor::Symlink, _) => {
-                    return Err(zx::Status::NOT_FILE)
-                }
-                _ => return Err(zx::Status::IO_DATA_INTEGRITY),
-            }
-        }
-
-        let moved_node = src_dir
-            .volume()
-            .get_or_load_node(moved_id, moved_descriptor.clone(), Some(src_dir.clone()))
-            .await
-            .map_err(map_to_status)?;
-
-        if let ObjectDescriptor::Directory = moved_descriptor {
-            // Lastly, ensure that self isn't a (transitive) child of the moved node.
-            let mut node_opt = Some(self.clone());
-            while let Some(node) = node_opt {
-                if node.object_id() == moved_node.object_id() {
-                    return Err(zx::Status::INVALID_ARGS);
-                }
-                node_opt = node.parent();
-            }
-        }
-
-        let replace_result = directory::replace_child(
-            &mut transaction,
-            Some((src_dir.directory(), src)),
-            (self.directory(), dst),
-        )
-        .await
-        .map_err(map_to_status)?;
-
-        transaction
-            .commit_with_callback(|_| {
-                moved_node.set_parent(self.clone());
-                src_dir.did_remove(src);
-
-                match replace_result {
-                    ReplacedChild::None => {}
-                    ReplacedChild::ObjectWithRemainingLinks(..) | ReplacedChild::Object(_) => {
-                        self.did_remove(dst);
-                    }
-                    ReplacedChild::Directory(id) => {
-                        self.did_remove(dst);
-                        self.volume().mark_directory_deleted(id);
-                    }
-                }
-                self.did_add(dst, Some(moved_node));
-            })
-            .await
-            .map_err(map_to_status)?;
-
-        if let ReplacedChild::Object(id) = replace_result {
-            self.volume().maybe_purge_file(id).await.map_err(map_to_status)?;
-        }
-        Ok(())
+    ) -> BoxFuture<'static, Result<(), zx::Status>> {
+        Box::pin(self.rename_impl(src_dir, src_name, dst_name))
     }
 
     async fn create_symlink(
@@ -679,7 +683,6 @@ impl DirectoryEntry for FxDirectory {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for FxDirectory {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         let props = self.directory.get_properties().await.map_err(map_to_status)?;
@@ -740,7 +743,6 @@ impl vfs::node::Node for FxDirectory {
     }
 }
 
-#[async_trait]
 impl VfsDirectory for FxDirectory {
     fn open(
         self: Arc<Self>,
@@ -963,37 +965,29 @@ impl From<Directory<FxVolume>> for FxDirectory {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{
-            directory::FxDirectory,
-            file::FxFile,
-            fuchsia::testing::{
-                close_dir_checked, close_file_checked, open2_dir, open2_dir_checked, open_dir,
-                open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
-            },
-        },
-        assert_matches::assert_matches,
-        fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_fs::{
-            directory::{DirEntry, DirentKind},
-            file,
-        },
-        fuchsia_zircon as zx,
-        futures::StreamExt,
-        fxfs::object_store::Timestamp,
-        rand::Rng,
-        std::{
-            os::fd::AsRawFd,
-            sync::{
-                atomic::{AtomicU64, Ordering},
-                Arc,
-            },
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{common::rights_to_posix_mode_bits, node::Node, path::Path},
+    use crate::directory::FxDirectory;
+    use crate::file::FxFile;
+    use crate::fuchsia::testing::{
+        close_dir_checked, close_file_checked, open2_dir, open2_dir_checked, open_dir,
+        open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
+    use fuchsia_fs::directory::{DirEntry, DirentKind};
+    use fuchsia_fs::file;
+    use futures::StreamExt;
+    use fxfs::object_store::Timestamp;
+    use rand::Rng;
+    use std::os::fd::AsRawFd;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
+    use vfs::common::rights_to_posix_mode_bits;
+    use vfs::node::Node;
+    use vfs::path::Path;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fuchsia::test]
     async fn test_open_root_dir() {

@@ -3,23 +3,24 @@
 // found in the LICENSE file.
 
 #![warn(clippy::await_holding_refcell_ref)]
+use crate::input_handler::{InputHandlerStatus, UnhandledInputHandler};
+use crate::utils::{Position, Size};
+use crate::{input_device, metrics, touch_binding};
+use anyhow::{Context, Error, Result};
+use async_trait::async_trait;
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::create_proxy;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_inspect::health::Reporter;
+use futures::stream::StreamExt;
+use metrics_registry::*;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 use {
-    crate::input_handler::{InputHandlerStatus, UnhandledInputHandler},
-    crate::utils::{Position, Size},
-    crate::{input_device, metrics, touch_binding},
-    anyhow::{Context, Error, Result},
-    async_trait::async_trait,
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::create_proxy,
     fidl_fuchsia_input_interaction_observation as interaction_observation,
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect::health::Reporter,
-    fuchsia_zircon as zx,
-    futures::stream::StreamExt,
-    metrics_registry::*,
-    std::{cell::RefCell, collections::HashMap, rc::Rc},
+    fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config, fuchsia_zircon as zx,
 };
 
 /// An input handler that parses touch events and forwards them to Scenic through the
@@ -483,22 +484,21 @@ impl TouchInjectorHandler {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::input_handler::InputHandler;
+    use crate::testing_utilities::{
+        create_fake_input_event, create_touch_contact, create_touch_pointer_sample_event,
+        create_touch_screen_event, create_touch_screen_event_with_handled, create_touchpad_event,
+    };
+    use assert_matches::assert_matches;
+    use maplit::hashmap;
+    use pretty_assertions::assert_eq;
+    use std::collections::HashSet;
+    use std::convert::TryFrom as _;
+    use std::ops::Add;
     use {
-        super::*,
-        crate::input_handler::InputHandler,
-        crate::testing_utilities::{
-            create_fake_input_event, create_touch_contact, create_touch_pointer_sample_event,
-            create_touch_screen_event, create_touch_screen_event_with_handled,
-            create_touchpad_event,
-        },
-        assert_matches::assert_matches,
         fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
         fuchsia_async as fasync, fuchsia_zircon as zx,
-        maplit::hashmap,
-        pretty_assertions::assert_eq,
-        std::collections::HashSet,
-        std::convert::TryFrom as _,
-        std::ops::Add,
     };
 
     const TOUCH_ID: u32 = 1;

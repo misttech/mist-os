@@ -88,6 +88,6 @@ zx::result<> profiler::UnownedComponent::Start(ComponentWatcher::ComponentEventH
   return zx::ok();
 }
 
-zx::result<> profiler::UnownedComponent::Stop() { return zx::ok(); }
+zx::result<> profiler::UnownedComponent::Stop() { return component_watcher_.Reset(); }
 
 zx::result<> profiler::UnownedComponent::Destroy() { return zx::ok(); }

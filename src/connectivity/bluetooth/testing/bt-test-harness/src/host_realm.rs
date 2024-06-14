@@ -2,30 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{emulator::EMULATOR_ROOT_DRIVER_URL, host_realm::mpsc::Receiver},
-    anyhow::{format_err, Error},
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_bluetooth_host::{HostMarker, ReceiverMarker, ReceiverRequestStream},
-    fidl_fuchsia_component::{CreateChildArgs, RealmMarker},
-    fidl_fuchsia_component_decl::{
-        Child, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, Durability,
-        StartupMode,
-    },
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger::LogSinkMarker,
-    fuchsia_bluetooth::constants::{
-        BT_HOST, BT_HOST_COLLECTION, BT_HOST_URL, DEV_DIR, HCI_DEVICE_DIR,
-    },
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-        ScopedInstance,
-    },
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    futures::{channel::mpsc, SinkExt, StreamExt},
-    std::sync::{Arc, Mutex},
+use crate::emulator::EMULATOR_ROOT_DRIVER_URL;
+use crate::host_realm::mpsc::Receiver;
+use anyhow::{format_err, Error};
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_bluetooth_host::{HostMarker, ReceiverMarker, ReceiverRequestStream};
+use fidl_fuchsia_component::{CreateChildArgs, RealmMarker};
+use fidl_fuchsia_component_decl::{
+    Child, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, Durability, StartupMode,
 };
+use fidl_fuchsia_logger::LogSinkMarker;
+use fuchsia_bluetooth::constants::{
+    BT_HOST, BT_HOST_COLLECTION, BT_HOST_URL, DEV_DIR, HCI_DEVICE_DIR,
+};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+    ScopedInstance,
+};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
+use std::sync::{Arc, Mutex};
+use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio};
 
 mod constants {
     pub mod receiver {

@@ -75,7 +75,8 @@ impl FxfsError {
 
 #[cfg(target_os = "fuchsia")]
 mod fuchsia {
-    use {super::*, fuchsia_zircon::Status};
+    use super::*;
+    use fuchsia_zircon::Status;
 
     impl From<FxfsError> for Status {
         fn from(err: FxfsError) -> Status {
@@ -109,10 +110,8 @@ mod fuchsia {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::FxfsError,
-        anyhow::{anyhow, Context},
-    };
+    use super::FxfsError;
+    use anyhow::{anyhow, Context};
 
     #[test]
     fn test_matches() {

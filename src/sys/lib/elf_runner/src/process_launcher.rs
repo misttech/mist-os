@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::vdso_vmo::get_stable_vdso_vmo,
-    anyhow::Context,
-    cm_types::NamespacePath,
-    fidl_connector::Connect,
-    fidl_fuchsia_process as fproc, fuchsia_async as fasync,
-    fuchsia_runtime::{HandleInfo, HandleInfoError},
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    process_builder::{
-        BuiltProcess, NamespaceEntry, ProcessBuilder, ProcessBuilderError, StartupHandle,
-    },
-    std::{ffi::CString, fmt::Debug, sync::Arc},
-    thiserror::Error,
-    tracing::{error, warn},
+use crate::vdso_vmo::get_stable_vdso_vmo;
+use anyhow::Context;
+use cm_types::NamespacePath;
+use fidl_connector::Connect;
+use fuchsia_runtime::{HandleInfo, HandleInfoError};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use process_builder::{
+    BuiltProcess, NamespaceEntry, ProcessBuilder, ProcessBuilderError, StartupHandle,
 };
+use std::ffi::CString;
+use std::fmt::Debug;
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::{error, warn};
+use {fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 
 /// Internal error type for ProcessLauncher which conveniently wraps errors that might
 /// result during process launching and allows for mapping them to an equivalent zx::Status, which

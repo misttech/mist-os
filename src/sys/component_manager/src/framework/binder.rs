@@ -2,24 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
-        model::{
-            component::{StartReason, WeakComponentInstance},
-            routing::report_routing_failure,
-            start::Start,
-        },
-    },
-    ::routing::RouteRequest,
-    async_trait::async_trait,
-    cm_types::Name,
-    errors::ModelError,
-    fuchsia_zircon as zx,
-    lazy_static::lazy_static,
-    routing::capability_source::InternalCapability,
-    tracing::warn,
-};
+use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
+use crate::model::component::{StartReason, WeakComponentInstance};
+use crate::model::routing::report_routing_failure;
+use crate::model::start::Start;
+use ::routing::RouteRequest;
+use async_trait::async_trait;
+use cm_types::Name;
+use errors::ModelError;
+use fuchsia_zircon as zx;
+use lazy_static::lazy_static;
+use routing::capability_source::InternalCapability;
+use tracing::warn;
 
 lazy_static! {
     static ref BINDER_SERVICE: Name = "fuchsia.component.Binder".parse().unwrap();
@@ -112,30 +106,27 @@ async fn report_routing_failure_to_target(target: WeakComponentInstance, err: Mo
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            builtin_environment::BuiltinEnvironment,
-            model::{
-                events::{source::EventSource, stream::EventStream},
-                testing::test_helpers::*,
-            },
-        },
-        assert_matches::assert_matches,
-        cm_rust::ComponentDecl,
-        cm_rust_testing::*,
-        cm_util::TaskGroup,
-        fidl::{client::Client, handle::AsyncChannel},
-        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        futures::{lock::Mutex, StreamExt},
-        hooks::EventType,
-        moniker::Moniker,
-        std::sync::Arc,
-        vfs::{
-            directory::entry::OpenRequest, execution_scope::ExecutionScope, path::Path as VfsPath,
-            ToObjectRequest,
-        },
-    };
+    use super::*;
+    use crate::builtin_environment::BuiltinEnvironment;
+    use crate::model::events::source::EventSource;
+    use crate::model::events::stream::EventStream;
+    use crate::model::testing::test_helpers::*;
+    use assert_matches::assert_matches;
+    use cm_rust::ComponentDecl;
+    use cm_rust_testing::*;
+    use cm_util::TaskGroup;
+    use fidl::client::Client;
+    use fidl::handle::AsyncChannel;
+    use futures::lock::Mutex;
+    use futures::StreamExt;
+    use hooks::EventType;
+    use moniker::Moniker;
+    use std::sync::Arc;
+    use vfs::directory::entry::OpenRequest;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path as VfsPath;
+    use vfs::ToObjectRequest;
+    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     struct BinderCapabilityTestFixture {
         builtin_environment: Arc<Mutex<BuiltinEnvironment>>,

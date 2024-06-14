@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bt_avctp::{self as avctp, AvctpCommand},
-    futures::Future,
-    packet_encoding::{Decodable, Encodable},
-    std::sync::Arc,
-    tracing::{info, trace, warn},
-};
+use bt_avctp::{self as avctp, AvctpCommand};
+use futures::Future;
+use packet_encoding::{Decodable, Encodable};
+use std::sync::Arc;
+use tracing::{info, trace, warn};
 
 use crate::packets::*;
 use crate::peer_manager::TargetDelegate;

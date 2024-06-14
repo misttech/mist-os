@@ -4,16 +4,12 @@
 
 use macro_rules_attribute::apply;
 use starnix_sync::RwLock;
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Weak},
-};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Weak};
 
-use crate::{
-    device::terminal::Terminal,
-    mutable_state::{state_accessor, state_implementation},
-    task::ProcessGroup,
-};
+use crate::device::terminal::Terminal;
+use crate::mutable_state::{state_accessor, state_implementation};
+use crate::task::ProcessGroup;
 use starnix_uapi::pid_t;
 
 #[derive(Debug)]

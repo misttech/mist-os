@@ -5,31 +5,26 @@
 // TODO(https://fxbug.dev/42066994): Remove.
 #![allow(unused_variables, unused_imports, dead_code)]
 
+use crate::guest_config;
+use anyhow::{anyhow, Error};
+use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
+use fidl_fuchsia_net::MacAddress;
+use fidl_fuchsia_virtualization::{
+    GuestConfig, GuestDescriptor, GuestError, GuestInfo, GuestLifecycleMarker, GuestLifecycleProxy,
+    GuestManagerConnectResponder, GuestManagerError, GuestManagerForceShutdownResponder,
+    GuestManagerGetInfoResponder, GuestManagerLaunchResponder, GuestManagerRequest,
+    GuestManagerRequestStream, GuestMarker, GuestStatus, NetSpec,
+};
+use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol};
+use futures::stream::{try_unfold, FuturesUnordered, SelectAll};
+use futures::{future, select_biased, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::{fmt, fs};
 use {
-    crate::guest_config,
-    anyhow::{anyhow, Error},
-    fidl::endpoints::{create_proxy, Proxy, ServerEnd},
-    fidl_fuchsia_hardware_network,
-    fidl_fuchsia_net::MacAddress,
-    fidl_fuchsia_net_interfaces as ninterfaces,
-    fidl_fuchsia_virtualization::{
-        GuestConfig, GuestDescriptor, GuestError, GuestInfo, GuestLifecycleMarker,
-        GuestLifecycleProxy, GuestManagerConnectResponder, GuestManagerError,
-        GuestManagerForceShutdownResponder, GuestManagerGetInfoResponder,
-        GuestManagerLaunchResponder, GuestManagerRequest, GuestManagerRequestStream, GuestMarker,
-        GuestStatus, NetSpec,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol},
-    fuchsia_zircon as zx,
-    futures::{
-        future, select_biased,
-        stream::{try_unfold, FuturesUnordered, SelectAll},
-        FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
-    },
-    std::collections::HashSet,
-    std::path::{Path, PathBuf},
-    std::{fmt, fs, rc::Rc},
+    fidl_fuchsia_hardware_network, fidl_fuchsia_net_interfaces as ninterfaces,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 // This is a locally administered MAC address (first byte 0x02) mixed with the
@@ -550,24 +545,22 @@ impl GuestManager {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        async_utils::PollExt,
-        fidl::endpoints::{create_endpoints, create_proxy_and_stream},
-        fidl_fuchsia_virtualization::{
-            GuestLifecycleRequest, GuestLifecycleRequestStream, GuestLifecycleRunResponder,
-            GuestManagerMarker, GuestManagerProxy, GuestManagerRequestStream,
-            HostVsockAcceptorMarker, Listener,
-        },
-        fs::write,
-        fuchsia_fs::{file, OpenFlags},
-        futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
-        futures::future::{self, join, Either},
-        futures::select,
-        std::cell::{Cell, Ref, RefCell},
-        std::io::Write,
-        tempfile::{NamedTempFile, TempPath},
+    use super::*;
+    use async_utils::PollExt;
+    use fidl::endpoints::{create_endpoints, create_proxy_and_stream};
+    use fidl_fuchsia_virtualization::{
+        GuestLifecycleRequest, GuestLifecycleRequestStream, GuestLifecycleRunResponder,
+        GuestManagerMarker, GuestManagerProxy, GuestManagerRequestStream, HostVsockAcceptorMarker,
+        Listener,
     };
+    use fs::write;
+    use fuchsia_fs::{file, OpenFlags};
+    use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+    use futures::future::{self, join, Either};
+    use futures::select;
+    use std::cell::{Cell, Ref, RefCell};
+    use std::io::Write;
+    use tempfile::{NamedTempFile, TempPath};
 
     #[derive(PartialEq, Debug)]
     enum VmmState {

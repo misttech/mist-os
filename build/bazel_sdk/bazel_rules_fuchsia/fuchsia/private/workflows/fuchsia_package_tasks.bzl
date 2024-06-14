@@ -166,6 +166,8 @@ def fuchsia_package_tasks(
         test_realm = None,
         enumerate_test_components = False,
         enumerated_component_filter = None,
+        retries = None,
+        disable_retries_on_failure = None,
         tags = [],
         **kwargs):
     # Disable Bazel sandboxing when running tests to allow ffx run without
@@ -283,6 +285,8 @@ def fuchsia_package_tasks(
             package = package,
             component_name_filter = enumerated_component_filter,
             test_realm = test_realm,
+            retries = retries,
+            disable_retries_on_failure = disable_retries_on_failure,
             tags = intermediate_target_tags,
             **kwargs
         )

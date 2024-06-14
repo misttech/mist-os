@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use crate::task::{CurrentTask, ThreadState};
-use starnix_syscalls::{
-    decls::{Syscall, SyscallDecl},
-    SyscallArg,
-};
+use starnix_syscalls::decls::{Syscall, SyscallDecl};
+use starnix_syscalls::SyscallArg;
 
 /// Generates CFI directives so the unwinder will be redirected to unwind the stack provided in `state`.
 #[macro_export]
@@ -61,8 +59,7 @@ macro_rules! restore_cfi_directives {
     };
 }
 
-pub(crate) use generate_cfi_directives;
-pub(crate) use restore_cfi_directives;
+pub(crate) use {generate_cfi_directives, restore_cfi_directives};
 
 pub fn new_syscall_from_state(syscall_decl: SyscallDecl, thread_state: &ThreadState) -> Syscall {
     Syscall {

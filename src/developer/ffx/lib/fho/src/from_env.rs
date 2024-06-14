@@ -15,8 +15,9 @@ use rcs::OpenDirType;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
+use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
-use std::{rc::Rc, sync::Arc};
 
 mod from_toolbox;
 mod helpers;
@@ -216,9 +217,7 @@ impl TryFromEnv for ffx_fidl::TargetInfo {
     /// lab environments.
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         let targets = Vec::<Self>::try_from_env(env).await?;
-        if targets.is_empty() {
-            return_user_error!("Could not discover any targets.");
-        } else if targets.len() > 1 {
+        if targets.len() > 1 {
             return_user_error!("Found more than one target: {targets:#?}.");
         } else {
             Ok(targets[0].clone())
@@ -238,9 +237,13 @@ impl TryFromEnv for Vec<ffx_fidl::TargetInfo> {
             .await
             .bug_context("getting ffx target")?
             .user_message("A target must either be set as default or explicitly provided.")?;
-        let targets = resolve_target_query_to_info(TargetInfoQuery::from(target), &env.context)
-            .await
-            .bug_context("resolving target")?;
+        let targets =
+            resolve_target_query_to_info(TargetInfoQuery::from(target.clone()), &env.context)
+                .await
+                .bug_context("resolving target")?;
+        if targets.is_empty() {
+            return_user_error!("Could not discover any targets for specifier '{target}'.");
+        }
         Ok(targets)
     }
 }
@@ -480,7 +483,20 @@ impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_fidl::TargetProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.injector.target_factory().await.user_message("Failed to create target proxy")
+        match env.injector.target_factory().await.map_err(|e| {
+            // This error case happens when there are multiple targets in target list.
+            // So let's print out the ffx error message directly (which comes from OpenTargetError::QueryAmbiguous)
+            // rather than just returning "Failed to create target proxy" which is not helpful.
+            if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
+                let message = format!("{ffx_e}");
+                Err(e).user_message(message)
+            } else {
+                Err(e).user_message("Failed to create target proxy")
+            }
+        }) {
+            Ok(p) => Ok(p),
+            Err(e) => e,
+        }
     }
 }
 

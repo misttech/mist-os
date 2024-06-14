@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    animation::KeyFrame,
-    core::{Core, Object, ObjectRef, OnAdded, Property},
-    shapes::paint::Color32,
-};
+use crate::animation::KeyFrame;
+use crate::core::{Core, Object, ObjectRef, OnAdded, Property};
+use crate::shapes::paint::Color32;
 
 use super::Animator;
 

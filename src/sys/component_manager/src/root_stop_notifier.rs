@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    errors::ModelError,
-    futures::{channel::*, lock::Mutex},
-    hooks::{Event, EventType, Hook, HooksRegistration},
-    std::sync::{Arc, Weak},
-};
+use async_trait::async_trait;
+use errors::ModelError;
+use futures::channel::*;
+use futures::lock::Mutex;
+use hooks::{Event, EventType, Hook, HooksRegistration};
+use std::sync::{Arc, Weak};
 
 /// Notifies when the root instance has been destroyed by ComponentManager.
 /// This is used to terminate ComponentManager when the root component has been destroyed.

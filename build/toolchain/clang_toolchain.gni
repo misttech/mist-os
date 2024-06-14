@@ -300,6 +300,22 @@ template("clang_toolchain") {
       } else {
         _rust_concurrent_jobs = concurrent_jobs.local
       }
+      if (rustc_timeout > 0 || ice_detection) {
+        _wrapper = rebase_path("//build/rust/rustc_wrapper.sh", root_build_dir)
+        if (ice_detection) {
+          _check_ice = "--check-ice"
+        } else {
+          _check_ice = ""
+        }
+        _rustc_wrapper += string_join(" ",
+                                      [
+                                        _wrapper,
+                                        "--timeout",
+                                        "$rustc_timeout",
+                                        _check_ice,
+                                        "--",
+                                      ]) + " "
+      }
     }
 
     # Set all tools to defaults

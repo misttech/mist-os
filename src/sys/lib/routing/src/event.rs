@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{error::EventsRoutingError, walk_state::WalkStateUnit},
-    cm_rust::DictionaryValue,
-    cm_types::Name,
-    maplit::btreemap,
-    std::collections::BTreeMap,
-};
+use crate::error::EventsRoutingError;
+use crate::walk_state::WalkStateUnit;
+use cm_rust::DictionaryValue;
+use cm_types::Name;
+use maplit::btreemap;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub struct EventSubscription<NameType = Name>
@@ -122,7 +121,9 @@ fn is_subset(prev_value: &DictionaryValue, next_value: &DictionaryValue) -> bool
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, maplit::btreemap};
+    use super::*;
+    use assert_matches::assert_matches;
+    use maplit::btreemap;
 
     #[test]
     fn test_filter_walk_state() {

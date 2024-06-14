@@ -4,7 +4,9 @@
 
 use fidl_fuchsia_bluetooth_sys::{self as sys, BrEdrSecurityMode, LeSecurityMode};
 use serde::{Deserialize, Serialize};
-use std::{cmp::PartialEq, fs::OpenOptions, path::Path};
+use std::cmp::PartialEq;
+use std::fs::OpenOptions;
+use std::path::Path;
 
 static OVERRIDE_CONFIG_FILE_PATH: &'static str = "/config/data/build-config.json";
 static DEFAULT_CONFIG_FILE_PATH: &'static str = "/pkg/data/bt-gap-default.json";
@@ -106,14 +108,13 @@ fn load_internal(override_file_path: &Path, default_file_path: &Path) -> Config 
 mod tests {
     use super::*;
     use crate::host_device::HostDevice;
-    use {
-        assert_matches::assert_matches,
-        fidl_fuchsia_bluetooth_host::{HostMarker, HostRequest},
-        fuchsia_bluetooth::types::{Address, HostId},
-        futures::{future, join, stream::TryStreamExt},
-        std::collections::HashSet,
-        tempfile::NamedTempFile,
-    };
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_bluetooth_host::{HostMarker, HostRequest};
+    use fuchsia_bluetooth::types::{Address, HostId};
+    use futures::stream::TryStreamExt;
+    use futures::{future, join};
+    use std::collections::HashSet;
+    use tempfile::NamedTempFile;
 
     static BASIC_CONFIG: Config = Config {
         le: LeConfig {

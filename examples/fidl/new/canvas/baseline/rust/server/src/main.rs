@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::RequestStream as _,
-    fidl_examples_canvas_baseline::{BoundingBox, InstanceRequest, InstanceRequestStream, Point},
-    fuchsia_async::{Time, Timer},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon::{self as zx},
-    futures::future::join,
-    futures::prelude::*,
-    std::sync::{Arc, Mutex},
-};
+use anyhow::{Context as _, Error};
+use fidl::endpoints::RequestStream as _;
+use fidl_examples_canvas_baseline::{BoundingBox, InstanceRequest, InstanceRequestStream, Point};
+use fuchsia_async::{Time, Timer};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_zircon::{self as zx};
+use futures::future::join;
+use futures::prelude::*;
+use std::sync::{Arc, Mutex};
 
 // A struct that stores the two things we care about for this example: the bounding box the lines
 // that have been added thus far, and bit to track whether or not there have been changes since the

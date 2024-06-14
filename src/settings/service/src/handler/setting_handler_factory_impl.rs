@@ -12,8 +12,7 @@ use crate::service::message::{Delegate, Signature};
 use crate::service_context::ServiceContext;
 use async_trait::async_trait;
 use futures::StreamExt;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 

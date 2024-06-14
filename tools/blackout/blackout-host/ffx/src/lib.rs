@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Result;
+use ffx_core::ffx_plugin;
+use ffx_storage_blackout_step_args::{
+    BlackoutCommand, BlackoutSubcommand, SetupCommand, TestCommand, VerifyCommand,
+};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_io::OpenFlags;
+use fuchsia_zircon_status::Status;
 use {
-    anyhow::Result,
-    ffx_core::ffx_plugin,
-    ffx_storage_blackout_step_args::{
-        BlackoutCommand, BlackoutSubcommand, SetupCommand, TestCommand, VerifyCommand,
-    },
-    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_blackout_test as fblackout,
-    fidl_fuchsia_developer_remotecontrol as fremotecontrol,
-    fidl_fuchsia_io::OpenFlags,
-    fidl_fuchsia_sys2 as fsys,
-    fuchsia_zircon_status::Status,
+    fidl_fuchsia_developer_remotecontrol as fremotecontrol, fidl_fuchsia_sys2 as fsys,
 };
 
 /// Connect to a protocol on a remote device using the remote control proxy.

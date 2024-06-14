@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    std::{
-        clone::Clone,
-        cmp::Ordering,
-        hash::{Hash, Hasher},
-        ops::Range,
-    },
-    unic_char_range::{chars, CharIter, CharRange},
-};
+use anyhow::{format_err, Error};
+use std::clone::Clone;
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
+use std::ops::Range;
+use unic_char_range::{chars, CharIter, CharRange};
 
 /// A trait for objects that represent one or more disjoint, non-adjacent
 /// [CharRanges](unic_char_range::CharRange).
@@ -459,12 +455,10 @@ fn format_range(range: &CharRange) -> String {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{are_chars_adjacent, CharCollection},
-        anyhow::Error,
-        std::char,
-        unic_char_range::{chars, CharRange},
-    };
+    use super::{are_chars_adjacent, CharCollection};
+    use anyhow::Error;
+    use std::char;
+    use unic_char_range::{chars, CharRange};
 
     #[test]
     fn test_from_sorted_ranges() -> Result<(), Error> {

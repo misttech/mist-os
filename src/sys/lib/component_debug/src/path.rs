@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::io::{Directory, DirentKind},
-    anyhow::{anyhow, bail, Result},
-    fidl_fuchsia_sys2 as fsys,
-    std::{
-        path::{Component, PathBuf},
-        str::FromStr,
-    },
-    thiserror::Error,
-};
+use crate::io::{Directory, DirentKind};
+use anyhow::{anyhow, bail, Result};
+use fidl_fuchsia_sys2 as fsys;
+use std::path::{Component, PathBuf};
+use std::str::FromStr;
+use thiserror::Error;
 
 /// Separator for user input for parsing command line arguments to structs
 /// in this crate.
@@ -287,11 +283,9 @@ pub async fn add_source_filename_to_path_if_absent<D: Directory>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::path::{dir_type_to_str, parse_dir_type_from_str, RemoteDirectoryPath},
-        fidl_fuchsia_sys2 as fsys,
-        std::str::FromStr,
-    };
+    use crate::path::{dir_type_to_str, parse_dir_type_from_str, RemoteDirectoryPath};
+    use fidl_fuchsia_sys2 as fsys;
+    use std::str::FromStr;
 
     #[test]
     fn test_parse_dir_type_from_str() {

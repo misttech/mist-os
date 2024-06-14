@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    animation::StateMachineInput,
-    core::{Core, ObjectRef, OnAdded, Property},
-};
+use crate::animation::StateMachineInput;
+use crate::core::{Core, ObjectRef, OnAdded, Property};
 
 #[derive(Debug, Default)]
 pub struct StateMachineBool {

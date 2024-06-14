@@ -4,10 +4,11 @@
 
 #![allow(clippy::large_futures)]
 
-use crate::{
-    buffer_set::*, elementary_stream::*, input_packet_stream::*, output_validator::*, FatalError,
-    Result,
-};
+use crate::buffer_set::*;
+use crate::elementary_stream::*;
+use crate::input_packet_stream::*;
+use crate::output_validator::*;
+use crate::{FatalError, Result};
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_sysmem2::BufferCollectionConstraints;
 use fuchsia_stream_processors::*;

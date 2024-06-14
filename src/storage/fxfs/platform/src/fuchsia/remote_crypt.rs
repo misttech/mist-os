@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Error},
-    async_trait::async_trait,
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_fxfs::{CryptMarker, CryptProxy, KeyPurpose as FidlKeyPurpose},
-    fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, KEY_SIZE},
-};
+use anyhow::{anyhow, bail, Error};
+use async_trait::async_trait;
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_fxfs::{CryptMarker, CryptProxy, KeyPurpose as FidlKeyPurpose};
+use fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, KEY_SIZE};
 
 pub struct RemoteCrypt {
     client: CryptProxy,

@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, format_err, Context as _, Error},
-    async_trait::async_trait,
-    fidl::endpoints::{create_proxy, create_request_stream},
-    fidl_fuchsia_wlan_common as wlan_common,
-    fidl_fuchsia_wlan_policy::{self as wlan_policy, NetworkConfig, SecurityType},
-    fuchsia_async::{Time, TimeoutExt as _},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon::Duration,
-    futures::TryStreamExt as _,
-};
+use anyhow::{bail, format_err, Context as _, Error};
+use async_trait::async_trait;
+use fidl::endpoints::{create_proxy, create_request_stream};
+use fidl_fuchsia_wlan_common as wlan_common;
+use fidl_fuchsia_wlan_policy::{self as wlan_policy, NetworkConfig, SecurityType};
+use fuchsia_async::{Time, TimeoutExt as _};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon::Duration;
+use futures::TryStreamExt as _;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_seconds(60);
 
@@ -185,10 +183,10 @@ async fn handle_scan(
 
 #[cfg(test)]
 mod tests {
-    use {
-        assert_matches::assert_matches, fuchsia_async as fasync, std::cell::Cell,
-        std::future::Future,
-    };
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use std::cell::Cell;
+    use std::future::Future;
 
     use super::*;
 

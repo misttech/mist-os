@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::expect::{expect_call, Status},
-    anyhow::Error,
-    fidl_fuchsia_bluetooth::Uuid as FidlUuid,
-    fidl_fuchsia_bluetooth_gatt::{
-        self as gatt, ReadByTypeResult, RemoteServiceMarker, RemoteServiceProxy,
-        RemoteServiceRequest, RemoteServiceRequestStream,
-    },
-    fuchsia_bluetooth::types::Uuid,
-    fuchsia_zircon::Duration,
+use crate::expect::{expect_call, Status};
+use anyhow::Error;
+use fidl_fuchsia_bluetooth::Uuid as FidlUuid;
+use fidl_fuchsia_bluetooth_gatt::{
+    self as gatt, ReadByTypeResult, RemoteServiceMarker, RemoteServiceProxy, RemoteServiceRequest,
+    RemoteServiceRequestStream,
 };
+use fuchsia_bluetooth::types::Uuid;
+use fuchsia_zircon::Duration;
 
 /// Provides a simple mock implementation of `fuchsia.bluetooth.gatt.RemoteService`.
 pub struct RemoteServiceMock {
@@ -55,7 +53,8 @@ impl RemoteServiceMock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {crate::timeout_duration, futures::join};
+    use crate::timeout_duration;
+    use futures::join;
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_expect_read_by_type() {

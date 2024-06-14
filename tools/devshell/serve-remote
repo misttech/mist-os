@@ -145,6 +145,11 @@ if "${serve}"; then
       fx-command-help
       exit 1
     fi
+  else
+    if ! ssh "${host}" ls "${dir}"/.jiri_root/bin/fx; then
+       fx-error "failed to find ${dir} on $host"
+      exit 1
+    fi
   fi
 fi
 

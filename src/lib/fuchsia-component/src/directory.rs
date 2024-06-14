@@ -9,9 +9,8 @@
 
 use anyhow::{Context, Error};
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_io as fio;
-use fuchsia_zircon as zx;
 use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// A trait for opening filesystem nodes.
 pub trait Directory {
@@ -146,7 +145,9 @@ mod tests {
     use crate::client::test_util::run_directory_server;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
-    use vfs::{directory::immutable::simple, file::vmo::read_only, pseudo_directory};
+    use vfs::directory::immutable::simple;
+    use vfs::file::vmo::read_only;
+    use vfs::pseudo_directory;
 
     #[fasync::run_singlethreaded(test)]
     async fn open_directory_no_describe_real() {

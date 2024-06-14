@@ -167,7 +167,9 @@ class MetricsProcessorsSet(MetricsProcessor):
     def __init__(self, sub_processors: Sequence[MetricsProcessor]):
         self.sub_processors = sub_processors
 
-    def process_metrics(self, model: trace_model.Model) -> list[TestCaseResult]:
+    def process_metrics(
+        self, model: trace_model.Model
+    ) -> Sequence[TestCaseResult]:
         results: list[TestCaseResult] = []
         _LOGGER.info(
             f"Combining metrics from {len(self.sub_processors)} subprocessors..."

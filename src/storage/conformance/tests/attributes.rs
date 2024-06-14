@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    assert_matches::assert_matches,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    io_conformance_util::{test_harness::TestHarness, *},
-};
+use assert_matches::assert_matches;
+use io_conformance_util::test_harness::TestHarness;
+use io_conformance_util::*;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn set_attr_file_with_sufficient_rights() {

@@ -6,15 +6,11 @@
 
 // TODO(ctiller): merge this implementation with the implementation in zircon_handle?
 
-use super::{
-    on_signals::OnSignalsRef, Handle, HandleDisposition, HandleInfo, MessageBuf, MessageBufEtc,
-    Signals,
-};
+use super::on_signals::OnSignalsRef;
+use super::{Handle, HandleDisposition, HandleInfo, MessageBuf, MessageBufEtc, Signals};
 use fuchsia_zircon_status as zx_status;
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 /// An I/O object representing a `Channel`.
 pub struct Channel {
@@ -228,10 +224,8 @@ impl<'a> futures::Future for RecvEtcMsg<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::super::Channel;
-    use super::super::{Handle, HandleDisposition, HandleOp, ObjectType, Rights, Status};
-    use super::Channel as AsyncChannel;
-    use super::{MessageBuf, MessageBufEtc};
+    use super::super::{Channel, Handle, HandleDisposition, HandleOp, ObjectType, Rights, Status};
+    use super::{Channel as AsyncChannel, MessageBuf, MessageBufEtc};
     use futures::executor::block_on;
     use futures::task::noop_waker_ref;
     use std::future::Future;

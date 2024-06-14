@@ -187,7 +187,7 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
 
   // Grab a copy of the ticks to mono ratio; we need this to initialize the
   // constants window.
-  affine::Ratio ticks_to_mono_ratio = platform_get_ticks_to_time_ratio();
+  affine::Ratio ticks_to_mono_ratio = timer_get_ticks_to_time_ratio();
 
   // At this point in time, we absolutely must know the rate that our tick
   // counter is ticking at.  If we don't, then something has gone horribly
@@ -233,7 +233,8 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
   fasttime::internal::TimeValues values = {
       .version = 1,
       .ticks_per_second = per_second,
-      .raw_ticks_to_ticks_offset = platform_get_raw_ticks_to_ticks_offset(),
+      .boot_ticks_offset = timer_get_boot_ticks_offset(),
+      .mono_ticks_offset = timer_get_mono_ticks_offset(),
       .ticks_to_mono_numerator = ticks_to_mono_ratio.numerator(),
       .ticks_to_mono_denominator = ticks_to_mono_ratio.denominator(),
       .usermode_can_access_ticks = usermode_can_access_ticks,
@@ -360,6 +361,15 @@ const VDso* VDso::Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles,
        ++v)
     vdso->CreateVariant(static_cast<Variant>(v), &vmo_kernel_handles[v]);
 
+  // Map and pin the time values VMO for each variant. We do this after having created all of the
+  // variants to avoid any issues with pinning pages in a VMO prior to snapshotting it.
+  for (size_t v = static_cast<size_t>(Variant::STABLE); v < static_cast<size_t>(Variant::COUNT);
+       ++v) {
+    Variant var = static_cast<Variant>(v);
+    zx_status_t status = vdso->MapTimeValuesVmo(var, vdso->variant_vmo_[variant_index(var)]->vmo());
+    ASSERT(status == ZX_OK);
+  }
+
   instance_ = vdso;
   return instance_;
 }
@@ -385,6 +395,30 @@ void VDso::CreateTimeValuesVmo(KernelHandle<VmObjectDispatcher>* time_values_han
   status =
       time_values_handle->dispatcher()->set_name(kTimeValuesVmoName, strlen(kTimeValuesVmoName));
   ASSERT(status == ZX_OK);
+}
+
+void VDso::AddMonotonicTicksOffset(zx_ticks_t additional) {
+  for (auto time_values : instance_->time_values_) {
+    // TODO(https://fxbug.dev/341785588): This code should be made resilient to a changing
+    // mono_ticks_offset once we start pausing the clock during system suspension.
+    time_values->mono_ticks_offset.fetch_add(additional, ktl::memory_order_relaxed);
+  }
+}
+
+zx_status_t VDso::MapTimeValuesVmo(Variant variant, const fbl::RefPtr<VmObject>& vdso_vmo) {
+  size_t variant_idx = variant_index(variant);
+  zx_status_t status = variant_time_mappings_[variant_idx].Init(
+      vdso_vmo, VDSO_DATA_TIME_VALUES, VDSO_DATA_TIME_VALUES_SIZE, "vdso time values");
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // Store the pointer to the actual TimeValues structure to avoid having to call base_locking every
+  // time. We can do this because the mappings are not changed once created.
+  time_values_[variant_index(variant)] = reinterpret_cast<fasttime::internal::TimeValues*>(
+      variant_time_mappings_[variant_idx].base_locking());
+
+  return ZX_OK;
 }
 
 // Each vDSO variant VMO is made via a COW clone of the next vDSO

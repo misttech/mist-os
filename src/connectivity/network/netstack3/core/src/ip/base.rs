@@ -6,45 +6,40 @@
 
 use core::sync::atomic::AtomicU16;
 
-use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess},
-    relation::LockBefore,
-    wrap::prelude::*,
+use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess};
+use lock_order::relation::LockBefore;
+use log::trace;
+use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
+use net_types::{MulticastAddr, SpecifiedAddr};
+use netstack3_base::socket::SocketIpAddr;
+use netstack3_base::{CounterContext, TokenBucket, WeakDeviceIdentifier};
+use netstack3_datagram as datagram;
+use netstack3_device::{DeviceId, WeakDeviceId};
+use netstack3_icmp_echo::{
+    self as icmp_echo, IcmpEchoBoundStateContext, IcmpEchoContextMarker,
+    IcmpEchoIpTransportContext, IcmpEchoStateContext, IcmpSocketId, IcmpSocketSet, IcmpSocketState,
+    IcmpSockets,
 };
-use net_types::{
-    ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
-    MulticastAddr, SpecifiedAddr,
+use netstack3_ip::device::{self, IpDeviceBindingsContext, IpDeviceIpExt};
+use netstack3_ip::icmp::{
+    self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
+    Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
 };
-use netstack3_base::{
-    AnyDevice, CounterContext, DeviceIdContext, TokenBucket, UninstantiableWrapper,
-    WeakDeviceIdentifier,
+use netstack3_ip::raw::RawIpSocketMap;
+use netstack3_ip::{
+    self as ip, ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext,
+    IpLayerContext, IpLayerIpExt, IpPacketFragmentCache, IpStateContext, IpStateInner,
+    IpTransportContext, IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache,
+    PmtuContext, ResolveRouteError, ResolvedRoute, TransparentLocalDelivery, TransportReceiveError,
 };
+use netstack3_tcp::TcpIpTransportContext;
+use netstack3_udp::UdpIpTransportContext;
 use packet::BufferMut;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
-use tracing::trace;
 
-use crate::{
-    device::{DeviceId, WeakDeviceId},
-    ip::{
-        self,
-        device::{self, IpDeviceBindingsContext, IpDeviceIpExt},
-        icmp::{
-            self, IcmpIpTransportContext, IcmpRxCounters, IcmpSocketId, IcmpSocketSet,
-            IcmpSocketState, IcmpSockets, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
-            Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
-        },
-        raw::RawIpSocketMap,
-        ForwardingTable, FragmentContext, IpCounters, IpDeviceStateContext,
-        IpForwardingDeviceContext, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
-        IpPacketFragmentCache, IpStateContext, IpStateInner, IpTransportContext,
-        IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
-        ResolveRouteError, TransparentLocalDelivery, TransportReceiveError,
-    },
-    routes::ResolvedRoute,
-    socket::{datagram, SocketIpAddr},
-    transport::{tcp::TcpIpTransportContext, udp::UdpIpTransportContext},
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 impl<I, BT, L> FragmentContext<I, BT> for CoreCtx<'_, BT, L>
 where
@@ -211,21 +206,15 @@ impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::Ip
     }
 }
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I, BC, L> IpStateContext<I, BC> for CoreCtx<'_, BC, L>
 where
     I: IpLayerIpExt,
     BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::IpStateRoutingTable<I>>,
-
-    // These bounds ensure that we can fulfill all the traits for the associated
-    // type `IpDeviceIdCtx` below and keep the compiler happy where we don't
-    // have implementations that are generic on Ip.
-    for<'a> CoreCtx<'a, BC, crate::lock_ordering::IpStateRoutingTable<I>>:
-        DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-            + IpForwardingDeviceContext<I>
-            + IpDeviceStateContext<I, BC>,
 {
-    type IpDeviceIdCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IpStateRoutingTable<I>>;
+    type IpDeviceIdCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRoutingTable<I>>>;
 
     fn with_ip_routing_table<
         O,
@@ -381,8 +370,7 @@ impl<
             + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv4>>,
     > InnerIcmpContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
-    type IpSocketsCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpBoundMap<Ipv4>>;
-    type DualStackContext = UninstantiableWrapper<Self>;
+    type EchoTransportContext = IcmpEchoIpTransportContext;
 
     fn receive_icmp_error(
         &mut self,
@@ -445,21 +433,6 @@ impl<
         }
     }
 
-    fn with_icmp_ctx_and_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::BoundSockets<Ipv4, Self::WeakDeviceId, BC>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut sockets, mut core_ctx) =
-            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<Ipv4>>();
-        cb(&mut core_ctx, &mut sockets)
-    }
-
     fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<BC::Instant>) -> O>(
         &mut self,
         cb: F,
@@ -475,8 +448,8 @@ impl<
             + LockBefore<crate::lock_ordering::UdpAllSocketsSet<Ipv6>>,
     > InnerIcmpContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
-    type IpSocketsCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpBoundMap<Ipv6>>;
-    type DualStackContext = UninstantiableWrapper<Self>;
+    type EchoTransportContext = IcmpEchoIpTransportContext;
+
     fn receive_icmp_error(
         &mut self,
         bindings_ctx: &mut BC,
@@ -538,21 +511,6 @@ impl<
         }
     }
 
-    fn with_icmp_ctx_and_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut icmp::BoundSockets<Ipv6, Self::WeakDeviceId, BC>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut sockets, mut core_ctx) =
-            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<Ipv6>>();
-        cb(&mut core_ctx, &mut sockets)
-    }
-
     fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<BC::Instant>) -> O>(
         &mut self,
         cb: F,
@@ -563,16 +521,14 @@ impl<
 
 impl<L, BC: BindingsContext> icmp::IcmpStateContext for CoreCtx<'_, BC, L> {}
 
+impl<BT: BindingsTypes, L> IcmpEchoContextMarker for CoreCtx<'_, BT, L> {}
+
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<
-        I,
-        BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<I>>
-            + LockBefore<crate::lock_ordering::TcpDemux<I>>
-            + LockBefore<crate::lock_ordering::UdpBoundMap<I>>,
-    > icmp::IcmpSocketStateContext<I, BC> for CoreCtx<'_, BC, L>
+impl<I, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<I>>>
+    IcmpEchoStateContext<I, BC> for CoreCtx<'_, BC, L>
 {
-    type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpSocketState<I>>;
+    type SocketStateCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IcmpSocketState<I>>>;
 
     fn with_all_sockets_mut<O, F: FnOnce(&mut IcmpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
         &mut self,
@@ -622,7 +578,7 @@ impl<
         &mut self,
         cb: F,
     ) -> O {
-        cb(&mut self.cast_locked())
+        cb(&mut self.cast_locked::<crate::lock_ordering::IcmpSocketState<I>>())
     }
 
     fn for_each_socket<
@@ -645,6 +601,27 @@ impl<
             let mut restricted = restricted.cast_core_ctx();
             cb(&mut restricted, &id, &socket_state);
         });
+    }
+}
+
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<I, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpBoundMap<I>>>
+    IcmpEchoBoundStateContext<I, BC> for CoreCtx<'_, BC, L>
+{
+    type IpSocketsCtx<'a> = CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IcmpBoundMap<I>>>;
+    fn with_icmp_ctx_and_sockets_mut<
+        O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut icmp_echo::BoundSockets<I, Self::WeakDeviceId, BC>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (mut sockets, mut core_ctx) =
+            self.write_lock_and::<crate::lock_ordering::IcmpBoundMap<I>>();
+        cb(&mut core_ctx, &mut sockets)
     }
 }
 
@@ -709,18 +686,19 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
 }
 
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
-    DelegatedOrderedLockAccess<icmp::BoundSockets<I, WeakDeviceId<BT>, BT>> for StackState<BT>
+    DelegatedOrderedLockAccess<icmp_echo::BoundSockets<I, WeakDeviceId<BT>, BT>>
+    for StackState<BT>
 {
     type Inner = IcmpSockets<I, WeakDeviceId<BT>, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
-        &self.inner_icmp_state().sockets
+        &self.transport.icmp_echo_state()
     }
 }
 
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     for crate::lock_ordering::IcmpBoundMap<I>
 {
-    type Data = icmp::BoundSockets<I, WeakDeviceId<BT>, BT>;
+    type Data = icmp_echo::BoundSockets<I, WeakDeviceId<BT>, BT>;
 }
 
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
@@ -728,7 +706,7 @@ impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
 {
     type Inner = IcmpSockets<I, WeakDeviceId<BT>, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
-        &self.inner_icmp_state().sockets
+        &self.transport.icmp_echo_state()
     }
 }
 
@@ -741,7 +719,7 @@ impl<I: datagram::DualStackIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>
 impl<I: datagram::DualStackIpExt, BT: BindingsTypes>
     DelegatedOrderedLockAccess<IpMarked<I, TokenBucket<BT::Instant>>> for StackState<BT>
 {
-    type Inner = IcmpState<I, WeakDeviceId<BT>, BT>;
+    type Inner = IcmpState<I, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
         self.inner_icmp_state()
     }

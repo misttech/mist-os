@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{metrics::Metrics, puppet::DiffType},
-    anyhow::{bail, format_err, Error},
-    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-    diagnostics_hierarchy::{
-        ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram,
-        Property as iProperty,
-    },
-    fidl_diagnostics_validate::{self as validate, Value},
-    inspect_format::{ArrayFormat, BlockIndex, LinkNodeDisposition},
-    num_derive::{FromPrimitive, ToPrimitive},
-    num_traits::Zero,
-    std::{
-        clone::Clone,
-        collections::{HashMap, HashSet},
-    },
+use crate::metrics::Metrics;
+use crate::puppet::DiffType;
+use anyhow::{bail, format_err, Error};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
+use diagnostics_hierarchy::{
+    ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram,
+    Property as iProperty,
 };
+use fidl_diagnostics_validate::{self as validate, Value};
+use inspect_format::{ArrayFormat, BlockIndex, LinkNodeDisposition};
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::Zero;
+use std::clone::Clone;
+use std::collections::{HashMap, HashSet};
 
 mod scanner;
 pub use scanner::Scanner;
@@ -1282,13 +1280,11 @@ impl From<DiagnosticsHierarchy> for Data {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::*,
-        fidl_diagnostics_validate::{ValueType, ROOT_ID},
-        fuchsia_inspect::reader::ArrayContent as iArrayContent,
-        inspect_format::BlockType,
-    };
+    use super::*;
+    use crate::*;
+    use fidl_diagnostics_validate::{ValueType, ROOT_ID};
+    use fuchsia_inspect::reader::ArrayContent as iArrayContent;
+    use inspect_format::BlockType;
 
     #[fuchsia::test]
     fn test_basic_data_strings() -> Result<(), Error> {

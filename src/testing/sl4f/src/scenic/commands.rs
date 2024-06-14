@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::scenic::{facade::ScenicFacade, types::ScenicMethod};
+use crate::scenic::facade::ScenicFacade;
+use crate::scenic::types::ScenicMethod;
 use crate::server::Facade;
 use anyhow::Error;
 use async_trait::async_trait;

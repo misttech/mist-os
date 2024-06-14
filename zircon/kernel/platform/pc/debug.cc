@@ -321,15 +321,6 @@ void X86UartInitLate() {
   }
 }
 
-void pc_suspend_debug() { output_enabled = false; }
-
-void pc_resume_debug() {
-  if (platform_serial_enabled()) {
-    init_uart();
-    output_enabled = true;
-  }
-}
-
 // This is called when the FIFO is detected to be empty. So we can write an
 // entire FIFO's worth of bytes. Much more efficient than writing 1 byte
 // at a time (and then checking for FIFO to drain).

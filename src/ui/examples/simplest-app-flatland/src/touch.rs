@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::internal_message::*,
-    fidl_fuchsia_ui_pointer::{
-        self as fptr, TouchEvent, TouchInteractionId, TouchInteractionStatus, TouchResponse,
-    },
-    fuchsia_async as fasync,
-    futures::channel::mpsc::UnboundedSender,
-    std::{collections::HashMap, slice::Iter},
-    tracing::*,
+use crate::internal_message::*;
+use fidl_fuchsia_ui_pointer::{
+    self as fptr, TouchEvent, TouchInteractionId, TouchInteractionStatus, TouchResponse,
 };
+use fuchsia_async as fasync;
+use futures::channel::mpsc::UnboundedSender;
+use std::collections::HashMap;
+use std::slice::Iter;
+use tracing::*;
 
 /// Generate a vector of responses to the input `TouchEvents`, as required by
 /// `fuchsia.ui.pointer.TouchSource.Watch()`.

@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    byteorder::{LittleEndian, ReadBytesExt},
-    serde::{Deserialize, Serialize},
-    std::collections::HashMap,
-    std::fmt,
-    std::io::{Cursor, Read, Seek, SeekFrom},
-    std::str,
-    thiserror::Error,
-    tracing::info,
-};
+use anyhow::{Error, Result};
+use byteorder::{LittleEndian, ReadBytesExt};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::{fmt, str};
+use thiserror::Error;
+use tracing::info;
 
 const FVM_MAGIC: u64 = 0x54524150204d5646;
 const FVM_VERSION: u64 = 0x00000001;

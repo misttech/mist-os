@@ -2,23 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    any::{self, Any, TypeId},
-    fmt,
-    rc::Rc,
-};
+use std::any::{self, Any, TypeId};
+use std::fmt;
+use std::rc::Rc;
 
-use crate::{
-    animation::Loop,
-    artboard::Artboard,
-    draw_target::DrawTargetPlacement,
-    importers::ImportStack,
-    shapes::{
-        paint::{BlendMode, Color32, StrokeCap, StrokeJoin},
-        FillRule,
-    },
-    StatusCode,
-};
+use crate::animation::Loop;
+use crate::artboard::Artboard;
+use crate::draw_target::DrawTargetPlacement;
+use crate::importers::ImportStack;
+use crate::shapes::paint::{BlendMode, Color32, StrokeCap, StrokeJoin};
+use crate::shapes::FillRule;
+use crate::StatusCode;
 
 mod binary_reader;
 mod object;

@@ -16,6 +16,8 @@
 
 #include <memory>
 
+#include "src/developer/forensics/exceptions/handler/wake_lease.h"
+
 namespace forensics {
 namespace exceptions {
 namespace handler {
@@ -24,7 +26,7 @@ namespace handler {
 class CrashReporter : public fuchsia::exception::internal::CrashReporter {
  public:
   CrashReporter(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
-                zx::duration component_lookup_timeout, bool suspend_enabled);
+                zx::duration component_lookup_timeout, std::unique_ptr<WakeLeaseBase> wake_lease);
 
   // |fuchsia::exception::internal::CrashReporter|
   virtual void Send(zx::exception exception, zx::process crashed_proces, zx::thread crashed_thread,
@@ -35,6 +37,7 @@ class CrashReporter : public fuchsia::exception::internal::CrashReporter {
   async::Executor executor_;
   std::shared_ptr<sys::ServiceDirectory> services_;
   zx::duration component_lookup_timeout_;
+  std::unique_ptr<WakeLeaseBase> wake_lease_;
 };
 
 }  // namespace handler

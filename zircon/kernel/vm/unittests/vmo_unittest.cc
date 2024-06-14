@@ -1514,6 +1514,71 @@ static bool vmo_clones_of_compressed_pages_test() {
   END_TEST;
 }
 
+// Test that CoW clones mapped into the kernel behave correctly if a 'parent' page gets compressed.
+static bool vmo_clone_kernel_mapped_compressed_test() {
+  BEGIN_TEST;
+
+  // Need a compressor.
+  auto compression = pmm_page_compression();
+  if (!compression) {
+    END_TEST;
+  }
+
+  auto compressor = compression->AcquireCompressor();
+
+  AutoVmScannerDisable scanner_disable;
+
+  // Create a VMO and write to its page to commit it.
+  fbl::RefPtr<VmObjectPaged> vmo;
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE, &vmo);
+  ASSERT_OK(status);
+
+  uint64_t data = 42;
+  EXPECT_OK(vmo->Write(&data, 0, sizeof(data)));
+
+  // Now create a child of the VMO and fork the page into it.
+  fbl::RefPtr<VmObject> clone;
+  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
+                             &clone));
+  data = 41;
+  EXPECT_OK(clone->Write(&data, 0, sizeof(data)));
+
+  // Pin and map the clone into the kernel aspace.
+  PinnedVmObject pinned_vmo;
+  ASSERT_OK(PinnedVmObject::Create(clone, 0, PAGE_SIZE, true, &pinned_vmo));
+  fbl::RefPtr<VmMapping> mapping;
+  auto result = VmAspace::kernel_aspace()->RootVmar()->CreateVmMapping(
+      0, PAGE_SIZE, 0, VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE, clone, 0,
+      ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE, "pin clone map");
+  ASSERT_TRUE(result.is_ok());
+  mapping = ktl::move(result->mapping);
+  auto cleanup = fit::defer([&]() { mapping->Destroy(); });
+  ASSERT_OK(mapping->MapRange(0, PAGE_SIZE, true));
+  volatile uint64_t* ptr = reinterpret_cast<volatile uint64_t*>(result->base);
+
+  // Should be able to use ptr without a fault.
+  EXPECT_EQ(*ptr, 41u);
+
+  // Compress the parent page by reaching into the hidden VMO parent.
+  fbl::RefPtr<VmCowPages> hidden_root = vmo->DebugGetCowPages()->DebugGetParent();
+  ASSERT_NONNULL(hidden_root);
+  vm_page_t* page = hidden_root->DebugGetPage(0);
+  ASSERT_NONNULL(page);
+  ASSERT_OK(compressor.get().Arm());
+  // Attempt to reclaim the page in the hidden parent. As the clone is a fully committed and mapped
+  // VMO this should *not* cause any of its pages to be unmapped. If it did this violate the
+  // requirement that kernel mappings are always pinned and mapped.
+  uint64_t reclaimed =
+      reclaim_page(hidden_root, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
+  EXPECT_EQ(reclaimed, 1u);
+  page = nullptr;
+
+  // Should still be able to touch the ptr;
+  EXPECT_EQ(*ptr, 41u);
+
+  END_TEST;
+}
+
 static bool vmo_move_pages_on_access_test() {
   BEGIN_TEST;
 
@@ -2779,7 +2844,7 @@ static bool vmo_discardable_states_test() {
   auto cleanup_freed_list = fit::defer([&freed_list]() { pmm_free(&freed_list); });
 
   // Cannot discard when locked.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(&freed_list));
 
   // Unlock.
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
@@ -2788,7 +2853,7 @@ static bool vmo_discardable_states_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
 
   // Should be able to discard now.
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(&freed_list));
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsReclaimable());
@@ -2834,13 +2899,7 @@ static bool vmo_discardable_states_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
 
-  // Cannot discard if recently unlocked.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(ZX_TIME_INFINITE, &freed_list));
-  EXPECT_TRUE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsReclaimable());
-  EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
-  EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
-
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(&freed_list));
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsReclaimable());
@@ -2874,7 +2933,7 @@ static bool vmo_discard_test() {
   auto cleanup_freed_list = fit::defer([&freed_list]() { pmm_free(&freed_list); });
 
   // Cannot discard when locked.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(&freed_list));
   EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
 
   // Unlock.
@@ -2884,7 +2943,7 @@ static bool vmo_discard_test() {
   uint64_t reclamation_count = vmo->ReclamationEventCount();
 
   // Should be able to discard now.
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(&freed_list));
   EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
   EXPECT_GT(vmo->ReclamationEventCount(), reclamation_count);
   // Verify that the size is not affected.
@@ -2910,14 +2969,14 @@ static bool vmo_discard_test() {
   reclamation_count = vmo->ReclamationEventCount();
 
   // Cannot discard a vmo with pinned pages.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(&freed_list));
   EXPECT_EQ(kNewSize, vmo->size());
   EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
   EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   // Unpin the pages. Should be able to discard now.
   vmo->Unpin(0, kSize);
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(&freed_list));
   EXPECT_EQ(kNewSize, vmo->size());
   EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
   EXPECT_GT(vmo->ReclamationEventCount(), reclamation_count);
@@ -2927,15 +2986,11 @@ static bool vmo_discard_test() {
   EXPECT_EQ(ZX_OK, vmo->CommitRange(0, kNewSize));
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kNewSize));
 
-  // Cannot discard if recently unlocked.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(ZX_TIME_INFINITE, &freed_list));
-  EXPECT_EQ(kNewSize, vmo->GetAttributedMemory().uncompressed_bytes);
-
   // Cannot discard a non-discardable vmo.
   vmo.reset();
   status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, kSize, &vmo);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages(&freed_list));
   EXPECT_EQ(0u, vmo->ReclamationEventCount());
 
   END_TEST;
@@ -3000,7 +3055,7 @@ static bool vmo_discard_failure_test() {
 
   // Unlock and discard.
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(0, &freed_list));
+  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages(&freed_list));
   EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
   EXPECT_EQ(kSize, vmo->size());
 
@@ -3091,7 +3146,7 @@ static bool vmo_discardable_counts_test() {
       if (rand() % 2) {
         // Discarded pages won't show up under locked or unlocked counts.
         EXPECT_EQ(static_cast<uint64_t>(i + 1),
-                  vmos[i]->DebugGetCowPages()->DiscardPages(0, &freed_list));
+                  vmos[i]->DebugGetCowPages()->DiscardPages(&freed_list));
       } else {
         // Unlocked but not discarded.
         expected.unlocked += (i + 1);
@@ -3108,55 +3163,6 @@ static bool vmo_discardable_counts_test() {
   // might be higher than the expected counts.
   EXPECT_LE(expected.locked, counts.locked);
   EXPECT_LE(expected.unlocked, counts.unlocked);
-
-  END_TEST;
-}
-
-static bool vmo_discardable_not_compressible_test() {
-  BEGIN_TEST;
-
-  AutoVmScannerDisable scanner_disable;
-  // Need a working compressor.
-  auto compression = pmm_page_compression();
-  if (!compression) {
-    END_TEST;
-  }
-
-  auto compressor = compression->AcquireCompressor();
-
-  fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kDiscardable, PAGE_SIZE, &vmo);
-  ASSERT_EQ(ZX_OK, status);
-
-  // Commit the page.
-  EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE));
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
-
-  // Attempt to reclaim it.
-  EXPECT_OK(compressor.get().Arm());
-  vm_page_t* page;
-  status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
-  ASSERT_OK(status);
-  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
-            0u);
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
-
-  // Should also not be compressible when locked.
-  zx_vmo_lock_state_t lock_state = {};
-  EXPECT_OK(vmo->LockRange(0, PAGE_SIZE, &lock_state));
-
-  EXPECT_OK(compressor.get().Arm());
-  status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
-  ASSERT_OK(status);
-  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
-            0u);
-  EXPECT_TRUE((VmObject::AttributionCounts{.uncompressed_bytes = PAGE_SIZE}) ==
-              vmo->GetAttributedMemory());
-
-  EXPECT_OK(vmo->UnlockRange(0, PAGE_SIZE));
 
   END_TEST;
 }
@@ -3225,6 +3231,8 @@ static bool vmo_lookup_compressed_pages_test() {
 
 static bool vmo_write_does_not_commit_test() {
   BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
 
   // Create a vmo and commit a page to it.
   fbl::RefPtr<VmObjectPaged> vmo;
@@ -4329,6 +4337,99 @@ static bool vmo_prefetch_compressed_pages_test() {
   END_TEST;
 }
 
+// Check that committed ranges in children correctly have range updates skipped.
+static bool vmo_skip_range_update_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+  constexpr uint64_t kNumPages = 16;
+
+  fbl::RefPtr<VmObjectPaged> vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * kNumPages, &vmo));
+
+  EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE * kNumPages));
+
+  fbl::RefPtr<VmObject> child;
+  ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0u,
+                             PAGE_SIZE * kNumPages, false, &child));
+
+  // Fork some pages into the child to have some regions that should be able to avoid range updates.
+  for (auto page : {4, 5, 6, 10, 11, 12}) {
+    uint64_t data = 42;
+    EXPECT_OK(child->Write(&data, PAGE_SIZE * page, sizeof(data)));
+  }
+
+  // Create a user memory mapping to check if unmaps do and do not get performed.
+  ktl::unique_ptr<testing::UserMemory> user_memory = testing::UserMemory::Create(child, 0, 0);
+  ASSERT_TRUE(user_memory);
+
+  // Reach into the hidden parent so we can directly perform range updates.
+  fbl::RefPtr<VmCowPages> hidden_parent = vmo->DebugGetCowPages()->DebugGetParent();
+  ASSERT_TRUE(hidden_parent);
+
+  struct {
+    uint64_t page_start;
+    uint64_t num_pages;
+    ktl::array<int, kNumPages> unmapped;
+  } test_ranges[] = {
+      // Simple range that is not covered in the child should get unmapped
+      {0, 1, {0, -1}},
+      // Various ranges fully covered by the child should have no unmappings
+      {4, 1, {-1}},
+      {4, 3, {-1}},
+      {6, 1, {-1}},
+      // Ranges that partially touch a single committed range should get trimmed
+      {3, 2, {3, -1}},
+      {6, 2, {7, -1}},
+      // Range that spans a single gap that sees the parent should get trimmed at both ends to just
+      // that gap.
+      {4, 9, {7, 8, 9, -1}},
+      // Spanning across a committed range causes us to still have to unnecessarily unmap.
+      {3, 10, {3, 4, 5, 6, 7, 8, 9, -1}},
+      {4, 10, {7, 8, 9, 10, 11, 12, 13, -1}},
+      {3, 11, {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, -1}},
+  };
+
+  for (auto& range : test_ranges) {
+    // Ensure all the mappings start populated.
+    for (uint64_t i = 0; i < kNumPages; i++) {
+      user_memory->get<char>(i * PAGE_SIZE);
+      paddr_t paddr;
+      uint mmu_flags;
+      EXPECT_OK(user_memory->aspace()->arch_aspace().Query(user_memory->base() + i * PAGE_SIZE,
+                                                           &paddr, &mmu_flags));
+    }
+    // Perform the requested range update.
+    {
+      Guard<CriticalMutex> guard{hidden_parent->lock()};
+      hidden_parent->RangeChangeUpdateLocked(range.page_start * PAGE_SIZE,
+                                             range.num_pages * PAGE_SIZE,
+                                             VmCowPages::RangeChangeOp::Unmap);
+    }
+    // Check all the mappings are either there or not there as expected.
+    bool expected[kNumPages];
+    for (uint64_t i = 0; i < kNumPages; i++) {
+      expected[i] = true;
+    }
+    for (auto page : range.unmapped) {
+      // page of -1 is a sentinel as we cannot use the default 0 as sentinel.
+      if (page == -1) {
+        break;
+      }
+      expected[page] = false;
+    }
+    for (uint64_t i = 0; i < kNumPages; i++) {
+      paddr_t paddr;
+      uint mmu_flags;
+      zx_status_t status = user_memory->aspace()->arch_aspace().Query(
+          user_memory->base() + i * PAGE_SIZE, &paddr, &mmu_flags);
+      EXPECT_EQ(expected[i] ? ZX_OK : ZX_ERR_NOT_FOUND, status);
+    }
+  }
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vmo_tests)
 VM_UNITTEST(vmo_create_test)
 VM_UNITTEST(vmo_create_maximum_size)
@@ -4358,6 +4459,7 @@ VM_UNITTEST(vmo_lookup_slice_test)
 VM_UNITTEST(vmo_lookup_clone_test)
 VM_UNITTEST(vmo_clone_removes_write_test)
 VM_UNITTEST(vmo_clones_of_compressed_pages_test)
+VM_UNITTEST(vmo_clone_kernel_mapped_compressed_test)
 VM_UNITTEST(vmo_move_pages_on_access_test)
 VM_UNITTEST(vmo_eviction_hints_test)
 VM_UNITTEST(vmo_always_need_evicts_loaned_test)
@@ -4377,7 +4479,6 @@ VM_UNITTEST(vmo_discardable_states_test)
 VM_UNITTEST(vmo_discard_test)
 VM_UNITTEST(vmo_discard_failure_test)
 VM_UNITTEST(vmo_discardable_counts_test)
-VM_UNITTEST(vmo_discardable_not_compressible_test)
 VM_UNITTEST(vmo_lookup_compressed_pages_test)
 VM_UNITTEST(vmo_write_does_not_commit_test)
 VM_UNITTEST(vmo_stack_owned_loaned_pages_interval_test)
@@ -4393,6 +4494,7 @@ VM_UNITTEST(vmo_high_priority_reclaim_test)
 VM_UNITTEST(vmo_snapshot_modified_test)
 VM_UNITTEST(vmo_pin_race_loaned_test)
 VM_UNITTEST(vmo_prefetch_compressed_pages_test)
+VM_UNITTEST(vmo_skip_range_update_test)
 UNITTEST_END_TESTCASE(vmo_tests, "vmo", "VmObject tests")
 
 }  // namespace vm_unittest

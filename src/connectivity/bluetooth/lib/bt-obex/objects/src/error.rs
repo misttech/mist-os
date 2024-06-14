@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use thiserror::Error;
-use xml::{reader::Error as XmlReaderError, writer::Error as XmlWriterError};
+use xml::reader::Error as XmlReaderError;
+use xml::writer::Error as XmlWriterError;
 
 /// The error types for packet parsing.
 #[derive(Error, Debug)]

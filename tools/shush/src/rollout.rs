@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{fs::File, io::BufReader, path::Path};
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
 
 use anyhow::Result;
 
-use crate::{api::Api, issues::Issue};
+use crate::api::Api;
+use crate::issues::Issue;
 
 pub fn rollout(api: &mut (impl Api + ?Sized), rollout_path: &Path, verbose: bool) -> Result<()> {
     let created_issues =

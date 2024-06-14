@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_runtime::process_self,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Peered},
-    futures::{try_join, StreamExt, TryFutureExt, TryStreamExt},
-    std::ffi::CString,
-    tracing::warn,
-};
+use anyhow::{Context as _, Result};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_runtime::process_self;
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Peered};
+use futures::{try_join, StreamExt, TryFutureExt, TryStreamExt};
+use std::ffi::CString;
+use tracing::warn;
+use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync};
 
 struct Instrumentation {
     _collector: fuzz::CoverageDataCollectorProxy,

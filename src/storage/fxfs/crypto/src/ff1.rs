@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::UnwrappedKey,
-    aes::{
-        cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit},
-        Aes256,
-    },
-    byteorder::{BigEndian, ByteOrder},
-};
+use crate::UnwrappedKey;
+use aes::cipher::generic_array::GenericArray;
+use aes::cipher::{BlockEncrypt, KeyInit};
+use aes::Aes256;
+use byteorder::{BigEndian, ByteOrder};
 
 // This is a heavily specialized version of ff1 encryption as described in:
 // https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-38G.pdf.  This implementation
@@ -81,7 +78,8 @@ impl Ff1 {
 
 #[cfg(test)]
 mod tests {
-    use {super::Ff1, crate::UnwrappedKey};
+    use super::Ff1;
+    use crate::UnwrappedKey;
 
     #[test]
     fn test_ff1() {

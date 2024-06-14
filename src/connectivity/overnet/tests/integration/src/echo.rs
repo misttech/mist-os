@@ -7,16 +7,14 @@
 
 #![cfg(test)]
 
-use {
-    super::Overnet,
-    anyhow::{Context as _, Error},
-    fidl::prelude::*,
-    fidl_test_echo as echo,
-    fuchsia_async::Task,
-    futures::prelude::*,
-    overnet_core::NodeIdGenerator,
-    std::sync::Arc,
-};
+use super::Overnet;
+use anyhow::{Context as _, Error};
+use fidl::prelude::*;
+use fidl_test_echo as echo;
+use fuchsia_async::Task;
+use futures::prelude::*;
+use overnet_core::NodeIdGenerator;
+use std::sync::Arc;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Test scenarios

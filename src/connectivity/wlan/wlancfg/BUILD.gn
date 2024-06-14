@@ -233,6 +233,7 @@ rustc_fuzzer("fuzz_saved_networks_manager_store") {
     "//src/lib/fuzzing/rust:fuzz",
     "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:rand",
   ]
 }
 

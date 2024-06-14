@@ -350,11 +350,9 @@ impl SafeIntegerConversion for u32 {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use {
-        super::*,
-        std::io::{Cursor, Read as _, Seek as _, SeekFrom, Write as _},
-        zerocopy::AsBytes as _,
-    };
+    use super::*;
+    use std::io::{Cursor, Read as _, Seek as _, SeekFrom, Write as _};
+    use zerocopy::AsBytes as _;
 
     pub(crate) fn example_archive() -> Vec<u8> {
         let mut b: Vec<u8> = vec![0; 16384];

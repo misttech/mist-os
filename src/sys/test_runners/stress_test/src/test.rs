@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Result},
-    fidl::endpoints::create_proxy,
-    fidl::Error as FidlError,
-    fidl_fuchsia_component::{CreateChildArgs, RealmMarker, RealmProxy},
-    fidl_fuchsia_component_decl::{Child, ChildRef, CollectionRef, StartupMode},
-    fidl_fuchsia_component_runner::ComponentNamespaceEntry,
-    fidl_fuchsia_data::{DictionaryEntry, DictionaryValue},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_stresstest::{ActorMarker, ActorProxy, Error},
-    fuchsia_async::{Task, TimeoutExt},
-    fuchsia_component::client::connect_to_protocol_at_dir_root,
-    futures::FutureExt,
-    rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng},
-    std::str::FromStr,
-    std::time::Duration,
-    tracing::{debug, info},
-};
+use anyhow::{format_err, Context, Result};
+use fidl::endpoints::create_proxy;
+use fidl::Error as FidlError;
+use fidl_fuchsia_component::{CreateChildArgs, RealmMarker, RealmProxy};
+use fidl_fuchsia_component_decl::{Child, ChildRef, CollectionRef, StartupMode};
+use fidl_fuchsia_component_runner::ComponentNamespaceEntry;
+use fidl_fuchsia_data::{DictionaryEntry, DictionaryValue};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_stresstest::{ActorMarker, ActorProxy, Error};
+use fuchsia_async::{Task, TimeoutExt};
+use fuchsia_component::client::connect_to_protocol_at_dir_root;
+use futures::FutureExt;
+use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
+use std::str::FromStr;
+use std::time::Duration;
+use tracing::{debug, info};
 
 /// Stress tests assume that this collection exists and actors can be created in it.
 static ACTOR_COLLECTION_NAME: &'static str = "actors";

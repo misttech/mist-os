@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        retained::RetainedIndex,
-        writing::{CleanupGuard, WritingIndex},
-    },
-    fidl_fuchsia_pkg as fpkg,
-    fuchsia_hash::Hash,
-    fuchsia_inspect as finspect,
-    futures::future::{BoxFuture, FutureExt as _},
-    std::{collections::HashSet, sync::Arc},
-};
+use super::retained::RetainedIndex;
+use super::writing::{CleanupGuard, WritingIndex};
+use fuchsia_hash::Hash;
+use futures::future::{BoxFuture, FutureExt as _};
+use std::collections::HashSet;
+use std::sync::Arc;
+use {fidl_fuchsia_pkg as fpkg, fuchsia_inspect as finspect};
 
 /// The index of packages known to pkg-cache.
 #[derive(Clone, Debug)]
@@ -160,7 +156,9 @@ pub async fn set_retained_index(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, maplit::hashmap};
+    use super::*;
+    use assert_matches::assert_matches;
+    use maplit::hashmap;
 
     fn hash(n: u8) -> Hash {
         Hash::from([n; 32])

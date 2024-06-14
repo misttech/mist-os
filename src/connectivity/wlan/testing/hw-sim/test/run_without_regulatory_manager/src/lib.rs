@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::{create_endpoints, create_proxy},
-    fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_component::client::connect_to_protocol_at,
-    std::pin::pin,
-    wlan_hw_sim::{event::action, *},
-};
+use fidl::endpoints::{create_endpoints, create_proxy};
+use fidl_fuchsia_wlan_policy as fidl_policy;
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_component::client::connect_to_protocol_at;
+use std::pin::pin;
+use wlan_hw_sim::event::action;
+use wlan_hw_sim::*;
 
 /// Test that we can connect to the policy service to discover a client interface when the
 /// RegulatoryRegionWatcher cannot be reached.

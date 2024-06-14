@@ -3,36 +3,30 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use bt_avdtp as avdtp;
 use fidl_fuchsia_bluetooth_bredr::{
     self as bredr, ChannelParameters, ProfileDescriptor, ProfileProxy,
 };
-use fuchsia_async as fasync;
-use fuchsia_bluetooth::{
-    detachable_map::{DetachableMap, DetachableWeak},
-    inspect::DebugExt,
-    types::{Channel, PeerId},
-};
+use fuchsia_bluetooth::detachable_map::{DetachableMap, DetachableWeak};
+use fuchsia_bluetooth::inspect::DebugExt;
+use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::{mpsc, oneshot},
-    stream::{Stream, StreamExt},
-    task::{Context, Poll},
-    Future, FutureExt, TryFutureExt,
-};
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    pin::Pin,
-    sync::Arc,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::stream::{Stream, StreamExt};
+use futures::task::{Context, Poll};
+use futures::{Future, FutureExt, TryFutureExt};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::pin::Pin;
+use std::sync::Arc;
 use tracing::{info, warn};
+use {bt_avdtp as avdtp, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::codec::CodecNegotiation;
+use crate::peer::Peer;
+use crate::permits::Permits;
 use crate::stream::StreamsBuilder;
-use crate::{peer::Peer, permits::Permits};
 
 /// Statistics node for tracking various information about a peer that has been encountered.
 /// Typically used as an inspect tree node.

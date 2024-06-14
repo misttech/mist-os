@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_componentmanager_test as ftest;
-use fuchsia_async as fasync;
 use fuchsia_component::client;
 use fuchsia_zircon::{Rights, Signals};
 use tracing::*;
+use {fidl_componentmanager_test as ftest, fuchsia_async as fasync};
 
 #[fuchsia::main(logging_minimum_severity = "warn")]
 async fn main() {

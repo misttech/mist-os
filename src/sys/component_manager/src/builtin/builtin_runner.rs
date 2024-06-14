@@ -5,32 +5,34 @@
 use async_trait::async_trait;
 use cm_config::SecurityPolicy;
 use cm_util::TaskGroup;
-use elf_runner::{crash_info::CrashRecords, process_launcher::NamespaceConnector};
+use elf_runner::crash_info::CrashRecords;
+use elf_runner::process_launcher::NamespaceConnector;
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_runner as fcrunner;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_memory_attribution as fattribution;
-use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Clock};
-use futures::{future::BoxFuture, Future, FutureExt, TryStreamExt};
+use futures::future::BoxFuture;
+use futures::{Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
-use sandbox::{Capability, CapabilityTrait, Dict, Open};
-use std::sync::Arc;
+use sandbox::{Capability, Dict, Open, RemotableCapability};
+use std::sync::{Arc, Weak};
 use thiserror::Error;
 use tracing::warn;
-use vfs::{directory::entry::OpenRequest, execution_scope::ExecutionScope, service::endpoint};
+use vfs::directory::entry::OpenRequest;
+use vfs::execution_scope::ExecutionScope;
+use vfs::service::endpoint;
 use zx::{AsHandleRef, HandleBased, Task};
-
-use crate::{
-    builtin::runner::BuiltinRunnerFactory,
-    model::component::WeakComponentInstance,
-    model::token::{InstanceRegistry, InstanceToken},
-    sandbox_util,
-    sandbox_util::LaunchTaskOnReceive,
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
+    fuchsia_async as fasync,
 };
+
+use crate::builtin::runner::BuiltinRunnerFactory;
+use crate::model::component::{WeakComponentInstance, WeakExtendedInstance};
+use crate::model::token::{InstanceRegistry, InstanceToken};
+use crate::sandbox_util;
+use crate::sandbox_util::LaunchTaskOnReceive;
 
 const TYPE: &str = "type";
 const SVC: &str = "svc";
@@ -229,6 +231,7 @@ impl ElfRunnerProgram {
 
         let inner_clone = inner.clone();
         let elf_runner = Arc::new(LaunchTaskOnReceive::new(
+            WeakExtendedInstance::AboveRoot(Weak::new()),
             task_group.as_weak(),
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
             None,
@@ -244,6 +247,7 @@ impl ElfRunnerProgram {
 
         let inner_clone = inner.clone();
         let snapshot_provider = Arc::new(LaunchTaskOnReceive::new(
+            WeakExtendedInstance::AboveRoot(Weak::new()),
             task_group.as_weak(),
             fattribution::ProviderMarker::PROTOCOL_NAME,
             None,
@@ -361,13 +365,12 @@ mod tests {
     use moniker::Moniker;
     use sandbox::Directory;
     use serve_processargs::NamespaceBuilder;
-    use vfs::{path::Path as VfsPath, ToObjectRequest};
+    use vfs::path::Path as VfsPath;
+    use vfs::ToObjectRequest;
 
-    use crate::{
-        bedrock::program::{Program, StartInfo},
-        model::escrow::EscrowedState,
-        runner::RemoteRunner,
-    };
+    use crate::bedrock::program::{Program, StartInfo};
+    use crate::model::escrow::EscrowedState;
+    use crate::runner::RemoteRunner;
 
     use super::*;
 

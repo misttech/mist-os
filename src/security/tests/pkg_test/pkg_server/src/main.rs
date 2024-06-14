@@ -2,36 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    argh::{from_env, FromArgs},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio,
-    fidl_test_security_pkg::{PackageServer_Request, PackageServer_RequestStream},
-    fuchsia_async::{net::TcpListener, Task},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_fs::{directory, file},
-    fuchsia_hyper::{Executor, TcpStream},
-    futures::{
-        channel::oneshot::{channel, Receiver},
-        stream::{Stream, StreamExt, TryStreamExt},
-        FutureExt,
-    },
-    hyper::{
-        server::{accept::from_stream, Server},
-        service::{make_service_fn, service_fn},
-        Body, Method, Request, Response, StatusCode,
-    },
-    rustls::{Certificate, NoClientAuth, ServerConfig},
-    std::{
-        net::{IpAddr, Ipv4Addr, SocketAddr},
-        pin::Pin,
-        sync::Arc,
-    },
-    tokio::io::{AsyncRead, AsyncWrite},
-    tokio_rustls::TlsAcceptor,
-    tracing::{info, warn},
-};
+use anyhow::{Error, Result};
+use argh::{from_env, FromArgs};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
+use fidl_test_security_pkg::{PackageServer_Request, PackageServer_RequestStream};
+use fuchsia_async::net::TcpListener;
+use fuchsia_async::Task;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_fs::{directory, file};
+use fuchsia_hyper::{Executor, TcpStream};
+use futures::channel::oneshot::{channel, Receiver};
+use futures::stream::{Stream, StreamExt, TryStreamExt};
+use futures::FutureExt;
+use hyper::server::accept::from_stream;
+use hyper::server::Server;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Method, Request, Response, StatusCode};
+use rustls::{Certificate, NoClientAuth, ServerConfig};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::pin::Pin;
+use std::sync::Arc;
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio_rustls::TlsAcceptor;
+use tracing::{info, warn};
 
 /// Flags for pkg_server.
 #[derive(FromArgs, Debug, PartialEq)]

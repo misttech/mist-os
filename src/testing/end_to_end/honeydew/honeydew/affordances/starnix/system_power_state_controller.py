@@ -219,22 +219,6 @@ class SystemPowerStateController(
                 logs_duration=logs_duration,
             )
 
-    def idle_suspend_auto_resume(self, verify: bool = True) -> None:
-        """Perform idle-suspend and auto-resume operation on the device.
-
-        Args:
-            verify: Whether or not to verify if suspend-resume operation
-                performed successfully. Optional and default is True.
-
-        Raises:
-            errors.SystemPowerStateControllerError: In case of failure
-        """
-        self.suspend_resume(
-            suspend_state=system_power_state_controller_interface.IdleSuspend(),
-            resume_mode=system_power_state_controller_interface.AutomaticResume(),
-            verify=verify,
-        )
-
     def idle_suspend_timer_based_resume(
         self, duration: int, verify: bool = True
     ) -> None:
@@ -285,25 +269,10 @@ class SystemPowerStateController(
 
         if not isinstance(
             resume_mode,
-            (
-                system_power_state_controller_interface.AutomaticResume,
-                system_power_state_controller_interface.TimerResume,
-            ),
+            (system_power_state_controller_interface.TimerResume,),
         ):
             raise errors.NotSupportedError(
                 f"Resuming the device using '{resume_mode}' is not yet supported."
-            )
-
-        if (
-            isinstance(
-                resume_mode, system_power_state_controller_interface.TimerResume
-            )
-            and resume_mode.duration
-            >= system_power_state_controller_interface.AutomaticResume.duration
-        ):
-            raise ValueError(
-                f"Resuming the device using '{resume_mode}' is not valid. "
-                f"Set the timer value less than '{system_power_state_controller_interface.AutomaticResume.duration}sec'"
             )
 
     def _suspend(
@@ -380,11 +349,6 @@ class SystemPowerStateController(
         )
 
         if isinstance(
-            resume_mode, system_power_state_controller_interface.AutomaticResume
-        ):
-            # Nothing to do for AutomaticResume
-            pass
-        elif isinstance(
             resume_mode, system_power_state_controller_interface.TimerResume
         ):
             proc: subprocess.Popen[str] = self._set_timer(resume_mode.duration)
@@ -393,11 +357,6 @@ class SystemPowerStateController(
         yield
 
         if isinstance(
-            resume_mode, system_power_state_controller_interface.AutomaticResume
-        ):
-            # Device will resume automatically
-            return
-        elif isinstance(
             resume_mode, system_power_state_controller_interface.TimerResume
         ):
             self._wait_for_timer_end(proc=proc, resume_mode=resume_mode)
@@ -494,7 +453,11 @@ class SystemPowerStateController(
         """
         output: str
         error: str
-        output, error = proc.communicate(timeout=resume_mode.duration)
+        # For timer to end, wait for minimum of that duration. Otherwise, there
+        # is a chance that proc.communicate() timeout can happen right at the
+        # same time as timer expires
+        timeout: float = resume_mode.duration + 1
+        output, error = proc.communicate(timeout=timeout)
 
         if proc.returncode != 0:
             message: str = (
@@ -616,7 +579,6 @@ class SystemPowerStateController(
             suspend_state=suspend_state,
             resume_mode=resume_mode,
             suspend_resume_duration=suspend_resume_execution_time,
-            min_buffer_duration=0,
             max_buffer_duration=3,
         )
 
@@ -640,7 +602,6 @@ class SystemPowerStateController(
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
         suspend_resume_duration: float,
-        min_buffer_duration: float,
         max_buffer_duration: float,
     ) -> None:
         """Verify that suspend-resume operation was indeed triggered by checking
@@ -650,8 +611,6 @@ class SystemPowerStateController(
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
             suspend_resume_duration: How long suspend-resume operation took.
-            min_buffer_duration: How much minimum buffer time to consider while
-                verifying the duration.
             max_buffer_duration: How much maximum buffer time to consider while
                 verifying the duration.
 
@@ -661,28 +620,18 @@ class SystemPowerStateController(
         """
         if isinstance(
             resume_mode,
-            (
-                system_power_state_controller_interface.AutomaticResume,
-                system_power_state_controller_interface.TimerResume,
-            ),
+            (system_power_state_controller_interface.TimerResume,),
         ):
-            min_expected_duration: float = (
-                resume_mode.duration - min_buffer_duration
-            )
             max_expected_duration: float = (
                 resume_mode.duration + max_buffer_duration
             )
 
-            if (
-                suspend_resume_duration < min_expected_duration
-                or suspend_resume_duration > max_expected_duration
-            ):
+            if suspend_resume_duration > max_expected_duration:
                 raise errors.SystemPowerStateControllerError(
                     f"'{suspend_state}' followed by '{resume_mode}' operation "
                     f"took {suspend_resume_duration} seconds on "
-                    f"'{self._device_name}'. Expected duration range: "
-                    f"[{min_expected_duration}, {max_expected_duration}] "
-                    f"seconds.",
+                    f"'{self._device_name}'. Expected it to not take more than "
+                    f"{max_expected_duration} seconds.",
                 )
 
     def _verify_suspend_resume_using_log_analysis(
@@ -758,6 +707,5 @@ class SystemPowerStateController(
             suspend_state=suspend_state,
             resume_mode=resume_mode,
             suspend_resume_duration=suspend_resume_duration,
-            min_buffer_duration=1,
             max_buffer_duration=0.5,
         )

@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{
-    byteorder::network_endian::{U32, U64},
-    AsBytes, FromBytes, FromZeros, NoCell,
-};
+use zerocopy::byteorder::network_endian::{U32, U64};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 // Supported minimum platform AVB version.
 const MIN_AVB_VERSION_MAJOR: u32 = 1;

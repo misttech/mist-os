@@ -8,7 +8,10 @@ pub(crate) mod local_timer_heap;
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil;
 
-use core::{convert::Infallible as Never, fmt::Debug, marker::PhantomData, time::Duration};
+use core::convert::Infallible as Never;
+use core::fmt::Debug;
+use core::marker::PhantomData;
+use core::time::Duration;
 
 use crate::inspect::InspectableValue;
 

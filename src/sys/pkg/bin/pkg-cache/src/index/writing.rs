@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_inspect::{self as finspect},
-    fuchsia_merkle::Hash,
-    std::collections::{HashMap, HashSet},
-};
+use fuchsia_inspect::{self as finspect};
+use fuchsia_merkle::Hash;
+use std::collections::{HashMap, HashSet};
 
 /// Protects packages from GC while they are being written. This index does not protect packages
 /// from GC after they have been written, so, to guarantee continuous protection, clients should
@@ -161,7 +159,8 @@ pub enum StopError {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     fn hash(b: u8) -> Hash {
         [b; 32].into()

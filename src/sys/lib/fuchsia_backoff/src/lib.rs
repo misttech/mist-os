@@ -296,7 +296,8 @@ mod tests {
         F: Future,
         F::Output: std::fmt::Debug + PartialEq + Eq,
     {
-        use std::{pin::pin, task::Poll};
+        use std::pin::pin;
+        use std::task::Poll;
 
         let mut future = pin!(future);
         let mut executor = fasync::TestExecutor::new_with_fake_time();

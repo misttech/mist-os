@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{parser, results},
-    anyhow::{anyhow, Result},
-    argh::{ArgsInfo, FromArgs},
-    regex::Regex,
-    std::path::{Path, PathBuf},
-    std::{fmt, str::FromStr},
-    url::Url,
-};
+use crate::{parser, results};
+use anyhow::{anyhow, Result};
+use argh::{ArgsInfo, FromArgs};
+use regex::Regex;
+use std::fmt;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use url::Url;
 
 /// Custom type to store a list of test URLs.
 #[derive(Default, Clone, PartialEq, Debug)]

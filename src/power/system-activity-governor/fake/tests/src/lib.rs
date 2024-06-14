@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus},
-    fidl_fuchsia_power_system::{
-        self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
-        WakeHandlingLevel,
-    },
-    fidl_test_sagcontrol as fctrl, fuchsia_async as fasync,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    futures::{channel::mpsc, StreamExt},
-    power_broker_client::PowerElementContext,
-    tracing::*,
+use anyhow::Result;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
+use fidl_fuchsia_power_system::{
+    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
+    WakeHandlingLevel,
 };
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures::channel::mpsc;
+use futures::StreamExt;
+use power_broker_client::PowerElementContext;
+use tracing::*;
+use {fidl_test_sagcontrol as fctrl, fuchsia_async as fasync};
 
 struct TestEnv {
     realm_instance: RealmInstance,

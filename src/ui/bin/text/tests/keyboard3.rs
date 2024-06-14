@@ -3,25 +3,21 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
+use anyhow::{Context as _, Result};
+use assert_matches::assert_matches;
+use fidl::endpoints::{create_request_stream, DiscoverableProtocolMarker, ProtocolMarker as _};
+use fuchsia_component_test::{
+    Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
+};
+use futures::stream::{FusedStream, StreamExt};
+use futures::{future, FutureExt};
+use test_case::test_case;
+use test_helpers::create_key_event;
 use {
-    anyhow::{Context as _, Result},
-    assert_matches::assert_matches,
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl::endpoints::{create_request_stream, ProtocolMarker as _},
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input as fidl_input,
     fidl_fuchsia_ui_input3 as ui_input3, fidl_fuchsia_ui_keyboard_focus as fidl_focus,
-    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync,
-    fuchsia_component_test::{
-        Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
-    },
-    fuchsia_scenic as scenic, fuchsia_zircon as zx,
-    futures::FutureExt,
-    futures::{
-        future,
-        stream::{FusedStream, StreamExt},
-    },
-    test_case::test_case,
-    test_helpers::create_key_event,
+    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync, fuchsia_scenic as scenic,
+    fuchsia_zircon as zx,
 };
 
 const URL_TEXT_MANAGER: &str =

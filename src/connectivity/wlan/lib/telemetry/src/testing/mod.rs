@@ -4,20 +4,16 @@
 
 #![cfg(test)]
 
-use {
-    super::*,
-    fidl::endpoints::create_proxy_and_stream,
-    fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload},
-    fuchsia_async as fasync,
-    fuchsia_inspect::{
-        reader::{
-            DiagnosticsHierarchy, {self as reader},
-        },
-        Inspector, Node as InspectNode,
-    },
-    futures::task::Poll,
-    std::pin::pin,
+use super::*;
+use fidl::endpoints::create_proxy_and_stream;
+use fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload};
+use fuchsia_async as fasync;
+use fuchsia_inspect::reader::{
+    DiagnosticsHierarchy, {self as reader},
 };
+use fuchsia_inspect::{Inspector, Node as InspectNode};
+use futures::task::Poll;
+use std::pin::pin;
 
 trait CobaltExt {
     // Respond to MetricEventLoggerRequest and extract its MetricEvent

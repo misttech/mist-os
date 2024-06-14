@@ -257,7 +257,7 @@ modification time is newer than the source file, but it will only print the warn
 the file is displayed. Check for this warning if you suspect a problem.
 
 Some people have multiple checkouts. If it's finding a file in the wrong one, override the
-`build-dirs` option as described above in [the setup guide](running.md).
+`build-dirs` option as described above in [the setup guide](troubleshooting.md#set-symbol-location).
 
 To display the file name of the file it found from `list`, use the `-f` option:
 

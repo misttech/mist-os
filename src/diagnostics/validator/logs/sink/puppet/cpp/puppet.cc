@@ -29,16 +29,16 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
           syslog_runtime::LogBuffer buffer;
           syslog_runtime::BeginRecord(&buffer, severity, __FILE__, __LINE__, "Changed severity",
                                       nullptr);
-          syslog_runtime::FlushRecord(&buffer);
+          buffer.Flush();
         },
         nullptr);
   }
 
   void StopInterestListener(StopInterestListenerCallback callback) override {
-    fuchsia_logging::LogSettings settings;
-    settings.disable_interest_listener = true;
-    settings.min_log_level = fuchsia_logging::LOG_TRACE;
-    syslog_runtime::SetLogSettings(settings);
+    fuchsia_logging::LogSettingsBuilder log_settings;
+    log_settings.WithMinLogSeverity(fuchsia_logging::LOG_TRACE)
+        .DisableInterestListener()
+        .BuildAndInitialize();
     callback();
   }
 
@@ -75,7 +75,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
           break;
       }
     }
-    syslog_runtime::FlushRecord(&buffer);
+    buffer.Flush();
     callback();
   }
 
@@ -86,6 +86,9 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  fuchsia_logging::LogSettingsBuilder log_settings;
+  log_settings.WithDispatcher(loop.dispatcher());
+  log_settings.BuildAndInitialize();
   Puppet puppet(sys::ComponentContext::CreateAndServeOutgoingDirectory());
   // Note: This puppet is ran by a runner that
   // uses --test-invalid-unicode, which isn't directly passed to this puppet

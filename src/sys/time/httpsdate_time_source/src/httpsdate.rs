@@ -2,27 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        constants::{
-            CONVERGE_SAMPLES, INITIAL_SAMPLE_POLLS, MAX_TIME_BETWEEN_SAMPLES_RANDOMIZATION,
-            SAMPLE_POLLS,
-        },
-        datatypes::{HttpsSample, Phase},
-        diagnostics::{Diagnostics, Event},
-        sampler::HttpsSampler,
-        Config,
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_time_external::{Properties, Status, TimeSample, Urgency},
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{channel::mpsc::Sender, future::BoxFuture, lock::Mutex, Future, SinkExt},
-    httpdate_hyper::{HttpsDateError, HttpsDateErrorType},
-    push_source::Update,
-    rand::Rng,
-    tracing::{debug, error, info},
+use crate::constants::{
+    CONVERGE_SAMPLES, INITIAL_SAMPLE_POLLS, MAX_TIME_BETWEEN_SAMPLES_RANDOMIZATION, SAMPLE_POLLS,
 };
+use crate::datatypes::{HttpsSample, Phase};
+use crate::diagnostics::{Diagnostics, Event};
+use crate::sampler::HttpsSampler;
+use crate::Config;
+use anyhow::Error;
+use async_trait::async_trait;
+use fidl_fuchsia_time_external::{Properties, Status, TimeSample, Urgency};
+use futures::channel::mpsc::Sender;
+use futures::future::BoxFuture;
+use futures::lock::Mutex;
+use futures::{Future, SinkExt};
+use httpdate_hyper::{HttpsDateError, HttpsDateErrorType};
+use push_source::Update;
+use rand::Rng;
+use tracing::{debug, error, info};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// A definition of how long an algorithm should wait between polls. Defines fixed wait durations
 /// following successful poll attempts, and a capped exponential backoff following failed poll
@@ -300,19 +298,21 @@ fn mult_duration(duration: zx::Duration, factor: f32) -> zx::Duration {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            datatypes::Poll, diagnostics::FakeDiagnostics, sampler::FakeSampler, SampleConfig,
-        },
-        anyhow::format_err,
-        assert_matches::assert_matches,
-        futures::{channel::mpsc::channel, future::ready, stream::StreamExt, task::Poll as FPoll},
-        lazy_static::lazy_static,
-        pull_source::UpdateAlgorithm as _,
-        push_source::UpdateAlgorithm as _,
-        std::sync::Arc,
-    };
+    use super::*;
+    use crate::datatypes::Poll;
+    use crate::diagnostics::FakeDiagnostics;
+    use crate::sampler::FakeSampler;
+    use crate::SampleConfig;
+    use anyhow::format_err;
+    use assert_matches::assert_matches;
+    use futures::channel::mpsc::channel;
+    use futures::future::ready;
+    use futures::stream::StreamExt;
+    use futures::task::Poll as FPoll;
+    use lazy_static::lazy_static;
+    use pull_source::UpdateAlgorithm as _;
+    use push_source::UpdateAlgorithm as _;
+    use std::sync::Arc;
 
     /// Test retry strategy with minimal wait periods.
     const TEST_RETRY_STRATEGY: RetryStrategy = RetryStrategy {

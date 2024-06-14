@@ -4,12 +4,10 @@
 
 mod wire;
 
-use {
-    anyhow::{anyhow, Error},
-    std::io::{Read, Seek},
-    std::mem,
-    zerocopy::FromBytes,
-};
+use anyhow::{anyhow, Error};
+use std::io::{Read, Seek};
+use std::mem;
+use zerocopy::FromBytes;
 
 // Each QCOW file starts with this magic value "QFI\xfb".
 const QCOW_MAGIC: u32 = 0x514649fb;
@@ -391,7 +389,8 @@ impl QcowFileReadOnly {
 
 #[cfg(test)]
 mod test {
-    use {super::*, std::fs::File};
+    use super::*;
+    use std::fs::File;
 
     fn open_qcow_file(path: &str) -> QcowFileReadOnly {
         let test_image = File::open(path).expect("Failed to open file");

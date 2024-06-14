@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::input_reports_reader::InputReportsReader,
-    anyhow::{Context as _, Error},
-    async_utils::event::Event as AsyncEvent,
-    fidl::endpoints::ServerEnd,
-    fidl::Error as FidlError,
-    fidl_fuchsia_input_report::{
-        DeviceDescriptor, FeatureReport, InputDeviceRequest, InputDeviceRequestStream, InputReport,
-        InputReportsReaderMarker,
-    },
-    fuchsia_async as fasync,
-    futures::{channel::mpsc, future, pin_mut, StreamExt, TryFutureExt},
+use crate::input_reports_reader::InputReportsReader;
+use anyhow::{Context as _, Error};
+use async_utils::event::Event as AsyncEvent;
+use fidl::endpoints::ServerEnd;
+use fidl::Error as FidlError;
+use fidl_fuchsia_input_report::{
+    DeviceDescriptor, FeatureReport, InputDeviceRequest, InputDeviceRequestStream, InputReport,
+    InputReportsReaderMarker,
 };
+use fuchsia_async as fasync;
+use futures::channel::mpsc;
+use futures::{future, pin_mut, StreamExt, TryFutureExt};
 
 /// Implements the server side of the
 /// `fuchsia.input.report.InputDevice` FIDL protocol. This struct also enables users to inject
@@ -204,12 +203,10 @@ impl InputDevice {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints,
-        fidl_fuchsia_input_report::{DeviceDescriptor, InputDeviceMarker},
-        fuchsia_async as fasync,
-    };
+    use super::*;
+    use fidl::endpoints;
+    use fidl_fuchsia_input_report::{DeviceDescriptor, InputDeviceMarker};
+    use fuchsia_async as fasync;
 
     mod responds_to_get_feature_report_request {
         use super::*;
@@ -248,14 +245,10 @@ mod tests {
     }
 
     mod responds_to_get_descriptor_request {
-        use {
-            super::{
-                utils::{make_input_device_proxy_and_struct, make_touchscreen_descriptor},
-                *,
-            },
-            assert_matches::assert_matches,
-            futures::task::Poll,
-        };
+        use super::utils::{make_input_device_proxy_and_struct, make_touchscreen_descriptor};
+        use super::*;
+        use assert_matches::assert_matches;
+        use futures::task::Poll;
 
         #[fasync::run_until_stalled(test)]
         async fn single_request_before_call_to_get_input_reports_reader() -> Result<(), Error> {
@@ -362,16 +355,13 @@ mod tests {
     }
 
     mod future_resolution {
-        use {
-            super::{
-                utils::{make_input_device_proxy_and_struct, make_input_reports_reader_proxy},
-                *,
-            },
-            futures::task::Poll,
-        };
+        use super::utils::{make_input_device_proxy_and_struct, make_input_reports_reader_proxy};
+        use super::*;
+        use futures::task::Poll;
 
         mod resolves_after_all_reports_are_sent_to_input_reports_reader {
-            use {super::*, assert_matches::assert_matches};
+            use super::*;
+            use assert_matches::assert_matches;
 
             #[test]
             fn if_device_request_channel_was_closed() {
@@ -562,10 +552,9 @@ mod tests {
         }
 
         mod is_pending_if_peer_did_not_read_all_reports {
-            use {
-                super::*, assert_matches::assert_matches,
-                fidl_fuchsia_input_report::MAX_DEVICE_REPORT_COUNT,
-            };
+            use super::*;
+            use assert_matches::assert_matches;
+            use fidl_fuchsia_input_report::MAX_DEVICE_REPORT_COUNT;
 
             #[test]
             fn if_device_request_channel_is_open() {

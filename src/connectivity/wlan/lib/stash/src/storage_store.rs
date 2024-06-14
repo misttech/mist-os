@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    std::{collections::HashMap, io::Write, os::fd::AsRawFd},
-    tracing::{error, info, warn},
-    wlan_stash_constants::{FileContent, PersistentStorageData},
-};
+use anyhow::{format_err, Error};
+use std::collections::HashMap;
+use std::io::Write;
+use std::os::fd::AsRawFd;
+use tracing::{error, info, warn};
+use wlan_stash_constants::{FileContent, PersistentStorageData};
 
 type FileContents = HashMap<String, FileContent>;
 
@@ -28,8 +28,9 @@ impl StorageStore {
         Self { path: path.as_ref().into() }
     }
 
-    #[allow(unused)]
-    pub fn delete_store(&mut self) -> Result<(), Error> {
+    /// Clears the backing file if it exists or creates a new one
+    /// {"version:" 1, saved_networks: [] }
+    pub fn empty_store(&self) -> Result<(), Error> {
         self.write(Vec::new())
     }
 
@@ -47,14 +48,14 @@ impl StorageStore {
 
             // Write to the file, using a temporary file to ensure the original data isn't lost if
             // there is an error.
-            let mut file = std::fs::File::create(&tmp_path)?;
+            dbg!(tmp_path.clone());
+            let mut file = std::fs::File::create(tmp_path.clone())?;
             file.write_all(&serialized_data)?;
             // This fsync is required because the storage stack doesn't guarantee data is flushed
             // before the rename.
             fuchsia_nix::unistd::fsync(file.as_raw_fd())?;
         }
         std::fs::rename(&tmp_path, &self.path)?;
-        tracing::info!("Successfully saved data to {:?}", self.path);
         Ok(())
     }
 
@@ -104,14 +105,12 @@ impl StorageStore {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::tests::rand_string,
-        wlan_stash_constants::{Credential, SecurityType},
-    };
+    use super::*;
+    use crate::tests::rand_string;
+    use wlan_stash_constants::{Credential, SecurityType};
 
     #[fuchsia::test]
-    fn test_write() {
+    fn test_write_and_load() {
         let path = format!("/data/config.{}", rand_string());
         let store = StorageStore::new(&path);
         let network_configs = vec![PersistentStorageData {
@@ -211,15 +210,19 @@ mod tests {
     #[fuchsia::test]
     fn test_delete_store() {
         let path = format!("/data/config.{}", rand_string());
-        let mut store = StorageStore::new(&path);
+        let store = StorageStore::new(&path);
         let network_config = vec![PersistentStorageData {
             ssid: "foo".into(),
             security_type: SecurityType::Wpa2,
             credential: Credential::Password(b"password".to_vec()),
             has_ever_connected: false,
         }];
-        store.write(network_config).expect("write failed");
-        store.delete_store().expect("delete_store failed");
+        store.write(network_config.clone()).expect("write failed");
+        assert_eq!(store.load().expect("load failed"), network_config);
+
+        // Empty the store and check that nothing is loaded.
+        store.empty_store().expect("empty_store failed");
+        let store = StorageStore::new(&path);
         assert_eq!(store.load().expect("load failed"), Vec::new());
     }
 }

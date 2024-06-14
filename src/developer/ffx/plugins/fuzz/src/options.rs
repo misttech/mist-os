@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Error, Result},
-    fidl_fuchsia_fuzzer as fuzz,
-    fuchsia_fuzzctl::constants::*,
-    lazy_static::lazy_static,
-    regex::Regex,
-};
+use anyhow::{anyhow, bail, Error, Result};
+use fidl_fuchsia_fuzzer as fuzz;
+use fuchsia_fuzzctl::constants::*;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 /// Names of allowable fuzzer options corresponding to `fuchsia.fuzzer.Options`.
 pub const NAMES: &[&str] = &[

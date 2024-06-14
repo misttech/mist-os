@@ -7,10 +7,8 @@
 use dhcp_protocol::{AtLeast, AtMostBytes};
 use packet::{InnerPacketBuilder, ParseBuffer as _, Serializer};
 use packet_formats::ip::IpPacket as _;
-use std::{
-    net::Ipv4Addr,
-    num::{NonZeroU16, NonZeroU32, TryFromIntError},
-};
+use std::net::Ipv4Addr;
+use std::num::{NonZeroU16, NonZeroU32, TryFromIntError};
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum ParseError {
@@ -700,7 +698,8 @@ mod test {
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
     use dhcp_protocol::{CLIENT_PORT, SERVER_PORT};
-    use net_declare::{net::prefix_length_v4, net_ip_v4, net_mac, std_ip_v4};
+    use net_declare::net::prefix_length_v4;
+    use net_declare::{net_ip_v4, net_mac, std_ip_v4};
     use net_types::ip::{Ip, Ipv4, PrefixLength};
     use std::net::Ipv4Addr;
     use test_case::test_case;

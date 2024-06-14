@@ -16,23 +16,23 @@ pub mod watchdog;
 #[cfg(test)]
 mod testutil;
 
+use crate::route_table::{Route, RouteTable};
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use anyhow::anyhow;
+use fuchsia_inspect::{Inspector, Node as InspectNode};
+use futures::channel::mpsc;
+use inspect::InspectInfo;
+use itertools::Itertools;
+use named_timer::DeadlineId;
+use net_declare::{fidl_subnet, std_ip};
+use net_types::ScopeableAddress as _;
+use num_derive::FromPrimitive;
+use std::collections::hash_map::{Entry, HashMap};
+use tracing::{debug, error, info};
 use {
-    crate::route_table::{Route, RouteTable},
-    crate::telemetry::{TelemetryEvent, TelemetrySender},
-    anyhow::anyhow,
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_async as fasync,
-    fuchsia_inspect::{Inspector, Node as InspectNode},
     fuchsia_zircon as zx,
-    futures::channel::mpsc,
-    inspect::InspectInfo,
-    itertools::Itertools,
-    named_timer::DeadlineId,
-    net_declare::{fidl_subnet, std_ip},
-    net_types::ScopeableAddress as _,
-    num_derive::FromPrimitive,
-    std::collections::hash_map::{Entry, HashMap},
-    tracing::{debug, error, info},
 };
 
 use std::net::IpAddr;
@@ -1424,23 +1424,20 @@ fn scan_neighbor_health(
 mod tests {
     use crate::fetch::FetchAddr;
 
-    use {
-        super::*,
-        crate::{
-            dig::Dig,
-            fetch::Fetch,
-            neighbor_cache::{NeighborHealth, NeighborState},
-            ping::Ping,
-        },
-        async_trait::async_trait,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_net as fnet, fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::StreamExt as _,
-        net_declare::{fidl_ip, fidl_subnet, std_ip, std_socket_addr},
-        net_types::ip,
-        std::{pin::pin, task::Poll},
-        test_case::test_case,
-    };
+    use super::*;
+    use crate::dig::Dig;
+    use crate::fetch::Fetch;
+    use crate::neighbor_cache::{NeighborHealth, NeighborState};
+    use crate::ping::Ping;
+    use async_trait::async_trait;
+    use diagnostics_assertions::assert_data_tree;
+    use futures::StreamExt as _;
+    use net_declare::{fidl_ip, fidl_subnet, std_ip, std_socket_addr};
+    use net_types::ip;
+    use std::pin::pin;
+    use std::task::Poll;
+    use test_case::test_case;
+    use {fidl_fuchsia_net as fnet, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const ETHERNET_INTERFACE_NAME: &str = "eth1";
     const ID1: u64 = 1;

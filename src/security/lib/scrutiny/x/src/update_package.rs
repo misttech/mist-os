@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::api;
 use super::api::Package as _;
-use super::blob::BlobOpenError;
-use super::blob::BlobSet;
-use super::data_source as ds;
+use super::blob::{BlobOpenError, BlobSet};
 use super::data_source::DataSource;
-use super::package::Error as PackageError;
-use super::package::Package;
+use super::package::{Error as PackageError, Package};
+use super::{api, data_source as ds};
 use cm_rust::ComponentDecl;
-use fuchsia_url::PackageUrl;
-use fuchsia_url::PinnedAbsolutePackageUrl;
+use fuchsia_url::{PackageUrl, PinnedAbsolutePackageUrl};
 use std::io;
 use thiserror::Error;
 
@@ -125,15 +121,12 @@ fn update_package_url() -> api::PackageResolverUrl {
 
 #[cfg(test)]
 pub mod test {
-    use assembly_manifest::AssemblyManifest;
-    use assembly_manifest::Image;
-    use assembly_partitions_config::BootloaderPartition;
-    use assembly_partitions_config::Partition;
-    use assembly_partitions_config::PartitionsConfig;
-    use assembly_partitions_config::Slot as PartitionSlot;
+    use assembly_manifest::{AssemblyManifest, Image};
+    use assembly_partitions_config::{
+        BootloaderPartition, Partition, PartitionsConfig, Slot as PartitionSlot,
+    };
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
-    use assembly_update_package::Slot;
-    use assembly_update_package::UpdatePackageBuilder;
+    use assembly_update_package::{Slot, UpdatePackageBuilder};
     use camino::Utf8Path;
     use epoch::EpochFile;
     use fuchsia_merkle::Hash;

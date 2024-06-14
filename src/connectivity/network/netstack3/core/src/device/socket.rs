@@ -5,24 +5,19 @@
 //! Implementations of traits defined in foreign modules for the types defined
 //! in the device socket module.
 
-use lock_order::{
-    lock::{DelegatedOrderedLockAccess, LockLevelFor},
-    relation::LockBefore,
-    wrap::prelude::*,
+use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
+use lock_order::relation::LockBefore;
+use netstack3_device::socket::{
+    AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext,
+    DeviceSocketContextTypes, DeviceSocketId, DeviceSockets, HeldSockets, PrimaryDeviceSocketId,
+    SocketStateAccessor, Target,
 };
+use netstack3_device::{for_any_device_id, DeviceId, WeakDeviceId};
 
-use crate::{
-    device::{
-        self, for_any_device_id,
-        socket::{
-            AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext,
-            DeviceSocketContextTypes, DeviceSocketId, DeviceSockets, HeldSockets,
-            PrimaryDeviceSocketId, SocketStateAccessor, Target,
-        },
-        DeviceId, WeakDeviceId,
-    },
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
-};
+use crate::context::prelude::*;
+use crate::context::WrapLockLevel;
+use crate::device::integration;
+use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 impl<BT: BindingsTypes, L> DeviceSocketContextTypes<BT> for CoreCtx<'_, BT, L> {
     type SocketId = DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>;
@@ -41,7 +36,8 @@ impl<BT: BindingsTypes, L> DeviceSocketContextTypes<BT> for CoreCtx<'_, BT, L> {
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
     DeviceSocketContext<BC> for CoreCtx<'_, BC, L>
 {
-    type SocketTablesCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::AnyDeviceSockets>;
+    type SocketTablesCoreCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::AnyDeviceSockets>>;
 
     fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::SocketId>) -> R, R>(
         &mut self,
@@ -108,7 +104,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
     DeviceSocketAccessor<BC> for CoreCtx<'_, BC, L>
 {
-    type DeviceSocketCoreCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::DeviceSockets>;
+    type DeviceSocketCoreCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::DeviceSockets>>;
 
     fn with_device_sockets<
         F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
@@ -121,17 +118,15 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
         for_any_device_id!(
             DeviceId,
             device,
-            device => device::integration::with_device_state_and_core_ctx(
-                self,
-                device,
-                |mut core_ctx_and_resource| {
-                    let (device_sockets, mut locked) = core_ctx_and_resource
-                        .read_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
-                        |c| c.right(),
-                    );
-                    cb(&*device_sockets, &mut locked.cast_core_ctx())
-                },
-            )
+            device => {
+                let mut core_ctx_and_resource =
+                    integration::device_state_and_core_ctx(self, device);
+                let (device_sockets, mut locked) = core_ctx_and_resource
+                    .read_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
+                    |c| c.right(),
+                );
+                cb(&*device_sockets, &mut locked.cast_core_ctx())
+            }
         )
     }
 
@@ -146,17 +141,15 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
         for_any_device_id!(
             DeviceId,
             device,
-            device => device::integration::with_device_state_and_core_ctx(
-                self,
-                device,
-                |mut core_ctx_and_resource| {
-                    let (mut device_sockets, mut locked) = core_ctx_and_resource
-                        .write_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
-                        |c| c.right(),
-                    );
-                    cb(&mut *device_sockets, &mut locked.cast_core_ctx())
-                },
-            )
+            device => {
+                let mut core_ctx_and_resource =
+                    integration::device_state_and_core_ctx(self, device);
+                let (mut device_sockets, mut locked) = core_ctx_and_resource
+                    .write_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
+                    |c| c.right(),
+                );
+                cb(&mut *device_sockets, &mut locked.cast_core_ctx())
+            }
         )
     }
 }

@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::ap::TimedEvent;
+use crate::device::DeviceOps;
+use crate::disconnect::LocallyInitiated;
+use crate::error::Error;
+use anyhow::format_err;
+use ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid};
+use wlan_common::big_endian::BigEndianU16;
+use wlan_common::ie::rsn::rsne;
+use wlan_common::ie::{self};
+use wlan_common::mac::{self, Aid, AuthAlgorithmNumber, StatusCode};
+use wlan_common::sequence::SequenceManager;
+use wlan_common::timer::{EventId, Timer};
+use wlan_common::{data_writer, mgmt_writer, wmm, TimeUnit};
+use wlan_ffi_transport::{Buffer, BufferProvider};
+use wlan_frame_writer::{write_frame, write_frame_with_fixed_buffer};
 use {
-    crate::{ap::TimedEvent, device::DeviceOps, disconnect::LocallyInitiated, error::Error},
-    anyhow::format_err,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid},
-    wlan_common::{
-        big_endian::BigEndianU16,
-        data_writer,
-        ie::{self, rsn::rsne},
-        mac::{self, Aid, AuthAlgorithmNumber, StatusCode},
-        mgmt_writer,
-        sequence::SequenceManager,
-        timer::{EventId, Timer},
-        wmm, TimeUnit,
-    },
-    wlan_ffi_transport::{Buffer, BufferProvider},
-    wlan_frame_writer::{write_frame, write_frame_with_fixed_buffer},
 };
 
 /// BeaconParams contains parameters that may be used to offload beaconing to the hardware.
@@ -515,16 +515,13 @@ impl<D: DeviceOps> Context<D> {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{ap::ClientEvent, device::FakeDevice},
-        lazy_static::lazy_static,
-        wlan_common::{
-            assert_variant,
-            timer::{self, create_timer},
-        },
-        wlan_ffi_transport::FakeFfiBufferProvider,
-    };
+    use super::*;
+    use crate::ap::ClientEvent;
+    use crate::device::FakeDevice;
+    use lazy_static::lazy_static;
+    use wlan_common::assert_variant;
+    use wlan_common::timer::{self, create_timer};
+    use wlan_ffi_transport::FakeFfiBufferProvider;
 
     lazy_static! {
         static ref CLIENT_ADDR: MacAddr = [1u8; 6].into();

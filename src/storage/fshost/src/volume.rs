@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::device::Device,
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_hardware_block_partition::Guid,
-    fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeProxy},
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_zircon as zx,
-    std::cmp,
-};
+use crate::device::Device;
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_hardware_block_partition::Guid;
+use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeProxy};
+use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_zircon as zx;
+use std::cmp;
 
 // Number of bits required for the VSlice address space.
 const SLICE_ENTRY_VSLICE_BITS: u64 = 32;
@@ -118,16 +116,14 @@ pub async fn set_partition_max_bytes(
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::volume::{resize_volume, MAX_VSLICES},
-        anyhow::Error,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_hardware_block_volume::{
-            VolumeManagerInfo, VolumeMarker, VolumeRequest, VsliceRange,
-        },
-        fuchsia_zircon as zx,
-        futures::{pin_mut, select, FutureExt, StreamExt},
+    use crate::volume::{resize_volume, MAX_VSLICES};
+    use anyhow::Error;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_hardware_block_volume::{
+        VolumeManagerInfo, VolumeMarker, VolumeRequest, VsliceRange,
     };
+    use fuchsia_zircon as zx;
+    use futures::{pin_mut, select, FutureExt, StreamExt};
 
     const SLICE_SIZE: u64 = 16384;
     const SLICE_COUNT: u64 = 5000;

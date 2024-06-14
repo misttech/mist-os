@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Result};
 use async_trait::async_trait;
+use futures::stream::{self, StreamExt, TryStreamExt};
+use futures::FutureExt;
 use {
-    anyhow::{format_err, Result},
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input as ui_input,
     fidl_fuchsia_ui_input3 as ui_input3, fuchsia_zircon as zx,
-    futures::{
-        stream::{self, StreamExt, TryStreamExt},
-        FutureExt,
-    },
 };
 
 pub fn default_state() -> ui_input::TextInputState {

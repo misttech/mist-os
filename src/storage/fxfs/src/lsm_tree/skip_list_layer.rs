@@ -5,32 +5,22 @@
 // There are a great many optimisations that could be considered to improve performance and maybe
 // memory usage.
 
-use {
-    crate::{
-        drop_event::DropEvent,
-        log::*,
-        lsm_tree::{
-            merge::{self, MergeFn},
-            types::{
-                BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut,
-                OrdLowerBound, OrdUpperBound, Value,
-            },
-        },
-        serialized_types::{Version, LATEST_VERSION},
-    },
-    anyhow::{bail, Error},
-    async_trait::async_trait,
-    std::{
-        cell::UnsafeCell,
-        cmp::{min, Ordering},
-        collections::BTreeMap,
-        ops::{Bound, Range},
-        sync::{
-            atomic::{self, AtomicPtr, AtomicU32},
-            Arc, Mutex, MutexGuard,
-        },
-    },
+use crate::drop_event::DropEvent;
+use crate::log::*;
+use crate::lsm_tree::merge::{self, MergeFn};
+use crate::lsm_tree::types::{
+    BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, OrdLowerBound,
+    OrdUpperBound, Value,
 };
+use crate::serialized_types::{Version, LATEST_VERSION};
+use anyhow::{bail, Error};
+use async_trait::async_trait;
+use std::cell::UnsafeCell;
+use std::cmp::{min, Ordering};
+use std::collections::BTreeMap;
+use std::ops::{Bound, Range};
+use std::sync::atomic::{self, AtomicPtr, AtomicU32};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 // Each skip list node contains a variable sized pointer list. The head pointers also exist in the
 // form of a pointer list. Index 0 in the pointer list is the chain with the most elements i.e.
@@ -592,33 +582,24 @@ impl<K: Key, V: Value> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, K, V>
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{SkipListLayer, SkipListLayerIter, SkipListLayerIterMut},
-        crate::{
-            lsm_tree::{
-                merge::{
-                    ItemOp::{Discard, Replace},
-                    MergeLayerIterator, MergeResult,
-                },
-                types::{
-                    DefaultOrdLowerBound, DefaultOrdUpperBound, Item, ItemRef, Layer,
-                    LayerIterator, LayerIteratorMut, SortByU64,
-                },
-            },
-            serialized_types::{
-                versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
-            },
-        },
-        assert_matches::assert_matches,
-        fprint::TypeFingerprint,
-        fuchsia_async as fasync,
-        futures::{future::join_all, join, FutureExt},
-        std::{
-            hash::Hash,
-            ops::Bound,
-            time::{Duration, Instant},
-        },
+    use super::{SkipListLayer, SkipListLayerIter, SkipListLayerIterMut};
+    use crate::lsm_tree::merge::ItemOp::{Discard, Replace};
+    use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
+    use crate::lsm_tree::types::{
+        DefaultOrdLowerBound, DefaultOrdUpperBound, Item, ItemRef, Layer, LayerIterator,
+        LayerIteratorMut, SortByU64,
     };
+    use crate::serialized_types::{
+        versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
+    };
+    use assert_matches::assert_matches;
+    use fprint::TypeFingerprint;
+    use fuchsia_async as fasync;
+    use futures::future::join_all;
+    use futures::{join, FutureExt};
+    use std::hash::Hash;
+    use std::ops::Bound;
+    use std::time::{Duration, Instant};
 
     #[derive(
         Clone,

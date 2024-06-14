@@ -18,18 +18,15 @@ pub(crate) use crate::font_pkgs::FontPackageListing;
 pub(crate) use crate::font_sets::{FontSet, FontSets};
 pub(crate) use crate::product_config::{FallbackChainEntry, ProductConfig};
 
-use {
-    anyhow::Error,
-    fake_font_info_loader::FakeFontInfoLoaderImpl,
-    font_info::{FontAssetSource, FontInfo, FontInfoLoader, FontInfoLoaderImpl},
-    manifest::{v2::FontsManifest, FontManifestWrapper},
-    std::{
-        env, fs,
-        io::{self, Write},
-        path::PathBuf,
-    },
-    structopt::StructOpt,
-};
+use anyhow::Error;
+use fake_font_info_loader::FakeFontInfoLoaderImpl;
+use font_info::{FontAssetSource, FontInfo, FontInfoLoader, FontInfoLoaderImpl};
+use manifest::v2::FontsManifest;
+use manifest::FontManifestWrapper;
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::{env, fs};
+use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Font Manifest Generator")]

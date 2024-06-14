@@ -7,7 +7,8 @@ use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, NumericProperty};
 use fuchsia_inspect_derive::Inspect;
 use fuchsia_sync::Mutex;
-use std::{collections::HashMap, collections::HashSet, sync::Arc};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use crate::packets::{BrowseLevel, MediaPlayerItem};
 use crate::profile::{AvrcpControllerFeatures, AvrcpTargetFeatures};
@@ -268,11 +269,10 @@ mod tests {
     use async_utils::PollExt;
     use bt_metrics::respond_to_metrics_req_for_test;
     use diagnostics_assertions::assert_data_tree;
-    use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
     use fidl_fuchsia_metrics::{MetricEventLoggerMarker, MetricEventPayload};
-    use fuchsia_async as fasync;
     use fuchsia_inspect_derive::WithInspect;
     use futures::stream::StreamExt;
+    use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fuchsia_async as fasync};
 
     #[test]
     fn multiple_peers_connection_updates_to_shared_node() {

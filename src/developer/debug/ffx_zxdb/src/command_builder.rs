@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon_types::zx_koid_t;
-use std::{ffi::OsString, path::PathBuf, process::Command};
+use std::ffi::OsString;
+use std::path::PathBuf;
+use std::process::Command;
 
 use crate::debug_agent::DebugAgentSocket;
 

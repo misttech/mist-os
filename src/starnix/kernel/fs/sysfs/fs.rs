@@ -2,22 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::kobject::KObjectHandle,
-    fs::sysfs::{
-        cgroup::CgroupDirectoryNode, sysfs_kernel_directory, sysfs_power_directory,
-        CpuClassDirectory, SysfsDirectory,
-    },
-    task::{CurrentTask, NetstackDevicesDirectory},
-    vfs::{
-        CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo,
-        FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
-    },
+use crate::device::kobject::KObjectHandle;
+use crate::fs::sysfs::cgroup::CgroupDirectoryNode;
+use crate::fs::sysfs::{
+    sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, SysfsDirectory,
+};
+use crate::task::{CurrentTask, NetstackDevicesDirectory};
+use crate::vfs::{
+    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo,
+    FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
 };
 use starnix_logging::bug_ref;
-use starnix_uapi::{
-    auth::FsCred, errors::Errno, file_mode::mode, statfs, vfs::default_statfs, SYSFS_MAGIC,
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::{statfs, SYSFS_MAGIC};
 
 pub const SYSFS_DEVICES: &str = "devices";
 pub const SYSFS_BUS: &str = "bus";

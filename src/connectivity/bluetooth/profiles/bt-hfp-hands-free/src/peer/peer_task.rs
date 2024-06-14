@@ -3,13 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
-use at_commands as at;
-use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{Channel, PeerId};
-use futures::select;
-use futures::StreamExt;
+use futures::{select, StreamExt};
 use tracing::{debug, info, warn};
+use {at_commands as at, fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync};
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::peer::ag_indicators::AgIndicatorTranslator;

@@ -30,6 +30,11 @@ _all_core_crates = [
   "device:netstack3-device-instrumented",
   "device:netstack3-device-loom",
   "device:netstack3-device-testutils",
+  "datagram:netstack3-datagram",
+  "datagram:netstack3-datagram-benchmarks",
+  "datagram:netstack3-datagram-instrumented",
+  "datagram:netstack3-datagram-loom",
+  "datagram:netstack3-datagram-testutils",
   "tcp:netstack3-tcp",
   "tcp:netstack3-tcp-benchmarks",
   "tcp:netstack3-tcp-instrumented",
@@ -40,6 +45,11 @@ _all_core_crates = [
   "udp:netstack3-udp-instrumented",
   "udp:netstack3-udp-loom",
   "udp:netstack3-udp-testutils",
+  "icmp_echo:netstack3-icmp-echo",
+  "icmp_echo:netstack3-icmp-echo-benchmarks",
+  "icmp_echo:netstack3-icmp-echo-instrumented",
+  "icmp_echo:netstack3-icmp-echo-loom",
+  "icmp_echo:netstack3-icmp-echo-testutils",
   "sync:netstack3-sync",
   "sync:netstack3-sync-instrumented",
   "sync:netstack3-sync-loom",
@@ -50,10 +60,21 @@ rustc_library_with_features("netstack3-core") {
   edition = "2021"
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  check_cfgs = [ "benchmark" ]
+  check_cfgs = [
+    "benchmark",
+    "no_lock_order",
+  ]
+
+  # Disable lock ordering in release builds to speed-up compilation.
+  #
+  # We also always disable it for host builds to make it easier to spot
+  # conditional compilation problems when building a debug image.
+  if (!is_debug || is_host) {
+    configs += [ ":no_lock_order" ]
+  }
+
   sources = [
     "src/api.rs",
-    "src/benchmarks.rs",
     "src/context.rs",
     "src/counters.rs",
     "src/device/base.rs",
@@ -82,21 +103,23 @@ rustc_library_with_features("netstack3-core") {
     "//src/lib/network/packet",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
 
     # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
     # remove this module.
     "//src/lib/fakealloc",
   ]
-  _testutil_deps = [ "//third_party/rust_crates:zerocopy" ]
+  _testutils_deps = [ "//third_party/rust_crates:zerocopy" ]
 
   feature_sets = [
     {
       features = []
       deps += [
         "base:netstack3-base",
+        "datagram:netstack3-datagram",
         "device:netstack3-device",
         "filter:netstack3-filter",
+        "icmp_echo:netstack3-icmp-echo",
         "ip:netstack3-ip",
         "sync:netstack3-sync",
         "tcp:netstack3-tcp",
@@ -113,8 +136,10 @@ rustc_library_with_features("netstack3-core") {
       with_unit_tests = true
       non_test_deps = [
         "base:netstack3-base-instrumented",
+        "datagram:netstack3-datagram-instrumented",
         "device:netstack3-device-instrumented",
         "filter:netstack3-filter-instrumented",
+        "icmp_echo:netstack3-icmp-echo-instrumented",
         "ip:netstack3-ip-instrumented",
         "sync:netstack3-sync-instrumented",
         "tcp:netstack3-tcp-instrumented",
@@ -122,14 +147,16 @@ rustc_library_with_features("netstack3-core") {
       ]
       test_deps = [
         "base:netstack3-base-testutils",
+        "datagram:netstack3-datagram-testutils",
         "device:netstack3-device-testutils",
         "filter:netstack3-filter-testutils",
+        "icmp_echo:netstack3-icmp-echo-testutils",
         "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
         "tcp:netstack3-tcp-testutils",
         "udp:netstack3-udp-testutils",
       ]
-      test_deps += _testutil_deps
+      test_deps += _testutils_deps
 
       # Guard against bad crate variants.
       assert_no_deps = _all_core_crates - non_test_deps
@@ -146,8 +173,10 @@ rustc_library_with_features("netstack3-core") {
 
       _core_deps = [
         "base:netstack3-base-testutils",
+        "datagram:netstack3-datagram-testutils",
         "device:netstack3-device-testutils",
         "filter:netstack3-filter-testutils",
+        "icmp_echo:netstack3-icmp-echo-testutils",
         "ip:netstack3-ip-testutils",
         "sync:netstack3-sync-instrumented",
         "tcp:netstack3-tcp-testutils",
@@ -155,7 +184,7 @@ rustc_library_with_features("netstack3-core") {
       ]
 
       deps += _core_deps
-      deps += _testutil_deps
+      deps += _testutils_deps
 
       # Guard against bad crate variants.
       assert_no_deps = _all_core_crates - _core_deps
@@ -170,16 +199,17 @@ rustc_library_with_features("netstack3-core") {
 
       _core_deps = [
         "base:netstack3-base-benchmarks",
+        "datagram:netstack3-datagram-benchmarks",
         "device:netstack3-device-benchmarks",
         "filter:netstack3-filter-benchmarks",
+        "icmp_echo:netstack3-icmp-echo-benchmarks",
         "ip:netstack3-ip-benchmarks",
         "sync:netstack3-sync",
         "tcp:netstack3-tcp-benchmarks",
         "udp:netstack3-udp-benchmarks",
       ]
       deps += _core_deps
-      deps += [ "//third_party/rust_crates:criterion" ]
-      deps += _testutil_deps
+      deps += _testutils_deps
 
       # Guard against bad crate variants.
       assert_no_deps = _all_core_crates - _core_deps
@@ -201,15 +231,17 @@ rustc_library_with_features("netstack3-core") {
         ]
         _core_deps = [
           "base:netstack3-base-loom",
+          "datagram:netstack3-datagram-loom",
           "device:netstack3-device-loom",
           "filter:netstack3-filter-loom",
+          "icmp_echo:netstack3-icmp-echo-loom",
           "ip:netstack3-ip-loom",
           "sync:netstack3-sync-loom",
           "tcp:netstack3-tcp-loom",
           "udp:netstack3-udp-loom",
         ]
         deps += _core_deps
-        deps += _testutil_deps
+        deps += _testutils_deps
 
         # Guard against bad crate variants.
         assert_no_deps = _all_core_crates - _core_deps
@@ -238,6 +270,11 @@ config("benchmark") {
   rustflags = [ "--cfg=benchmark" ]
 }
 
+config("no_lock_order") {
+  rustflags = [ "--cfg=no_lock_order" ]
+  visibility = [ ":*" ]
+}
+
 rustc_fuzzer("fuzz-single-device") {
   edition = "2021"
   rustfunction = "single_device_arbitrary_packets"
@@ -254,8 +291,7 @@ rustc_fuzzer("fuzz-single-device") {
     "//src/lib/network/packet",
     "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-subscriber",
+    "//third_party/rust_crates:log",
   ]
 
   features = [
@@ -294,8 +330,10 @@ group("tests") {
     ":netstack3-core-instrumented_test($host_toolchain)",
     ":netstack3-core-test-package",
     "base:tests",
+    "datagram:tests",
     "device:tests",
     "filter:tests",
+    "icmp_echo:tests",
     "ip:tests",
     "lock-order:tests",
     "macros:tests",

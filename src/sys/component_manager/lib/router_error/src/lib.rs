@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_zircon_status as zx;
-use std::{
-    fmt::{self, Debug, Display},
-    sync::Arc,
-};
+use std::fmt::{self, Debug, Display};
+use std::sync::Arc;
 use thiserror::Error;
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon_status as zx};
 
 /// The error type returned by bedrock operations.
 #[derive(Debug, Error, Clone)]

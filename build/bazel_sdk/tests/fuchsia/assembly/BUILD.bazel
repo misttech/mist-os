@@ -86,6 +86,23 @@ fuchsia_board_configuration_test(
     visibility = ["//visibility:public"],
 )
 
+fuchsia_board_configuration(
+    name = "prebuilt_inputs_testing_board_configuration",
+    board_bundles_dir = "test_data",
+    board_name = "x64",
+    devicetree = "test_data/test.dtb",
+    input_bundles = [
+        "prebuilt_bib/testing_board_input_bundle",
+    ],
+)
+
+fuchsia_board_configuration_test(
+    name = "prebuilt_inputs_board_configuration_golden_test",
+    board_config = ":prebuilt_inputs_testing_board_configuration",
+    golden_file = ":test_data/prebuilt_inputs_board_configuration_golden_file.json",
+    visibility = ["//visibility:public"],
+)
+
 fuchsia_assemble_package(
     name = "assembled_ams_light",
     configs = {

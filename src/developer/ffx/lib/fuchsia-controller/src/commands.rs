@@ -11,17 +11,15 @@ use fidl::{
 };
 use fuchsia_async::emulated_handle::Koid;
 use fuchsia_async::OnSignalsRef;
-use fuchsia_zircon_status as zx_status;
-use fuchsia_zircon_types as zx_types;
 use std::future::Future;
-use std::mem::ManuallyDrop;
-use std::mem::MaybeUninit;
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{mpsc, Arc};
 use std::task::{Context, Poll};
 use std::time::Duration;
+use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
 
 type Responder<T> = mpsc::SyncSender<T>;
 type CmdResult<T> = Result<T, zx_status::Status>;

@@ -5,20 +5,17 @@
 //! link_checker implements the [`DocCheck` trait  used to perform checks on the links and images
 //! found in markdown documentation in the Fuchsia project.
 
-use crate::{
-    md_element::{CowStr, Element, LinkType},
-    DocCheck, DocCheckError, DocCheckerArgs, DocLine,
-};
+use crate::md_element::{CowStr, Element, LinkType};
+use crate::{DocCheck, DocCheckError, DocCheckerArgs, DocLine};
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use fuchsia_hyper::{new_https_client_from_tcp_options, HttpsClient, TcpOptions};
-use http::{uri::Uri, Request, StatusCode};
+use http::uri::Uri;
+use http::{Request, StatusCode};
 use hyper::Body;
-use std::{
-    collections::{HashMap, HashSet},
-    ffi::OsStr,
-    path::{self, Path, PathBuf},
-};
+use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
+use std::path::{self, Path, PathBuf};
 use url::Url;
 
 // path_help is a wrapper to allow mocking path checks

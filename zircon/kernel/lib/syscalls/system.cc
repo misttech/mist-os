@@ -496,6 +496,7 @@ zx_status_t sys_system_powerctl(zx_handle_t power_rsrc, uint32_t cmd,
     }
 #if defined __x86_64__
     case ZX_SYSTEM_POWERCTL_ACPI_TRANSITION_S_STATE:
+      return ZX_ERR_NOT_SUPPORTED;
     case ZX_SYSTEM_POWERCTL_X86_SET_PKG_PL1: {
       zx_system_powerctl_arg_t arg;
       MsrAccess msr;

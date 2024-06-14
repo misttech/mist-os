@@ -2,25 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Context, Result},
-    async_trait::async_trait,
-    chrono::{Datelike, Local, Timelike},
-    ffx_target_screenshot_args::{Format, ScreenshotCommand},
-    ffx_writer::{ToolIO, VerifiedMachineWriter},
-    fho::{moniker, FfxContext, FfxMain, FfxTool},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotProxy, ScreenshotTakeFileRequest},
-    futures::stream::{FuturesOrdered, StreamExt},
-    schemars::JsonSchema,
-    serde::{Deserialize, Serialize},
-    std::{
-        fmt::{Display, Formatter, Result as FmtResult},
-        fs,
-        io::Write,
-        path::{Path, PathBuf},
-    },
-};
+use anyhow::{anyhow, bail, Context, Result};
+use async_trait::async_trait;
+use chrono::{Datelike, Local, Timelike};
+use ffx_target_screenshot_args::{Format, ScreenshotCommand};
+use ffx_writer::{ToolIO, VerifiedMachineWriter};
+use fho::{moniker, FfxContext, FfxMain, FfxTool};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotProxy, ScreenshotTakeFileRequest};
+use futures::stream::{FuturesOrdered, StreamExt};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter, Result as FmtResult};
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 // Reads all of the contents of the given file from the current seek
 // offset to end of file, returning the content. It errors if the seek pointer
@@ -211,16 +207,14 @@ fn bgra_to_rgba(img_data: &mut Vec<u8>) {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        ffx_writer::{Format as WriterFormat, TestBuffers},
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_math::SizeU,
-        fidl_fuchsia_ui_composition::{ScreenshotRequest, ScreenshotTakeFileResponse},
-        futures::TryStreamExt,
-        std::os::unix::ffi::OsStrExt,
-        tempfile::tempdir,
-    };
+    use super::*;
+    use ffx_writer::{Format as WriterFormat, TestBuffers};
+    use fidl::endpoints::ServerEnd;
+    use fidl_fuchsia_math::SizeU;
+    use fidl_fuchsia_ui_composition::{ScreenshotRequest, ScreenshotTakeFileResponse};
+    use futures::TryStreamExt;
+    use std::os::unix::ffi::OsStrExt;
+    use tempfile::tempdir;
 
     fn serve_fake_file(server: ServerEnd<fio::FileMarker>) {
         fuchsia_async::Task::local(async move {

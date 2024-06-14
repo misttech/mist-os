@@ -2,30 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        error::Error,
-        features::{Feature, FeatureSet},
-        offer_to_all_would_duplicate, validate,
-        validate::ProtocolRequirements,
-        AnyRef, AsClause, Availability, Capability, CapabilityClause, Child, Collection, ConfigKey,
-        ConfigNestedValueType, ConfigRuntimeSource, ConfigType, ConfigValueType, DebugRegistration,
-        DictionaryRef, Document, Environment, EnvironmentExtends, EnvironmentRef, EventScope,
-        Expose, ExposeFromRef, ExposeToRef, FromClause, Offer, OfferFromRef, OfferToRef, OneOrMany,
-        Path, PathClause, Program, ResolverRegistration, RightsClause, RootDictionaryRef,
-        RunnerRegistration, SourceAvailability, Use, UseFromRef,
-    },
-    cm_rust::NativeIntoFidl,
-    cm_types::{self as cm, Name},
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    indexmap::IndexMap,
-    itertools::Itertools,
-    serde_json::{Map, Value},
-    sha2::{Digest, Sha256},
-    std::collections::{BTreeMap, BTreeSet},
-    std::convert::{Into, TryInto},
-    std::path::PathBuf,
+use crate::error::Error;
+use crate::features::{Feature, FeatureSet};
+use crate::validate::ProtocolRequirements;
+use crate::{
+    offer_to_all_would_duplicate, validate, AnyRef, AsClause, Availability, Capability,
+    CapabilityClause, Child, Collection, ConfigKey, ConfigNestedValueType, ConfigRuntimeSource,
+    ConfigType, ConfigValueType, DebugRegistration, DictionaryRef, Document, Environment,
+    EnvironmentExtends, EnvironmentRef, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause,
+    Offer, OfferFromRef, OfferToRef, OneOrMany, Path, PathClause, Program, ResolverRegistration,
+    RightsClause, RootDictionaryRef, RunnerRegistration, SourceAvailability, Use, UseFromRef,
 };
+use cm_rust::NativeIntoFidl;
+use cm_types::{self as cm, Name};
+use indexmap::IndexMap;
+use itertools::Itertools;
+use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+use std::convert::{Into, TryInto};
+use std::path::PathBuf;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio};
 
 /// Options for CML compilation. Uses the builder pattern.
 #[derive(Default, Clone)]
@@ -2194,27 +2191,26 @@ pub mod test_util {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::error::Error;
+    use crate::features::Feature;
+    use crate::translate::test_util::must_parse_cml;
+    use crate::{
+        create_offer, AnyRef, AsClause, Capability, CapabilityClause, Child, Collection,
+        DebugRegistration, Document, Environment, EnvironmentExtends, EnvironmentRef, Expose,
+        ExposeFromRef, ExposeToRef, FromClause, Offer, OfferFromRef, OneOrMany, Path, PathClause,
+        Program, ResolverRegistration, RightsClause, RunnerRegistration, Use, UseFromRef,
+    };
+    use assert_matches::assert_matches;
+    use cm_fidl_validator::error::{AvailabilityList, DeclField, Error as CmFidlError, ErrorList};
+    use cm_types::{self as cm, Name};
+    use difference::Changeset;
+    use serde_json::{json, Map, Value};
+    use std::collections::BTreeSet;
+    use std::convert::Into;
+    use std::str::FromStr;
     use {
-        super::*,
-        crate::translate::test_util::must_parse_cml,
-        crate::{
-            create_offer, error::Error, features::Feature, AnyRef, AsClause, Capability,
-            CapabilityClause, Child, Collection, DebugRegistration, Document, Environment,
-            EnvironmentExtends, EnvironmentRef, Expose, ExposeFromRef, ExposeToRef, FromClause,
-            Offer, OfferFromRef, OneOrMany, Path, PathClause, Program, ResolverRegistration,
-            RightsClause, RunnerRegistration, Use, UseFromRef,
-        },
-        assert_matches::assert_matches,
-        cm_fidl_validator::error::AvailabilityList,
-        cm_fidl_validator::error::Error as CmFidlError,
-        cm_fidl_validator::error::{DeclField, ErrorList},
-        cm_types::{self as cm, Name},
-        difference::Changeset,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-        serde_json::{json, Map, Value},
-        std::collections::BTreeSet,
-        std::convert::Into,
-        std::str::FromStr,
     };
 
     macro_rules! test_compile {

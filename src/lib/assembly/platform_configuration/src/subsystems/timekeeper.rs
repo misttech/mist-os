@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 
 use assembly_config_schema::platform_config::timekeeper_config::TimekeeperConfig;
 
@@ -33,6 +33,19 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         // See: b/299320231
         let early_exit = context.board_info.provides_feature("fuchsia::soft_crypto");
 
+        // Some e2e tests need to change Timekeeper behavior at runtime. This setting
+        // allows Timekeeper to serve an endpoint for such runtime behavior changes.
+        // Only eng builds are allowed to have this feature.
+        let serve_test_protocols = config.serve_test_protocols;
+
+        // See:
+        // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0115_build_types?hl=en#definitions
+        if serve_test_protocols && *context.build_type != BuildType::Eng {
+            return Err(anyhow!(
+                "`serve_test_protocols==true` is only allowed in `eng` builds, see RFC 0115"
+            ));
+        }
+
         // Refer to //src/sys/time/timekeeper/config.shard.cml
         // for details.
         config_builder
@@ -54,7 +67,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .field("early_exit", early_exit)?
             // TODO: b/295537795 - provide this setting somehow.
             .field("power_topology_integration_enabled", false)?
-            .field("rtc_is_read_only", config.rtc_is_read_only)?;
+            .field("serve_test_protocols", serve_test_protocols)?;
 
         let mut time_source_config_builder = builder
             .package("httpsdate-time-source-pull")

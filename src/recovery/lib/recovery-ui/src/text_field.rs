@@ -2,34 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    button::{Button, ButtonOptions, ButtonShape, SceneBuilderButtonExt},
-    constants::constants::{
-        BORDER_WIDTH, ICONS_PATH, ICON_PASSWORD_INVISIBLE, ICON_PASSWORD_VISIBLE,
-        ICON_PASSWORD_VISIBLE_SIZE, MIN_SPACE, TEXT_FIELD_FONT_SIZE, TEXT_FIELD_TITLE_SIZE,
-    },
-    font,
+use crate::button::{Button, ButtonOptions, ButtonShape, SceneBuilderButtonExt};
+use crate::constants::constants::{
+    BORDER_WIDTH, ICONS_PATH, ICON_PASSWORD_INVISIBLE, ICON_PASSWORD_VISIBLE,
+    ICON_PASSWORD_VISIBLE_SIZE, MIN_SPACE, TEXT_FIELD_FONT_SIZE, TEXT_FIELD_TITLE_SIZE,
 };
+use crate::font;
+use carnelian::color::Color;
+use carnelian::render::rive::load_rive;
+use carnelian::scene::facets::{
+    FacetId, RiveFacet, SetTextMessage, TextFacetOptions, TextVerticalAlignment,
+};
+use carnelian::scene::layout::{
+    Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize, Stack,
+    StackOptions,
+};
+use carnelian::scene::scene::{Scene, SceneBuilder};
+use carnelian::{input, Coord, Point, ViewAssistantContext};
+use derivative::Derivative;
+use euclid::{size2, Size2D, UnknownUnit};
 use rive_rs::File;
-use {
-    carnelian::{
-        color::Color,
-        input,
-        render::rive::load_rive,
-        scene::{
-            facets::{FacetId, RiveFacet, SetTextMessage, TextFacetOptions, TextVerticalAlignment},
-            layout::{
-                Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize,
-                Stack, StackOptions,
-            },
-            scene::{Scene, SceneBuilder},
-        },
-        Coord, Point, ViewAssistantContext,
-    },
-    derivative::Derivative,
-    euclid::{size2, Size2D, UnknownUnit},
-    std::ops::Add,
-};
+use std::ops::Add;
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum TextVisibility {

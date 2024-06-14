@@ -10,11 +10,11 @@ use fidl_fuchsia_hardware_backlight::{
     DeviceMarker as BacklightMarker, DeviceProxy as BacklightProxy, State as BacklightCommand,
 };
 use fidl_fuchsia_ui_display_internal::{DisplayPowerMarker, DisplayPowerProxy};
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
-use futures::{channel::oneshot, lock::Mutex};
+use futures::channel::oneshot;
+use futures::lock::Mutex;
 use std::sync::Arc;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// The minimum brightness value that can be sent to the backlight service.
 const MIN_REGULATED_BRIGHTNESS: f64 = 0.0004;
@@ -442,7 +442,8 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_hardware_backlight::DeviceRequestStream as BacklightRequestStream;
     use fuchsia_async::{self as fasync};
-    use futures::{join, prelude::future};
+    use futures::join;
+    use futures::prelude::future;
     use futures_util::stream::StreamExt;
 
     fn mock_backlight() -> (Arc<Backlight>, BacklightRequestStream) {
@@ -592,7 +593,8 @@ mod dual_state_tests {
     use fidl_fuchsia_hardware_backlight::DeviceRequestStream as BacklightRequestStream;
     use fidl_fuchsia_ui_display_internal::{DisplayPowerRequest, DisplayPowerRequestStream};
     use fuchsia_async::{self as fasync, Task};
-    use futures::{prelude::future, Future, TryStreamExt};
+    use futures::prelude::future;
+    use futures::{Future, TryStreamExt};
     use std::task::Poll;
     use test_helpers::ResettableFuture;
 

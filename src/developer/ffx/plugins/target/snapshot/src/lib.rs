@@ -16,13 +16,11 @@ use fidl_fuchsia_io as fio;
 use futures::stream::{FuturesOrdered, StreamExt};
 use schemars::JsonSchema;
 use serde::Serialize;
-use std::{
-    env::temp_dir,
-    fs,
-    io::Write,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::env::temp_dir;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]

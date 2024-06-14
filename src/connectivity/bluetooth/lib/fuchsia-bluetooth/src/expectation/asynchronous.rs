@@ -27,20 +27,17 @@
 //!   action_success.satisfied(state)
 //!   ```
 
-use {
-    anyhow::{format_err, Error},
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_sync::{MappedRwLockWriteGuard, RwLock, RwLockWriteGuard},
-    fuchsia_zircon as zx,
-    futures::{future::BoxFuture, FutureExt},
-    slab::Slab,
-    std::{
-        future::Future,
-        pin::Pin,
-        sync::Arc,
-        task::{self, Poll},
-    },
-};
+use anyhow::{format_err, Error};
+use fuchsia_async::{DurationExt, TimeoutExt};
+use fuchsia_sync::{MappedRwLockWriteGuard, RwLock, RwLockWriteGuard};
+use fuchsia_zircon as zx;
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use slab::Slab;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{self, Poll};
 
 use crate::expectation::Predicate;
 

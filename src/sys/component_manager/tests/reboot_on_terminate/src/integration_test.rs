@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fidl_test_components as ftest, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-    },
-    futures::channel::mpsc,
-    futures::prelude::*,
-    tracing::*,
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
+use futures::channel::mpsc;
+use futures::prelude::*;
+use tracing::*;
+use {fidl_fidl_test_components as ftest, fuchsia_async as fasync};
 
 #[fuchsia::test]
 async fn reboot_on_terminate_success() {

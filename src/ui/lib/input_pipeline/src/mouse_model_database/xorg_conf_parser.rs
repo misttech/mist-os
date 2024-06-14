@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use nom::{
-    self,
-    branch::alt,
-    bytes::complete::{is_not, tag, take_until, take_while},
-    character::complete::{alphanumeric1, digit1, line_ending, multispace1, not_line_ending},
-    character::is_hex_digit,
-    combinator::{map, map_res, value},
-    error::{ErrorKind, ParseError},
-    multi::many0,
-    sequence::{delimited, preceded, separated_pair, tuple},
-    IResult,
-};
-use {nom_locate::LocatedSpan, std::fmt, thiserror::Error};
+use nom::branch::alt;
+use nom::bytes::complete::{is_not, tag, take_until, take_while};
+use nom::character::complete::{alphanumeric1, digit1, line_ending, multispace1, not_line_ending};
+use nom::character::is_hex_digit;
+use nom::combinator::{map, map_res, value};
+use nom::error::{ErrorKind, ParseError};
+use nom::multi::many0;
+use nom::sequence::{delimited, preceded, separated_pair, tuple};
+use nom::{self, IResult};
+use nom_locate::LocatedSpan;
+use std::fmt;
+use thiserror::Error;
 
 #[derive(Debug, PartialEq)]
 pub(super) struct MouseModel {
@@ -419,7 +418,8 @@ mod helper {
 }
 
 mod tests {
-    use {super::*, test_case::test_case};
+    use super::*;
+    use test_case::test_case;
 
     pub(crate) fn check_result<O: PartialEq + fmt::Debug>(
         result: IResult<NomSpan<'_>, O, XOrgConfParserError>,
@@ -438,7 +438,9 @@ mod tests {
     }
 
     mod helper {
-        use {super::super::helper::*, super::*, test_case::test_case};
+        use super::super::helper::*;
+        use super::*;
+        use test_case::test_case;
 
         #[test_case("#123\r\nnext line", "next line"; "crlf")]
         #[test_case("#123\nnext line", "next line"; "lf")]

@@ -12,7 +12,7 @@
 #include <platform/timer.h>
 
 TaskRuntimeStats::operator zx_info_task_runtime_t() const {
-  const affine::Ratio ticks_to_time = platform_get_ticks_to_time_ratio();
+  const affine::Ratio ticks_to_time = timer_get_ticks_to_time_ratio();
   return {.cpu_time = ticks_to_time.Scale(cpu_ticks),
           .queue_time = ticks_to_time.Scale(queue_ticks),
           .page_fault_time = ticks_to_time.Scale(page_fault_ticks),

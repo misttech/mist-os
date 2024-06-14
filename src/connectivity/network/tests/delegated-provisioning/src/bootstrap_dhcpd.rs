@@ -4,10 +4,11 @@
 
 //! A minimal script to configure and start a DHCP server.
 
-use delegated_provisioning_constants as constants;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use tracing::info;
+use {
+    delegated_provisioning_constants as constants, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_dhcp as fnet_dhcp,
+};
 
 /// Computes the IPv4 address immediately following the given address.
 ///

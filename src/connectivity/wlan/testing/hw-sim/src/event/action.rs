@@ -44,24 +44,22 @@
 //! ));
 //! ```
 
+use anyhow::{bail, Context};
+use ieee80211::{Bssid, MacAddrBytes, Ssid};
+use tracing::{debug, info};
+use wlan_common::bss::Protection;
+use wlan_common::channel::Channel;
+use wlan_common::mac;
+use wlan_rsn::rsna::UpdateSink;
+use wlan_rsn::{auth, Authenticator};
 use {
-    anyhow::{bail, Context},
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_tap as fidl_tap,
-    ieee80211::{Bssid, MacAddrBytes, Ssid},
-    tracing::{debug, info},
-    wlan_common::{bss::Protection, channel::Channel, mac},
-    wlan_rsn::{auth, rsna::UpdateSink, Authenticator},
 };
 
-use crate::{
-    event::{
-        self, branch,
-        buffered::{AssocReqFrame, AuthFrame, Buffered, DataFrame, ProbeReqFrame},
-        Handler, Stateful,
-    },
-    ApAdvertisement, ProbeResponse, CLIENT_MAC_ADDR,
-};
+use crate::event::buffered::{AssocReqFrame, AuthFrame, Buffered, DataFrame, ProbeReqFrame};
+use crate::event::{self, branch, Handler, Stateful};
+use crate::{ApAdvertisement, ProbeResponse, CLIENT_MAC_ADDR};
 
 /// The result of an action event handler.
 ///

@@ -1,7 +1,6 @@
-use std::env;
-use std::fs;
 use std::path::Path;
 use std::process::{Command, ExitStatus};
+use std::{env, fs};
 
 // This code exercises the surface area that we expect of the std Backtrace
 // type. If the current toolchain is able to compile it, we go ahead and use

@@ -8,25 +8,16 @@ use anyhow::{Context, Result};
 use ffx::TargetAddrInfo;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_net::{IpAddress, Ipv4Address};
-use futures::{
-    channel::mpsc::{self, Receiver, Sender},
-    stream::StreamExt,
-    SinkExt,
-};
-use notify::{
-    event::{
-        CreateKind, Event,
-        EventKind::{Create, Modify, Remove},
-        RemoveKind,
-    },
-    EventKind, RecursiveMode, Watcher,
-};
-use std::{
-    collections::HashMap,
-    fs::create_dir_all,
-    path::{Path, PathBuf},
-    time::{Duration, Instant},
-};
+use futures::channel::mpsc::{self, Receiver, Sender};
+use futures::stream::StreamExt;
+use futures::SinkExt;
+use notify::event::EventKind::{Create, Modify, Remove};
+use notify::event::{CreateKind, Event, RemoveKind};
+use notify::{EventKind, RecursiveMode, Watcher};
+use std::collections::HashMap;
+use std::fs::create_dir_all;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 // `RecommendedWatcher` is a type alias to FsEvents in the notify crate.
 // On mac this seems to have bugs about what's reported and when regarding
 // file removal. Without PollWatcher the watcher would report a fresh file
@@ -342,10 +333,8 @@ pub fn get_all_targets(instances: &EmulatorInstances) -> Result<Vec<ffx::TargetI
 mod tests {
     pub(crate) use super::*;
     use crate::EngineState;
-    use notify::{
-        event::{EventAttributes, ModifyKind},
-        EventHandler,
-    };
+    use notify::event::{EventAttributes, ModifyKind};
+    use notify::EventHandler;
     use std::process;
     use tempfile::tempdir;
     #[test]

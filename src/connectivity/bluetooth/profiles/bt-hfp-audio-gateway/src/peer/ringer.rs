@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    core::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    fuchsia_async::{self as fasync, DurationExt},
-    fuchsia_zircon as zx,
-    futures::{
-        stream::{FusedStream, Stream},
-        FutureExt,
-    },
-};
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use fuchsia_async::{self as fasync, DurationExt};
+use fuchsia_zircon as zx;
+use futures::stream::{FusedStream, Stream};
+use futures::FutureExt;
 
 /// Default frequency used for rings.
 const DEFAULT_FREQUENCY: zx::Duration = zx::Duration::from_seconds(5);

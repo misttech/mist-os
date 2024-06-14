@@ -4,12 +4,10 @@
 
 #![cfg(test)]
 
-use {
-    anyhow::{format_err, Error},
-    char_set::CharSet,
-    font_info::{FontAssetSource, FontInfo, FontInfoLoaderImpl},
-    std::path::Path,
-};
+use anyhow::{format_err, Error};
+use char_set::CharSet;
+use font_info::{FontAssetSource, FontInfo, FontInfoLoaderImpl};
+use std::path::Path;
 
 /// Returns `"{output_dir}/test_data/font_info/SampleFont-Regular.ttf"`.
 #[cfg(not(target_os = "fuchsia"))]

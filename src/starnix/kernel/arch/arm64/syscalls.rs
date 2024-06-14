@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{syscalls::do_clone, CurrentTask},
-    vfs::{syscalls::sys_renameat2, FdNumber},
-};
+use crate::task::syscalls::do_clone;
+use crate::task::CurrentTask;
+use crate::vfs::syscalls::sys_renameat2;
+use crate::vfs::FdNumber;
 use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::{
-    clone_args,
-    errors::Errno,
-    pid_t,
-    user_address::{UserAddress, UserCString, UserRef},
-    CSIGNAL,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::{clone_args, pid_t, CSIGNAL};
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(

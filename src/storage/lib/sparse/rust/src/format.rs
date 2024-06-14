@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    serde::{Deserialize, Serialize},
-    static_assertions::const_assert_eq,
-};
+use serde::{Deserialize, Serialize};
+use static_assertions::const_assert_eq;
 
 /// `SparseHeader` represents the header section of a `SparseFile`
 #[derive(Debug, Serialize, Deserialize)]

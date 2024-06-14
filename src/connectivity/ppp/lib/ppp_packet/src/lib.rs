@@ -14,17 +14,13 @@ pub mod ipv6;
 pub mod link;
 pub mod records;
 
-use {
-    packet::{
-        BufferView, BufferViewMut, FragmentedBytesMut, PacketBuilder, PacketConstraints,
-        ParsablePacket, ParseMetadata, SerializeTarget,
-    },
-    thiserror::Error,
-    zerocopy::{
-        byteorder::network_endian::{U16, U32},
-        AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-    },
+use packet::{
+    BufferView, BufferViewMut, FragmentedBytesMut, PacketBuilder, PacketConstraints,
+    ParsablePacket, ParseMetadata, SerializeTarget,
 };
+use thiserror::Error;
+use zerocopy::byteorder::network_endian::{U16, U32};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 /// The type of error that occurred while attempting to parse a packet.
 #[derive(Error, Debug, PartialEq)]
@@ -452,11 +448,9 @@ impl PacketBuilder for EchoDiscardPacketBuilder {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::records::options::{Options, OptionsSerializer},
-        packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer},
-    };
+    use super::*;
+    use crate::records::options::{Options, OptionsSerializer};
+    use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer};
 
     #[fuchsia::test]
     fn test_link_parse_serialize() {

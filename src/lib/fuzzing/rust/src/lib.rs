@@ -4,17 +4,13 @@
 
 //! Rust/LibFuzzer integration for Fuchsia
 
-use {
-    proc_macro::TokenStream,
-    quote::{quote, quote_spanned},
-    std::ops::Deref,
-    syn::{
-        parse::Error,
-        parse_macro_input,
-        FnArg::{self, Receiver, Typed},
-        Type::Reference,
-    },
-};
+use proc_macro::TokenStream;
+use quote::{quote, quote_spanned};
+use std::ops::Deref;
+use syn::parse::Error;
+use syn::parse_macro_input;
+use syn::FnArg::{self, Receiver, Typed};
+use syn::Type::Reference;
 
 /// Defines a fuzz target function.
 ///

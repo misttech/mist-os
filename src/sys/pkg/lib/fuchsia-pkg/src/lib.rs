@@ -21,34 +21,28 @@ mod path;
 mod path_to_string;
 mod subpackages_build_manifest;
 
-pub use {
-    crate::{
-        errors::{
-            BuildError, MetaContentsError, MetaPackageError, MetaSubpackagesError,
-            PackageBuildManifestError, PackageManifestError, ParsePackagePathError,
-        },
-        meta_contents::MetaContents,
-        meta_package::MetaPackage,
-        meta_subpackages::MetaSubpackages,
-        package_archive::PackageArchiveBuilder,
-        package_build_manifest::PackageBuildManifest,
-        package_builder::{PackageBuilder, ABI_REVISION_FILE_PATH},
-        package_directory::{
-            LoadAbiRevisionError, LoadMetaContentsError, OpenRights, PackageDirectory,
-            ReadHashError,
-        },
-        package_manifest::{
-            BlobInfo, PackageManifest, PackageManifestBuilder, RelativeTo, SubpackageInfo,
-        },
-        package_manifest_list::PackageManifestList,
-        path::{PackageName, PackagePath, PackageVariant},
-        subpackages_build_manifest::{
-            SubpackagesBuildManifest, SubpackagesBuildManifestEntry,
-            SubpackagesBuildManifestEntryKind,
-        },
-    },
-    fuchsia_url::errors::PackagePathSegmentError,
-    path_to_string::PathToStringExt,
+pub use crate::errors::{
+    BuildError, MetaContentsError, MetaPackageError, MetaSubpackagesError,
+    PackageBuildManifestError, PackageManifestError, ParsePackagePathError,
 };
+pub use crate::meta_contents::MetaContents;
+pub use crate::meta_package::MetaPackage;
+pub use crate::meta_subpackages::MetaSubpackages;
+pub use crate::package_archive::PackageArchiveBuilder;
+pub use crate::package_build_manifest::PackageBuildManifest;
+pub use crate::package_builder::{PackageBuilder, ABI_REVISION_FILE_PATH};
+pub use crate::package_directory::{
+    LoadAbiRevisionError, LoadMetaContentsError, OpenRights, PackageDirectory, ReadHashError,
+};
+pub use crate::package_manifest::{
+    BlobInfo, PackageManifest, PackageManifestBuilder, RelativeTo, SubpackageInfo,
+};
+pub use crate::package_manifest_list::PackageManifestList;
+pub use crate::path::{PackageName, PackagePath, PackageVariant};
+pub use crate::subpackages_build_manifest::{
+    SubpackagesBuildManifest, SubpackagesBuildManifestEntry, SubpackagesBuildManifestEntryKind,
+};
+pub use fuchsia_url::errors::PackagePathSegmentError;
+pub use path_to_string::PathToStringExt;
 
 pub(crate) use crate::package::{BlobEntry, Package, SubpackageEntry};

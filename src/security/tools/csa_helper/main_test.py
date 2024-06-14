@@ -15,6 +15,8 @@ import time
 import unittest
 import unittest.mock as mock
 
+from typing import Any
+
 import main
 
 _TARGET_1 = "foo.cc.o"
@@ -23,7 +25,9 @@ _TARGET_3 = "biz/fuzz.cc.o"
 _TARGETS = [_TARGET_1, _TARGET_2, _TARGET_3]
 
 
-def setup_compdb_and_fs(directory, targets, changed):
+def setup_compdb_and_fs(
+    directory: str, targets: list[str], changed: list[str]
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     compdb = []
     changed_comp_db = []
     # Setup targets
@@ -56,7 +60,9 @@ def setup_compdb_and_fs(directory, targets, changed):
 
 
 class RunCsaHelperTest(unittest.TestCase):
-    def helper(self, temp_dir, targets, changed):
+    def helper(
+        self, temp_dir: str, targets: list[str], changed: list[str]
+    ) -> None:
         ninja_path = "tmp/ninja"
         out_dir = os.path.join(temp_dir, "foo/bar")
 
@@ -97,26 +103,28 @@ class RunCsaHelperTest(unittest.TestCase):
                     out_file.read(),
                 )
 
-    def test_no_changed_files(self):
+    def test_no_changed_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             self.helper(temp_dir, _TARGETS, [])
 
-    def test_some_changed_files(self):
+    def test_some_changed_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             self.helper(temp_dir, _TARGETS, [_TARGET_1, _TARGET_3])
 
-    def test_all_changed_files(self):
+    def test_all_changed_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             self.helper(temp_dir, _TARGETS, [_TARGET_1, _TARGET_2, _TARGET_3])
 
 
 class FakeNinja(object):
-    def __init__(self, directory, files_to_update):
+    def __init__(self, directory: str, files_to_update: list[str]) -> None:
         self.directory = directory
         self.files_to_update = files_to_update
         return
 
-    def run(self, *argv, **kwargs):
+    def run(
+        self, *argv: Any, **kwargs: Any
+    ) -> subprocess.CompletedProcess[bytes]:
         del argv
         del kwargs
 

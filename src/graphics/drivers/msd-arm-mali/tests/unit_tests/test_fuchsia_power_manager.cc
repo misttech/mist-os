@@ -65,6 +65,8 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
 
 class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
  public:
+  FakeLeaseControl() { fake_lease_control_couunt_++; }
+  ~FakeLeaseControl() { fake_lease_control_couunt_--; }
   void WatchStatus(fuchsia_power_broker::LeaseControlWatchStatusRequest& req,
                    WatchStatusCompleter::Sync& completer) override {
     if (req.last_status() != lease_status_)
@@ -78,11 +80,14 @@ class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl>
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   static fuchsia_power_broker::LeaseStatus lease_status_;
+
+  static uint32_t fake_lease_control_couunt_;
   std::vector<WatchStatusCompleter::Async> old_completers_;
 };
 
 fuchsia_power_broker::LeaseStatus FakeLeaseControl::lease_status_ =
     fuchsia_power_broker::LeaseStatus::kPending;
+uint32_t FakeLeaseControl::fake_lease_control_couunt_ = 0;
 
 class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
  public:
@@ -251,10 +256,11 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
 
 class FakePowerOwner : public FuchsiaPowerManager::Owner {
  public:
-  void SetPowerState(bool enabled, PowerStateCallback completer) {
+  void SetPowerState(bool enabled, PowerStateCallback completer) override {
     enabled_calls_.push_back(enabled);
     completer(enabled);
   }
+  PowerManager* GetPowerManager() override { return nullptr; }
 
   std::vector<bool>& enabled_calls() { return enabled_calls_; }
 
@@ -382,6 +388,30 @@ TEST(FuchsiaPowerManager, Basic) {
   for (bool call : owner.enabled_calls()) {
     // Required power level is 1, so all calls should be to enable the GPU.
     EXPECT_TRUE(call);
+  }
+  manager.EnablePower();
+  EXPECT_TRUE(manager.LeaseIsRequested());
+
+  while (true) {
+    bool have_lease_control = incoming.SyncCall([&](IncomingNamespace* incoming) mutable {
+      return FakeLeaseControl::fake_lease_control_couunt_ > 0;
+    });
+    if (have_lease_control) {
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+
+  manager.DisablePower();
+  EXPECT_FALSE(manager.LeaseIsRequested());
+  while (true) {
+    bool have_lease_control = incoming.SyncCall([&](IncomingNamespace* incoming) mutable {
+      return FakeLeaseControl::fake_lease_control_couunt_ > 0;
+    });
+    if (!have_lease_control) {
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 }
 

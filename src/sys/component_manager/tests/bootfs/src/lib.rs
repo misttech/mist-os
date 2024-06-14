@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::{directory, file, node, OpenFlags},
-    futures::StreamExt,
-    libc::{S_IRUSR, S_IXUSR},
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_io as fio;
+use fuchsia_fs::{directory, file, node, OpenFlags};
+use futures::StreamExt;
+use libc::{S_IRUSR, S_IXUSR};
 
 // Since this is a system test, we're actually going to verify real system critical files. That
 // means that these tests take a dependency on these files existing in the system, which may

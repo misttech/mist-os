@@ -2,18 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_hardware_block::BlockProxy,
-    fidl_fuchsia_paver::{PayloadStreamRequest, PayloadStreamRequestStream, ReadInfo, ReadResult},
-    fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    futures::prelude::*,
-    mapped_vmo::Mapping,
-    remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient, VmoId},
-    std::io::Read,
-};
+use anyhow::{Context as _, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_hardware_block::BlockProxy;
+use fidl_fuchsia_paver::{PayloadStreamRequest, PayloadStreamRequestStream, ReadInfo, ReadResult};
+use fuchsia_zircon as zx;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use mapped_vmo::Mapping;
+use remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient, VmoId};
+use std::io::Read;
 
 /// Callback type, called with (data_read, data_total)
 pub trait StatusCallback: Send + Sync + Fn(usize, usize) -> () {}
@@ -329,18 +327,16 @@ impl PayloadStreamer for BlockDevicePayloadStreamer {
 #[cfg(test)]
 mod tests {
 
-    use {
-        super::*,
-        anyhow::{anyhow, Context},
-        fidl_fuchsia_hardware_block::BlockMarker,
-        fidl_fuchsia_paver::{PayloadStreamMarker, PayloadStreamProxy},
-        fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx, HandleBased},
-        futures::future::try_join,
-        ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
-        std::sync::Mutex,
-        std::{io::Cursor, sync::Arc},
-    };
+    use super::*;
+    use anyhow::{anyhow, Context};
+    use fidl_fuchsia_hardware_block::BlockMarker;
+    use fidl_fuchsia_paver::{PayloadStreamMarker, PayloadStreamProxy};
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::{self as zx, HandleBased};
+    use futures::future::try_join;
+    use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
+    use std::io::Cursor;
+    use std::sync::{Arc, Mutex};
 
     struct StatusUpdate {
         data_read: usize,

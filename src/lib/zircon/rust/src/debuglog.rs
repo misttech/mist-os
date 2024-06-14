@@ -4,8 +4,7 @@
 
 //! Type-safe bindings for Zircon resources.
 
-use crate::ok;
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Resource, Status};
+use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Resource, Status};
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
 

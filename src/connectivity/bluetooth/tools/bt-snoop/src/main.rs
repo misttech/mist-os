@@ -6,34 +6,28 @@
 
 use anyhow::{format_err, Context as _, Error};
 use argh::FromArgs;
-use fidl::prelude::*;
 use fidl::Error as FidlError;
-use fidl_fuchsia_bluetooth_snoop::{SnoopRequest, SnoopRequestStream};
-use fidl_fuchsia_io as fio;
+use fidl_fuchsia_bluetooth_snoop::{
+    CaptureError, DevicePackets, SnoopPacket as FidlSnoopPacket, SnoopRequest, SnoopRequestStream,
+    SnoopStartRequest, UnrecognizedDeviceName,
+};
 use fidl_fuchsia_io::DirectoryProxy;
-use fuchsia_async as fasync;
-use fuchsia_bluetooth::bt_fidl_status;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
-use fuchsia_inspect as inspect;
-use fuchsia_trace as trace;
-use futures::{
-    future::{join, ready, Join, Ready, TryFutureExt},
-    select,
-    stream::{FusedStream, FuturesUnordered, Stream, StreamExt, StreamFuture},
-};
-use std::{fmt, time::Duration};
+use futures::future::{join, ready, Join, Ready};
+use futures::select;
+use futures::stream::{FusedStream, FuturesUnordered, Stream, StreamExt, StreamFuture};
+use std::collections::HashMap;
+use std::fmt;
+use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
+use {fidl_fuchsia_io as fio, fuchsia_inspect as inspect, fuchsia_trace as trace};
 
-use crate::{
-    clock::{set_utc_clock, utc_clock_transformation},
-    packet_logs::PacketLogs,
-    snooper::{SnoopPacket, Snooper},
-    subscription_manager::SubscriptionManager,
-};
+use crate::packet_logs::PacketLogs;
+use crate::snooper::{SnoopPacket, Snooper};
+use crate::subscription_manager::SubscriptionManager;
 
 mod bounded_queue;
-mod clock;
 mod packet_logs;
 mod snooper;
 mod subscription_manager;
@@ -46,8 +40,9 @@ const HCI_DEVICE_CLASS_PATH: &str = "/dev/class/bt-hci";
 /// A `DeviceId` represents the name of a host device within the HCI_DEVICE_CLASS_PATH.
 pub(crate) type DeviceId = String;
 
-/// A request is a tuple of the client id, the optional next request, and the rest of the stream.
-type ClientRequest = (ClientId, (Option<Result<SnoopRequest, FidlError>>, SnoopRequestStream));
+/// A request is a tuple of the client id, and the next request or error from the stream, or None
+/// if the stream has closed.
+type ClientRequest = (ClientId, Option<Result<SnoopRequest, FidlError>>);
 
 /// A `Stream` that holds a collection of client request streams and will return the item from the
 /// next ready stream.
@@ -127,80 +122,87 @@ fn handle_hci_device_event(
     }
 }
 
-/// Register a new client.
 fn register_new_client(
     stream: SnoopRequestStream,
     client_stream: &mut ConcurrentClientRequestFutures,
     client_id: ClientId,
 ) {
     client_stream.push(join(ready(client_id), stream.into_future()));
-    info!("New client connection: {}", client_id);
 }
 
 /// Handle a client request to dump the packet log, subscribe to future events or do both.
-/// Returns an error if the client channel does not accept a response that it requested.
+/// Returns an error if the client channel does not accept a response that it requested, or a
+/// boolean indicating if the client should receive ongoing packets.
 async fn handle_client_request(
     request: ClientRequest,
-    client_requests: &mut ConcurrentClientRequestFutures,
     subscribers: &mut SubscriptionManager,
     packet_logs: &PacketLogs,
-) -> Result<(), Error> {
-    let (id, (request, client_stream)) = request;
+) -> Result<bool, Error> {
+    let (id, request) = request;
+    info!("Request received from client {id}.");
     match request {
-        Some(Ok(SnoopRequest::Start { follow, host_device, responder })) => {
-            // Return early if the client has already issued a `Start` request.
-            if subscribers.is_registered(&id) {
-                responder.send(&bt_fidl_status!(
-                    Already,
-                    "Cannot issue `Start` request more than once."
-                ))?;
-                return Ok(());
+        Some(Ok(SnoopRequest::Start {
+            payload: SnoopStartRequest { follow, host_device, client, .. },
+            ..
+        })) => {
+            info!("Start request from client: {follow:?}, {host_device:?}");
+
+            let Some(client) = client.map(|client| client.into_proxy().unwrap()) else {
+                warn!("No client delivered, skipping");
+                return Ok(true);
+            };
+
+            let device_ids: Vec<String> = match &host_device {
+                Some(device) => {
+                    let Some(_log) = packet_logs.get(device) else {
+                        warn!("Couldn't find device: {device}, sending error to client");
+                        let _ = client.error(&CaptureError::UnrecognizedDeviceName(
+                            UnrecognizedDeviceName::default(),
+                        ));
+                        drop(client);
+                        return Ok(true);
+                    };
+                    vec![device.clone()]
+                }
+                None => packet_logs.device_ids().cloned().collect(),
+            };
+
+            let mut dev_packets: HashMap<_, _> = Default::default();
+            for device in &device_ids {
+                let log = packet_logs.get(device).unwrap();
+                let packets: &mut Vec<FidlSnoopPacket> =
+                    dev_packets.entry(device.clone()).or_insert_with(Vec::new);
+                packets.extend(log.lock().iter_mut().map(|e| (&*e).to_fidl()));
             }
 
-            debug!("Request received from client {}.", id);
-
-            let control_handle = responder.control_handle().clone();
-
-            // Get UTC time if it is available.
-            let utc_xform = utc_clock_transformation();
-
-            if let Some(ref device) = host_device {
-                if let Some(log) = packet_logs.get(device) {
-                    responder.send(&bt_fidl_status!())?;
-                    for packet in log.lock().await.iter_mut() {
-                        control_handle
-                            .send_on_packet(device, &packet.to_fidl(utc_xform.as_ref()))?;
-                    }
-                } else {
-                    responder.send(&bt_fidl_status!(NotFound, "Unrecognized device name."))?;
-                    return Ok(());
+            for (device, packets) in dev_packets.into_iter() {
+                if packets.len() == 0 {
+                    continue;
                 }
-            } else {
-                responder.send(&bt_fidl_status!())?;
-                let device_ids: Vec<_> = packet_logs.device_ids().cloned().collect();
-                for device in &device_ids {
-                    if let Some(log) = packet_logs.get(device) {
-                        for packet in log.lock().await.iter_mut() {
-                            control_handle
-                                .send_on_packet(device, &packet.to_fidl(utc_xform.as_ref()))?;
-                        }
-                    }
+                if let Err(e) = client
+                    .observe(&DevicePackets {
+                        host_device: Some(device),
+                        packets: Some(packets),
+                        ..Default::default()
+                    })
+                    .await
+                {
+                    warn!("Failed to send a previously observed packet to client: {e:?}");
+                    return Ok(true);
                 }
             }
 
-            if follow {
-                subscribers
-                    .register(id, control_handle, utc_xform.clone(), host_device)
-                    .expect("A client `Start` request should never be processed more than once");
-                client_requests.push(join(ready(id), client_stream.into_future()));
-                trace!("Client {} subscribed and waiting", id);
-            } else {
-                trace!("Client {} shutting down", id);
-                control_handle.shutdown();
+            if follow.is_some_and(|f| f) {
+                if let Err(e) = subscribers.register(id, client, host_device) {
+                    warn!("Failed to register new subscriber: {e:?}");
+                }
             }
         }
+        Some(Ok(_)) => {
+            warn!("Unknown method called on Snoop from {id:?}, closing stream");
+        }
         Some(Err(e)) => {
-            warn!("Client returned error: {:?}", e);
+            warn!("Client returned error: {e:?}");
             subscribers.deregister(&id);
         }
         None => {
@@ -208,12 +210,12 @@ async fn handle_client_request(
             subscribers.deregister(&id);
         }
     }
-    Ok(())
+    Ok(false)
 }
 
 /// Handle a possible incoming packet. Returns an error if the snoop channel is closed and cannot
 /// be reopened.
-async fn handle_packet(
+fn handle_packet(
     packet: Option<(DeviceId, SnoopPacket)>,
     snooper: Snooper,
     snoopers: &mut ConcurrentSnooperPacketFutures,
@@ -221,17 +223,17 @@ async fn handle_packet(
     packet_logs: &mut PacketLogs,
     truncate_payload: Option<usize>,
 ) {
-    if let Some((device, mut packet)) = packet {
-        trace!("Received packet from {}.", snooper.device_name);
-        if let Some(len) = truncate_payload {
-            packet.payload.truncate(len);
-        }
-        subscribers.notify(&device, &mut packet);
-        packet_logs.log_packet(&device, packet).await;
-        snoopers.push(snooper.into_future());
-    } else {
+    let Some((device, mut packet)) = packet else {
         info!("Snoop channel closed for device: {}", snooper.device_name);
+        return;
+    };
+    trace!("Received packet from {}.", snooper.device_name);
+    if let Some(len) = truncate_payload {
+        packet.payload.truncate(len);
     }
+    subscribers.notify(&device, &packet);
+    packet_logs.log_packet(&device, packet);
+    snoopers.push(snooper.into_future());
 }
 
 struct SnoopConfig {
@@ -345,7 +347,9 @@ async fn run(
         select! {
             // A new client has connected to one of the exposed services.
             request_stream = service_handler.select_next_some() => {
-                register_new_client(request_stream, &mut client_requests, id_gen.next());
+                let client_id = id_gen.next();
+                info!("New client connection: {client_id}");
+                register_new_client(request_stream, &mut client_requests, client_id);
             },
 
             // A new filesystem event in the hci device watch directory has been received.
@@ -369,10 +373,14 @@ async fn run(
 
             // A client has made a request to the server.
             request = client_requests.select_next_some() => {
-                if let Err(e) = handle_client_request(request, &mut client_requests,
-                    &mut subscribers, &packet_logs).await
-                {
-                    debug!("Unable to handle client request: {:?}", e);
+                let (client_id, (request, client_stream)) = request;
+                match handle_client_request((client_id, request),
+                    &mut subscribers, &packet_logs).await {
+                 Err(e) => {
+                    warn!("Error handling client request: {e:?}");
+                 },
+                 Ok(true) => register_new_client(client_stream, &mut client_requests, client_id),
+                 _ => {},
                 }
             },
 
@@ -380,7 +388,7 @@ async fn run(
             (packet, snooper) = snoopers.select_next_some() => {
                 trace::duration!(c"bluetooth", c"Snoop::ProcessPacket");
                 handle_packet(packet, snooper, &mut snoopers, &mut subscribers,
-                    &mut packet_logs, config.truncate_payload).await;
+                    &mut packet_logs, config.truncate_payload);
             },
         }
     }
@@ -406,12 +414,6 @@ async fn main() {
     let _ = fs.dir("svc").add_fidl_service(|stream: SnoopRequestStream| stream);
 
     let _ = fs.take_and_serve_directory_handle().expect("serve ServiceFS directory");
-
-    // Set the UTC Clock if it becomes available.
-    fasync::Task::local(set_utc_clock().unwrap_or_else(|e| {
-        warn!("Could not set UTC Clock. Falling back to clock monotonic. Error: {}", e);
-    }))
-    .detach();
 
     match run(config, fs.fuse(), runtime_inspect).await {
         Err(err) => error!("Failed with critical error: {:?}", err),

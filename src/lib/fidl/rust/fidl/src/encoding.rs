@@ -8,16 +8,16 @@
 
 pub use static_assertions::const_assert_eq;
 
-use {
-    crate::endpoints::ProtocolMarker,
-    crate::handle::{
-        Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, ObjectType, Rights, Status,
-    },
-    crate::{Error, MethodType, Result},
-    bitflags::bitflags,
-    fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types,
-    std::{cell::RefCell, cell::RefMut, marker::PhantomData, mem, ptr, str},
+use crate::endpoints::ProtocolMarker;
+use crate::handle::{
+    Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, ObjectType, Rights, Status,
 };
+use crate::{Error, MethodType, Result};
+use bitflags::bitflags;
+use std::cell::{RefCell, RefMut};
+use std::marker::PhantomData;
+use std::{mem, ptr, str};
+use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Traits

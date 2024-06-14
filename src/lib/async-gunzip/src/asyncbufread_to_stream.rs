@@ -18,7 +18,9 @@ use miniz_oxide::inflate::stream as mz_stream;
 use miniz_oxide::inflate::stream::InflateState;
 use miniz_oxide::{DataFormat, MZFlush, MZStatus};
 use pin_project::pin_project;
-use std::{io, pin::Pin, result, time::Instant};
+use std::pin::Pin;
+use std::time::Instant;
+use std::{io, result};
 
 mod flags;
 

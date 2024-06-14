@@ -4,28 +4,27 @@
 
 //! Test tools for building and serving TUF repositories containing Fuchsia packages.
 
-use {
-    crate::{package::Package, serve::ServedRepositoryBuilder},
-    anyhow::{format_err, Context as _, Error},
-    delivery_blob::DeliveryBlobType,
-    fidl_fuchsia_pkg_ext::{
-        MirrorConfig, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
-    },
-    fuchsia_merkle::Hash,
-    fuchsia_repo::{repo_builder::RepoBuilder, repo_keys::RepoKeys, repository::PmRepository},
-    fuchsia_url::RepositoryUrl,
-    maybe_owned::MaybeOwned,
-    serde::Deserialize,
-    std::{
-        collections::{BTreeMap, BTreeSet},
-        fs::{self, File},
-        io::{self, Read},
-        path::PathBuf,
-        sync::Arc,
-    },
-    tempfile::TempDir,
-    walkdir::WalkDir,
+use crate::package::Package;
+use crate::serve::ServedRepositoryBuilder;
+use anyhow::{format_err, Context as _, Error};
+use delivery_blob::DeliveryBlobType;
+use fidl_fuchsia_pkg_ext::{
+    MirrorConfig, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
 };
+use fuchsia_merkle::Hash;
+use fuchsia_repo::repo_builder::RepoBuilder;
+use fuchsia_repo::repo_keys::RepoKeys;
+use fuchsia_repo::repository::PmRepository;
+use fuchsia_url::RepositoryUrl;
+use maybe_owned::MaybeOwned;
+use serde::Deserialize;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs::{self, File};
+use std::io::{self, Read};
+use std::path::PathBuf;
+use std::sync::Arc;
+use tempfile::TempDir;
+use walkdir::WalkDir;
 
 /// A builder to simplify construction of TUF repositories containing Fuchsia packages.
 #[derive(Debug)]
@@ -344,7 +343,8 @@ impl Repository {
 #[cfg(test)]
 mod tests {
 
-    use {super::*, crate::package::PackageBuilder};
+    use super::*;
+    use crate::package::PackageBuilder;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_repo_builder() {

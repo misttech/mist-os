@@ -16,9 +16,9 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/nelson-buttons/nelson-buttons/buttons",
       "sys/platform/bt-uart/bluetooth-composite-spec/aml-uart/bt-transport-uart",
       "sys/platform/bt-uart/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
-      "sys/platform/05:00:2/i2c-0/aml-i2c",
-      "sys/platform/05:00:2:1/i2c-1/aml-i2c",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c",
+      "sys/platform/i2c-0/i2c-0/aml-i2c",
+      "sys/platform/i2c-1/i2c-1/aml-i2c",
+      "sys/platform/i2c-2/i2c-2/aml-i2c",
       "sys/platform/aml_gpu/aml-gpu-composite/aml-gpu",
       "sys/platform/aml-usb-phy/aml_usb_phy/aml_usb_phy",
       "sys/platform/nelson-audio-i2s-out/aml_tdm/nelson-audio-i2s-out",
@@ -28,29 +28,29 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",
 
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/canvas/aml-canvas",
       "sys/platform/tee/tee/optee",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/boot1/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/boot2/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/rpmb",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-000/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-001/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-002/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-003/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-004/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-005/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-006/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-007/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-008/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-009/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-010/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-011/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-012/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-013/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-014/block",
-      "sys/platform/05:00:8/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-015/block",
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/boot1/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/boot2/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/rpmb",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-000/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-001/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-002/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-003/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-004/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-005/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-006/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-007/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-008/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-009/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-010/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-011/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-012/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-013/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-014/block",
+      "sys/platform/nelson-emmc/nelson_emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-015/block",
+      "sys/platform/i2c-0/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/aml-nna/aml_nna",
       "sys/platform/nelson-clk/clocks",
       "sys/platform/nelson-clk/clocks/clock-init",
@@ -68,15 +68,15 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/pwm/aml-pwm-device/pwm-7",
       "sys/platform/pwm/aml-pwm-device/pwm-8",
       "sys/platform/pwm/aml-pwm-device/pwm-9",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
       "sys/platform/display/display/amlogic-display/display-coordinator",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-73/ti_ina231_mlb/ti-ina231",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-64/ti_ina231_speakers/ti-ina231",
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-112/shtv3",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-73/ti_ina231_mlb/ti-ina231",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-64/ti_ina231_speakers/ti-ina231",
+      "sys/platform/i2c-0/i2c-0/aml-i2c/i2c/i2c-0-112/shtv3",
       "sys/platform/gt6853-touch/gt6853_touch/gt6853",
 
       // Amber LED.
@@ -84,7 +84,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
 
       "sys/platform/gpio-h/aml-gpio/gpio/gpio-82/spi_1/aml-spi-1/spi/spi-1-0/selina-composite/selina",
 
-      "sys/platform/05:05:24/ram",
+      "sys/platform/aml-ram-ctl/ram",
 
       // Thermistor/ADC
       "sys/platform/03:0a:27/thermistor/thermistor-device/therm-thread",
@@ -96,8 +96,8 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "class/temperature/000",
       "class/temperature/001",
 
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m",
-      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m",
+      "sys/platform/i2c-2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",
 
       "sys/platform/gpio-c/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
 
@@ -106,8 +106,8 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/gpio-c/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52811_radio/ot-radio",
 
       // WLAN
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
-      "sys/platform/05:00:6/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
+      "sys/platform/aml-sdio/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
 #endif
 
   };

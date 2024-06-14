@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_net_name as fnet_name,
-    fuchsia_component::server::{ServiceFs, ServiceFsDir},
-    futures::{StreamExt as _, TryStreamExt as _},
-};
+use fidl_fuchsia_net_name as fnet_name;
+use fuchsia_component::server::{ServiceFs, ServiceFsDir};
+use futures::{StreamExt as _, TryStreamExt as _};
 
 // The maximum number of addresses that fdio can handle.
 const MAXADDRS: usize = 1024;

@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Error, fuchsia_zircon as zx};
+use anyhow::Error;
+use fuchsia_zircon as zx;
 
-pub use {
-    fidl_fuchsia_scenic_scheduling::PresentationInfo,
-    fidl_fuchsia_ui_composition::{
-        ChildViewWatcherMarker, ContentId, FlatlandDisplayMarker, FlatlandDisplayProxy,
-        FlatlandError, FlatlandEvent, FlatlandEventStream, FlatlandMarker, FlatlandProxy,
-        LayoutInfo, ParentViewportWatcherMarker, ParentViewportWatcherProxy, PresentArgs,
-        TransformId, ViewBoundProtocols, ViewportProperties,
-    },
-    fidl_fuchsia_ui_views::{ViewCreationToken, ViewportCreationToken},
+pub use fidl_fuchsia_scenic_scheduling::PresentationInfo;
+pub use fidl_fuchsia_ui_composition::{
+    ChildViewWatcherMarker, ContentId, FlatlandDisplayMarker, FlatlandDisplayProxy, FlatlandError,
+    FlatlandEvent, FlatlandEventStream, FlatlandMarker, FlatlandProxy, LayoutInfo,
+    ParentViewportWatcherMarker, ParentViewportWatcherProxy, PresentArgs, TransformId,
+    ViewBoundProtocols, ViewportProperties,
 };
+pub use fidl_fuchsia_ui_views::{ViewCreationToken, ViewportCreationToken};
 
 // Pair of tokens used to link two Flatland sessions together.
 pub struct ViewCreationTokenPair {

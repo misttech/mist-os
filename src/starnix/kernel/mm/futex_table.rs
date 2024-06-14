@@ -4,26 +4,19 @@
 
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
-use starnix_sync::InterruptibleEvent;
-use starnix_sync::Mutex;
-use std::{
-    collections::{hash_map::Entry, HashMap, VecDeque},
-    hash::Hash,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc, Weak,
-    },
-};
+use starnix_sync::{InterruptibleEvent, Mutex};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, VecDeque};
+use std::hash::Hash;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Weak};
 
-use crate::{
-    mm::{ProtectionFlags, PAGE_SIZE},
-    task::{CurrentTask, Task},
-};
+use crate::mm::{ProtectionFlags, PAGE_SIZE};
+use crate::task::{CurrentTask, Task};
 use starnix_logging::{impossible_error, log_error};
-use starnix_uapi::{
-    errno, error, errors::Errno, user_address::UserAddress, FUTEX_BITSET_MATCH_ANY, FUTEX_TID_MASK,
-    FUTEX_WAITERS,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::{errno, error, FUTEX_BITSET_MATCH_ANY, FUTEX_TID_MASK, FUTEX_WAITERS};
 
 /// A table of futexes.
 ///

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    serde::{Deserialize, Serialize},
-    serde_json5::from_str,
-    std::fs::read_to_string,
-};
+use serde::{Deserialize, Serialize};
+use serde_json5::from_str;
+use std::fs::read_to_string;
 
 /// Shared configuration file for security package delivery tests.
 #[derive(Serialize, Deserialize)]

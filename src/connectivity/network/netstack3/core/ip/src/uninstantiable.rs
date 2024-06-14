@@ -4,25 +4,27 @@
 
 use explicit::UnreachableExt as _;
 use net_types::SpecifiedAddr;
-use netstack3_base::{socket::SocketIpAddr, EitherDeviceId, UninstantiableWrapper};
+use netstack3_base::socket::SocketIpAddr;
+use netstack3_base::{AnyDevice, DeviceIdContext, EitherDeviceId, UninstantiableWrapper};
+use netstack3_filter::Tuple;
+
 use packet::{BufferMut, Serializer};
 
-use crate::internal::{
-    base::{HopLimits, IpExt, IpLayerIpExt, TransportIpContext},
-    socket::{
-        DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, Mms,
-        MmsError, SendOptions,
-    },
+use crate::internal::base::{BaseTransportIpContext, HopLimits, IpExt, IpLayerIpExt};
+use crate::internal::socket::{
+    DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, Mms,
+    MmsError, SendOptions,
 };
 
-impl<I: IpExt, C, P: TransportIpContext<I, C>> TransportIpContext<I, C>
+impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
     for UninstantiableWrapper<P>
 {
-    type DevicesWithAddrIter<'s> = P::DevicesWithAddrIter<'s> where P: 's;
-    fn get_devices_with_assigned_addr(
+    type DevicesWithAddrIter<'s> = UninstantiableWrapper<core::iter::Empty<P::DeviceId>>;
+    fn with_devices_with_assigned_addr<O, F: FnOnce(Self::DevicesWithAddrIter<'_>) -> O>(
         &mut self,
         _addr: SpecifiedAddr<I::Addr>,
-    ) -> Self::DevicesWithAddrIter<'_> {
+        _cb: F,
+    ) -> O {
         self.uninstantiable_unreachable()
     }
     fn get_default_hop_limits(&mut self, _device: Option<&Self::DeviceId>) -> HopLimits {
@@ -36,9 +38,14 @@ impl<I: IpExt, C, P: TransportIpContext<I, C>> TransportIpContext<I, C>
     ) {
         self.uninstantiable_unreachable()
     }
+    fn get_original_destination(&mut self, _tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
+        self.uninstantiable_unreachable()
+    }
 }
 
-impl<I: IpExt, C, P: IpSocketHandler<I, C>> IpSocketHandler<I, C> for UninstantiableWrapper<P> {
+impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
+    for UninstantiableWrapper<P>
+{
     fn new_ip_socket(
         &mut self,
         _ctx: &mut C,

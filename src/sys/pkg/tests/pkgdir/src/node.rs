@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{dirs_to_test, Mode, PackageSource},
-    anyhow::{anyhow, Context as _, Error},
-    fidl::{endpoints::Proxy as _, AsHandleRef as _},
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-};
+use crate::{dirs_to_test, Mode, PackageSource};
+use anyhow::{anyhow, Context as _, Error};
+use fidl::endpoints::Proxy as _;
+use fidl::AsHandleRef as _;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
 async fn get_attr() {

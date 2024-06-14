@@ -2,27 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    lsm_tree::LayerInfo,
-    object_store::{
-        allocator::{AllocatorInfo, AllocatorKey, AllocatorValue},
-        journal::{
-            super_block::{
-                SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV32, SuperBlockRecordV33,
-                SuperBlockRecordV37,
-            },
-            JournalRecord, JournalRecordV32, JournalRecordV33, JournalRecordV34, JournalRecordV36,
-            JournalRecordV37,
-        },
-        object_record::{
-            FsverityMetadata, ObjectKey, ObjectValue, ObjectValueV32, ObjectValueV33,
-            ObjectValueV37,
-        },
-        transaction::{Mutation, MutationV32, MutationV33, MutationV37},
-        EncryptedMutations, StoreInfo, StoreInfoV32,
-    },
-    serialized_types::{versioned_type, Version, Versioned, VersionedLatest},
+use crate::lsm_tree::LayerInfo;
+use crate::object_store::allocator::{AllocatorInfo, AllocatorKey, AllocatorValue};
+use crate::object_store::journal::super_block::{
+    SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV32, SuperBlockRecordV33,
+    SuperBlockRecordV37,
 };
+use crate::object_store::journal::{
+    JournalRecord, JournalRecordV32, JournalRecordV33, JournalRecordV34, JournalRecordV36,
+    JournalRecordV37,
+};
+use crate::object_store::object_record::{
+    FsverityMetadata, ObjectKey, ObjectValue, ObjectValueV32, ObjectValueV33, ObjectValueV37,
+};
+use crate::object_store::transaction::{Mutation, MutationV32, MutationV33, MutationV37};
+use crate::object_store::{EncryptedMutations, StoreInfo, StoreInfoV32};
+use crate::serialized_types::{versioned_type, Version, Versioned, VersionedLatest};
 
 /// The latest version of on-disk filesystem format.
 ///
@@ -107,28 +102,27 @@ versioned_type! {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        lsm_tree::{simple_persistent_layer::LayerInfoV32, LayerInfo},
-        object_store::{
-            allocator::{
-                AllocatorInfo, AllocatorInfoV32, AllocatorKey, AllocatorKeyV32, AllocatorValue,
-                AllocatorValueV32,
-            },
-            journal::{
-                super_block::{
-                    SuperBlockHeader, SuperBlockHeaderV32, SuperBlockRecord, SuperBlockRecordV32,
-                    SuperBlockRecordV33, SuperBlockRecordV37,
-                },
-                JournalRecord, JournalRecordV32, JournalRecordV33, JournalRecordV34,
-                JournalRecordV36, JournalRecordV37,
-            },
-            object_record::{
-                FsverityMetadataV33, ObjectKeyV32, ObjectValueV32, ObjectValueV33, ObjectValueV37,
-            },
-            transaction::{MutationV32, MutationV33, MutationV37},
-            EncryptedMutations, EncryptedMutationsV32, FsverityMetadata, Mutation, ObjectKey,
-            ObjectValue, StoreInfo, StoreInfoV32, StoreInfoV36,
-        },
+    use crate::lsm_tree::simple_persistent_layer::LayerInfoV32;
+    use crate::lsm_tree::LayerInfo;
+    use crate::object_store::allocator::{
+        AllocatorInfo, AllocatorInfoV32, AllocatorKey, AllocatorKeyV32, AllocatorValue,
+        AllocatorValueV32,
+    };
+    use crate::object_store::journal::super_block::{
+        SuperBlockHeader, SuperBlockHeaderV32, SuperBlockRecord, SuperBlockRecordV32,
+        SuperBlockRecordV33, SuperBlockRecordV37,
+    };
+    use crate::object_store::journal::{
+        JournalRecord, JournalRecordV32, JournalRecordV33, JournalRecordV34, JournalRecordV36,
+        JournalRecordV37,
+    };
+    use crate::object_store::object_record::{
+        FsverityMetadataV33, ObjectKeyV32, ObjectValueV32, ObjectValueV33, ObjectValueV37,
+    };
+    use crate::object_store::transaction::{MutationV32, MutationV33, MutationV37};
+    use crate::object_store::{
+        EncryptedMutations, EncryptedMutationsV32, FsverityMetadata, Mutation, ObjectKey,
+        ObjectValue, StoreInfo, StoreInfoV32, StoreInfoV36,
     };
 
     fn assert_type_fprint<T: fprint::TypeFingerprint>(fp: &str) -> bool {

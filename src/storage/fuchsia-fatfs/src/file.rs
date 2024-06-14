@@ -2,33 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        directory::FatDirectory,
-        filesystem::{FatFilesystem, FatFilesystemInner},
-        node::Node,
-        refs::FatfsFileRef,
-        types::File,
-        util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time},
-    },
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, Status},
-    libc::{S_IRUSR, S_IWUSR},
-    std::{
-        cell::UnsafeCell,
-        fmt::Debug,
-        io::{Read, Seek, Write},
-        pin::Pin,
-        sync::{Arc, RwLock},
-    },
-    vfs::{
-        attributes,
-        execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode},
-        ObjectRequestRef,
-    },
-};
+use crate::directory::FatDirectory;
+use crate::filesystem::{FatFilesystem, FatFilesystemInner};
+use crate::node::Node;
+use crate::refs::FatfsFileRef;
+use crate::types::File;
+use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::{self as zx, Status};
+use libc::{S_IRUSR, S_IWUSR};
+use std::cell::UnsafeCell;
+use std::fmt::Debug;
+use std::io::{Read, Seek, Write};
+use std::pin::Pin;
+use std::sync::{Arc, RwLock};
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode};
+use vfs::{attributes, ObjectRequestRef};
 
 fn extend(file: &mut File<'_>, mut current: u64, target: u64) -> Result<(), Status> {
     let zeros = vec![0; 8192];
@@ -212,7 +202,6 @@ impl Node for FatFile {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for FatFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let fs_lock = self.filesystem.lock().unwrap();
@@ -411,13 +400,9 @@ impl vfs::node::IsDirectory for FatFile {
 #[cfg(test)]
 mod tests {
     // We only test things here that aren't covered by fs_tests.
-    use {
-        super::*,
-        crate::{
-            node::{Closer, FatNode},
-            tests::{TestDiskContents, TestFatDisk},
-        },
-    };
+    use super::*;
+    use crate::node::{Closer, FatNode};
+    use crate::tests::{TestDiskContents, TestFatDisk};
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K
     const TEST_FILE_CONTENT: &str = "test file contents";

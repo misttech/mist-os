@@ -55,7 +55,7 @@ def ninja_plan_is_up_to_date(ninja_build_dir: str) -> bool:
     return True
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ninja_build_dir", help="Ninja build directory.")
     parser.add_argument(

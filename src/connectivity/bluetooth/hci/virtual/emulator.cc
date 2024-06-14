@@ -52,14 +52,27 @@ FakeController::Settings SettingsFromFidl(const fhbt::EmulatorSettings& input) {
   // TODO(armansito): Don't ignore "extended_advertising" setting when
   // supported.
   if (input.acl_buffer_settings().has_value()) {
-    settings.acl_data_packet_length = input.acl_buffer_settings()->data_packet_length();
-    settings.total_num_acl_data_packets = input.acl_buffer_settings()->total_num_data_packets();
+    fhbt::AclBufferSettings acl_settings = input.acl_buffer_settings().value();
+
+    if (acl_settings.data_packet_length().has_value()) {
+      settings.acl_data_packet_length = acl_settings.data_packet_length().value();
+    }
+
+    if (acl_settings.total_num_data_packets().has_value()) {
+      settings.total_num_acl_data_packets = acl_settings.total_num_data_packets().value();
+    }
   }
 
   if (input.le_acl_buffer_settings().has_value()) {
-    settings.le_acl_data_packet_length = input.le_acl_buffer_settings()->data_packet_length();
-    settings.le_total_num_acl_data_packets =
-        input.le_acl_buffer_settings()->total_num_data_packets();
+    fhbt::AclBufferSettings le_acl_settings = input.le_acl_buffer_settings().value();
+
+    if (le_acl_settings.data_packet_length().has_value()) {
+      settings.le_acl_data_packet_length = le_acl_settings.data_packet_length().value();
+    }
+
+    if (le_acl_settings.total_num_data_packets().has_value()) {
+      settings.le_total_num_acl_data_packets = le_acl_settings.total_num_data_packets().value();
+    }
   }
 
   return settings;
@@ -173,7 +186,7 @@ void EmulatorDevice::Publish(PublishRequest& request, PublishCompleter::Sync& co
     return;
   }
 
-  FakeController::Settings settings = SettingsFromFidl(request.settings());
+  FakeController::Settings settings = SettingsFromFidl(request);
   fake_device_.set_settings(settings);
 
   zx_status_t status = AddHciDeviceChildNode();
@@ -188,9 +201,8 @@ void EmulatorDevice::Publish(PublishRequest& request, PublishCompleter::Sync& co
 
 void EmulatorDevice::AddLowEnergyPeer(AddLowEnergyPeerRequest& request,
                                       AddLowEnergyPeerCompleter::Sync& completer) {
-  auto result =
-      EmulatedPeer::NewLowEnergy(request.parameters(), std::move(request.peer()), &fake_device_,
-                                 fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  auto result = EmulatedPeer::NewLowEnergy(std::move(request), &fake_device_,
+                                           fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (result.is_error()) {
     completer.Reply(fit::error(result.error()));
     return;
@@ -202,9 +214,8 @@ void EmulatorDevice::AddLowEnergyPeer(AddLowEnergyPeerRequest& request,
 
 void EmulatorDevice::AddBredrPeer(AddBredrPeerRequest& request,
                                   AddBredrPeerCompleter::Sync& completer) {
-  auto result =
-      EmulatedPeer::NewBredr(request.parameters(), std::move(request.peer()), &fake_device_,
-                             fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  auto result = EmulatedPeer::NewBredr(std::move(request), &fake_device_,
+                                       fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (result.is_error()) {
     completer.Reply(fit::error(result.error()));
     return;
@@ -228,6 +239,12 @@ void EmulatorDevice::WatchLegacyAdvertisingStates(
     WatchLegacyAdvertisingStatesCompleter::Sync& completer) {
   legacy_adv_states_completers_.emplace(completer.ToAsync());
   MaybeUpdateLegacyAdvertisingStates();
+}
+
+void EmulatorDevice::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Emulator> metadata,
+                                           fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown method in Emulator request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
@@ -454,16 +471,20 @@ void EmulatorDevice::OnLegacyAdvertisingStateChanged() {
   }
 
   if (adv_state.data_length) {
-    std::vector<uint8_t> output(adv_state.data_length);
-    bt::MutableBufferView output_view(output.data(), output.size());
-    output_view.Write(adv_state.data, adv_state.data_length);
-    fidl_state.advertising_data(std::move(output));
+    std::vector<uint8_t> output(adv_state.data, adv_state.data + adv_state.data_length);
+
+    if (!fidl_state.advertising_data().has_value()) {
+      fidl_state.advertising_data() = fhbt::AdvertisingData();
+    }
+    fidl_state.advertising_data()->data(output);
   }
   if (adv_state.scan_rsp_length) {
-    std::vector<uint8_t> output(adv_state.scan_rsp_length);
-    bt::MutableBufferView output_view(output.data(), output.size());
-    output_view.Write(adv_state.scan_rsp_data, adv_state.scan_rsp_length);
-    fidl_state.scan_response(std::move(output));
+    std::vector<uint8_t> output(adv_state.scan_rsp_data,
+                                adv_state.scan_rsp_data + adv_state.scan_rsp_length);
+    if (!fidl_state.scan_response().has_value()) {
+      fidl_state.scan_response() = fhbt::AdvertisingData();
+    }
+    fidl_state.scan_response()->data(output);
   }
 
   legacy_adv_states_.emplace_back(fidl_state);

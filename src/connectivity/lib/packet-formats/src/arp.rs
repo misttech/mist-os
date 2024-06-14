@@ -12,10 +12,8 @@ use core::mem;
 use net_types::ethernet::Mac;
 use net_types::ip::{IpAddress, Ipv4Addr};
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
-use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref,
-    Unaligned,
-};
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 

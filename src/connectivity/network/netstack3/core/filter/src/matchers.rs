@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 use alloc::string::String;
-use core::{num::NonZeroU64, ops::RangeInclusive};
+use core::fmt::Debug;
+use core::num::NonZeroU64;
+use core::ops::RangeInclusive;
+use netstack3_base::InspectableValue;
 
 use derivative::Derivative;
 use net_types::ip::{IpAddress, Subnet};
 use packet_formats::ip::IpExt;
 
-use crate::{
-    logic::Interfaces,
-    packets::{IpPacket, MaybeTransportPacket, TransportPacket},
-};
+use crate::logic::Interfaces;
+use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacket};
 
 /// Matches on metadata of packets that come through the filtering framework.
 trait Matcher<T> {
@@ -49,6 +50,12 @@ pub enum InterfaceMatcher<DeviceClass> {
     Name(String),
     /// The device class of the interface.
     DeviceClass(DeviceClass),
+}
+
+impl<DeviceClass: Debug> InspectableValue for InterfaceMatcher<DeviceClass> {
+    fn record<I: netstack3_base::Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_debug(name, self);
+    }
 }
 
 /// Allows filtering code to match on properties of an interface (ID, name, and
@@ -108,6 +115,12 @@ pub struct AddressMatcher<A: IpAddress> {
     pub invert: bool,
 }
 
+impl<A: IpAddress> InspectableValue for AddressMatcher<A> {
+    fn record<I: netstack3_base::Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_debug(name, self);
+    }
+}
+
 impl<A: IpAddress> Matcher<A> for AddressMatcher<A> {
     fn matches(&self, addr: &A) -> bool {
         let Self { matcher, invert } = self;
@@ -144,6 +157,12 @@ pub struct TransportProtocolMatcher<P> {
     /// If set, the matcher for the destination port or identifier of the
     /// transport header.
     pub dst_port: Option<PortMatcher>,
+}
+
+impl<P: Debug> InspectableValue for TransportProtocolMatcher<P> {
+    fn record<I: netstack3_base::Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_debug(name, self);
+    }
 }
 
 impl<P: PartialEq, T: MaybeTransportPacket> Matcher<(P, T)> for TransportProtocolMatcher<P> {
@@ -203,10 +222,8 @@ impl<I: IpExt, DeviceClass> PacketMatcher<I, DeviceClass> {
 #[cfg(test)]
 pub(crate) mod testutil {
     use const_unwrap::const_unwrap_option;
-    use netstack3_base::{
-        testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
-        DeviceIdentifier, StrongDeviceIdentifier,
-    };
+    use netstack3_base::testutil::{FakeStrongDeviceId, FakeWeakDeviceId};
+    use netstack3_base::{DeviceIdentifier, StrongDeviceIdentifier};
 
     use super::*;
     use crate::context::testutil::FakeDeviceClass;
@@ -320,17 +337,16 @@ mod base_testutil {
 #[cfg(test)]
 mod tests {
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
     use packet_formats::ip::{IpProto, Ipv4Proto};
     use test_case::test_case;
 
-    use super::{testutil::*, *};
-    use crate::{
-        context::testutil::FakeDeviceClass,
-        packets::testutil::internal::{
-            ArbitraryValue, FakeIcmpEchoRequest, FakeIpPacket, FakeTcpSegment, FakeUdpPacket,
-            TestIpExt, TransportPacketExt,
-        },
+    use super::testutil::*;
+    use super::*;
+    use crate::context::testutil::FakeDeviceClass;
+    use crate::packets::testutil::internal::{
+        ArbitraryValue, FakeIcmpEchoRequest, FakeIpPacket, FakeTcpSegment, FakeUdpPacket,
+        TestIpExt, TransportPacketExt,
     };
 
     #[test_case(InterfaceMatcher::Id(wlan_interface().id))]
@@ -402,12 +418,12 @@ mod tests {
         Range,
     }
 
-    #[ip_test]
+    #[ip_test(I)]
     #[test_case(AddressMatcherTestCase::Subnet, /* invert */ false)]
     #[test_case(AddressMatcherTestCase::Subnet, /* invert */ true)]
     #[test_case(AddressMatcherTestCase::Range, /* invert */ false)]
     #[test_case(AddressMatcherTestCase::Range, /* invert */ true)]
-    fn match_on_subnet_or_address_range<I: Ip + TestIpExt>(
+    fn match_on_subnet_or_address_range<I: TestIpExt>(
         test_case: AddressMatcherTestCase,
         invert: bool,
     ) {
@@ -592,8 +608,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn packet_must_match_all_provided_matchers<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn packet_must_match_all_provided_matchers<I: TestIpExt>() {
         let matcher = PacketMatcher::<I, FakeDeviceClass> {
             src_address: Some(AddressMatcher {
                 matcher: AddressMatcherType::Subnet(I::SUBNET),

@@ -8,12 +8,9 @@ use bitfield::bitfield;
 use nom::error::ErrorKind;
 use nom::number::streaming::{le_u16, le_u8};
 use nom::{call, do_parse, eof, map, named, named_args, take, try_parse, IResult};
-use wlan_common::{
-    appendable::{Appendable, BufferTooSmall},
-    ie::wpa,
-    ie::write_wpa1_ie,
-    organization::Oui,
-};
+use wlan_common::appendable::{Appendable, BufferTooSmall};
+use wlan_common::ie::{wpa, write_wpa1_ie};
+use wlan_common::organization::Oui;
 
 pub const TYPE: u8 = 0xDD;
 const PADDING_DATA_LEN: u8 = 0;
@@ -296,7 +293,8 @@ impl<A: Appendable> Writer<A> {
 mod tests {
     use super::*;
     use crate::key_data::extract_elements;
-    use wlan_common::{assert_variant, test_utils::FixedSizedTestBuffer};
+    use wlan_common::assert_variant;
+    use wlan_common::test_utils::FixedSizedTestBuffer;
 
     fn write_and_extract_padding(gtk_len: usize) -> Vec<u8> {
         let mut w = Writer::new(vec![]);

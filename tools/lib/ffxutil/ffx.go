@@ -411,6 +411,7 @@ func (f *FFXInstance) Test(
 				testFile,
 				"--output-directory",
 				testOutputDir,
+				"--show-full-moniker-in-logs",
 			},
 			args...)...)
 

@@ -8,10 +8,8 @@ use core::fmt;
 
 use net_types::ip::{GenericOverIp, Ipv6, Ipv6Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
-use zerocopy::{
-    byteorder::network_endian::U32, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
-    Unaligned,
-};
+use zerocopy::byteorder::network_endian::U32;
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 
@@ -72,6 +70,9 @@ impl<B: ByteSlice + fmt::Debug> fmt::Debug for Icmpv6Packet<B> {
             Mld(MulticastListenerDone(ref p)) => {
                 f.debug_tuple("MulticastListenerDone").field(p).finish()
             }
+            Mld(MulticastListenerQueryV2(ref p)) => {
+                f.debug_tuple("MulticastListenerQueryV2").field(p).finish()
+            }
             Mld(MulticastListenerReportV2(ref p)) => {
                 f.debug_tuple("MulticastListenerReportV2").field(p).finish()
             }
@@ -101,6 +102,7 @@ impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Packet<B
             Mld(MulticastListenerQuery(p)) => p.parse_metadata(),
             Mld(MulticastListenerReport(p)) => p.parse_metadata(),
             Mld(MulticastListenerDone(p)) => p.parse_metadata(),
+            Mld(MulticastListenerQueryV2(p)) => p.parse_metadata(),
             Mld(MulticastListenerReportV2(p)) => p.parse_metadata(),
         }
     }
@@ -111,9 +113,9 @@ impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Packet<B
         use ndp::NdpPacket::*;
 
         macro_rules! mtch {
-            ($buffer:expr, $args:expr, $pkt_name:ident, $($msg_variant:ident => $pkt_variant:expr => $type:ty,)*) => {
-                match peek_message_type($buffer.as_ref())? {
-                    $(Icmpv6MessageType::$msg_variant => {
+            ($buffer:expr, $args:expr, $pkt_name:ident, $( ($msg_variant:ident, $len_pat:pat) => $pkt_variant:expr => $type:ty,)*) => {
+                match ( peek_message_type($buffer.as_ref())?, $buffer.len() ) {
+                    $( (Icmpv6MessageType::$msg_variant, $len_pat) => {
                         let $pkt_name = <IcmpPacket<Ipv6, B, $type> as ParsablePacket<_, _>>::parse($buffer, $args)?;
                         $pkt_variant
                     })*
@@ -125,21 +127,22 @@ impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv6Addr>> for Icmpv6Packet<B
             buffer,
             args,
             packet,
-            DestUnreachable           => DestUnreachable(packet)                => IcmpDestUnreachable,
-            PacketTooBig              => PacketTooBig(packet)                   => Icmpv6PacketTooBig,
-            TimeExceeded              => TimeExceeded(packet)                   => IcmpTimeExceeded,
-            ParameterProblem          => ParameterProblem(packet)               => Icmpv6ParameterProblem,
-            EchoRequest               => EchoRequest(packet)                    => IcmpEchoRequest,
-            EchoReply                 => EchoReply(packet)                      => IcmpEchoReply,
-            RouterSolicitation        => Ndp(RouterSolicitation(packet))        => ndp::RouterSolicitation,
-            RouterAdvertisement       => Ndp(RouterAdvertisement(packet))       => ndp::RouterAdvertisement,
-            NeighborSolicitation      => Ndp(NeighborSolicitation(packet))      => ndp::NeighborSolicitation,
-            NeighborAdvertisement     => Ndp(NeighborAdvertisement(packet))     => ndp::NeighborAdvertisement,
-            Redirect                  => Ndp(Redirect(packet))                  => ndp::Redirect,
-            MulticastListenerQuery    => Mld(MulticastListenerQuery(packet))    => mld::MulticastListenerQuery,
-            MulticastListenerReport   => Mld(MulticastListenerReport(packet))   => mld::MulticastListenerReport,
-            MulticastListenerReportV2 => Mld(MulticastListenerReportV2(packet)) => mld::MulticastListenerReportV2,
-            MulticastListenerDone     => Mld(MulticastListenerDone(packet))     => mld::MulticastListenerDone,
+            (DestUnreachable, ..)               => DestUnreachable(packet)                => IcmpDestUnreachable,
+            (PacketTooBig, ..)                  => PacketTooBig(packet)                   => Icmpv6PacketTooBig,
+            (TimeExceeded, ..)                  => TimeExceeded(packet)                   => IcmpTimeExceeded,
+            (ParameterProblem, ..)              => ParameterProblem(packet)               => Icmpv6ParameterProblem,
+            (EchoRequest, ..)                   => EchoRequest(packet)                    => IcmpEchoRequest,
+            (EchoReply, ..)                     => EchoReply(packet)                      => IcmpEchoReply,
+            (RouterSolicitation, ..)            => Ndp(RouterSolicitation(packet))        => ndp::RouterSolicitation,
+            (RouterAdvertisement, ..)           => Ndp(RouterAdvertisement(packet))       => ndp::RouterAdvertisement,
+            (NeighborSolicitation, ..)          => Ndp(NeighborSolicitation(packet))      => ndp::NeighborSolicitation,
+            (NeighborAdvertisement, ..)         => Ndp(NeighborAdvertisement(packet))     => ndp::NeighborAdvertisement,
+            (Redirect, ..)                      => Ndp(Redirect(packet))                  => ndp::Redirect,
+            (MulticastListenerQuery, 0..=27 )   => Mld(MulticastListenerQuery(packet))    => mld::MulticastListenerQuery,
+            (MulticastListenerQuery, 28..)      => Mld(MulticastListenerQueryV2(packet))  => mld::MulticastListenerQueryV2,
+            (MulticastListenerReport, ..)       => Mld(MulticastListenerReport(packet))   => mld::MulticastListenerReport,
+            (MulticastListenerReportV2, ..)     => Mld(MulticastListenerReportV2(packet)) => mld::MulticastListenerReportV2,
+            (MulticastListenerDone, ..)         => Mld(MulticastListenerDone(packet))     => mld::MulticastListenerDone,
         ))
     }
 }
@@ -189,7 +192,49 @@ impl<B: ByteSliceMut> Icmpv6PacketRaw<B> {
                     MulticastListenerQuery(p) => &mut p.header.prefix,
                     MulticastListenerReport(p) => &mut p.header.prefix,
                     MulticastListenerDone(p) => &mut p.header.prefix,
+                    MulticastListenerQueryV2(p) => &mut p.header.prefix,
                     MulticastListenerReportV2(p) => &mut p.header.prefix,
+                }
+            }
+        }
+    }
+
+    /// Overwrites the current checksum with `checksum`, returning the original.
+    pub(crate) fn overwrite_checksum(&mut self, checksum: [u8; 2]) -> [u8; 2] {
+        core::mem::replace(&mut self.header_prefix_mut().checksum, checksum)
+    }
+
+    /// Attempts to calculate and write a Checksum for this [`Icmpv6PacketRaw`].
+    ///
+    /// Returns whether the checksum was successfully calculated & written. In
+    /// the false case, self is left unmodified.
+    pub fn try_write_checksum(&mut self, src_ip: Ipv6Addr, dst_ip: Ipv6Addr) -> bool {
+        use Icmpv6PacketRaw::*;
+        match self {
+            DestUnreachable(p) => p.try_write_checksum(src_ip, dst_ip),
+            PacketTooBig(p) => p.try_write_checksum(src_ip, dst_ip),
+            TimeExceeded(p) => p.try_write_checksum(src_ip, dst_ip),
+            ParameterProblem(p) => p.try_write_checksum(src_ip, dst_ip),
+            EchoRequest(p) => p.try_write_checksum(src_ip, dst_ip),
+            EchoReply(p) => p.try_write_checksum(src_ip, dst_ip),
+            Ndp(p) => {
+                use ndp::NdpPacketRaw::*;
+                match p {
+                    RouterSolicitation(p) => p.try_write_checksum(src_ip, dst_ip),
+                    RouterAdvertisement(p) => p.try_write_checksum(src_ip, dst_ip),
+                    NeighborSolicitation(p) => p.try_write_checksum(src_ip, dst_ip),
+                    NeighborAdvertisement(p) => p.try_write_checksum(src_ip, dst_ip),
+                    Redirect(p) => p.try_write_checksum(src_ip, dst_ip),
+                }
+            }
+            Mld(p) => {
+                use mld::MldPacketRaw::*;
+                match p {
+                    MulticastListenerQuery(p) => p.try_write_checksum(src_ip, dst_ip),
+                    MulticastListenerQueryV2(p) => p.try_write_checksum(src_ip, dst_ip),
+                    MulticastListenerReport(p) => p.try_write_checksum(src_ip, dst_ip),
+                    MulticastListenerDone(p) => p.try_write_checksum(src_ip, dst_ip),
+                    MulticastListenerReportV2(p) => p.try_write_checksum(src_ip, dst_ip),
                 }
             }
         }
@@ -218,6 +263,7 @@ impl<B: ByteSlice> ParsablePacket<B, ()> for Icmpv6PacketRaw<B> {
             Mld(MulticastListenerQuery(p)) => p.parse_metadata(),
             Mld(MulticastListenerReport(p)) => p.parse_metadata(),
             Mld(MulticastListenerDone(p)) => p.parse_metadata(),
+            Mld(MulticastListenerQueryV2(p)) => p.parse_metadata(),
             Mld(MulticastListenerReportV2(p)) => p.parse_metadata(),
         }
     }
@@ -228,9 +274,9 @@ impl<B: ByteSlice> ParsablePacket<B, ()> for Icmpv6PacketRaw<B> {
         use ndp::NdpPacketRaw::*;
 
         macro_rules! mtch {
-            ($buffer:expr, $pkt_name:ident, $($msg_variant:ident => $pkt_variant:expr => $type:ty,)*) => {
-                match peek_message_type($buffer.as_ref())? {
-                    $(Icmpv6MessageType::$msg_variant => {
+            ($buffer:expr, $pkt_name:ident, $( ($msg_variant:ident, $len_pat:pat) => $pkt_variant:expr => $type:ty,)*) => {
+                match ( peek_message_type($buffer.as_ref())?, $buffer.len() ) {
+                    $( (Icmpv6MessageType::$msg_variant, $len_pat) => {
                         let $pkt_name = <IcmpPacketRaw<Ipv6, B, $type> as ParsablePacket<_, _>>::parse($buffer, ())?;
                         $pkt_variant
                     })*
@@ -241,21 +287,22 @@ impl<B: ByteSlice> ParsablePacket<B, ()> for Icmpv6PacketRaw<B> {
         Ok(mtch!(
             buffer,
             packet,
-            DestUnreachable           => DestUnreachable(packet)                => IcmpDestUnreachable,
-            PacketTooBig              => PacketTooBig(packet)                   => Icmpv6PacketTooBig,
-            TimeExceeded              => TimeExceeded(packet)                   => IcmpTimeExceeded,
-            ParameterProblem          => ParameterProblem(packet)               => Icmpv6ParameterProblem,
-            EchoRequest               => EchoRequest(packet)                    => IcmpEchoRequest,
-            EchoReply                 => EchoReply(packet)                      => IcmpEchoReply,
-            RouterSolicitation        => Ndp(RouterSolicitation(packet))        => ndp::RouterSolicitation,
-            RouterAdvertisement       => Ndp(RouterAdvertisement(packet))       => ndp::RouterAdvertisement,
-            NeighborSolicitation      => Ndp(NeighborSolicitation(packet))      => ndp::NeighborSolicitation,
-            NeighborAdvertisement     => Ndp(NeighborAdvertisement(packet))     => ndp::NeighborAdvertisement,
-            Redirect                  => Ndp(Redirect(packet))                  => ndp::Redirect,
-            MulticastListenerQuery    => Mld(MulticastListenerQuery(packet))    => mld::MulticastListenerQuery,
-            MulticastListenerReport   => Mld(MulticastListenerReport(packet))   => mld::MulticastListenerReport,
-            MulticastListenerReportV2 => Mld(MulticastListenerReportV2(packet)) => mld::MulticastListenerReportV2,
-            MulticastListenerDone     => Mld(MulticastListenerDone(packet))     => mld::MulticastListenerDone,
+            (DestUnreachable, ..)               => DestUnreachable(packet)                => IcmpDestUnreachable,
+            (PacketTooBig, ..)                  => PacketTooBig(packet)                   => Icmpv6PacketTooBig,
+            (TimeExceeded, ..)                  => TimeExceeded(packet)                   => IcmpTimeExceeded,
+            (ParameterProblem, ..)              => ParameterProblem(packet)               => Icmpv6ParameterProblem,
+            (EchoRequest, ..)                   => EchoRequest(packet)                    => IcmpEchoRequest,
+            (EchoReply, ..)                     => EchoReply(packet)                      => IcmpEchoReply,
+            (RouterSolicitation, ..)            => Ndp(RouterSolicitation(packet))        => ndp::RouterSolicitation,
+            (RouterAdvertisement, ..)           => Ndp(RouterAdvertisement(packet))       => ndp::RouterAdvertisement,
+            (NeighborSolicitation, ..)          => Ndp(NeighborSolicitation(packet))      => ndp::NeighborSolicitation,
+            (NeighborAdvertisement, ..)         => Ndp(NeighborAdvertisement(packet))     => ndp::NeighborAdvertisement,
+            (Redirect, ..)                      => Ndp(Redirect(packet))                  => ndp::Redirect,
+            (MulticastListenerQuery, 0..=27 )   => Mld(MulticastListenerQuery(packet))    => mld::MulticastListenerQuery,
+            (MulticastListenerQuery, 28..)      => Mld(MulticastListenerQueryV2(packet))  => mld::MulticastListenerQueryV2,
+            (MulticastListenerReport, ..)       => Mld(MulticastListenerReport(packet))   => mld::MulticastListenerReport,
+            (MulticastListenerReportV2, ..)     => Mld(MulticastListenerReportV2(packet)) => mld::MulticastListenerReportV2,
+            (MulticastListenerDone, ..)         => Mld(MulticastListenerDone(packet))     => mld::MulticastListenerDone,
         ))
     }
 }
@@ -279,6 +326,7 @@ create_protocol_enum!(
         Redirect, 137, "Redirect";
 
         // MLDv1 messages
+        // This is used for both QueryV1 and QueryV2
         MulticastListenerQuery, 130, "Multicast Listener Query";
         MulticastListenerReport, 131, "Multicast Listener Report";
         MulticastListenerDone, 132, "Multicast Listener Done";
@@ -405,8 +453,11 @@ mod tests {
         icmp: &IcmpPacket<Ipv6, B, M>,
         builder: Ipv6PacketBuilder,
     ) -> Vec<u8> {
-        icmp.message_body
-            .bytes()
+        let (header, body) = icmp.message_body.bytes();
+        let body = if let Some(b) = body { b } else { &[] };
+        let complete_msg = &[header, body].concat();
+
+        complete_msg
             .into_serializer()
             .encapsulate(icmp.builder(src_ip, dst_ip))
             .encapsulate(builder)
@@ -440,7 +491,10 @@ mod tests {
     fn test_parse_and_serialize_echo_request() {
         use crate::testdata::icmp_echo_v6::*;
         test_parse_and_serialize::<IcmpEchoRequest, _>(REQUEST_IP_PACKET_BYTES, |icmp| {
-            assert_eq!(icmp.message_body.bytes(), ECHO_DATA);
+            let (inner_header, inner_body) = icmp.message_body.bytes();
+            assert!(inner_body.is_none());
+            let complete_msg = inner_header;
+            assert_eq!(complete_msg, ECHO_DATA);
             assert_eq!(icmp.message().id_seq.id.get(), IDENTIFIER);
             assert_eq!(icmp.message().id_seq.seq.get(), SEQUENCE_NUM);
         });

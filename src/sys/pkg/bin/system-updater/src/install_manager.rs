@@ -2,26 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::update::{Config, EnvironmentConnector, RebootController, Updater},
-    anyhow::anyhow,
-    event_queue::{EventQueue, Notify},
-    fidl_fuchsia_update_installer::{
-        CancelError, ResumeError, SuspendError, UpdateNotStartedReason,
-    },
-    fidl_fuchsia_update_installer_ext::State,
-    fuchsia_async as fasync, fuchsia_inspect as inspect,
-    fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt as _},
-    fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        prelude::*,
-        select,
-        stream::FusedStream,
-    },
-    std::time::Duration,
-    tracing::{error, warn},
+use crate::update::{Config, EnvironmentConnector, RebootController, Updater};
+use anyhow::anyhow;
+use event_queue::{EventQueue, Notify};
+use fidl_fuchsia_update_installer::{
+    CancelError, ResumeError, SuspendError, UpdateNotStartedReason,
 };
+use fidl_fuchsia_update_installer_ext::State;
+use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt as _};
+use futures::channel::{mpsc, oneshot};
+use futures::prelude::*;
+use futures::select;
+use futures::stream::FusedStream;
+use std::time::Duration;
+use tracing::{error, warn};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_zircon as zx};
 
 const INSPECT_STATUS_NODE_NAME: &str = "status";
 // Suspend is allowed at most 7 days, after that update will automatically resume.
@@ -515,27 +510,27 @@ impl SuspendState {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::update::{
-            ConfigBuilder, Environment, NamespaceBuildInfo, NamespaceCobaltConnector,
-            NamespaceSystemInfo,
-        },
-        async_trait::async_trait,
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
-        event_queue::ClosedClient,
-        fidl_fuchsia_hardware_power_statecontrol::AdminMarker as PowerStateControlMarker,
-        fidl_fuchsia_paver::{BootManagerMarker, DataSinkMarker},
-        fidl_fuchsia_pkg::{PackageCacheMarker, PackageResolverMarker, RetainedPackagesMarker},
-        fidl_fuchsia_space::ManagerMarker as SpaceManagerMarker,
-        fidl_fuchsia_update_installer_ext::{
-            PrepareFailureReason, Progress, UpdateInfo, UpdateInfoAndProgress,
-        },
-        fuchsia_inspect::Inspector,
-        fuchsia_sync::Mutex,
-        mpsc::{Receiver, Sender},
-        std::{pin::Pin, sync::Arc, task::Poll},
+    use super::*;
+    use crate::update::{
+        ConfigBuilder, Environment, NamespaceBuildInfo, NamespaceCobaltConnector,
+        NamespaceSystemInfo,
     };
+    use async_trait::async_trait;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use event_queue::ClosedClient;
+    use fidl_fuchsia_hardware_power_statecontrol::AdminMarker as PowerStateControlMarker;
+    use fidl_fuchsia_paver::{BootManagerMarker, DataSinkMarker};
+    use fidl_fuchsia_pkg::{PackageCacheMarker, PackageResolverMarker, RetainedPackagesMarker};
+    use fidl_fuchsia_space::ManagerMarker as SpaceManagerMarker;
+    use fidl_fuchsia_update_installer_ext::{
+        PrepareFailureReason, Progress, UpdateInfo, UpdateInfoAndProgress,
+    };
+    use fuchsia_inspect::Inspector;
+    use fuchsia_sync::Mutex;
+    use mpsc::{Receiver, Sender};
+    use std::pin::Pin;
+    use std::sync::Arc;
+    use std::task::Poll;
 
     const CALLBACK_CHANNEL_SIZE: usize = 20;
 

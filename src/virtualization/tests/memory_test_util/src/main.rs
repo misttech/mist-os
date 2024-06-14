@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 #![deny(warnings)]
 
-use {
-    argh::FromArgs,
-    std::{thread, time},
-};
+use argh::FromArgs;
+use std::{thread, time};
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Top-level command.

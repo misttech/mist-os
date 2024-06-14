@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use component_debug::{
-    cli::{list_cmd_print, list_cmd_serialized},
-    realm::Instance,
-};
+use component_debug::cli::{list_cmd_print, list_cmd_serialized};
+use component_debug::realm::Instance;
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_list_args::ComponentListCommand;

@@ -21,6 +21,9 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
             if context.board_info.provides_feature("fuchsia::video_encoders") {
                 builder.platform_bundle("video_development_support");
             }
+            if context.board_info.provides_feature("fuchsia::intel_hda") {
+                builder.platform_bundle("intel_hda");
+            }
         }
 
         match &media_config.audio {

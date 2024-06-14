@@ -2,26 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
-    fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async},
-    mm::{ProtectionFlags, VMEX_RESOURCE},
-    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    vfs::{
-        buffers::{with_iovec_segments, InputBuffer, OutputBuffer},
-        default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
-        fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink,
-        fsverity::FsVerityState,
-        Anon, CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle,
-        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget,
-        ValueOrSize, XattrOp, DEFAULT_BYTES_PER_BLOCK,
-    },
+use crate::device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
+use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
+use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
+use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
+use crate::vfs::buffers::{with_iovec_segments, InputBuffer, OutputBuffer};
+use crate::vfs::fsverity::FsVerityState;
+use crate::vfs::socket::{Socket, SocketFile, ZxioBackedSocket};
+use crate::vfs::{
+    default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
+    fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink, Anon, CacheConfig,
+    CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject, FileOps,
+    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
+    DEFAULT_BYTES_PER_BLOCK,
 };
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
-use fidl_fuchsia_io as fio;
-use fuchsia_zircon as zx;
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
@@ -30,32 +27,29 @@ use starnix_sync::{
     RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{
-    __kernel_fsid_t,
-    auth::FsCred,
-    device_type::DeviceType,
-    errno, error,
-    errors::Errno,
-    file_mode::FileMode,
-    from_status_like_fdio, fsverity_descriptor, ino_t,
-    mount_flags::MountFlags,
-    off_t,
-    open_flags::OpenFlags,
-    statfs,
-    vfs::{default_statfs, FdEvents},
+    __kernel_fsid_t, errno, error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs,
 };
 use std::sync::Arc;
+use syncio::zxio::{
+    zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
+    ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET, ZXIO_OBJECT_TYPE_DIR, ZXIO_OBJECT_TYPE_FILE,
+    ZXIO_OBJECT_TYPE_NONE, ZXIO_OBJECT_TYPE_PACKET_SOCKET, ZXIO_OBJECT_TYPE_RAW_SOCKET,
+    ZXIO_OBJECT_TYPE_STREAM_SOCKET, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
+};
 use syncio::{
-    zxio::{
-        zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
-        ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET, ZXIO_OBJECT_TYPE_DIR, ZXIO_OBJECT_TYPE_FILE,
-        ZXIO_OBJECT_TYPE_NONE, ZXIO_OBJECT_TYPE_PACKET_SOCKET, ZXIO_OBJECT_TYPE_RAW_SOCKET,
-        ZXIO_OBJECT_TYPE_STREAM_SOCKET, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
-    },
     zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, CreationMode,
     DirentIterator, OpenOptions, XattrSetMode, Zxio, ZxioDirent, ZXIO_ROOT_HASH_LENGTH,
 };
 use vfs::ProtocolsExt;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub struct RemoteFs {
     supports_open2: bool,
@@ -321,9 +315,9 @@ pub fn new_remote_file(
         | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
         | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
         | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
-            // TODO(https://fxbug.dev/342434176): Build the correct file ops for the
-            // correct type of socket.
-            return error!(ENOTSUP);
+            let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
+            let socket = Socket::new_with_ops(Box::new(socket_ops))?;
+            Box::new(SocketFile::new(socket))
         }
         _ => return error!(ENOTSUP),
     };
@@ -1684,22 +1678,20 @@ impl FsNodeOps for RemoteSymlink {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        mm::PAGE_SIZE,
-        testing::*,
-        vfs::{
-            buffers::{VecInputBuffer, VecOutputBuffer},
-            EpollFileObject, LookupContext, Namespace, SymlinkMode, TimeUpdateType,
-        },
-    };
+    use crate::mm::PAGE_SIZE;
+    use crate::testing::*;
+    use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::{EpollFileObject, LookupContext, Namespace, SymlinkMode, TimeUpdateType};
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;
-    use fidl_fuchsia_io as fio;
-    use fuchsia_async as fasync;
     use fuchsia_fs::{directory, file};
     use fuchsia_zircon::HandleBased;
     use fxfs_testing::{TestFixture, TestFixtureOptions};
-    use starnix_uapi::{auth::Credentials, errors::EINVAL, file_mode::mode, vfs::EpollEvent};
+    use starnix_uapi::auth::Credentials;
+    use starnix_uapi::errors::EINVAL;
+    use starnix_uapi::file_mode::mode;
+    use starnix_uapi::vfs::EpollEvent;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {

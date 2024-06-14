@@ -17,6 +17,7 @@ source_set("unit_test_fixture") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",
+    "//sdk/lib/vfs/cpp",
     "//src/developer/forensics/testing/stubs:cobalt",
     "//src/developer/forensics/utils/cobalt",
     "//src/lib/testing/loop_fixture",

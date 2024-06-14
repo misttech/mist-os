@@ -11,13 +11,12 @@ use fidl_fuchsia_ui_input3::KeyEventType;
 use fuchsia_async::{OnSignals, Task};
 use fuchsia_inspect::health::Reporter;
 use fuchsia_zircon::{AsHandleRef, Duration, Signals, Status, Time};
-use futures::{
-    channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    select, StreamExt,
-};
+use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures::{select, StreamExt};
 use keymaps::KeyState;
 use lazy_static::lazy_static;
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 lazy_static! {
     // The signal value corresponding to the `DISPLAY_OWNED_SIGNAL`.  Same as zircon's signal

@@ -69,12 +69,8 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
 
  public:
   BaseDriverTestFixture()
-      : env_wrapper_(runtime_.StartBackgroundDispatcher()->async_dispatcher(), std::in_place) {
-    start_args_ = env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::Init);
-
-    outgoing_directory_client_ =
-        env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::TakeOutgoingClient);
-
+      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
+        env_wrapper_(env_dispatcher_->async_dispatcher(), std::in_place) {
     if constexpr (kAutoStartDriver) {
       auto result = StartDriverImpl({});
       ZX_ASSERT_MSG(result.is_ok(), "Failed to StartDriver: %s.", result.status_string());
@@ -163,7 +159,7 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   T RunInDriverContext(fit::callback<T(DriverType&)> task) {
     static_assert(F == kDriverOnForeground, "Do not override the F template parameter.");
     ZX_ASSERT_MSG(dut_.has_value(),
-                  "Cannot call RunInDriverContext after ShutdownDispatchersAndDestroyDriverImpl.");
+                  "Cannot call RunInDriverContext after ShutdownDispatchersAndDestroyDriver.");
     return dut_->RunInDriverContext(std::move(task));
   }
 
@@ -178,7 +174,7 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   void RunInDriverContext(fit::callback<void(DriverType&)> task) {
     static_assert(F == kDriverOnForeground, "Do not override the F template parameter.");
     ZX_ASSERT_MSG(dut_.has_value(),
-                  "Cannot call RunInDriverContext after ShutdownDispatchersAndDestroyDriverImpl.");
+                  "Cannot call RunInDriverContext after ShutdownDispatchersAndDestroyDriver.");
     dut_->RunInDriverContext(std::move(task));
   }
 
@@ -189,7 +185,7 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   DriverType* driver() {
     static_assert(F == kDriverOnForeground, "Do not override the F template parameter.");
     ZX_ASSERT_MSG(dut_.has_value(),
-                  "Cannot call driver after ShutdownDispatchersAndDestroyDriverImpl.");
+                  "Cannot call driver after ShutdownDispatchersAndDestroyDriver.");
     return dut_->driver();
   }
 
@@ -356,29 +352,34 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   }
 
   zx::result<> StartDriverImpl(fit::callback<void(fdf::DriverStartArgs&)> args_modifier) {
-    ZX_ASSERT_MSG(!start_result_.has_value(), "Cannot start multiple times in a row.");
-
-    if (args_modifier) {
-      args_modifier(start_args_.value());
-    }
-
-    fdf::DriverStartArgs start_args = std::move(start_args_.value());
-    start_args_.reset();
+    ZX_ASSERT_MSG(
+        !start_result_.has_value(),
+        "Cannot call |StartDriver| multiple times in a row. If multiple starts are needed, "
+        "ensure to go through |StopDriver| and |ShutdownDispatchersAndDestroyDriver| first.");
 
     dut_.emplace(&runtime_);
+    fdf::DriverStartArgs start_args =
+        env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::Init);
+    outgoing_directory_client_ =
+        env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::TakeOutgoingClient);
+    if (args_modifier) {
+      args_modifier(start_args);
+    }
+
     start_result_ = dut_->Start(std::move(start_args));
     return start_result_.value();
   }
 
   zx::result<> StopDriverImpl() {
     ZX_ASSERT_MSG(start_result_.has_value(), "Cannot stop without having started.");
-    ZX_ASSERT_MSG(!prepare_stop_result_.has_value(), "Cannot stop multiple times in a row.");
+    ZX_ASSERT_MSG(!prepare_stop_result_.has_value(),
+                  "Ensure |StopDriver| is only called once after a |StartDriver| call.");
 
     if (StartedSuccessfully()) {
-      ZX_ASSERT_MSG(dut_.has_value(),
-                    "Cannot call StopDriver after ShutdownDispatchersAndDestroyDriverImpl.");
       prepare_stop_result_.emplace(dut_->PrepareStop());
     } else {
+      // Drivers that failed to stop don't receive a PrepareStop call. Set the result as ok so that
+      // the teardown continues successfully.
       prepare_stop_result_.emplace(zx::ok());
     }
 
@@ -386,20 +387,30 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   }
 
   void ShutdownDispatchersAndDestroyDriverImpl() {
+    // Allow for calling this method multiple times, but only do this work the first time.
     if (dut_.has_value()) {
       if (StartedSuccessfully()) {
-        ZX_ASSERT_MSG(
-            prepare_stop_result_.has_value(),
-            "Ensure that StopDriver is called when kAutoStopDriver=false and start was successful.");
+        ZX_ASSERT_MSG(prepare_stop_result_.has_value(),
+                      "Ensure |ShutdownDispatchersAndDestroyDriver| is only called once after "
+                      "a |StopDriver| call when kAutoStopDriver=false and start was successful.");
       }
 
-      env_wrapper_.reset();
-      runtime_.ShutdownAllDispatchers(dut_->GetDispatcher()->get());
-      dut_.reset();
+      // Shuts down the driver dispatcher and all dispatchers created under it by the driver.
+      if constexpr (kDriverOnForeground) {
+        runtime_.ResetForegroundDispatcher([this]() { dut_.reset(); });
+      } else {
+        runtime_.ShutdownBackgroundDispatcher(dut_->GetDispatcher()->get(),
+                                              [this]() { dut_.reset(); });
+      }
+
+      // Reset the start_result_ and prepare_stop_result_ to allow another iteration of the driver.
+      start_result_.reset();
+      prepare_stop_result_.reset();
     }
   }
 
   fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<internal::EnvWrapper<EnvironmentType>> env_wrapper_;
 
   // The dut_ is created through the |StartDriverImpl|, and becomes a nullopt through
@@ -409,7 +420,6 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
 
   std::optional<fdf::UnownedSynchronizedDispatcher> bg_task_dispatcher_;
-  std::optional<fdf::DriverStartArgs> start_args_;
   std::optional<zx::result<>> start_result_;
   std::optional<zx::result<>> prepare_stop_result_;
 };

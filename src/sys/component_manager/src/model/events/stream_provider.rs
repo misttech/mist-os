@@ -2,26 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        component::WeakExtendedInstance,
-        events::{
-            registry::{EventRegistry, EventSubscription},
-            stream::EventStream,
-        },
-        routing::router_ext::WeakComponentTokenExt,
-    },
-    async_trait::async_trait,
-    cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl},
-    errors::{EventsError, ModelError},
-    futures::lock::Mutex,
-    hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-    moniker::{ExtendedMoniker, Moniker},
-    std::{
-        collections::HashMap,
-        sync::{Arc, Weak},
-    },
-};
+use crate::model::component::WeakExtendedInstance;
+use crate::model::events::registry::{EventRegistry, EventSubscription};
+use crate::model::events::stream::EventStream;
+use crate::model::routing::router_ext::WeakComponentTokenExt;
+use async_trait::async_trait;
+use cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl};
+use errors::{EventsError, ModelError};
+use futures::lock::Mutex;
+use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
+use moniker::{ExtendedMoniker, Moniker};
+use std::collections::HashMap;
+use std::sync::{Arc, Weak};
 
 /// Contains the event stream and its name.
 pub struct EventStreamAttachment {
@@ -184,11 +176,7 @@ impl Hook for EventStreamProvider {
                 self.on_component_destroyed(target_moniker).await;
             }
             EventPayload::Resolved { decl, component, .. } => {
-                self.on_component_resolved(
-                    &WeakExtendedInstance::Component(component.clone().to_instance()),
-                    decl,
-                )
-                .await?;
+                self.on_component_resolved(component.as_ref(), decl).await?;
             }
             _ => {}
         }

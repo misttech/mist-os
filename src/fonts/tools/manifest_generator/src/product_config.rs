@@ -4,13 +4,12 @@
 
 #![allow(deprecated)]
 
-use {
-    crate::{font_catalog::TypefaceInAssetIndex, serde_ext},
-    anyhow::Error,
-    manifest::v2,
-    serde::Deserialize,
-    std::path::Path,
-};
+use crate::font_catalog::TypefaceInAssetIndex;
+use crate::serde_ext;
+use anyhow::Error;
+use manifest::v2;
+use serde::Deserialize;
+use std::path::Path;
 
 /// Serializable representation of a ".fontcfg.json" file, which includes fallback chains.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -142,10 +141,11 @@ pub struct Settings {
 #[cfg(test)]
 mod tests {
 
-    use {
-        super::*, pretty_assertions::assert_eq, serde_json::json, std::io::Write,
-        tempfile::NamedTempFile,
-    };
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_load_from_path() -> Result<(), Error> {

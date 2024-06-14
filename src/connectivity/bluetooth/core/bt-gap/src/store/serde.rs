@@ -29,13 +29,11 @@
 // This allows us to provide a camel-case module name to the `derive_opt_box` macro below.
 #![allow(non_snake_case)]
 
-use {
-    fidl_fuchsia_bluetooth as bt, fidl_fuchsia_bluetooth_sys as sys,
-    fuchsia_bluetooth::types::{
-        Address, BondingData, BredrBondData, HostData, LeBondData, OneOrBoth, PeerId, Uuid,
-    },
-    serde::{Deserialize, Serialize},
+use fuchsia_bluetooth::types::{
+    Address, BondingData, BredrBondData, HostData, LeBondData, OneOrBoth, PeerId, Uuid,
 };
+use serde::{Deserialize, Serialize};
+use {fidl_fuchsia_bluetooth as bt, fidl_fuchsia_bluetooth_sys as sys};
 
 #[derive(Serialize)]
 pub struct BondingDataSerializer(BondingDataDef);
@@ -93,10 +91,8 @@ macro_rules! option_encoding {
     ($encoding:ident, $remote_type:ty, $local_type:expr) => {
         #[allow(explicit_outlives_requirements)]
         mod $encoding {
-            use {
-                super::*,
-                serde::{Deserialize, Deserializer, Serialize, Serializer},
-            };
+            use super::*;
+            use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
             pub fn serialize<S>(
                 value: &Option<$remote_type>,
@@ -125,10 +121,8 @@ macro_rules! option_encoding {
 
 // Custom (de)serializer for fidl_fuchsia_bluetooth::ConnectionRole.
 mod connection_role_encoding {
-    use {
-        fidl_fuchsia_bluetooth::ConnectionRole,
-        serde::{de, Deserializer, Serializer},
-    };
+    use fidl_fuchsia_bluetooth::ConnectionRole;
+    use serde::{de, Deserializer, Serializer};
 
     pub fn serialize<S>(value: &ConnectionRole, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -173,11 +167,9 @@ option_encoding!(OptionConnectionRoleDef, bt::ConnectionRole, "connection_role_e
 
 // Custom (de)serializer for `fuchsia_bluetooth::types::Address`.
 mod address_encoding {
-    use {
-        fuchsia_bluetooth::types::Address,
-        serde::ser::SerializeStruct,
-        serde::{de, Deserialize, Deserializer, Serializer},
-    };
+    use fuchsia_bluetooth::types::Address;
+    use serde::ser::SerializeStruct;
+    use serde::{de, Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(address: &Address, serializer: S) -> Result<S::Ok, S::Error>
     where

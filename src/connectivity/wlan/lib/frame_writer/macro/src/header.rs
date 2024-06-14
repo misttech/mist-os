@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::frame_writer::BufferWrite,
-    quote::quote,
-    syn::{
-        parse::{Parse, ParseStream},
-        spanned::Spanned,
-        Error, Expr, ExprIf, ExprPath, Path, Result, Token,
-    },
-};
+use crate::frame_writer::BufferWrite;
+use quote::quote;
+use syn::parse::{Parse, ParseStream};
+use syn::spanned::Spanned;
+use syn::{Error, Expr, ExprIf, ExprPath, Path, Result, Token};
 
 pub struct HeaderDefinition {
     header_type: Path,

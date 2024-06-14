@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        commands::{types::*, utils},
-        types::Error,
-    },
-    argh::{ArgsInfo, FromArgs},
-    async_trait::async_trait,
-    diagnostics_data::{Inspect, InspectData},
-    diagnostics_hierarchy::DiagnosticsHierarchy,
-    serde::Serialize,
-    std::fmt,
-};
+use crate::commands::types::*;
+use crate::commands::utils;
+use crate::types::Error;
+use argh::{ArgsInfo, FromArgs};
+use async_trait::async_trait;
+use diagnostics_data::{Inspect, InspectData};
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use serde::Serialize;
+use std::fmt;
 
 /// Lists all available full selectors (component selector + tree selector).
 /// If a selector is provided, it’ll only print selectors for that component.

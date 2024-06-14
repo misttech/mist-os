@@ -34,7 +34,9 @@ impl<T: DefaultDrop> std::ops::Drop for WithDefaultDrop<T> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_sync::Mutex, std::sync::Arc};
+    use super::*;
+    use fuchsia_sync::Mutex;
+    use std::sync::Arc;
 
     struct TestDrop(Arc<Mutex<bool>>);
 

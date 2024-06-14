@@ -1,10 +1,8 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    argh::{ArgsInfo, FromArgs},
-    lspci::filter::Filter,
-};
+use argh::{ArgsInfo, FromArgs};
+use lspci::filter::Filter;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(

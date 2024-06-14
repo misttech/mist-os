@@ -4,7 +4,9 @@
 
 use crate::format::SampleSize;
 use fidl_fuchsia_hardware_audio as fhaudio;
-use std::{fmt::Display, num::NonZeroU32, str::FromStr};
+use std::fmt::Display;
+use std::num::NonZeroU32;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DaiFormat {

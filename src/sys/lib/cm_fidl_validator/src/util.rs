@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::*,
-    cm_types::{LongName, Name, ParseError, Path, RelativePath, Url, UrlScheme},
-    fidl_fuchsia_component_decl as fdecl,
-    std::collections::HashMap,
-};
+use crate::error::*;
+use cm_types::{LongName, Name, ParseError, Path, RelativePath, Url, UrlScheme};
+use fidl_fuchsia_component_decl as fdecl;
+use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum AllowableIds {
@@ -154,14 +152,12 @@ pub(crate) fn check_url_scheme(
 #[cfg(test)]
 mod tests {
 
-    use {
-        super::*,
-        cm_types::{MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH},
-        lazy_static::lazy_static,
-        proptest::prelude::*,
-        regex::Regex,
-        url::Url,
-    };
+    use super::*;
+    use cm_types::{MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH};
+    use lazy_static::lazy_static;
+    use proptest::prelude::*;
+    use regex::Regex;
+    use url::Url;
 
     mod path {
         use cm_types::{MAX_NAME_LENGTH, MAX_PATH_LENGTH};

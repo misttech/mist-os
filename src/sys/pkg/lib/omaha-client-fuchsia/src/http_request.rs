@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_async::TimeoutExt,
-    futures::{future::BoxFuture, prelude::*},
-    hyper::{client::ResponseFuture, Body, Client, Request, Response},
-    omaha_client::http_request::{Error, HttpRequest},
-    std::time::Duration,
-};
+use fuchsia_async::TimeoutExt;
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use hyper::client::ResponseFuture;
+use hyper::{Body, Client, Request, Response};
+use omaha_client::http_request::{Error, HttpRequest};
+use std::time::Duration;
 
 pub struct FuchsiaHyperHttpRequest {
     timeout: Duration,
@@ -48,11 +48,9 @@ impl FuchsiaHyperHttpRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_hyper_test_support::{
-        fault_injection::{Hang, HangBody},
-        handler::StaticResponse,
-        TestServer,
-    };
+    use fuchsia_hyper_test_support::fault_injection::{Hang, HangBody};
+    use fuchsia_hyper_test_support::handler::StaticResponse;
+    use fuchsia_hyper_test_support::TestServer;
 
     /// Helper that constructs a Request for a given path on the given test server.
     fn make_request_for(server: &TestServer, path: &str) -> Request<Body> {

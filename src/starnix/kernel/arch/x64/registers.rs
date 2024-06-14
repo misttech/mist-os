@@ -4,7 +4,8 @@
 
 use fuchsia_zircon as zx;
 
-use starnix_uapi::{error, errors::Errno, user_regs_struct};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{error, user_regs_struct};
 
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`].

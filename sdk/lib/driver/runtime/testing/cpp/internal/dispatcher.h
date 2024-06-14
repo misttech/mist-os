@@ -40,6 +40,8 @@ class TestSynchronizedDispatcher {
   const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_; }
   async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }
 
+  const void* owner() const { return owner_driver_; }
+
  private:
   // Start a managed dispatcher. Once this returns successfully the dispatcher is available to be
   // used for queueing and running tasks.
@@ -72,6 +74,7 @@ class TestSynchronizedDispatcher {
   std::optional<fdf_internal::DefaultDispatcherSetting> default_dispatcher_setting_;
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion dispatcher_shutdown_;
+  const void* owner_driver_;
 };
 
 // Starts a driver dispatcher that becomes the default driver dispatcher for the current thread.

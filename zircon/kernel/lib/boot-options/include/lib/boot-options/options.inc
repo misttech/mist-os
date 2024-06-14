@@ -226,7 +226,7 @@ Refer to `kernel.oom.outofmemory-mb`, `kernel.oom.critical-mb`,
 memory pressure state transitions.
 
 The current memory availability state can be queried with the command
-`k pmm mem_avail_state info`.
+`k mem mem_avail_state info`.
 )""")
 
 DEFINE_OPTION("kernel.oom.outofmemory-mb", uint64_t, oom_out_of_memory_threshold_mb, {50}, R"""(
@@ -544,18 +544,6 @@ DEFINE_OPTION("kernel.page-scanner.enable-eviction", bool, page_scanner_enable_e
 When set, allows the page scanner to evict user pager backed pages. Eviction can
 reduce memory usage and prevent out of memory scenarios, but removes some
 timing predictability from system behavior.
-)""")
-
-DEFINE_OPTION("kernel.page-scanner.discardable-evictions-percent", uint32_t,
-              page_scanner_discardable_evictions_percent, {20}, R"""(
-Percentage of page evictions, that should be satisfied from
-discardable VMOs, as opposed to pager-backed VMOs. For example, if this value
-is set to `X` and the kernel needs to reclaim `N` pages to relieve memory
-pressure, it will evict `(N * X / 100)` pages from discardable VMOs, and the
-remaining `(N * (100 - X) / 100)` pages from pager-backed VMOs.
-
-Note that the kernel will try its best to honor this ratio between discardable
-and pager-backed pages evicted, but the actual numbers might not be exact.
 )""")
 
 DEFINE_OPTION("kernel.page-scanner.page-table-eviction-policy", PageTableEvictionPolicy,

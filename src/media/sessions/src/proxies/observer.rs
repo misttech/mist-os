@@ -4,14 +4,10 @@
 
 use crate::Result;
 use fidl_fuchsia_media_sessions2::*;
-use futures::{
-    stream::{Fuse, Map, Stream, StreamExt},
-    Future,
-};
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use futures::stream::{Fuse, Map, Stream, StreamExt};
+use futures::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tracing::warn;
 
 pub enum WatchStatusResponder {
@@ -150,7 +146,10 @@ mod test {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
     use fuchsia_async as fasync;
-    use futures::{channel::mpsc, future, sink::SinkExt, task::noop_waker, FutureExt};
+    use futures::channel::mpsc;
+    use futures::sink::SinkExt;
+    use futures::task::noop_waker;
+    use futures::{future, FutureExt};
 
     #[fuchsia::test]
     async fn clients_waits_for_new_status() -> Result<()> {

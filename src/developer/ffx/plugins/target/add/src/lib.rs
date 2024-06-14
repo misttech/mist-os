@@ -82,8 +82,7 @@ pub async fn add_impl(
 mod test {
     use super::*;
     use fho::{Format, TestBuffers};
-    use fidl_fuchsia_developer_ffx as ffx;
-    use fidl_fuchsia_net as net;
+    use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_net as net};
 
     fn setup_fake_target_collection<T: 'static + Fn(ffx::TargetAddrInfo) + Send>(
         test: T,

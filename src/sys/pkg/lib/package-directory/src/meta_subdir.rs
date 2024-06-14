@@ -2,23 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::root_dir::RootDir,
-    async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::sync::Arc,
-    vfs::{
-        common::send_on_open_with_error,
-        directory::{
-            immutable::connection::ImmutableConnection, traversal_position::TraversalPosition,
-        },
-        execution_scope::ExecutionScope,
-        immutable_attributes,
-        path::Path as VfsPath,
-        ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
-    },
-};
+use crate::root_dir::RootDir;
+use fidl::endpoints::ServerEnd;
+use std::sync::Arc;
+use vfs::common::send_on_open_with_error;
+use vfs::directory::immutable::connection::ImmutableConnection;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path as VfsPath;
+use vfs::{immutable_attributes, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub(crate) struct MetaSubdir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,
@@ -35,7 +28,6 @@ impl<S: crate::NonMetaStorage> MetaSubdir<S> {
 
 impl<S: crate::NonMetaStorage> vfs::node::IsDirectory for MetaSubdir<S> {}
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::node::Node for MetaSubdir<S> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         let size = crate::usize_to_u64_safe(self.root_dir.meta_files.len());
@@ -76,7 +68,6 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaSubdir<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for MetaSubdir<S> {
     fn open(
         self: Arc<Self>,
@@ -226,17 +217,15 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        futures::prelude::*,
-        std::convert::TryInto as _,
-        vfs::{
-            directory::{entry::EntryInfo, entry_container::Directory},
-            node::Node,
-        },
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
+    use fuchsia_pkg_testing::PackageBuilder;
+    use futures::prelude::*;
+    use std::convert::TryInto as _;
+    use vfs::directory::entry::EntryInfo;
+    use vfs::directory::entry_container::Directory;
+    use vfs::node::Node;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,

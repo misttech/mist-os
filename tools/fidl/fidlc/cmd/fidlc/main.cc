@@ -15,6 +15,7 @@
 #include <ios>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -38,7 +39,7 @@ void Usage() {
   std::cout << R"USAGE(The FIDL compiler
 
 Usage: fidlc [--json JSON_PATH]
-             [--available PLATFORM:VERSION]
+             [--available PLATFORM:VERSION[,VERSION]...]
              [--versioned PLATFORM[:VERSION]]
              [--name LIBRARY_NAME]
              [--experimental FLAG_NAME]
@@ -63,10 +64,11 @@ Options:
    representation is JSON that conforms to the schema available via --json-schema.
    The intermediate representation is used as input to the various backends.
 
- * `--available PLATFORM:VERSION`. If present, this flag instructs `fidlc` to compile
-    libraries versioned under PLATFORM at VERSION, based on `@available` attributes.
-    PLATFORM corresponds to a library's `@available(platform="PLATFORM")` attribute,
-    or to the library name's first component if the `platform` argument is omitted.
+ * `--available PLATFORM:VERSION[,VERSION]...`. If present, this flag instructs `fidlc`
+   to include elements annotated `@available` under PLATFORM at any given VERSION.
+   PLATFORM corresponds to a library's `@available(platform="PLATFORM")` attribute,
+   or to the library name's first component if the `platform` argument is omitted.
+   E.g. `--available example:1,3` selects versions 1 and 3 of platform "example".
 
  * `--versioned PLATFORM[:VERSION]`. If present, this flag instructs `fidlc` to
    validate that the main library being compiled is versioned under PLATFORM.
@@ -252,23 +254,36 @@ class ArgvArguments : public Arguments {
   std::unique_ptr<ResponseFileArguments> response_file_;
 };
 
-std::pair<fidlc::Platform, std::optional<fidlc::Version>> ParsePlatformAndVersion(
+std::pair<fidlc::Platform, std::set<fidlc::Version>> ParsePlatformAndVersions(
     const std::string& arg) {
   auto colon_idx = arg.find(':');
   auto platform_str = arg.substr(0, colon_idx);
   auto platform = fidlc::Platform::Parse(platform_str);
   if (!platform.has_value())
     FailWithUsage("Invalid platform name `%s`\n", platform_str.c_str());
-  std::optional<fidlc::Version> version;
+  std::set<fidlc::Version> versions;
   if (colon_idx != std::string::npos) {
-    auto version_str = arg.substr(colon_idx + 1);
-    version = fidlc::Version::Parse(version_str);
-    if (!version.has_value())
-      FailWithUsage("Invalid version `%s`\n", version_str.c_str());
-    if (platform->is_unversioned())
-      FailWithUsage("Selecting a version for '%s' is not allowed\n", platform_str.c_str());
+    for (size_t i = colon_idx + 1; i < arg.size();) {
+      size_t comma = arg.find(',', i);
+      auto version_str = arg.substr(i, comma == std::string::npos ? std::string::npos : comma - i);
+      i += version_str.size() + 1;
+      auto version = fidlc::Version::Parse(version_str);
+      if (!version.has_value()) {
+        FailWithUsage("Invalid version `%s`\n", version_str.c_str());
+      }
+      if (versions.count(*version) != 0) {
+        FailWithUsage("Duplicate version `%s`\n", version_str.c_str());
+      }
+      if (!versions.empty() && *version < *versions.rbegin()) {
+        FailWithUsage("Version `%s` not in ascending order\n", version_str.c_str());
+      }
+      versions.insert(*version);
+    }
   }
-  return {std::move(platform).value(), version};
+  if (platform->is_unversioned() && !versions.empty()) {
+    FailWithUsage("Selecting versions for '%s' is not allowed\n", platform_str.c_str());
+  }
+  return {std::move(platform).value(), std::move(versions)};
 }
 
 enum struct Behavior {
@@ -504,12 +519,25 @@ int main(int argc, char* argv[]) {
       json_path = path;
       outputs.emplace_back(Behavior::kJSON, path);
     } else if (flag == "--available") {
-      auto [platform, version] = ParsePlatformAndVersion(args->Claim());
-      if (!version.has_value())
+      auto [platform, versions] = ParsePlatformAndVersions(args->Claim());
+      if (versions.empty())
         FailWithUsage("Missing version for flag `available`\n");
-      version_selection.Insert(platform, version.value());
+      if (versions.count(fidlc::Version::kLegacy) != 0)
+        FailWithUsage("LEGACY is no longer allowed (see RFC-0232)\n");
+      if (versions.size() > 1 && versions.count(fidlc::Version::kHead) == 0) {
+        FailWithUsage(
+            "Targeting multiple versions without including HEAD is not yet "
+            "supported (https://fxbug.dev/42085274)");
+      }
+      version_selection.Insert(std::move(platform), std::move(versions));
     } else if (flag == "--versioned") {
-      std::tie(expected_platform, expected_version_added) = ParsePlatformAndVersion(args->Claim());
+      auto [platform, versions] = ParsePlatformAndVersions(args->Claim());
+      expected_platform = std::move(platform);
+      if (versions.size() == 1) {
+        expected_version_added = *versions.begin();
+      } else if (versions.size() > 1) {
+        FailWithUsage("Too many versions given in `versioned` flag\n");
+      }
     } else if (flag == "--name") {
       expected_library_name = args->Claim();
     } else if (flag == "--experimental") {

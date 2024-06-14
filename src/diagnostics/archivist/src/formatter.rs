@@ -1,23 +1,20 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{diagnostics::BatchIteratorConnectionStats, error::AccessorError},
-    fidl_fuchsia_diagnostics::{
-        DataType, Format, FormattedContent, StreamMode, MAXIMUM_ENTRIES_PER_BATCH,
-    },
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    serde::Serialize,
-    std::{
-        io::{BufWriter, Result as IoResult, Write},
-        pin::Pin,
-        sync::Arc,
-        task::{Context, Poll},
-    },
-    tracing::{error, warn},
+use crate::diagnostics::BatchIteratorConnectionStats;
+use crate::error::AccessorError;
+use fidl_fuchsia_diagnostics::{
+    DataType, Format, FormattedContent, StreamMode, MAXIMUM_ENTRIES_PER_BATCH,
 };
+use fuchsia_sync::Mutex;
+use fuchsia_zircon as zx;
+use futures::prelude::*;
+use serde::Serialize;
+use std::io::{BufWriter, Result as IoResult, Write};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use tracing::{error, warn};
 
 pub type FormattedStream =
     Pin<Box<dyn Stream<Item = Vec<Result<FormattedContent, AccessorError>>> + Send>>;

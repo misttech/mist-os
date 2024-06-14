@@ -8,18 +8,18 @@ use crate::font::get_default_font_face;
 use anyhow::Error;
 use carnelian::drawing::FontFace;
 use carnelian::render::rive::load_rive;
-use carnelian::scene::facets::RiveFacet;
-use carnelian::scene::layout::{Alignment, Stack, StackOptions};
+use carnelian::render::Context as RenderContext;
+use carnelian::scene::facets::{
+    RiveFacet, TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment,
+};
+use carnelian::scene::layout::{
+    Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize, Stack,
+    StackOptions,
+};
+use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    input, make_message,
-    render::Context as RenderContext,
-    scene::{
-        facets::{TextFacetOptions, TextHorizontalAlignment, TextVerticalAlignment},
-        layout::{CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize},
-        scene::{Scene, SceneBuilder},
-    },
-    AppSender, Coord, Message, MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext,
-    ViewKey,
+    input, make_message, AppSender, Coord, Message, MessageTarget, Point, Size, ViewAssistant,
+    ViewAssistantContext, ViewKey,
 };
 use euclid::{size2, Size2D, UnknownUnit};
 use recovery_util::ota::state_machine::Event;

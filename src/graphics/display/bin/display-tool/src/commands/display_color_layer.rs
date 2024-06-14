@@ -13,7 +13,8 @@ use {
     std::io::Write,
 };
 
-use crate::{fps::Counter, rgb::Rgb888};
+use crate::fps::Counter;
+use crate::rgb::Rgb888;
 
 const CLEAR: &str = "\x1B[2K\r";
 

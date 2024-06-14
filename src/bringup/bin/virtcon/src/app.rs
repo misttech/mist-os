@@ -2,26 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::args::VirtualConsoleArgs,
-    crate::colors::ColorScheme,
-    crate::log::{Log, LogClient},
-    crate::session_manager::{SessionManager, SessionManagerClient},
-    crate::terminal::Terminal,
-    crate::view::{ViewMessages, VirtualConsoleViewAssistant},
-    anyhow::Error,
-    carnelian::{
-        app::Config, make_message, AppAssistant, AppSender, MessageTarget, ViewAssistantPtr,
-        ViewKey,
-    },
-    fidl::prelude::*,
-    fidl_fuchsia_hardware_display::VirtconMode,
-    fidl_fuchsia_virtualconsole::SessionManagerMarker,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    pty::ServerPty,
-    std::collections::BTreeMap,
-    term_model::event::{Event, EventListener},
-};
+use crate::args::VirtualConsoleArgs;
+use crate::colors::ColorScheme;
+use crate::log::{Log, LogClient};
+use crate::session_manager::{SessionManager, SessionManagerClient};
+use crate::terminal::Terminal;
+use crate::view::{ViewMessages, VirtualConsoleViewAssistant};
+use anyhow::Error;
+use carnelian::app::Config;
+use carnelian::{make_message, AppAssistant, AppSender, MessageTarget, ViewAssistantPtr, ViewKey};
+use fidl::prelude::*;
+use fidl_fuchsia_hardware_display::VirtconMode;
+use fidl_fuchsia_virtualconsole::SessionManagerMarker;
+use pty::ServerPty;
+use std::collections::BTreeMap;
+use term_model::event::{Event, EventListener};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const DEBUGLOG_ID: u32 = 0;
 const FIRST_SESSION_ID: u32 = 1;
@@ -274,7 +270,8 @@ impl AppAssistant for VirtualConsoleAppAssistant {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync};
+    use super::*;
+    use fuchsia_async as fasync;
 
     #[fasync::run_singlethreaded(test)]
     async fn can_create_app() -> Result<(), Error> {

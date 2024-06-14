@@ -97,11 +97,11 @@ bool IsDebugLoggingActive() {
 }
 
 void SetDebugLogging(bool activate) {
-  fuchsia_logging::LogSettings settings;
+  fuchsia_logging::LogSettingsBuilder builder;
   if (activate) {
-    settings.min_log_level = fuchsia_logging::LOG_DEBUG;
+    builder.WithMinLogSeverity(fuchsia_logging::LOG_DEBUG);
   }
-  fuchsia_logging::SetLogSettings(settings);
+  builder.BuildAndInitialize();
 }
 
 void SetLogCategories(std::initializer_list<LogCategory> categories) {

@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{fmt, rc::Rc};
+use std::fmt;
+use std::rc::Rc;
 
-use crate::{
-    core::ObjectRef,
-    shapes::{paint::TrimPath, CommandPath, MetricsPath},
-};
+use crate::core::ObjectRef;
+use crate::shapes::paint::TrimPath;
+use crate::shapes::{CommandPath, MetricsPath};
 
 pub fn as_ref(object_ref: ObjectRef<'_>) -> impl StrokeEffect + '_ {
     object_ref.cast::<TrimPath>()

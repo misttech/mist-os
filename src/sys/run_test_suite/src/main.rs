@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs,
-    diagnostics_data::Severity,
-    fidl_fuchsia_diagnostics::LogInterestSelector,
-    fidl_fuchsia_sys2 as fsys,
-    fidl_fuchsia_test_manager::{LogsIteratorOption, RunBuilderMarker},
-};
+use argh::FromArgs;
+use diagnostics_data::Severity;
+use fidl_fuchsia_diagnostics::LogInterestSelector;
+use fidl_fuchsia_sys2 as fsys;
+use fidl_fuchsia_test_manager::{LogsIteratorOption, RunBuilderMarker};
 
 #[derive(FromArgs, Default, PartialEq, Debug)]
 /// Entry point for executing tests.

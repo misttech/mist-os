@@ -2,16 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::events::{event::Event, registry::ComponentEventRoute},
-    ::routing::event::EventFilter,
-    anyhow::{format_err, Error},
-    cm_rust::DictionaryValue,
-    futures::{channel::mpsc, lock::Mutex, sink::SinkExt},
-    hooks::{Event as ComponentEvent, EventPayload, TransferEvent},
-    maplit::btreemap,
-    moniker::ExtendedMoniker,
-};
+use crate::model::events::event::Event;
+use crate::model::events::registry::ComponentEventRoute;
+use ::routing::event::EventFilter;
+use anyhow::{format_err, Error};
+use cm_rust::DictionaryValue;
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::sink::SinkExt;
+use hooks::{Event as ComponentEvent, EventPayload, TransferEvent};
+use maplit::btreemap;
+use moniker::ExtendedMoniker;
 
 /// EventDispatcher and EventStream are two ends of a channel.
 ///
@@ -156,10 +157,14 @@ impl EventDispatcherScope {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fuchsia_zircon as zx, futures::StreamExt,
-        hooks::CapabilityReceiver, moniker::Moniker, sandbox::Message, std::sync::Arc,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_zircon as zx;
+    use futures::StreamExt;
+    use hooks::CapabilityReceiver;
+    use moniker::Moniker;
+    use sandbox::Message;
+    use std::sync::Arc;
 
     struct EventDispatcherFactory {
         /// The receiving end of a channel of Events.

@@ -18,7 +18,7 @@ For example, in order to use a test tool against the core nand driver, nandpart
 devices may be removed like so:
 
 ```shell
-$ unbind /dev/sys/platform/05:00:f/aml-raw_nand/nand/fvm
+$ unbind /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm
 ```
 
 Warning: Before removing a particular device, remove its descendants. By
@@ -53,8 +53,8 @@ $ nand-util --device /dev/sys/platform/00:00:2e/nand-ctl/ram-nand-0 --check
 ## Inspection / manipulation
 
 ```shell
-$ nand-util --device /dev/sys/platform/05:00:f/aml-raw_nand/nand --info
-$ nand-util --device /dev/sys/platform/05:00:f/aml-raw_nand/nand/fvm --read --block 1 --page 2
+$ nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand --info
+$ nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm --read --block 1 --page 2
 ```
 
 ## Grab an image
@@ -66,9 +66,9 @@ likely to render the system unusable. Remember to netboot or use Zedboot as
 needed.
 
 ```shell
-$ unbind /dev/sys/platform/05:00:f/aml-raw_nand/nand/fvm/ftl/block
-$ unbind /dev/sys/platform/05:00:f/aml-raw_nand/nand/fvm/ftl
-$ nand-util --device /dev/sys/platform/05:00:f/aml-raw_nand/nand/fvm --save --file /tmp/image
+$ unbind /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm/ftl/block
+$ unbind /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm/ftl
+$ nand-util --device /dev/sys/platform/raw_nand/aml-raw_nand/nand/fvm --save --file /tmp/image
 ```
 
 Transfer the image file to the host:

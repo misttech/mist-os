@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::task_metrics::{
-        measurement::Measurement, runtime_stats_source::RuntimeStatsSource, task_info::TaskInfo,
-    },
-    fuchsia_inspect as inspect, fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    std::{fmt::Debug, sync::Arc},
-};
+use crate::task_metrics::measurement::Measurement;
+use crate::task_metrics::runtime_stats_source::RuntimeStatsSource;
+use crate::task_metrics::task_info::TaskInfo;
+use futures::lock::Mutex;
+use std::fmt::Debug;
+use std::sync::Arc;
+use {fuchsia_inspect as inspect, fuchsia_zircon as zx};
 
 /// Tracks the tasks associated to some component and provides utilities for measuring them.
 pub struct ComponentStats<T: RuntimeStatsSource + Debug> {

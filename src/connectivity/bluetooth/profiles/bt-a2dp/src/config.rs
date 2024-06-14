@@ -4,10 +4,9 @@
 
 use a2dp_profile_config::Config;
 use anyhow::{format_err, Error};
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fuchsia_zircon as zx;
 use std::collections::HashSet;
 use thiserror::Error;
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_zircon as zx};
 
 use crate::media::sources::AudioSourceType;
 

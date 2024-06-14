@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::vec_deque, time::Duration};
+use std::collections::vec_deque;
+use std::time::Duration;
 
 pub trait SizeOf {
     /// Size in bytes of an object. Makes no distinction between stack and heap allocated memory.

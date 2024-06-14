@@ -5,18 +5,16 @@
 // lazy_static is required for re_find_static.
 use crate::errors::UserError;
 use lazy_static::lazy_static;
-use nom::{
-    branch::alt,
-    bytes::complete::{escaped, is_not, tag},
-    character::complete::{
-        char, digit1, hex_digit1, line_ending, multispace1, not_line_ending, one_of,
-    },
-    combinator::{map, map_res, opt, value},
-    error::{ErrorKind, ParseError},
-    multi::{many0, separated_nonempty_list},
-    sequence::{delimited, preceded, tuple},
-    IResult, Slice,
+use nom::branch::alt;
+use nom::bytes::complete::{escaped, is_not, tag};
+use nom::character::complete::{
+    char, digit1, hex_digit1, line_ending, multispace1, not_line_ending, one_of,
 };
+use nom::combinator::{map, map_res, opt, value};
+use nom::error::{ErrorKind, ParseError};
+use nom::multi::{many0, separated_nonempty_list};
+use nom::sequence::{delimited, preceded, tuple};
+use nom::{IResult, Slice};
 use nom_locate::LocatedSpan;
 use regex::Regex;
 use std::fmt;

@@ -2,29 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    futures::{
-        future::{Future, FutureExt},
-        io::{self, AsyncRead, AsyncWrite},
-        task::{Context, Poll},
-    },
-    hyper::{
-        client::{
-            connect::{Connected, Connection},
-            Client,
-        },
-        Body,
-    },
-    std::{
-        marker::PhantomData,
-        net::{
-            AddrParseError, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, SocketAddrV4, SocketAddrV6,
-        },
-        num::ParseIntError,
-        pin::Pin,
-    },
-    tokio::io::ReadBuf,
+use futures::future::{Future, FutureExt};
+use futures::io::{self, AsyncRead, AsyncWrite};
+use futures::task::{Context, Poll};
+use hyper::client::connect::{Connected, Connection};
+use hyper::client::Client;
+use hyper::Body;
+use std::marker::PhantomData;
+use std::net::{
+    AddrParseError, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, SocketAddrV4, SocketAddrV6,
 };
+use std::num::ParseIntError;
+use std::pin::Pin;
+use tokio::io::ReadBuf;
 
 #[cfg(not(target_os = "fuchsia"))]
 use async_net as net;
@@ -404,11 +394,9 @@ pub(crate) fn connect_and_bind_device<D: AsRef<[u8]>>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_async::{self as fasync},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_async::{self as fasync};
 
     async fn unsupported(_name: &str) -> Result<u32, io::Error> {
         panic!("should not have happened")

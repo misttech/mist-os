@@ -15,13 +15,11 @@ use netsvc_proto::netboot::{
     NetbootPacket, NetbootPacketBuilder, Opcode, ADVERT_PORT, SERVER_PORT,
 };
 use packet::{Buf, FragmentedBuffer, InnerPacketBuilder, ParseBuffer, Serializer};
-use std::{
-    collections::HashSet,
-    net::{IpAddr, Ipv6Addr, SocketAddr},
-    num::NonZeroU16,
-    sync::{Arc, Weak},
-    time::Duration,
-};
+use std::collections::HashSet;
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+use std::num::NonZeroU16;
+use std::sync::{Arc, Weak};
+use std::time::Duration;
 use zerocopy::ByteSlice;
 
 /// Zedboot discovery port (must be a nonzero u16)

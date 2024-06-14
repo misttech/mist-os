@@ -2,24 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::autocomplete::FuzzHelper,
-    anyhow::{anyhow, bail, Result},
-    argh::FromArgs,
-    async_trait::async_trait,
-    ffx_fuzz_args::{FuzzShellCommand, FuzzerState},
-    fuchsia_async as fasync,
-    futures::channel::mpsc,
-    futures::{SinkExt, StreamExt},
-    rustyline::error::ReadlineError,
-    rustyline::{CompletionType, Config, Editor},
-    std::io,
-    std::sync::{Arc, Mutex},
-    std::thread,
-    termion::input::TermRead,
-    termion::raw::IntoRawMode,
-    termion::{color, style},
-};
+use crate::autocomplete::FuzzHelper;
+use anyhow::{anyhow, bail, Result};
+use argh::FromArgs;
+use async_trait::async_trait;
+use ffx_fuzz_args::{FuzzShellCommand, FuzzerState};
+use fuchsia_async as fasync;
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
+use rustyline::error::ReadlineError;
+use rustyline::{CompletionType, Config, Editor};
+use std::sync::{Arc, Mutex};
+use std::{io, thread};
+use termion::input::TermRead;
+use termion::raw::IntoRawMode;
+use termion::{color, style};
 
 /// Trait for getting input such as user commands.
 ///
@@ -213,16 +210,14 @@ async fn shell_read_loop(
 
 #[cfg(test)]
 pub mod test_fixtures {
-    use {
-        super::{parse, ParsedCommand, Reader},
-        anyhow::{bail, Result},
-        async_trait::async_trait,
-        fuchsia_async as fasync,
-        fuchsia_fuzzctl::{deadline_after, Duration},
-        futures::channel::mpsc,
-        futures::{SinkExt, StreamExt},
-        std::collections::LinkedList,
-    };
+    use super::{parse, ParsedCommand, Reader};
+    use anyhow::{bail, Result};
+    use async_trait::async_trait;
+    use fuchsia_async as fasync;
+    use fuchsia_fuzzctl::{deadline_after, Duration};
+    use futures::channel::mpsc;
+    use futures::{SinkExt, StreamExt};
+    use std::collections::LinkedList;
 
     /// The ScriptReader represents canned input for a unit test.
     pub struct ScriptReader {

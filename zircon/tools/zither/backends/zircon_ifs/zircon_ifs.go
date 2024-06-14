@@ -6,6 +6,7 @@ package zircon_ifs
 
 import (
 	"embed"
+	"encoding/json"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -32,14 +33,12 @@ func (gen Generator) DeclOrder() zither.DeclOrder { return zither.SourceDeclOrde
 func (gen Generator) DeclCallback(zither.Decl) {}
 
 func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) ([]string, error) {
-	symbols := []symbol{
-		// TODO(https://fxbug.dev/42126998): These are not syscalls, but are a part of the
-		// vDSO interface today (they probably shouldn't be). For now, we
-		// hardcode these symbols here.
-		{Name: "_zx_exception_get_string", Weak: false},
-		{Name: "zx_exception_get_string", Weak: true},
-		{Name: "_zx_status_get_string", Weak: false},
-		{Name: "zx_status_get_string", Weak: true},
+	syscall_names := []string{
+		// TODO(https://fxbug.dev/42126998): These are not syscalls,
+		// but are a part of the vDSO interface today (they probably
+		// shouldn't be). For now, we hardcode these symbols here.
+		"zx_exception_get_string",
+		"zx_status_get_string",
 	}
 	for _, summary := range summary.Files {
 		for _, decl := range summary.Decls {
@@ -52,22 +51,38 @@ func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) 
 					continue
 				}
 				name := "zx_" + zither.LowerCaseWithUnderscores(syscall)
-				symbols = append(symbols,
-					symbol{Name: "_" + name, Weak: false},
-					symbol{Name: name, Weak: true},
-				)
+				syscall_names = append(syscall_names, name)
 			}
 		}
+	}
+	sort.Strings(syscall_names)
+
+	symbols := []symbol{}
+	for _, name := range syscall_names {
+		symbols = append(symbols,
+			symbol{Name: "_" + name, Weak: false},
+			symbol{Name: name, Weak: true},
+		)
 	}
 	sort.Slice(symbols, func(i, j int) bool {
 		return strings.Compare(symbols[i].Name, symbols[j].Name) < 0
 	})
 
-	output := filepath.Join(outputDir, "zircon.ifs")
-	if err := gen.GenerateFile(output, "GenerateZirconIfsFile", symbols); err != nil {
+	ifs_output := filepath.Join(outputDir, "zircon.ifs")
+	if err := gen.GenerateFile(ifs_output, "GenerateZirconIfsFile", symbols); err != nil {
 		return nil, err
 	}
-	return []string{output}, nil
+
+	json_output := filepath.Join(outputDir, "libzircon.json")
+	json_bytes, err := json.MarshalIndent(syscall_names, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	if err := fidlgen.WriteFileIfChanged(json_output, append(json_bytes, '\n')); err != nil {
+		return nil, err
+	}
+
+	return []string{ifs_output, json_output}, nil
 }
 
 type symbol struct {

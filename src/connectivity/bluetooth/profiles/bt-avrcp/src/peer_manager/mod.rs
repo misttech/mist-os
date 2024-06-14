@@ -2,25 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bt_avctp::{AvcPeer, AvctpPeer},
-    fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_bluetooth::types::{Channel, PeerId},
-    fuchsia_inspect_derive::{AttachError, Inspect},
-    fuchsia_sync::RwLock,
-    futures::channel::oneshot,
-    std::{collections::HashMap, sync::Arc},
-};
+use bt_avctp::{AvcPeer, AvctpPeer};
+use fuchsia_bluetooth::types::{Channel, PeerId};
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_sync::RwLock;
+use futures::channel::oneshot;
+use std::collections::HashMap;
+use std::sync::Arc;
+use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fidl_fuchsia_bluetooth_bredr as bredr};
 
 mod inspect;
 mod target_delegate;
 
-use crate::{
-    metrics::MetricsNode,
-    peer::{Controller, RemotePeerHandle},
-    profile::AvrcpService,
-    types::PeerError as Error,
-};
+use crate::metrics::MetricsNode;
+use crate::peer::{Controller, RemotePeerHandle};
+use crate::profile::AvrcpService;
+use crate::types::PeerError as Error;
 use inspect::PeerManagerInspect;
 pub use target_delegate::TargetDelegate;
 

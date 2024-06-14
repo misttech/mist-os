@@ -14,14 +14,14 @@ import rustc
 
 import cl_utils
 
-from typing import Any, Sequence
+from typing import Any, Collection, Sequence
 
 
 def _strs(items: Sequence[Any]) -> Sequence[str]:
     return [str(i) for i in items]
 
 
-def _paths(items: Sequence[Any]) -> Sequence[Path]:
+def _paths(items: Collection[Any]) -> Collection[Path]:
     if isinstance(items, list):
         return [Path(i) for i in items]
     elif isinstance(items, set):
@@ -34,7 +34,7 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 
 
 class RustActionTests(unittest.TestCase):
-    def test_simple(self):
+    def test_simple(self) -> None:
         compiler = Path("../tools/rustc")
         source = Path("../foo/lib.rs")
         output = Path("foo.rlib")
@@ -66,7 +66,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.externs, {})
         self.assertEqual(set(r.extern_paths()), set())
 
-    def test_args_from_response_file(self):
+    def test_args_from_response_file(self) -> None:
         compiler = Path("../tools/rustc")
         source = Path("../foo/lib.rs")
         output = Path("foo.rlib")
@@ -82,7 +82,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.output_file, output)
         self.assertEqual(r.direct_sources, [source])
 
-    def test_executable_suffixed(self):
+    def test_executable_suffixed(self) -> None:
         compiler = Path("../tools/rustc")
         source = Path("../foo/lib.rs")
         for output in (Path("bin/foo.exe"), Path("bin/foo")):
@@ -97,20 +97,20 @@ class RustActionTests(unittest.TestCase):
             self.assertEqual(r._auxiliary_output_path, "bin/foo")
             self.assertEqual(r.direct_sources, [source])
 
-    def test_no_source(self):
+    def test_no_source(self) -> None:
         compiler = Path("../tools/bin/rustc")
         output = Path("foo.rlib")
         r = rustc.RustAction(_strs([compiler, "-o", output]))
         self.assertEqual(r.direct_sources, [])
 
-    def test_no_output(self):
+    def test_no_output(self) -> None:
         compiler = Path("../tools/bin/rustc")
         source = Path("../foo/lib.rs")
         r = rustc.RustAction(_strs([compiler, source]))
         with self.assertRaises(RuntimeError):
             base = r._output_file_base
 
-    def test_do_not_help(self):
+    def test_do_not_help(self) -> None:
         compiler = Path("../tools/rustc")
         source = Path("../foo/lib.rs")
         output = Path("foo.rlib")
@@ -122,13 +122,13 @@ class RustActionTests(unittest.TestCase):
                 self.assertEqual(r.compiler, compiler)
             mock_exit.assert_not_called()
 
-    def test_env(self):
+    def test_env(self) -> None:
         r = rustc.RustAction(
             ["A=B", "C=D", "../tools/rustc", "../foo/lib.rs", "-o", "foo.rlib"]
         )
         self.assertEqual(r.env, ["A=B", "C=D"])
 
-    def test_env_references_other_source_file(self):
+    def test_env_references_other_source_file(self) -> None:
         r = rustc.RustAction(
             [
                 "A=foo/other.rs",
@@ -142,7 +142,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.env, ["A=foo/other.rs", "C=D"])
         self.assertEqual(r.direct_sources, [Path("../foo/lib.rs")])
 
-    def test_crate_type(self):
+    def test_crate_type(self) -> None:
         cases = [
             ("rlib", rustc.CrateType.RLIB, False, False),
             ("bin", rustc.CrateType.BINARY, True, True),
@@ -159,13 +159,13 @@ class RustActionTests(unittest.TestCase):
             self.assertEqual(r.needs_linker, needs_linker)
             self.assertEqual(r.main_output_is_executable, is_executable)
 
-    def test_emit_link(self):
+    def test_emit_link(self) -> None:
         r = rustc.RustAction(
             ["../tools/rustc", "--emit=link", "../foo/lib.rs", "-o", "foo.rlib"]
         )
         self.assertEqual(r.emit, {"link": []})
 
-    def test_emit_depfile(self):
+    def test_emit_depfile(self) -> None:
         depfile = Path("foo.rlib.d")
         r = rustc.RustAction(
             [
@@ -179,7 +179,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.emit, {"dep-info": [str(depfile)]})
         self.assertEqual(r.depfile, depfile)
 
-    def test_emit_link_and_depfile(self):
+    def test_emit_link_and_depfile(self) -> None:
         depfile = Path("foo.rlib.d")
         r = rustc.RustAction(
             [
@@ -193,7 +193,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.emit, {"link": [], "dep-info": [str(depfile)]})
         self.assertEqual(r.depfile, depfile)
 
-    def test_emit_link_and_unnamed_rmeta(self):
+    def test_emit_link_and_unnamed_rmeta(self) -> None:
         rmeta = Path("foo.rmeta")
         r = rustc.RustAction(
             [
@@ -208,7 +208,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.rmeta, rmeta)
         self.assertIn(rmeta, set(r.extra_output_files()))
 
-    def test_emit_link_and_named_rmeta(self):
+    def test_emit_link_and_named_rmeta(self) -> None:
         rmeta = Path("bar.rmeta")
         r = rustc.RustAction(
             [
@@ -223,7 +223,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.rmeta, rmeta)
         self.assertIn(rmeta, set(r.extra_output_files()))
 
-    def test_emit_llvm_ir(self):
+    def test_emit_llvm_ir(self) -> None:
         output = Path("obj/foo.rlib")
         r = rustc.RustAction(
             [
@@ -239,7 +239,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.output_file, output)
         self.assertIn(Path("obj/foo.ll"), set(r.extra_output_files()))
 
-    def test_emit_llvm_bc(self):
+    def test_emit_llvm_bc(self) -> None:
         output = Path("obj/foo.rlib")
         r = rustc.RustAction(
             [
@@ -255,7 +255,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.output_file, output)
         self.assertIn(Path("obj/foo.bc"), set(r.extra_output_files()))
 
-    def test_emit_llvm_ir_bc_extra_filename(self):
+    def test_emit_llvm_ir_bc_extra_filename(self) -> None:
         output = Path("obj/foo.rlib")
         r = rustc.RustAction(
             [
@@ -276,7 +276,7 @@ class RustActionTests(unittest.TestCase):
             set(r.extra_output_files()),
         )
 
-    def test_c_sysroot(self):
+    def test_c_sysroot(self) -> None:
         c_sysroot = Path("../path/to/platform/sysroot")
         r = rustc.RustAction(
             [
@@ -289,7 +289,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(r.c_sysroot, c_sysroot)
 
-    def test_rust_sysroot(self):
+    def test_rust_sysroot(self) -> None:
         rust_sysroot = Path("../path/to/rust/sysroot")
         r = rustc.RustAction(
             [
@@ -303,7 +303,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(r.rust_sysroot, rust_sysroot)
 
-    def test_fuse_ld(self):
+    def test_fuse_ld(self) -> None:
         ld = Path("gold")
         r = rustc.RustAction(
             [
@@ -316,7 +316,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(r.use_ld, ld)
 
-    def test_rust_sysroot_default(self):
+    def test_rust_sysroot_default(self) -> None:
         working_dir = Path("/home/project/build")
         fake_default_sysroot = Path("/home/project/tools/fake/sysroot")
         compiler = Path("../tools/rustc")
@@ -346,7 +346,7 @@ class RustActionTests(unittest.TestCase):
             self.assertEqual(r.rust_sysroot, fake_default_sysroot)
         mock_default.assert_called_with()
 
-    def test_target(self):
+    def test_target(self) -> None:
         target = f"--target=powerpc32-apple-darwin8"
         r = rustc.RustAction(
             [
@@ -359,7 +359,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(r.target, target)
 
-    def test_save_analysis(self):
+    def test_save_analysis(self) -> None:
         for opts in (
             ["-Zsave-analysis=yes"],
             ["-Z", "save-analysis=yes"],
@@ -374,7 +374,7 @@ class RustActionTests(unittest.TestCase):
                 Path("save-analysis-temp/foo.json"), set(r.extra_output_files())
             )
 
-    def test_llvm_time_trace(self):
+    def test_llvm_time_trace(self) -> None:
         for opts in (
             ["-Zllvm-time-trace"],
             ["-Z", "llvm-time-trace"],
@@ -389,7 +389,7 @@ class RustActionTests(unittest.TestCase):
                 Path("obj/foo.llvm_timings.json"), set(r.extra_output_files())
             )
 
-    def test_extra_filename(self):
+    def test_extra_filename(self) -> None:
         suffix = "cafef00d"
         for opts in (
             [f"-Cextra-filename={suffix}"],
@@ -400,7 +400,7 @@ class RustActionTests(unittest.TestCase):
             )
             self.assertEqual(r.extra_filename, suffix)
 
-    def test_linker(self):
+    def test_linker(self) -> None:
         linker = Path("../path/to/linky-mc-link-face")
         for opts in (
             [f"-Clinker={linker}"],
@@ -411,8 +411,8 @@ class RustActionTests(unittest.TestCase):
             )
             self.assertEqual(r.linker, linker)
 
-    def test_link_arg_files(self):
-        link_args = _paths(["obj/foo/this.so", "obj/bar/that.so"])
+    def test_link_arg_files(self) -> None:
+        link_args = list(_paths(["obj/foo/this.so", "obj/bar/that.so"]))
         for opts in (
             [f"-Clink-arg={link_args[0]}", f"-Clink-arg={link_args[1]}"],
             [
@@ -427,7 +427,7 @@ class RustActionTests(unittest.TestCase):
             )
             self.assertEqual(r.link_arg_files, link_args)
 
-    def test_link_map_output(self):
+    def test_link_map_output(self) -> None:
         r = rustc.RustAction(
             [
                 "../tools/rustc",
@@ -441,7 +441,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.link_map_output, map_file)
         self.assertIn(map_file, set(r.extra_output_files()))
 
-    def test_soname(self):
+    def test_soname(self) -> None:
         soname = "foo.so"
         for opts in (
             [f"-Clink-arg=--soname={soname}"],
@@ -459,7 +459,7 @@ class RustActionTests(unittest.TestCase):
             self.assertNotIn(soname, r.link_arg_files)
             self.assertEqual([], r.link_arg_files)
 
-    def test_direct_inputs(self):
+    def test_direct_inputs(self) -> None:
         input1 = Path("obj/foo/this.a")
         input2 = Path("../foo/lib.rs")
         input3 = Path("obj/bar/that.so")
@@ -487,8 +487,8 @@ class RustActionTests(unittest.TestCase):
             r.explicit_link_arg_files, [input1, input3, input4, input5, input6]
         )
 
-    def test_Lnative_flag(self):
-        link_paths = _paths(["obj/foo/here", "obj/bar/there"])
+    def test_Lnative_flag(self) -> None:
+        link_paths = list(_paths(["obj/foo/here", "obj/bar/there"]))
         for opts in (
             [f"-Lnative={link_paths[0]}", f"-Lnative={link_paths[1]}"],
             ["-L", f"native={link_paths[0]}", "-L", f"native={link_paths[1]}"],
@@ -498,7 +498,7 @@ class RustActionTests(unittest.TestCase):
             )
             self.assertEqual(r.native, link_paths)
 
-    def test_externs(self):
+    def test_externs(self) -> None:
         libdir1 = Path("path/to/this_lib")
         libdir2 = Path("path/to/that_lib")
         r = rustc.RustAction(
@@ -525,7 +525,7 @@ class RustActionTests(unittest.TestCase):
             _paths({"path/to/this_lib", "path/to/that_lib"}),
         )
 
-    def test_externs_last_wins(self):
+    def test_externs_last_wins(self) -> None:
         libdir1 = Path("path/to/this_lib")
         libdir2 = Path("path/to/that_lib")
         r = rustc.RustAction(
@@ -548,7 +548,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(set(r.extern_paths()), _paths({"path/to/that_lib"}))
 
-    def test_dep_only_command_without_metadata(self):
+    def test_dep_only_command_without_metadata(self) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other"
         emit_opts = (
             ["--emit=link"],
@@ -583,7 +583,7 @@ class RustActionTests(unittest.TestCase):
             )
             self.assertEqual(aux_rspfiles, [])
 
-    def test_dep_only_command_without_emit(self):
+    def test_dep_only_command_without_emit(self) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other-2"
         r = rustc.RustAction(
             ["../tools/rustc", "../foo/lib.rs", "-o", "foo.rlib"]
@@ -606,7 +606,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(aux_rspfiles, [])
 
-    def test_dep_only_command_with_metadata(self):
+    def test_dep_only_command_with_metadata(self) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other"
         rmeta_output = "foo34.rmeta"
         emit_opts = (
@@ -647,7 +647,7 @@ class RustActionTests(unittest.TestCase):
             )
             self.assertEqual(aux_rspfiles, [])
 
-    def test_dep_only_command_no_metadata_with_externs(self):
+    def test_dep_only_command_no_metadata_with_externs(self) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other"
         emit_opts = ["--emit=link"]
         r = rustc.RustAction(
@@ -657,7 +657,7 @@ class RustActionTests(unittest.TestCase):
             + emit_opts
             + ["../foo/lib.rs", "-o", "foo35.rlib", "--extern", "extdep"]
         )
-        self.assertTrue(r.emit_metadata)
+        self.assertFalse(r.emit_metadata)
         dep_command, aux_rspfiles = r.dep_only_command_with_rspfiles(
             new_depfile
         )
@@ -677,7 +677,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(aux_rspfiles, [])
 
-    def test_dep_only_command_no_metadata_with_externs(self):
+    def test_dep_only_command_no_metadata_with_externs_rmeta(self) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other"
         rmeta_output = "foo36.rmeta"
         emit_opts = ["--emit=link,metadata=unused.rmeta"]
@@ -708,7 +708,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(aux_rspfiles, [])
 
-    def test_dep_only_command_no_metadata_with_extern_rlib(self):
+    def test_dep_only_command_no_metadata_with_extern_rlib(self) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other"
         rmeta_output = "foo37.rmeta"
         emit_opts = ["--emit=link,metadata=unused.rmeta"]
@@ -749,7 +749,7 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(aux_rspfiles, [])
 
-    def test_dep_only_command_no_metadata_with_extern_proc_macro(self):
+    def test_dep_only_command_no_metadata_with_extern_proc_macro(self) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other"
         rmeta_output = "foo38.rmeta"
         emit_opts = ["--emit=link,metadata=unused.rmeta"]
@@ -788,7 +788,7 @@ class RustActionTests(unittest.TestCase):
 
     def test_dep_only_command_emit_metadata_with_extern_rlib_inside_rspfile(
         self,
-    ):
+    ) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other"
         rmeta_output = "foo39.rmeta"
         emit_opts = ["--emit=link,metadata=unused.rmeta"]
@@ -847,7 +847,7 @@ class RustActionTests(unittest.TestCase):
 
     def test_dep_only_command_emit_metadata_with_empty_rspfile(
         self,
-    ):
+    ) -> None:
         new_depfile = "some/where/new-foo.rlib.d.other"
         rmeta_output = "foo40.rmeta"
         emit_opts = ["--emit=link,metadata=unused.rmeta"]

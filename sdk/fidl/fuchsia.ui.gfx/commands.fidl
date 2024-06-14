@@ -7,7 +7,7 @@ using fuchsia.mem;
 using zx;
 
 /// Commands that are used to modify the state of a `Session`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type Command = strict resource union {
     1: create_resource CreateResourceCmd;
     2: release_resource ReleaseResourceCmd;
@@ -103,7 +103,7 @@ type Command = strict resource union {
 
 /// Instructs the compositor to create the specified `Resource`, and to register
 /// it in a table so that it can be referenced by subsequent commands.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type CreateResourceCmd = resource struct {
     /// An ID that is currently not used within the session.
     id uint32;
@@ -117,7 +117,7 @@ type CreateResourceCmd = resource struct {
 /// resource may be required to render an in-progress frame, or it may be
 /// referred to by another resource).  However, the ID will be immediately
 /// unregistered, and may be reused to create a new resource.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ReleaseResourceCmd = struct {
     /// ID of the resource to be dereferenced.
     id uint32;
@@ -131,7 +131,7 @@ type ReleaseResourceCmd = struct {
 /// No specific mechanism is provided for transferring a token from an exporter
 /// to an importer; collaborators may choose any out-of-band API they wish to do
 /// so.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ExportResourceCmdDeprecated = resource struct {
     id uint32;
     token zx.Handle:EVENTPAIR;
@@ -159,7 +159,7 @@ type ExportResourceCmdDeprecated = resource struct {
 // TODO: describe how the imported resource behaves if the exported resource
 // isn't yet available, or becomes unavailable (e.g. an imported Material might
 // act as a plain white texture).
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type ImportResourceCmdDeprecated = resource struct {
     id uint32;
     token zx.Handle:EVENTPAIR;
@@ -180,7 +180,7 @@ type ImportResourceCmdDeprecated = resource struct {
 /// Constraints:
 /// - `node_id` refs a `Node`.
 /// - `tag_value` is the tag value to assign, or 0 to remove the tag.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetTagCmd = struct {
     node_id uint32;
     tag_value uint32;
@@ -196,7 +196,7 @@ type SetTagCmd = struct {
 /// Discussion:
 /// For nodes, this command will detach a node from its parent, regardless of
 /// whether it is a part or a child of its parent.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type DetachCmd = struct {
     id uint32;
 };
@@ -205,7 +205,7 @@ type DetachCmd = struct {
 ///
 /// Constraints:
 /// - `id` refs a Resource with the has_transform characteristic.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetTranslationCmd = struct {
     id uint32;
     value Vector3Value;
@@ -215,7 +215,7 @@ type SetTranslationCmd = struct {
 ///
 /// Constraints:
 /// - `id` refs a Resource with the has_transform characteristic.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetScaleCmd = struct {
     id uint32;
     value Vector3Value;
@@ -231,7 +231,7 @@ type SetScaleCmd = struct {
 /// [a,b,c,d], [a] represents the amount of rotation that should be applied and
 /// [b,c,d] represents the vector around which the rotation is applied. This
 /// conforms to the semantics of glm::quat.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetRotationCmd = struct {
     id uint32;
     value QuaternionValue;
@@ -241,7 +241,7 @@ type SetRotationCmd = struct {
 ///
 /// Constraints:
 /// - `id` refs a Resource with the has_transform characteristic.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetAnchorCmd = struct {
     id uint32;
     value Vector3Value;
@@ -253,7 +253,7 @@ type SetAnchorCmd = struct {
 /// - `id` refs a resizeable object.
 /// - some objects that support this command may have additional constraints
 ///   (e.g. in some cases `depth` must be zero).
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetSizeCmd = struct {
     id uint32;
     value Vector2Value;
@@ -264,7 +264,7 @@ type SetSizeCmd = struct {
 /// Constraints:
 /// - `node_id` refs a `Node` with the has_opacity characteristic.
 /// - `opacity` is in the range [0, 1].
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetOpacityCmd = struct {
     node_id uint32;
     opacity float32;
@@ -276,7 +276,7 @@ type SetOpacityCmd = struct {
 /// `width_change_factor` and `height_change_factor` is how much bigger or smaller
 /// the item is expected to be in the near future. This one number encapsulate
 /// both changes in scale, as well as changes to layout width and height.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SendSizeChangeHintCmdHACK = struct {
     node_id uint32;
     width_change_factor float32;
@@ -292,7 +292,7 @@ type SendSizeChangeHintCmdHACK = struct {
 /// Discussion:
 /// The child node is first removed from its existing parent, as if DetachCmd
 /// was applied first.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type AddChildCmd = struct {
     node_id uint32;
     child_id uint32;
@@ -313,14 +313,14 @@ type AddChildCmd = struct {
 /// Discussion:
 /// The part node is first removed from its existing parent, as if DetachCmd
 /// was applied first.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type AddPartCmd = struct {
     node_id uint32;
     part_id uint32;
 };
 
 /// Detaches all of a node's children (but not its parts).
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type DetachChildrenCmd = struct {
     node_id uint32;
 };
@@ -339,7 +339,7 @@ type DetachChildrenCmd = struct {
 /// In order to be painted, a node requires both a `Shape` and a `Material`.
 /// Without a material, a node can still participate in hit-testing and clipping.
 /// Without a shape, a node cannot do any of the above.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetShapeCmd = struct {
     node_id uint32;
     shape_id uint32;
@@ -359,7 +359,7 @@ type SetShapeCmd = struct {
 /// In order to be painted, a node requires both a `Shape` and a `Material`.
 /// Without a material, a node can still participate in hit-testing and clipping.
 /// Without a shape, a node cannot do any of the above.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetMaterialCmd = struct {
     node_id uint32;
     material_id uint32;
@@ -385,7 +385,7 @@ type SetMaterialCmd = struct {
 // For example, consider a 3D space that looks through a portal into a 2D space
 // that uses a clip for a circular reveal.  It would not be meaningful to clip
 // objects on the outside (i.e. in the 3D space).
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetClipCmd = struct {
     node_id uint32;
     clip_id uint32;
@@ -397,7 +397,7 @@ type SetClipCmd = struct {
 /// Discussion:
 /// By default, hit testing is performed on the node's content, its parts,
 /// and its children.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetHitTestBehaviorCmd = struct {
     node_id uint32;
     hit_test_behavior HitTestBehavior;
@@ -408,7 +408,7 @@ type SetHitTestBehaviorCmd = struct {
 /// Discussion:
 /// By default, all nodes are semantically visible. Semantically invisible nodes and their children
 /// are ignored by hit tests performed for accessibility.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetSemanticVisibilityCmd = struct {
     node_id uint32;
     @allow_deprecated_struct_defaults
@@ -419,20 +419,20 @@ type SetSemanticVisibilityCmd = struct {
 ///
 /// Constraints:
 /// - `view_holder_id` refs a `ViewHolder`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetViewPropertiesCmd = struct {
     view_holder_id uint32;
     properties ViewProperties;
 };
 
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 closed protocol SnapshotCallbackDEPRECATED {
     strict OnData(resource struct {
         data fuchsia.mem.Buffer;
     });
 };
 
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type TakeSnapshotCmdDEPRECATED = resource struct {
     node_id uint32;
     callback client_end:SnapshotCallbackDEPRECATED;
@@ -444,7 +444,7 @@ type TakeSnapshotCmdDEPRECATED = resource struct {
 /// - `renderer_id` refs a `Renderer`.
 /// - `camera_id` refs a `Camera`, or stops rendering by passing zero.
 /// - `matrix` is a value or variable of type kMatrix4x4.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetCameraCmd = struct {
     renderer_id uint32;
     camera_id uint32;
@@ -458,7 +458,7 @@ type SetCameraCmd = struct {
 /// - `eye_position` is the position of the eye.
 /// - `eye_look_at` is the point is the scene the that eye is pointed at.
 /// - `eye_up` defines the camera's "up" vector.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetCameraTransformCmd = struct {
     camera_id uint32;
     eye_position Vector3Value;
@@ -475,7 +475,7 @@ type SetCameraTransformCmd = struct {
 ///
 /// NOTE: A default orthographic projection is specified by setting `fovy` to
 /// zero.  In this case, the camera transform is ignored.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetCameraProjectionCmd = struct {
     camera_id uint32;
     fovy FloatValue; // Y-axis field of view, in radians.
@@ -491,7 +491,7 @@ type SetCameraProjectionCmd = struct {
 ///
 /// These projection matrices may also contain a transform in camera space for
 /// their eye if needed.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetStereoCameraProjectionCmd = struct {
     camera_id uint32;
     left_projection Matrix4Value;
@@ -504,7 +504,7 @@ type SetStereoCameraProjectionCmd = struct {
 /// - `camera_id` refs a `Camera`.
 /// - `translation` is the desired translation, in Vulkan NDC.
 /// - `scale` is the scale factor to apply on the x/y plane before translation.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetCameraClipSpaceTransformCmd = struct {
     camera_id uint32;
     translation vec2;
@@ -583,7 +583,7 @@ type SetCameraClipSpaceTransformCmd = struct {
 ///
 /// This commanderation is intended for late latching camera pose to support
 /// low-latency motion-tracked rendering.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetCameraPoseBufferCmd = struct {
     camera_id uint32;
     buffer_id uint32;
@@ -593,14 +593,14 @@ type SetCameraPoseBufferCmd = struct {
 };
 
 /// Sets the color of the Light identified by `light_id`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetLightColorCmd = struct {
     light_id uint32;
     color ColorRgbValue;
 };
 
 /// Sets the direction of the DirectionalLight identified by `light_id`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetLightDirectionCmd = struct {
     light_id uint32;
     direction Vector3Value;
@@ -608,7 +608,7 @@ type SetLightDirectionCmd = struct {
 
 /// Adds the light specified by `light_id` specified by `light_id` to the scene
 /// identified by `scene_id`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type AddLightCmd = struct {
     scene_id uint32;
     light_id uint32;
@@ -616,13 +616,13 @@ type AddLightCmd = struct {
 
 /// Detach the light specified by `light_id` from the scene that it is attached
 /// to, if any.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type DetachLightCmd = struct {
     light_id uint32;
 };
 
 /// Detach all lights from the scene specified by `scene_id`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type DetachLightsCmd = struct {
     scene_id uint32;
 };
@@ -636,7 +636,7 @@ type DetachLightsCmd = struct {
 /// If no texture is provided (i.e. `texture_id` is zero), a solid color is used.
 /// If a texture is provided, then the value sampled from the texture is
 /// multiplied by the color.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetTextureCmd = struct {
     material_id uint32;
     texture_id uint32; // Refers to an Image resource.  May be zero (no texture).
@@ -649,7 +649,7 @@ type SetTextureCmd = struct {
 ///
 /// If a texture is set on the material, then the value sampled from the texture
 /// is multiplied by the color.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetColorCmd = struct {
     material_id uint32;
     color ColorRgbaValue;
@@ -676,14 +676,14 @@ type SetColorCmd = struct {
 ///   - each vertex has a position and UV-coordinates, but no surface normal.
 ///   - the 3D position occupies bytes 0-11 (3 dimensions * 4 bytes per float32).
 ///   - the UV coords occupy bytes 12-19, since no surface normal is provided.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type MeshIndexFormat = strict enum {
     // TODO(https://fxbug.dev/42097613): only kUint32 is currently supported.
     kUint16 = 1;
     kUint32 = 2;
 };
 
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type MeshVertexFormat = struct {
     /// kVector2 or kVector3.
     position_type ValueType;
@@ -693,7 +693,7 @@ type MeshVertexFormat = struct {
     tex_coord_type ValueType;
 };
 
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type BindMeshBuffersCmd = struct {
     mesh_id uint32;
     index_buffer_id uint32;
@@ -713,7 +713,7 @@ type BindMeshBuffersCmd = struct {
 /// - `layer_id` refs a `Layer`.
 /// - The layer must not already belong to a different stack; it must first be
 ///   detached.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type AddLayerCmd = struct {
     layer_stack_id uint32;
     layer_id uint32;
@@ -724,7 +724,7 @@ type AddLayerCmd = struct {
 /// - `layer_stack_id` refs a `LayerStack`.
 /// - `layer_id` refs a `Layer`.
 /// - The layer must belong to this stack.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type RemoveLayerCmd = struct {
     layer_stack_id uint32;
     layer_id uint32;
@@ -733,7 +733,7 @@ type RemoveLayerCmd = struct {
 /// Remove all layers from a layer stack.
 /// Constraints
 /// - `layer_stack_id` refs a `LayerStack`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type RemoveAllLayersCmd = struct {
     layer_stack_id uint32;
 };
@@ -742,7 +742,7 @@ type RemoveAllLayersCmd = struct {
 /// Constraints:
 /// - `compositor_id` refs a `DisplayCompositor`.
 /// - `layer_stack_id` refs a `LayerStack`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetLayerStackCmd = struct {
     compositor_id uint32;
     layer_stack_id uint32;
@@ -752,7 +752,7 @@ type SetLayerStackCmd = struct {
 /// Constraints:
 /// - `layer_id` refs a `Layer`.
 /// - `renderer_id` refs a `Renderer`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetRendererCmd = struct {
     layer_id uint32;
     renderer_id uint32;
@@ -762,7 +762,7 @@ type SetRendererCmd = struct {
 ///
 /// `renderer_id` refs the Renderer that is being modified.
 /// `param` describes the parameter that should be set, and to what.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetRendererParamCmd = struct {
     renderer_id uint32;
     param RendererParam;
@@ -777,14 +777,14 @@ type SetRendererParamCmd = struct {
 /// Constraints:
 /// - `resource_id` is a valid resource id
 /// - `event_mask` is zero or a combination of `k*EventMask` bits OR'ed together.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetEventMaskCmd = struct {
     id uint32;
     event_mask uint32;
 };
 
 /// Maximum length for a resource label.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 const kLabelMaxLength uint32 = 32;
 
 /// Sets/clears a label to help developers identify the purpose of the resource
@@ -797,7 +797,7 @@ const kLabelMaxLength uint32 = 32;
 /// Constraints:
 /// - The label's maximum length is `kLabelMaxLength` characters.
 /// - Setting the label to an empty string clears it.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetLabelCmd = struct {
     id uint32;
     label string;
@@ -812,13 +812,13 @@ type SetLabelCmd = struct {
 ///
 /// `renderer_id` refs the target renderer.
 /// `disable_clipping` specifies whether the clipping should be disabled.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetDisableClippingCmd = struct {
     renderer_id uint32;
     disable_clipping bool;
 };
 
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetImportFocusCmdDEPRECATED = struct {};
 
 /// Sets the list of clip planes that apply to a Node and all of its children.  Replaces
@@ -826,14 +826,14 @@ type SetImportFocusCmdDEPRECATED = struct {};
 ///
 /// - `node_id` refs a `Node` with the has_clip characteristic.
 /// - `clip_planes` is the new list of oriented clip planes.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetClipPlanesCmd = struct {
     node_id uint32;
     clip_planes vector<Plane3>;
 };
 
 /// Sets the position of the PointLight identified by `light_id`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetPointLightPositionCmd = struct {
     light_id uint32;
     position Vector3Value;
@@ -848,7 +848,7 @@ type SetPointLightPositionCmd = struct {
 // TODO(https://fxbug.dev/42097875): need to formalize the units of light intensity and distance used
 // to compute fall-off.  Currently the unit is pips; consequently a falloff of 1.0
 // causes light to attenuate far too rapidly.  Meters would be more appropriate.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetPointLightFalloffCmd = struct {
     light_id uint32;
     falloff FloatValue;
@@ -856,7 +856,7 @@ type SetPointLightFalloffCmd = struct {
 
 /// Adds the light specified by `light_id` specified by `light_id` to the scene
 /// identified by `scene_id`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SceneAddAmbientLightCmd = struct {
     scene_id uint32;
     light_id uint32;
@@ -864,7 +864,7 @@ type SceneAddAmbientLightCmd = struct {
 
 /// Adds the light specified by `light_id` specified by `light_id` to the scene
 /// identified by `scene_id`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SceneAddDirectionalLightCmd = struct {
     scene_id uint32;
     light_id uint32;
@@ -872,7 +872,7 @@ type SceneAddDirectionalLightCmd = struct {
 
 /// Adds the light specified by `light_id` specified by `light_id` to the scene
 /// identified by `scene_id`.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SceneAddPointLightCmd = struct {
     scene_id uint32;
     light_id uint32;
@@ -892,7 +892,7 @@ type SceneAddPointLightCmd = struct {
 ///   preoffsets = [0 0 0]
 ///   matrix = [1 0 0 0 1 0 0 0 1]
 ///   postoffsets = [0 0 0]
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetDisplayColorConversionCmdHACK = struct {
     compositor_id uint32;
     preoffsets array<float32, 3>;
@@ -911,7 +911,7 @@ type SetDisplayColorConversionCmdHACK = struct {
 /// is orienting the screen. The only legal values for the
 /// rotation are 0, 90, 180, and 270, which are each
 ///  applied counterclockwise.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetDisplayRotationCmdHACK = struct {
     compositor_id uint32;
     rotation_degrees uint32;
@@ -920,7 +920,7 @@ type SetDisplayRotationCmdHACK = struct {
 // Enable (or disable) debug wireframe rendering for the specified
 // view and its immediately embedded views (i.e. any view whose
 // nearest ancestor view is this one).
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetEnableDebugViewBoundsCmd = struct {
     view_id uint32;
     enable bool;
@@ -928,7 +928,7 @@ type SetEnableDebugViewBoundsCmd = struct {
 
 // This command determines the color to be set on a view holders
 // debug wireframe bounding box.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetViewHolderBoundsColorCmd = struct {
     view_holder_id uint32;
     color ColorRgbValue;
@@ -936,7 +936,7 @@ type SetViewHolderBoundsColorCmd = struct {
 
 // This command sets the minimum RGB value for all displays, which
 // all pixel values are clamped to.
-@available(deprecated=13, removed=17, legacy=true)
+@available(deprecated=13, removed=17)
 type SetDisplayMinimumRgbCmdHACK = struct {
     min_value uint8;
 };

@@ -7,28 +7,26 @@
 mod buffer;
 
 use std::fmt::Debug;
+use std::mem::MaybeUninit;
 use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, TryFromIntError};
+use std::ops::Range;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
-use std::{mem::MaybeUninit, ops::Range, task::Waker};
+use std::task::Waker;
 
 use explicit::{PollExt as _, ResultExt as _};
-use fidl_fuchsia_hardware_network as netdev;
 use fidl_table_validation::ValidFidlTable;
-use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
-use futures::{
-    future::{poll_fn, Future},
-    ready,
-    task::{Context, Poll},
-};
+use futures::future::{poll_fn, Future};
+use futures::ready;
+use futures::task::{Context, Poll};
+use {fidl_fuchsia_hardware_network as netdev, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::error::{Error, Result};
+use buffer::pool::Pool;
 pub use buffer::Buffer;
 use buffer::{
-    pool::Pool, AllocKind, DescId, Rx, Tx, NETWORK_DEVICE_DESCRIPTOR_LENGTH,
-    NETWORK_DEVICE_DESCRIPTOR_VERSION,
+    AllocKind, DescId, Rx, Tx, NETWORK_DEVICE_DESCRIPTOR_LENGTH, NETWORK_DEVICE_DESCRIPTOR_VERSION,
 };
 
 /// A session between network device client and driver.
@@ -617,7 +615,10 @@ impl<T> ReadyBuffer<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::{num::NonZeroU32, ops::Deref, sync::Arc, task::Poll};
+    use std::num::NonZeroU32;
+    use std::ops::Deref;
+    use std::sync::Arc;
+    use std::task::Poll;
 
     use assert_matches::assert_matches;
     use fuchsia_async::Fifo;
@@ -625,10 +626,10 @@ mod tests {
     use test_case::test_case;
     use zerocopy::{AsBytes, FromBytes, NoCell};
 
+    use super::buffer::{
+        AllocKind, DescId, NETWORK_DEVICE_DESCRIPTOR_LENGTH, NETWORK_DEVICE_DESCRIPTOR_VERSION,
+    };
     use super::{
-        buffer::{
-            AllocKind, DescId, NETWORK_DEVICE_DESCRIPTOR_LENGTH, NETWORK_DEVICE_DESCRIPTOR_VERSION,
-        },
         BufferLayout, Config, DeviceBaseInfo, DeviceInfo, Error, Inner, Mutex, Pending, Pool,
         ReadyBuffer, Task,
     };

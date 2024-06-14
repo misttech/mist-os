@@ -6,19 +6,15 @@
 
 #![deny(missing_docs)]
 
-use {
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon_status::{self as zx, assoc_values},
-    futures::stream::{FusedStream, Stream},
-    std::{
-        ffi::OsStr,
-        os::unix::ffi::OsStrExt,
-        path::PathBuf,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    thiserror::Error,
-};
+use fuchsia_zircon_status::{self as zx, assoc_values};
+use futures::stream::{FusedStream, Stream};
+use std::ffi::OsStr;
+use std::os::unix::ffi::OsStrExt;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use thiserror::Error;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon::MessageBuf;
@@ -242,7 +238,6 @@ mod tests {
     use super::*;
     use crate::OpenFlags;
     use assert_matches::assert_matches;
-    use async_trait::async_trait;
     use fuchsia_async::{DurationExt, TimeoutExt};
     use fuchsia_zircon::prelude::*;
     use futures::prelude::*;
@@ -360,7 +355,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Node for MockDirectory {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
             unimplemented!()
@@ -375,7 +369,6 @@ mod tests {
         fn close(self: Arc<Self>) {}
     }
 
-    #[async_trait]
     impl Directory for MockDirectory {
         fn open(
             self: Arc<Self>,

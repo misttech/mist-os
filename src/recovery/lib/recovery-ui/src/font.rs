@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use carnelian::drawing::load_font;
-use carnelian::drawing::FontFace;
+use carnelian::drawing::{load_font, FontFace};
 use lazy_static::lazy_static;
 use std::path::PathBuf;
 

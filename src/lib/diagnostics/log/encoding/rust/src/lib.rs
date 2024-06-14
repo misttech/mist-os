@@ -177,17 +177,50 @@ impl SeverityExt for Metadata<'_> {
     }
 }
 
+impl SeverityExt for log::Level {
+    fn severity(&self) -> Severity {
+        match self {
+            log::Level::Error => Severity::Error,
+            log::Level::Warn => Severity::Warn,
+            log::Level::Info => Severity::Info,
+            log::Level::Debug => Severity::Debug,
+            log::Level::Trace => Severity::Trace,
+        }
+    }
+
+    fn raw_severity(&self) -> RawSeverity {
+        self.severity().into_primitive()
+    }
+}
+
+/// A type which can be created from a `Severity` value.
+pub trait FromSeverity {
+    /// Creates `Self` from `severity`.
+    fn from_severity(severity: &Severity) -> Self;
+}
+
+impl FromSeverity for log::LevelFilter {
+    fn from_severity(severity: &Severity) -> Self {
+        match severity {
+            Severity::Error => log::LevelFilter::Error,
+            Severity::Warn => log::LevelFilter::Warn,
+            Severity::Info => log::LevelFilter::Info,
+            Severity::Debug => log::LevelFilter::Debug,
+            Severity::Trace => log::LevelFilter::Trace,
+            // NB: Not a clean mapping.
+            Severity::Fatal => log::LevelFilter::Error,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            encode::{Encoder, EncodingError, MutableBuffer},
-            parse::{parse_argument, try_parse_record, ParseResult},
-        },
-        fuchsia_zircon as zx,
-        std::{fmt::Debug, io::Cursor},
-    };
+    use super::*;
+    use crate::encode::{Encoder, EncodingError, MutableBuffer};
+    use crate::parse::{parse_argument, try_parse_record, ParseResult};
+    use fuchsia_zircon as zx;
+    use std::fmt::Debug;
+    use std::io::Cursor;
 
     const BUF_LEN: usize = 1024;
 

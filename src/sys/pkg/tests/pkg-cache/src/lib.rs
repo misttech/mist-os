@@ -6,31 +6,34 @@
 #![allow(clippy::bool_assert_comparison)]
 #![cfg(test)]
 
+use anyhow::anyhow;
+use assert_matches::assert_matches;
+use blobfs_ramdisk::BlobfsRamdisk;
+use diagnostics_assertions::TreeAssertion;
+use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_inspect::reader::DiagnosticsHierarchy;
+use fuchsia_merkle::Hash;
+use fuchsia_pkg_testing::{get_inspect_hierarchy, BlobContents, Package};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{self as zx, Status};
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use mock_boot_arguments::MockBootArgumentsService;
+use mock_metrics::MockMetricEventLoggerFactory;
+use mock_paver::{MockPaverService, MockPaverServiceBuilder};
+use mock_reboot::{MockRebootService, RebootReason};
+use mock_verifier::MockVerifierService;
+use std::collections::HashMap;
+use std::sync::Arc;
+use vfs::directory::entry_container::Directory as _;
+use vfs::directory::helper::DirectlyMutable as _;
 use {
-    anyhow::anyhow,
-    assert_matches::assert_matches,
-    blobfs_ramdisk::BlobfsRamdisk,
-    diagnostics_assertions::TreeAssertion,
-    fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fcomponent_resolution,
     fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
     fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as fpkg_ext, fidl_fuchsia_space as fspace,
     fidl_fuchsia_update as fupdate, fidl_fuchsia_update_verify as fupdate_verify,
     fuchsia_async as fasync,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_inspect::reader::DiagnosticsHierarchy,
-    fuchsia_merkle::Hash,
-    fuchsia_pkg_testing::{get_inspect_hierarchy, BlobContents, Package},
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{self as zx, Status},
-    futures::{future::BoxFuture, prelude::*},
-    mock_boot_arguments::MockBootArgumentsService,
-    mock_metrics::MockMetricEventLoggerFactory,
-    mock_paver::{MockPaverService, MockPaverServiceBuilder},
-    mock_reboot::{MockRebootService, RebootReason},
-    mock_verifier::MockVerifierService,
-    std::{collections::HashMap, sync::Arc},
-    vfs::directory::{entry_container::Directory as _, helper::DirectlyMutable as _},
 };
 
 mod base_pkg_index;

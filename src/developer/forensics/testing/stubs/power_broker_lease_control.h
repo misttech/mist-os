@@ -10,32 +10,32 @@
 #include <lib/async/dispatcher.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <optional>
+
+#include "src/developer/forensics/testing/stubs/fidl_server.h"
+
 namespace forensics::stubs {
 
-class PowerBrokerLeaseControl : public fidl::testing::TestBase<fuchsia_power_broker::LeaseControl> {
+class PowerBrokerLeaseControl : public FidlServer<fuchsia_power_broker::LeaseControl> {
  public:
   PowerBrokerLeaseControl(uint8_t level,
                           fidl::ServerEnd<fuchsia_power_broker::LeaseControl> server_end,
                           async_dispatcher_t* dispatcher,
+                          fuchsia_power_broker::LeaseStatus initial_status,
                           std::function<void(PowerBrokerLeaseControl*)> on_closure)
       : level_(level),
         binding_(dispatcher, std::move(server_end), this,
                  std::mem_fn(&PowerBrokerLeaseControl::OnFidlClosed)),
+        current_status_(initial_status),
         on_closure_(std::move(on_closure)) {}
+
+  void WatchStatus(WatchStatusRequest& request, WatchStatusCompleter::Sync& completer) override;
+
+  void SetStatus(fuchsia_power_broker::LeaseStatus status);
 
   void OnFidlClosed(const fidl::UnbindInfo error) {
     FX_LOGS(ERROR) << error;
     on_closure_(this);
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FX_NOTIMPLEMENTED() << name << " is not implemented";
-  }
-
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED() << "Method ordinal '" << metadata.method_ordinal << "' is not implemented";
   }
 
   uint8_t Level() const { return level_; }
@@ -43,7 +43,9 @@ class PowerBrokerLeaseControl : public fidl::testing::TestBase<fuchsia_power_bro
  private:
   uint8_t level_;
   fidl::ServerBinding<fuchsia_power_broker::LeaseControl> binding_;
+  fuchsia_power_broker::LeaseStatus current_status_;
   std::function<void(PowerBrokerLeaseControl*)> on_closure_;
+  std::optional<WatchStatusCompleter::Async> queued_response_;
 };
 
 }  // namespace forensics::stubs

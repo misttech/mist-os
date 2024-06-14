@@ -8,24 +8,23 @@ mod delete_all;
 mod list;
 mod make_directory;
 
-pub use {
-    copy::copy, delete::delete, delete_all::delete_all, list::list, make_directory::make_directory,
-};
+pub use copy::copy;
+pub use delete::delete;
+pub use delete_all::delete_all;
+pub use list::list;
+pub use make_directory::make_directory;
 
 #[cfg(test)]
 pub mod test {
     use std::collections::HashMap;
 
-    use {
-        fidl::endpoints::{RequestStream, ServerEnd},
-        fidl::handle::AsyncChannel,
-        fidl_fuchsia_io as fio,
-        fidl_fuchsia_sys2::StorageAdminProxy,
-        fidl_fuchsia_sys2::StorageAdminRequest,
-        futures::TryStreamExt,
-        std::fs::{create_dir, write},
-        tempfile::tempdir,
-    };
+    use fidl::endpoints::{RequestStream, ServerEnd};
+    use fidl::handle::AsyncChannel;
+    use fidl_fuchsia_io as fio;
+    use fidl_fuchsia_sys2::{StorageAdminProxy, StorageAdminRequest};
+    use futures::TryStreamExt;
+    use std::fs::{create_dir, write};
+    use tempfile::tempdir;
 
     fn setup_oneshot_fake_storage_admin<R: 'static>(mut handle_request: R) -> StorageAdminProxy
     where

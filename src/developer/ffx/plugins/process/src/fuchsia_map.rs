@@ -97,7 +97,8 @@ pub mod json {
 mod tests {
     use fidl_fuchsia_buildinfo::BuildInfo;
 
-    use crate::{fuchsia_map::json, processes_data::processed};
+    use crate::fuchsia_map::json;
+    use crate::processes_data::processed;
     use pretty_assertions::assert_eq;
     use std::collections::{HashMap, HashSet};
 

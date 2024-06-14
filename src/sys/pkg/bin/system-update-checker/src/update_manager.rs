@@ -18,20 +18,16 @@ use fidl_fuchsia_update_ext::{
     query_commit_status, CheckOptions, CommitStatus, Initiator, InstallationDeferredData,
     InstallationErrorData, InstallationProgress, InstallingData, State, UpdateInfo,
 };
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_hash::Hash;
-use fuchsia_inspect as finspect;
-use futures::{
-    channel::{mpsc, oneshot},
-    future::BoxFuture,
-    pin_mut,
-    prelude::*,
-    select,
-    stream::BoxStream,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use futures::stream::BoxStream;
+use futures::{pin_mut, select};
 use std::sync::Arc;
 use tracing::{error, info};
+use {fuchsia_async as fasync, fuchsia_inspect as finspect};
 
 #[derive(Debug)]
 pub struct UpdateManagerControlHandle<N: StateNotifier, A>(

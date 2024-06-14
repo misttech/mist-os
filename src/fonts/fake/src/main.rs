@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_fonts::{self as fonts},
-    fidl_fuchsia_fonts_experimental as fonts_exp,
-    fuchsia_component::server::ServiceFs,
-    futures::{prelude::*, stream::TryStreamExt},
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_fonts::{self as fonts};
+use fidl_fuchsia_fonts_experimental as fonts_exp;
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use futures::stream::TryStreamExt;
 
 enum ProviderRequestStream {
     Stable(fonts::ProviderRequestStream),

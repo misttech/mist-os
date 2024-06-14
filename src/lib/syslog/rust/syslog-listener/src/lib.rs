@@ -13,7 +13,8 @@ use fidl_fuchsia_logger::{
     LogProxy,
 };
 use fuchsia_component::client::connect_to_protocol;
-use futures::{channel::mpsc, TryStreamExt};
+use futures::channel::mpsc;
+use futures::TryStreamExt;
 
 /// This trait is used to pass log message back to client.
 pub trait LogProcessor {

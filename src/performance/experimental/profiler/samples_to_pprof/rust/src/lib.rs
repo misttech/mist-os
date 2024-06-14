@@ -16,8 +16,7 @@ pub fn convert(from: String, to: String) -> bool {
 }
 
 mod sys {
-    use std::ffi::c_char;
-    use std::ffi::c_int;
+    use std::ffi::{c_char, c_int};
     #[link(name = "rust_samples_to_pprof")]
     extern "C" {
         // See the C++ documentation for this function in samples_to_pprof_rust.cc

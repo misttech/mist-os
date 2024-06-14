@@ -2,24 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
+use std::sync::Arc;
 
 use fasync::{Task, TaskGroup};
 use fidl::endpoints::{create_proxy, ClientEnd, ServerEnd};
-use fidl_fuchsia_component_sandbox as fsandbox;
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::{mpsc, oneshot},
-    select, FutureExt, StreamExt,
-};
+use futures::channel::{mpsc, oneshot};
+use futures::{select, FutureExt, StreamExt};
 use std::sync::Mutex;
-use vfs::{directory::entry::OpenRequest, remote::remote_dir};
+use vfs::directory::entry::OpenRequest;
+use vfs::remote::remote_dir;
 use zx::AsHandleRef;
+use {
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 use super::start::Start;
-use crate::{bedrock::program::EscrowRequest, model::component::StartReason};
+use crate::bedrock::program::EscrowRequest;
+use crate::model::component::StartReason;
 use errors::ActionError;
 
 pub struct EscrowedState {
@@ -281,28 +282,25 @@ impl ActorImpl {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        sync::{Arc, Weak},
-        task::Poll,
-    };
+    use std::sync::{Arc, Weak};
+    use std::task::Poll;
 
     use assert_matches::assert_matches;
     use async_trait::async_trait;
-    use fidl_fuchsia_io as fio;
     use fuchsia_async::{self as fasync, TaskGroup, TestExecutor};
-    use fuchsia_zircon as zx;
-    use futures::{channel::mpsc, lock::Mutex, StreamExt};
+    use futures::channel::mpsc;
+    use futures::lock::Mutex;
+    use futures::StreamExt;
     use moniker::Moniker;
-    use vfs::{directory::entry::OpenRequest, execution_scope::ExecutionScope, ToObjectRequest};
+    use vfs::directory::entry::OpenRequest;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::ToObjectRequest;
+    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
-    use crate::{
-        bedrock::program::EscrowRequest,
-        framework::controller,
-        model::{
-            component::{IncomingCapabilities, StartReason},
-            start::Start,
-        },
-    };
+    use crate::bedrock::program::EscrowRequest;
+    use crate::framework::controller;
+    use crate::model::component::{IncomingCapabilities, StartReason};
+    use crate::model::start::Start;
     use errors::{ActionError, StartActionError};
 
     use super::{Actor, EscrowedState};

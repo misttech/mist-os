@@ -19,20 +19,8 @@ def file_sha1(path):
     return sha1.hexdigest()
 
 
-def rewrite_legacy_ninja_build_outputs_path(p):
-    return p.replace(
-        "workspace/external/legacy_ninja_build_outputs",
-        "output_base/external/legacy_ninja_build_outputs",
-    )
-
-
 def replace_with_file_hash(dict, key, root_dir, extra_files_read):
     p = os.path.join(root_dir, dict[key])
-    # Note this is only necessary in partitions config verification because it
-    # references file from legacy_ninja_build_outputs. A find-and-replace is
-    # sufficnet since these verifications are meant to be temporary until we
-    # finish GN->Bazel migration for assembly.
-    p = rewrite_legacy_ninja_build_outputs_path(p)
     # Follow links for depfile entry. See https://fxbug.dev/42073472.
     p = os.path.relpath(os.path.realpath(p))
     dict[key] = file_sha1(p)
@@ -62,17 +50,7 @@ def main():
         "--partitions_config1", type=argparse.FileType("r"), required=True
     )
     parser.add_argument(
-        "--root_dir1",
-        help="Directory where paths in --partitions_config1 are relative to",
-        required=True,
-    )
-    parser.add_argument(
         "--partitions_config2", type=argparse.FileType("r"), required=True
-    )
-    parser.add_argument(
-        "--root_dir2",
-        help="Directory where paths in --partitions_config2 are relative to",
-        required=True,
     )
     parser.add_argument("--depfile", required=True)
     parser.add_argument("--output", required=True)
@@ -82,8 +60,16 @@ def main():
     partitions_config2 = json.load(args.partitions_config2)
 
     extra_files_read = []
-    normalize(partitions_config1, args.root_dir1, extra_files_read)
-    normalize(partitions_config2, args.root_dir2, extra_files_read)
+    normalize(
+        partitions_config1,
+        os.path.dirname(args.partitions_config1.name),
+        extra_files_read,
+    )
+    normalize(
+        partitions_config2,
+        os.path.dirname(args.partitions_config2.name),
+        extra_files_read,
+    )
 
     partitions_config1_str = json.dumps(
         partitions_config1, sort_keys=True, indent=2

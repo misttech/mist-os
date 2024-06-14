@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::configuration::Configuration,
-    super::errors::{
-        BootManagerError, BootManagerResultExt, PolicyError, VerifyError, VerifyErrors,
-        VerifySource,
-    },
-    crate::config::{Config as ComponentConfig, Mode},
-    fidl_fuchsia_paver as paver,
-    fuchsia_zircon::Status,
-    tracing::info,
+use super::configuration::Configuration;
+use super::errors::{
+    BootManagerError, BootManagerResultExt, PolicyError, VerifyError, VerifyErrors, VerifySource,
 };
+use crate::config::{Config as ComponentConfig, Mode};
+use fidl_fuchsia_paver as paver;
+use fuchsia_zircon::Status;
+use tracing::info;
 
 /// After gathering state from the BootManager, the PolicyEngine can answer whether we
 /// should verify and commit.
@@ -110,14 +107,12 @@ impl PolicyEngine {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::metadata::errors::VerifyFailureReason,
-        assert_matches::assert_matches,
-        fidl_fuchsia_update_verify as verify, fuchsia_async as fasync,
-        mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
-        std::sync::Arc,
-    };
+    use super::*;
+    use crate::metadata::errors::VerifyFailureReason;
+    use assert_matches::assert_matches;
+    use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
+    use std::sync::Arc;
+    use {fidl_fuchsia_update_verify as verify, fuchsia_async as fasync};
 
     /// Test we should NOT verify and commit when when the device is in recovery.
     #[fasync::run_singlethreaded(test)]

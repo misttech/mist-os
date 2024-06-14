@@ -66,11 +66,14 @@ class Fusb302SignalsTest : public zxtest::Test {
 
     sensors_.emplace(mock_i2c_client_, inspect_.GetRoot().CreateChild("Sensors"));
     fifos_.emplace(mock_i2c_client_);
-    protocol_.emplace(fifos_.value());
+    protocol_.emplace(GoodCrcGenerationMode::kTracked, fifos_.value());
     signals_.emplace(mock_i2c_client_, sensors_.value(), protocol_.value());
   }
 
-  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+  void TearDown() override {
+    mock_i2c_.VerifyAndClear();
+    fdf::Logger::SetGlobalInstance(nullptr);
+  }
 
  protected:
   inspect::Inspector inspect_;
@@ -86,17 +89,6 @@ class Fusb302SignalsTest : public zxtest::Test {
   std::optional<Fusb302Protocol> protocol_;
   std::optional<Fusb302Signals> signals_;
 };
-
-TEST_F(Fusb302SignalsTest, InitInterruptUnitFromResetState) {
-  mock_i2c_.ExpectWriteStop({kMaskAddress, 0x44});
-  mock_i2c_.ExpectWriteStop({kMaskAAddress, 0x26});
-  mock_i2c_.ExpectWrite({kMaskBAddress}).ExpectReadStop({0x00});
-  mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x00});
-  mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
-  mock_i2c_.ExpectWrite({kInterruptBAddress}).ExpectReadStop({0x00});
-
-  EXPECT_OK(signals_->InitInterruptUnit());
-}
 
 TEST_F(Fusb302SignalsTest, InitInterruptUnitAllWrites) {
   mock_i2c_.ExpectWriteStop({kMaskAddress, 0x44});
@@ -212,38 +204,6 @@ TEST_F(Fusb302SignalsTest, ServiceInterruptsReceivedCorrectCrcSourceCapabilities
             protocol_->FirstUnreadMessage().header().message_type());
 }
 
-TEST_F(Fusb302SignalsTest, ServiceInterruptsReceivedCorrectCrcFollowedByMarkMessageAsRead) {
-  mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x10});
-  mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
-  mock_i2c_.ExpectWrite({kInterruptBAddress}).ExpectReadStop({0x00});
-
-  // Fusb302Fifos::Receive()
-  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x00});
-  mock_i2c_.ExpectWrite({kFifosAddress}).ExpectReadStop({kSopRxToken, 0xa1, 0x11});
-  mock_i2c_.ExpectWrite({kFifosAddress})
-      .ExpectReadStop({0x2c, 0x91, 0x01, 0x27, 0xb1, 0x9b, 0x26, 0x94});
-  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x20});
-
-  // Fusb302Fifos::MarkMessageAsRead()
-  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x08});
-  mock_i2c_.ExpectWrite({kStatus0Address}).ExpectReadStop({0x80});
-  mock_i2c_.ExpectWriteStop({kFifosAddress, kSync1TxToken, kSync1TxToken, kSync1TxToken,
-                             kSync2TxToken, kPackSymTxToken | 2, 0x41, 0x00, kJamCrcTxToken,
-                             kEopTxToken, kTxOffTxToken, kTxOnTxToken});
-
-  HardwareStateChanges changes = signals_->ServiceInterrupts();
-  EXPECT_EQ(false, changes.port_state_changed);
-  EXPECT_EQ(false, changes.received_reset);
-  EXPECT_EQ(false, changes.timer_signaled);
-
-  ASSERT_TRUE(protocol_->HasUnreadMessage());
-  EXPECT_EQ(usb_pd::MessageType::kSourceCapabilities,
-            protocol_->FirstUnreadMessage().header().message_type());
-
-  // Verify that ServiceInterrupts() didn't incorrectly report an auto-reply.
-  EXPECT_OK(protocol_->MarkMessageAsRead());
-}
-
 TEST_F(Fusb302SignalsTest, ServiceInterruptsReceivedCorrectCrcAndTransmittedGoodCrc) {
   mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x10});
   mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
@@ -285,32 +245,6 @@ TEST_F(Fusb302SignalsTest, ServiceInterruptsReceivedCorrectCrcSourceCapabilities
   EXPECT_EQ(false, changes.port_state_changed);
   EXPECT_EQ(false, changes.received_reset);
   EXPECT_EQ(false, changes.timer_signaled);
-}
-
-TEST_F(Fusb302SignalsTest, ServiceInterruptsReceivedCorrectCrcSoftReset) {
-  mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x10});
-  mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
-  mock_i2c_.ExpectWrite({kInterruptBAddress}).ExpectReadStop({0x00});
-
-  // Fusb302Fifos::Receive()
-  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x00});
-  mock_i2c_.ExpectWrite({kFifosAddress}).ExpectReadStop({kSopRxToken, 0xad, 0x01});
-  mock_i2c_.ExpectWrite({kFifosAddress}).ExpectReadStop({0xef, 0x8f, 0x4c, 0x92});
-  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x20});
-
-  // Fusb302Fifos::MarkMessageAsRead()
-  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x08});
-  mock_i2c_.ExpectWrite({kStatus0Address}).ExpectReadStop({0x80});
-  mock_i2c_.ExpectWriteStop({kFifosAddress, kSync1TxToken, kSync1TxToken, kSync1TxToken,
-                             kSync2TxToken, kPackSymTxToken | 2, 0x41, 0x00, kJamCrcTxToken,
-                             kEopTxToken, kTxOffTxToken, kTxOnTxToken});
-
-  HardwareStateChanges changes = signals_->ServiceInterrupts();
-  EXPECT_EQ(false, changes.port_state_changed);
-  EXPECT_EQ(true, changes.received_reset);
-  EXPECT_EQ(false, changes.timer_signaled);
-
-  EXPECT_FALSE(protocol_->HasUnreadMessage());
 }
 
 TEST_F(Fusb302SignalsTest, ServiceInterruptsReceivedCorrectCrcGoodCrc) {
@@ -371,6 +305,122 @@ TEST_F(Fusb302SignalsTest, ServiceInterruptsReceivedCorrectCrcGoodCrcOutOfOrder)
   EXPECT_EQ(false, changes.timer_signaled);
 
   EXPECT_EQ(TransmissionState::kPending, protocol_->transmission_state());
+}
+
+class Fusb302SignalsHardwareGeneratedGoodCrcAssumedTest : public Fusb302SignalsTest {
+ public:
+  void SetUp() override {
+    Fusb302SignalsTest::SetUp();
+
+    protocol_.emplace(GoodCrcGenerationMode::kAssumed, fifos_.value());
+    signals_.emplace(mock_i2c_client_, sensors_.value(), protocol_.value());
+  }
+};
+
+TEST_F(Fusb302SignalsHardwareGeneratedGoodCrcAssumedTest, InitInterruptUnitAllWrites) {
+  mock_i2c_.ExpectWriteStop({kMaskAddress, 0x44});
+  mock_i2c_.ExpectWriteStop({kMaskAAddress, 0x26});
+  mock_i2c_.ExpectWrite({kMaskBAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWriteStop({kMaskBAddress, 0x01});
+
+  mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWrite({kInterruptBAddress}).ExpectReadStop({0x00});
+
+  EXPECT_OK(signals_->InitInterruptUnit());
+}
+
+class Fusb302SignalsHardwareGeneratedGoodCrcTrackedTest : public Fusb302SignalsTest {
+ public:
+  void SetUp() override {
+    Fusb302SignalsTest::SetUp();
+
+    protocol_.emplace(GoodCrcGenerationMode::kTracked, fifos_.value());
+    signals_.emplace(mock_i2c_client_, sensors_.value(), protocol_.value());
+  }
+};
+
+TEST_F(Fusb302SignalsHardwareGeneratedGoodCrcTrackedTest, InitInterruptUnitAllWrites) {
+  mock_i2c_.ExpectWriteStop({kMaskAddress, 0x44});
+  mock_i2c_.ExpectWriteStop({kMaskAAddress, 0x26});
+  mock_i2c_.ExpectWrite({kMaskBAddress}).ExpectReadStop({0xff});
+  mock_i2c_.ExpectWriteStop({kMaskBAddress, 0xfe});
+
+  mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWrite({kInterruptBAddress}).ExpectReadStop({0x00});
+
+  EXPECT_OK(signals_->InitInterruptUnit());
+}
+
+class Fusb302SignalsSoftwareGeneratedGoodCrcTrackedTest : public Fusb302SignalsTest {
+ public:
+  void SetUp() override {
+    Fusb302SignalsTest::SetUp();
+
+    protocol_.emplace(GoodCrcGenerationMode::kSoftware, fifos_.value());
+    signals_.emplace(mock_i2c_client_, sensors_.value(), protocol_.value());
+  }
+};
+
+TEST_F(Fusb302SignalsSoftwareGeneratedGoodCrcTrackedTest,
+       ServiceInterruptsReceivedCorrectCrcFollowedByMarkMessageAsRead) {
+  mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x10});
+  mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWrite({kInterruptBAddress}).ExpectReadStop({0x00});
+
+  // Fusb302Fifos::Receive()
+  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWrite({kFifosAddress}).ExpectReadStop({kSopRxToken, 0xa1, 0x11});
+  mock_i2c_.ExpectWrite({kFifosAddress})
+      .ExpectReadStop({0x2c, 0x91, 0x01, 0x27, 0xb1, 0x9b, 0x26, 0x94});
+  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x20});
+
+  // Fusb302Fifos::MarkMessageAsRead()
+  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x08});
+  mock_i2c_.ExpectWrite({kStatus0Address}).ExpectReadStop({0x80});
+  mock_i2c_.ExpectWriteStop({kFifosAddress, kSync1TxToken, kSync1TxToken, kSync1TxToken,
+                             kSync2TxToken, kPackSymTxToken | 2, 0x41, 0x00, kJamCrcTxToken,
+                             kEopTxToken, kTxOffTxToken, kTxOnTxToken});
+
+  HardwareStateChanges changes = signals_->ServiceInterrupts();
+  EXPECT_EQ(false, changes.port_state_changed);
+  EXPECT_EQ(false, changes.received_reset);
+  EXPECT_EQ(false, changes.timer_signaled);
+
+  ASSERT_TRUE(protocol_->HasUnreadMessage());
+  EXPECT_EQ(usb_pd::MessageType::kSourceCapabilities,
+            protocol_->FirstUnreadMessage().header().message_type());
+
+  // Verify that ServiceInterrupts() didn't incorrectly report an auto-reply.
+  EXPECT_OK(protocol_->MarkMessageAsRead());
+}
+
+TEST_F(Fusb302SignalsSoftwareGeneratedGoodCrcTrackedTest,
+       ServiceInterruptsReceivedCorrectCrcSoftReset) {
+  mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x10});
+  mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWrite({kInterruptBAddress}).ExpectReadStop({0x00});
+
+  // Fusb302Fifos::Receive()
+  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x00});
+  mock_i2c_.ExpectWrite({kFifosAddress}).ExpectReadStop({kSopRxToken, 0xad, 0x01});
+  mock_i2c_.ExpectWrite({kFifosAddress}).ExpectReadStop({0xef, 0x8f, 0x4c, 0x92});
+  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x20});
+
+  // Fusb302Fifos::MarkMessageAsRead()
+  mock_i2c_.ExpectWrite({kStatus1Address}).ExpectReadStop({0x08});
+  mock_i2c_.ExpectWrite({kStatus0Address}).ExpectReadStop({0x80});
+  mock_i2c_.ExpectWriteStop({kFifosAddress, kSync1TxToken, kSync1TxToken, kSync1TxToken,
+                             kSync2TxToken, kPackSymTxToken | 2, 0x41, 0x00, kJamCrcTxToken,
+                             kEopTxToken, kTxOffTxToken, kTxOnTxToken});
+
+  HardwareStateChanges changes = signals_->ServiceInterrupts();
+  EXPECT_EQ(false, changes.port_state_changed);
+  EXPECT_EQ(true, changes.received_reset);
+  EXPECT_EQ(false, changes.timer_signaled);
+
+  EXPECT_FALSE(protocol_->HasUnreadMessage());
 }
 
 }  // namespace

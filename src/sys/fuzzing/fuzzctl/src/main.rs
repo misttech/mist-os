@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuzzctl::FuzzCtl,
-    anyhow::{Context as _, Result},
-    fidl_fuchsia_fuzzer as fuzz,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_fuzzctl::{StdioSink, Writer},
-    std::path::PathBuf,
-};
+use crate::fuzzctl::FuzzCtl;
+use anyhow::{Context as _, Result};
+use fidl_fuchsia_fuzzer as fuzz;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_fuzzctl::{StdioSink, Writer};
+use std::path::PathBuf;
 
 mod args;
 mod fuzzctl;

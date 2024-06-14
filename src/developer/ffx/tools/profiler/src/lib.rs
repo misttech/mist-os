@@ -4,16 +4,16 @@
 mod args;
 
 use ::std::path::PathBuf;
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use args::{ProfilerCommand, ProfilerSubCommand};
 use async_fs::File;
 use errors::{ffx_bail, ffx_error};
 use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_cpu_profiler as profiler;
 use fuchsia_async::unblock;
+use std::io::{stdin, BufRead};
 use std::process::Command;
-use std::{io::stdin, io::BufRead, time::Duration};
+use std::time::Duration;
 use tempfile::Builder;
 
 type Writer = MachineWriter<()>;
@@ -124,8 +124,22 @@ pub async fn profiler(
     match cmd.sub_cmd {
         ProfilerSubCommand::Start(opts) => {
             let target = gather_targets(&opts)?;
+            let config = profiler::SamplingConfig {
+                period: Some(opts.sample_period_us * 1000),
+                timebase: Some(profiler::Counter::PlatformIndependent(
+                    profiler::CounterId::Nanoseconds,
+                )),
+                sample: Some(profiler::Sample {
+                    callgraph: Some(profiler::CallgraphConfig {
+                        strategy: Some(profiler::CallgraphStrategy::FramePointer),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
             let profiler_config = profiler::Config {
-                configs: Some(vec![]),
+                configs: Some(vec![config]),
                 target: Some(target),
                 ..Default::default()
             };

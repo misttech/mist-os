@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::file_handler,
-    anyhow::Error,
-    serde_json::{json, Value as JsonValue},
-    tracing::*,
-};
+use crate::file_handler;
+use anyhow::Error;
+use serde_json::{json, Value as JsonValue};
+use tracing::*;
 
 // Make sure extremely deep-tree data doesn't overflow a stack.
 const MAX_TREE_DEPTH: u32 = 128;

@@ -4,12 +4,9 @@
 
 use std::ops::ControlFlow;
 
-use crate::painter::{
-    layer_workbench::{
-        passes::PassesSharedState, Context, Index, LayerWorkbenchState, OptimizerTileWriteOp,
-    },
-    Func, LayerProps, Style,
-};
+use crate::painter::layer_workbench::passes::PassesSharedState;
+use crate::painter::layer_workbench::{Context, Index, LayerWorkbenchState, OptimizerTileWriteOp};
+use crate::painter::{Func, LayerProps, Style};
 
 pub fn skip_trivial_clips_pass<'w, 'c, P: LayerProps>(
     workbench: &'w mut LayerWorkbenchState,

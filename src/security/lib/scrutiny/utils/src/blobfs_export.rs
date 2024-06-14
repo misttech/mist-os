@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    libc::{c_char, c_int},
-    std::ffi::CString,
-};
+use anyhow::{anyhow, Result};
+use libc::{c_char, c_int};
+use std::ffi::CString;
 
 #[link(name = "ffi")]
 extern "C" {

@@ -11,9 +11,20 @@
 #include "src/developer/memory/metrics/tests/test_utils.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "third_party/rapidjson/include/rapidjson/document.h"
+#include "third_party/rapidjson/include/rapidjson/ostreamwrapper.h"
+#include "third_party/rapidjson/include/rapidjson/prettywriter.h"
 
-namespace memory {
-namespace test {
+namespace rapidjson {
+
+// Teach the testing framework to print json doc.
+void PrintTo(const rapidjson::Document& value, ::std::ostream* os) {
+  rapidjson::OStreamWrapper osw(*os);
+  rapidjson::PrettyWriter writer(osw);
+  value.Accept(writer);
+}
+}  // namespace rapidjson
+
+namespace memory::test {
 
 using PrinterUnitTest = testing::Test;
 
@@ -25,7 +36,7 @@ void ConfirmLines(std::ostringstream& oss, std::vector<std::string> expected_lin
     SCOPED_TRACE(li);
     std::string expected_line = expected_lines.at(li);
     std::string_view line = lines.at(li);
-    EXPECT_STREQ(expected_line.c_str(), line.data());
+    EXPECT_STREQ(expected_line.c_str(), std::string(line).c_str());
   }
 }
 
@@ -78,64 +89,67 @@ TEST_F(PrinterUnitTest, PrintCapture) {
                                        },
                                });
   std::ostringstream oss;
-  Printer p(oss);
-
-  p.PrintCapture(c);
-
+  Printer(oss).PrintCapture(c);
   rapidjson::Document doc;
   doc.Parse(oss.str().c_str());
 
-  ASSERT_TRUE(doc.IsObject());
-
-  EXPECT_EQ(1234, doc["Time"].GetInt64());
-
-  auto kernel = doc["Kernel"].GetObject();
-  EXPECT_EQ(300U, kernel["total"].GetUint64());
-  EXPECT_EQ(100U, kernel["free"].GetUint64());
-  EXPECT_EQ(10U, kernel["wired"].GetUint64());
-  EXPECT_EQ(20U, kernel["total_heap"].GetUint64());
-  EXPECT_EQ(30U, kernel["free_heap"].GetUint64());
-  EXPECT_EQ(40U, kernel["vmo"].GetUint64());
-  EXPECT_EQ(50U, kernel["mmu"].GetUint64());
-  EXPECT_EQ(60U, kernel["ipc"].GetUint64());
-  EXPECT_EQ(70U, kernel["other"].GetUint64());
-  EXPECT_EQ(15U, kernel["vmo_pager_total"].GetUint64());
-  EXPECT_EQ(4U, kernel["vmo_pager_newest"].GetUint64());
-  EXPECT_EQ(8U, kernel["vmo_pager_oldest"].GetUint64());
-  EXPECT_EQ(3U, kernel["vmo_discardable_locked"].GetUint64());
-  EXPECT_EQ(7U, kernel["vmo_discardable_unlocked"].GetUint64());
-
-  auto processes = doc["Processes"].GetArray();
-  ASSERT_EQ(2U, processes.Size());
-  auto process_header = processes[0].GetArray();
-  EXPECT_STREQ("koid", process_header[0].GetString());
-  EXPECT_STREQ("name", process_header[1].GetString());
-  EXPECT_STREQ("vmos", process_header[2].GetString());
-  auto process = processes[1].GetArray();
-  EXPECT_EQ(100U, process[0].GetUint64());
-  EXPECT_STREQ("p1", process[1].GetString());
-  auto process_vmos = process[2].GetArray();
-  ASSERT_EQ(1U, process_vmos.Size());
-  EXPECT_EQ(1, process_vmos[0]);
-
-  auto vmo_names = doc["VmoNames"].GetArray();
-  ASSERT_EQ(1U, vmo_names.Size());
-  EXPECT_STREQ("v1", vmo_names[0].GetString());
-
-  auto vmos = doc["Vmos"].GetArray();
-  ASSERT_EQ(2U, vmos.Size());
-  auto vmo_header = vmos[0].GetArray();
-  EXPECT_STREQ("koid", vmo_header[0].GetString());
-  EXPECT_STREQ("name", vmo_header[1].GetString());
-  EXPECT_STREQ("parent_koid", vmo_header[2].GetString());
-  EXPECT_STREQ("committed_bytes", vmo_header[3].GetString());
-  EXPECT_STREQ("allocated_bytes", vmo_header[4].GetString());
-  auto vmo = vmos[1].GetArray();
-  EXPECT_EQ(1U, vmo[0].GetUint64());
-  EXPECT_EQ(0U, vmo[1].GetUint64());
-  EXPECT_EQ(100U, vmo[2].GetUint64());
-  EXPECT_EQ(200U, vmo[3].GetUint64());
-  EXPECT_EQ(300U, vmo[4].GetUint64());
+  rapidjson::Document expected;
+  expected.Parse(R"json(
+    {
+        "Time": 1234,
+        "Kernel": {
+            "total": 300,
+            "free": 100,
+            "wired": 10,
+            "total_heap": 20,
+            "free_heap": 30,
+            "vmo": 40,
+            "mmu": 50,
+            "ipc": 60,
+            "other": 70,
+            "vmo_pager_total": 15,
+            "vmo_pager_newest": 4,
+            "vmo_pager_oldest": 8,
+            "vmo_discardable_locked": 3,
+            "vmo_discardable_unlocked": 7,
+            "vmo_reclaim_disabled": 0
+        },
+        "Processes": [
+            [
+                "koid",
+                "name",
+                "vmos"
+            ],
+            [
+                100,
+                "p1",
+                [
+                    1
+                ]
+            ]
+        ],
+        "VmoNames": [
+            "v1"
+        ],
+        "Vmos": [
+            [
+                "koid",
+                "name",
+                "parent_koid",
+                "committed_bytes",
+                "allocated_bytes"
+            ],
+            [
+                1,
+                0,
+                100,
+                200,
+                300
+            ]
+        ]
+    }
+  )json");
+  EXPECT_EQ(doc, expected);
 }
 
 TEST_F(PrinterUnitTest, PrintCaptureAndBucketConfig) {
@@ -277,15 +291,15 @@ TEST_F(PrinterUnitTest, PrintSummaryKMEM) {
                                    .time = 1234,
                                    .kmem =
                                        {
-                                           .total_bytes = 1024 * 1024,
+                                           .total_bytes = 1024ul * 1024,
                                            .free_bytes = 1024,
-                                           .wired_bytes = 2 * 1024,
-                                           .total_heap_bytes = 3 * 1024,
-                                           .free_heap_bytes = 2 * 1024,
-                                           .vmo_bytes = 5 * 1024,
-                                           .mmu_overhead_bytes = 6 * 1024,
-                                           .ipc_bytes = 7 * 1024,
-                                           .other_bytes = 8 * 1024,
+                                           .wired_bytes = 2ul * 1024,
+                                           .total_heap_bytes = 3ul * 1024,
+                                           .free_heap_bytes = 2ul * 1024,
+                                           .vmo_bytes = 5ul * 1024,
+                                           .mmu_overhead_bytes = 6ul * 1024,
+                                           .ipc_bytes = 7ul * 1024,
+                                           .other_bytes = 8ul * 1024,
                                        },
                                });
 
@@ -305,15 +319,15 @@ TEST_F(PrinterUnitTest, PrintSummaryPROCESS) {
                                    .time = 1234,
                                    .kmem =
                                        {
-                                           .total_bytes = 1024 * 1024,
+                                           .total_bytes = 1024ul * 1024,
                                            .free_bytes = 1024,
-                                           .wired_bytes = 2 * 1024,
-                                           .total_heap_bytes = 3 * 1024,
-                                           .free_heap_bytes = 2 * 1024,
-                                           .vmo_bytes = 5 * 1024,
-                                           .mmu_overhead_bytes = 6 * 1024,
-                                           .ipc_bytes = 7 * 1024,
-                                           .other_bytes = 8 * 1024,
+                                           .wired_bytes = 2ul * 1024,
+                                           .total_heap_bytes = 3ul * 1024,
+                                           .free_heap_bytes = 2ul * 1024,
+                                           .vmo_bytes = 5ul * 1024,
+                                           .mmu_overhead_bytes = 6ul * 1024,
+                                           .ipc_bytes = 7ul * 1024,
+                                           .other_bytes = 8ul * 1024,
                                        },
                                    .vmos = {{.koid = 1, .name = "v1", .committed_bytes = 1024}},
                                    .processes = {{.koid = 100, .name = "p1", .vmos = {1}}},
@@ -337,15 +351,15 @@ TEST_F(PrinterUnitTest, PrintSummaryVMO) {
                                    .time = 1234,
                                    .kmem =
                                        {
-                                           .total_bytes = 1024 * 1024,
+                                           .total_bytes = 1024ul * 1024,
                                            .free_bytes = 1024,
-                                           .wired_bytes = 2 * 1024,
-                                           .total_heap_bytes = 3 * 1024,
-                                           .free_heap_bytes = 2 * 1024,
-                                           .vmo_bytes = 5 * 1024,
-                                           .mmu_overhead_bytes = 6 * 1024,
-                                           .ipc_bytes = 7 * 1024,
-                                           .other_bytes = 8 * 1024,
+                                           .wired_bytes = 2ul * 1024,
+                                           .total_heap_bytes = 3ul * 1024,
+                                           .free_heap_bytes = 2ul * 1024,
+                                           .vmo_bytes = 5ul * 1024,
+                                           .mmu_overhead_bytes = 6ul * 1024,
+                                           .ipc_bytes = 7ul * 1024,
+                                           .other_bytes = 8ul * 1024,
                                        },
                                    .vmos = {{.koid = 1, .name = "v1", .committed_bytes = 1024}},
                                    .processes = {{.koid = 100, .name = "p1", .vmos = {1}}},
@@ -374,12 +388,12 @@ TEST_F(PrinterUnitTest, PrintSummaryVMOShared) {
   Capture c;
   TestUtils::CreateCapture(&c, {
                                    .time = 1234,
-                                   .kmem = {.vmo_bytes = 6 * 1024},
+                                   .kmem = {.vmo_bytes = 6ul * 1024},
                                    .vmos =
                                        {
                                            {.koid = 1, .name = "v1", .committed_bytes = 1024},
-                                           {.koid = 2, .name = "v2", .committed_bytes = 2 * 1024},
-                                           {.koid = 3, .name = "v3", .committed_bytes = 3 * 1024},
+                                           {.koid = 2, .name = "v2", .committed_bytes = 2ul * 1024},
+                                           {.koid = 3, .name = "v3", .committed_bytes = 3ul * 1024},
                                        },
                                    .processes =
                                        {
@@ -642,21 +656,21 @@ TEST_F(PrinterUnitTest, FormatSize) {
     const char* val;
   };
   std::vector<TestCase> tests = {
-      {0, "0B"},
-      {1, "1B"},
-      {1023, "1023B"},
-      {1024, "1K"},
-      {1025, "1K"},
-      {1029, "1K"},
-      {1124, "1.1K"},
-      {1536, "1.5K"},
-      {2047, "2K"},
-      {1024 * 1024, "1M"},
-      {1024 * 1024 * 1024, "1G"},
-      {1024UL * 1024 * 1024 * 1024, "1T"},
-      {1024UL * 1024 * 1024 * 1024 * 1024, "1P"},
-      {1024UL * 1024 * 1024 * 1024 * 1024 * 1024, "1E"},
-      {1024UL * 1024 * 1024 * 1024 * 1024 * 1024 * 1024, "0B"},
+      {.bytes = 0, .val = "0B"},
+      {.bytes = 1, .val = "1B"},
+      {.bytes = 1023, .val = "1023B"},
+      {.bytes = 1024, .val = "1K"},
+      {.bytes = 1025, .val = "1K"},
+      {.bytes = 1029, .val = "1K"},
+      {.bytes = 1124, .val = "1.1K"},
+      {.bytes = 1536, .val = "1.5K"},
+      {.bytes = 2047, .val = "2K"},
+      {.bytes = 1024ul * 1024, .val = "1M"},
+      {.bytes = 1024ul * 1024 * 1024, .val = "1G"},
+      {.bytes = 1024UL * 1024 * 1024 * 1024, .val = "1T"},
+      {.bytes = 1024UL * 1024 * 1024 * 1024 * 1024, .val = "1P"},
+      {.bytes = 1024UL * 1024 * 1024 * 1024 * 1024 * 1024, .val = "1E"},
+      {.bytes = 1024UL * 1024 * 1024 * 1024 * 1024 * 1024 * 1024, .val = "0B"},
   };
   for (const auto& test : tests) {
     char buf[kMaxFormattedStringSize];
@@ -664,5 +678,4 @@ TEST_F(PrinterUnitTest, FormatSize) {
   }
 }
 
-}  // namespace test
-}  // namespace memory
+}  // namespace memory::test

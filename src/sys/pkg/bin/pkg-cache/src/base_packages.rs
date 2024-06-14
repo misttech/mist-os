@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context as _},
-    fuchsia_inspect as finspect,
-    fuchsia_merkle::Hash,
-    futures::{future::BoxFuture, FutureExt as _, StreamExt as _},
-    std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    },
-    tracing::warn,
-};
+use anyhow::{anyhow, Context as _};
+use fuchsia_inspect as finspect;
+use fuchsia_merkle::Hash;
+use futures::future::BoxFuture;
+use futures::{FutureExt as _, StreamExt as _};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use tracing::warn;
 
 /// A forest of packages and the blobs they require (including subpackages).
 #[derive(Debug)]
@@ -239,13 +236,11 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
-        fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
-        std::iter::FromIterator as _,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
+    use std::iter::FromIterator as _;
 
     struct TestEnv {
         _blobfs: blobfs_ramdisk::BlobfsRamdisk,

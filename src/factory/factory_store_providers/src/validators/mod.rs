@@ -6,15 +6,13 @@ mod pass;
 mod size;
 mod text;
 
-use {
-    crate::config::{ValidatorContext, ValidatorFileArgsMap},
-    anyhow::Error,
-    pass::PassValidator,
-    size::SizeValidator,
-    std::fmt::Debug,
-    text::TextValidator,
-    thiserror::Error,
-};
+use crate::config::{ValidatorContext, ValidatorFileArgsMap};
+use anyhow::Error;
+use pass::PassValidator;
+use size::SizeValidator;
+use std::fmt::Debug;
+use text::TextValidator;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ValidatorError {

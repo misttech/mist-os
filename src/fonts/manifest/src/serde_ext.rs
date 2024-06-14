@@ -7,10 +7,8 @@
 
 #![allow(missing_docs)]
 
-use {
-    fidl_fuchsia_fonts::{GenericFontFamily, Slant, Style2 as FidlStyle, Width},
-    serde::{Deserialize, Serialize},
-};
+use fidl_fuchsia_fonts::{GenericFontFamily, Slant, Style2 as FidlStyle, Width};
+use serde::{Deserialize, Serialize};
 
 /// Generates Serde serialize and deserialize methods for types of `Option<T>`, where `T` is a type
 /// defined in a remote crate and is mirrored in a local type (https://serde.rs/remote-derive.html).
@@ -64,10 +62,8 @@ macro_rules! derive_opt {
     ($module:ident, $remote_type:ty, $local_type:ty, $local_type_str:expr) => {
         #[allow(non_snake_case, dead_code, missing_docs, explicit_outlives_requirements)]
         pub mod $module {
-            use {
-                super::*,
-                serde::{Deserialize, Deserializer, Serialize, Serializer},
-            };
+            use super::*;
+            use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
             #[doc = "Implementation of Serde's serialize"]
             pub fn serialize<S>(

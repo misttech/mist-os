@@ -2,29 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::debug_data_server;
+use crate::run_events::{RunEvent, SuiteEvents};
+use anyhow::Error;
+use fidl::endpoints::create_endpoints;
+use fidl_fuchsia_test_manager::LaunchError;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::LocalComponentHandles;
+use fuchsia_fs::directory::open_channel_in_namespace;
+use fuchsia_fs::OpenFlags;
+use futures::channel::mpsc;
+use futures::future::FutureExt;
+use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use futures::{pin_mut, select_biased, SinkExt};
+use tracing::info;
 use {
-    crate::{
-        debug_data_server,
-        run_events::{RunEvent, SuiteEvents},
-    },
-    anyhow::Error,
-    fidl::endpoints::create_endpoints,
     fidl_fuchsia_debugdata as fdebug, fidl_fuchsia_io as fio,
-    fidl_fuchsia_test_debug as ftest_debug,
-    fidl_fuchsia_test_manager::LaunchError,
-    fuchsia_async as fasync,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    fuchsia_component_test::LocalComponentHandles,
-    fuchsia_fs::{directory::open_channel_in_namespace, OpenFlags},
-    fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc,
-        future::FutureExt,
-        pin_mut, select_biased,
-        stream::{FuturesUnordered, StreamExt, TryStreamExt},
-        SinkExt,
-    },
-    tracing::info,
+    fidl_fuchsia_test_debug as ftest_debug, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 /// Processor that collects debug data and serves the iterator sending data back to a test
@@ -299,18 +294,18 @@ async fn serve_publisher(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{run_events::RunEventPayload, run_events::SuiteEventPayload, utilities::stream_fn},
-        fidl::endpoints::create_proxy_and_stream,
-        fuchsia_component_test::{
-            Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
-        },
-        futures::TryFutureExt,
-        maplit::hashset,
-        std::{collections::HashSet, task::Poll},
-        test_diagnostics::collect_string_from_socket,
+    use super::*;
+    use crate::run_events::{RunEventPayload, SuiteEventPayload};
+    use crate::utilities::stream_fn;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_component_test::{
+        Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
     };
+    use futures::TryFutureExt;
+    use maplit::hashset;
+    use std::collections::HashSet;
+    use std::task::Poll;
+    use test_diagnostics::collect_string_from_socket;
 
     const VMO_SIZE: u64 = 4096;
 

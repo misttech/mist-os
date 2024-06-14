@@ -5,19 +5,33 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_EDID_EDID_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_EDID_EDID_H_
 
+#include <lib/fit/result.h>
+#include <lib/stdcompat/span.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 
 #include <fbl/vector.h>
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/edid/timings.h"
+#include "src/graphics/display/lib/edid/internal/iterators.h"
+
+// References
+//
+// The code contains references to the following documents.
+//
+// - VESA Enhanced Extended Display Identification Data (E-EDID) Standard,
+//   Video Electronics Standards Association (VESA), Release A, Revision 2,
+//   dated September 25, 2006, revised December 31, 2020.
+//   Referenced as "E-EDID standard".
+//   Available at https://vesa.org/vesa-standards/ .
 
 namespace edid {
 
@@ -301,133 +315,92 @@ static constexpr uint8_t kDdcDataI2cAddress = 0x50;
 // Returned string is a statically allocated constant. Returns NULL if no match is found.
 const char* GetEisaVendorName(uint16_t manufacturer_name_code);
 
-struct ReadEdidResult {
- public:
-  static ReadEdidResult MakeError(const char* error_message) {
-    return {
-        .is_error = true,
-        .error_message = error_message,
-    };
-  }
+using ReadEdidResult = fit::result<const char*, fbl::Vector<uint8_t>>;
 
-  static ReadEdidResult MakeEdidBytes(fbl::Vector<uint8_t>&& edid_bytes) {
-    return {
-        .is_error = false,
-        .edid_bytes = std::move(edid_bytes),
-    };
-  }
-
-  bool is_error = false;
-  fbl::Vector<uint8_t> edid_bytes;
-  const char* error_message = nullptr;
-};
-
-// Read EDID bytes over DDC I2C bus using `transact()` function.
-// If any error occurs, returns an ReadEdidResult::ErrorMessageType;
+// Reads EDID bytes over DDC I2C bus using `transact()` function.
+//
+// On error, returns a `const char*` string of static storage duration
+// containing the error message.
 // Otherwise, returns the vector containing the raw EDID bytes, including all
 // extension blocks.
 ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact);
 
 class timing_iterator;
-class audio_data_block_iterator;
 
 class Edid {
  public:
-  // Creates an Edid from the EdidDdcSource. Does not retain a reference to the source.
-  bool Init(void* ctx, ddc_i2c_transact edid_source, const char** err_msg);
-  // Creates an Edid from raw bytes. The bytes array must remain valid for the duration
-  // of the Edid object's lifetime.
-  bool Init(const uint8_t* bytes, uint16_t len, const char** err_msg);
+  // Reads the EDID bytes from the EdidDdcSource and creates an Edid object
+  // from them.
+  //
+  // On error, returns a `const char*` string of static storage duration
+  // containing the error message.
+  fit::result<const char*> Init(void* ctx, ddc_i2c_transact edid_source);
+
+  // Creates an Edid from raw bytes.
+  //
+  // On error, returns a `const char*` string of static storage duration
+  // containing the error message.
+  fit::result<const char*> Init(cpp20::span<const uint8_t> bytes);
 
   void Print(void (*print_fn)(const char* str)) const;
 
-  const uint8_t* edid_bytes() const { return bytes_; }
-  uint16_t edid_length() const { return len_; }
+  const uint8_t* edid_bytes() const { return bytes_.data(); }
+  size_t edid_length() const { return bytes_.size(); }
 
-  uint16_t product_code() const { return base_edid_->product_code; }
-  uint16_t manufacturer_name_code() const {
-    return static_cast<uint16_t>(base_edid_->manufacturer_id1 << 8 | base_edid_->manufacturer_id2);
-  }
-  bool is_standard_rgb() const { return base_edid_->standard_srgb(); }
+  uint16_t product_code() const { return base_edid().product_code; }
+  bool is_standard_rgb() const { return base_edid().standard_srgb(); }
   bool supports_basic_audio() const;
-  const char* manufacturer_id() const { return manufacturer_id_; }
-  const char* manufacturer_name() const { return manufacturer_name_; }
-  const char* monitor_name() const { return monitor_name_; }
-  const char* monitor_serial() const { return monitor_serial_; }
-  uint32_t horizontal_size_mm() const { return (base_edid_->horizontal_size_cm * 10); }
-  uint32_t vertical_size_mm() const { return (base_edid_->vertical_size_cm * 10); }
+
+  // Returns the display manufacturer's ISA / UEFI Plug and Play device
+  // identifier (PNPID).
+  std::string GetManufacturerId() const;
+
+  // Returns an empty string ("") if the manufacturer is not found.
+  //
+  // Otherwise, returns the name of the display product manufacturer as
+  // registered in the PNP ID Registry from the Unified Extensible Firmware
+  // Interface (UEFI) Forum (https://uefi.org/PNP_ID_List).
+  //
+  // The returned string is guaranteed to have a static storage duration.
+  const char* GetManufacturerName() const;
+
+  // Returns the display product name stored in the Display Product Name String
+  // Descriptor, defined in the E-EDID standard, Section 3.10.3.4 "Display
+  // Product Name (ASCII) String Descriptor Definition (tag #FCh)", page 44.
+  std::string GetDisplayProductName() const;
+
+  // Returns the display product serial number stored in the Display Product
+  // Serial Number Descriptor, defined in the E-EDID standard, Section 3.10.3.2
+  // "Display Product Serial Number Descriptor Definition (tag #FFh)".
+  std::string GetDisplayProductSerialNumber() const;
+
+  // Guaranteed to be >= 0 and < 2^16.
+  int horizontal_size_mm() const;
+
+  // Guaranteed to be >= 0 and < 2^16.
+  int vertical_size_mm() const;
   bool is_hdmi() const;
 
+  const BaseEdid& base_edid() const { return *reinterpret_cast<const BaseEdid*>(bytes_.data()); }
+
  private:
+  friend class internal::data_block_iterator;
+  friend class internal::descriptor_iterator;
+  friend class timing_iterator;
+
   template <typename T>
   const T* GetBlock(uint8_t block_num) const;
 
-  class descriptor_iterator {
-   public:
-    explicit descriptor_iterator(const Edid* edid) : edid_(edid) { ++(*this); }
+  fit::result<const char*> Validate();
 
-    descriptor_iterator& operator++();
-    bool is_valid() const { return edid_ != nullptr; }
-
-    uint8_t block_idx() const { return block_idx_; }
-    const Descriptor* operator->() const { return descriptor_; }
-    const Descriptor* get() const { return descriptor_; }
-
-   private:
-    // Set to null when the iterator is exhausted.
-    const Edid* edid_;
-    // The block index in which we're looking for descriptors.
-    uint8_t block_idx_ = 0;
-    // The index of the current descriptor in the current block.
-    uint32_t descriptor_idx_ = UINT32_MAX;
-
-    const Descriptor* descriptor_;
-  };
-
-  class data_block_iterator {
-   public:
-    explicit data_block_iterator(const Edid* edid);
-
-    data_block_iterator& operator++();
-    bool is_valid() const { return edid_ != nullptr; }
-
-    // Only valid if |is_valid()| is true
-    uint8_t cea_revision() const { return cea_revision_; }
-
-    const DataBlock* operator->() const { return db_; }
-
-   private:
-    // Set to null when the iterator is exhausted.
-    const Edid* edid_;
-    // The block index in which we're looking for descriptors. No dbs in the 1st block.
-    uint8_t block_idx_ = 1;
-    // The index of the current descriptor in the current block.
-    uint32_t db_idx_ = UINT32_MAX;
-
-    const DataBlock* db_;
-
-    uint8_t cea_revision_;
-  };
-
-  // Edid bytes and length
-  const uint8_t* bytes_;
-  uint16_t len_;
-
-  // Ptr to base edid structure in bytes_
-  const BaseEdid* base_edid_;
-
-  // Contains the edid bytes if they are owned by this object. |bytes_| should generally
-  // be used, since this will be empty if something else owns the edid bytes.
-  fbl::Vector<uint8_t> edid_bytes_;
-
-  char manufacturer_id_[sizeof(Descriptor::Monitor::data) + 1];
-  char monitor_name_[sizeof(Descriptor::Monitor::data) + 1];
-  char monitor_serial_[sizeof(Descriptor::Monitor::data) + 1];
-  const char* manufacturer_name_ = nullptr;
-
-  friend timing_iterator;
-  friend audio_data_block_iterator;
+  fbl::Vector<uint8_t> bytes_;
 };
+
+template <typename T>
+const T* Edid::GetBlock(uint8_t block_num) const {
+  const uint8_t* bytes = bytes_.data() + block_num * kBlockSize;
+  return bytes[0] == T::kTag ? reinterpret_cast<const T*>(bytes) : nullptr;
+}
 
 // Iterator that returns all of the timing modes of the display. The iterator
 // **does not** filter out duplicates.
@@ -465,30 +438,8 @@ class timing_iterator {
   const Edid* edid_;
   uint8_t state_;
   uint16_t state_index_;
-  Edid::descriptor_iterator descriptors_;
-  Edid::data_block_iterator dbs_;
-};
-
-class audio_data_block_iterator {
- public:
-  explicit audio_data_block_iterator(const Edid* edid)
-      : edid_(edid), sad_idx_(UINT8_MAX), dbs_(edid) {
-    ++(*this);
-  }
-
-  audio_data_block_iterator& operator++();
-
-  const ShortAudioDescriptor& operator*() const { return descriptor_; }
-  const ShortAudioDescriptor* operator->() const { return &descriptor_; }
-
-  bool is_valid() const { return edid_ != nullptr; }
-
- private:
-  const Edid* edid_;
-  uint8_t sad_idx_;
-  Edid::data_block_iterator dbs_;
-
-  ShortAudioDescriptor descriptor_;
+  internal::descriptor_iterator descriptors_;
+  internal::data_block_iterator dbs_;
 };
 
 }  // namespace edid

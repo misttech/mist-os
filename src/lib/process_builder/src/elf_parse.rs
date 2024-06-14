@@ -3,17 +3,14 @@
 // found in the LICENSE file.
 
 //! Parses ELF files per the ELF specification in ulib/musl/include/elf.h
-use {
-    bitflags::bitflags,
-    fuchsia_zircon as zx,
-    num_derive::FromPrimitive,
-    num_traits::cast::FromPrimitive,
-    static_assertions::assert_eq_size,
-    std::fmt,
-    std::mem,
-    thiserror::Error,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
-};
+use bitflags::bitflags;
+use fuchsia_zircon as zx;
+use num_derive::FromPrimitive;
+use num_traits::cast::FromPrimitive;
+use static_assertions::assert_eq_size;
+use std::{fmt, mem};
+use thiserror::Error;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// Possible errors that can occur during ELF parsing.
 #[derive(Error, Debug)]
@@ -531,7 +528,10 @@ impl Elf64DynSection {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, anyhow::Error, assert_matches::assert_matches, std::fs::File};
+    use super::*;
+    use anyhow::Error;
+    use assert_matches::assert_matches;
+    use std::fs::File;
 
     // These are specially crafted files that just contain a valid ELF64 file header but
     // nothing else.

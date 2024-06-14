@@ -4,18 +4,16 @@
 
 //! Fake network definitions to place core contexts in a network together.
 
-use alloc::{
-    collections::{BinaryHeap, HashMap},
-    vec::Vec,
-};
-use core::{fmt::Debug, hash::Hash, time::Duration};
+use alloc::collections::{BinaryHeap, HashMap};
+use alloc::vec::Vec;
+use core::fmt::Debug;
+use core::hash::Hash;
+use core::time::Duration;
 
 use packet::Buf;
 
-use crate::{
-    testutil::{FakeInstant, InstantAndData, WithFakeFrameContext, WithFakeTimerContext},
-    InstantContext as _,
-};
+use crate::testutil::{FakeInstant, InstantAndData, WithFakeFrameContext, WithFakeTimerContext};
+use crate::InstantContext as _;
 
 /// A fake network, composed of many `FakeCoreCtx`s.
 ///
@@ -461,10 +459,8 @@ mod tests {
 
     use alloc::vec;
 
-    use crate::{
-        testutil::{FakeFrameCtx, FakeTimerCtx},
-        SendFrameContext as _, TimerContext as _,
-    };
+    use crate::testutil::{FakeFrameCtx, FakeTimerCtx};
+    use crate::{SendFrameContext as _, TimerContext as _};
 
     // Define some fake contexts and links specifically to test the fake
     // network timers implementation.

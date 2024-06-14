@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_bluetooth_avrcp::{self as fidl_avrcp, MediaAttributes, PlayStatus},
-    fidl_fuchsia_media::{self as fidl_media_types, Metadata, TimelineFunction},
-    fidl_fuchsia_media_sessions2 as fidl_media,
-    fidl_table_validation::ValidFidlTable,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    tracing::{debug, trace, warn},
-};
+use fidl_fuchsia_bluetooth_avrcp::{self as fidl_avrcp, MediaAttributes, PlayStatus};
+use fidl_fuchsia_media::{self as fidl_media_types, Metadata, TimelineFunction};
+use fidl_table_validation::ValidFidlTable;
+use tracing::{debug, trace, warn};
+use {fidl_fuchsia_media_sessions2 as fidl_media, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// Converts time (i64, in nanoseconds) to milliseconds (u32).
 fn time_nanos_to_millis(t: i64) -> u32 {

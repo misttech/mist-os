@@ -2,19 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::driver_utils::{connect_proxy, get_driver_alias, map_topo_paths_to_class_paths, Driver};
+use crate::MIN_INTERVAL_FOR_SYSLOG_MS;
+use anyhow::{format_err, Error, Result};
+use fuchsia_inspect::{self as inspect, Property};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use magma::magma_total_time_query_result;
+use std::collections::HashMap;
+use std::mem;
+use std::rc::Rc;
+use tracing::{error, info};
+use zerocopy::FromBytes;
 use {
-    crate::driver_utils::{connect_proxy, get_driver_alias, map_topo_paths_to_class_paths, Driver},
-    crate::MIN_INTERVAL_FOR_SYSLOG_MS,
-    anyhow::{format_err, Error, Result},
     fidl_fuchsia_gpu_magma as fgpu, fidl_fuchsia_power_metrics as fmetrics,
-    fuchsia_async as fasync,
-    fuchsia_inspect::{self as inspect, Property},
-    fuchsia_zircon as zx,
-    futures::{stream::FuturesUnordered, StreamExt},
-    magma::magma_total_time_query_result,
-    std::{collections::HashMap, mem, rc::Rc},
-    tracing::{error, info},
-    zerocopy::FromBytes,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 const GPU_SERVICE_DIRS: [&str; 1] = ["/dev/class/gpu"];
@@ -269,13 +271,13 @@ impl InspectData {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
-        futures::{task::Poll, FutureExt, TryStreamExt},
-        std::{cell::Cell, pin::Pin},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use futures::task::Poll;
+    use futures::{FutureExt, TryStreamExt};
+    use std::cell::Cell;
+    use std::pin::Pin;
 
     // Write magma_total_time_query_result into a VMO buffer.
     fn create_magma_total_time_query_result_vmo(

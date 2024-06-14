@@ -16,26 +16,25 @@ mod packages;
 mod update_mode;
 mod version;
 
-pub use crate::{
-    board::VerifyBoardError,
-    epoch::ParseEpochError,
-    hash::HashError,
-    image::OpenImageError,
-    images::{
-        parse_image_packages_json, ImageMetadata, ImageMetadataError, ImagePackagesError,
-        ImagePackagesManifest, ImagePackagesManifestBuilder, ImagesMetadata,
-        VersionedImagePackagesManifest, ZbiAndOptionalVbmetaMetadata,
-    },
-    images::{ResolveImagesError, VerifyError},
-    name::VerifyNameError,
-    packages::{
-        parse_packages_json, serialize_packages_json, ParsePackageError, SerializePackageError,
-    },
-    update_mode::{ParseUpdateModeError, UpdateMode},
-    version::{ReadVersionError, SystemVersion},
+pub use crate::board::VerifyBoardError;
+pub use crate::epoch::ParseEpochError;
+pub use crate::hash::HashError;
+pub use crate::image::OpenImageError;
+pub use crate::images::{
+    parse_image_packages_json, ImageMetadata, ImageMetadataError, ImagePackagesError,
+    ImagePackagesManifest, ImagePackagesManifestBuilder, ImagesMetadata, ResolveImagesError,
+    VerifyError, VersionedImagePackagesManifest, ZbiAndOptionalVbmetaMetadata,
 };
+pub use crate::name::VerifyNameError;
+pub use crate::packages::{
+    parse_packages_json, serialize_packages_json, ParsePackageError, SerializePackageError,
+};
+pub use crate::update_mode::{ParseUpdateModeError, UpdateMode};
+pub use crate::version::{ReadVersionError, SystemVersion};
 
-use {fidl_fuchsia_io as fio, fuchsia_hash::Hash, fuchsia_url::PinnedAbsolutePackageUrl};
+use fidl_fuchsia_io as fio;
+use fuchsia_hash::Hash;
+use fuchsia_url::PinnedAbsolutePackageUrl;
 
 /// An open handle to an image package.
 #[cfg(target_os = "fuchsia")]

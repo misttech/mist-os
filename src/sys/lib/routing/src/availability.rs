@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::AvailabilityRoutingError,
-    cm_rust::{Availability, ExposeDeclCommon, ExposeSource, OfferDeclCommon, OfferSource},
-};
+use crate::error::AvailabilityRoutingError;
+use cm_rust::{Availability, ExposeDeclCommon, ExposeSource, OfferDeclCommon, OfferSource};
 
 pub fn advance_with_offer(
     current: Availability,
@@ -63,15 +61,12 @@ pub fn advance(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        cm_rust::{
-            DependencyType, ExposeDecl, ExposeProtocolDecl, ExposeTarget, OfferDecl,
-            OfferProtocolDecl,
-        },
-        cm_rust_testing::*,
-        test_case::test_case,
+    use super::*;
+    use cm_rust::{
+        DependencyType, ExposeDecl, ExposeProtocolDecl, ExposeTarget, OfferDecl, OfferProtocolDecl,
     };
+    use cm_rust_testing::*;
+    use test_case::test_case;
 
     fn new_offer(availability: Availability) -> OfferDecl {
         OfferDecl::Protocol(OfferProtocolDecl {

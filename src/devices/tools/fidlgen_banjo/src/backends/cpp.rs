@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{util::*, *},
-    fidl_ir_lib::fidl::*,
-    std::collections::HashSet,
-    std::iter,
-};
+use super::util::*;
+use super::*;
+use fidl_ir_lib::fidl::*;
+use std::collections::HashSet;
+use std::iter;
 
 pub struct CppBackend<'a, W: io::Write> {
     w: &'a mut W,

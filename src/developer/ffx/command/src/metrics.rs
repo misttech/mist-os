@@ -8,11 +8,9 @@ use ffx_config::EnvironmentContext;
 use ffx_metrics::{add_ffx_launch_event, add_ffx_overnet_proxy_drop_event, init_metrics_svc};
 use fuchsia_async::TimeoutExt;
 use itertools::Itertools;
-use std::{
-    io::Write,
-    process::ExitStatus,
-    time::{Duration, Instant},
-};
+use std::io::Write;
+use std::process::ExitStatus;
+use std::time::{Duration, Instant};
 
 use crate::{FfxContext, Result};
 

@@ -32,10 +32,15 @@ group("tests") {
 rustc_embed_files("version-history-data") {
   edition = "2021"
 
+  _version_history_label = "//sdk:version_history($default_toolchain)"
+  _version_history_dir =
+      get_label_info(_version_history_label, "target_out_dir")
+
   files = [
     {
       constant_name = "VERSION_HISTORY"
-      source = "//sdk/version_history.json"
+      source = "${_version_history_dir}/version_history.json"
+      deps = [ _version_history_label ]
     },
   ]
 }

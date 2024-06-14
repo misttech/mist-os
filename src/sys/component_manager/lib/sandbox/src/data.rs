@@ -15,9 +15,6 @@ pub enum Data {
     Uint64(u64),
 }
 
-#[cfg(target_os = "fuchsia")]
-impl crate::CapabilityTrait for Data {}
-
 impl TryFrom<fsandbox::Data> for Data {
     type Error = RemoteError;
 

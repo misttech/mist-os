@@ -4,12 +4,10 @@
 
 use std::cell::Cell;
 
-use crate::{
-    bones::{CubicWeight, Weight},
-    core::{Core, ObjectRef, OnAdded},
-    math::{self, Mat},
-    shapes::{CubicAsymmetricVertex, CubicDetachedVertex, CubicMirroredVertex, PathVertex},
-};
+use crate::bones::{CubicWeight, Weight};
+use crate::core::{Core, ObjectRef, OnAdded};
+use crate::math::{self, Mat};
+use crate::shapes::{CubicAsymmetricVertex, CubicDetachedVertex, CubicMirroredVertex, PathVertex};
 
 #[derive(Debug, Default)]
 pub struct CubicVertex {

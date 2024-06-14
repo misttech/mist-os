@@ -4,8 +4,7 @@
 
 use crate::error::Error;
 use crate::features::FeatureSet;
-use crate::include;
-use crate::util;
+use crate::{include, util};
 use fidl::persist;
 use std::io::Write;
 use std::path::PathBuf;
@@ -89,14 +88,11 @@ mod tests {
     use assert_matches::assert_matches;
     use difference::Changeset;
     use fidl::unpersist;
-    use fidl_fuchsia_component_decl as fdecl;
-    use fidl_fuchsia_data as fdata;
     use serde_json::json;
-    use std::{
-        fs::File,
-        io::{ErrorKind, Read},
-    };
+    use std::fs::File;
+    use std::io::{ErrorKind, Read};
     use tempfile::TempDir;
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata};
 
     macro_rules! test_compile_with_features {
         (

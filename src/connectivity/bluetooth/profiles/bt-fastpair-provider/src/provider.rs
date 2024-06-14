@@ -11,8 +11,9 @@ use fidl_fuchsia_bluetooth_sys::{HostWatcherMarker, PairingMarker, PairingProxy}
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
+use futures::channel::mpsc;
 use futures::stream::{FusedStream, StreamExt};
-use futures::{channel::mpsc, select, FutureExt};
+use futures::{select, FutureExt};
 use host_watcher::{HostEvent, HostWatcher};
 use std::pin::pin;
 use tracing::{debug, info, trace, warn};

@@ -2,30 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::paths::{
-        maybe_path_for_char, maybe_path_for_cursor_style, path_for_strikeout, path_for_underline,
-        Line,
-    },
-    carnelian::{
-        color::Color,
-        drawing::{FontFace, Glyph, TextGrid},
-        render::{BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Style},
-        scene::{LayerGroup, SceneOrder},
-        Size,
-    },
-    euclid::{point2, Rect},
-    rustc_hash::{FxHashMap, FxHashSet},
-    std::{
-        collections::{hash_map::Entry, BTreeSet},
-        mem,
-    },
-    term_model::{
-        ansi::{CursorStyle, TermInfo},
-        config::Config,
-        term::{cell::Flags, color::Rgb, RenderableCell, RenderableCellContent, Term},
-    },
+use crate::paths::{
+    maybe_path_for_char, maybe_path_for_cursor_style, path_for_strikeout, path_for_underline, Line,
 };
+use carnelian::color::Color;
+use carnelian::drawing::{FontFace, Glyph, TextGrid};
+use carnelian::render::{
+    BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Style,
+};
+use carnelian::scene::{LayerGroup, SceneOrder};
+use carnelian::Size;
+use euclid::{point2, Rect};
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::hash_map::Entry;
+use std::collections::BTreeSet;
+use std::mem;
+use term_model::ansi::{CursorStyle, TermInfo};
+use term_model::config::Config;
+use term_model::term::cell::Flags;
+use term_model::term::color::Rgb;
+use term_model::term::{RenderableCell, RenderableCellContent, Term};
 
 // Supported scale factors.
 //
@@ -458,24 +454,18 @@ impl Renderer {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        carnelian::{
-            drawing::DisplayRotation,
-            render::{generic, Context as RenderContext, ContextInner},
-        },
-        euclid::size2,
-        fuchsia_async as fasync,
-        once_cell::sync::Lazy,
-        std::collections::BTreeMap,
-        term_model::{
-            ansi::Processor,
-            clipboard::Clipboard,
-            event::{Event, EventListener},
-            term::SizeInfo,
-        },
-    };
+    use super::*;
+    use anyhow::Error;
+    use carnelian::drawing::DisplayRotation;
+    use carnelian::render::{generic, Context as RenderContext, ContextInner};
+    use euclid::size2;
+    use fuchsia_async as fasync;
+    use once_cell::sync::Lazy;
+    use std::collections::BTreeMap;
+    use term_model::ansi::Processor;
+    use term_model::clipboard::Clipboard;
+    use term_model::event::{Event, EventListener};
+    use term_model::term::SizeInfo;
 
     struct TermConfig;
 

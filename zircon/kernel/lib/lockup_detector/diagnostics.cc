@@ -10,6 +10,7 @@
 #include <inttypes.h>
 #include <lib/boot-options/boot-options.h>
 
+#include <kernel/scheduler.h>
 #include <ktl/bit.h>
 #include <object/process_dispatcher.h>
 #include <object/thread_dispatcher.h>
@@ -138,7 +139,7 @@ void DumpRegistersAndBacktrace(cpu_num_t cpu, FILE* output_target) {
 
   // First, dump the context for the unresponsive CPU.  Then, dump the contexts of the other CPUs.
   cpu_num_t target_cpu = cpu;
-  cpu_mask_t remaining_cpus = mp_get_active_mask() & ~cpu_num_to_mask(target_cpu);
+  cpu_mask_t remaining_cpus = Scheduler::PeekActiveMask() & ~cpu_num_to_mask(target_cpu);
   do {
     CpuContext context;
     zx_status_t status = g_cpu_context_exchange.RequestContext(target_cpu, timeout, context);

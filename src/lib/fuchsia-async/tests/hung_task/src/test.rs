@@ -8,7 +8,8 @@ use fidl_fuchsia_diagnostics::Severity;
 use fuchsia_async::{Task, Timer};
 use fuchsia_zircon::AsHandleRef as _;
 use futures::prelude::*;
-use std::{pin::pin, time::Duration};
+use std::pin::pin;
+use std::time::Duration;
 use test_case::test_case;
 use tracing::trace;
 

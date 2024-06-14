@@ -14,38 +14,37 @@ mod runtime_dir;
 mod stdout;
 pub mod vdso_vmo;
 
+use self::component::{ElfComponent, ElfComponentInfo};
+use self::config::ElfProgramConfig;
+use self::error::{JobError, StartComponentError, StartInfoError};
+use self::runtime_dir::RuntimeDirBuilder;
+use self::stdout::bind_streams_to_syslog;
+use crate::component_set::ComponentSet;
+use crate::crash_info::CrashRecords;
+use crate::memory::reporter::MemoryReporter;
+use crate::vdso_vmo::get_next_vdso_vmo;
+use ::routing::policy::ScopedPolicyChecker;
+use chrono::{NaiveDateTime, TimeZone as _, Utc};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_diagnostics_types::{
+    ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
+};
+use fidl_fuchsia_process_lifecycle::LifecycleMarker;
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use futures::channel::oneshot;
+use futures::TryStreamExt;
+use moniker::Moniker;
+use runner::component::ChannelEpitaph;
+use runner::StartInfo;
+use std::path::Path;
+use std::sync::Arc;
+use tracing::warn;
 use {
-    self::{
-        component::{ElfComponent, ElfComponentInfo},
-        config::ElfProgramConfig,
-        error::{JobError, StartComponentError, StartInfoError},
-        runtime_dir::RuntimeDirBuilder,
-        stdout::bind_streams_to_syslog,
-    },
-    crate::{
-        component_set::ComponentSet, crash_info::CrashRecords, memory::reporter::MemoryReporter,
-        vdso_vmo::get_next_vdso_vmo,
-    },
-    ::routing::policy::ScopedPolicyChecker,
-    chrono::{NaiveDateTime, TimeZone as _, Utc},
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_diagnostics_types::{
-        ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
-    },
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_process as fproc,
-    fidl_fuchsia_process_lifecycle::LifecycleMarker,
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
-    futures::channel::oneshot,
-    futures::TryStreamExt,
-    moniker::Moniker,
-    runner::component::ChannelEpitaph,
-    runner::StartInfo,
-    std::{path::Path, sync::Arc},
-    tracing::warn,
 };
 
 // Maximum time that the runner will wait for break_on_start eventpair to signal.
@@ -655,29 +654,29 @@ async fn start(
 
 #[cfg(test)]
 mod tests {
+    use super::runtime_dir::RuntimeDirectory;
+    use super::*;
+    use anyhow::{Context, Error};
+    use assert_matches::assert_matches;
+    use cm_config::{AllowlistEntryBuilder, JobPolicyAllowlists, SecurityPolicy};
+    use fidl::endpoints::{
+        create_endpoints, create_proxy, spawn_stream_handler, ClientEnd,
+        DiscoverableProtocolMarker, Proxy,
+    };
+    use fidl_connector::Connect;
+    use fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask;
+    use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
+    use fidl_fuchsia_process_lifecycle::LifecycleProxy;
+    use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+    use fuchsia_zircon::{self as zx, Task};
+    use futures::channel::mpsc;
+    use futures::lock::Mutex;
+    use futures::{join, StreamExt};
+    use runner::component::Controllable;
+    use std::task::Poll;
     use {
-        super::runtime_dir::RuntimeDirectory,
-        super::*,
-        anyhow::{Context, Error},
-        assert_matches::assert_matches,
-        cm_config::{AllowlistEntryBuilder, JobPolicyAllowlists, SecurityPolicy},
-        fidl::endpoints::{
-            create_endpoints, create_proxy, spawn_stream_handler, ClientEnd,
-            DiscoverableProtocolMarker, Proxy,
-        },
-        fidl_connector::Connect,
         fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
-        fidl_fuchsia_data as fdata,
-        fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
-        fidl_fuchsia_io as fio,
-        fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream},
-        fidl_fuchsia_process_lifecycle::LifecycleProxy,
-        fuchsia_async as fasync,
-        fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-        fuchsia_zircon::{self as zx, Task},
-        futures::{channel::mpsc, join, lock::Mutex, StreamExt},
-        runner::component::Controllable,
-        std::task::Poll,
+        fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     };
 
     pub enum MockServiceRequest {

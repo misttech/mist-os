@@ -4,16 +4,13 @@
 
 #![recursion_limit = "256"]
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_hardware_vsock::DeviceMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_fs::OpenFlags,
-    futures::TryStreamExt,
-    futures::{StreamExt, TryFutureExt},
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_hardware_vsock::DeviceMarker;
+use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_fs::OpenFlags;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 
 use vsock_service_lib as service;
 

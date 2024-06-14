@@ -4,30 +4,23 @@
 
 //! The Transmission Control Protocol (TCP).
 
-use core::{
-    num::{NonZeroU16, NonZeroU8},
-    time::Duration,
-};
+use core::num::{NonZeroU16, NonZeroU8};
+use core::time::Duration;
 
 use const_unwrap::const_unwrap_option;
 use net_types::ip::{GenericOverIp, Ip, IpMarked, IpVersion};
 use netstack3_base::{Counter, WeakDeviceIdentifier};
-use netstack3_ip::{
-    icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode},
-    socket::Mms,
-    IpExt,
-};
-use packet_formats::{
-    icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
-    utils::NonZeroDuration,
-};
+use netstack3_ip::icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode};
+use netstack3_ip::socket::Mms;
+use netstack3_ip::IpExt;
+use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
+use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
-use crate::internal::{
-    seqnum::{UnscaledWindowSize, WindowSize},
-    socket::{isn::IsnGenerator, DualStackIpExt, Sockets, TcpBindingsTypes},
-    state::DEFAULT_MAX_SYN_RETRIES,
-};
+use crate::internal::seqnum::{UnscaledWindowSize, WindowSize};
+use crate::internal::socket::isn::IsnGenerator;
+use crate::internal::socket::{DualStackIpExt, Sockets, TcpBindingsTypes};
+use crate::internal::state::DEFAULT_MAX_SYN_RETRIES;
 
 /// Default lifetime for a orphaned connection in FIN_WAIT2.
 pub const DEFAULT_FIN_WAIT2_TIMEOUT: Duration = Duration::from_secs(60);

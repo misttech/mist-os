@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::gn::add_version_suffix,
-    crate::types::*,
-    camino::{Utf8Path, Utf8PathBuf},
-    cargo_metadata::{Package, PackageId, Version},
-    std::borrow::Cow,
-    std::cmp::Ordering,
-    std::collections::{hash_map::DefaultHasher, HashMap},
-    std::hash::{Hash, Hasher},
-};
+use crate::gn::add_version_suffix;
+use crate::types::*;
+use camino::{Utf8Path, Utf8PathBuf};
+use cargo_metadata::{Package, PackageId, Version};
+use std::borrow::Cow;
+use std::cmp::Ordering;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 
 pub struct GnTarget<'a> {
     /// Package ID from the Cargo metadata

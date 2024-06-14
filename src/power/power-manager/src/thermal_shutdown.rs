@@ -13,17 +13,14 @@ use crate::temperature_handler::TemperatureFilter;
 use crate::types::{Celsius, Seconds};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use fuchsia_async as fasync;
-use futures::{
-    future::{FutureExt, LocalBoxFuture},
-    stream::FuturesUnordered,
-    StreamExt,
-};
+use futures::future::{FutureExt, LocalBoxFuture};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde_derive::Deserialize;
-use serde_json as json;
 use std::collections::HashMap;
 use std::rc::Rc;
 use tracing::*;
+use {fuchsia_async as fasync, serde_json as json};
 
 /// Node: ThermalShutdown
 ///

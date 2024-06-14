@@ -3,42 +3,38 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
-use fuchsia_sync::Mutex;
-use {
-    chrono::{Datelike, TimeZone, Timelike},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_hardware_rtc::{DeviceRequest, DeviceRequestStream},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_metrics_test::{
-        LogMethod, MetricEventLoggerQuerierMarker, MetricEventLoggerQuerierProxy,
-    },
-    fidl_fuchsia_testing::{
-        FakeClockControlMarker, FakeClockControlProxy, FakeClockMarker, FakeClockProxy,
-    },
-    fidl_fuchsia_time::{MaintenanceRequest, MaintenanceRequestStream},
-    fidl_fuchsia_time_external::{PushSourceMarker, Status, TimeSample},
-    fidl_test_time::{TimeSourceControlRequest, TimeSourceControlRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{
-        Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, RealmInstance,
-        Ref, Route,
-    },
-    fuchsia_zircon::{self as zx, HandleBased, Rights},
-    futures::{
-        channel::mpsc::Sender,
-        stream::{Stream, StreamExt, TryStreamExt},
-        Future, FutureExt, SinkExt,
-    },
-    lazy_static::lazy_static,
-    push_source::{PushSource, TestUpdateAlgorithm, Update},
-    std::{ops::Deref, sync::Arc},
-    time_metrics_registry::PROJECT_ID,
-    vfs::{
-        directory::entry_container::Directory, execution_scope::ExecutionScope, pseudo_directory,
-    },
+use chrono::{Datelike, TimeZone, Timelike};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_hardware_rtc::{DeviceRequest, DeviceRequestStream};
+use fidl_fuchsia_metrics::MetricEvent;
+use fidl_fuchsia_metrics_test::{
+    LogMethod, MetricEventLoggerQuerierMarker, MetricEventLoggerQuerierProxy,
 };
+use fidl_fuchsia_testing::{
+    FakeClockControlMarker, FakeClockControlProxy, FakeClockMarker, FakeClockProxy,
+};
+use fidl_fuchsia_time::{MaintenanceRequest, MaintenanceRequestStream};
+use fidl_fuchsia_time_external::{PushSourceMarker, Status, TimeSample};
+use fidl_test_time::{TimeSourceControlRequest, TimeSourceControlRequestStream};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{
+    Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, RealmInstance, Ref,
+    Route,
+};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{self as zx, HandleBased, Rights};
+use futures::channel::mpsc::Sender;
+use futures::stream::{Stream, StreamExt, TryStreamExt};
+use futures::{Future, FutureExt, SinkExt};
+use lazy_static::lazy_static;
+use push_source::{PushSource, TestUpdateAlgorithm, Update};
+use std::ops::Deref;
+use std::sync::Arc;
+use time_metrics_registry::PROJECT_ID;
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::pseudo_directory;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// URL for timekeeper.
 const TIMEKEEPER_URL: &str = "#meta/timekeeper_for_integration.cm";

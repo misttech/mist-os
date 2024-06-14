@@ -31,7 +31,6 @@
 namespace monitor {
 
 namespace test {
-class MonitorUnitTest;
 class MemoryBandwidthInspectTest;
 }  // namespace test
 
@@ -71,10 +70,14 @@ class Monitor : public fuchsia::memory::inspection::Collector {
   void SampleAndPost();
   void MeasureBandwidthAndPost();
   void PeriodicMeasureBandwidth();
-  void PrintHelp();
+  static void PrintHelp();
   inspect::Inspector Inspect(const std::vector<memory::BucketMatch>& bucket_matches);
 
-  zx_status_t GetCapture(memory::Capture* capture, std::unique_ptr<memory::CaptureStrategy> filter);
+  // Overridable for testing purpose.
+  virtual zx_status_t GetCapture(memory::Capture* capture,
+                                 const memory::CaptureState& capture_state,
+                                 memory::CaptureLevel level,
+                                 std::unique_ptr<memory::CaptureStrategy> strategy);
   void GetDigest(const memory::Capture& capture, memory::Digest* digest);
   void PressureLevelChanged(Level level);
 
@@ -103,7 +106,6 @@ class Monitor : public fuchsia::memory::inspection::Collector {
   uint64_t pending_bandwidth_measurements_ = 0;
   Level level_;
 
-  friend class test::MonitorUnitTest;
   friend class test::MemoryBandwidthInspectTest;
   FXL_DISALLOW_COPY_AND_ASSIGN(Monitor);
 };

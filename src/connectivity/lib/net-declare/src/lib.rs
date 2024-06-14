@@ -111,44 +111,35 @@ pub use net_declare_macros::net_prefix_length_v6;
 
 /// Redeclaration of macros to generate `std` types.
 pub mod std {
-    pub use super::std_ip as ip;
-    pub use super::std_ip_v4 as ip_v4;
-    pub use super::std_ip_v6 as ip_v6;
-    pub use super::std_socket_addr as socket_addr;
-    pub use super::std_socket_addr_v4 as socket_addr_v4;
-    pub use super::std_socket_addr_v6 as socket_addr_v6;
+    pub use super::{
+        std_ip as ip, std_ip_v4 as ip_v4, std_ip_v6 as ip_v6, std_socket_addr as socket_addr,
+        std_socket_addr_v4 as socket_addr_v4, std_socket_addr_v6 as socket_addr_v6,
+    };
 }
 
 /// Redeclaration of macros to generate `fidl` types.
 pub mod fidl {
-    pub use super::fidl_ip as ip;
-    pub use super::fidl_ip_v4 as ip_v4;
-    pub use super::fidl_ip_v6 as ip_v6;
-    pub use super::fidl_mac as mac;
-    pub use super::fidl_socket_addr as socket_addr;
-    pub use super::fidl_socket_addr_v4 as socket_addr_v4;
-    pub use super::fidl_socket_addr_v6 as socket_addr_v6;
-    pub use super::fidl_subnet as subnet;
+    pub use super::{
+        fidl_ip as ip, fidl_ip_v4 as ip_v4, fidl_ip_v6 as ip_v6, fidl_mac as mac,
+        fidl_socket_addr as socket_addr, fidl_socket_addr_v4 as socket_addr_v4,
+        fidl_socket_addr_v6 as socket_addr_v6, fidl_subnet as subnet,
+    };
 }
 
 /// Redeclaration of macros to generate `net_types` types.
 pub mod net {
-    pub use super::net_ip as ip;
-    pub use super::net_ip_v4 as ip_v4;
-    pub use super::net_ip_v6 as ip_v6;
-    pub use super::net_mac as mac;
-    pub use super::net_prefix_length_v4 as prefix_length_v4;
-    pub use super::net_prefix_length_v6 as prefix_length_v6;
-    pub use super::net_subnet_v4 as subnet_v4;
-    pub use super::net_subnet_v6 as subnet_v6;
+    pub use super::{
+        net_ip as ip, net_ip_v4 as ip_v4, net_ip_v6 as ip_v6, net_mac as mac,
+        net_prefix_length_v4 as prefix_length_v4, net_prefix_length_v6 as prefix_length_v6,
+        net_subnet_v4 as subnet_v4, net_subnet_v6 as subnet_v6,
+    };
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ::std;
-    use fidl_fuchsia_net as fidl;
     use net_declare_macros::net_prefix_length_v4;
+    use {::std, fidl_fuchsia_net as fidl};
 
     #[test]
     fn test_std_ip() {

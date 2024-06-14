@@ -2,23 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        blobfs::{BlobFsReader, BlobFsReaderBuilder},
-        fs::tempdir,
-        io::{ReadSeek, TryClonableBufReaderFile, TryClone},
-    },
-    anyhow::{anyhow, Context, Result},
-    pathdiff::diff_paths,
-    std::{
-        collections::HashSet,
-        fs::{self, File},
-        io::{BufReader, Read, Seek},
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
-    tracing::warn,
-};
+use crate::blobfs::{BlobFsReader, BlobFsReaderBuilder};
+use crate::fs::tempdir;
+use crate::io::{ReadSeek, TryClonableBufReaderFile, TryClone};
+use anyhow::{anyhow, Context, Result};
+use pathdiff::diff_paths;
+use std::collections::HashSet;
+use std::fs::{self, File};
+use std::io::{BufReader, Read, Seek};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tracing::warn;
 
 /// Interface for fetching raw bytes by file path.
 pub trait ArtifactReader: Send + Sync {
@@ -378,16 +372,12 @@ fn dep_from_absolute<P1: AsRef<Path>, P2: AsRef<Path>>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{ArtifactReader, FileArtifactReader},
-        maplit::hashset,
-        std::{
-            fs::{create_dir, File},
-            io::Write,
-            path::Path,
-        },
-        tempfile::tempdir,
-    };
+    use super::{ArtifactReader, FileArtifactReader};
+    use maplit::hashset;
+    use std::fs::{create_dir, File};
+    use std::io::Write;
+    use std::path::Path;
+    use tempfile::tempdir;
 
     #[test]
     fn test_basic() {

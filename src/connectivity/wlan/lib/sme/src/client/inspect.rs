@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::{ClientSmeStatus, ServingApInfo};
+use fuchsia_inspect::{
+    BoolProperty, BytesProperty, IntProperty, Node, Property, StringProperty, UintProperty,
+};
+use fuchsia_inspect_contrib::inspect_insert;
+use fuchsia_inspect_contrib::log::{InspectListClosure, InspectUintArray};
+use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt, TimeProperty};
+use fuchsia_sync::Mutex;
+use ieee80211::Ssid;
+use wlan_common::ie::{self, wsc};
 use {
-    crate::client::{ClientSmeStatus, ServingApInfo},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_inspect::{
-        BoolProperty, BytesProperty, IntProperty, Node, Property, StringProperty, UintProperty,
-    },
-    fuchsia_inspect_contrib::{
-        inspect_insert,
-        log::{InspectListClosure, InspectUintArray},
-        nodes::{BoundedListNode, NodeExt, TimeProperty},
-    },
-    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
-    ieee80211::Ssid,
-    wlan_common::ie::{self, wsc},
 };
 
 /// These limits are set to capture roughly 5 to 10 recent connection attempts. An average
@@ -510,12 +508,10 @@ impl ConnectingToNode {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::client::test_utils,
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
-        fuchsia_inspect::Inspector,
-    };
+    use super::*;
+    use crate::client::test_utils;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fuchsia_inspect::Inspector;
 
     #[test]
     fn test_inspect_update_pulse_connect_disconnect() {

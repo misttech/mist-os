@@ -37,18 +37,11 @@
 
 use lock_order::Unlocked;
 
-use crate::{
-    marker::{BindingsContext, BindingsTypes},
-    state::StackState,
-};
+use netstack3_base::ContextProvider;
+use {netstack3_device as device, netstack3_ip as ip, netstack3_udp as udp};
 
-pub use netstack3_base::{
-    BuildableCoreContext, ContextPair, ContextProvider, CoreTimerContext, CounterContext, CtxPair,
-    DeferredResourceRemovalContext, EventContext, HandleableTimer, InstantBindingsTypes,
-    InstantContext, ReceivableFrameMeta, ReferenceNotifiers, ReferenceNotifiersExt,
-    ResourceCounterContext, RngContext, TimerBindingsTypes, TimerContext, TimerHandler,
-    TracingContext,
-};
+use crate::marker::{BindingsContext, BindingsTypes};
+use crate::state::StackState;
 
 // Enable all blanket implementations on CoreCtx.
 //
@@ -57,24 +50,12 @@ pub use netstack3_base::{
 // individually so it's easier to split things into separate crates and avoids
 // playing whack-a-mole with single markers that work for some traits/crates but
 // not others.
-impl<BC: BindingsContext, L> crate::ip::marker::UseTransportIpContextBlanket
-    for CoreCtx<'_, BC, L>
-{
-}
-impl<BC: BindingsContext, L> crate::ip::marker::UseIpSocketContextBlanket for CoreCtx<'_, BC, L> {}
-impl<BC: BindingsContext, L> crate::ip::marker::UseIpSocketHandlerBlanket for CoreCtx<'_, BC, L> {}
-impl<BC: BindingsContext, L> crate::ip::marker::UseDeviceIpSocketHandlerBlanket
-    for CoreCtx<'_, BC, L>
-{
-}
-impl<BC: BindingsContext, L> crate::transport::udp::UseUdpIpTransportContextBlanket
-    for CoreCtx<'_, BC, L>
-{
-}
-impl<BC: BindingsContext, L> crate::device::marker::UseArpFrameMetadataBlanket
-    for CoreCtx<'_, BC, L>
-{
-}
+impl<BC: BindingsContext, L> ip::marker::UseTransportIpContextBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> ip::marker::UseIpSocketContextBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> ip::marker::UseIpSocketHandlerBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> ip::marker::UseDeviceIpSocketHandlerBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> udp::UseUdpIpTransportContextBlanket for CoreCtx<'_, BC, L> {}
+impl<BC: BindingsContext, L> device::marker::UseArpFrameMetadataBlanket for CoreCtx<'_, BC, L> {}
 
 /// Provides access to core context implementations.
 ///
@@ -88,8 +69,6 @@ pub(crate) type CoreCtxAndResource<'a, BT, R, L> =
 /// An alias for an unlocked [`CoreCtx`].
 pub type UnlockedCoreCtx<'a, BT> = CoreCtx<'a, BT, Unlocked>;
 
-pub(crate) use locked::Locked;
-
 impl<'a, BT, L> ContextProvider for CoreCtx<'a, BT, L>
 where
     BT: BindingsTypes,
@@ -101,6 +80,16 @@ where
     }
 }
 
+pub(crate) use locked::{Locked, WrapLockLevel};
+
+/// Prelude import to enable the lock wrapper traits.
+pub(crate) mod prelude {
+    #[cfg(no_lock_order)]
+    pub(crate) use lock_order::wrap::disable::prelude::*;
+    #[cfg(not(no_lock_order))]
+    pub(crate) use lock_order::wrap::prelude::*;
+}
+
 /// Provides a crate-local wrapper for `[lock_order::Locked]`.
 ///
 /// This module is intentionally private so usage is limited to the type alias
@@ -109,10 +98,14 @@ mod locked {
     use super::{BindingsTypes, CoreCtx, StackState};
 
     use core::ops::Deref;
-    use lock_order::{wrap::LockedWrapper, Locked as ExternalLocked, TupleWrapper, Unlocked};
+    use lock_order::wrap::LockedWrapper;
+    use lock_order::{Locked as ExternalLocked, TupleWrapper, Unlocked};
 
     /// A crate-local wrapper on [`lock_order::Locked`].
     pub struct Locked<T, L>(ExternalLocked<T, L>);
+
+    // SAFETY: This is only compiled when lock ordering is disabled.
+    unsafe impl<T, L> lock_order::wrap::disable::DisabledLockWrapper for Locked<T, L> {}
 
     impl<T, L> LockedWrapper<T, L> for Locked<T, L>
     where
@@ -168,26 +161,31 @@ mod locked {
         T: Deref<Target = TupleWrapper<&'a StackState<BT>, &'a R>>,
         BT: BindingsTypes,
     {
-        pub(crate) fn cast_resource(&mut self) -> Locked<&'_ R, L> {
-            let Self(locked) = self;
-            Locked(locked.cast_with(|c| c.right()))
-        }
-
         pub(crate) fn cast_core_ctx(&mut self) -> CoreCtx<'_, BT, L> {
             let Self(locked) = self;
             crate::CoreCtx::<BT, L>::wrap(locked.cast_with(|c| c.left()))
         }
     }
-}
 
-/// Fake implementations of context traits.
-#[cfg(any(test, feature = "testutils"))]
-pub(crate) mod testutil {
-    // TODO(https://fxbug.dev/342685842): Remove this re-export.
-    pub use netstack3_base::testutil::{
-        FakeBindingsCtx, FakeCoreCtx, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant,
-        FakeInstantCtx, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, FakeTimerCtx,
-        FakeTimerCtxExt, FakeTracingCtx, InstantAndData, PendingFrame, PendingFrameData,
-        StepResult, WithFakeFrameContext, WithFakeTimerContext,
-    };
+    /// Enables the [`WrapLockLevel`] type alias.
+    pub trait WrappedLockLevel {
+        type LockLevel;
+    }
+
+    impl<L> WrappedLockLevel for L {
+        /// All lock levels are actually [`Unlocked`].
+        #[cfg(no_lock_order)]
+        type LockLevel = Unlocked;
+        /// All lock levels are themselves.
+        #[cfg(not(no_lock_order))]
+        type LockLevel = L;
+    }
+
+    /// Wraps lock level `L` in [`WrappedLockLevel::LockLevel`], which allows
+    /// lock ordering to be disabled by build configuration.
+    ///
+    /// Whenever using a concrete instantiation of a lock level (i.e. not in a
+    /// `LockBefore` trait bound) it must be wrapped in `WrapLockLevel` for
+    /// compilation with `cfg(no_lock_order)` to succeed.
+    pub(crate) type WrapLockLevel<L> = <L as WrappedLockLevel>::LockLevel;
 }

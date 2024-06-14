@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use crate::base::SettingType;
-use crate::config;
 use crate::message::base::Audience;
-use crate::payload_convert;
-use crate::service;
 use crate::service_context::ExternalServiceEvent;
+use crate::{config, payload_convert, service};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq)]

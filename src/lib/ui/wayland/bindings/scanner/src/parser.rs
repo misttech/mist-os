@@ -4,10 +4,9 @@
 
 use xml::reader::{EventReader, XmlEvent};
 
-use std::error;
-use std::fmt;
 use std::io::Read;
 use std::str::{FromStr, ParseBoolError};
+use std::{error, fmt};
 
 #[derive(Debug, PartialEq)]
 pub enum ArgKind {

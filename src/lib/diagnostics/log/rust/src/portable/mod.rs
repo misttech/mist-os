@@ -3,19 +3,19 @@
 
 use crate::PublishOptions;
 use fidl_fuchsia_diagnostics::{Interest, Severity};
-use std::{collections::HashSet, fmt, marker::PhantomData, sync::Once};
+use std::collections::HashSet;
+use std::fmt;
+use std::marker::PhantomData;
+use std::sync::Once;
 use thiserror::Error;
-use tracing::{level_filters::LevelFilter, Event, Level, Subscriber};
-use tracing_log::NormalizeEvent;
-use tracing_subscriber::{
-    fmt::{
-        format::{DefaultFields, Writer},
-        time::{FormatTime, SystemTime},
-        FmtContext, FormatEvent, FormatFields, FormattedFields, MakeWriter,
-    },
-    registry::LookupSpan,
-    FmtSubscriber,
-};
+use tracing::level_filters::LevelFilter;
+use tracing::{Event, Level, Subscriber};
+use tracing_log::{LogTracer, NormalizeEvent};
+use tracing_subscriber::fmt::format::{DefaultFields, Writer};
+use tracing_subscriber::fmt::time::{FormatTime, SystemTime};
+use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields, FormattedFields, MakeWriter};
+use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::FmtSubscriber;
 
 /// Tag derived from metadata.
 ///
@@ -56,9 +56,7 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
     START.call_once(|| {
         let subscriber = create_subscriber(&opts, std::io::stderr).expect("create subscriber");
         tracing::subscriber::set_global_default(subscriber).expect("set global subscriber");
-        if opts.ingest_log_events {
-            crate::ingest_log_events().expect("ingest log events");
-        }
+        LogTracer::init().expect("ingest log events");
         if opts.install_panic_hook {
             crate::install_panic_hook(opts.panic_prefix);
         }
@@ -168,10 +166,8 @@ where
 mod tests {
     use super::*;
     use regex::Regex;
-    use std::{
-        io,
-        sync::{Arc, Mutex},
-    };
+    use std::io;
+    use std::sync::{Arc, Mutex};
     use tracing::{error, info, warn};
 
     struct MockWriter(Arc<Mutex<Vec<u8>>>);

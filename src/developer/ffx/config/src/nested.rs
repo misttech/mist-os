@@ -5,7 +5,8 @@
 //! Functions for interacting with nested json objects in a recursive way.
 
 use anyhow::{Context, Result};
-use serde_json::{map::Entry, Map, Value};
+use serde_json::map::Entry;
+use serde_json::{Map, Value};
 
 /// A trait that adds a recursive mapping function to a nested json value tree.
 ///

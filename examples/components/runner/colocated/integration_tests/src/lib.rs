@@ -4,19 +4,18 @@
 
 #![cfg(test)]
 
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_decl as fdecl;
-use fidl_fuchsia_examples_colocated as fcolocated;
-use fidl_fuchsia_memory_attribution as fattribution;
 use fidl_fuchsia_process::HandleInfo;
-use fuchsia_async as fasync;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route,
 };
 use fuchsia_runtime::HandleType;
-use fuchsia_zircon as zx;
 use futures_util::{FutureExt, StreamExt};
 use std::sync::Arc;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_examples_colocated as fcolocated, fidl_fuchsia_memory_attribution as fattribution,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 #[fuchsia::test]
 async fn test_attribute_memory() {

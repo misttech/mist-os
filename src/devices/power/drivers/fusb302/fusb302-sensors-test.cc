@@ -43,7 +43,10 @@ class Fusb302SensorsTest : public inspect::InspectTestHelper, public zxtest::Tes
     sensors_.emplace(mock_i2c_client_, inspect_.GetRoot().CreateChild("Sensors"));
   }
 
-  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+  void TearDown() override {
+    mock_i2c_.VerifyAndClear();
+    fdf::Logger::SetGlobalInstance(nullptr);
+  }
 
  protected:
   inspect::Inspector inspect_;

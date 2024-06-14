@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _, Result};
-use fidl_fuchsia_component as fcomponent;
-use fidl_fuchsia_component_decl as fdecl;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use std::collections::HashMap;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+};
 
 /// Name of the collection that contains the hermetic network realm.
 pub const HERMETIC_NETWORK_COLLECTION_NAME: &'static str = "enclosed-network";

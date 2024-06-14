@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{borrow::Cow, mem::replace};
+use std::borrow::Cow;
+use std::mem::replace;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Linealyzer {
@@ -91,7 +92,9 @@ impl<'l, 'a> std::iter::FusedIterator for LinealyzerIter<'l, 'a> {}
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, proptest::prelude::*};
+    use super::*;
+    use assert_matches::assert_matches;
+    use proptest::prelude::*;
 
     fn assert_all_3_partitionings_owned(input: &[u8], expected: Vec<Vec<u8>>) {
         for i in 0..=input.len() {

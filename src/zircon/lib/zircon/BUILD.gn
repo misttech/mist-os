@@ -24,6 +24,10 @@ if ((is_fuchsia || is_mistos) && toolchain_base_environment != "kernel") {
   group("zircon") {
     public_deps = [ ":headers" ]
   }
+
+  group("zircon.as-needed") {
+    public_deps = [ ":headers" ]
+  }
 }
 
 group("headers") {

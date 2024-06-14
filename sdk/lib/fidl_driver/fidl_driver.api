@@ -1,7 +1,7 @@
 {
   "pkg/fidl_driver/include/lib/fidl_driver/cpp/internal/server_details.h": "56c057542370981747537b303f9df363",
   "pkg/fidl_driver/include/lib/fidl_driver/cpp/internal/wire_client_details.h": "53ab6782ef2d9ad31c4e6a40795422f0",
-  "pkg/fidl_driver/include/lib/fidl_driver/cpp/server.h": "8768c5ddf2d004ae3da727255e42f682",
+  "pkg/fidl_driver/include/lib/fidl_driver/cpp/server.h": "e296d92b44a88c55ffd4be9fb5a6e59b",
   "pkg/fidl_driver/include/lib/fidl_driver/cpp/sync_call.h": "4659fce68e7ce56602e8c70f70edeeff",
   "pkg/fidl_driver/include/lib/fidl_driver/cpp/unknown_interactions.h": "e6f9bc16acb187cbc258526477c16b7d",
   "pkg/fidl_driver/include/lib/fidl_driver/cpp/wire_client.h": "ef3b1e2f622719c4f36fcfd358bba41c",

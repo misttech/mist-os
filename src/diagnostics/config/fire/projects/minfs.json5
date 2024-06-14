@@ -4,7 +4,7 @@
             metric_id: 7,
             metric_type: "Integer",
             selector: [
-                "bootstrap/fshost:root/data_stats/data/persistent/{COMPONENT_ID}:storage_size",
+                "bootstrap/fshost:root/data_stats/data/persistent/{INSTANCE_ID}:storage_size",
             ],
         },
     ],

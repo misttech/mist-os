@@ -103,7 +103,7 @@ server implementation.
 
 An important point to note here is that this code assumes that the component's
 namespace already contains an instance of the `Echo` protocol. When
-[running the example](#run) at the end of the tutorial, a
+[running the example](#run-the-client) at the end of the tutorial, a
 [realm][glossary.realm] component is used to route the protocol from the server
 and offer it to the client component.
 
@@ -236,7 +236,7 @@ There are also differences in pointers vs references and argument structure:
   {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/cpp/client/main.cc" region_tag="one_way_wire_first_line" adjust_indentation="auto" %}
   ```
 
-## Run the client
+## Run the client {#run-the-client}
 
 In order for the client and server to communicate using the `Echo` protocol,
 component framework must route the `fuchsia.examples.Echo` capability from the

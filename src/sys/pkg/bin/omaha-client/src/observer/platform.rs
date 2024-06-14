@@ -123,11 +123,9 @@ mod mock {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, TreeAssertion},
-        fuchsia_inspect::Inspector,
-    };
+    use super::*;
+    use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, TreeAssertion};
+    use fuchsia_inspect::Inspector;
 
     static TARGET_VERSION: &str = "some-ver";
 

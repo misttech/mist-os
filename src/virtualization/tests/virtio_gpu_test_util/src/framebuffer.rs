@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {serde::Serialize, serde_json::json};
+use serde::Serialize;
+use serde_json::json;
 
 #[derive(Serialize, Debug, Default)]
 pub struct DisplayInfo {

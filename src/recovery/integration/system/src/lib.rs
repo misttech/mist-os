@@ -16,7 +16,8 @@ use fidl_fuchsia_logger::{
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::Duration;
 
-use futures::{channel::mpsc, StreamExt, TryStreamExt};
+use futures::channel::mpsc;
+use futures::{StreamExt, TryStreamExt};
 
 const STARTUP_LOG_MSG: &str = "recovery: started";
 

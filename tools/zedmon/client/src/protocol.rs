@@ -5,13 +5,11 @@
 //! Implements the Zedmon USB protocol, defined by
 //! https://fuchsia.googlesource.com/zedmon/+/HEAD/docs/usb_proto.md.
 
-use {
-    byteorder::{LittleEndian as LE, ReadBytesExt},
-    num_derive::FromPrimitive,
-    num_traits::FromPrimitive,
-    std::io::{BufRead, Cursor},
-    std::str,
-};
+use byteorder::{LittleEndian as LE, ReadBytesExt};
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
+use std::io::{BufRead, Cursor};
+use std::str;
 
 pub const MAX_PACKET_SIZE: usize = 64;
 
@@ -439,7 +437,10 @@ impl ReportParser {
 /// This module is public to expose serialization functions to tests in other modules.
 #[cfg(test)]
 pub mod tests {
-    use {super::*, assert_matches::assert_matches, byteorder::WriteBytesExt, std::io::Write};
+    use super::*;
+    use assert_matches::assert_matches;
+    use byteorder::WriteBytesExt;
+    use std::io::Write;
 
     fn get_scalar_type(value: &Value) -> ScalarType {
         match *value {

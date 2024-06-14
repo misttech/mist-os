@@ -7,39 +7,33 @@
 use alloc::vec::Vec;
 
 use either::Either;
-use net_types::{
-    ip::{
-        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant,
-        IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-    },
-    SpecifiedAddr,
+use log::trace;
+use net_types::ip::{
+    AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpVersionMarker, Ipv4,
+    Ipv4Addr, Ipv6, Ipv6Addr,
 };
+use net_types::SpecifiedAddr;
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, EventContext as _, ExistsError, Inspector, Instant,
     InstantBindingsTypes, NotFoundError, ReferenceNotifiers, RemoveResourceResult,
     RemoveResourceResultWithContext,
 };
 use thiserror::Error;
-use tracing::trace;
 
-use crate::internal::{
-    device::{
-        self,
-        config::{
-            IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate,
-            UpdateIpConfigurationError,
-        },
-        state::{
-            Ipv4AddrConfig, Ipv4AddressState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-            Ipv6AddressState, Lifetime,
-        },
-        AddressRemovedReason, DelIpAddr, IpAddressId as _, IpDeviceAddressContext as _,
-        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
-        IpDeviceStateContext as _,
-    },
-    forwarding::IpForwardingDeviceContext,
-    types::RawMetric,
+use crate::internal::device::config::{
+    IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate, UpdateIpConfigurationError,
 };
+use crate::internal::device::state::{
+    Ipv4AddrConfig, Ipv4AddressState, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddressState,
+    Lifetime,
+};
+use crate::internal::device::{
+    self, AddressRemovedReason, DelIpAddr, IpAddressId as _, IpDeviceAddressContext as _,
+    IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
+    IpDeviceStateContext as _,
+};
+use crate::internal::forwarding::IpForwardingDeviceContext;
+use crate::internal::types::RawMetric;
 
 /// Provides an API for dealing with devices at the IP layer, aka interfaces.
 pub struct DeviceIpApi<I: Ip, C>(C, IpVersionMarker<I>);
@@ -224,18 +218,18 @@ where
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
             struct Wrap<'a, I: IpDeviceIpExt, II: Instant>(&'a mut I::AddressState<II>);
-            let IpInvariant(valid_until) = I::map_ip(
+            let valid_until = I::map_ip_in(
                 Wrap(address_state),
                 |Wrap(Ipv4AddressState { config })| {
-                    IpInvariant(match config {
+                    match config {
                         Some(Ipv4AddrConfig { valid_until }) => Ok(valid_until),
                         // Address is being removed, configuration has been
                         // taken out.
                         None => Err(NotFoundError.into()),
-                    })
+                    }
                 },
                 |Wrap(Ipv6AddressState { flags: _, config })| {
-                    IpInvariant(match config {
+                    match config {
                         // Address is being removed, configuration has been
                         // taken out.
                         None => Err(NotFoundError.into()),
@@ -245,7 +239,7 @@ where
                         Some(Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until })) => {
                             Ok(valid_until)
                         }
-                    })
+                    }
                 },
             );
             let valid_until = valid_until?;
@@ -443,13 +437,13 @@ impl<Inst: Instant> AddrSubnetAndManualConfigEither<Inst> {
             config: I::ManualAddressConfig<Inst>,
         }
 
-        let IpInvariant(result) = I::map_ip(
+        let result = I::map_ip_in(
             AddrSubnetAndConfig { addr_subnet, config },
             |AddrSubnetAndConfig { addr_subnet, config }| {
-                IpInvariant(AddrSubnetAndManualConfigEither::V4(addr_subnet, config))
+                AddrSubnetAndManualConfigEither::V4(addr_subnet, config)
             },
             |AddrSubnetAndConfig { addr_subnet, config }| {
-                IpInvariant(AddrSubnetAndManualConfigEither::V6(addr_subnet, config))
+                AddrSubnetAndManualConfigEither::V6(addr_subnet, config)
             },
         );
         result

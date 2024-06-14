@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    cm_stress_tests_lib::{create_child, stop_child, Child},
-    fidl_test_componentmanager_stresstests as fstresstests, fuchsia_async as fasync,
-    futures::prelude::*,
-};
+use cm_stress_tests_lib::{create_child, stop_child, Child};
+use futures::prelude::*;
+use {fidl_test_componentmanager_stresstests as fstresstests, fuchsia_async as fasync};
 
 const NUM_CHILDREN: u16 = 128;
 

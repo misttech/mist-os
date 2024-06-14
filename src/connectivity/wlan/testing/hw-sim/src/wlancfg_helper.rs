@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::test_utils::RetryWithBackoff,
-    fidl::endpoints::{create_endpoints, create_proxy},
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_policy::{Credential, NetworkConfig, NetworkIdentifier, SecurityType},
-    fuchsia_component::client::connect_to_protocol_at,
-    fuchsia_zircon::prelude::*,
-    futures::{StreamExt, TryStreamExt},
-    ieee80211::Ssid,
-    tracing::info,
-};
+use crate::test_utils::RetryWithBackoff;
+use fidl::endpoints::{create_endpoints, create_proxy};
+use fidl_fuchsia_wlan_policy::{Credential, NetworkConfig, NetworkIdentifier, SecurityType};
+use fuchsia_component::client::connect_to_protocol_at;
+use fuchsia_zircon::prelude::*;
+use futures::{StreamExt, TryStreamExt};
+use ieee80211::Ssid;
+use tracing::info;
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 fn create_network_config(
     ssid: &Ssid,

@@ -6,7 +6,8 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.platform.bus") {
   contains_drivers = true
-  sdk_category = "internal"
+  sdk_category = "partner"
+  sdk_area = "Drivers"
   sources = [ "platform-bus.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.driver.framework",

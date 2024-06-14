@@ -12,7 +12,11 @@ zx_library("zx") {
 
   sdk_headers = [ "lib/zx/result.h" ]
   sources = []
-  deps = [ "//src/zircon/lib/zircon" ]
+
+  # Be compatible with hermetic_source_set() deps reaching this target.  The
+  # vDSO link stub will satisfy references in the outer link rather than being
+  # an input to the hermetic relocatable link.
+  deps = [ "//src/zircon/lib/zircon:zircon.as-needed" ]
 
   public_deps = [
     "//sdk/lib/fit",

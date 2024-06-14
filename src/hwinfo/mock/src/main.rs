@@ -10,7 +10,8 @@ use fidl_fuchsia_hwinfo::{
 use fidl_fuchsia_hwinfo_mock::{SetterRequest, SetterRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect::{component, health::Reporter};
+use fuchsia_inspect::component;
+use fuchsia_inspect::health::Reporter;
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};

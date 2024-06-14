@@ -6,9 +6,11 @@
 #![allow(non_snake_case)]
 
 use fuchsia_bootfs::BootfsParser;
-use fuchsia_zbi::{ZbiParser, ZbiType::StorageBootfsFactory};
+use fuchsia_zbi::ZbiParser;
+use fuchsia_zbi::ZbiType::StorageBootfsFactory;
 use fuchsia_zircon as zx;
-use std::{convert::TryInto, slice};
+use std::convert::TryInto;
+use std::slice;
 
 pub type size_t = ::std::os::raw::c_ulong;
 

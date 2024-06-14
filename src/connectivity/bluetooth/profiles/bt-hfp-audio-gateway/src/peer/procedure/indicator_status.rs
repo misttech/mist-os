@@ -4,7 +4,8 @@
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 
-use crate::peer::{service_level_connection::SlcState, update::AgUpdate};
+use crate::peer::service_level_connection::SlcState;
+use crate::peer::update::AgUpdate;
 use at_commands as at;
 
 /// The HF requests supported AG indicators via this procedure. See HFP v1.8, Section 4.2.1.3.

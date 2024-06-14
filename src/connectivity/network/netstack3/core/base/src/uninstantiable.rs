@@ -9,7 +9,8 @@
 //! of their local traits on these types, so they can be used in uninstantiable
 //! contexts.
 
-use core::{convert::Infallible as Never, marker::PhantomData};
+use core::convert::Infallible as Never;
+use core::marker::PhantomData;
 
 use explicit::UnreachableExt as _;
 
@@ -72,4 +73,12 @@ impl<P, C> CounterContext<C> for UninstantiableWrapper<P> {
 impl<D: Device, C: DeviceIdContext<D>> DeviceIdContext<D> for UninstantiableWrapper<C> {
     type DeviceId = C::DeviceId;
     type WeakDeviceId = C::WeakDeviceId;
+}
+
+impl<A: Iterator> Iterator for UninstantiableWrapper<A> {
+    type Item = A::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.uninstantiable_unreachable()
+    }
 }

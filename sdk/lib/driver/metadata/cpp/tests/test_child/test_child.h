@@ -27,7 +27,6 @@ class TestChild : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_t
 
   // fuchsia.hardware.test/Child implementation.
   void GetMetadata(GetMetadataCompleter::Sync& completer) override;
-
   void ForwardMetadata(ForwardMetadataCompleter::Sync& completer) override;
 
  private:

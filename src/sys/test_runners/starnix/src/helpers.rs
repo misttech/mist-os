@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Context as _, Error};
+use fidl::endpoints::{create_proxy, Proxy};
+use fidl::HandleBased;
+use fidl_fuchsia_test::{self as ftest};
+use frunner::ComponentNamespaceEntry;
+use fuchsiaperf::FuchsiaPerfBenchmarkResult;
+use futures::StreamExt;
+use gtest_runner_lib::parser::read_file;
+use namespace::Namespace;
+use tracing::debug;
 use {
-    anyhow::{anyhow, Context as _, Error},
-    fidl::endpoints::{create_proxy, Proxy},
-    fidl::HandleBased,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_test::{self as ftest},
-    frunner::ComponentNamespaceEntry,
-    fuchsia_runtime as fruntime, fuchsia_zircon as zx,
-    fuchsiaperf::FuchsiaPerfBenchmarkResult,
-    futures::StreamExt,
-    gtest_runner_lib::parser::read_file,
-    namespace::Namespace,
-    tracing::debug,
+    fidl_fuchsia_process as fprocess, fuchsia_runtime as fruntime, fuchsia_zircon as zx,
 };
 
 #[derive(Copy, Clone, Eq, PartialEq)]

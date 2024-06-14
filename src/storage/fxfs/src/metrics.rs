@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::object_store::ObjectStore,
-    fuchsia_inspect::Node,
-    futures::FutureExt,
-    once_cell::sync::Lazy,
-    rustc_hash::FxHashMap as HashMap,
-    std::sync::{Mutex, Weak},
-};
+use crate::object_store::ObjectStore;
+use fuchsia_inspect::Node;
+use futures::FutureExt;
+use once_cell::sync::Lazy;
+use rustc_hash::FxHashMap as HashMap;
+use std::sync::{Mutex, Weak};
 
 /// Root node to which the filesystem Inspect tree will be attached.
 fn root() -> Node {

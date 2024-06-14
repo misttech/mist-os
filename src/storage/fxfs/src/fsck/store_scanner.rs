@@ -2,34 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        fsck::{
-            errors::{FsckError, FsckFatal, FsckWarning},
-            FragmentationStats, Fsck, FsckResult,
-        },
-        lsm_tree::types::{Item, ItemRef, LayerIterator},
-        object_handle::INVALID_OBJECT_ID,
-        object_store::{
-            allocator::{self, AllocatorKey, AllocatorValue},
-            graveyard::Graveyard,
-            AttributeKey, ChildValue, EncryptionKeys, ExtendedAttributeValue, ExtentKey,
-            ExtentValue, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
-            ObjectStore, ObjectValue, ProjectProperty, RootDigest, DEFAULT_DATA_ATTRIBUTE_ID,
-            EXTENDED_ATTRIBUTE_RANGE_END, EXTENDED_ATTRIBUTE_RANGE_START,
-            FSVERITY_MERKLE_ATTRIBUTE_ID,
-        },
-        range::RangeExt,
-        round::round_up,
-    },
-    anyhow::Error,
-    rustc_hash::FxHashSet as HashSet,
-    std::{
-        cell::UnsafeCell,
-        collections::btree_map::BTreeMap,
-        ops::{Bound, Range},
-    },
+use crate::fsck::errors::{FsckError, FsckFatal, FsckWarning};
+use crate::fsck::{FragmentationStats, Fsck, FsckResult};
+use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+use crate::object_handle::INVALID_OBJECT_ID;
+use crate::object_store::allocator::{self, AllocatorKey, AllocatorValue};
+use crate::object_store::graveyard::Graveyard;
+use crate::object_store::{
+    AttributeKey, ChildValue, EncryptionKeys, ExtendedAttributeValue, ExtentKey, ExtentValue,
+    ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,
+    ObjectValue, ProjectProperty, RootDigest, DEFAULT_DATA_ATTRIBUTE_ID,
+    EXTENDED_ATTRIBUTE_RANGE_END, EXTENDED_ATTRIBUTE_RANGE_START, FSVERITY_MERKLE_ATTRIBUTE_ID,
 };
+use crate::range::RangeExt;
+use crate::round::round_up;
+use anyhow::Error;
+use rustc_hash::FxHashSet as HashSet;
+use std::cell::UnsafeCell;
+use std::collections::btree_map::BTreeMap;
+use std::ops::{Bound, Range};
 
 // Information for scanned objects about their allocated attributes.
 #[derive(Debug)]

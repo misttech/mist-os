@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
-use crate::factory_reset::{facade::FactoryResetFacade, types::FactoryResetMethod};
+use crate::factory_reset::facade::FactoryResetFacade;
+use crate::factory_reset::types::FactoryResetMethod;
 use crate::server::Facade;
 use anyhow::Error;
 use async_trait::async_trait;

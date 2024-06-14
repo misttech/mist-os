@@ -4,13 +4,11 @@
 
 use std::rc::Rc;
 
-use crate::{
-    component::Component,
-    component_dirt::ComponentDirt,
-    core::{Core, Object, ObjectRef, OnAdded},
-    math,
-    shapes::{CubicDetachedVertex, CubicVertex, ParametricPath, Path, PathVertex},
-};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, Object, ObjectRef, OnAdded};
+use crate::math;
+use crate::shapes::{CubicDetachedVertex, CubicVertex, ParametricPath, Path, PathVertex};
 
 #[derive(Debug)]
 pub struct Ellipse {

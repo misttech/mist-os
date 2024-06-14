@@ -5,7 +5,8 @@
 use anyhow::{format_err, Result};
 use fidl_fuchsia_sys2 as fsys;
 use moniker::Moniker;
-use prettytable::{cell, format::consts::FORMAT_CLEAN, row, Row, Table};
+use prettytable::format::consts::FORMAT_CLEAN;
+use prettytable::{cell, row, Row, Table};
 
 const USE_TITLE: &'static str = "Used Capability";
 const EXPOSE_TITLE: &'static str = "Exposed Capability";
@@ -129,7 +130,9 @@ fn new_table(title: &str) -> Table {
 
 #[cfg(test)]
 mod test {
-    use {super::*, fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt};
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use futures::TryStreamExt;
 
     fn route_validator(
         expected_moniker: &'static str,

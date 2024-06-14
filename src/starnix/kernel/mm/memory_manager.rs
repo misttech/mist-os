@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey, VMEX_RESOURCE},
-    signals::{SignalDetail, SignalInfo},
-    task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task},
-    vfs::{
-        AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString,
-        NamespaceNode, SequenceFileSource,
-    },
+use crate::mm::vmo::round_up_to_system_page_size;
+use crate::mm::{FutexTable, PrivateFutexKey, VMEX_RESOURCE};
+use crate::signals::{SignalDetail, SignalInfo};
+use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
+use crate::vfs::{
+    AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString,
+    NamespaceNode, SequenceFileSource,
 };
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
@@ -24,21 +23,24 @@ use starnix_logging::{
     impossible_error, log_warn, set_zx_name, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::range_ext::RangeExt;
+use starnix_uapi::resource_limits::Resource;
+use starnix_uapi::signals::{SIGBUS, SIGSEGV};
+use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::{
-    errno, error,
-    errors::Errno,
-    ownership::WeakRef,
-    range_ext::RangeExt,
-    resource_limits::Resource,
-    signals::{SIGBUS, SIGSEGV},
-    user_address::{UserAddress, UserCString, UserRef},
-    user_buffer::{UserBuffer, UserBuffers},
-    MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE, MADV_NORMAL,
-    MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_EXEC,
-    PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
+    errno, error, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE,
+    MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE,
+    PROT_EXEC, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
 use static_assertions::const_assert_eq;
-use std::{collections::HashMap, ffi::CStr, mem::MaybeUninit, ops::Range, sync::Arc};
+use std::collections::HashMap;
+use std::ffi::CStr;
+use std::mem::MaybeUninit;
+use std::ops::Range;
+use std::sync::Arc;
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{AsBytes, FromBytes, NoCell};
@@ -3752,14 +3754,18 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{mm::syscalls::do_mmap, task::syscalls::sys_prctl, testing::*, vfs::FdNumber};
+    use crate::mm::syscalls::do_mmap;
+    use crate::task::syscalls::sys_prctl;
+    use crate::testing::*;
+    use crate::vfs::FdNumber;
     use assert_matches::assert_matches;
     use itertools::assert_equal;
     use starnix_uapi::{
         MAP_ANONYMOUS, MAP_FIXED, MAP_GROWSDOWN, MAP_PRIVATE, PROT_NONE, PR_SET_VMA,
         PR_SET_VMA_ANON_NAME,
     };
-    use std::{ffi::CString, ops::Deref as _};
+    use std::ffi::CString;
+    use std::ops::Deref as _;
     use zerocopy::FromZeros;
 
     #[::fuchsia::test]

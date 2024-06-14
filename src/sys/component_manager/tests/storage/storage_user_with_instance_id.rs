@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {std::fs::*, std::path::PathBuf};
+use std::fs::*;
+use std::path::PathBuf;
 
 #[fuchsia::main]
 fn main() {

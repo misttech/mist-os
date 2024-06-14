@@ -2,38 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        access_point::{state_machine as ap_fsm, state_machine::AccessPointApi, types as ap_types},
-        client::{
-            connection_selection::ConnectionSelectionRequester,
-            roaming::local_roam_manager::LocalRoamManagerApi, state_machine as client_fsm,
-            types as client_types,
-        },
-        config_management::SavedNetworksManagerApi,
-        mode_management::{
-            iface_manager_api::{ConnectAttemptRequest, SmeForScan},
-            iface_manager_types::*,
-            phy_manager::{CreateClientIfacesReason, PhyManagerApi},
-            recovery, Defect,
-        },
-        telemetry::{TelemetryEvent, TelemetrySender},
-        util::{atomic_oneshot_stream, future_with_metadata, listener},
-    },
-    anyhow::{format_err, Error},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::{ready, BoxFuture, Fuse},
-        lock::Mutex,
-        select,
-        stream::FuturesUnordered,
-        FutureExt, StreamExt,
-    },
-    std::{convert::Infallible, fmt::Debug, pin::pin, sync::Arc, unimplemented},
-    tracing::{debug, error, info, warn},
-};
+use crate::access_point::state_machine::AccessPointApi;
+use crate::access_point::{state_machine as ap_fsm, types as ap_types};
+use crate::client::connection_selection::ConnectionSelectionRequester;
+use crate::client::roaming::local_roam_manager::LocalRoamManagerApi;
+use crate::client::{state_machine as client_fsm, types as client_types};
+use crate::config_management::SavedNetworksManagerApi;
+use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan};
+use crate::mode_management::iface_manager_types::*;
+use crate::mode_management::phy_manager::{CreateClientIfacesReason, PhyManagerApi};
+use crate::mode_management::{recovery, Defect};
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use crate::util::{atomic_oneshot_stream, future_with_metadata, listener};
+use anyhow::{format_err, Error};
+use fidl::endpoints::create_proxy;
+use futures::channel::{mpsc, oneshot};
+use futures::future::{ready, BoxFuture, Fuse};
+use futures::lock::Mutex;
+use futures::stream::FuturesUnordered;
+use futures::{select, FutureExt, StreamExt};
+use std::convert::Infallible;
+use std::fmt::Debug;
+use std::pin::pin;
+use std::sync::Arc;
+use std::unimplemented;
+use tracing::{debug, error, info, warn};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.
@@ -506,9 +500,6 @@ impl IfaceManagerService {
             }
         }
 
-        // Cancel any ongoing attempt to auto connect the previously idle iface.
-        self.connection_selection_futures.clear();
-
         client_iface.last_roam_time = fasync::Time::now();
         self.clients.push(client_iface);
         Ok(())
@@ -951,6 +942,9 @@ async fn initiate_connection_selection_for_connect_request(
             .await
             .map(|candidate| ConnectionSelectionResponse::ConnectRequest { candidate, request })
     };
+
+    // Cancel any ongoing attempt to auto connect the previously idle iface.
+    iface_manager.connection_selection_futures.clear();
 
     iface_manager.connection_selection_futures.push(fut.boxed());
     Ok(())
@@ -1453,37 +1447,33 @@ pub(crate) async fn serve_iface_manager_requests(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            access_point::types,
-            client::{connection_selection::ConnectionSelectionRequest, types as client_types},
-            config_management::{
-                Credential, NetworkIdentifier, SavedNetworksManager, SecurityType,
-            },
-            mode_management::{
-                phy_manager::{self, PhyManagerError},
-                recovery::RecoverySummary,
-                IfaceFailure, PhyFailure,
-            },
-            regulatory_manager::REGION_CODE_LEN,
-            util::testing::{
-                fakes::{FakeLocalRoamManager, FakeScanRequester},
-                generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
-                poll_sme_req,
-            },
-        },
-        async_trait::async_trait,
-        fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_common as fidl_common,
-        fuchsia_async::{DurationExt, TestExecutor},
-        fuchsia_inspect as inspect,
-        futures::{stream::StreamFuture, task::Poll, TryStreamExt},
-        ieee80211::MacAddr,
-        lazy_static::lazy_static,
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::{assert_variant, channel::Cbw, random_fidl_bss_description, RadioConfig},
+    use super::*;
+    use crate::access_point::types;
+    use crate::client::connection_selection::ConnectionSelectionRequest;
+    use crate::client::types as client_types;
+    use crate::config_management::{
+        Credential, NetworkIdentifier, SavedNetworksManager, SecurityType,
     };
+    use crate::mode_management::phy_manager::{self, PhyManagerError};
+    use crate::mode_management::recovery::RecoverySummary;
+    use crate::mode_management::{IfaceFailure, PhyFailure};
+    use crate::regulatory_manager::REGION_CODE_LEN;
+    use crate::util::testing::fakes::{FakeLocalRoamManager, FakeScanRequester};
+    use crate::util::testing::{
+        generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
+        poll_sme_req,
+    };
+    use async_trait::async_trait;
+    use fuchsia_async::{DurationExt, TestExecutor};
+    use futures::stream::StreamFuture;
+    use futures::task::Poll;
+    use ieee80211::MacAddr;
+    use lazy_static::lazy_static;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::channel::Cbw;
+    use wlan_common::{assert_variant, random_fidl_bss_description, RadioConfig};
+    use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_inspect as inspect};
 
     // Responses that FakePhyManager will provide
     pub const TEST_CLIENT_IFACE_ID: u16 = 0;
@@ -1897,41 +1887,6 @@ mod tests {
         iface_manager
     }
 
-    /// Move stash requests forward so that a save request can progress.
-    fn process_stash_write(
-        exec: &mut fuchsia_async::TestExecutor,
-        stash_server: &mut fidl_stash::StoreAccessorRequestStream,
-    ) {
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::SetValue { .. })))
-        );
-        process_stash_flush(exec, stash_server);
-    }
-
-    fn process_stash_delete(
-        exec: &mut fuchsia_async::TestExecutor,
-        stash_server: &mut fidl_stash::StoreAccessorRequestStream,
-    ) {
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::DeletePrefix { .. })))
-        );
-        process_stash_flush(exec, stash_server);
-    }
-
-    fn process_stash_flush(
-        exec: &mut fuchsia_async::TestExecutor,
-        stash_server: &mut fidl_stash::StoreAccessorRequestStream,
-    ) {
-        assert_variant!(
-            exec.run_until_stalled(&mut stash_server.try_next()),
-            Poll::Ready(Ok(Some(fidl_stash::StoreAccessorRequest::Flush{responder}))) => {
-                responder.send(Ok(())).expect("failed to send stash response");
-            }
-        );
-    }
-
     #[track_caller]
     fn run_state_machine_futures(
         exec: &mut fuchsia_async::TestExecutor,
@@ -1988,12 +1943,9 @@ mod tests {
     fn test_connect_with_unconfigured_iface() {
         let mut exec = fuchsia_async::TestExecutor::new();
 
-        let mut test_values = test_setup(&mut exec);
+        let test_values = test_setup(&mut exec);
         let (mut iface_manager, mut _sme_stream) =
             create_iface_manager_with_client(&test_values, false);
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
 
         // Add credentials for the test network to the saved networks.
         let connect_selection = generate_connect_selection();
@@ -2002,9 +1954,7 @@ mod tests {
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-        process_stash_write(&mut exec, &mut stash_server);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         {
             let connect_fut = iface_manager.connect(connect_selection.clone());
@@ -2071,62 +2021,91 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_connect_cancels_auto_reconnect_future() {
+    fn test_connect_request_cancels_auto_reconnect_future() {
         let mut exec = fuchsia_async::TestExecutor::new();
 
         let mut test_values = test_setup(&mut exec);
         let (mut iface_manager, mut _sme_stream) =
             create_iface_manager_with_client(&test_values, false);
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
+
+        let scanned_candidate = generate_random_scanned_candidate();
+        let connect_selection = client_types::ConnectSelection {
+            target: scanned_candidate.clone(),
+            reason: client_types::ConnectReason::NewSavedNetworkAutoconnect,
+        };
+        let connect_request = ConnectAttemptRequest::new(
+            scanned_candidate.network.clone(),
+            scanned_candidate.credential.clone(),
+            connect_selection.reason,
+        );
 
         // Add credentials for the test network to the saved networks.
-        let connect_selection = generate_connect_selection();
         let save_network_fut = test_values.saved_networks.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
-        process_stash_write(&mut exec, &mut stash_server);
-
-        // Add a network selection future which won't complete that should be canceled by a
-        // connect request.
-        async fn blocking_fn() -> Result<ConnectionSelectionResponse, anyhow::Error> {
-            loop {
-                fasync::Timer::new(zx::Duration::from_millis(1).after_now()).await
-            }
+        // Initiate automatic connection selection
+        {
+            let mut sel_fut = pin!(initiate_automatic_connection_selection(&mut iface_manager));
+            assert_variant!(exec.run_until_stalled(&mut sel_fut), Poll::Ready(()));
         }
-        iface_manager.connection_selection_futures.push(blocking_fn().boxed());
 
         // Request a connect through IfaceManager and respond to requests needed to complete it.
         {
-            let connect_fut = iface_manager.connect(connect_selection);
+            assert_eq!(iface_manager.connection_selection_futures.len(), 1);
+
+            let connect_fut = iface_manager.handle_connect_request(connect_request);
             let mut connect_fut = pin!(connect_fut);
 
-            // Expect that we have requested a client SME proxy.
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
-            let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
-            assert_variant!(
-                poll_service_req(&mut exec, &mut monitor_service_fut),
-                Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
-                    iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
-                }) => {
-                    // Send back a positive acknowledgement.
-                    assert!(responder.send(Ok(())).is_ok());
-                }
-            );
-
-            let mut connect_fut = pin!(connect_fut);
-            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(connect_result) => {
-                assert!(connect_result.is_ok());
-            });
+            // Run the future for the connect request
+            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(())));
         }
 
-        // Verify that the network selection future was dropped from the list.
-        assert!(iface_manager.connection_selection_futures.is_empty());
+        // There should be a new connection selection future for the manual connect request,
+        // and the previous one should have been removed.
+        assert_eq!(iface_manager.connection_selection_futures.len(), 1);
+
+        // Progress the connection selection future, which should make a scan request if it's
+        // the correct future and wouldn't if it's the future from the beginning of the test.
+        let (_sender, receiver) = mpsc::channel(1);
+        let serve_fut = serve_iface_manager_requests(
+            iface_manager,
+            receiver,
+            test_values.defect_receiver,
+            test_values.recovery_receiver,
+        );
+        let mut serve_fut = pin!(serve_fut);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Respond to the connection selection request
+        assert_variant!(test_values.connection_selection_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, ConnectionSelectionRequest::NewConnectionSelection {network_id, reason, responder} => {
+                assert!(network_id.is_some());
+                assert_eq!(reason, client_types::ConnectReason::NewSavedNetworkAutoconnect);
+                responder.send(Some(scanned_candidate)).expect("failed to send selection");
+            });
+        });
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Since an AP was selected, the iface manager should request an SME handle to
+        // initialize a state machine.
+        let mut monitor_service_fut = test_values.monitor_service_stream.into_future();
+        assert_variant!(
+            poll_service_req(&mut exec, &mut monitor_service_fut),
+            Poll::Ready(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::GetClientSme {
+                iface_id: TEST_CLIENT_IFACE_ID, sme_server: _, responder
+            }) => {
+                // Send back a positive acknowledgement.
+                assert!(responder.send(Ok(())).is_ok());
+            }
+        );
+
+        // Check the connection selection futures receiver to see that connection selection
+        // wasn't initiated again.
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 
     #[fuchsia::test]
@@ -2212,7 +2191,7 @@ mod tests {
     ) {
         let mut exec = fuchsia_async::TestExecutor::new();
 
-        let mut test_values = test_setup(&mut exec);
+        let test_values = test_setup(&mut exec);
         // The default FakePhyManager will not have a WPA3 iface which is intentional because if
         // an unconfigured iface is available with WPA3, it should be used without asking
         // PhyManager for an iface.
@@ -2223,10 +2202,6 @@ mod tests {
         security_support.sae.driver_handler_supported = sae_driver_handler_supported;
         security_support.sae.sme_handler_supported = sae_sme_handler_supported;
         iface_manager.clients[0].security_support = security_support;
-
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
 
         let network_id = NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa3);
         let connect_selection = client_types::ConnectSelection {
@@ -2243,14 +2218,12 @@ mod tests {
             reason: client_types::ConnectReason::FidlConnectRequest,
         };
 
-        let save_network_fut = test_values.saved_networks.store(
+        let mut save_network_fut = test_values.saved_networks.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-        process_stash_write(&mut exec, &mut stash_server);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         {
             let connect_fut = iface_manager.connect(connect_selection.clone());
@@ -4910,20 +4883,14 @@ mod tests {
             expected_connect_selection: None,
         }));
 
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
-
         // Update the saved networks with knowledge of the test SSID and credentials.
         let connect_selection = generate_connect_selection();
-        let save_network_fut = test_values.saved_networks.store(
+        let mut save_network_fut = test_values.saved_networks.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-        process_stash_write(&mut exec, &mut stash_server);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Ask the IfaceManager to reconnect.
         let mut sme_stream = {
@@ -5045,7 +5012,7 @@ mod tests {
         let mut exec = fuchsia_async::TestExecutor::new();
 
         // Create a configured ClientIfaceContainer.
-        let mut test_values = test_setup(&mut exec);
+        let test_values = test_setup(&mut exec);
         let (mut iface_manager, _sme_stream) = create_iface_manager_with_client(&test_values, true);
 
         // Make the client state machine report that it is alive.
@@ -5055,20 +5022,14 @@ mod tests {
             expected_connect_selection: None,
         }));
 
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
-
         // Update the saved networks with knowledge of the test SSID and credentials.
         let connect_selection = generate_connect_selection();
-        let save_network_fut = test_values.saved_networks.store(
+        let mut save_network_fut = test_values.saved_networks.store(
             connect_selection.target.network.clone(),
             connect_selection.target.credential.clone(),
         );
         let mut save_network_fut = pin!(save_network_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-        process_stash_write(&mut exec, &mut stash_server);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Ask the IfaceManager to reconnect.
         {
@@ -5104,21 +5065,10 @@ mod tests {
         // Insert a saved network.
         let network_id = NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa);
         let credential = Credential::Password(TEST_PASSWORD.as_bytes().to_vec());
-        let mut stash_server = {
-            let (saved_networks, mut stash_server) =
-                exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-            test_values.saved_networks = Arc::new(saved_networks);
-
-            // Update the saved networks with knowledge of the test SSID and credentials.
-            let save_network_fut =
-                test_values.saved_networks.store(network_id.clone(), credential.clone());
-            let mut save_network_fut = pin!(save_network_fut);
-            assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-            process_stash_write(&mut exec, &mut stash_server);
-
-            stash_server
-        };
+        let mut save_network_fut =
+            test_values.saved_networks.store(network_id.clone(), credential.clone());
+        let mut save_network_fut = pin!(save_network_fut);
+        assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
 
         // Make the client state machine report that it is not alive.
         let (mut iface_manager, _sme_stream) = create_iface_manager_with_client(&test_values, true);
@@ -5146,10 +5096,10 @@ mod tests {
             }
             NetworkSelectionMissingAttribute::SavedNetwork => {
                 // Remove the saved network so that there are no known networks to connect to.
-                let mut remove_network_fut =
-                    pin!(test_values.saved_networks.remove(network_id.clone(), credential.clone()));
-                assert_variant!(exec.run_until_stalled(&mut remove_network_fut), Poll::Pending);
-                process_stash_delete(&mut exec, &mut stash_server);
+                let remove_network_fut =
+                    test_values.saved_networks.remove(network_id.clone(), credential);
+                let mut remove_network_fut = pin!(remove_network_fut);
+                assert_variant!(exec.run_until_stalled(&mut remove_network_fut), Poll::Ready(_));
             }
             NetworkSelectionMissingAttribute::NetworkSelectionInProgress => {
                 // Insert a future so that it looks like a scan is in progress.
@@ -5406,23 +5356,18 @@ mod tests {
     #[fuchsia::test]
     fn test_terminated_client() {
         let mut exec = fuchsia_async::TestExecutor::new();
-        let mut test_values = test_setup(&mut exec);
+        let test_values = test_setup(&mut exec);
 
         // Create a fake network entry so that a reconnect will be attempted.
         let network_id = NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa);
         let credential = Credential::Password(TEST_PASSWORD.as_bytes().to_vec());
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        test_values.saved_networks = Arc::new(saved_networks);
 
         // Update the saved networks with knowledge of the test SSID and credentials.
         {
             let save_network_fut =
                 test_values.saved_networks.store(network_id.clone(), credential.clone());
             let mut save_network_fut = pin!(save_network_fut);
-            assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Pending);
-
-            process_stash_write(&mut exec, &mut stash_server);
+            assert_variant!(exec.run_until_stalled(&mut save_network_fut), Poll::Ready(_));
         }
 
         // Create an interface manager with an unconfigured client interface.

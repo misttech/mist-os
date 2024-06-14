@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{ArtifactMetadata, MaybeUnknown, Outcome, SuiteResult, TestCaseResult, TestRunResult};
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-    path::{Path, PathBuf},
-};
+use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
+use std::path::{Path, PathBuf};
 use test_list::TestTag;
 
 enum MatchOption<T> {

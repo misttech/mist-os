@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::key::exchange::{self, handshake::group_key::supplicant::Supplicant};
+use crate::key::exchange::handshake::group_key::supplicant::Supplicant;
+use crate::key::exchange::{self};
 use crate::rsna::{Dot11VerifiedKeyFrame, NegotiatedProtection, Role, UpdateSink};
 use crate::{rsn_ensure, Error};
 use bytes::Bytes;

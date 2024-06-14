@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    core::{
-        hash::Hash,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    futures::{
-        stream::{FusedStream, Stream, StreamExt},
-        Future,
-    },
-    std::collections::HashMap,
-};
+use core::hash::Hash;
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use futures::stream::{FusedStream, Stream, StreamExt};
+use futures::Future;
+use std::collections::HashMap;
 
 /// A collection of Stream indexed by key, allowing removal by Key. When polled, a StreamMap yields
 /// from whichever member stream is ready first.
@@ -139,13 +133,12 @@ mod test {
     //!   * Progress is always eventually made - the Stream cannot be stalled
     //!   * All inserted elements will eventually be yielded
     //!   * Elements are never duplicated
-    use {
-        super::*,
-        crate::stream::{StreamItem, WithEpitaph, WithTag},
-        futures::channel::mpsc,
-        proptest::prelude::*,
-        std::{collections::HashSet, fmt::Debug},
-    };
+    use super::*;
+    use crate::stream::{StreamItem, WithEpitaph, WithTag};
+    use futures::channel::mpsc;
+    use proptest::prelude::*;
+    use std::collections::HashSet;
+    use std::fmt::Debug;
 
     // We validate the behavior of the StreamMap stream by enumerating all possible external
     // events, and then generating permutations of valid sequences of those events. These model

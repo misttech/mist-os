@@ -3,24 +3,25 @@
 // found in the LICENSE file.
 
 use super::LayerGroup;
-use crate::{
-    color::Color,
-    drawing::{
-        linebreak_text, measure_text_size, path_for_rectangle, path_for_rounded_rectangle,
-        FontFace, GlyphMap, Text,
-    },
-    render::{
-        rive::{load_rive, RenderCache as RiveRenderCache},
-        BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Shed, Style,
-    },
-    scene::scene::SceneOrder,
-    Coord, IdFromRaw, IdGenerator2, Point, Rect, Size, ViewAssistantContext,
+use crate::color::Color;
+use crate::drawing::{
+    linebreak_text, measure_text_size, path_for_rectangle, path_for_rounded_rectangle, FontFace,
+    GlyphMap, Text,
 };
+use crate::render::rive::{load_rive, RenderCache as RiveRenderCache};
+use crate::render::{
+    BlendMode, Context as RenderContext, Fill, FillRule, Layer, Raster, Shed, Style,
+};
+use crate::scene::scene::SceneOrder;
+use crate::{Coord, IdFromRaw, IdGenerator2, Point, Rect, Size, ViewAssistantContext};
 use anyhow::Error;
-use euclid::{default::Transform2D, size2, vec2};
+use euclid::default::Transform2D;
+use euclid::{size2, vec2};
 use fuchsia_trace::duration;
 use rive_rs::{self as rive};
-use std::{any::Any, collections::BTreeMap, path::PathBuf};
+use std::any::Any;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// Identifier for a Facet
@@ -669,10 +670,8 @@ impl Facet for RiveFacet {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        drawing::FontFace,
-        scene::facets::{TextFacet, TextFacetOptions},
-    };
+    use crate::drawing::FontFace;
+    use crate::scene::facets::{TextFacet, TextFacetOptions};
     use once_cell::sync::Lazy;
 
     static FONT_DATA: &'static [u8] = include_bytes!(

@@ -34,25 +34,19 @@
 
 use crate::structs::MINIMUM_INODE_SIZE;
 
-use {
-    crate::{
-        readers::Reader,
-        structs::{
-            BlockGroupDesc32, DirEntry2, DirEntryHeader, EntryType, Extent, ExtentHeader,
-            ExtentIndex, ExtentTreeNode, INode, InvalidAddressErrorType, ParseToStruct,
-            ParsingError, SuperBlock, XattrEntryHeader, XattrHeader, FIRST_BG_PADDING,
-            MIN_EXT4_SIZE, ROOT_INODE_NUM,
-        },
-    },
-    once_cell::sync::OnceCell,
-    std::{
-        collections::BTreeMap,
-        mem::{size_of, size_of_val},
-        path::{Component, Path},
-        str,
-    },
-    zerocopy::{byteorder::little_endian::U32 as LEU32, AsBytes, ByteSlice},
+use crate::readers::Reader;
+use crate::structs::{
+    BlockGroupDesc32, DirEntry2, DirEntryHeader, EntryType, Extent, ExtentHeader, ExtentIndex,
+    ExtentTreeNode, INode, InvalidAddressErrorType, ParseToStruct, ParsingError, SuperBlock,
+    XattrEntryHeader, XattrHeader, FIRST_BG_PADDING, MIN_EXT4_SIZE, ROOT_INODE_NUM,
 };
+use once_cell::sync::OnceCell;
+use std::collections::BTreeMap;
+use std::mem::{size_of, size_of_val};
+use std::path::{Component, Path};
+use std::str;
+use zerocopy::byteorder::little_endian::U32 as LEU32;
+use zerocopy::{AsBytes, ByteSlice};
 
 // Assuming/ensuring that we are on a 64bit system where u64 == usize.
 assert_eq_size!(u64, usize);
@@ -657,7 +651,8 @@ impl Parser {
     pub fn build_fuchsia_tree(
         &self,
     ) -> Result<std::sync::Arc<vfs::directory::immutable::Simple>, ParsingError> {
-        use vfs::{file::vmo::read_only, tree_builder::TreeBuilder};
+        use vfs::file::vmo::read_only;
+        use vfs::tree_builder::TreeBuilder;
 
         let root_inode = self.root_inode()?;
         let mut tree = TreeBuilder::empty_dir();
@@ -687,18 +682,15 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{parser::Parser, readers::VecReader, structs::EntryType},
-        maplit::hashmap,
-        sha2::{Digest, Sha256},
-        std::{
-            collections::{HashMap, HashSet},
-            fs,
-            path::Path,
-            str,
-        },
-        test_case::test_case,
-    };
+    use crate::parser::Parser;
+    use crate::readers::VecReader;
+    use crate::structs::EntryType;
+    use maplit::hashmap;
+    use sha2::{Digest, Sha256};
+    use std::collections::{HashMap, HashSet};
+    use std::path::Path;
+    use std::{fs, str};
+    use test_case::test_case;
 
     #[fuchsia::test]
     fn list_root_1_file() {

@@ -2,22 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_bluetooth_sys::{BootstrapMarker, BootstrapProxy},
-    fuchsia_bluetooth::expectation::asynchronous::{expectable, Expectable},
-    futures::future::{self, BoxFuture, FutureExt},
-    std::{
-        ops::{Deref, DerefMut},
-        sync::Arc,
-    },
-    test_harness::{SharedState, TestHarness},
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_bluetooth_sys::{BootstrapMarker, BootstrapProxy};
+use fuchsia_bluetooth::expectation::asynchronous::{expectable, Expectable};
+use futures::future::{self, BoxFuture, FutureExt};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use test_harness::{SharedState, TestHarness};
 
-use crate::{
-    core_realm::{CoreRealm, SHARED_STATE_INDEX},
-    host_watcher::ActivatedFakeHost,
-};
+use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
+use crate::host_watcher::ActivatedFakeHost;
 
 #[derive(Clone)]
 pub struct BootstrapHarness(Expectable<(), BootstrapProxy>);

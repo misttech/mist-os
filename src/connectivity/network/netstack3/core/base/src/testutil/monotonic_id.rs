@@ -4,10 +4,8 @@
 
 //! A convenient monotonically increasing identifier to use in tests.
 
-use core::{
-    fmt::{self, Debug, Display},
-    sync::atomic::{self, AtomicUsize},
-};
+use core::fmt::{self, Debug, Display};
+use core::sync::atomic::{self, AtomicUsize};
 
 /// A convenient monotonically increasing identifier to use in tests.
 pub struct MonotonicIdentifier(usize);

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{explore::*, query::get_cml_moniker_from_query},
-    anyhow::Result,
-    fidl_fuchsia_dash as fdash, fidl_fuchsia_sys2 as fsys,
-};
+use crate::explore::*;
+use crate::query::get_cml_moniker_from_query;
+use anyhow::Result;
+use {fidl_fuchsia_dash as fdash, fidl_fuchsia_sys2 as fsys};
 
 pub async fn explore_cmd(
     query: String,

@@ -408,7 +408,7 @@ inline Table& Table::field(std::optional<int32_t> value) {
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_doccomments::Struct> : public std::true_type {};
+struct IsFidlType<::test_doccomments::Struct> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_doccomments::Struct> {
@@ -420,14 +420,14 @@ struct TypeTraits<::test_doccomments::Struct> {
 };
 
 template <>
-struct IsStruct<::test_doccomments::Struct> : public std::true_type {};
+struct IsStruct<::test_doccomments::Struct> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::Struct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_doccomments::Struct, 4> {};
 
 template <>
-struct IsFidlType<::test_doccomments::Table> : public std::true_type {};
+struct IsFidlType<::test_doccomments::Table> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_doccomments::Table> {
@@ -439,13 +439,13 @@ struct TypeTraits<::test_doccomments::Table> {
 };
 
 template <>
-struct IsTable<::test_doccomments::Table> : public std::true_type {};
+struct IsTable<::test_doccomments::Table> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::Table, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_doccomments::Table> {};
 
 template <>
-struct IsFidlType<::test_doccomments::StrictUnion> : public std::true_type {};
+struct IsFidlType<::test_doccomments::StrictUnion> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_doccomments::StrictUnion> {
@@ -457,14 +457,14 @@ struct TypeTraits<::test_doccomments::StrictUnion> {
 };
 
 template <>
-struct IsUnion<::test_doccomments::StrictUnion> : public std::true_type {};
+struct IsUnion<::test_doccomments::StrictUnion> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::StrictUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_doccomments::StrictUnion> {};
 
 template <>
-struct IsFidlType<::test_doccomments::FlexibleUnion> : public std::true_type {};
+struct IsFidlType<::test_doccomments::FlexibleUnion> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_doccomments::FlexibleUnion> {
@@ -476,7 +476,7 @@ struct TypeTraits<::test_doccomments::FlexibleUnion> {
 };
 
 template <>
-struct IsUnion<::test_doccomments::FlexibleUnion> : public std::true_type {};
+struct IsUnion<::test_doccomments::FlexibleUnion> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::FlexibleUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final

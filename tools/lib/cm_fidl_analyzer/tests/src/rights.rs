@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 mod tests {
-    use {
-        crate::routing::RoutingTestBuilderForAnalyzer,
-        routing_test_helpers::rights::CommonRightsTest,
-    };
+    use crate::routing::RoutingTestBuilderForAnalyzer;
+    use routing_test_helpers::rights::CommonRightsTest;
 
     #[fuchsia::test]
     async fn offer_increasing_rights() {

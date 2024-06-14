@@ -392,7 +392,7 @@ directory specified by `fx status`.**
   - Use `--[no-]log` to toggle logging entirely.
   - Use `--logpath` to change the output path of the log.
 - **Test artifacts are not streamed off of the device.**
-  - Use `--ffx-output-directory` to specify a directory where
+  - Use `--artifact-output-directory` (`--outdir`) to specify a directory where
   artifacts may be streamed in the `ffx test` output format.
 - **Debug printing is suppressed.**
   - Use `--verbose` (`-v`) to print debug information to the console.

@@ -2,23 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fidl::{FidlServer, StateMachineController},
-    inspect::{LastResultsNode, ProtocolStateNode, ScheduleNode},
-    installer::{is_update_urgent, FuchsiaInstallError},
-};
+use crate::fidl::{FidlServer, StateMachineController};
+use crate::inspect::{LastResultsNode, ProtocolStateNode, ScheduleNode};
+use crate::installer::{is_update_urgent, FuchsiaInstallError};
 use anyhow::anyhow;
 use fidl_fuchsia_feedback::{CrashReporterMarker, CrashReporterProxy};
 use fuchsia_inspect::Node;
-use futures::{future::LocalBoxFuture, prelude::*};
-use omaha_client::{
-    clock,
-    common::{ProtocolState, UpdateCheckSchedule},
-    protocol::response::Response,
-    state_machine::{update_check, InstallProgress, State, StateMachineEvent, UpdateCheckError},
-    storage::Storage,
-    time::{StandardTimeSource, TimeSource},
+use futures::future::LocalBoxFuture;
+use futures::prelude::*;
+use omaha_client::clock;
+use omaha_client::common::{ProtocolState, UpdateCheckSchedule};
+use omaha_client::protocol::response::Response;
+use omaha_client::state_machine::{
+    update_check, InstallProgress, State, StateMachineEvent, UpdateCheckError,
 };
+use omaha_client::storage::Storage;
+use omaha_client::time::{StandardTimeSource, TimeSource};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::SystemTime;
@@ -225,12 +224,11 @@ mod tests {
     use fuchsia_inspect::Inspector;
     use futures::channel::mpsc;
     use mock_crash_reporter::{MockCrashReporterService, ThrottleHook};
+    use omaha_client::protocol::response::{self, Manifest, UpdateCheck};
+    use omaha_client::storage::MemStorage;
     use omaha_client::time::MockTimeSource;
-    use omaha_client::{
-        protocol::response::{self, Manifest, UpdateCheck},
-        storage::MemStorage,
-    };
-    use std::{sync::Arc, time::Duration};
+    use std::sync::Arc;
+    use std::time::Duration;
 
     async fn new_test_observer() -> FuchsiaObserver<MemStorage, MockOrRealStateMachineController> {
         let fidl = FidlServerBuilder::new().build().await;

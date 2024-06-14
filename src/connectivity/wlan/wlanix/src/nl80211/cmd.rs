@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    netlink_packet_utils::DecodeError, num::FromPrimitive, num_derive::FromPrimitive,
-    std::convert::TryFrom,
-};
+use netlink_packet_utils::DecodeError;
+use num::FromPrimitive;
+use num_derive::FromPrimitive;
+use std::convert::TryFrom;
 
 use crate::nl80211::constants::*;
 

@@ -28,10 +28,9 @@ pub use self::common::*;
 pub use self::icmpv4::*;
 pub use self::icmpv6::*;
 
-use core::cmp;
 use core::fmt::Debug;
 use core::marker::PhantomData;
-use core::mem;
+use core::{cmp, mem};
 
 use byteorder::{ByteOrder, NetworkEndian};
 use derivative::Derivative;
@@ -250,7 +249,18 @@ pub trait MessageBody: Sized {
     }
 
     /// Return the underlying bytes.
-    fn bytes(&self) -> &[u8];
+    ///
+    /// Not all ICMP messages have a fixed size, some messages like MLDv2 Query or MLDv2 Report
+    /// ([RFC 3810 section 5.1] and [RFC 3810 section 5.2]) contain a fixed amount of information
+    /// followed by a variable amount of records.
+    /// The first value returned contains the fixed size part, while the second value contains the
+    /// records for the messages that support them, more precisely, the second value is [None] if
+    /// the message does not have a variable part, otherwise it will contain the serialized list of
+    /// records.
+    ///
+    /// [RFC 3810 section 5.1]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.1
+    /// [RFC 3810 section 5.2]: https://datatracker.ietf.org/doc/html/rfc3810#section-5.2
+    fn bytes(&self) -> (&[u8], Option<&[u8]>);
 }
 
 impl<B: ByteSlice> MessageBody for EmptyMessage<B> {
@@ -268,8 +278,8 @@ impl<B: ByteSlice> MessageBody for EmptyMessage<B> {
         0
     }
 
-    fn bytes(&self) -> &[u8] {
-        &[]
+    fn bytes(&self) -> (&[u8], Option<&[u8]>) {
+        (&[], None)
     }
 }
 
@@ -299,8 +309,8 @@ impl<B: ByteSlice> MessageBody for OriginalPacket<B> {
         self.0.len()
     }
 
-    fn bytes(&self) -> &[u8] {
-        &self.0
+    fn bytes(&self) -> (&[u8], Option<&[u8]>) {
+        (&self.0, None)
     }
 }
 
@@ -314,8 +324,8 @@ impl<B: ByteSlice, O: for<'a> OptionsImpl<'a>> MessageBody for Options<B, O> {
         self.bytes().len()
     }
 
-    fn bytes(&self) -> &[u8] {
-        self.bytes()
+    fn bytes(&self) -> (&[u8], Option<&[u8]>) {
+        (self.bytes(), None)
     }
 }
 
@@ -397,6 +407,31 @@ impl<I: IcmpIpExt, B: ByteSlice, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
     }
 }
 
+impl<I: IcmpIpExt, B: ByteSliceMut, M: IcmpMessage<I>> IcmpPacketRaw<I, B, M> {
+    /// Attempts to calculate and write a Checksum for this [`IcmpPacketRaw`].
+    ///
+    /// Returns whether the checksum was successfully calculated & written. In
+    /// the false case, self is left unmodified.
+    pub(crate) fn try_write_checksum(&mut self, src_ip: I::Addr, dst_ip: I::Addr) -> bool {
+        // NB: Zero the checksum to avoid interference when computing it.
+        let original_checksum = self.header.prefix.checksum;
+        self.header.prefix.checksum = [0, 0];
+
+        if let Some(checksum) = IcmpPacket::<I, B, M>::compute_checksum(
+            &self.header,
+            &self.message_body,
+            src_ip,
+            dst_ip,
+        ) {
+            self.header.prefix.checksum = checksum;
+            true
+        } else {
+            self.header.prefix.checksum = original_checksum;
+            false
+        }
+    }
+}
+
 impl<I: IcmpIpExt, B: ByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoRequest> {
     /// Set the ID of the ICMP echo message.
     pub fn set_id(&mut self, new: u16) {
@@ -453,12 +488,10 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>> ParsablePacket<B, ()>
     }
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> ParseResult<Self> {
-        let header = buffer
-            .take_obj_front::<Header<M>>()
-            .ok_or_else(debug_err_fn!(ParseError::Format, "too few bytes for header"))?;
+        let header = buffer.take_obj_front::<Header<M>>().ok_or(ParseError::Format)?;
         let message_body = buffer.into_rest();
         if header.prefix.msg_type != M::TYPE.into() {
-            return debug_err!(Err(ParseError::NotExpected), "unexpected message type");
+            return Err(ParseError::NotExpected);
         }
         Ok(IcmpPacketRaw { header, message_body, _marker: PhantomData })
     }
@@ -475,17 +508,13 @@ impl<B: ByteSlice, I: IcmpIpExt, M: IcmpMessage<I>>
     ) -> ParseResult<Self> {
         let IcmpPacketRaw { header, message_body, _marker } = raw;
         if !M::EXPECTS_BODY && !message_body.is_empty() {
-            return debug_err!(Err(ParseError::Format), "unexpected message body");
+            return Err(ParseError::Format);
         }
-        let _: M::Code = M::code_from_u8(header.prefix.code).ok_or_else(debug_err_fn!(
-            ParseError::Format,
-            "unrecognized code: {}",
-            header.prefix.code
-        ))?;
+        let _: M::Code = M::code_from_u8(header.prefix.code).ok_or(ParseError::Format)?;
         let checksum = Self::compute_checksum(&header, &message_body, args.src_ip, args.dst_ip)
-            .ok_or_else(debug_err_fn!(ParseError::Format, "packet too large"))?;
+            .ok_or(ParseError::Format)?;
         if checksum != [0, 0] {
-            return debug_err!(Err(ParseError::Checksum), "invalid checksum");
+            return Err(ParseError::Checksum);
         }
         let message_body = M::Body::parse(message_body)?;
         Ok(IcmpPacket { header, message_body, _marker })
@@ -758,7 +787,9 @@ impl IdAndSeq {
 
 #[cfg(test)]
 mod tests {
-    use packet::ParseBuffer;
+    use ip_test_macro::ip_test;
+    use packet::{InnerPacketBuilder, ParseBuffer, Serializer, SliceBufViewMut};
+    use test_case::test_case;
 
     use super::*;
 
@@ -809,5 +840,42 @@ mod tests {
         header.prefix.checksum = [1, 1];
         let mut buf = header.as_bytes();
         assert!(buf.parse::<IcmpPacketRaw<Ipv4, _, IcmpEchoRequest>>().is_ok());
+    }
+
+    #[ip_test(I)]
+    #[test_case([0,0]; "zeroed_checksum")]
+    #[test_case([123, 234]; "garbage_checksum")]
+    fn test_try_write_checksum<I: IcmpIpExt>(corrupt_checksum: [u8; 2]) {
+        // NB: The process of serializing an `IcmpPacketBuilder` will compute a
+        // valid checksum.
+        let icmp_message_with_checksum = []
+            .into_serializer()
+            .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                *I::LOOPBACK_ADDRESS,
+                *I::LOOPBACK_ADDRESS,
+                IcmpUnusedCode,
+                IcmpEchoRequest::new(1, 1),
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .as_ref()
+            .to_vec();
+
+        // Clone the message and corrupt the checksum.
+        let mut icmp_message_without_checksum = icmp_message_with_checksum.clone();
+        {
+            let buf = SliceBufViewMut::new(&mut icmp_message_without_checksum);
+            let mut message = IcmpPacketRaw::<I, _, IcmpEchoRequest>::parse_mut(buf, ())
+                .expect("parse packet raw should succeed");
+            message.header.prefix.checksum = corrupt_checksum;
+        }
+        assert_ne!(&icmp_message_with_checksum[..], &icmp_message_without_checksum[..]);
+
+        // Write the checksum, and verify the message now matches the original.
+        let buf = SliceBufViewMut::new(&mut icmp_message_without_checksum);
+        let mut message = IcmpPacketRaw::<I, _, IcmpEchoRequest>::parse_mut(buf, ())
+            .expect("parse packet raw should succeed");
+        assert!(message.try_write_checksum(*I::LOOPBACK_ADDRESS, *I::LOOPBACK_ADDRESS));
+        assert_eq!(&icmp_message_with_checksum[..], &icmp_message_without_checksum[..]);
     }
 }

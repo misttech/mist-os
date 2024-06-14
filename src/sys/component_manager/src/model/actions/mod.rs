@@ -62,30 +62,28 @@ mod stop;
 mod unresolve;
 
 // Re-export the actions
-pub use {
-    destroy::DestroyAction, discover::DiscoverAction, resolve::ResolveAction,
-    shutdown::ShutdownAction, shutdown::ShutdownType, start::StartAction, stop::StopAction,
-    unresolve::UnresolveAction,
-};
+pub use destroy::DestroyAction;
+pub use discover::DiscoverAction;
+pub use resolve::ResolveAction;
+pub use shutdown::{ShutdownAction, ShutdownType};
+pub use start::StartAction;
+pub use stop::StopAction;
+pub use unresolve::UnresolveAction;
 
-use {
-    crate::model::component::{ComponentInstance, WeakComponentInstance},
-    async_trait::async_trait,
-    cm_util::AbortHandle,
-    coordinator::{ActionCoordinator, ActionExecutor, Command},
-    errors::ActionError,
-    fuchsia_async as fasync,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::{BoxFuture, FutureExt, Shared},
-        task::{Context, Poll},
-        Future, SinkExt,
-    },
-    std::fmt::Debug,
-    std::hash::Hash,
-    std::pin::Pin,
-    std::sync::Arc,
-};
+use crate::model::component::{ComponentInstance, WeakComponentInstance};
+use async_trait::async_trait;
+use cm_util::AbortHandle;
+use coordinator::{ActionCoordinator, ActionExecutor, Command};
+use errors::ActionError;
+use fuchsia_async as fasync;
+use futures::channel::{mpsc, oneshot};
+use futures::future::{BoxFuture, FutureExt, Shared};
+use futures::task::{Context, Poll};
+use futures::{Future, SinkExt};
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::pin::Pin;
+use std::sync::Arc;
 
 /// A action on a component that must eventually be fulfilled.
 #[async_trait]
@@ -230,10 +228,10 @@ impl ActionsManager {
 
 #[cfg(test)]
 pub(crate) mod test_utils {
-    use {
-        super::*, crate::model::component::instance::InstanceState, moniker::ChildName,
-        routing::component_instance::ComponentInstanceInterface,
-    };
+    use super::*;
+    use crate::model::component::instance::InstanceState;
+    use moniker::ChildName;
+    use routing::component_instance::ComponentInstanceInterface;
 
     /// A mock action, which can be scheduled on a component. The mock action will wait until it
     /// receives a message over a given oneshot, and then use the received value as the return

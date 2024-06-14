@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 
 mod test {
-    use {
-        super::super::utils,
-        crate::{gestures::args, input_device, mouse_binding, touch_binding, Position},
-        assert_matches::assert_matches,
-        fuchsia_zircon as zx,
-        maplit::hashset,
-        pretty_assertions::assert_eq,
-    };
+    use super::super::utils;
+    use crate::gestures::args;
+    use crate::{input_device, mouse_binding, touch_binding, Position};
+    use assert_matches::assert_matches;
+    use fuchsia_zircon as zx;
+    use maplit::hashset;
+    use pretty_assertions::assert_eq;
 
     fn touchpad_event(positions: Vec<Position>, time: zx::Time) -> input_device::InputEvent {
         let injector_contacts: Vec<touch_binding::TouchContact> = positions

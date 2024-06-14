@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::TestEnv,
-    fidl_fuchsia_io as fio,
-    fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
-};
+use crate::TestEnv;
+use fidl_fuchsia_io as fio;
+use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn expose_pkgfs_ctl_validation_missing_file() {

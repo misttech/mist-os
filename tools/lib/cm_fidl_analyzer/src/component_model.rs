@@ -2,49 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        component_instance::{ComponentInstanceForAnalyzer, TopInstanceForAnalyzer},
-        match_absolute_component_urls,
-        route::VerifyRouteResult,
-        PkgUrlMatch,
-    },
-    anyhow::{anyhow, Context, Result},
-    cm_config::RuntimeConfig,
-    cm_rust::{
-        CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl,
-        OfferDeclCommon, OfferStorageDecl, OfferTarget, ProgramDecl, ResolverRegistration,
-        SourceName, UseDecl, UseDeclCommon, UseEventStreamDecl, UseRunnerDecl, UseSource,
-        UseStorageDecl,
-    },
-    cm_types::{Name, Url},
-    config_encoder::ConfigFields,
-    fidl::prelude::*,
-    fidl_fuchsia_sys2 as fsys,
-    fuchsia_url::AbsoluteComponentUrl,
-    fuchsia_zircon_status as zx_status,
-    futures::FutureExt,
-    moniker::{ChildName, Moniker},
-    router_error::Explain,
-    routing::{
-        capability_source::{CapabilitySource, ComponentCapability},
-        component_instance::{
-            ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
-        },
-        environment::{find_first_absolute_ancestor_url, RunnerRegistry},
-        error::{ComponentInstanceError, RoutingError},
-        legacy_router::RouteBundle,
-        mapper::{RouteMapper, RouteSegment},
-        policy::GlobalPolicyChecker,
-        route_capability, route_event_stream, RouteRequest, RouteSource,
-    },
-    serde::{Deserialize, Serialize},
-    std::{
-        collections::{BTreeMap, HashMap, HashSet},
-        sync::Arc,
-    },
-    thiserror::Error,
+use crate::component_instance::{ComponentInstanceForAnalyzer, TopInstanceForAnalyzer};
+use crate::route::VerifyRouteResult;
+use crate::{match_absolute_component_urls, PkgUrlMatch};
+use anyhow::{anyhow, Context, Result};
+use cm_config::RuntimeConfig;
+use cm_rust::{
+    CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl,
+    OfferDeclCommon, OfferStorageDecl, OfferTarget, ProgramDecl, ResolverRegistration, SourceName,
+    UseDecl, UseDeclCommon, UseEventStreamDecl, UseRunnerDecl, UseSource, UseStorageDecl,
 };
+use cm_types::{Name, Url};
+use config_encoder::ConfigFields;
+use fidl::prelude::*;
+use fuchsia_url::AbsoluteComponentUrl;
+use futures::FutureExt;
+use moniker::{ChildName, Moniker};
+use router_error::Explain;
+use routing::capability_source::{CapabilitySource, ComponentCapability};
+use routing::component_instance::{
+    ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
+};
+use routing::environment::{find_first_absolute_ancestor_url, RunnerRegistry};
+use routing::error::{ComponentInstanceError, RoutingError};
+use routing::legacy_router::RouteBundle;
+use routing::mapper::{RouteMapper, RouteSegment};
+use routing::policy::GlobalPolicyChecker;
+use routing::{route_capability, route_event_stream, RouteRequest, RouteSource};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
+use thiserror::Error;
+use {fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status};
 
 /// Errors that may occur when building a `ComponentModelForAnalyzer` from
 /// a set of component manifests.
@@ -1304,35 +1293,32 @@ pub struct Child {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::ModelBuilderForAnalyzer,
-        crate::{environment::BOOT_SCHEME, ComponentModelForAnalyzer},
-        anyhow::Result,
-        assert_matches::assert_matches,
-        cm_config::RuntimeConfig,
-        cm_rust::{
-            Availability, ComponentDecl, DependencyType, RegistrationSource, ResolverRegistration,
-            RunnerRegistration, UseProtocolDecl, UseSource, UseStorageDecl,
-        },
-        cm_rust_testing::{
-            CapabilityBuilder, ChildBuilder, ComponentDeclBuilder, EnvironmentBuilder, UseBuilder,
-        },
-        cm_types::{Name, Url},
-        config_encoder::ConfigFields,
-        fidl_fuchsia_component_internal as component_internal,
-        maplit::hashmap,
-        moniker::{ChildName, Moniker},
-        routing::{
-            component_instance::{
-                ComponentInstanceInterface, ExtendedInstanceInterface,
-                WeakExtendedInstanceInterface,
-            },
-            environment::RunnerRegistry,
-            error::ComponentInstanceError,
-            RouteRequest,
-        },
-        std::{collections::HashMap, sync::Arc},
+    use super::ModelBuilderForAnalyzer;
+    use crate::environment::BOOT_SCHEME;
+    use crate::ComponentModelForAnalyzer;
+    use anyhow::Result;
+    use assert_matches::assert_matches;
+    use cm_config::RuntimeConfig;
+    use cm_rust::{
+        Availability, ComponentDecl, DependencyType, RegistrationSource, ResolverRegistration,
+        RunnerRegistration, UseProtocolDecl, UseSource, UseStorageDecl,
     };
+    use cm_rust_testing::{
+        CapabilityBuilder, ChildBuilder, ComponentDeclBuilder, EnvironmentBuilder, UseBuilder,
+    };
+    use cm_types::{Name, Url};
+    use config_encoder::ConfigFields;
+    use fidl_fuchsia_component_internal as component_internal;
+    use maplit::hashmap;
+    use moniker::{ChildName, Moniker};
+    use routing::component_instance::{
+        ComponentInstanceInterface, ExtendedInstanceInterface, WeakExtendedInstanceInterface,
+    };
+    use routing::environment::RunnerRegistry;
+    use routing::error::ComponentInstanceError;
+    use routing::RouteRequest;
+    use std::collections::HashMap;
+    use std::sync::Arc;
 
     const TEST_URL_PREFIX: &str = "test:///";
 

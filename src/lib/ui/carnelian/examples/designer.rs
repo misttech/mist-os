@@ -2,31 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    carnelian::{
-        color::Color,
-        input::{self},
-        make_app_assistant,
-        render::{
-            BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, PathBuilder, Style,
-        },
-        scene::{
-            facets::Facet,
-            scene::{Scene, SceneBuilder, SceneOrder},
-            LayerGroup,
-        },
-        App, AppAssistant, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr,
-        ViewKey,
-    },
-    core::cell::RefCell,
-    euclid::{point2, size2},
-    fuchsia_zircon::Event,
-    std::collections::HashSet,
-    std::collections::VecDeque,
-    std::f32,
-    std::rc::Rc,
+use anyhow::Error;
+use carnelian::color::Color;
+use carnelian::input::{self};
+use carnelian::render::{
+    BlendMode, Context as RenderContext, Fill, FillRule, Layer, Path, PathBuilder, Style,
 };
+use carnelian::scene::facets::Facet;
+use carnelian::scene::scene::{Scene, SceneBuilder, SceneOrder};
+use carnelian::scene::LayerGroup;
+use carnelian::{
+    make_app_assistant, App, AppAssistant, Point, Size, ViewAssistant, ViewAssistantContext,
+    ViewAssistantPtr, ViewKey,
+};
+use core::cell::RefCell;
+use euclid::{point2, size2};
+use fuchsia_zircon::Event;
+use std::collections::{HashSet, VecDeque};
+use std::f32;
+use std::rc::Rc;
 
 const BACKGROUND_COLOR: Color = Color { r: 235, g: 255, b: 255, a: 255 };
 

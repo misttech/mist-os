@@ -6,11 +6,9 @@ use anyhow::Result;
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetIp, TargetIpPort};
 use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
 use netext::{scope_id_to_name, IsLocalAddr};
-use std::{
-    cmp::Ordering,
-    net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
-    str::FromStr,
-};
+use std::cmp::Ordering;
+use std::net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::str::FromStr;
 
 #[derive(Clone, Debug, Copy)]
 pub struct TargetAddr(SocketAddr);

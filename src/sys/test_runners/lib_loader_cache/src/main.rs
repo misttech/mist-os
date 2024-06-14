@@ -4,13 +4,11 @@
 
 mod loader_cache;
 
-use {
-    fidl_fuchsia_test_runner as ftestrunner, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    thiserror::Error,
-    tracing::{error, info, warn},
-};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use thiserror::Error;
+use tracing::{error, info, warn};
+use {fidl_fuchsia_test_runner as ftestrunner, fuchsia_async as fasync};
 
 /// Run with 3 threads as all test runners will share the instance of this component.
 /// We want to be able to serve `LibraryLoaderCacheBuilder` on one thread and `LibraryLoaderCache`

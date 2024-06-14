@@ -2,77 +2,66 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::{
-    collections::{HashMap, HashSet},
-    vec,
-    vec::Vec,
-};
-use core::{
-    convert::TryInto as _,
-    fmt::Debug,
-    num::{NonZeroU16, NonZeroU8},
-    time::Duration,
-};
+use alloc::collections::{HashMap, HashSet};
+use alloc::vec;
+use alloc::vec::Vec;
+use core::convert::TryInto as _;
+use core::fmt::Debug;
+use core::num::{NonZeroU16, NonZeroU8};
+use core::time::Duration;
 
 use assert_matches::assert_matches;
 
+use log::trace;
 use net_declare::net::{mac, subnet_v6};
-use net_types::{
-    ethernet::Mac,
-    ip::{AddrSubnet, Ip as _, Ipv6, Ipv6Addr, Ipv6Scope, Mtu, Subnet},
-    NonMappedAddr, ScopeableAddress as _, UnicastAddr, Witness as _,
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{AddrSubnet, Ip as _, Ipv6, Ipv6Addr, Ipv6Scope, Mtu, Subnet};
+use net_types::{NonMappedAddr, ScopeableAddress as _, UnicastAddr, Witness as _};
 use netstack3_base::LinkAddress;
 use packet::{Buf, EmptyBuf, InnerPacketBuilder as _, Serializer as _};
-use packet_formats::{
-    ethernet::EthernetFrameLengthCheck,
-    icmp::{
-        ndp::{
-            options::{NdpOption, NdpOptionBuilder, PrefixInformation},
-            OptionSequenceBuilder, Options, RouterAdvertisement, RouterSolicitation,
-        },
-        IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode,
-    },
-    ip::{IpProto, Ipv6Proto},
-    ipv6::Ipv6PacketBuilder,
-    testutil::{parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame},
-    utils::NonZeroDuration,
+use packet_formats::ethernet::EthernetFrameLengthCheck;
+use packet_formats::icmp::ndp::options::{NdpOption, NdpOptionBuilder, PrefixInformation};
+use packet_formats::icmp::ndp::{
+    OptionSequenceBuilder, Options, RouterAdvertisement, RouterSolicitation,
 };
+use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::ip::{IpProto, Ipv6Proto};
+use packet_formats::ipv6::Ipv6PacketBuilder;
+use packet_formats::testutil::{
+    parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame,
+};
+use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
-use tracing::trace;
 use zerocopy::ByteSlice;
 
-use netstack3_base::{
-    testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
-    FrameDestination, InstantContext as _, RngContext as _,
+use netstack3_base::testutil::{
+    assert_empty, set_logger_for_test, FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult,
+    TestIpExt, TEST_ADDRS_V6,
 };
-use netstack3_core::{
-    device::{
-        DeviceId, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
-        MaxEthernetFrameSize,
-    },
-    testutil::{
-        assert_empty, new_simple_fake_network, set_logger_for_test, Ctx, CtxPairExt as _,
-        DispatchedFrame, FakeBindingsCtx, FakeCtx, FakeCtxBuilder, FakeCtxNetworkSpec, TestIpExt,
-        DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE, TEST_ADDRS_V6,
-    },
-    BindingsTypes, Instant, TimerId,
+use netstack3_base::{FrameDestination, InstantContext as _, RngContext as _};
+use netstack3_core::device::{
+    DeviceId, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
+    MaxEthernetFrameSize,
 };
-use netstack3_ip::{
-    self as ip,
-    device::{
-        get_ipv6_hop_limit, testutil::with_assigned_ipv6_addr_subnets, InnerSlaacTimerId,
-        IpAddressId as _, IpDeviceBindingsContext, IpDeviceConfigurationUpdate,
-        IpDeviceStateContext, Ipv4DeviceConfigurationUpdate, Ipv6AddrConfig, Ipv6AddressFlags,
-        Ipv6AddressState, Ipv6DeviceAddr, Ipv6DeviceConfigurationContext,
-        Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime, OpaqueIid,
-        OpaqueIidNonce, SlaacBindingsContext, SlaacConfig, SlaacConfiguration, SlaacContext,
-        SlaacTimerId, StableIidSecret, TemporarySlaacAddressConfiguration, TemporarySlaacConfig,
-        MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL,
-    },
-    icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-    SendIpPacketMeta,
+use netstack3_core::testutil::{
+    new_simple_fake_network, Ctx, CtxPairExt as _, DispatchedFrame, FakeBindingsCtx, FakeCtx,
+    FakeCtxBuilder, FakeCtxNetworkSpec, DEFAULT_INTERFACE_METRIC,
 };
+use netstack3_core::{BindingsTypes, Instant, TimerId};
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_ip::device::testutil::with_assigned_ipv6_addr_subnets;
+use netstack3_ip::device::{
+    get_ipv6_hop_limit, InnerSlaacTimerId, IpAddressId as _, IpDeviceBindingsContext,
+    IpDeviceConfigurationUpdate, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
+    Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceAddr,
+    Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
+    Ipv6DeviceTimerId, Lifetime, OpaqueIid, OpaqueIidNonce, SlaacBindingsContext, SlaacConfig,
+    SlaacConfiguration, SlaacContext, SlaacTimerId, StableIidSecret,
+    TemporarySlaacAddressConfiguration, TemporarySlaacConfig, MAX_RTR_SOLICITATION_DELAY,
+    RTR_SOLICITATION_INTERVAL,
+};
+use netstack3_ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
+use netstack3_ip::{self as ip, IpPacketDestination, SendIpPacketMeta};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct GlobalIpv6Addr<I> {
@@ -248,8 +237,7 @@ fn test_address_resolution() {
                 device: &local_device_id,
                 src_ip: Some(local_ip().into_specified()),
                 dst_ip: remote_ip().into_specified(),
-                broadcast: None,
-                next_hop: remote_ip().into_specified(),
+                destination: IpPacketDestination::from_addr(remote_ip().into()),
                 proto: Ipv6Proto::Icmpv6,
                 ttl: None,
                 mtu: None,
@@ -1001,8 +989,7 @@ fn test_sending_ipv6_packet_after_hop_limit_change() {
                 device: device_id,
                 src_ip: Some(config.local_ip),
                 dst_ip: config.remote_ip,
-                broadcast: None,
-                next_hop: config.remote_ip,
+                destination: IpPacketDestination::from_addr(config.remote_ip),
                 proto: IpProto::Tcp.into(),
                 ttl: None,
                 mtu: None,

@@ -4,8 +4,7 @@
 
 //! Type-safe bindings for Zircon iommu objects.
 
-use crate::ok;
-use crate::{AsHandleRef, Handle, HandleBased, HandleRef, Resource, Status};
+use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Resource, Status};
 use fuchsia_zircon_sys as sys;
 
 /// An object representing a Zircon iommu

@@ -7,42 +7,37 @@
 //! IGMPv2 is a communications protocol used by hosts and adjacent routers on
 //! IPv4 networks to establish multicast group memberships.
 
-use core::{fmt::Debug, time::Duration};
+use core::fmt::Debug;
+use core::time::Duration;
 
-use net_types::{
-    ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr},
-    MulticastAddr, SpecifiedAddr, Witness,
-};
+use log::{debug, error};
+use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
+use net_types::{MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
     AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, Instant, TimerContext,
     WeakDeviceIdentifier,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, Serializer};
-use packet_formats::{
-    igmp::{
-        messages::{IgmpLeaveGroup, IgmpMembershipReportV1, IgmpMembershipReportV2, IgmpPacket},
-        IgmpMessage, IgmpPacketBuilder, MessageType,
-    },
-    ip::Ipv4Proto,
-    ipv4::{
-        options::{Ipv4Option, Ipv4OptionData},
-        Ipv4OptionsTooLongError, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions,
-    },
-    utils::NonZeroDuration,
+use packet_formats::igmp::messages::{
+    IgmpLeaveGroup, IgmpMembershipReportV1, IgmpMembershipReportV2, IgmpPacket,
 };
+use packet_formats::igmp::{IgmpMessage, IgmpPacketBuilder, MessageType};
+use packet_formats::ip::Ipv4Proto;
+use packet_formats::ipv4::options::{Ipv4Option, Ipv4OptionData};
+use packet_formats::ipv4::{
+    Ipv4OptionsTooLongError, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions,
+};
+use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
-use tracing::{debug, error};
 use zerocopy::ByteSlice;
 
-use crate::internal::{
-    base::IpLayerHandler,
-    device::IpDeviceSendContext,
-    gmp::{
-        gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
-        GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
-        GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
-        ProtocolSpecific, QueryTarget,
-    },
+use crate::internal::base::{IpLayerHandler, IpPacketDestination};
+use crate::internal::device::IpDeviceSendContext;
+use crate::internal::gmp::{
+    gmp_handle_timer, handle_query_message, handle_report_message, GmpBindingsContext,
+    GmpBindingsTypes, GmpContext, GmpDelayedReportTimerId, GmpMessage, GmpMessageType,
+    GmpStateContext, GmpStateMachine, GmpStateRef, GmpTypeLayout, IpExt, MulticastGroupSet,
+    ProtocolSpecific, QueryTarget,
 };
 
 /// The bindings types for IGMP.
@@ -399,6 +394,7 @@ where
     // some details regarding considerations for IGMP/MLD snooping switches.
     let src_ip =
         core_ctx.get_ip_addr_subnet(device).map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.addr().get());
+    let destination = IpPacketDestination::from_addr(dst_ip.into_specified());
 
     let body =
         IgmpPacketBuilder::<EmptyBuf, M>::new_with_resp_time(group_addr.get(), max_resp_time);
@@ -411,15 +407,8 @@ where
     };
     let body = body.into_serializer().encapsulate(builder);
 
-    IpLayerHandler::send_ip_frame(
-        core_ctx,
-        bindings_ctx,
-        &device,
-        dst_ip.into_specified(),
-        body,
-        None,
-    )
-    .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
+    IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
+        .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -561,26 +550,25 @@ mod tests {
     use assert_matches::assert_matches;
 
     use net_types::ip::{Ip, IpVersionMarker};
-    use netstack3_base::{
-        testutil::{
-            assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
-            FakeWeakDeviceId,
-        },
-        CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _,
+    use netstack3_base::testutil::{
+        assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
+        FakeWeakDeviceId,
     };
+    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _};
     use netstack3_filter::ProofOfEgressCheck;
-    use packet::{serialize::Buf, ParsablePacket as _};
-    use packet_formats::{igmp::messages::IgmpMembershipQueryV2, testutil::parse_ip_packet};
+    use packet::serialize::Buf;
+    use packet::ParsablePacket as _;
+    use packet_formats::igmp::messages::IgmpMembershipQueryV2;
+    use packet_formats::testutil::parse_ip_packet;
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::{
-        base::{self, testutil::FakeIpDeviceIdCtx, IpLayerPacketMetadata, SendIpPacketMeta},
-        gmp::{
-            GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
-            QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
-        },
-        types::IpTypesIpExt,
+    use crate::internal::base::{
+        self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta,
+    };
+    use crate::internal::gmp::{
+        GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
+        QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
     };
 
     /// Metadata for sending an IGMP packet.
@@ -605,13 +593,6 @@ mod tests {
         igmp_state: IgmpState<FakeBindingsCtx>,
         igmp_enabled: bool,
         addr_subnet: Option<AddrSubnet<Ipv4Addr>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
-    }
-
-    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeIgmpCtx {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
-            &self.ip_device_id_ctx
-        }
     }
 
     type FakeCtx = CtxPair<FakeCoreCtx, FakeBindingsCtx>;
@@ -685,9 +666,8 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtx,
             device: &Self::DeviceId,
-            next_hop: SpecifiedAddr<<Ipv4 as Ip>::Addr>,
+            destination: IpPacketDestination<Ipv4, &Self::DeviceId>,
             body: S,
-            broadcast: Option<<Ipv4 as IpTypesIpExt>::BroadcastMarker>,
         ) -> Result<(), S>
         where
             S: Serializer + netstack3_filter::IpPacket<Ipv4>,
@@ -697,9 +677,8 @@ mod tests {
                 self,
                 bindings_ctx,
                 device,
-                next_hop,
+                destination,
                 body,
-                broadcast,
                 IpLayerPacketMetadata::default(),
             )
         }
@@ -710,23 +689,19 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtx,
             device_id: &Self::DeviceId,
-            local_addr: SpecifiedAddr<Ipv4Addr>,
+            destination: IpPacketDestination<Ipv4, &Self::DeviceId>,
             body: S,
-            _broadcast: Option<()>,
             ProofOfEgressCheck { .. }: ProofOfEgressCheck,
         ) -> Result<(), S>
         where
             S: Serializer,
             S::Buffer: BufferMut,
         {
-            self.send_frame(
-                bindings_ctx,
-                IgmpPacketMetadata::new(
-                    device_id.clone(),
-                    MulticastAddr::new(local_addr.get()).expect("addr should be multicast"),
-                ),
-                body,
-            )
+            let addr = match destination {
+                IpPacketDestination::Multicast(addr) => addr,
+                _ => panic!("destination is not multicast: {:?}", destination),
+            };
+            self.send_frame(bindings_ctx, IgmpPacketMetadata::new(device_id.clone(), addr), body)
         }
     }
 
@@ -869,7 +844,6 @@ mod tests {
                 ),
                 igmp_enabled: true,
                 addr_subnet: None,
-                ip_device_id_ctx: Default::default(),
             })
         });
         ctx.bindings_ctx.seed_rng(seed);

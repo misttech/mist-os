@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
-};
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 #[repr(C)]
 #[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy, Debug, Default)]

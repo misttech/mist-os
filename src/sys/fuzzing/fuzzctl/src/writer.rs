@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    diagnostics_data::{LogsData, Severity},
-    serde_json::to_vec_pretty,
-    std::cell::RefCell,
-    std::fmt::{Debug, Display},
-    std::fs::{create_dir_all, File},
-    std::io::{self, Write},
-    std::path::{Path, PathBuf},
-    std::rc::Rc,
-    std::sync::{Arc, Mutex},
-    termion::{color, style},
-};
+use anyhow::{Context as _, Result};
+use diagnostics_data::{LogsData, Severity};
+use serde_json::to_vec_pretty;
+use std::cell::RefCell;
+use std::fmt::{Debug, Display};
+use std::fs::{create_dir_all, File};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+use termion::{color, style};
 
 /// `Writer` handles formatting and delivering output from both the plugin and fuzzer.
 ///

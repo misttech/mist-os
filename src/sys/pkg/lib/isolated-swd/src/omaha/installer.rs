@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::updater::Updater,
-    anyhow::anyhow,
-    fuchsia_url::PinnedAbsolutePackageUrl,
-    futures::future::LocalBoxFuture,
-    futures::prelude::*,
-    omaha_client::{
-        cup_ecdsa::RequestMetadata,
-        installer::{AppInstallResult, Installer, ProgressObserver},
-        protocol::response::{OmahaStatus, Response},
-        request_builder::RequestParams,
-    },
-    omaha_client_fuchsia::install_plan::{FuchsiaInstallPlan, UpdatePackageUrl},
-    thiserror::Error,
-    tracing::warn,
-};
+use crate::updater::Updater;
+use anyhow::anyhow;
+use fuchsia_url::PinnedAbsolutePackageUrl;
+use futures::future::LocalBoxFuture;
+use futures::prelude::*;
+use omaha_client::cup_ecdsa::RequestMetadata;
+use omaha_client::installer::{AppInstallResult, Installer, ProgressObserver};
+use omaha_client::protocol::response::{OmahaStatus, Response};
+use omaha_client::request_builder::RequestParams;
+use omaha_client_fuchsia::install_plan::{FuchsiaInstallPlan, UpdatePackageUrl};
+use thiserror::Error;
+use tracing::warn;
 
 /// An Omaha Installer implementation that uses the `isolated-swd` Updater to perform the OTA
 /// installation.
@@ -183,11 +179,9 @@ fn try_create_install_plan(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        omaha_client::protocol::response::{App, Manifest, Package, Packages, UpdateCheck},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use omaha_client::protocol::response::{App, Manifest, Package, Packages, UpdateCheck};
 
     const TEST_URL_BASE: &str = "fuchsia-pkg://fuchsia.com/";
     const TEST_PACKAGE_NAME: &str =

@@ -18,8 +18,9 @@
 #include <unordered_map>
 #include <vector>
 
-namespace memory {
+class TestMonitor;
 
+namespace memory {
 struct Process {
   zx_koid_t koid;
   zx_koid_t job;
@@ -79,8 +80,8 @@ class OS {
 };
 
 // GetInfoVector executes an OS::GetInfo call that outputs a list of element inside |buffer|,
-// ensuring that |buffer| is big enough to receive the list of elements. |GetInfoVector| returns the
-// status of the call and the number of elements effectively returned.
+// ensuring that |buffer| is big enough to receive the list of elements. |GetInfoVector| returns
+// the status of the call and the number of elements effectively returned.
 template <typename T>
 zx::result<size_t> GetInfoVector(OS& os, zx_handle_t handle, uint32_t topic,
                                  std::vector<T>& buffer) {
@@ -132,8 +133,8 @@ class Capture {
   //           "fuchsia.kernel.Stats",
   //           ...
   //
-  // GetCapture takes ownership of the provided |strategy|, as it stateful and should not be reused
-  // between calls.
+  // GetCapture takes ownership of the provided |strategy|, as it stateful and should not be
+  // reused between calls.
   static zx_status_t GetCapture(
       Capture* capture, const CaptureState& state, CaptureLevel level,
       std::unique_ptr<CaptureStrategy> strategy,
@@ -141,8 +142,12 @@ class Capture {
 
   zx_time_t time() const { return time_; }
   const zx_info_kmem_stats_t& kmem() const { return kmem_; }
-  const zx_info_kmem_stats_extended_t& kmem_extended() const { return kmem_extended_; }
-  const zx_info_kmem_stats_compression_t& kmem_compression() const { return kmem_compression_; }
+  const std::optional<zx_info_kmem_stats_extended_t>& kmem_extended() const {
+    return kmem_extended_;
+  }
+  const std::optional<zx_info_kmem_stats_compression_t>& kmem_compression() const {
+    return kmem_compression_;
+  }
 
   const std::unordered_map<zx_koid_t, Process>& koid_to_process() const { return koid_to_process_; }
 
@@ -162,13 +167,14 @@ class Capture {
 
   zx_time_t time_;
   zx_info_kmem_stats_t kmem_ = {};
-  zx_info_kmem_stats_extended_t kmem_extended_ = {};
-  zx_info_kmem_stats_compression_t kmem_compression_ = {};
+  std::optional<zx_info_kmem_stats_extended_t> kmem_extended_;
+  std::optional<zx_info_kmem_stats_compression_t> kmem_compression_;
   std::unordered_map<zx_koid_t, Process> koid_to_process_;
   std::unordered_map<zx_koid_t, Vmo> koid_to_vmo_;
   std::vector<zx_koid_t> root_vmos_;
 
   class ProcessGetter;
+  friend class ::TestMonitor;
   friend class TestUtils;
 };
 

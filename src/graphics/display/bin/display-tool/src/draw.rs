@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Result},
-    display_utils::{Image, ImageId},
-    fuchsia_image_format::{
-        image_format_minimum_row_bytes_2, image_format_stride_bytes_per_width_pixel_2,
-    },
-    fuchsia_zircon as zx,
-    mapped_vmo::Mapping,
-    std::cmp::min,
+use anyhow::{format_err, Context, Result};
+use display_utils::{Image, ImageId};
+use fuchsia_image_format::{
+    image_format_minimum_row_bytes_2, image_format_stride_bytes_per_width_pixel_2,
 };
+use fuchsia_zircon as zx;
+use mapped_vmo::Mapping;
+use std::cmp::min;
 
 // TODO(armansito): Extend this to support different patterns and tiled image formats.
 

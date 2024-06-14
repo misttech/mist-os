@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::layout;
-use crate::socket;
+use crate::{layout, socket};
 use fidl::endpoints::{create_proxy, ClientEnd, ServerEnd};
-use fidl_fuchsia_component_runner as fcrunner;
-use fidl_fuchsia_dash as fdash;
 use fidl_fuchsia_dash::LauncherError;
-use fidl_fuchsia_hardware_pty as pty;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as fsys;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon as zx;
 use moniker::Moniker;
 use tracing::warn;
+use {
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_dash as fdash,
+    fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fuchsia_zircon as zx,
+};
 
 pub async fn explore_over_socket(
     moniker: &str,

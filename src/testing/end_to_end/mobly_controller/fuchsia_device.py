@@ -21,6 +21,10 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _FFX_CONFIG_OBJ: ffx.FfxConfig = ffx.FfxConfig()
 
+_FFX_CONFIG_LOGS_LEVEL: str = "debug"
+
+_FFX_CONFIG_PROXY_TIMEOUT_SECS: int = 30
+
 
 def create(
     configs: list[dict[str, Any]]
@@ -69,9 +73,10 @@ def create(
         binary_path=ffx_path,
         isolate_dir=None,
         logs_dir=f"{test_logs_dir}/ffx/",
-        logs_level=None,
+        logs_level=_FFX_CONFIG_LOGS_LEVEL,
         enable_mdns=_enable_mdns(configs),
         subtools_search_path=_get_ffx_subtools_search_path(configs),
+        proxy_timeout_secs=_FFX_CONFIG_PROXY_TIMEOUT_SECS,
     )
 
     fuchsia_devices: list[fuchsia_device_interface.FuchsiaDevice] = []

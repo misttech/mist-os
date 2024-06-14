@@ -18,14 +18,15 @@ use ffx_core::ffx_plugin;
 use ffx_fastboot::manifest::FlashManifestVersion;
 use ffx_product_create_args::CreateCommand;
 use fuchsia_pkg::PackageManifest;
-use fuchsia_repo::{
-    repo_builder::RepoBuilder, repo_keys::RepoKeys, repository::FileSystemRepository,
-};
+use fuchsia_repo::repo_builder::RepoBuilder;
+use fuchsia_repo::repo_keys::RepoKeys;
+use fuchsia_repo::repository::FileSystemRepository;
 use sdk_metadata::{
     ProductBundle, ProductBundleV2, Repository, VirtualDevice, VirtualDeviceManifest,
 };
-use std::fs::File;
+use std::fs::{self, File};
 use tempfile::TempDir;
+use walkdir::WalkDir;
 
 /// Default delivery blob type to use for products.
 const DEFAULT_DELIVERY_BLOB_TYPE: u32 = 1;
@@ -279,27 +280,33 @@ fn load_partitions_config(
     path: impl AsRef<Utf8Path>,
     out_dir: impl AsRef<Utf8Path>,
 ) -> Result<PartitionsConfig> {
-    let path = path.as_ref();
+    let path = path.as_ref().parent().context("Determine base path")?;
     let out_dir = out_dir.as_ref();
 
-    // Make sure `out_dir` is created.
     std::fs::create_dir_all(&out_dir).context("Creating the out_dir")?;
 
-    let partitions_file = File::open(path).context("Opening partitions config")?;
-    let mut config: PartitionsConfig =
-        serde_json::from_reader(partitions_file).context("Parsing partitions config")?;
-
-    for cred in &mut config.unlock_credentials {
-        *cred = copy_file(&cred, &out_dir)?;
-    }
-    for bootstrap in &mut config.bootstrap_partitions {
-        bootstrap.image = copy_file(&bootstrap.image, &out_dir)?;
-    }
-    for bootloader in &mut config.bootloader_partitions {
-        bootloader.image = copy_file(&bootloader.image, &out_dir)?;
+    // This is invalid, causing a cycle since WalkDir would infinitely iterate
+    // as we keep adding subdirectories/subfiles.
+    if out_dir.canonicalize_utf8()?.starts_with(path.canonicalize_utf8()?) {
+        bail!("out_dir {:?} cannot be nested in partitions_config base path {:?}", out_dir, path);
     }
 
-    Ok(config)
+    for entry in WalkDir::new(path).follow_links(true) {
+        let entry = entry?;
+        let entry_path = entry.path();
+
+        let relative_path = entry_path.strip_prefix(path)?;
+        let rebased_path = out_dir.join_os(relative_path);
+
+        if entry.file_type().is_dir() {
+            fs::create_dir_all(rebased_path).context("Create directory")?;
+        } else if entry.file_type().is_file() {
+            fs::copy(entry_path, rebased_path).context("Copy file")?;
+        }
+    }
+
+    PartitionsConfig::try_load_from(out_dir.join("partitions_config.json"))
+        .context("Loading partitions config")
 }
 
 /// Open and parse an AssemblyManifest from a path, copying the images into `out_dir`.
@@ -430,20 +437,32 @@ mod test {
         let temp = TempDir::new().unwrap();
         let tempdir = Utf8Path::from_path(temp.path()).unwrap();
         let pb_dir = tempdir.join("pb");
+        fs::create_dir(&pb_dir).unwrap();
 
-        let config_path = tempdir.join("config.json");
+        let config_dir = tempdir.join("config");
+        fs::create_dir(&config_dir).unwrap();
+        let config_path = config_dir.join("partitions_config.json");
         let config_file = File::create(&config_path).unwrap();
         serde_json::to_writer(&config_file, &PartitionsConfig::default()).unwrap();
 
-        let error_path = tempdir.join("error.json");
+        let error_dir = tempdir.join("error");
+        fs::create_dir(&error_dir).unwrap();
+        let error_path = error_dir.join("partitions_config.json");
         let mut error_file = File::create(&error_path).unwrap();
         error_file.write_all("error".as_bytes()).unwrap();
+
+        let nested_error_path = pb_dir.join("partitions_config.json");
+        let nested_error_file = File::create(&nested_error_path).unwrap();
+        serde_json::to_writer(&nested_error_file, &PartitionsConfig::default()).unwrap();
 
         let parsed = load_partitions_config(&config_path, &pb_dir);
         assert!(parsed.is_ok());
 
         let error = load_partitions_config(&error_path, &pb_dir);
         assert!(error.is_err());
+
+        let nested_error = load_partitions_config(&nested_error_path, &pb_dir);
+        assert!(nested_error.is_err());
     }
 
     #[test]
@@ -476,7 +495,9 @@ mod test {
         let tempdir = Utf8Path::from_path(temp.path()).unwrap();
         let pb_dir = tempdir.join("pb");
 
-        let partitions_path = tempdir.join("partitions.json");
+        let partitions_dir = tempdir.join("partitions");
+        fs::create_dir(&partitions_dir).unwrap();
+        let partitions_path = partitions_dir.join("partitions_config.json");
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
@@ -530,7 +551,9 @@ mod test {
         let tempdir = Utf8Path::from_path(temp.path()).unwrap();
         let pb_dir = tempdir.join("pb");
 
-        let partitions_path = tempdir.join("partitions.json");
+        let partitions_dir = tempdir.join("partitions");
+        fs::create_dir(&partitions_dir).unwrap();
+        let partitions_path = partitions_dir.join("partitions_config.json");
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
@@ -587,7 +610,9 @@ mod test {
         let tempdir = Utf8Path::from_path(temp.path()).unwrap();
         let pb_dir = tempdir.join("pb");
 
-        let partitions_path = tempdir.join("partitions.json");
+        let partitions_dir = tempdir.join("partitions");
+        fs::create_dir(&partitions_dir).unwrap();
+        let partitions_path = partitions_dir.join("partitions_config.json");
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
@@ -632,7 +657,9 @@ mod test {
         let tempdir = Utf8Path::from_path(temp.path()).unwrap().canonicalize_utf8().unwrap();
         let pb_dir = tempdir.join("pb");
 
-        let partitions_path = tempdir.join("partitions.json");
+        let partitions_dir = tempdir.join("partitions");
+        fs::create_dir(&partitions_dir).unwrap();
+        let partitions_path = partitions_dir.join("partitions_config.json");
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
@@ -699,10 +726,11 @@ mod test {
     async fn test_pb_create_with_update() {
         let tmp = TempDir::new().unwrap();
         let tempdir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
-
         let pb_dir = tempdir.join("pb");
 
-        let partitions_path = tempdir.join("partitions.json");
+        let partitions_dir = tempdir.join("partitions");
+        fs::create_dir(&partitions_dir).unwrap();
+        let partitions_path = partitions_dir.join("partitions_config.json");
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
@@ -774,7 +802,9 @@ mod test {
         let tempdir = Utf8Path::from_path(temp.path()).unwrap().canonicalize_utf8().unwrap();
         let pb_dir = tempdir.join("pb");
 
-        let partitions_path = tempdir.join("partitions.json");
+        let partitions_dir = tempdir.join("partitions");
+        fs::create_dir(&partitions_dir).unwrap();
+        let partitions_path = partitions_dir.join("partitions_config.json");
         let partitions_file = File::create(&partitions_path)?;
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default())?;
 

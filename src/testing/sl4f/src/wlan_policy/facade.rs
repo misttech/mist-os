@@ -2,25 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common_utils::common::macros::with_line;
+use crate::wlan_policy::types::{ClientStateSummary, NetworkConfig};
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints::Proxy as _;
+use fuchsia_async::{self as fasync, DurationExt as _};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_sync::RwLock;
+use futures::TryStreamExt;
+use std::cell::Cell;
+use std::collections::HashSet;
+use std::fmt::{self, Debug};
+use tracing::*;
 use {
-    crate::{
-        common_utils::common::macros::with_line,
-        wlan_policy::types::{ClientStateSummary, NetworkConfig},
-    },
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints::Proxy as _,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
-    fuchsia_async::{self as fasync, DurationExt as _},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_sync::RwLock,
     fuchsia_zircon as zx,
-    futures::TryStreamExt,
-    std::{
-        cell::Cell,
-        collections::HashSet,
-        fmt::{self, Debug},
-    },
-    tracing::*,
 };
 
 pub struct WlanPolicyFacade {

@@ -4,12 +4,10 @@
 
 use std::rc::Rc;
 
-use crate::{
-    component::Component,
-    component_dirt::ComponentDirt,
-    core::{Core, Object, ObjectRef, OnAdded},
-    shapes::{ParametricPath, Path, PathVertex, StraightVertex},
-};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, Object, ObjectRef, OnAdded};
+use crate::shapes::{ParametricPath, Path, PathVertex, StraightVertex};
 
 #[derive(Debug)]
 pub struct Triangle {

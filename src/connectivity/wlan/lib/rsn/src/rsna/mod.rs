@@ -6,15 +6,12 @@ use crate::integrity::{self, integrity_algorithm};
 use crate::key::exchange::Key;
 use crate::keywrap::{self, keywrap_algorithm};
 
-use crate::ProtectionInfo;
-use crate::{rsn_ensure, Error};
+use crate::{rsn_ensure, Error, ProtectionInfo};
 use anyhow::{anyhow, ensure};
 use fidl_fuchsia_wlan_mlme::SaeFrame;
-use wlan_common::ie::rsn::{
-    akm::Akm,
-    cipher::{Cipher, CIPHER_BIP_CMAC_128, GROUP_CIPHER_SUITE, TKIP},
-    rsne::{RsnCapabilities, Rsne},
-};
+use wlan_common::ie::rsn::akm::Akm;
+use wlan_common::ie::rsn::cipher::{Cipher, CIPHER_BIP_CMAC_128, GROUP_CIPHER_SUITE, TKIP};
+use wlan_common::ie::rsn::rsne::{RsnCapabilities, Rsne};
 use wlan_common::ie::wpa::WpaIe;
 use zerocopy::ByteSlice;
 
@@ -537,14 +534,10 @@ pub type UpdateSink = Vec<SecAssocUpdate>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wlan_common::{
-        assert_variant,
-        ie::rsn::{
-            akm::{self, AKM_PSK},
-            cipher::{self, CIPHER_CCMP_128, CIPHER_GCMP_256},
-            fake_wpa2_s_rsne,
-        },
-    };
+    use wlan_common::assert_variant;
+    use wlan_common::ie::rsn::akm::{self, AKM_PSK};
+    use wlan_common::ie::rsn::cipher::{self, CIPHER_CCMP_128, CIPHER_GCMP_256};
+    use wlan_common::ie::rsn::fake_wpa2_s_rsne;
 
     #[test]
     fn test_negotiated_protection_from_rsne() {

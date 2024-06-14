@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::convert::banjo_to_fidl;
+use super::{FullmacDriverEvent, FullmacDriverEventSink};
+use std::ffi::c_void;
 use {
-    super::{convert::banjo_to_fidl, FullmacDriverEvent, FullmacDriverEventSink},
     banjo_fuchsia_wlan_common as banjo_wlan_common,
     banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
-    std::ffi::c_void,
 };
 
 /// Hand-rolled Rust version of the banjo wlan_fullmac_ifc_protocol for communication from the
@@ -607,11 +608,9 @@ impl DeviceOps for FullmacDevice {
 
 #[cfg(test)]
 pub mod test_utils {
-    use {
-        super::*,
-        banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-        std::sync::{Arc, Mutex},
-    };
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use {banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme};
 
     #[derive(Debug)]
     pub enum DriverCall {

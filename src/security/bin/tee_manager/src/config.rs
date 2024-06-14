@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    serde_derive::Deserialize,
-    std::{fs::File, io::BufReader},
-    uuid::Uuid,
-};
+use anyhow::{Context, Error};
+use serde_derive::Deserialize;
+use std::fs::File;
+use std::io::BufReader;
+use uuid::Uuid;
 
 const CONFIG_FILE: &'static str = "/config/data/tee_manager.config";
 

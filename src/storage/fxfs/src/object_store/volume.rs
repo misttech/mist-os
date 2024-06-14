@@ -2,22 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        errors::FxfsError,
-        filesystem::FxFilesystem,
-        object_store::{
-            directory::Directory,
-            load_store_info,
-            transaction::{lock_keys, Options, Transaction},
-            tree_cache::TreeCache,
-            LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
-        },
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    fxfs_crypto::Crypt,
-    std::sync::Arc,
+use crate::errors::FxfsError;
+use crate::filesystem::FxFilesystem;
+use crate::object_store::directory::Directory;
+use crate::object_store::transaction::{lock_keys, Options, Transaction};
+use crate::object_store::tree_cache::TreeCache;
+use crate::object_store::{
+    load_store_info, LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
 };
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use fxfs_crypto::Crypt;
+use std::sync::Arc;
 
 // Volumes are a grouping of an object store and a root directory within this object store. They
 // model a hierarchical tree of objects within a single store.
@@ -191,21 +186,16 @@ pub async fn list_volumes(volume_directory: &Directory<ObjectStore>) -> Result<V
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::root_volume,
-        crate::{
-            filesystem::{FxFilesystem, JournalingObject, SyncOptions},
-            object_handle::{ObjectHandle, WriteObjectHandle},
-            object_store::{
-                directory::Directory,
-                transaction::{lock_keys, Options},
-                LockKey,
-            },
-        },
-        fxfs_insecure_crypto::InsecureCrypt,
-        std::sync::Arc,
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-    };
+    use super::root_volume;
+    use crate::filesystem::{FxFilesystem, JournalingObject, SyncOptions};
+    use crate::object_handle::{ObjectHandle, WriteObjectHandle};
+    use crate::object_store::directory::Directory;
+    use crate::object_store::transaction::{lock_keys, Options};
+    use crate::object_store::LockKey;
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use std::sync::Arc;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
 
     #[fuchsia::test]
     async fn test_lookup_nonexistent_volume() {
@@ -343,8 +333,8 @@ mod tests {
                     .allocator()
                     .get_owner_allocated_bytes()
                     .get(&store_object_id)
-                    .unwrap_or(&0i64),
-                &0i64,
+                    .unwrap_or(&0),
+                &0,
             );
             // Confirm volume entry is gone.
             root_volume

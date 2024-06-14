@@ -26,6 +26,7 @@ args: ## Set up build dir and arguments file
 	$(NOECHO)mkdir -p $(OUTPUT)
 	$(NOECHO)echo "target_os=\"mistos\"" > $(OUTPUT)/args.gn
 	$(NOECHO)echo "host_test_labels=[]" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "rbe_mode = \"off\"" >> $(OUTPUT)/args.gn
 .PHONY: args
 
 gen: ## Generate ninja

@@ -4,20 +4,16 @@
 
 mod controller;
 
-use {
-    crate::engine::controller::{
-        collector::{CollectorListController, CollectorSchedulerController},
-        controller::ControllerListController,
-        health::HealthController,
-        model::{ModelConfigController, ModelStatsController},
-        plugin::PluginListController,
-    },
-    scrutiny::engine::{
-        dispatcher::ControllerDispatcher, manager::PluginManager, scheduler::CollectorScheduler,
-    },
-    scrutiny::prelude::*,
-    std::sync::{Arc, Mutex, RwLock, Weak},
-};
+use crate::engine::controller::collector::{CollectorListController, CollectorSchedulerController};
+use crate::engine::controller::controller::ControllerListController;
+use crate::engine::controller::health::HealthController;
+use crate::engine::controller::model::{ModelConfigController, ModelStatsController};
+use crate::engine::controller::plugin::PluginListController;
+use scrutiny::engine::dispatcher::ControllerDispatcher;
+use scrutiny::engine::manager::PluginManager;
+use scrutiny::engine::scheduler::CollectorScheduler;
+use scrutiny::prelude::*;
+use std::sync::{Arc, Mutex, RwLock, Weak};
 
 /// The `EnginePlugin` allows introspection into the Scrutiny engine
 /// through a plugin. This allows users to inspect the abstracted state of
@@ -69,19 +65,17 @@ impl Plugin for EnginePlugin {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::core::collection::{Component, ComponentSource, Components},
-        crate::engine::controller::{
-            collector::CollectorListEntry, model::ModelStats, plugin::PluginListEntry,
-        },
-        anyhow::Result,
-        scrutiny::plugin,
-        scrutiny_testing::fake::*,
-        serde_json::json,
-        std::collections::HashSet,
-        uuid::Uuid,
-    };
+    use super::*;
+    use crate::core::collection::{Component, ComponentSource, Components};
+    use crate::engine::controller::collector::CollectorListEntry;
+    use crate::engine::controller::model::ModelStats;
+    use crate::engine::controller::plugin::PluginListEntry;
+    use anyhow::Result;
+    use scrutiny::plugin;
+    use scrutiny_testing::fake::*;
+    use serde_json::json;
+    use std::collections::HashSet;
+    use uuid::Uuid;
 
     plugin!(FakePlugin, PluginHooks::new(collectors! {}, controllers! {}), vec![]);
 

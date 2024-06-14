@@ -4,19 +4,16 @@
 
 //! The definition of a TCP segment.
 
-use core::{
-    convert::TryFrom as _,
-    num::{NonZeroU16, TryFromIntError},
-    ops::Range,
-};
+use core::convert::TryFrom as _;
+use core::num::{NonZeroU16, TryFromIntError};
+use core::ops::Range;
 
+use log::info;
 use packet_formats::tcp::options::TcpOption;
 
-use crate::internal::{
-    base::{Control, Mss},
-    buffer::SendPayload,
-    seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize},
-};
+use crate::internal::base::{Control, Mss};
+use crate::internal::buffer::SendPayload;
+use crate::internal::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 
 /// A TCP segment.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -62,7 +59,7 @@ impl Options {
                     //   value larger than 14, the TCP SHOULD log the error but
                     //   MUST use 14 instead of the specified value.
                     if ws > WindowScale::MAX.get() {
-                        tracing::info!(
+                        info!(
                             "received an out-of-range window scale: {}, want < {}",
                             ws,
                             WindowScale::MAX.get()

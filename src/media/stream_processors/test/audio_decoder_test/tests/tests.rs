@@ -4,7 +4,10 @@
 
 #![cfg(test)]
 
-use audio_decoder_test_lib::{cvsd::*, lc3::*, sbc::*, test_suite::*};
+use audio_decoder_test_lib::cvsd::*;
+use audio_decoder_test_lib::lc3::*;
+use audio_decoder_test_lib::sbc::*;
+use audio_decoder_test_lib::test_suite::*;
 
 use decoder_test_data::*;
 use fidl_fuchsia_media::*;

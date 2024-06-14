@@ -40,7 +40,8 @@ import shutil
 import stat
 import subprocess
 import sys
-from typing import Dict, Sequence
+from pathlib import Path
+from typing import Any, Callable, Sequence
 
 import check_ninja_build_plan
 import compute_content_hash
@@ -72,7 +73,7 @@ def get_host_tag() -> str:
     return "%s-%s" % (get_host_platform(), get_host_arch())
 
 
-def force_symlink(target_path: str, dst_path: str):
+def force_symlink(target_path: str, dst_path: str) -> None:
     """Create a symlink at |dst_path| that points to |target_path|."""
     dst_dir = os.path.dirname(dst_path)
     os.makedirs(dst_dir, exist_ok=True)
@@ -87,8 +88,8 @@ def force_symlink(target_path: str, dst_path: str):
             raise
 
 
-def make_removeable(path: str):
-    """Ensure the file at |path| is removeable."""
+def make_removable(path: str) -> None:
+    """Ensure the file at |path| is removable."""
 
     islink = os.path.islink(path)
 
@@ -114,7 +115,7 @@ def make_removeable(path: str):
             )
 
 
-def remove_dir(path):
+def remove_dir(path: str) -> None:
     """Properly remove a directory."""
     # shutil.rmtree() does not work well when there are readonly symlinks to
     # directories. This results in weird NotADirectory error when trying to
@@ -138,11 +139,11 @@ def remove_dir(path):
         for file in files:
             file_path = os.path.join(root, file)
             all_files.append(file_path)
-            make_removeable(file_path)
+            make_removable(file_path)
         for subdir in real_subdirs:
             dir_path = os.path.join(root, subdir)
             all_dirs.append(dir_path)
-            make_removeable(dir_path)
+            make_removable(dir_path)
 
     for file in reversed(all_files):
         os.remove(file)
@@ -151,14 +152,14 @@ def remove_dir(path):
     os.rmdir(path)
 
 
-def create_clean_dir(path):
+def create_clean_dir(path: str) -> None:
     """Create a clean directory."""
     if os.path.exists(path):
         remove_dir(path)
     os.makedirs(path)
 
 
-def get_bazel_relative_topdir(fuchsia_dir, workspace_name):
+def get_bazel_relative_topdir(fuchsia_dir: str, workspace_name: str) -> str:
     """Return Bazel topdir for a given workspace, relative to Ninja output dir."""
     input_file = os.path.join(
         fuchsia_dir,
@@ -172,7 +173,7 @@ def get_bazel_relative_topdir(fuchsia_dir, workspace_name):
         return f.read().strip()
 
 
-def get_fx_build_dir(fuchsia_dir):
+def get_fx_build_dir(fuchsia_dir: str) -> str | None:
     """Return the path to the Ninja build directory set through 'fx set'.
 
     Args:
@@ -191,7 +192,7 @@ def get_fx_build_dir(fuchsia_dir):
         return os.path.join(fuchsia_dir, build_dir)
 
 
-def _cfg_values_to_dict(values_text):
+def _cfg_values_to_dict(values_text: str) -> dict[str, str]:
     """Parse comma-separated key=value pairs into a dictionary."""
     values = {}
     for var in values_text.split(","):
@@ -200,7 +201,7 @@ def _cfg_values_to_dict(values_text):
     return values
 
 
-def get_reclient_config(fuchsia_dir):
+def get_reclient_config(fuchsia_dir: str) -> dict[str, str]:
     """Return reclient configuration."""
     rewrapper_config_path = os.path.join(
         fuchsia_dir, "build", "rbe", "fuchsia-rewrapper.cfg"
@@ -216,7 +217,7 @@ def get_reclient_config(fuchsia_dir):
     with open(rewrapper_config_path) as f:
         for line in f:
             line = line.strip()
-            values = {}
+            values: dict[str, str] = {}
             if line.startswith(platform_prefix):
                 # After "platform=", expect comma-separated key=value pairs.
                 platform_values = _cfg_values_to_dict(
@@ -224,7 +225,7 @@ def get_reclient_config(fuchsia_dir):
                 )
 
     container_image = platform_values.get("container-image")
-    gce_machine_type = platform_values.get("gceMachineType")
+    gce_machine_type = platform_values.get("gceMachineType", "")
 
     instance_name = None
     with open(reproxy_config_path) as f:
@@ -254,7 +255,7 @@ def get_reclient_config(fuchsia_dir):
     }
 
 
-def generate_fuchsia_build_config(fuchsia_dir) -> Dict[str, str]:
+def generate_fuchsia_build_config(fuchsia_dir: str) -> dict[str, str]:
     """Generate a dictionary containing build configuration information."""
     rbe_config = get_reclient_config(fuchsia_dir)
     host_os = get_host_platform()
@@ -274,11 +275,11 @@ def generate_fuchsia_build_config(fuchsia_dir) -> Dict[str, str]:
     }
 
 
-def md5_all_files(paths):
+def md5_all_files(paths: list[str]) -> str:
     return compute_content_hash.content_hash_for_files(paths)
 
 
-def all_sdk_metas(sdk_root):
+def all_sdk_metas(sdk_root: str) -> list[str]:
     """Collect all SDK metadata files from a given exported SDK.
 
     Args:
@@ -306,7 +307,7 @@ def all_sdk_metas(sdk_root):
     return [os.path.realpath(p) for p in [sdk_manifest_path] + part_metas]
 
 
-def find_clang_content_files(clang_install_dir):
+def find_clang_content_files(clang_install_dir: str) -> Sequence[Path]:
     """Return a list of content hashing input files for Clang."""
     return compute_content_hash.find_content_files(
         clang_install_dir, cipd_name="clang"
@@ -316,24 +317,26 @@ def find_clang_content_files(clang_install_dir):
 class GeneratedFiles(object):
     """Models the content of a generated Bazel workspace."""
 
-    def __init__(self, files={}):
+    def __init__(self, files: dict[str, Any] = {}) -> None:
         self._files = files
 
-    def _check_new_path(self, path):
+    def _check_new_path(self, path: str) -> None:
         assert path not in self._files, (
             "File entry already in generated list: " + path
         )
 
-    def add_symlink(self, dst_path, target_path):
+    def add_symlink(self, dst_path: str, target_path: str) -> None:
         self._check_new_path(dst_path)
         self._files[dst_path] = {
             "type": "symlink",
             "target": target_path,
         }
 
-    def add_file(self, dst_path, content, executable=False):
+    def add_file(
+        self, dst_path: str, content: str, executable: bool = False
+    ) -> None:
         self._check_new_path(dst_path)
-        entry = {
+        entry: dict[str, Any] = {
             "type": "file",
             "content": content,
         }
@@ -341,25 +344,30 @@ class GeneratedFiles(object):
             entry["executable"] = True
         self._files[dst_path] = entry
 
-    def add_file_hash(self, dst_path):
+    def add_file_hash(self, dst_path: str) -> None:
         self._check_new_path(dst_path)
         self._files[dst_path] = {
             "type": "md5",
             "hash": md5_all_files([dst_path]),
         }
 
-    def add_top_entries(self, fuchsia_dir, subdir, excluded_file):
+    def add_top_entries(
+        self,
+        fuchsia_dir: str,
+        subdir: str,
+        excluded_file: Callable[[str], bool],
+    ) -> None:
         for name in os.listdir(fuchsia_dir):
             if not excluded_file(name):
                 self.add_symlink(
                     os.path.join(subdir, name), os.path.join(fuchsia_dir, name)
                 )
 
-    def to_json(self):
+    def to_json(self) -> str:
         """Convert to JSON file."""
         return json.dumps(self._files, indent=2, sort_keys=True)
 
-    def write(self, out_dir):
+    def write(self, out_dir: str) -> None:
         """Write workspace content to directory."""
         for path, entry in self._files.items():
             type = entry["type"]
@@ -381,7 +389,7 @@ class GeneratedFiles(object):
                 assert False, "Unknown entry type: " % entry["type"]
 
 
-def maybe_regenerate_ninja(gn_output_dir, ninja):
+def maybe_regenerate_ninja(gn_output_dir: str, ninja: str) -> bool:
     """Regenerate Ninja build plan if needed, returns True on update."""
     # This reads the build.ninja.d directly and tries to stat() all
     # dependencies in it directly (around 7000+), which is much
@@ -455,7 +463,7 @@ def find_all_files_under(path: str) -> Sequence[str]:
     Returns:
       A list of file paths.
     """
-    result = []
+    result: list[str] = []
     for root, dirs, files in os.walk(path):
         result.extend(os.path.join(root, file) for file in files)
 
@@ -477,7 +485,7 @@ def find_prebuilt_python_content_files(install_path: str) -> Sequence[str]:
     Returns:
       A list of file paths.
     """
-    result = []
+    result: list[str] = []
     for root, dirs, files in os.walk(install_path):
         result.extend(
             os.path.join(root, file)
@@ -513,7 +521,7 @@ def find_host_binary_path(program: str) -> str:
 _VALID_TARGET_CPUS = ("arm64", "x64", "riscv64")
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
@@ -635,42 +643,31 @@ def main():
 
     bazel_launcher = os.path.abspath(os.path.join(topdir, "bazel"))
 
-    def log(message, level=1):
+    def log(message: str, level: int = 1) -> None:
         if verbosity >= level:
             print(message)
 
-    def log2(message):
+    def log2(message: str) -> None:
         log(message, 2)
 
     log2(
-        """Using directories and files:
-  Fuchsia:                {}
-  GN build:               {}
-  Ninja binary:           {}
-  Bazel source:           {}
-  Topdir:                 {}
-  Logs directory:         {}
-  Bazel workspace:        {}
-  Bazel output_base:      {}
-  Bazel output user root: {}
-  Bazel launcher:         {}
-""".format(
-            fuchsia_dir,
-            gn_output_dir,
-            ninja_binary,
-            bazel_bin,
-            topdir,
-            logs_dir,
-            workspace_dir,
-            output_base_dir,
-            output_user_root,
-            bazel_launcher,
-        )
+        f"""Using directories and files:
+  Fuchsia:                {fuchsia_dir}
+  GN build:               {gn_output_dir}
+  Ninja binary:           {ninja_binary}
+  Bazel source:           {bazel_bin}
+  Topdir:                 {topdir}
+  Logs directory:         {logs_dir}
+  Bazel workspace:        {workspace_dir}
+  Bazel output_base:      {output_base_dir}
+  Bazel output user root: {output_user_root}
+  Bazel launcher:         {bazel_launcher}
+"""
     )
 
     if not check_ninja_build_plan.ninja_plan_is_up_to_date(gn_output_dir):
         print(
-            "Ninja build plan is not up-to-date, please run `fx build` before this script!",
+            f"Ninja build plan in {gn_output_dir} is not up-to-date, please run `fx build` before this script!",
             file=sys.stderr,
         )
         return 1
@@ -679,17 +676,17 @@ def main():
 
     generated = GeneratedFiles()
 
-    def expand_template_file(filename: str, **kwargs) -> str:
+    def expand_template_file(filename: str, **kwargs: Any) -> str:
         """Expand a template file and add it to the set of tracked input files."""
         template_file = os.path.join(templates_dir, filename)
         generated.add_file_hash(os.path.abspath(template_file))
         with open(template_file) as f:
             return f.read().format(**kwargs)
 
-    def write_workspace_file(path, content):
+    def write_workspace_file(path: str, content: str) -> None:
         generated.add_file(os.path.join("workspace", path), content)
 
-    def create_workspace_symlink(path, target_path):
+    def create_workspace_symlink(path: str, target_path: str) -> None:
         generated.add_symlink(os.path.join("workspace", path), target_path)
 
     script_path = os.path.relpath(__file__, fuchsia_dir)
@@ -703,8 +700,7 @@ def main():
         )
 
         generated.add_symlink(
-            os.path,
-            join("workspace", "WORKSPACE.bzlmod"),
+            os.path.join("workspace", "WORKSPACE.bzlmod"),
             os.path.join(
                 fuchsia_dir, "build", "bazel", "toplevel.WORKSPACE.bzlmod"
             ),
@@ -726,7 +722,7 @@ def main():
 
     # Generate symlinks
 
-    def excluded_file(path):
+    def excluded_file(path: str) -> bool:
         """Return true if a file path must be excluded from the symlink list."""
         # Never symlink to the 'out' directory.
         if path == "out":
@@ -827,18 +823,6 @@ common --enable_bzlmod=false
 """
     generated.add_file(os.path.join("workspace", ".bazelrc"), bazelrc_content)
 
-    # Create a symlink to the GN-generated file that will contain the list
-    # of @legacy_ninja_build_outputs entries. This file is generated by the
-    # GN target //build/bazel:legacy_ninja_build_outputs.
-    generated.add_symlink(
-        os.path.join("workspace", "bazel_inputs_manifest.json"),
-        os.path.join(
-            workspace_dir,
-            "..",
-            "legacy_ninja_build_outputs.inputs_manifest.json",
-        ),
-    )
-
     # Generate wrapper script in topdir/bazel that invokes Bazel with the right --output_base.
     bazel_launcher_content = expand_template_file(
         "template.bazel.sh",
@@ -880,8 +864,12 @@ common --enable_bzlmod=false
     # Content hash file for @prebuilt_clang, fuchsia_clang, keep in sync with
     # generate_prebuilt_clang_toolchain_repository() in
     # //build/bazel_sdk/bazel_rules_fuchsia/fuchsia/workspace/fuchsia_clang_repository.bzl
-    clang_content_files = find_clang_content_files(
-        os.path.join(fuchsia_dir, "prebuilt", "third_party", "clang", host_tag)
+    clang_content_files = list(
+        find_clang_content_files(
+            os.path.join(
+                fuchsia_dir, "prebuilt", "third_party", "clang", host_tag
+            )
+        )
     )
 
     rules_fuchsia_dir = os.path.join(
@@ -1007,7 +995,9 @@ common --enable_bzlmod=false
     # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
 
     # LINT.IfChange
-    generated_repositories_inputs["bazel_rules_fuchsia"] = rules_fuchsia_files
+    generated_repositories_inputs["bazel_rules_fuchsia"] = list(
+        rules_fuchsia_files
+    )
     # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
 
     # LINT.IfChange
@@ -1016,14 +1006,20 @@ common --enable_bzlmod=false
 
     # TODO: support content hash file in fuchsia_clang_repository() definition
     # This is already supported by generate_prebuilt_clang_repository()
-    generated_repositories_inputs["fuchsia_clang"] = fuchsia_clang_content_files
+    generated_repositories_inputs["fuchsia_clang"] = [
+        str(file) for file in fuchsia_clang_content_files
+    ]
 
     # LINT.IfChange
-    generated_repositories_inputs["prebuilt_clang"] = clang_content_files
+    generated_repositories_inputs["prebuilt_clang"] = [
+        str(file) for file in clang_content_files
+    ]
     # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
 
     # LINT.IfChange
-    generated_repositories_inputs["prebuilt_python"] = python_content_files
+    generated_repositories_inputs["prebuilt_python"] = list(
+        python_content_files
+    )
     # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
 
     # LINT.IfChange

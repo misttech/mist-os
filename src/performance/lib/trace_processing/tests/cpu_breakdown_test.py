@@ -4,11 +4,10 @@
 # found in the LICENSE file.
 """Unit tests for cpu_breakdown.py."""
 
-from trace_processing.metrics import cpu_breakdown
-
-import trace_processing.trace_model as trace_model
-import trace_processing.trace_time as trace_time
 import unittest
+
+from trace_processing.metrics import cpu_breakdown
+from trace_processing import trace_model, trace_time
 
 
 class CpuBreakdownTest(unittest.TestCase):

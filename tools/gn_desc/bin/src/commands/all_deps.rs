@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::BTreeSet, fmt::Display};
+use std::collections::BTreeSet;
+use std::fmt::Display;
 
 use argh::FromArgs;
 use gn_graph::{Graph, Target};

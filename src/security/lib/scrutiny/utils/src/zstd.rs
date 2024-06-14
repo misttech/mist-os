@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Result},
-    libc::{c_char, c_int, c_void, size_t},
-    std::ffi::CStr,
-};
+use anyhow::{anyhow, Result};
+use libc::{c_char, c_int, c_void, size_t};
+use std::ffi::CStr;
 
 // "C" externs provided from the zstd third_party library.
 #[link(name = "zstd")]

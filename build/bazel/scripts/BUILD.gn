@@ -6,6 +6,7 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("update_workspace_test") {
+    enable_mypy = true
     main_source = "update_workspace_test.py"
     sources = [
       "check_ninja_build_plan.py",

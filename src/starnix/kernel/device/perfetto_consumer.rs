@@ -2,35 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{CurrentTask, EventHandler, Kernel, Waiter},
-    vfs::{
-        buffers::{VecInputBuffer, VecOutputBuffer},
-        socket::{
-            new_socket_file, resolve_unix_socket_address, SocketDomain, SocketPeer, SocketProtocol,
-            SocketType,
-        },
-        FileHandle, FsStr, FsString,
-    },
+use crate::task::{CurrentTask, EventHandler, Kernel, Waiter};
+use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+use crate::vfs::socket::{
+    new_socket_file, resolve_unix_socket_address, SocketDomain, SocketPeer, SocketProtocol,
+    SocketType,
 };
+use crate::vfs::{FileHandle, FsStr, FsString};
 use once_cell::sync::OnceCell;
+use perfetto_consumer_proto::perfetto::protos::trace_config::buffer_config::FillPolicy;
+use perfetto_consumer_proto::perfetto::protos::trace_config::{BufferConfig, DataSource};
 use perfetto_consumer_proto::perfetto::protos::{
-    ipc_frame,
-    trace_config::{buffer_config::FillPolicy, BufferConfig, DataSource},
-    DataSourceConfig, DisableTracingRequest, EnableTracingRequest, FreeBuffersRequest,
+    ipc_frame, DataSourceConfig, DisableTracingRequest, EnableTracingRequest, FreeBuffersRequest,
     FtraceConfig, IpcFrame, ReadBuffersRequest, ReadBuffersResponse, TraceConfig,
 };
 use prost::Message;
 use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked, WriteOps};
-use starnix_uapi::{errno, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
-use std::{
-    collections::VecDeque,
-    sync::{
-        mpsc::{channel, Sender},
-        Arc,
-    },
-};
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::FdEvents;
+use std::collections::VecDeque;
+use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
 
 use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};
 

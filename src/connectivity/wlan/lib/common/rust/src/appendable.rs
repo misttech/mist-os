@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    std::mem::size_of,
-    thiserror::Error,
-    zerocopy::{AsBytes, FromBytes, NoCell, Ref, Unaligned},
-};
+use std::mem::size_of;
+use thiserror::Error;
+use zerocopy::{AsBytes, FromBytes, NoCell, Ref, Unaligned};
 
 #[derive(Error, Debug)]
 #[error("Buffer is too small for the written data")]

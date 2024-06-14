@@ -2,55 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        component::map_to_raw_status,
-        directory::FxDirectory,
-        dirent_cache::DirentCache,
-        file::FxFile,
-        fxblob::blob::FxBlob,
-        memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-        node::{FxNode, GetResult, NodeCache},
-        pager::Pager,
-        profile::{new_profile_state, ProfileState},
-        symlink::FxSymlink,
-        volumes_directory::VolumesDirectory,
-    },
-    anyhow::{bail, ensure, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_fxfs::{
-        BlobCreatorRequestStream, BlobReaderRequestStream, BytesAndNodes, ProjectIdRequest,
-        ProjectIdRequestStream, ProjectIterToken,
-    },
-    fidl_fuchsia_io as fio,
-    fs_inspect::{FsInspectVolume, VolumeData},
-    fuchsia_async as fasync,
-    futures::{
-        channel::oneshot,
-        stream::{self, FusedStream, Stream},
-        FutureExt, StreamExt, TryStreamExt,
-    },
-    fxfs::{
-        errors::FxfsError,
-        filesystem::{self, SyncOptions},
-        log::*,
-        object_handle::ObjectHandle,
-        object_store::{
-            directory::{replace_child_with_object, Directory},
-            transaction::{lock_keys, LockKey, Options},
-            HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore, Timestamp,
-        },
-    },
-    std::{
-        future::Future,
-        sync::{Arc, Mutex, Weak},
-        time::Duration,
-    },
-    vfs::{
-        directory::{entry::DirectoryEntry, entry_container::Directory as VfsDirectory},
-        execution_scope::ExecutionScope,
-    },
+use crate::fuchsia::component::map_to_raw_status;
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::dirent_cache::DirentCache;
+use crate::fuchsia::file::FxFile;
+use crate::fuchsia::fxblob::blob::FxBlob;
+use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
+use crate::fuchsia::node::{FxNode, GetResult, NodeCache};
+use crate::fuchsia::pager::Pager;
+use crate::fuchsia::profile::ProfileState;
+use crate::fuchsia::symlink::FxSymlink;
+use crate::fuchsia::volumes_directory::VolumesDirectory;
+use anyhow::{bail, ensure, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_fxfs::{
+    BlobCreatorRequestStream, BlobReaderRequestStream, BytesAndNodes, ProjectIdRequest,
+    ProjectIdRequestStream, ProjectIterToken,
 };
+use fs_inspect::{FsInspectVolume, VolumeData};
+use futures::channel::oneshot;
+use futures::stream::{self, FusedStream, Stream};
+use futures::{FutureExt, StreamExt, TryStreamExt};
+use fxfs::errors::FxfsError;
+use fxfs::filesystem::{self, SyncOptions};
+use fxfs::log::*;
+use fxfs::object_handle::ObjectHandle;
+use fxfs::object_store::directory::{replace_child_with_object, Directory};
+use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+use fxfs::object_store::{HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore, Timestamp};
+use std::future::Future;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, Weak};
+use std::time::Duration;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::entry_container::Directory as VfsDirectory;
+use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // LINT.IfChange
 // TODO:(b/299919008) Fix this number to something reasonable, or maybe just for fxblob.
@@ -122,8 +109,11 @@ impl Default for MemoryPressureConfig {
 struct ProfileHolder {
     state: Box<dyn ProfileState>,
 
-    /// The name for the ongoing recording upon completion and the object id of that recording.
-    recording_info: Option<(String, u64)>,
+    /// The name for the ongoing recording upon completion.
+    recording_name: String,
+
+    /// The object id of the ongoing recording.
+    recording_object: u64,
 }
 
 /// FxVolume represents an opened volume. It is also a (weak) cache for all opened Nodes within the
@@ -146,7 +136,11 @@ pub struct FxVolume {
 
     dirent_cache: DirentCache,
 
-    profile_state: Mutex<ProfileHolder>,
+    profile_state: Mutex<Option<ProfileHolder>>,
+
+    // TODO(https://fxbug.dev/342837879): Remove this after resolving the flake.
+    /// To help track down a flake in https://fxbug.dev/342837879. See `unwrap_or_poison()`.
+    poisoned: AtomicBool,
 }
 
 #[fxfs_trace::trace]
@@ -167,10 +161,8 @@ impl FxVolume {
             fs_id,
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
-            profile_state: Mutex::new(ProfileHolder {
-                state: new_profile_state(true),
-                recording_info: None,
-            }),
+            profile_state: Mutex::new(None),
+            poisoned: AtomicBool::new(false),
         })
     }
 
@@ -196,6 +188,24 @@ impl FxVolume {
 
     pub fn scope(&self) -> &ExecutionScope {
         &self.scope
+    }
+
+    /// Returns an unwrapping of the Arc if this is the last reference, or sets the `poison` field
+    /// to true. This helps examine a flake in https://fxbug.dev/342837879 where there is an
+    /// unexpected Arc reference remaining to this FxVolume. Poisoning this FxVolume will result in
+    /// a panic when the last reference is actually dropped, to provide a stack trace to the
+    /// remaining reference.
+    pub fn unwrap_or_poison(self: Arc<Self>) -> Option<Self> {
+        // First poison the instance, then clear the poison if the unwrap is successful. This
+        // avoids a race where the poison flag may not be set in time before the actual last
+        // reference gets dropped, while using `Arc::into_inner` means that we know if the last
+        // Arc reference was dropped here or not.
+        self.poisoned.store(true, Ordering::Release);
+        let mut inner = Arc::into_inner(self);
+        if let Some(inner) = &mut inner {
+            inner.poisoned.store(false, Ordering::Release);
+        }
+        inner
     }
 
     async fn place_file(self: &Arc<Self>, name: &str, object_id: u64) -> Result<(), Error> {
@@ -224,29 +234,35 @@ impl FxVolume {
         Ok(())
     }
 
-    /// Stops the profiling, returns if there is any status to be cleaned finished up from the
+    /// Stops the profiling, returns a ProfileHolder if there is any finalizing left for the
     /// recording. This may be used in a sync context during shutdown when we can't handle the
     /// mutations to finalize the recording.
-    fn stop_profiler(&self) -> Option<(String, u64)> {
+    fn stop_profiler(&self) -> Option<ProfileHolder> {
         let mut profile_state = self.profile_state.lock().unwrap();
-        // Clear recorder first to flush entries.
+        // Clear recorder first to flush entries. Possibly a no-op.
         self.pager.set_recorder(None);
-        // Stop profiler ensuring that the write handle is closed.
-        profile_state.state.stop_profiler();
-        info!("Stopping profile activity for volume object {}.", self.store.store_object_id());
-        std::mem::take(&mut profile_state.recording_info)
+        if let Some(state) = &mut (*profile_state) {
+            // Stop profiler ensuring that the write handle is closed.
+            state.state.stop_profiler();
+            info!("Stopping profile activity for volume object {}.", self.store.store_object_id());
+        }
+        std::mem::take(&mut *profile_state)
     }
 
     /// Stop profiling, recover resources from it and finalize recordings.
-    pub async fn finish_profiling(self: &Arc<Self>) {
+    pub async fn stop_profile_tasks(self: &Arc<Self>) {
         // If there was a file being recorded, place it in the profile directory.
-        if let Some((name, object_id)) = self.stop_profiler() {
-            if let Err(e) = self.place_file(&name, object_id).await {
-                warn!("Failed to commit new profile recording '{}': {:?}", name, e);
+        if let Some(holder) = self.stop_profiler() {
+            if let Err(e) = self.place_file(&holder.recording_name, holder.recording_object).await {
+                warn!(
+                    "Failed to commit new profile recording '{}': {:?}",
+                    &holder.recording_name, e
+                );
             }
         }
     }
 
+    /// Opens or creates the profile directory in the volume's internal directory.
     pub async fn get_profile_directory(self: &Arc<Self>) -> Result<Directory<FxVolume>, Error> {
         let internal_dir = self
             .get_or_create_internal_dir()
@@ -277,15 +293,34 @@ impl FxVolume {
         })
     }
 
-    pub async fn record_or_replay_profile(self: &Arc<Self>, name: &str) -> Result<(), Error> {
+    /// Starts recording a profile for the volume under the name given, and if a profile exists
+    /// under that same name it is replayed and will be replaced after by the new recording if it
+    /// is cleanly shutdown and finalized.
+    pub async fn record_or_replay_profile(
+        self: &Arc<Self>,
+        mut state: Box<dyn ProfileState>,
+        name: &str,
+    ) -> Result<(), Error> {
         // We don't meddle in FxDirectory or FxFile here because we don't want a paged object.
         // Normally we ensure that there's only one copy by using the Node cache on the volume, but
         // that would create FxFile, so in this case we just assume that only one profile operation
         // should be ongoing at a time, as that is ensured in `VolumesDirectory`.
+
+        // If there is a recording already, prepare to replay it.
+        let profile_dir = self.get_profile_directory().await?;
+        let replay_handle = if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
+            ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
+            Some(Box::new(
+                ObjectStore::open_object(self, id, HandleOptions::default(), None).await?,
+            ))
+        } else {
+            None
+        };
+
+        // Start a recording handle. Put it in the graveyard in case we can't properly complete it.
         let mut transaction =
             self.store().filesystem().new_transaction(lock_keys![], Options::default()).await?;
-        // Start a recording first. Put it in the graveyard in case we can't properly complete it.
-        let handle = Box::new(
+        let recording_handle = Box::new(
             ObjectStore::create_object(
                 self,
                 &mut transaction,
@@ -295,29 +330,28 @@ impl FxVolume {
             )
             .await?,
         );
-        let recording_id = handle.handle().object_id();
-        self.store.add_to_graveyard(&mut transaction, recording_id);
+        let recording_object = recording_handle.handle().object_id();
+        self.store.add_to_graveyard(&mut transaction, recording_object);
         transaction.commit().await?;
-        {
-            let mut profile_state = self.profile_state.lock().unwrap();
-            self.pager.set_recorder(Some(profile_state.state.record_new(handle)));
-            profile_state.recording_info = Some((name.to_owned(), recording_id));
-        }
-        info!("Recording new profile '{name}' for volume object {}", self.store.store_object_id());
 
-        // If there is a recording already, replay it.
-        let profile_dir = self.get_profile_directory().await?;
-        if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
-            ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
-            let handle =
-                Box::new(ObjectStore::open_object(self, id, HandleOptions::default(), None).await?);
-            let mut profile_state = self.profile_state.lock().unwrap();
-            profile_state.state.replay_profile(handle, self.clone());
+        let mut profile_state = self.profile_state.lock().unwrap();
+        if let Some(mut holder) = profile_state.take() {
+            warn!("Profile operations already in flight. Stopping and dropping the current ones");
+            holder.state.stop_profiler();
+        }
+
+        info!("Recording new profile '{name}' for volume object {}", self.store.store_object_id());
+        // Begin recording first to ensure that we capture any activity from the replay.
+        self.pager.set_recorder(Some(state.record_new(recording_handle)));
+        if let Some(handle) = replay_handle {
+            state.replay_profile(handle, self.clone());
             info!(
                 "Replaying existing profile '{name}' for volume object {}",
                 self.store.store_object_id()
             );
         }
+        *profile_state =
+            Some(ProfileHolder { state, recording_name: name.to_owned(), recording_object });
         Ok(())
     }
 
@@ -600,6 +634,15 @@ impl AsRef<ObjectStore> for FxVolume {
     }
 }
 
+impl Drop for FxVolume {
+    fn drop(&mut self) {
+        // To analyze a flake in https://fxbug.dev/342837879. See `unwrap_or_poison` for details.
+        if self.poisoned.load(Ordering::Acquire) {
+            panic!("Dropped final FxVolume reference after shutdown");
+        }
+    }
+}
+
 #[async_trait]
 impl FsInspectVolume for FxVolume {
     async fn get_volume_data(&self) -> VolumeData {
@@ -815,50 +858,44 @@ pub fn info_to_filesystem_info(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::DIRENT_CACHE_LIMIT,
-        crate::fuchsia::{
-            directory::FxDirectory,
-            file::FxFile,
-            fxblob::{
-                testing::{self as blob_testing, BlobFixture},
-                BlobDirectory,
-            },
-            memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-            pager::PagerBacked,
-            testing::{
-                close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
-                open_file_checked, write_at, TestFixture,
-            },
-            volume::{FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig},
-            volumes_directory::VolumesDirectory,
-        },
-        delivery_blob::CompressionMode,
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker, VolumeMarker},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_fs::file,
-        fuchsia_zircon::Status,
-        fxfs::{
-            filesystem::FxFilesystem,
-            fsck::{fsck, fsck_volume},
-            object_handle::ObjectHandle,
-            object_store::{
-                directory::replace_child,
-                transaction::{lock_keys, LockKey, Options},
-                volume::root_volume,
-                HandleOptions, ObjectDescriptor, ObjectStore,
-            },
-        },
-        fxfs_insecure_crypto::InsecureCrypt,
-        std::{
-            sync::{Arc, Weak},
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
+    use super::DIRENT_CACHE_LIMIT;
+    use crate::fuchsia::directory::FxDirectory;
+    use crate::fuchsia::file::FxFile;
+    use crate::fuchsia::fxblob::testing::{self as blob_testing, BlobFixture};
+    use crate::fuchsia::fxblob::BlobDirectory;
+    use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
+    use crate::fuchsia::pager::PagerBacked;
+    use crate::fuchsia::profile::new_profile_state;
+    use crate::fuchsia::testing::{
+        close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
+        open_file_checked, write_at, TestFixture,
     };
+    use crate::fuchsia::volume::{
+        FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
+    };
+    use crate::fuchsia::volumes_directory::VolumesDirectory;
+    use delivery_blob::CompressionMode;
+    use fidl::endpoints::ServerEnd;
+    use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker, VolumeMarker};
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_fs::file;
+    use fuchsia_zircon::Status;
+    use fxfs::filesystem::FxFilesystem;
+    use fxfs::fsck::{fsck, fsck_volume};
+    use fxfs::object_handle::ObjectHandle;
+    use fxfs::object_store::directory::replace_child;
+    use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+    use fxfs::object_store::volume::root_volume;
+    use fxfs::object_store::{HandleOptions, ObjectDescriptor, ObjectStore};
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use std::sync::{Arc, Weak};
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test(threads = 10)]
     async fn test_rename_different_dirs() {
@@ -2279,7 +2316,12 @@ mod tests {
         device.reopen(false);
         let mut device = {
             let fixture = blob_testing::open_blob_fixture(device).await;
-            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Recording");
+            fixture
+                .volume()
+                .volume()
+                .record_or_replay_profile(new_profile_state(true), "foo")
+                .await
+                .expect("Recording");
 
             // Page in the zero offsets only to avoid readahead strangeness.
             let mut writable = [0u8];
@@ -2287,7 +2329,7 @@ mod tests {
                 let vmo = fixture.get_blob_vmo(*hash).await;
                 vmo.read(&mut writable, 0).expect("Vmo read");
             }
-            fixture.volume().volume().finish_profiling().await;
+            fixture.volume().volume().stop_profile_tasks().await;
             fixture.close().await
         };
 
@@ -2312,7 +2354,12 @@ mod tests {
                     assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
                 }
 
-                fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
+                fixture
+                    .volume()
+                    .volume()
+                    .record_or_replay_profile(new_profile_state(true), "foo")
+                    .await
+                    .expect("Replaying");
 
                 // Move the file in flight to ensure a new version lands to be used next time.
                 {
@@ -2353,7 +2400,7 @@ mod tests {
                 }
 
                 // Complete the recording.
-                fixture.volume().volume().finish_profiling().await;
+                fixture.volume().volume().stop_profile_tasks().await;
             }
             device = fixture.close().await;
         }
@@ -2376,7 +2423,12 @@ mod tests {
         device.reopen(false);
         let device = {
             let fixture = blob_testing::open_blob_fixture(device).await;
-            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Recording");
+            fixture
+                .volume()
+                .volume()
+                .record_or_replay_profile(new_profile_state(true), "foo")
+                .await
+                .expect("Recording");
 
             // Page in the zero offsets only to avoid readahead strangeness.
             {
@@ -2385,7 +2437,7 @@ mod tests {
                 let vmo = fixture.get_blob_vmo(*hash).await;
                 vmo.read(&mut writable, 0).expect("Vmo read");
             }
-            fixture.volume().volume().finish_profiling().await;
+            fixture.volume().volume().stop_profile_tasks().await;
             fixture.close().await
         };
 
@@ -2408,7 +2460,12 @@ mod tests {
                 assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
             }
 
-            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
+            fixture
+                .volume()
+                .volume()
+                .record_or_replay_profile(new_profile_state(true), "foo")
+                .await
+                .expect("Replaying");
 
             // Await all data being played back by checking that things have paged in.
             {
@@ -2428,7 +2485,7 @@ mod tests {
             }
 
             // Complete the recording.
-            fixture.volume().volume().finish_profiling().await;
+            fixture.volume().volume().stop_profile_tasks().await;
         }
         let device = fixture.close().await;
 
@@ -2451,7 +2508,12 @@ mod tests {
                 assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
             }
 
-            fixture.volume().volume().record_or_replay_profile("foo").await.expect("Replaying");
+            fixture
+                .volume()
+                .volume()
+                .record_or_replay_profile(new_profile_state(true), "foo")
+                .await
+                .expect("Replaying");
 
             // Await all data being played back by checking that things have paged in.
             {
@@ -2463,7 +2525,7 @@ mod tests {
             }
 
             // Complete the recording.
-            fixture.volume().volume().finish_profiling().await;
+            fixture.volume().volume().stop_profile_tasks().await;
 
             // Verify that first blob was not paged in as the it should be dropped from the profile.
             {

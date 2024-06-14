@@ -4,7 +4,8 @@
 
 use crate::common_utils::common::LazyProxy;
 use anyhow::{bail, Error};
-use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
 use fidl_fuchsia_paver::{PaverMarker, PaverProxy};
 use fuchsia_zircon::Status;
 use serde::{Deserialize, Serialize};
@@ -175,7 +176,9 @@ mod tests {
         BootManagerRequest, BootManagerRequestStream, DataSinkRequest, DataSinkRequestStream,
         PaverRequest,
     };
-    use futures::{future::Future, join, stream::StreamExt};
+    use futures::future::Future;
+    use futures::join;
+    use futures::stream::StreamExt;
     use serde_json::json;
 
     #[test]

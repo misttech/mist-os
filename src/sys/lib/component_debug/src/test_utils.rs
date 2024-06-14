@@ -1,17 +1,15 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::Result,
-    fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd},
-    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async::Task,
-    futures::StreamExt,
-    moniker::Moniker,
-    std::collections::HashMap,
-    std::fs::{create_dir_all, write},
-    tempfile::TempDir,
-};
+use anyhow::Result;
+use fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd};
+use fuchsia_async::Task;
+use futures::StreamExt;
+use moniker::Moniker;
+use std::collections::HashMap;
+use std::fs::{create_dir_all, write};
+use tempfile::TempDir;
+use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys};
 
 #[derive(Clone)]
 pub struct File {

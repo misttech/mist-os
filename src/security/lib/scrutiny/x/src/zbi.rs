@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::api;
 use super::api::DataSource as _;
 use super::blob::VerifiedMemoryBlob;
 use super::bootfs::Bootfs;
-use super::data_source as ds;
+use super::{api, data_source as ds};
 use derivative::Derivative;
 use once_cell::sync::OnceCell;
 use scrutiny_utils::bootfs::BootfsReader;
-use scrutiny_utils::zbi::ZbiReader;
-use scrutiny_utils::zbi::ZbiSection;
-use scrutiny_utils::zbi::ZbiType;
+use scrutiny_utils::zbi::{ZbiReader, ZbiSection, ZbiType};
 use std::rc::Rc;
 use thiserror::Error;
 

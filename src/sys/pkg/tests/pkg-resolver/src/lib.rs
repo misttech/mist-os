@@ -4,51 +4,50 @@
 
 #![allow(clippy::let_unit_value)]
 
+use assert_matches::assert_matches;
+use blobfs_ramdisk::BlobfsRamdisk;
+use cobalt_client::traits::AsEventCodes;
+use diagnostics_assertions::TreeAssertion;
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _};
+use fidl::persist;
+use fidl_fuchsia_metrics::{self as fmetrics, MetricEvent, MetricEventPayload};
+use fidl_fuchsia_pkg::{
+    self as fpkg, CupMarker, CupProxy, GetInfoError, PackageCacheMarker, PackageResolverMarker,
+    PackageResolverProxy, RepositoryManagerMarker, RepositoryManagerProxy, WriteError,
+};
+use fidl_fuchsia_pkg_ext::{
+    self as pkg, RepositoryConfig, RepositoryConfigBuilder, RepositoryConfigs,
+};
+use fidl_fuchsia_pkg_internal::{PersistentEagerPackage, PersistentEagerPackages};
+use fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig};
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, ScopedInstance,
+};
+use fuchsia_merkle::Hash;
+use fuchsia_pkg_testing::serve::ServedRepository;
+use fuchsia_pkg_testing::{Package, PackageBuilder};
+use fuchsia_sync::Mutex;
+use fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl};
+use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
+use futures::prelude::*;
+use mock_boot_arguments::MockBootArgumentsService;
+use mock_metrics::MockMetricEventLoggerFactory;
+use serde::Serialize;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{self, BufWriter, Write};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
+use tempfile::TempDir;
+use vfs::directory::entry_container::Directory as _;
+use vfs::directory::helper::DirectlyMutable as _;
 use {
-    assert_matches::assert_matches,
-    blobfs_ramdisk::BlobfsRamdisk,
-    cobalt_client::traits::AsEventCodes,
-    diagnostics_assertions::TreeAssertion,
-    diagnostics_hierarchy::DiagnosticsHierarchy,
-    diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect},
-    fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _},
-    fidl::persist,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics::{self as fmetrics, MetricEvent, MetricEventPayload},
-    fidl_fuchsia_pkg::{
-        self as fpkg, CupMarker, CupProxy, GetInfoError, PackageCacheMarker, PackageResolverMarker,
-        PackageResolverProxy, RepositoryManagerMarker, RepositoryManagerProxy, WriteError,
-    },
-    fidl_fuchsia_pkg_ext::{
-        self as pkg, RepositoryConfig, RepositoryConfigBuilder, RepositoryConfigs,
-    },
-    fidl_fuchsia_pkg_internal::{PersistentEagerPackage, PersistentEagerPackages},
-    fidl_fuchsia_pkg_rewrite as fpkg_rewrite,
-    fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig},
-    fidl_fuchsia_space as fspace, fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_update as fupdate,
-    fuchsia_async as fasync,
-    fuchsia_component_test::{
-        Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, ScopedInstance,
-    },
-    fuchsia_merkle::Hash,
-    fuchsia_pkg_testing::{serve::ServedRepository, Package, PackageBuilder},
-    fuchsia_sync::Mutex,
-    fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl},
-    fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _},
-    futures::prelude::*,
-    mock_boot_arguments::MockBootArgumentsService,
-    mock_metrics::MockMetricEventLoggerFactory,
-    serde::Serialize,
-    std::{
-        collections::HashMap,
-        fs::File,
-        io::{self, BufWriter, Write},
-        path::{Path, PathBuf},
-        sync::Arc,
-        time::Duration,
-    },
-    tempfile::TempDir,
-    vfs::directory::{entry_container::Directory as _, helper::DirectlyMutable as _},
+    fidl_fuchsia_pkg_rewrite as fpkg_rewrite, fidl_fuchsia_space as fspace,
+    fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_update as fupdate, fuchsia_async as fasync,
 };
 
 // If the body of an https response is not large enough, hyper will download the body

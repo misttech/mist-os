@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_ui_composition as fuicomp;
-use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, HandleBased};
 use magma::magma_image_info_t;
-use starnix_core::{
-    fileops_impl_vmo,
-    task::CurrentTask,
-    vfs::{Anon, FileHandle, FileObject, FileOps, FsNodeInfo},
-};
-use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags};
+use starnix_core::fileops_impl_vmo;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{Anon, FileHandle, FileObject, FileOps, FsNodeInfo};
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Arc;
+use {fidl_fuchsia_ui_composition as fuicomp, fuchsia_zircon as zx};
 
 pub struct ImageInfo {
     /// The magma image info associated with the `vmo`.

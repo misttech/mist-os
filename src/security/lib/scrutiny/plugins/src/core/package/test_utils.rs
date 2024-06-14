@@ -2,22 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::core::{
-        package::reader::PackageReader,
-        util::types::{ComponentManifest, PackageDefinition, PartialPackageDefinition},
-    },
-    anyhow::{anyhow, Result},
-    fuchsia_merkle::{Hash, HASH_SIZE},
-    fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant, PinnedAbsolutePackageUrl},
-    scrutiny::model::model::DataModel,
-    scrutiny_testing::{artifact::AppendResult, fake::fake_model_config, TEST_REPO_URL},
-    std::{
-        collections::{HashMap, HashSet},
-        path::PathBuf,
-        sync::Arc,
-    },
-};
+use crate::core::package::reader::PackageReader;
+use crate::core::util::types::{ComponentManifest, PackageDefinition, PartialPackageDefinition};
+use anyhow::{anyhow, Result};
+use fuchsia_merkle::{Hash, HASH_SIZE};
+use fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant, PinnedAbsolutePackageUrl};
+use scrutiny::model::model::DataModel;
+use scrutiny_testing::artifact::AppendResult;
+use scrutiny_testing::fake::fake_model_config;
+use scrutiny_testing::TEST_REPO_URL;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 pub struct MockPackageReader {
     pkg_urls: Option<Vec<PinnedAbsolutePackageUrl>>,

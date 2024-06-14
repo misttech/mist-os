@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    fidl::endpoints::{DiscoverableProtocolMarker, ServiceMarker},
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-};
+use anyhow::{Context as _, Result};
+use fidl::endpoints::{DiscoverableProtocolMarker, ServiceMarker};
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio};
 
 pub const COMPONENT_NAME: &str = "driver_test_realm";
 pub const DRIVER_TEST_REALM_URL: &str = "#meta/driver_test_realm.cm";

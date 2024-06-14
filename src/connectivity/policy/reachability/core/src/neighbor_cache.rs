@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_neighbor as fnet_neighbor;
-use fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext;
-use fuchsia_zircon as zx;
 use std::collections::HashMap;
 use tracing::error;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_neighbor as fnet_neighbor,
+    fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext, fuchsia_zircon as zx,
+};
 
 use super::Id;
 

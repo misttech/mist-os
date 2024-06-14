@@ -7,15 +7,11 @@
 #[macro_use]
 extern crate quote;
 
-use {
-    proc_macro::TokenStream,
-    quote::ToTokens,
-    std::collections::BTreeMap,
-    syn::{
-        parse::{Parse, ParseStream},
-        parse_macro_input, Data, Fields, Result,
-    },
-};
+use proc_macro::TokenStream;
+use quote::ToTokens;
+use std::collections::BTreeMap;
+use syn::parse::{Parse, ParseStream};
+use syn::{parse_macro_input, Data, Fields, Result};
 
 /// Holds an open-ended version range like `3..` meaning version 3 and up.
 #[derive(Clone)]

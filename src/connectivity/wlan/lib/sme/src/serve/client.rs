@@ -2,25 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    client::{
-        self as client_sme, ConnectResult, ConnectTransactionEvent, ConnectTransactionStream,
-    },
-    MlmeEventStream, MlmeSink, MlmeStream,
+use crate::client::{
+    self as client_sme, ConnectResult, ConnectTransactionEvent, ConnectTransactionStream,
 };
-use fidl::{endpoints::RequestStream, endpoints::ServerEnd};
-use fidl_fuchsia_wlan_common as fidl_common;
-use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
-use fidl_fuchsia_wlan_mlme as fidl_mlme;
+use crate::{MlmeEventStream, MlmeSink, MlmeStream};
+use fidl::endpoints::{RequestStream, ServerEnd};
 use fidl_fuchsia_wlan_sme::{self as fidl_sme, ClientSmeRequest, TelemetryRequest};
 use fuchsia_inspect_contrib::auto_persist;
-use fuchsia_zircon as zx;
 use futures::channel::mpsc;
-use futures::{prelude::*, select};
+use futures::prelude::*;
+use futures::select;
 use std::pin::pin;
 use std::sync::{Arc, Mutex};
 use tracing::error;
 use wlan_common::scan::write_vmo;
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+};
 
 pub type Endpoint = ServerEnd<fidl_sme::ClientSmeMarker>;
 type Sme = client_sme::ClientSme;
@@ -255,21 +254,21 @@ fn convert_connect_result(result: &ConnectResult, is_reconnect: bool) -> fidl_sm
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::client::{ConnectFailure, EstablishRsnaFailure, EstablishRsnaFailureReason},
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_wlan_internal as fidl_internal,
-        fidl_fuchsia_wlan_mlme::ScanResultCode,
-        fidl_fuchsia_wlan_sme::{self as fidl_sme},
-        fuchsia_async as fasync,
-        futures::{stream::StreamFuture, task::Poll},
-        rand::{prelude::ThreadRng, Rng},
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::{assert_variant, random_bss_description, scan::read_vmo},
-        wlan_rsn::auth,
-    };
+    use super::*;
+    use crate::client::{ConnectFailure, EstablishRsnaFailure, EstablishRsnaFailureReason};
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_wlan_mlme::ScanResultCode;
+    use fidl_fuchsia_wlan_sme::{self as fidl_sme};
+    use futures::stream::StreamFuture;
+    use futures::task::Poll;
+    use rand::prelude::ThreadRng;
+    use rand::Rng;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::scan::read_vmo;
+    use wlan_common::{assert_variant, random_bss_description};
+    use wlan_rsn::auth;
+    use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
 
     #[test]
     fn test_convert_connect_result() {

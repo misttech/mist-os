@@ -2,20 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{Closed, TryMerge},
-    futures::{
-        channel::oneshot,
-        future::{Either, Ready, Shared},
-        prelude::*,
-    },
-    pin_project::pin_project,
-    std::{
-        collections::VecDeque,
-        pin::Pin,
-        task::{Context, Poll},
-    },
-};
+use super::{Closed, TryMerge};
+use futures::channel::oneshot;
+use futures::future::{Either, Ready, Shared};
+use futures::prelude::*;
+use pin_project::pin_project;
+use std::collections::VecDeque;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 #[pin_project]
 pub(crate) struct TaskFuture<O> {
@@ -168,10 +162,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{super::tests::MergeEqual, *},
-        futures::executor::block_on,
-    };
+    use super::super::tests::MergeEqual;
+    use super::*;
+    use futures::executor::block_on;
 
     #[test]
     fn merges() {

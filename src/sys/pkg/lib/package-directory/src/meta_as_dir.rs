@@ -2,23 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{root_dir::RootDir, usize_to_u64_safe},
-    async_trait::async_trait,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::sync::Arc,
-    vfs::{
-        common::send_on_open_with_error,
-        directory::{
-            immutable::connection::ImmutableConnection, traversal_position::TraversalPosition,
-        },
-        execution_scope::ExecutionScope,
-        immutable_attributes,
-        path::Path as VfsPath,
-        ObjectRequestRef, ProtocolsExt, ToObjectRequest,
-    },
-};
+use crate::root_dir::RootDir;
+use crate::usize_to_u64_safe;
+use fidl::endpoints::ServerEnd;
+use std::sync::Arc;
+use vfs::common::send_on_open_with_error;
+use vfs::directory::immutable::connection::ImmutableConnection;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path as VfsPath;
+use vfs::{immutable_attributes, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub(crate) struct MetaAsDir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,
@@ -32,7 +26,6 @@ impl<S: crate::NonMetaStorage> MetaAsDir<S> {
 
 impl<S: crate::NonMetaStorage> vfs::node::IsDirectory for MetaAsDir<S> {}
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
         Ok(fio::NodeAttributes {
@@ -71,7 +64,6 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
     }
 }
 
-#[async_trait]
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for MetaAsDir<S> {
     fn open(
         self: Arc<Self>,
@@ -99,11 +91,12 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
                     return Err(zx::Status::NOT_SUPPORTED);
                 }
 
-                // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain MetaAsFile,
-                // the Open call must be made on RootDir. This is consistent with pkgfs behavior and is
-                // needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles Clone
-                // by calling Open with a path of ".", a mode of 0, and mostly unmodified flags and
-                // that combination of arguments would normally result in MetaAsFile being used.
+                // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain the "meta"
+                // file, the Open call must be made on RootDir. This is consistent with pkgfs
+                // behavior and is needed so that Clone'ing MetaAsDir results in MetaAsDir, because
+                // VFS handles Clone by calling Open with a path of ".", a mode of 0, and mostly
+                // unmodified flags and that combination of arguments would normally result in the
+                // file being used.
                 object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
             });
             return;
@@ -155,11 +148,11 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
                 }
             }
 
-            // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain MetaAsFile,
-            // the Open call must be made on RootDir. This is consistent with pkgfs behavior and is
-            // needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles Clone
-            // by calling Open with a path of ".", a mode of 0, and mostly unmodified flags and
-            // that combination of arguments would normally result in MetaAsFile being used.
+            // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain the "meta"
+            // file, the Open call must be made on RootDir. This is consistent with pkgfs behavior
+            // and is needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles
+            // Clone by calling Open with a path of ".", a mode of 0, and mostly unmodified flags
+            // and that combination of arguments would normally result in the file being used.
             //
             // Note that `ImmutableConnection::create` will check that protocols contain
             // directory-only protocols.
@@ -224,18 +217,16 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_fs::directory::{DirEntry, DirentKind},
-        fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        futures::prelude::*,
-        std::convert::TryInto as _,
-        vfs::{
-            directory::{entry::EntryInfo, entry_container::Directory},
-            node::Node,
-        },
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_fs::directory::{DirEntry, DirentKind};
+    use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
+    use fuchsia_pkg_testing::PackageBuilder;
+    use futures::prelude::*;
+    use std::convert::TryInto as _;
+    use vfs::directory::entry::EntryInfo;
+    use vfs::directory::entry_container::Directory;
+    use vfs::node::Node;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,

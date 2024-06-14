@@ -6,12 +6,10 @@
 // executed in parallel. IF tests are not executed in parallel, the tests will hang as this
 // implementation will never reply back
 
-use {
-    fidl_fidl_examples_routing_echo as fecho, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::{StreamExt, TryStreamExt},
-    std::sync::{Arc, Mutex},
-};
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
+use std::sync::{Arc, Mutex};
+use {fidl_fidl_examples_routing_echo as fecho, fuchsia_async as fasync};
 
 #[fasync::run_singlethreaded]
 async fn main() {

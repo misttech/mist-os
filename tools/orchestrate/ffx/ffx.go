@@ -143,14 +143,22 @@ func (f *Ffx) setupDefaultConfig(configPath string, opt Option) error {
 }
 
 // Cmd returns a generic exec.Cmd configured to execute ffx.
-func (f *Ffx) Cmd(args ...string) *exec.Cmd {
+func (f *Ffx) Cmd(args ...string) (*exec.Cmd, error) {
 	cmd := exec.Command(f.bin, args...)
-	cmd.Env = f.ApplyEnv(cmd.Environ())
-	return cmd
+	env, err := f.ApplyEnv(cmd.Environ())
+	if err != nil {
+		return nil, fmt.Errorf("Applying ffx env: %v", err)
+	}
+	cmd.Env = env
+	return cmd, nil
 }
 
 // ApplyEnv adds the environment variables needed for safe execution of ffx.
-func (f *Ffx) ApplyEnv(env []string) []string {
+func (f *Ffx) ApplyEnv(env []string) ([]string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("os.Getwd: %v", err)
+	}
 	env = append(env, "FFX_ISOLATE_DIR="+f.Dir, "FUCHSIA_ANALYTICS_DISABLED=1")
 	if f.sslCertPath != "" {
 		env = append(env, "SSL_CERT_FILE="+f.sslCertPath)
@@ -162,12 +170,19 @@ func (f *Ffx) ApplyEnv(env []string) []string {
 	for _, xdg_env_var := range XDG_ENV_VARS {
 		env = append(env, xdg_env_var+"="+f.Dir)
 	}
-	return env
+	sshDir := filepath.Join(wd, "openssh-portable", "bin")
+	// For non-daemon commands, the path to the ssh binary is required. Previously this was only
+	// needed for execution of `ffx daemon start`.
+	env = utils.AppendPath(env, sshDir)
+	return env, nil
 }
 
 // RunCmdSync starts a command and waits for the command to complete.
 func (f *Ffx) RunCmdSync(args ...string) (string, error) {
-	cmd := f.Cmd(args...)
+	cmd, err := f.Cmd(args...)
+	if err != nil {
+		return "", fmt.Errorf("Creating ffx command from %+v: %v", args, err)
+	}
 	log.Printf("Running command and streaming output: %+v", cmd.Args)
 
 	// Pipe stderr to stdout, and then tee to a string builder.
@@ -185,7 +200,10 @@ func (f *Ffx) RunCmdSync(args ...string) (string, error) {
 
 // RunCmdAsync starts a command but does NOT wait for the command to complete.
 func (f *Ffx) RunCmdAsync(args ...string) (*exec.Cmd, error) {
-	cmd := f.Cmd(args...)
+	cmd, err := f.Cmd(args...)
+	if err != nil {
+		return nil, fmt.Errorf("Creating ffx command from %+v: %v", args, err)
+	}
 	log.Printf("Running background command: %+v", cmd.Args)
 	if err := cmd.Start(); err != nil {
 		return cmd, fmt.Errorf("start command %s: %w", args, err)

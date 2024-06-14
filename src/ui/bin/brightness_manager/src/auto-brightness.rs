@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Context;
-use anyhow::Error;
+use anyhow::{Context, Error};
 use fuchsia_async::DurationExt;
 use fuchsia_zircon::Duration;
 use led::{Led, LedControl};
@@ -125,8 +124,8 @@ mod tests {
     use fuchsia_async::{self as fasync};
     use fuchsia_zircon::Duration;
     use futures::lock::Mutex;
-    use lib::sensor::AmbientLightInputRpt;
-    use lib::{backlight::BacklightControl, sensor::SensorControl};
+    use lib::backlight::BacklightControl;
+    use lib::sensor::{AmbientLightInputRpt, SensorControl};
     use std::sync::Arc;
 
     struct MockSensor {

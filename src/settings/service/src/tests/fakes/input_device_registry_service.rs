@@ -5,11 +5,11 @@
 use std::sync::Arc;
 
 use anyhow::{format_err, Error};
-use fidl::{endpoints::ServerEnd, prelude::*};
-use fuchsia_async as fasync;
+use fidl::endpoints::ServerEnd;
+use fidl::prelude::*;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon as zx;
 use futures::TryStreamExt;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fidl_fuchsia_ui_policy::MediaButtonsListenerProxy;

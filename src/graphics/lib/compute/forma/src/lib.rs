@@ -28,11 +28,11 @@ pub use crate::renderer::GpuRenderer;
 pub use composition::{Composition, Layer};
 pub use utils::clear_buffer;
 
+pub use surpass::painter::{
+    BlendMode, Channel, Color, Fill, FillRule, Func, Gradient, GradientBuilder, GradientType,
+    Image, Props, Rect, Style, Texture, BGR0, BGR1, BGRA, RGB0, RGB1, RGBA,
+};
 pub use surpass::{
-    painter::{
-        BlendMode, Channel, Color, Fill, FillRule, Func, Gradient, GradientBuilder, GradientType,
-        Image, Props, Rect, Style, Texture, BGR0, BGR1, BGRA, RGB0, RGB1, RGBA,
-    },
     AffineTransform, GeomId, GeomPresTransform, GeomPresTransformError, Order, OrderError, Path,
     PathBuilder, Point,
 };

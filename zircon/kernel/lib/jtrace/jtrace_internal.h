@@ -249,7 +249,7 @@ class JTrace {
     // is that we end up with a partially garbled trace record.
     SetTraceEnabled(false);
 
-    const affine::Ratio ticks_to_mono_ratio = platform_get_ticks_to_time_ratio();
+    const affine::Ratio ticks_to_mono_ratio = timer_get_ticks_to_time_ratio();
     const zx_ticks_t deadline =
         zx_ticks_add_ticks(current_ticks(), ticks_to_mono_ratio.Inverse().Scale(timeout));
     while ((trace_ops_in_flight_.load(ktl::memory_order_acquire) > 0) &&
@@ -372,7 +372,7 @@ class JTrace {
     }
 
     auto ConvertTimestamp = [](const Entry& e) -> zx_time_t {
-      const affine::Ratio ticks_to_mono_ratio = platform_get_ticks_to_time_ratio();
+      const affine::Ratio ticks_to_mono_ratio = timer_get_ticks_to_time_ratio();
       const zx_ticks_t ts = (e.ts_ticks == kZeroReplacement) ? 0 : e.ts_ticks;
       return ticks_to_mono_ratio.Scale(ts);
     };

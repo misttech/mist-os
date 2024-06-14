@@ -20,10 +20,8 @@ use packet::{
     InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
     ParseMetadata, SerializeTarget, Serializer,
 };
-use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
-    Ref, Unaligned,
-};
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 use crate::ip::IpProto;

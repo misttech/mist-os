@@ -2,33 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        component_instance::{
-            ComponentInstanceInterface, WeakComponentInstanceInterface,
-            WeakExtendedInstanceInterface,
-        },
-        error::RoutingError,
-    },
-    async_trait::async_trait,
-    cm_rust::{
-        CapabilityDecl, CapabilityTypeName, ConfigurationDecl, DictionaryDecl, DirectoryDecl,
-        EventStreamDecl, ExposeConfigurationDecl, ExposeDecl, ExposeDictionaryDecl,
-        ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
-        ExposeServiceDecl, ExposeSource, NameMapping, OfferConfigurationDecl, OfferDecl,
-        OfferDictionaryDecl, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl,
-        OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
-        ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl, ServiceDecl, StorageDecl,
-        UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
-    },
-    cm_types::{Name, Path},
-    derivative::Derivative,
-    from_enum::FromEnum,
-    futures::future::BoxFuture,
-    moniker::ChildName,
-    std::{fmt, sync::Weak},
-    thiserror::Error,
+use crate::component_instance::{
+    ComponentInstanceInterface, WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
 };
+use crate::error::RoutingError;
+use async_trait::async_trait;
+use cm_rust::{
+    CapabilityDecl, CapabilityTypeName, ConfigurationDecl, DictionaryDecl, DirectoryDecl,
+    EventStreamDecl, ExposeConfigurationDecl, ExposeDecl, ExposeDictionaryDecl,
+    ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
+    ExposeServiceDecl, ExposeSource, NameMapping, OfferConfigurationDecl, OfferDecl,
+    OfferDictionaryDecl, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl,
+    OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
+    ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl, ServiceDecl, StorageDecl, UseDecl,
+    UseDirectoryDecl, UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
+};
+use cm_types::{Name, Path};
+use derivative::Derivative;
+use from_enum::FromEnum;
+use futures::future::BoxFuture;
+use moniker::ChildName;
+use std::fmt;
+use std::sync::Weak;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -716,7 +712,9 @@ pub type BuiltinCapabilities = Vec<CapabilityDecl>;
 
 #[cfg(test)]
 mod tests {
-    use {super::*, cm_rust::StorageDirectorySource, fidl_fuchsia_component_decl as fdecl};
+    use super::*;
+    use cm_rust::StorageDirectorySource;
+    use fidl_fuchsia_component_decl as fdecl;
 
     #[test]
     fn capability_type_name() {

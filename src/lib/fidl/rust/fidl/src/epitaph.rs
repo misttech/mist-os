@@ -4,17 +4,12 @@
 
 //! Epitaph support for Channel and AsyncChannel.
 
-use {
-    crate::{
-        encoding::{
-            self, DynamicFlags, EpitaphBody, TransactionHeader, TransactionMessage,
-            TransactionMessageType,
-        },
-        error::Error,
-        AsyncChannel, Channel, HandleDisposition,
-    },
-    fuchsia_zircon_status as zx_status,
+use crate::encoding::{
+    self, DynamicFlags, EpitaphBody, TransactionHeader, TransactionMessage, TransactionMessageType,
 };
+use crate::error::Error;
+use crate::{AsyncChannel, Channel, HandleDisposition};
+use fuchsia_zircon_status as zx_status;
 
 /// Extension trait that provides Channel-like objects with the ability to send a FIDL epitaph.
 pub trait ChannelEpitaphExt {

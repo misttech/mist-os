@@ -2,17 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::driver_utils::{connect_proxy, list_drivers};
+use crate::MIN_INTERVAL_FOR_SYSLOG_MS;
+use anyhow::{format_err, Result};
+use fuchsia_inspect::{self as inspect, Property};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use tracing::{error, info};
 use {
-    crate::driver_utils::{connect_proxy, list_drivers},
-    crate::MIN_INTERVAL_FOR_SYSLOG_MS,
-    anyhow::{format_err, Result},
     fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_power_metrics as fmetrics,
-    fuchsia_async as fasync,
-    fuchsia_inspect::{self as inspect, Property},
-    fuchsia_zircon as zx,
-    futures::{stream::FuturesUnordered, StreamExt},
-    std::{cell::RefCell, collections::HashMap, rc::Rc},
-    tracing::{error, info},
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 // TODO(didis): Use netstack API after https://fxbug.dev/42062536 is implemented.
@@ -436,13 +438,13 @@ impl InspectData {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
-        futures::{task::Poll, FutureExt, TryStreamExt},
-        std::{cell::Cell, pin::Pin},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
+    use futures::task::Poll;
+    use futures::{FutureExt, TryStreamExt};
+    use std::cell::Cell;
+    use std::pin::Pin;
 
     fn setup_fake_network_port(
         mut get_counter: impl FnMut() -> fhwnet::PortGetCountersResponse + 'static,

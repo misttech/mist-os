@@ -4,10 +4,8 @@
 
 //! Utilities for parsing and serializing IPV6CP options.
 
-use {
-    crate::records::options::{OptionsImpl, OptionsImplLayout, OptionsSerializerImpl},
-    byteorder::{ByteOrder, NetworkEndian},
-};
+use crate::records::options::{OptionsImpl, OptionsImplLayout, OptionsSerializerImpl};
+use byteorder::{ByteOrder, NetworkEndian};
 
 /// An IPV6CP control option.
 #[derive(Clone, Eq, Hash, PartialEq, Debug)]

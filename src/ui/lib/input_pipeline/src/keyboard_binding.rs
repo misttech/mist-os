@@ -2,21 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::autorepeater,
-    crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent},
-    crate::metrics,
-    anyhow::{format_err, Error, Result},
-    async_trait::async_trait,
-    fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
-    fidl_fuchsia_ui_input3 as fidl_ui_input3,
-    fidl_fuchsia_ui_input3::KeyEventType,
-    fuchsia_async as fasync,
-    fuchsia_inspect::health::Reporter,
-    fuchsia_zircon as zx,
-    futures::channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    metrics_registry::*,
-};
+use crate::input_device::{self, Handled, InputDeviceBinding, InputDeviceStatus, InputEvent};
+use crate::{autorepeater, metrics};
+use anyhow::{format_err, Error, Result};
+use async_trait::async_trait;
+use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport};
+use fidl_fuchsia_ui_input3::KeyEventType;
+use fuchsia_inspect::health::Reporter;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use metrics_registry::*;
+use {fidl_fuchsia_ui_input3 as fidl_ui_input3, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// A [`KeyboardEvent`] represents an input event from a keyboard device.
 ///
@@ -606,10 +601,10 @@ impl KeyboardBinding {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::testing_utilities, fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::StreamExt,
-    };
+    use super::*;
+    use crate::testing_utilities;
+    use futures::StreamExt;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     /// Tests that a key that is present in the new report, but was not present in the previous report
     /// is propagated as pressed.

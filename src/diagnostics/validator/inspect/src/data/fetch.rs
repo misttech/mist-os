@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_inspect::{TreeMarker, TreeNameIteratorMarker, TreeProxy},
-    fuchsia_zircon::Vmo,
-    std::{collections::HashMap, future::Future, pin::Pin},
-};
+use anyhow::{format_err, Error};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_inspect::{TreeMarker, TreeNameIteratorMarker, TreeProxy};
+use fuchsia_zircon::Vmo;
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 
 /// A tree representation of an Inspect-formatted VMO.
 /// It contains the root VMO and all loaded child VMOs.
@@ -88,20 +88,18 @@ impl LazyNodeFetcher {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Context,
-        fidl_fuchsia_inspect::{
-            TreeContent, TreeNameIteratorRequest, TreeNameIteratorRequestStream, TreeRequest,
-            TreeRequestStream,
-        },
-        fidl_fuchsia_mem::Buffer,
-        fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx, HandleBased},
-        futures::{TryFutureExt, TryStreamExt},
-        std::sync::Arc,
-        tracing::error,
+    use super::*;
+    use anyhow::Context;
+    use fidl_fuchsia_inspect::{
+        TreeContent, TreeNameIteratorRequest, TreeNameIteratorRequestStream, TreeRequest,
+        TreeRequestStream,
     };
+    use fidl_fuchsia_mem::Buffer;
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::{self as zx, HandleBased};
+    use futures::{TryFutureExt, TryStreamExt};
+    use std::sync::Arc;
+    use tracing::error;
 
     const MAX_TREE_NAME_LIST_SIZE: usize = 1;
     const SHARED_VMO: &str = "SHARED";

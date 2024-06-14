@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::error::{ComponentError, EvaluationError},
-    crate::spec::TestCase,
-    itertools::Itertools,
-    maplit::hashmap,
-    std::collections::HashMap,
-};
+use crate::error::{ComponentError, EvaluationError};
+use crate::spec::TestCase;
+use itertools::Itertools;
+use maplit::hashmap;
+use std::collections::HashMap;
 
 const TRIAGE_PRESENCE_TEMPLATE: &'static str = r#"
 {

@@ -6,10 +6,9 @@
 //! convenience functions to support 16-bit, 32-bit, and 128-bit canonical formats as well as
 //! string representation. It can be converted to/from a fuchsia.bluetooth.Uuid FIDL type.
 
-use fidl_fuchsia_bluetooth as fidl;
-use fidl_fuchsia_bluetooth_bredr as fidlbredr;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use {fidl_fuchsia_bluetooth as fidl, fidl_fuchsia_bluetooth_bredr as fidlbredr};
 
 use crate::error::Error;
 use crate::inspect::ToProperty;

@@ -38,13 +38,9 @@ use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
-use crate::security::{
-    wpa::{
-        credential::{Passphrase, PassphraseError, Psk, PskError},
-        data::{CredentialData, EnterpriseData, PersonalData},
-    },
-    BareCredentials, SecurityError,
-};
+use crate::security::wpa::credential::{Passphrase, PassphraseError, Psk, PskError};
+use crate::security::wpa::data::{CredentialData, EnterpriseData, PersonalData};
+use crate::security::{BareCredentials, SecurityError};
 
 pub use crate::security::wpa::data::AuthenticatorData;
 
@@ -769,14 +765,10 @@ mod tests {
 
     use test_case::test_case;
 
-    use crate::security::{
-        wep::{WepKey, WEP40_KEY_BYTES},
-        wpa::{
-            self,
-            credential::{Passphrase, Psk, PSK_SIZE_BYTES},
-        },
-        BareCredentials, SecurityError,
-    };
+    use crate::security::wep::{WepKey, WEP40_KEY_BYTES};
+    use crate::security::wpa::credential::{Passphrase, Psk, PSK_SIZE_BYTES};
+    use crate::security::wpa::{self};
+    use crate::security::{BareCredentials, SecurityError};
 
     fn wep_key() -> WepKey {
         [170u8; WEP40_KEY_BYTES].into()

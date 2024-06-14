@@ -5,55 +5,48 @@
 //! This module contains the [`BlobDirectory`] node type used to represent a directory of immutable
 //! content-addressable blobs.
 
-use {
-    crate::fuchsia::{
-        component::map_to_raw_status,
-        directory::FxDirectory,
-        fxblob::{blob::FxBlob, writer::DeliveryBlobWriter},
-        node::{FxNode, GetResult, OpenedNode},
-        volume::{FxVolume, RootDir},
-    },
-    anyhow::{anyhow, ensure, Context as _, Error},
-    async_trait::async_trait,
-    fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd},
-    fidl_fuchsia_fxfs::{
-        BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderRequest, BlobReaderRequestStream,
-        BlobWriterMarker, CreateBlobError,
-    },
-    fidl_fuchsia_io::{
-        self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
-        NodeMarker, WatchMask,
-    },
-    fuchsia_async as fasync,
-    fuchsia_hash::Hash,
-    fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
-    fuchsia_zircon::Status,
-    futures::TryStreamExt,
-    fxfs::{
-        errors::FxfsError,
-        object_handle::ReadObjectHandle,
-        object_store::{
-            self,
-            transaction::{lock_keys, LockKey},
-            HandleOptions, ObjectDescriptor, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
-        },
-        serialized_types::BlobMetadata,
-    },
-    fxfs_macros::ToWeakNode,
-    std::{str::FromStr, sync::Arc},
-    vfs::{
-        directory::{
-            dirents_sink::{self, Sink},
-            entry::{DirectoryEntry, EntryInfo, OpenRequest},
-            entry_container::{Directory as VfsDirectory, DirectoryWatcher, MutableDirectory},
-            mutable::connection::MutableConnection,
-            traversal_position::TraversalPosition,
-        },
-        execution_scope::ExecutionScope,
-        path::Path,
-        ObjectRequestRef, ToObjectRequest,
-    },
+use crate::fuchsia::component::map_to_raw_status;
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::fxblob::blob::FxBlob;
+use crate::fuchsia::fxblob::writer::DeliveryBlobWriter;
+use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
+use crate::fuchsia::volume::{FxVolume, RootDir};
+use anyhow::{anyhow, ensure, Context as _, Error};
+use async_trait::async_trait;
+use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
+use fidl_fuchsia_fxfs::{
+    BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderRequest, BlobReaderRequestStream,
+    BlobWriterMarker, CreateBlobError,
 };
+use fidl_fuchsia_io::{
+    self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
+    NodeMarker, WatchMask,
+};
+use fuchsia_async as fasync;
+use fuchsia_hash::Hash;
+use fuchsia_merkle::{MerkleTree, MerkleTreeBuilder};
+use fuchsia_zircon::Status;
+use futures::TryStreamExt;
+use fxfs::errors::FxfsError;
+use fxfs::object_handle::ReadObjectHandle;
+use fxfs::object_store::transaction::{lock_keys, LockKey};
+use fxfs::object_store::{
+    self, HandleOptions, ObjectDescriptor, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
+};
+use fxfs::serialized_types::BlobMetadata;
+use fxfs_macros::ToWeakNode;
+use std::str::FromStr;
+use std::sync::Arc;
+use vfs::directory::dirents_sink::{self, Sink};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry_container::{
+    Directory as VfsDirectory, DirectoryWatcher, MutableDirectory,
+};
+use vfs::directory::mutable::connection::MutableConnection;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::{ObjectRequestRef, ToObjectRequest};
 
 /// A flat directory containing content-addressable blobs (names are their hashes).
 /// It is not possible to create sub-directories.
@@ -394,7 +387,6 @@ impl FxNode for BlobDirectory {
     }
 }
 
-#[async_trait]
 impl MutableDirectory for BlobDirectory {
     async fn unlink(self: Arc<Self>, name: &str, must_be_directory: bool) -> Result<(), Status> {
         if must_be_directory {
@@ -418,16 +410,6 @@ impl MutableDirectory for BlobDirectory {
     async fn sync(&self) -> Result<(), Status> {
         self.directory.sync().await
     }
-
-    async fn rename(
-        self: Arc<Self>,
-        _src_dir: Arc<dyn vfs::directory::entry_container::MutableDirectory + 'static>,
-        _src_name: Path,
-        _dst_name: Path,
-    ) -> Result<(), Status> {
-        // Files in a blob directory can't be renamed.
-        Err(Status::NOT_SUPPORTED)
-    }
 }
 
 /// Implementation of VFS pseudo-directory for blobs. Forks a task per connection.
@@ -441,7 +423,6 @@ impl DirectoryEntry for BlobDirectory {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for BlobDirectory {
     async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
         self.directory.get_attrs().await
@@ -460,7 +441,6 @@ impl vfs::node::Node for BlobDirectory {
 }
 
 /// Implements VFS entry container trait for directories, allowing manipulation of their contents.
-#[async_trait]
 impl VfsDirectory for BlobDirectory {
     fn open(
         self: Arc<Self>,
@@ -541,22 +521,20 @@ impl From<object_store::Directory<FxVolume>> for BlobDirectory {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::fuchsia::fxblob::testing::{new_blob_fixture, open_blob_fixture, BlobFixture},
-        assert_matches::assert_matches,
-        blob_writer::BlobWriter,
-        delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
-        fidl_fuchsia_fxfs::BlobReaderMarker,
-        fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _},
-        fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_fs::directory::{
-            readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
-        },
-        fuchsia_zircon::DurationNum as _,
-        futures::StreamExt as _,
-        std::path::PathBuf,
+    use super::*;
+    use crate::fuchsia::fxblob::testing::{new_blob_fixture, open_blob_fixture, BlobFixture};
+    use assert_matches::assert_matches;
+    use blob_writer::BlobWriter;
+    use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
+    use fidl_fuchsia_fxfs::BlobReaderMarker;
+    use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_fs::directory::{
+        readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
     };
+    use fuchsia_zircon::DurationNum as _;
+    use futures::StreamExt as _;
+    use std::path::PathBuf;
 
     #[fasync::run(10, test)]
     async fn test_unlink() {

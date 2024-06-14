@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::util::ProviderFactory;
+use crate::{FONTS_MEDIUM_CM, FONTS_SMALL_CM};
+use anyhow::{format_err, Context as _, Error};
+use fuchsia_zircon::AsHandleRef;
 use tracing::info;
-use {
-    crate::util::ProviderFactory,
-    crate::{FONTS_MEDIUM_CM, FONTS_SMALL_CM},
-    anyhow::{format_err, Context as _, Error},
-    fidl_fuchsia_fonts as fonts, fuchsia_zircon as zx,
-    fuchsia_zircon::AsHandleRef,
-};
+use {fidl_fuchsia_fonts as fonts, fuchsia_zircon as zx};
 
 macro_rules! assert_buf_eq {
     ($font_info_a:ident, $font_info_b:ident) => {

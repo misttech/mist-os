@@ -138,6 +138,14 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
             ssid=test_ssid,
         )
 
+        end_time = time.time() + 30
+        while time.time() < end_time:
+            iface_ids = self.device.wlan.get_iface_id_list()
+            if len(iface_ids) > 0:
+                break
+        else:
+            asserts.fail("No iface ids present")
+
         bss_scan_response = self.device.wlan.scan_for_bss_info()
         bss_desc_for_ssid = bss_scan_response.get(test_ssid)
         if bss_desc_for_ssid:

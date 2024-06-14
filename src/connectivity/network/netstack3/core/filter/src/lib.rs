@@ -23,9 +23,11 @@ use logic::nat::NatConfig;
 pub type ConntrackConnection<I, BT> = conntrack::Connection<I, BT, NatConfig>;
 
 pub use api::FilterApi;
+pub use conntrack::{Table, Tuple};
 pub use context::{
     FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext, NatContext,
 };
+pub use logic::nat::NatType;
 pub use logic::{
     FilterHandler, FilterImpl, FilterTimerId, IngressVerdict, ProofOfEgressCheck, Verdict,
 };
@@ -37,8 +39,8 @@ pub use packets::{
     ForwardedPacket, IcmpMessage, IpPacket, MaybeTransportPacket, MaybeTransportPacketMut,
     NestedWithInnerIpPacket, RawIpBody, TransportPacketSerializer, TxPacket,
 };
+pub use state::validation::{ValidRoutines, ValidationError};
 pub use state::{
-    validation::{ValidRoutines, ValidationError},
     Action, FilterIpMetadata, Hook, IpRoutines, NatRoutines, Routine, Routines, Rule, State,
     TransparentProxy, UninstalledRoutine,
 };

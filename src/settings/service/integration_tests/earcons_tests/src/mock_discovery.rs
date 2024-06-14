@@ -11,9 +11,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_component_test::LocalComponentHandles;
 use futures::channel::mpsc::Sender;
 use futures::lock::Mutex;
-use futures::SinkExt;
-use futures::StreamExt;
-use futures::TryStreamExt;
+use futures::{SinkExt, StreamExt, TryStreamExt};
 use std::sync::Arc;
 
 pub type SessionId = u64;

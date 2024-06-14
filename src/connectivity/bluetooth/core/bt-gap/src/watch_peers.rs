@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth as btfidl;
-use fidl_fuchsia_bluetooth_sys as sys;
 use fuchsia_bluetooth::types::{Peer, PeerId};
 use fuchsia_sync::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tracing::{info, warn};
+use {fidl_fuchsia_bluetooth as btfidl, fidl_fuchsia_bluetooth_sys as sys};
 
 pub struct PeerWatcher {
     // Store the previous state in a shared structure that can be updated when the hanging_get is
@@ -93,7 +92,8 @@ fn peers_diff(
 #[cfg(test)]
 mod test {
     use super::*;
-    use {fuchsia_bluetooth::types::Address, futures::TryStreamExt};
+    use fuchsia_bluetooth::types::Address;
+    use futures::TryStreamExt;
 
     // Make some simple example peers for test cases
     fn example_peer(id: PeerId, address: Address, name: Option<String>) -> Peer {

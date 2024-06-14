@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::diagnostics::send_log_entry,
-    crate::options::add_defaults,
-    crate::test::Test,
-    anyhow::{anyhow, Context as _, Result},
-    fidl_fuchsia_fuzzer::{
-        self as fuzz, Artifact as FidlArtifact, Input as FidlInput, Result_ as FuzzResult,
-    },
-    fuchsia_async as fasync,
-    fuchsia_fuzzctl::InputPair,
-    fuchsia_zircon_status as zx,
-    futures::{join, AsyncReadExt, AsyncWriteExt, StreamExt},
-    std::cell::RefCell,
-    std::rc::Rc,
+use crate::diagnostics::send_log_entry;
+use crate::options::add_defaults;
+use crate::test::Test;
+use anyhow::{anyhow, Context as _, Result};
+use fidl_fuchsia_fuzzer::{
+    self as fuzz, Artifact as FidlArtifact, Input as FidlInput, Result_ as FuzzResult,
 };
+use fuchsia_fuzzctl::InputPair;
+use futures::{join, AsyncReadExt, AsyncWriteExt, StreamExt};
+use std::cell::RefCell;
+use std::rc::Rc;
+use {fuchsia_async as fasync, fuchsia_zircon_status as zx};
 
 /// Test fake that allows configuring how to respond to `fuchsia.fuzzer.Controller` methods.
 ///

@@ -56,7 +56,6 @@ rustc_binary("bin") {
     "//src/sys/pkg/lib/system-image",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hmac",
     "//third_party/rust_crates:rand",
@@ -111,12 +110,6 @@ rustc_binary("bin") {
     "//build/config/rust/lints:clippy_warn_all",
     "//build/config/rust:bootfs",
   ]
-
-  # TODO(https://fxbug.dev/324112857): When Blobfs also supports open2, remove this feature flag
-  # and the generated_fshost_config.gni import above.
-  if (fxfs_blob) {
-    features = [ "supports_open2" ]
-  }
 }
 
 fuchsia_component_manifest("manifest") {

@@ -7,13 +7,13 @@
 
 use crate::{ArgType, Header, StringRef};
 use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
-use nom::{
-    bytes::complete::take,
-    multi::many0,
-    number::complete::{le_f64, le_i64, le_u64},
-    Err, IResult,
-};
-use std::{borrow::Cow, cell::RefCell, rc::Rc};
+use nom::bytes::complete::take;
+use nom::multi::many0;
+use nom::number::complete::{le_f64, le_i64, le_u64};
+use nom::{Err, IResult};
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::rc::Rc;
 use thiserror::Error;
 
 pub(crate) type ParseResult<'a, T> = IResult<&'a [u8], T, ParseError>;

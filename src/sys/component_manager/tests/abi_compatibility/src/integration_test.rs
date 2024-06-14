@@ -1,13 +1,14 @@
+use anyhow::Error;
+use assert_matches::assert_matches;
+use fuchsia_component::server as fserver;
+use fuchsia_component_test::*;
+use futures::channel::mpsc;
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use std::fmt;
+use version_history::AbiRevision;
 use {
-    anyhow::Error,
-    assert_matches::assert_matches,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_mem as fmem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_component::server as fserver,
-    fuchsia_component_test::*,
-    futures::{channel::mpsc, FutureExt, SinkExt, StreamExt, TryStreamExt},
-    std::fmt,
-    version_history::AbiRevision,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -169,8 +170,9 @@ async fn add_component_resolver(
 
 // Construct a realm with three component resolvers that return distinct abi revisions for components.
 // A test channel is passed to each resolver to send a copy of its FIDL response for testing.
+// `child_name_prefix` will be prepended to the names of all of the components.
 async fn create_realm(
-    cm_url: &str,
+    child_name_prefix: &str,
     test_channel_tx: mpsc::Sender<fresolution::Component>,
 ) -> (RealmInstance, fasync::Task<()>) {
     let mut builder = RealmBuilder::new().await.unwrap();
@@ -185,7 +187,7 @@ async fn create_realm(
 
     builder
         .add_child(
-            "absent_abi_component",
+            format!("{}absent_abi_component", child_name_prefix),
             "absent://absent_abi_component",
             ChildOptions::new().environment(cr_absent.environment()),
         )
@@ -193,7 +195,7 @@ async fn create_realm(
         .unwrap();
     builder
         .add_child(
-            "unsupported_abi_component",
+            format!("{}unsupported_abi_component", child_name_prefix),
             "unsupported://unsupported_abi_component",
             ChildOptions::new().environment(cr_unsupported.environment()),
         )
@@ -201,14 +203,17 @@ async fn create_realm(
         .unwrap();
     builder
         .add_child(
-            "supported_abi_component",
+            format!("{}supported_abi_component", child_name_prefix),
             "supported://supported_abi_component",
             ChildOptions::new().environment(cr_supported.environment()),
         )
         .await
         .unwrap();
 
-    let (cm_builder, task) = builder.with_nested_component_manager(cm_url).await.unwrap();
+    let (cm_builder, task) = builder
+        .with_nested_component_manager("#meta/abi_compat_component_manager.cm")
+        .await
+        .unwrap();
     cm_builder
         .add_route(
             Route::new()
@@ -226,12 +231,10 @@ async fn create_realm(
 }
 
 #[fuchsia::test]
-async fn resolve_components_against_allow_all_policy() {
-    // Uses a config that sets `abi_revision_policy` to `allow_all`
-    let cm_url = "#meta/component_manager_allow_all.cm";
+async fn resolve_regular_components() {
     // A channel used to verify component resolver fidl responses.
     let (test_channel_tx, mut test_channel_rx) = mpsc::channel(1);
-    let (instance, _task) = create_realm(cm_url, test_channel_tx).await;
+    let (instance, _task) = create_realm("", test_channel_tx).await;
     // get a handle to lifecycle controller to start components
     let lifecycle_controller = instance
         .root
@@ -247,28 +250,27 @@ async fn resolve_components_against_allow_all_policy() {
     {
         let child_moniker = "./absent_abi_component";
         // Attempt to resolve the component. Expect the component resolver to have returned a
-        // resolved component with an absent ABI, but resolution passes because of `allow_all`
-        // compatibility policy.
+        // resolved component with an absent ABI, so resolution fails.
         let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
-        assert_eq!(resolve_res, Ok(()));
+        assert_eq!(resolve_res, Err(fsys::ResolveError::Internal));
         // verify the copy of the component resolver result that was sent to component manager
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(resolver_response, Some(fresolution::Component { abi_revision: None, .. }));
         let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
-        assert!(instance.resolved_info.is_some());
+        assert!(instance.resolved_info.is_none());
     }
     // Test resolution of a component with an unsupported abi revision
     {
         let child_moniker = "./unsupported_abi_component";
         let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
-        assert_eq!(resolve_res, Ok(()));
+        assert_eq!(resolve_res, Err(fsys::ResolveError::Internal));
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(
             resolver_response,
             Some(fresolution::Component { abi_revision: Some(u64::MAX), .. })
         );
         let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
-        assert!(instance.resolved_info.is_some());
+        assert!(instance.resolved_info.is_none());
     }
     // Test resolution of a component with a supported abi revision
     {
@@ -290,12 +292,13 @@ async fn resolve_components_against_allow_all_policy() {
 }
 
 #[fuchsia::test]
-async fn resolve_components_against_enforce_presence_policy() {
-    // Uses a config that sets `abi_revision_policy` to `enforce_presence`
-    let cm_url = "#meta/component_manager_enforce_presence.cm";
+async fn resolve_allowlisted_components() {
     // A channel used to verify component resolver fidl responses.
     let (test_channel_tx, mut test_channel_rx) = mpsc::channel(1);
-    let (instance, _task) = create_realm(cm_url, test_channel_tx).await;
+
+    // Add `exempt_` to the beginning of the component names. These specific
+    // component names are allowlisted in abi_compat_cm_config.json5.
+    let (instance, _task) = create_realm("exempt_", test_channel_tx).await;
     // get a handle to lifecycle controller to start components
     let lifecycle_controller = instance
         .root
@@ -309,21 +312,21 @@ async fn resolve_components_against_enforce_presence_policy() {
 
     // Test resolution of a component with an absent abi revision
     {
-        let child_moniker = "./absent_abi_component";
-        // Attempt to resolve the component. Expect the component resolver to have returned a
-        // resolved component with an absent ABI, but resolution fails because of
-        // `enforce_presence` compatibility policy.
+        let child_moniker = "./exempt_absent_abi_component";
+        // Attempt to resolve the component. Expect the component resolver to
+        // have returned a resolved component with an absent ABI, and resolution
+        // works because the child is on the allowlist.
         let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
-        assert_eq!(resolve_res, Err(fsys::ResolveError::Internal));
+        assert_eq!(resolve_res, Ok(()));
         // verify the copy of the component resolver result that was sent to component manager
         let resolver_response = test_channel_rx.next().await;
         assert_matches!(resolver_response, Some(fresolution::Component { abi_revision: None, .. }));
         let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
-        assert!(instance.resolved_info.is_none());
+        assert!(instance.resolved_info.is_some());
     }
     // Test resolution of a component with an unsupported abi revision
     {
-        let child_moniker = "./unsupported_abi_component";
+        let child_moniker = "./exempt_unsupported_abi_component";
         let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
         assert_eq!(resolve_res, Ok(()));
         let resolver_response = test_channel_rx.next().await;
@@ -336,71 +339,7 @@ async fn resolve_components_against_enforce_presence_policy() {
     }
     // Test resolution of a component with a supported abi revision
     {
-        let child_moniker = "./supported_abi_component";
-        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
-        assert_eq!(resolve_res, Ok(()));
-        let resolver_response =
-            test_channel_rx.next().await.expect("resolver failed to return an ABI component");
-        assert_eq!(
-            resolver_response.abi_revision.unwrap(),
-            version_history::HISTORY
-                .get_example_supported_version_for_tests()
-                .abi_revision
-                .as_u64()
-        );
-        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
-        assert!(instance.resolved_info.is_some());
-    }
-}
-
-#[fuchsia::test]
-async fn resolve_components_against_enforce_presence_compatibility_policy() {
-    // Uses a config that sets `abi_revision_policy` to `enforce_presence_and_compatibility`
-    let cm_url = "#meta/component_manager_enforce_presence_compatibility.cm";
-    // A channel used to verify component resolver fidl responses.
-    let (test_channel_tx, mut test_channel_rx) = mpsc::channel(1);
-    let (instance, _task) = create_realm(cm_url, test_channel_tx).await;
-    // get a handle to lifecycle controller to start components
-    let lifecycle_controller = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
-        .unwrap();
-    // get a handle to realmquery to get component info
-    let realm_query = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
-        .expect("failed to connect to RealmQuery");
-
-    // Test resolution of a component with an absent abi revision
-    {
-        let child_moniker = "./absent_abi_component";
-        // Attempt to resolve the component. Expect the component resolver to have returned a
-        // resolved component with an absent ABI, but resolution fails because of
-        // `enforce_presence_and_compatibility` compatibility policy.
-        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
-        assert_eq!(resolve_res, Err(fsys::ResolveError::Internal));
-        // verify the copy of the component resolver result that was sent to component manager
-        let resolver_response = test_channel_rx.next().await;
-        assert_matches!(resolver_response, Some(fresolution::Component { abi_revision: None, .. }));
-        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
-        assert!(instance.resolved_info.is_none());
-    }
-    // Test resolution of a component with an unsupported abi revision
-    {
-        let child_moniker = "./unsupported_abi_component";
-        let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
-        assert_eq!(resolve_res, Err(fsys::ResolveError::Internal));
-        let resolver_response = test_channel_rx.next().await;
-        assert_matches!(
-            resolver_response,
-            Some(fresolution::Component { abi_revision: Some(u64::MAX), .. })
-        );
-        let instance = realm_query.get_instance(child_moniker).await.unwrap().unwrap();
-        assert!(instance.resolved_info.is_none());
-    }
-    // Test resolution of a component with a supported abi revision
-    {
-        let child_moniker = "./supported_abi_component";
+        let child_moniker = "./exempt_supported_abi_component";
         let resolve_res = lifecycle_controller.resolve_instance(child_moniker).await.unwrap();
         assert_eq!(resolve_res, Ok(()));
         let resolver_response =

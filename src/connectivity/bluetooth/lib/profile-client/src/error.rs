@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fidl_fuchsia_bluetooth_bredr as bredr, thiserror::Error};
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {

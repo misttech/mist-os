@@ -6,10 +6,8 @@
 //! contains data structure to represent the platform API in ways that are
 //! convenient for comparison, and the comparison algorithms.
 
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    fmt::Display,
-};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::fmt::Display;
 
 use anyhow::Result;
 use flyweights::FlyStr;

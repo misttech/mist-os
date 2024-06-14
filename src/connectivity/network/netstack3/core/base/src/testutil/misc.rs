@@ -11,6 +11,7 @@
 
 use alloc::vec::Vec;
 use core::fmt::Debug;
+use core::sync::atomic::{self, AtomicBool};
 
 /// Install a logger for tests.
 ///
@@ -18,44 +19,27 @@ use core::fmt::Debug;
 /// This function sets global program state, so all tests that run after this
 /// function is called will use the logger.
 pub fn set_logger_for_test() {
-    use tracing::Subscriber;
-    use tracing_subscriber::{
-        fmt::{
-            format::{self, FormatEvent, FormatFields},
-            FmtContext,
-        },
-        registry::LookupSpan,
-    };
+    struct Logger;
 
-    struct SimpleFormatter;
-
-    impl<S, N> FormatEvent<S, N> for SimpleFormatter
-    where
-        S: Subscriber + for<'a> LookupSpan<'a>,
-        N: for<'a> FormatFields<'a> + 'static,
-    {
-        fn format_event(
-            &self,
-            ctx: &FmtContext<'_, S, N>,
-            mut writer: format::Writer<'_>,
-            event: &tracing::Event<'_>,
-        ) -> std::fmt::Result {
-            ctx.format_fields(writer.by_ref(), event)?;
-            writeln!(writer)
+    impl log::Log for Logger {
+        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+            true
         }
+
+        fn log(&self, record: &log::Record<'_>) {
+            std::println_for_test!("[{}] ({}) {}", record.level(), record.target(), record.args())
+        }
+
+        fn flush(&self) {}
     }
 
-    tracing::subscriber::set_global_default(
-        tracing_subscriber::fmt()
-            .event_format(SimpleFormatter)
-            .with_max_level(tracing::Level::TRACE)
-            .with_test_writer()
-            .finish(),
-    )
-    .unwrap_or({
-        // Ignore errors caused by some other test invocation having already set
-        // the global default subscriber.
-    })
+    static LOGGER_ONCE: AtomicBool = AtomicBool::new(true);
+
+    // log::set_logger will panic if called multiple times.
+    if LOGGER_ONCE.swap(false, atomic::Ordering::AcqRel) {
+        log::set_logger(&Logger).unwrap();
+        log::set_max_level(log::LevelFilter::Trace);
+    }
 }
 
 /// Asserts that an iterable object produces zero items.

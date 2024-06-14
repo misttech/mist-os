@@ -10,16 +10,16 @@ import hashlib
 import json
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any
 
 
-def content_sha1(content):
+def content_sha1(content: bytes) -> str:
     sha1 = hashlib.sha1()
     sha1.update(content)
     return sha1.hexdigest()
 
 
-def package_manifest_sha1(path):
+def package_manifest_sha1(path: str) -> str:
     """Normalizes package manifest then calculate hash."""
     with open(path, "r") as f:
         raw_json = json.load(f)
@@ -32,14 +32,14 @@ def package_manifest_sha1(path):
     return content_sha1(json.dumps(raw_json).encode())
 
 
-def file_sha1(path):
+def file_sha1(path: str) -> str:
     """Hashes a file as-is."""
     with open(path, "rb") as f:
         return content_sha1(f.read())
 
 
 def normalize_file_in_config(
-    configuration: Dict[str, Any], item: str, root_dir: str
+    configuration: dict[str, Any], item: str, root_dir: str
 ) -> None:
     """Replace an `item` (in "foo.bar.baz" format) in the `configuration` with
     an item that contains the sha1 of the file referenced. The new item will be
@@ -116,13 +116,13 @@ def normalize_file_in_config(
 
 
 def normalize_files_in_config(
-    configuration: Dict[str, Any], items: List[str], root_dir: str
+    configuration: dict[str, Any], items: list[str], root_dir: str
 ) -> None:
     for item in items:
         normalize_file_in_config(configuration, item, root_dir)
 
 
-def remove_empty_items(configuration: Dict[str, Any]) -> None:
+def remove_empty_items(configuration: dict[str, Any]) -> None:
     """Remove all items (recursively) whose value is 'None'"""
     items_to_remove = []
     for name, value in configuration.items():
@@ -130,7 +130,7 @@ def remove_empty_items(configuration: Dict[str, Any]) -> None:
         if value is None:
             items_to_remove.append(name)
 
-        elif isinstance(value, Dict):
+        elif isinstance(value, dict):
             # if the value is a dict, then remove any None-value and empty dicts
             # from it.
             remove_empty_items(value)
@@ -144,7 +144,7 @@ def remove_empty_items(configuration: Dict[str, Any]) -> None:
         configuration.pop(name)
 
 
-def normalize_platform(config, root_dir):
+def normalize_platform(config: dict[str, Any], root_dir: str) -> None:
     if "platform" not in config:
         return
 
@@ -182,8 +182,11 @@ def normalize_platform(config, root_dir):
 
 
 def normalize_product(
-    config, root_dir, extra_files_read, config_data_to_ignore
-):
+    config: dict[str, Any],
+    root_dir: str,
+    extra_files_read: list[str],
+    config_data_to_ignore: list[str],
+) -> None:
     if "product" not in config:
         return
 
@@ -275,12 +278,17 @@ def normalize_product(
     return
 
 
-def normalize(config, root_dir, extra_files_read, config_data_to_ignore):
+def normalize(
+    config: dict[str, Any],
+    root_dir: str,
+    extra_files_read: list[str],
+    config_data_to_ignore: list[str],
+) -> None:
     normalize_platform(config, root_dir)
     normalize_product(config, root_dir, extra_files_read, config_data_to_ignore)
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Compares assembly product configurations"
     )
@@ -316,7 +324,7 @@ def main():
     product_config_json1 = json.load(args.product_config1)
     product_config_json2 = json.load(args.product_config2)
 
-    extra_files_read = []
+    extra_files_read: list[str] = []
     normalize(
         product_config_json1,
         args.root_dir1,
@@ -354,6 +362,8 @@ def main():
     if len(diffstr) != 0:
         print(f"Error: non-empty diff product configs:\n{diffstr}")
         return 1
+
+    return 0
 
 
 if __name__ == "__main__":

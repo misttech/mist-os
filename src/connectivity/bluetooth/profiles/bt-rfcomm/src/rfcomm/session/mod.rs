@@ -7,18 +7,18 @@ use bt_rfcomm::frame::mux_commands::*;
 use bt_rfcomm::frame::{CommandResponse, Frame, FrameData, FrameParseError, UIHData, UserData};
 use bt_rfcomm::{Role, ServerChannel, DLCI};
 use fidl_fuchsia_bluetooth::ErrorCode;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{Channel, PeerId};
-use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Shared};
 use futures::lock::Mutex;
 use futures::{select, FutureExt, SinkExt, StreamExt};
 use packet_encoding::Encodable;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info, trace, warn};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 /// RFCOMM channels used to communicate with profile clients.
 pub mod channel;
@@ -26,10 +26,8 @@ pub mod channel;
 /// The multiplexer that manages RFCOMM channels for this session.
 pub mod multiplexer;
 
-use self::{
-    channel::{Credits, FlowControlMode, FlowControlledData},
-    multiplexer::{SessionMultiplexer, SessionParameters},
-};
+use self::channel::{Credits, FlowControlMode, FlowControlledData};
+use self::multiplexer::{SessionMultiplexer, SessionParameters};
 use crate::rfcomm::inspect::SessionInspect;
 use crate::rfcomm::types::{Error, SignaledTask};
 
@@ -1070,10 +1068,12 @@ mod tests {
     use async_utils::PollExt;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async as fasync;
-    use futures::{task::Poll, Future};
+    use futures::task::Poll;
+    use futures::Future;
     use std::pin::pin;
 
-    use crate::{rfcomm::session::multiplexer::ParameterNegotiationState, rfcomm::test_util::*};
+    use crate::rfcomm::session::multiplexer::ParameterNegotiationState;
+    use crate::rfcomm::test_util::*;
 
     /// Makes a DLC PN frame with arbitrary command parameters.
     /// `command_response` indicates whether the frame should be a command or response.

@@ -14,6 +14,7 @@
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/lib/utils/pixel.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
@@ -163,7 +164,7 @@ TEST_F(CpuRendererIntegrationTest, RenderSmokeTest) {
   EXPECT_TRUE(utils::IsEventSignalled(release_fence_copy, ZX_EVENT_SIGNALED));
 }
 
-TEST_F(CpuRendererIntegrationTest, Renders) {
+TEST_F(CpuRendererIntegrationTest, RendersImage) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
 
   // Send one token to Flatland Allocator.
@@ -227,6 +228,27 @@ TEST_F(CpuRendererIntegrationTest, Renders) {
   auto histogram = screenshot.Histogram();
 
   EXPECT_EQ(histogram[color], num_pixels);
+}
+
+TEST_F(CpuRendererIntegrationTest, RendersSolidFill) {
+  // Create a red solid fill.
+  const ContentId kFilledRectContentId{.value = 1};
+  root_flatland_->CreateFilledRect(kFilledRectContentId);
+  const fuchsia::ui::composition::ColorRgba kRed{
+      .red = 1.f, .green = 0.f, .blue = 0.f, .alpha = 1.f};
+  root_flatland_->SetSolidFill(kFilledRectContentId, kRed,
+                               {.width = display_width_, .height = display_height_});
+
+  // Present the created solid fill.
+  root_flatland_->CreateTransform(kRootTransform);
+  root_flatland_->SetRootTransform(kRootTransform);
+  root_flatland_->SetContent(kRootTransform, kFilledRectContentId);
+  BlockingPresent(this, root_flatland_);
+
+  auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
+  auto histogram = screenshot.Histogram();
+
+  EXPECT_EQ(histogram[utils::kRed], display_width_ * display_height_);
 }
 
 }  // namespace integration_tests

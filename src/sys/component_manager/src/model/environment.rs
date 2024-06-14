@@ -2,22 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        component::{
-            manager::ComponentManagerInstance, ComponentInstance, ExtendedInstance,
-            WeakExtendedInstance,
-        },
-        resolver::{Resolver, ResolverRegistry},
-    },
-    ::routing::environment::{DebugRegistry, EnvironmentExtends, RunnerRegistry},
-    ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
-    async_trait::async_trait,
-    cm_rust::EnvironmentDecl,
-    fidl_fuchsia_component_decl as fdecl,
-    std::{sync::Arc, time::Duration},
-    tracing::error,
-};
+use crate::model::component::manager::ComponentManagerInstance;
+use crate::model::component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance};
+use crate::model::resolver::{Resolver, ResolverRegistry};
+use ::routing::environment::{DebugRegistry, EnvironmentExtends, RunnerRegistry};
+use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
+use async_trait::async_trait;
+use cm_rust::EnvironmentDecl;
+use fidl_fuchsia_component_decl as fdecl;
+use std::sync::Arc;
+use std::time::Duration;
+use tracing::error;
 
 #[cfg(test)]
 use std::sync::Weak;
@@ -151,35 +146,30 @@ impl Resolver for Environment {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::model::{
-            component::StartReason,
-            context::ModelContext,
-            model::{Model, ModelParams},
-            testing::mocks::MockResolver,
-            token::InstanceRegistry,
-        },
-        ::routing::{
-            bedrock::structured_dict::ComponentInput, environment::DebugRegistration,
-            policy::PolicyError,
-        },
-        assert_matches::assert_matches,
-        cm_config::{
-            AllowlistEntryBuilder, CapabilityAllowlistSource, DebugCapabilityAllowlistEntry,
-            DebugCapabilityKey, RuntimeConfig, SecurityPolicy,
-        },
-        cm_rust::{RegistrationSource, RunnerRegistration},
-        cm_rust_testing::{
-            ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
-        },
-        cm_types::Name,
-        errors::{ActionError, ModelError, ResolveActionError},
-        fidl_fuchsia_component as fcomponent,
-        maplit::hashmap,
-        moniker::Moniker,
-        std::collections::{HashMap, HashSet},
+    use super::*;
+    use crate::model::component::StartReason;
+    use crate::model::context::ModelContext;
+    use crate::model::model::{Model, ModelParams};
+    use crate::model::testing::mocks::MockResolver;
+    use crate::model::token::InstanceRegistry;
+    use ::routing::bedrock::structured_dict::ComponentInput;
+    use ::routing::environment::DebugRegistration;
+    use ::routing::policy::PolicyError;
+    use assert_matches::assert_matches;
+    use cm_config::{
+        AllowlistEntryBuilder, CapabilityAllowlistSource, DebugCapabilityAllowlistEntry,
+        DebugCapabilityKey, RuntimeConfig, SecurityPolicy,
     };
+    use cm_rust::{RegistrationSource, RunnerRegistration};
+    use cm_rust_testing::{
+        ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
+    };
+    use cm_types::Name;
+    use errors::{ActionError, ModelError, ResolveActionError};
+    use fidl_fuchsia_component as fcomponent;
+    use maplit::hashmap;
+    use moniker::Moniker;
+    use std::collections::{HashMap, HashSet};
 
     #[fuchsia::test]
     async fn test_from_decl() {

@@ -511,7 +511,7 @@ static void spinlock_test() {
   ASSERT(!arch_ints_disabled());
 
   // Verify slightly more advanced functionality that requires multiple cores.
-  cpu_mask_t active = mp_get_active_mask();
+  const cpu_mask_t active = Scheduler::PeekActiveMask();
   if (!active || ispow2(active)) {
     printf("skipping rest of spinlock_test, not enough active cpus\n");
     return;
@@ -667,7 +667,7 @@ static cpu_mask_t random_mask(cpu_mask_t active) {
 static int affinity_test_thread(void* arg) {
   Thread* t = Thread::Current::Get();
   affinity_test_state* state = static_cast<affinity_test_state*>(arg);
-  cpu_mask_t active = mp_get_active_mask();
+  const cpu_mask_t active = Scheduler::PeekActiveMask();
 
   printf("top of affinity tester %p\n", t);
 
@@ -712,7 +712,7 @@ static int affinity_test_thread(void* arg) {
 __NO_INLINE static void affinity_test() {
   printf("starting thread affinity test\n");
 
-  cpu_mask_t active = mp_get_active_mask();
+  const cpu_mask_t active = Scheduler::PeekActiveMask();
   if (!active || ispow2(active)) {
     printf("aborting test, not enough active cpus\n");
     return;
@@ -804,7 +804,7 @@ __NO_INLINE static void priority_test() {
   ASSERT(bp.IsFair());
   ASSERT(bp.fair.weight == SchedulerState::ConvertPriorityToWeight(DEFAULT_PRIORITY - 2));
 
-  cpu_mask_t active = mp_get_active_mask();
+  const cpu_mask_t active = Scheduler::PeekActiveMask();
   if (!active || ispow2(active)) {
     printf("skipping rest, not enough active cpus\n");
     return;

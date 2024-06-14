@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file
 
-use {super::util::*, crate::FONTS_SMALL_CM};
+use super::util::*;
+use crate::FONTS_SMALL_CM;
 
 // Add new tests here so we don't overload component manager with requests (58150)
 #[fasync::run_singlethreaded(test)]

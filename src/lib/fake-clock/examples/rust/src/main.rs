@@ -4,12 +4,11 @@
 
 use fidl::Error;
 use fidl_fuchsia_fakeclock_test::{ExampleRequest, ExampleRequestStream};
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use named_timer::DeadlineId;
 use tracing::warn;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const DEADLINE_NAME: DeadlineId<'static> = DeadlineId::new("fake-clock-example", "deadline");
 

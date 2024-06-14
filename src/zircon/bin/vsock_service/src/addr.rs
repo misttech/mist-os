@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_hardware_vsock::Addr as Raw,
-    std::{
-        hash::{Hash, Hasher},
-        ops::{Deref, DerefMut},
-    },
-};
+use fidl_fuchsia_hardware_vsock::Addr as Raw;
+use std::hash::{Hash, Hasher};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Debug)]
 pub struct Vsock {

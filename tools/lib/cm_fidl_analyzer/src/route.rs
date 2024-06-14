@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::component_model::AnalyzerModelError,
-    cm_types::Name,
-    moniker::Moniker,
-    routing::mapper::RouteSegment,
-    serde::{Deserialize, Serialize},
-    thiserror::Error,
-};
+use crate::component_model::AnalyzerModelError;
+use cm_types::Name;
+use moniker::Moniker;
+use routing::mapper::RouteSegment;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 /// A summary of a specific capability route and the outcome of verification.
 #[derive(Clone, Debug, PartialEq)]

@@ -4,13 +4,11 @@
 
 //! Typesafe wrappers around parsing the update-mode file.
 
-use {
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    serde::{Deserialize, Serialize},
-    std::str::FromStr,
-    thiserror::Error,
-};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use thiserror::Error;
 
 /// An error encountered while parsing the update-mode file.
 #[derive(Debug, Error)]
@@ -98,10 +96,12 @@ pub(crate) async fn update_mode(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::TestUpdatePackage, assert_matches::assert_matches,
-        fuchsia_async as fasync, proptest::prelude::*, serde_json::json,
-    };
+    use super::*;
+    use crate::TestUpdatePackage;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use proptest::prelude::*;
+    use serde_json::json;
 
     fn valid_update_mode_json_value(mode: &str) -> serde_json::Value {
         json!({

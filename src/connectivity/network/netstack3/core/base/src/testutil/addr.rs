@@ -5,9 +5,9 @@
 //! Defines shareable address constants for use in tests.
 
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
+use net_types::ethernet::Mac;
+use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
 use net_types::{
-    ethernet::Mac,
-    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
     MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, UnicastAddress, Witness as _,
 };
 

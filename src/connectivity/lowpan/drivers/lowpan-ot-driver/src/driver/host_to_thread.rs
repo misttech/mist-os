@@ -14,7 +14,8 @@ use lowpan_driver_common::net::{Ipv6PacketMatcherRule, NetworkInterfaceEvent};
 
 use packet::ParsablePacket;
 use packet_formats::icmp::mld::MldPacket;
-use packet_formats::icmp::{ndp::NdpPacket, IcmpParseArgs, Icmpv6Packet};
+use packet_formats::icmp::ndp::NdpPacket;
+use packet_formats::icmp::{IcmpParseArgs, Icmpv6Packet};
 use packet_formats::ip::{IpPacket, IpProto, Ipv6Proto};
 use packet_formats::ipv6::Ipv6Packet;
 

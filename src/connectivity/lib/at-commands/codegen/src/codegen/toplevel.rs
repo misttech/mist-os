@@ -6,17 +6,11 @@
 //! modules and imports and calls out to the other codegen modules to generate types
 //! and "raise" and "lower" methods.
 
-use {
-    super::lower as codegen_lower,
-    super::raise as codegen_raise,
-    super::types as codegen_types,
-    super::{
-        common::{write_indent, write_newline},
-        error::Result,
-    },
-    crate::definition::Definition,
-    std::io,
-};
+use super::common::{write_indent, write_newline};
+use super::error::Result;
+use super::{lower as codegen_lower, raise as codegen_raise, types as codegen_types};
+use crate::definition::Definition;
+use std::io;
 
 static PRELUDE: &str = r"// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be

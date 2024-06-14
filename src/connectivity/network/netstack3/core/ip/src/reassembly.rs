@@ -30,14 +30,11 @@
 //! + 40 byte IPv6 header). If a link supports an MTU greater than the maximum
 //! size of a non-jumbogram packet, the packet should not be fragmented.
 
-use alloc::{
-    collections::{
-        hash_map::{Entry, HashMap},
-        BTreeSet, BinaryHeap,
-    },
-    vec::Vec,
-};
-use core::{cmp::Ordering, time::Duration};
+use alloc::collections::hash_map::{Entry, HashMap};
+use alloc::collections::{BTreeSet, BinaryHeap};
+use alloc::vec::Vec;
+use core::cmp::Ordering;
+use core::time::Duration;
 
 use assert_matches::assert_matches;
 use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpVersionMarker};
@@ -46,11 +43,10 @@ use netstack3_base::{
     TimerContext,
 };
 use packet::BufferViewMut;
-use packet_formats::{
-    ip::IpPacket,
-    ipv4::{Ipv4Header, Ipv4Packet},
-    ipv6::{ext_hdrs::Ipv6ExtensionHeaderData, Ipv6Packet},
-};
+use packet_formats::ip::IpPacket;
+use packet_formats::ipv4::{Ipv4Header, Ipv4Packet};
+use packet_formats::ipv6::ext_hdrs::Ipv6ExtensionHeaderData;
+use packet_formats::ipv6::Ipv6Packet;
 use zerocopy::{ByteSlice, ByteSliceMut};
 
 use crate::internal::base::IpExt;
@@ -812,23 +808,17 @@ mod tests {
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
-    use net_types::{
-        ip::{Ipv4, Ipv6},
-        Witness,
+    use net_types::ip::{Ipv4, Ipv6};
+    use net_types::Witness;
+    use netstack3_base::testutil::{
+        assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt, TestAddrs,
+        TEST_ADDRS_V4, TEST_ADDRS_V6,
     };
-    use netstack3_base::{
-        testutil::{
-            assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt, TestAddrs,
-            TEST_ADDRS_V4, TEST_ADDRS_V6,
-        },
-        CtxPair, IntoCoreTimerCtx,
-    };
+    use netstack3_base::{CtxPair, IntoCoreTimerCtx};
     use packet::{Buf, ParseBuffer, Serializer};
-    use packet_formats::{
-        ip::{IpProto, Ipv6ExtHdrType},
-        ipv4::Ipv4PacketBuilder,
-        ipv6::Ipv6PacketBuilder,
-    };
+    use packet_formats::ip::{IpProto, Ipv6ExtHdrType};
+    use packet_formats::ipv4::Ipv4PacketBuilder;
+    use packet_formats::ipv6::Ipv6PacketBuilder;
 
     use crate::internal::base;
 
@@ -1215,8 +1205,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_ip_reassembly<I: Ip + TestIpExt + base::IpExt>() {
+    #[ip_test(I)]
+    fn test_ip_reassembly<I: TestIpExt + base::IpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
@@ -1255,8 +1245,8 @@ mod tests {
         try_reassemble_ip_packet(&mut core_ctx, &mut bindings_ctx, fragment_id, 24);
     }
 
-    #[ip_test]
-    fn test_ip_reassemble_with_missing_blocks<I: Ip + TestIpExt + base::IpExt>() {
+    #[ip_test(I)]
+    fn test_ip_reassemble_with_missing_blocks<I: TestIpExt + base::IpExt>() {
         let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
@@ -1298,8 +1288,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_ip_reassemble_after_timer<I: Ip + TestIpExt + base::IpExt>() {
+    #[ip_test(I)]
+    fn test_ip_reassemble_after_timer<I: TestIpExt + base::IpExt>() {
         let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
@@ -1390,8 +1380,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_ip_fragment_cache_oom<I: Ip + TestIpExt + base::IpExt>() {
+    #[ip_test(I)]
+    fn test_ip_fragment_cache_oom<I: TestIpExt + base::IpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let mut fragment_id = 0;
         const THRESHOLD: usize = 8196usize;
@@ -1445,8 +1435,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_unordered_fragments<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_unordered_fragments<I: TestIpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
@@ -1483,8 +1473,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_ip_overlapping_single_fragment<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_ip_overlapping_single_fragment<I: TestIpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
@@ -1657,8 +1647,8 @@ mod tests {
         assert_eq!(core_ctx.state.cache.size, 0);
     }
 
-    #[ip_test]
-    fn test_ip_reassembly_with_multiple_intertwined_packets<I: Ip + TestIpExt + base::IpExt>() {
+    #[ip_test(I)]
+    fn test_ip_reassembly_with_multiple_intertwined_packets<I: TestIpExt + base::IpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
@@ -1731,10 +1721,8 @@ mod tests {
         try_reassemble_ip_packet(&mut core_ctx, &mut bindings_ctx, fragment_id_1, 24);
     }
 
-    #[ip_test]
-    fn test_ip_reassembly_timer_with_multiple_intertwined_packets<
-        I: Ip + TestIpExt + base::IpExt,
-    >() {
+    #[ip_test(I)]
+    fn test_ip_reassembly_timer_with_multiple_intertwined_packets<I: TestIpExt + base::IpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
@@ -1903,8 +1891,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_cancel_timer_on_overlap<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_cancel_timer_on_overlap<I: TestIpExt>() {
         const FRAGMENT_ID: u16 = 1;
         const FRAGMENT_OFFSET: u16 = 0;
         const M_FLAG: bool = true;

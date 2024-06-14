@@ -8,14 +8,12 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
-#include <lib/ddk/binding.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/fidl/cpp/wire/vector_view.h>
-#include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/fit/function.h>
 #include <lib/zircon-internal/align.h>
 #include <stdio.h>
@@ -26,6 +24,7 @@
 
 #include <unordered_set>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <fbl/string_printf.h>
 
 #include "src/devices/bus/drivers/platform/node-util.h"
@@ -320,25 +319,12 @@ void PlatformDevice::DdkRelease() { delete this; }
 zx_status_t PlatformDevice::Start() {
   // TODO(b/340283894): Remove.
   static const std::unordered_set<std::string> kLegacyNameAllowlist{
-      "ram-nand",          // 00:00:2e
-      "i2c-0",             // 05:00:2
-      "i2c-2",             // 05:00:2:2
-      "vim3-sdio",         // 05:00:6
-      "aml_emmc",          // 05:00:8
-      "aml-sdio",          // 05:00:6,05:00:7
-      "aml-ram-ctl",       // 05:05:24,05:03:24,05:04:24
-      "aml-thermal-pll",   // 05:05:a,05:03:a,05:04:a
-      "nelson-emmc",       // 05:00:8
-      "thermistor",        // 03:0a:27
-      "i2c-1",             // 05:00:2:1
-      "raw_nand",          // 05:00:f
-      "aml-thermal-ddr",   // 05:03:28,05:04:28
-      "sherlock-emmc",     // 05:00:8
-      "sherlock-sd-emmc",  // 05:00:6
-      "pll-temp-sensor",   // 05:06:39
-      "sysmem",            // 00:00:1b
-      "fake-battery",      // 00:00:33
-      "gpio",              // 05:04:1,05:03:1,05:05:1,05:06:1
+      "ram-nand",         // 00:00:2e
+      "aml-thermal-pll",  // 05:05:a,05:03:a,05:04:a
+      "thermistor",       // 03:0a:27
+      "pll-temp-sensor",  // 05:06:39
+      "sysmem",           // 00:00:1b
+      "gpio",             // 05:04:1,05:03:1,05:05:1,05:06:1
   };
 
   char name[ZX_DEVICE_NAME_MAX];
@@ -360,14 +346,13 @@ zx_status_t PlatformDevice::Start() {
     }
   }
 
-  std::vector<zx_device_prop_t> dev_props{
-      {BIND_PLATFORM_DEV_VID, 0, vid_},
-      {BIND_PLATFORM_DEV_PID, 0, pid_},
-      {BIND_PLATFORM_DEV_DID, 0, did_},
-      {BIND_PLATFORM_DEV_INSTANCE_ID, 0, instance_id_},
+  std::vector<zx_device_prop_t> dev_props;
+  std::vector<zx_device_str_prop_t> dev_str_props{
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, vid_),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID, pid_),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID, did_),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id_),
   };
-
-  std::vector<zx_device_str_prop_t> dev_str_props;
   if (node_.properties().has_value()) {
     for (auto& prop : node_.properties().value()) {
       if (auto dev_prop = ConvertToDeviceProperty(prop); dev_prop.is_ok()) {

@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 use ref_cast::RefCast;
-use std::{
-    borrow::Borrow,
-    cmp::Ordering,
-    hash::{Hash, Hasher},
-    ops::Deref,
-    sync::{Arc, Weak},
-};
+use std::borrow::Borrow;
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
+use std::ops::Deref;
+use std::sync::{Arc, Weak};
 
 /// A wrapper around Arc with Hash implemented based on Arc::as_ptr.
 #[derive(RefCast)]

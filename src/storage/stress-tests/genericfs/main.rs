@@ -7,19 +7,16 @@ mod environment;
 mod file_actor;
 mod instance_actor;
 
-use {
-    argh::FromArgs,
-    environment::FsEnvironment,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
-    fs_management::{F2fs, Fxfs, Minfs},
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
-    std::sync::Arc,
-    stress_test::run_test,
-    tracing::Level,
-};
+use argh::FromArgs;
+use environment::FsEnvironment;
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
+use fs_management::{F2fs, Fxfs, Minfs};
+use fuchsia_component::client::connect_to_protocol;
+use std::sync::Arc;
+use stress_test::run_test;
+use tracing::Level;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[derive(Clone, Debug, FromArgs)]
 /// Creates an instance of fvm and performs stressful operations on it

@@ -1,12 +1,11 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_pkg as fpkg,
-    fuchsia_pkg_testing::{serve::responder, PackageBuilder, RepositoryBuilder},
-    lib::{make_pkg_with_extra_blobs, TestEnvBuilder, EMPTY_REPO_PATH},
-    std::sync::Arc,
-};
+use fuchsia_pkg_testing::serve::responder;
+use fuchsia_pkg_testing::{PackageBuilder, RepositoryBuilder};
+use lib::{make_pkg_with_extra_blobs, TestEnvBuilder, EMPTY_REPO_PATH};
+use std::sync::Arc;
+use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_pkg as fpkg};
 
 #[fuchsia::test]
 async fn create_tuf_client_timeout() {

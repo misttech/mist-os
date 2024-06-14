@@ -9,10 +9,9 @@ import argparse
 import json
 import os
 import sys
-from typing import List, Set
 
 from depfile import DepFile
-from assembly import FileEntry, FilePath, ImageAssemblyConfig, PackageManifest
+from assembly import FilePath, ImageAssemblyConfig, PackageManifest
 from serialization import json_load
 
 
@@ -25,9 +24,9 @@ def get_relative_path(relative_path: str, relative_to_file: str) -> str:
 
 
 def files_from_package_set(
-    package_set: List[FilePath], deps: Set[FilePath]
-) -> Set[FilePath]:
-    paths: Set[FilePath] = set()
+    package_set: list[FilePath], deps: set[FilePath]
+) -> set[FilePath]:
+    paths: set[FilePath] = set()
     for manifest in package_set:
         paths.add(manifest)
         with open(manifest, "r") as file:
@@ -53,7 +52,7 @@ def files_from_package_set(
     return paths
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--image-assembly-config",
@@ -73,8 +72,8 @@ def main():
     )
 
     args = parser.parse_args()
-    deps: Set[FilePath] = set()
-    inputs: Set[FilePath] = set()
+    deps: set[FilePath] = set()
+    inputs: set[FilePath] = set()
 
     with open(args.image_assembly_config, "r") as f:
         config = ImageAssemblyConfig.json_load(f)
@@ -108,8 +107,17 @@ def main():
             elif image["type"] == "zbi":
                 if "postprocessing_script" in image:
                     script = image["postprocessing_script"]
-                    if "path" in script:
+                    if "path" in script and script["path"]:
                         inputs.add(script["path"])
+                    if (
+                        "board_script_path" in script
+                        and script["board_script_path"]
+                    ):
+                        script_dir = os.path.dirname(
+                            script["board_script_path"]
+                        )
+                        for file in os.listdir(script_dir):
+                            inputs.add(os.path.join(script_dir, file))
 
     if deps:
         with open(args.depfile, "w") as depfile:
@@ -118,6 +126,8 @@ def main():
     with open(args.output, "w") as f:
         for input in inputs:
             f.write(input + "\n")
+
+    return 0
 
 
 if __name__ == "__main__":

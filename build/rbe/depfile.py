@@ -14,12 +14,12 @@ from typing import AbstractSet, Callable, Iterable, Optional, Sequence
 
 
 class LexError(ValueError):
-    def __init__(self, msg):
+    def __init__(self, msg: str):
         super().__init__(msg)
 
 
 class ParseError(ValueError):
-    def __init__(self, msg):
+    def __init__(self, msg: str):
         super().__init__(msg)
 
 
@@ -46,7 +46,7 @@ _COMMENT_RE = re.compile(r"#[^\n]*")
 
 
 def _lex_line(line: str) -> Iterable[Token]:
-    prev: Token = None
+    prev: Token | None = None
     while line:  # is not empty
         next_char = line[0]
 
@@ -175,7 +175,7 @@ class Dep(object):
     @property
     def absolute_paths(self) -> AbstractSet[Path]:
         return {
-            p for p in self.target_paths + self.deps_paths if p.is_absolute()
+            p for p in [*self.target_paths, *self.deps_paths] if p.is_absolute()
         }
 
 
@@ -202,7 +202,7 @@ def _parse_one_dep(toks: Iterable[Token]) -> Optional[Dep]:
     state: _ParserState = _ParserState.EXPECTING_FIRST_TARGET
 
     targets = []
-    colon = None
+    colon: Token
     deps = []
 
     for tok in toks:
@@ -281,7 +281,7 @@ def parse_lines(lines: Iterable[str]) -> Iterable[Dep]:
 
 
 def absolute_paths(deps: Iterable[Dep]) -> AbstractSet[Path]:
-    unique_paths = set()
+    unique_paths: set[Path] = set()
     for d in deps:
         unique_paths.update(d.absolute_paths)
     return unique_paths

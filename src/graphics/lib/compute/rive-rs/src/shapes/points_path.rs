@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    bones::{Skin, Skinnable},
-    component::Component,
-    component_dirt::ComponentDirt,
-    core::{Core, Object, ObjectRef, OnAdded, Property},
-    math::Mat,
-    option_cell::OptionCell,
-    shapes::path::Path,
-    transform_component::TransformComponent,
-};
+use crate::bones::{Skin, Skinnable};
+use crate::component::Component;
+use crate::component_dirt::ComponentDirt;
+use crate::core::{Core, Object, ObjectRef, OnAdded, Property};
+use crate::math::Mat;
+use crate::option_cell::OptionCell;
+use crate::shapes::path::Path;
+use crate::transform_component::TransformComponent;
 
 #[derive(Debug, Default)]
 pub struct PointsPath {

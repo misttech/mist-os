@@ -13,17 +13,16 @@
 //! distinct from the empty `buffered::MgmtFrame` type. Generally, there is no need to explicitly
 //! refer to the corresponding `mac` types in event handlers.
 
-use {
-    fidl_fuchsia_wlan_tap as fidl_tap,
-    std::{borrow::Borrow, fmt::Debug, marker::PhantomData},
-    wlan_common::mac::{
-        self, ActionBody, AssocReqFrame as ParsedAssocReqFrame,
-        AssocRespFrame as ParsedAssocRespFrame, AuthFrame as ParsedAuthFrame,
-        DataFrame as ParsedDataFrame, MacFrame as ParsedMacFrame, MgmtFrame as ParsedMgmtFrame,
-        NoAck, ProbeReqFrame as ParsedProbeReqFrame,
-    },
-    zerocopy::ByteSlice,
+use fidl_fuchsia_wlan_tap as fidl_tap;
+use std::borrow::Borrow;
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use wlan_common::mac::{
+    self, ActionBody, AssocReqFrame as ParsedAssocReqFrame, AssocRespFrame as ParsedAssocRespFrame,
+    AuthFrame as ParsedAuthFrame, DataFrame as ParsedDataFrame, MacFrame as ParsedMacFrame,
+    MgmtFrame as ParsedMgmtFrame, NoAck, ProbeReqFrame as ParsedProbeReqFrame,
 };
+use zerocopy::ByteSlice;
 
 use crate::event::extract::FromEvent;
 

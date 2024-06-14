@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        get_system_image_hash, CachePackages, CachePackagesInitError, StaticPackages,
-        StaticPackagesInitError,
-    },
-    anyhow::Context as _,
-    fuchsia_hash::Hash,
-    package_directory::RootDir,
-    std::sync::Arc,
+use crate::{
+    get_system_image_hash, CachePackages, CachePackagesInitError, StaticPackages,
+    StaticPackagesInitError,
 };
+use anyhow::Context as _;
+use fuchsia_hash::Hash;
+use package_directory::RootDir;
+use std::sync::Arc;
 
 static DISABLE_RESTRICTIONS_FILE_PATH: &str = "data/pkgfs_disable_executability_restrictions";
 
@@ -92,7 +90,9 @@ impl SystemImage {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, fuchsia_pkg_testing::SystemImageBuilder};
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_pkg_testing::SystemImageBuilder;
 
     struct TestEnv {
         _blobfs: blobfs_ramdisk::BlobfsRamdisk,

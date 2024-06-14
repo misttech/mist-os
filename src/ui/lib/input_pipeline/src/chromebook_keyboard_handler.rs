@@ -22,12 +22,12 @@ use async_trait::async_trait;
 use fidl_fuchsia_input::Key;
 use fidl_fuchsia_ui_input3::KeyEventType;
 use fuchsia_inspect::health::Reporter;
-use fuchsia_trace as ftrace;
-use fuchsia_zircon as zx;
 use keymaps::KeyState;
 use lazy_static::lazy_static;
 use maplit::hashmap;
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
+use {fuchsia_trace as ftrace, fuchsia_zircon as zx};
 
 /// The vendor ID denoting the internal Chromebook keyboard.
 const VENDOR_ID: u32 = 0x18d1; // Google

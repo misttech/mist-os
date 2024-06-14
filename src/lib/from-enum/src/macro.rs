@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    darling::{ast, FromDeriveInput, FromField, FromVariant},
-    proc_macro2::TokenStream,
-    quote::quote,
-    std::collections::HashSet,
-    syn::{parse_macro_input, Ident, Type},
-};
+use darling::{ast, FromDeriveInput, FromField, FromVariant};
+use proc_macro2::TokenStream;
+use quote::quote;
+use std::collections::HashSet;
+use syn::{parse_macro_input, Ident, Type};
 
 #[derive(FromField)]
 struct EnumField {

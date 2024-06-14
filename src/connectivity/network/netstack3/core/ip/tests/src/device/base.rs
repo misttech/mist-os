@@ -4,43 +4,36 @@
 
 use alloc::collections::HashSet;
 use alloc::vec;
-use core::{
-    num::{NonZeroU16, NonZeroU8},
-    time::Duration,
-};
+use core::num::{NonZeroU16, NonZeroU8};
+use core::time::Duration;
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac};
-use net_types::{
-    ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
-    LinkLocalAddr, SpecifiedAddr, UnicastAddr, Witness,
-};
+use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
+use net_types::{LinkLocalAddr, SpecifiedAddr, UnicastAddr, Witness};
 use test_case::test_case;
 
-use netstack3_base::{testutil::FakeInstant, InstantContext as _};
-use netstack3_core::{
-    device::{
-        DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
-        LoopbackDevice, MaxEthernetFrameSize,
-    },
-    testutil::{
-        assert_empty, Ctx, CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx,
-        TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-    },
-    IpExt, StackStateBuilder, TimerId,
+use netstack3_base::testutil::{assert_empty, FakeInstant, TestIpExt as _};
+use netstack3_base::InstantContext as _;
+use netstack3_core::device::{
+    DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
+    LoopbackDevice, MaxEthernetFrameSize,
 };
-use netstack3_ip::{
-    device::{
-        AddressRemovedReason, DadTimerId, IpAddressId as _, IpAddressState, IpDeviceConfiguration,
-        IpDeviceConfigurationUpdate, IpDeviceEvent, IpDeviceFlags, IpDeviceStateContext,
-        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
-        Ipv6DeviceTimerId, Lifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfiguration,
-        UpdateIpConfigurationError,
-    },
-    gmp::MldTimerId,
-    nud::{self, LinkResolutionResult},
+use netstack3_core::testutil::{
+    Ctx, CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
 };
+use netstack3_core::{IpExt, StackStateBuilder, TimerId};
+use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_ip::device::{
+    AddressRemovedReason, DadTimerId, IpAddressId as _, IpAddressState, IpDeviceConfiguration,
+    IpDeviceConfigurationUpdate, IpDeviceEvent, IpDeviceFlags, IpDeviceStateContext,
+    Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
+    Ipv6DeviceTimerId, Lifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfiguration,
+    UpdateIpConfigurationError,
+};
+use netstack3_ip::gmp::MldTimerId;
+use netstack3_ip::nud::{self, LinkResolutionResult};
 
 #[test]
 fn enable_disable_ipv4() {
@@ -619,9 +612,9 @@ fn notify_on_dad_failure_ipv6() {
     let _ = ctx.bindings_ctx.take_events();
 }
 
-#[ip_test]
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-fn update_ip_device_configuration_err<I: Ip + IpExt>() {
+#[ip_test(I)]
+fn update_ip_device_configuration_err<I: IpExt>() {
     let mut ctx = FakeCtx::default();
 
     let loopback_device_id = ctx

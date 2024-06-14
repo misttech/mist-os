@@ -13,24 +13,22 @@ mod qcow_backend;
 mod remote_backend;
 mod wire;
 
-use {
-    crate::backend::*,
-    crate::block_device::*,
-    crate::copy_on_write_backend::CopyOnWriteBackend,
-    crate::file_backend::FileBackend,
-    crate::memory_backend::MemoryBackend,
-    crate::qcow_backend::QcowBackend,
-    crate::remote_backend::RemoteBackend,
-    anyhow::{anyhow, Context},
-    fidl::endpoints::RequestStream,
-    fidl_fuchsia_virtualization::{BlockFormat, BlockMode, BlockSpec},
-    fidl_fuchsia_virtualization_hardware::VirtioBlockRequestStream,
-    fuchsia_component::server,
-    fuchsia_trace as ftrace,
-    fuchsia_trace_provider::trace_provider_create_with_fdio,
-    futures::{StreamExt, TryFutureExt, TryStreamExt},
-    virtio_device::chain::ReadableChain,
-};
+use crate::backend::*;
+use crate::block_device::*;
+use crate::copy_on_write_backend::CopyOnWriteBackend;
+use crate::file_backend::FileBackend;
+use crate::memory_backend::MemoryBackend;
+use crate::qcow_backend::QcowBackend;
+use crate::remote_backend::RemoteBackend;
+use anyhow::{anyhow, Context};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_virtualization::{BlockFormat, BlockMode, BlockSpec};
+use fidl_fuchsia_virtualization_hardware::VirtioBlockRequestStream;
+use fuchsia_component::server;
+use fuchsia_trace as ftrace;
+use fuchsia_trace_provider::trace_provider_create_with_fdio;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use virtio_device::chain::ReadableChain;
 
 async fn create_backend(
     format: BlockFormat,

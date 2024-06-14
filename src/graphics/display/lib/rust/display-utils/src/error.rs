@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_hardware_display::ClientCompositionOp,
-    fidl_fuchsia_hardware_display_types::{ClientCompositionOpcode, ConfigResult},
-    fuchsia_zircon as zx,
-    futures::channel::mpsc,
-    thiserror::Error,
-};
+use fidl_fuchsia_hardware_display::ClientCompositionOp;
+use fidl_fuchsia_hardware_display_types::{ClientCompositionOpcode, ConfigResult};
+use fuchsia_zircon as zx;
+use futures::channel::mpsc;
+use thiserror::Error;
 
-use crate::{
-    controller::VsyncEvent,
-    types::{DisplayId, LayerId},
-};
+use crate::controller::VsyncEvent;
+use crate::types::{DisplayId, LayerId};
 
 /// Library error type.
 #[derive(Error, Debug)]

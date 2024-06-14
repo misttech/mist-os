@@ -13,10 +13,10 @@ import json
 import os
 import sys
 import logging
-from typing import Dict, List, Set, Tuple, Optional
 
 from assembly import (
     AssemblyInputBundle,
+    AssemblyInputBundleCreationException,
     AIBCreator,
     KernelInfo,
 )
@@ -24,7 +24,7 @@ from assembly import (
 logger = logging.getLogger()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Create an assemblyinput bundle that includes the zircon kernel"
     )

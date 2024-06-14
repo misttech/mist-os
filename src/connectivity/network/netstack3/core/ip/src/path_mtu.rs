@@ -8,12 +8,12 @@
 use alloc::collections::HashMap;
 use core::time::Duration;
 
+use log::trace;
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Mtu};
 use netstack3_base::{
     CoreTimerContext, HandleableTimer, Instant, InstantBindingsTypes, TimerBindingsTypes,
     TimerContext,
 };
-use tracing::trace;
 
 /// Time between PMTU maintenance operations.
 ///
@@ -411,14 +411,11 @@ mod tests {
     use super::*;
 
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ipv4, Ipv6};
     use net_types::{SpecifiedAddr, Witness};
-    use netstack3_base::{
-        testutil::{
-            assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt, TestIpExt,
-        },
-        CtxPair, InstantContext, IntoCoreTimerCtx,
+    use netstack3_base::testutil::{
+        assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeTimerCtxExt, TestIpExt,
     };
+    use netstack3_base::{CtxPair, InstantContext, IntoCoreTimerCtx};
     use test_case::test_case;
 
     struct FakePmtuContext<I: Ip> {
@@ -494,8 +491,8 @@ mod tests {
         core_ctx.state.cache.get_last_updated(src_ip, dst_ip)
     }
 
-    #[ip_test]
-    fn test_ip_path_mtu_cache_ctx<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_ip_path_mtu_cache_ctx<I: TestIpExt>() {
         let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 
@@ -667,8 +664,8 @@ mod tests {
         );
     }
 
-    #[ip_test]
-    fn test_ip_pmtu_task<I: Ip + TestIpExt>() {
+    #[ip_test(I)]
+    fn test_ip_pmtu_task<I: TestIpExt>() {
         let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
 

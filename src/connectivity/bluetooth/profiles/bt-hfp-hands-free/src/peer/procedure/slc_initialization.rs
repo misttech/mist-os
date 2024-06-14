@@ -5,8 +5,7 @@
 use anyhow::{format_err, Result};
 use at_commands as at;
 
-use super::{at_cmd, at_ok, at_resp};
-use super::{CommandToHf, Procedure, ProcedureInput, ProcedureOutput};
+use super::{at_cmd, at_ok, at_resp, CommandToHf, Procedure, ProcedureInput, ProcedureOutput};
 
 use crate::features::{extract_features_from_command, AgFeatures, CVSD, MSBC};
 use crate::peer::ag_indicators::AgIndicatorIndex;
@@ -332,7 +331,8 @@ fn convert_cind_to_hf_command(cind: at::Success) -> ProcedureOutput {
 mod tests {
     use super::*;
 
-    use crate::{config::HandsFreeFeatureSupport, features::CallHoldAction, features::HfFeatures};
+    use crate::config::HandsFreeFeatureSupport;
+    use crate::features::{CallHoldAction, HfFeatures};
     use assert_matches::assert_matches;
 
     fn supported_indicator_indices_output(

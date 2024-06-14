@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use etagere::{size2, AllocId, Allocation, AtlasAllocator};
 use renderer::{Renderer, Timings};
 use rustc_hash::FxHashMap;
-use surpass::{
-    painter::{Color, Fill, Func, GradientType, Image, ImageId, Props},
-    Order,
-};
+use surpass::painter::{Color, Fill, Func, GradientType, Image, ImageId, Props};
+use surpass::Order;
 
 use crate::{Composition, Layer};
 

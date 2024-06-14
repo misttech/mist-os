@@ -1,0 +1,132 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This file will be processed in every toolchain, so detect when it's being
+# processed in the default_toolchain.  As this file is imported by
+# BUILDCONFIG.gn, `default_toolchain` hasn't yet been set, and while
+# `current_toolchain` _is_ set, it's an empty string while in the context of
+# the default toolchain.
+_print_warnings = current_toolchain == ""
+
+declare_args() {
+  # The overall compilation mode to use.  The valid values are:
+  #  * `dbg`: for debug-enabled builds.
+  #  * `fastbuild`: some optimizations, but prioritizing compilation speed over
+  #                 runtime performance.
+  #  * `opt`: all the optimizations, used for product releases.
+  compilation_mode = ""
+
+  # Overridden settings for the compilation mode.  This is a set of override
+  # values for variables whose default values are set by the chosen compilation
+  # mode (above).
+  #   * optimize:  The optimization mode to use.  Valid values are:
+  #       * `none`: really unoptimized, usually only build-tested and not run
+  #       * `debug`: "optimized for debugging", light enough to avoid confusion
+  #       * `default`: default optimization level
+  #       * `size`:  optimized for space rather than purely for speed
+  #       * `size_lto`:  optimize for space and use LTO
+  #       * `speed`: optimized purely for speed
+  #       * `sanitizer`: optimized for sanitizers (ASan, etc.)
+  #       * `profile`: optimized for coverage/profile data collection
+  #       * `coverage`: optimized for coverage data collection
+  #
+  compilation_settings_overrides = {
+  }
+}
+
+_default_compilation_settings = {
+  dbg = {
+    optimize = "none"
+  }
+
+  fastbuild = {
+    optimize = "minimal"
+  }
+
+  opt = {
+    optimize = "size_lto"
+  }
+}
+
+declare_args() {
+  # Debug build.
+  is_debug = ""
+}
+
+# Determine if compilation_modes or is_debug are being used by the developer
+#
+# After this block of logic, both compilation_mode and is_debug will have a
+# valid value.
+#
+if (compilation_mode == "" && is_debug == "") {
+  # Neither is specified, use the "debug" compilation mode as the default
+  compilation_mode = "dbg"
+  is_debug = true
+} else if (compilation_mode != "") {
+  # capture the value as specified as a GN argument
+  _is_debug_gn_arg = is_debug
+
+  # Compilation mode has been set by the developer, set is_debug to match
+  is_debug = compilation_mode == "dbg"
+
+  # Print warnings about use of the old GN argument when 'compilation_mode'
+  if (_is_debug_gn_arg != "" && _print_warnings) {
+    print()
+    print(
+        "WARNING: The 'is_debug' GN arg is ignored when 'compilation_mode' has been set.")
+    if (_is_debug_gn_arg != is_debug) {
+      print()
+      print(
+          "WARNING: 'is_debug' has been overridden by the chosen 'compilation_mode', it is now: ${is_debug}")
+    }
+    print()
+  }
+} else {
+  # Compilation mode has not been set, but is_debug has, so set compilation_mode
+  # to match
+  if (is_debug) {
+    compilation_mode = "dbg"
+  } else {
+    compilation_mode = "opt"
+  }
+}
+
+assert(is_debug != "", "'is_debug' has not been correctly set via GN args.")
+assert(compilation_mode != "",
+       "'compilation_mode' has not been correctly set via GN args.")
+
+# Validate that the chosen compilation mode is one of the valid modes
+assert(
+    defined(_default_compilation_settings[compilation_mode]),
+    "The specified compilation mode (${compilation_mode}) is not a valid option. They are: 'dbg', 'fastbuild', and 'opt'")
+
+compilation_settings = {
+  # Set the compilation settings to use based on the chosen compilation mode
+  _settings_defaults = _default_compilation_settings[compilation_mode]
+  forward_variables_from(_settings_defaults, "*")
+
+  if (_print_warnings) {
+    # Warn if the overridden settings are not at their default value for this
+    # compilation mode.
+    foreach(_setting_name, [ "optimize" ]) {
+      if (defined(compilation_settings_overrides[_setting_name]) &&
+          compilation_settings_overrides[_setting_name] ==
+          _settings_defaults[_setting_name]) {
+        print(
+            "  WARNING:  You are setting '${_setting_name}' to the default value (${optimize}) for this compilation mode (${compilation_mode}), this is unncessary.")
+      }
+    }
+  }
+
+  # Apply overrides specified by the developer. This cannot be done using the
+  # forward_variables_from() function because that will refuse to clobber any
+  # existing values.  However, this also allows the inclusion of specific logic
+  # (such as warning about setting overrides to default values or using
+  # deprecated options).
+
+  # optimization setting
+  if (defined(compilation_settings_overrides.optimize)) {
+    optimize = compilation_settings_overrides.optimize
+  }
+}

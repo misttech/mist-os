@@ -8,16 +8,15 @@
 //! based on the user-overridable join channel and bandwidth.
 //! If successful, the capabilities will be extracted and saved.
 
+use crate::channel::{Cbw, Channel};
+use crate::ie::intersect::*;
+use crate::ie::{
+    self, parse_ht_capabilities, parse_vht_capabilities, HtCapabilities, SupportedRate,
+    VhtCapabilities,
+};
+use crate::mac::CapabilityInfo;
+use anyhow::{format_err, Context as _, Error};
 use {
-    crate::{
-        channel::{Cbw, Channel},
-        ie::{
-            self, intersect::*, parse_ht_capabilities, parse_vht_capabilities, HtCapabilities,
-            SupportedRate, VhtCapabilities,
-        },
-        mac::CapabilityInfo,
-    },
-    anyhow::{format_err, Context as _, Error},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_mlme as fidl_mlme,
 };
@@ -234,12 +233,9 @@ fn intersect(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            assert_variant, mac, test_utils::fake_capabilities::fake_5ghz_band_capability_ht_cbw,
-        },
-    };
+    use super::*;
+    use crate::test_utils::fake_capabilities::fake_5ghz_band_capability_ht_cbw;
+    use crate::{assert_variant, mac};
 
     #[test]
     fn test_build_cap_info() {

@@ -1,19 +1,17 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{anyhow, Context as _, Error},
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::file::AsyncReader,
-    fuchsia_zircon as zx,
-    futures::{future::BoxFuture, prelude::*},
-    std::{convert::TryInto as _, marker::PhantomData, path::Path},
-    tuf::{
-        metadata::{MetadataPath, MetadataVersion, TargetPath},
-        pouf::Pouf,
-        repository::{RepositoryProvider, RepositoryStorage},
-    },
-};
+use anyhow::{anyhow, Context as _, Error};
+use fuchsia_fs::file::AsyncReader;
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use std::convert::TryInto as _;
+use std::marker::PhantomData;
+use std::path::Path;
+use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
+use tuf::pouf::Pouf;
+use tuf::repository::{RepositoryProvider, RepositoryStorage};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -279,9 +277,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fuchsia_async as fasync, futures::io::Cursor, tempfile::tempdir, tuf::pouf::Pouf1,
-    };
+    use super::*;
+    use fuchsia_async as fasync;
+    use futures::io::Cursor;
+    use tempfile::tempdir;
+    use tuf::pouf::Pouf1;
 
     fn get_random_buffer() -> Vec<u8> {
         use rand::prelude::*;

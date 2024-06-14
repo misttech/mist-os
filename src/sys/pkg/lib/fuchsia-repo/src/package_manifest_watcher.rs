@@ -2,29 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, format_err, Context as _, Result},
-    camino::{Utf8Path, Utf8PathBuf},
-    fuchsia_hash::Hash,
-    fuchsia_pkg::{PackageManifest, PackageManifestList},
-    futures::{
-        channel::mpsc::{channel, Receiver},
-        executor::block_on,
-        SinkExt, Stream,
-    },
-    notify::{RecommendedWatcher, RecursiveMode},
-    notify_batch_watcher::{BatchEvent, BatchWatcher, Error as BatchError},
-    std::{
-        collections::{hash_map, HashMap, HashSet},
-        fs::File,
-        io::BufReader,
-        path::PathBuf,
-        pin::Pin,
-        task::{Context, Poll},
-        time::{Duration, Instant},
-    },
-    tracing::error,
-};
+use anyhow::{anyhow, format_err, Context as _, Result};
+use camino::{Utf8Path, Utf8PathBuf};
+use fuchsia_hash::Hash;
+use fuchsia_pkg::{PackageManifest, PackageManifestList};
+use futures::channel::mpsc::{channel, Receiver};
+use futures::executor::block_on;
+use futures::{SinkExt, Stream};
+use notify::{RecommendedWatcher, RecursiveMode};
+use notify_batch_watcher::{BatchEvent, BatchWatcher, Error as BatchError};
+use std::collections::{hash_map, HashMap, HashSet};
+use std::fs::File;
+use std::io::BufReader;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
+use tracing::error;
 
 type BatchResult = Result<BatchEvent, Vec<BatchError>>;
 
@@ -567,10 +561,12 @@ fn read_package_manifest_list(path: &Utf8Path) -> Result<HashSet<Utf8PathBuf>> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::test_utils, fuchsia_async::TimeoutExt, fuchsia_pkg::PackageBuilder,
-        futures::StreamExt as _, pretty_assertions::assert_eq,
-    };
+    use super::*;
+    use crate::test_utils;
+    use fuchsia_async::TimeoutExt;
+    use fuchsia_pkg::PackageBuilder;
+    use futures::StreamExt as _;
+    use pretty_assertions::assert_eq;
 
     const TEST_BATCH_WATCHER_TIMEOUT: Duration = Duration::from_millis(100);
 

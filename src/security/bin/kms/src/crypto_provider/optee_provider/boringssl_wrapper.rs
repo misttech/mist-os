@@ -11,9 +11,7 @@ use bssl_sys::{
     RSA_free, RSA_get0_key, RSA_new, RSA_parse_private_key, RSA_set0_key, BIGNUM as BN, CBB, CBS,
     EC_KEY, EVP_PKEY, RSA,
 };
-use std::mem;
-use std::ptr;
-use std::slice;
+use std::{mem, ptr, slice};
 
 /// Wrapper around openssl BIGNUM.
 struct BigNum<'a> {

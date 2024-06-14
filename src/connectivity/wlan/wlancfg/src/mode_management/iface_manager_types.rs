@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        access_point::{state_machine as ap_fsm, types as ap_types},
-        client::types as client_types,
-        mode_management::iface_manager_api as api,
-        regulatory_manager::REGION_CODE_LEN,
-    },
-    anyhow::Error,
-    futures::channel::oneshot,
-};
+use crate::access_point::{state_machine as ap_fsm, types as ap_types};
+use crate::client::types as client_types;
+use crate::mode_management::iface_manager_api as api;
+use crate::regulatory_manager::REGION_CODE_LEN;
+use anyhow::Error;
+use futures::channel::oneshot;
 
 pub use ieee80211::Ssid;
 

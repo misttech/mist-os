@@ -12,16 +12,16 @@ use crate::{
     clone_get_service_proxy_assert_ok,
 };
 
-use crate::{
-    execution_scope::ExecutionScope,
-    file::test_utils::{run_client, run_server_client},
-    service, ToObjectRequest,
-};
+use crate::execution_scope::ExecutionScope;
+use crate::file::test_utils::{run_client, run_server_client};
+use crate::{service, ToObjectRequest};
 
-use {
-    assert_matches::assert_matches, fidl::endpoints::create_proxy, fidl_fuchsia_io as fio,
-    fuchsia_async::TestExecutor, fuchsia_zircon_status::Status, futures::StreamExt,
-};
+use assert_matches::assert_matches;
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
+use fuchsia_async::TestExecutor;
+use fuchsia_zircon_status::Status;
+use futures::StreamExt;
 
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;

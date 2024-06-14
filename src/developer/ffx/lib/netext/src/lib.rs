@@ -4,16 +4,12 @@
 
 use anyhow::{anyhow, bail, Context as _, Result};
 use itertools::Itertools;
-use nix::{
-    ifaddrs::{getifaddrs, InterfaceAddress},
-    net::if_::InterfaceFlags,
-    sys::socket::{SockaddrLike, SockaddrStorage},
-};
+use nix::ifaddrs::{getifaddrs, InterfaceAddress};
+use nix::net::if_::InterfaceFlags;
+use nix::sys::socket::{SockaddrLike, SockaddrStorage};
 use regex::Regex;
-use std::{
-    ffi::CString,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-};
+use std::ffi::CString;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 pub trait IsLocalAddr {
     /// is_local_addr returns true if the address is not globally routable.

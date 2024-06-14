@@ -469,11 +469,12 @@ impl NetstackFacade {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_net as fnet;
-    use fidl_fuchsia_net_interfaces as finterfaces;
-    use fuchsia_async as fasync;
     use futures::StreamExt as _;
     use test_case::test_case;
+    use {
+        fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as finterfaces,
+        fuchsia_async as fasync,
+    };
 
     struct MockStateTester {
         expected_state: Vec<Box<dyn FnOnce(finterfaces::WatcherRequest) + Send + 'static>>,

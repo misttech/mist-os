@@ -2,39 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::{collections::HashMap, vec::Vec};
-use core::{
-    fmt::{Debug, Display},
-    num::NonZeroU64,
-};
+use alloc::collections::HashMap;
+use alloc::vec::Vec;
+use core::fmt::{Debug, Display};
+use core::num::NonZeroU64;
 
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use net_types::{
-    ethernet::Mac,
-    ip::{Ip, IpVersion, Ipv4, Ipv6},
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
+use netstack3_base::sync::RwLock;
 use netstack3_base::{
-    sync::RwLock, Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector,
-    InstantContext, ReferenceNotifiers, TimerBindingsTypes, TimerHandler,
+    Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector, InstantContext,
+    ReferenceNotifiers, TimerBindingsTypes, TimerHandler,
 };
 use netstack3_filter::FilterBindingsTypes;
 use netstack3_ip::nud::{LinkResolutionContext, NudCounters};
 use packet::Buf;
 
-use crate::internal::{
-    arp::ArpCounters,
-    ethernet::{EthernetLinkDevice, EthernetTimerId},
-    id::{
-        BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
-        EthernetWeakDeviceId,
-    },
-    loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
-    pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
-    queue::{rx::ReceiveQueueBindingsContext, tx::TransmitQueueBindingsContext},
-    socket::{self, HeldSockets},
-    state::DeviceStateSpec,
+use crate::internal::arp::ArpCounters;
+use crate::internal::ethernet::{EthernetLinkDevice, EthernetTimerId};
+use crate::internal::id::{
+    BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
+    EthernetWeakDeviceId,
 };
+use crate::internal::loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId};
+use crate::internal::pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId};
+use crate::internal::queue::rx::ReceiveQueueBindingsContext;
+use crate::internal::queue::tx::TransmitQueueBindingsContext;
+use crate::internal::socket::{self, HeldSockets};
+use crate::internal::state::DeviceStateSpec;
 
 /// Iterator over devices.
 ///
@@ -243,6 +240,16 @@ pub struct DeviceCounters {
     pub send_ipv6_frame: Counter,
     /// Count of frames that failed to send because there was no Tx queue.
     pub send_dropped_no_queue: Counter,
+}
+
+impl DeviceCounters {
+    /// Either `send_ipv4_frame` or `send_ipv6_frame` depending on `I`.
+    pub fn send_frame<I: Ip>(&self) -> &Counter {
+        match I::VERSION {
+            IpVersion::V4 => &self.send_ipv4_frame,
+            IpVersion::V6 => &self.send_ipv6_frame,
+        }
+    }
 }
 
 impl Inspectable for DeviceCounters {

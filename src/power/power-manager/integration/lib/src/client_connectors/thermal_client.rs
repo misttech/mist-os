@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::TestEnv, fidl_fuchsia_thermal as fthermal};
+use crate::TestEnv;
+use fidl_fuchsia_thermal as fthermal;
 
 /// Convenience type for interacting with the Power Manager's thermal client service.
 pub struct ThermalClient {

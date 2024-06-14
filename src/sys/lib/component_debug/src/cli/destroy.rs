@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        cli::format::format_destroy_error, lifecycle::destroy_instance_in_collection,
-        query::get_cml_moniker_from_query,
-    },
-    anyhow::{format_err, Result},
-    fidl_fuchsia_sys2 as fsys,
-};
+use crate::cli::format::format_destroy_error;
+use crate::lifecycle::destroy_instance_in_collection;
+use crate::query::get_cml_moniker_from_query;
+use anyhow::{format_err, Result};
+use fidl_fuchsia_sys2 as fsys;
 
 pub async fn destroy_cmd<W: std::io::Write>(
     query: String,
@@ -43,10 +40,11 @@ pub async fn destroy_cmd<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, crate::test_utils::serve_realm_query_instances,
-        fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt, moniker::Moniker,
-    };
+    use super::*;
+    use crate::test_utils::serve_realm_query_instances;
+    use fidl::endpoints::create_proxy_and_stream;
+    use futures::TryStreamExt;
+    use moniker::Moniker;
 
     fn setup_fake_lifecycle_controller(
         expected_moniker: &'static str,

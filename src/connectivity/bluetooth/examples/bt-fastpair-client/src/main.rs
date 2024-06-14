@@ -13,7 +13,8 @@ use fidl_fuchsia_bluetooth_sys::{
 };
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::client::connect_to_protocol;
-use futures::{select, stream::TryStreamExt, FutureExt};
+use futures::stream::TryStreamExt;
+use futures::{select, FutureExt};
 use std::pin::pin;
 use tracing::{info, warn};
 

@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::util::future_with_metadata::FutureWithMetadata,
-    futures::{channel::mpsc, future::BoxFuture, prelude::*, select, stream::FuturesUnordered},
-};
+use crate::util::future_with_metadata::FutureWithMetadata;
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use futures::select;
+use futures::stream::FuturesUnordered;
 
 pub trait Listener<F> {
     /// Sends an update to the listener.  Returns itself boxed if the update was sent successfully.
@@ -105,14 +107,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::super::*,
-        fidl::endpoints::create_proxy,
-        fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync,
-        futures::{channel::mpsc, prelude::*, task::Poll},
-        std::pin::pin,
-        wlan_common::assert_variant,
-    };
+    use super::super::*;
+    use fidl::endpoints::create_proxy;
+    use futures::channel::mpsc;
+    use futures::prelude::*;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use wlan_common::assert_variant;
+    use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync};
 
     // A collection of test utilities to test the Generic functions using Client impl
     mod test_utils {

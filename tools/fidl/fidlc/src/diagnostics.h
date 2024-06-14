@@ -358,13 +358,8 @@ constexpr ErrorDef<180, Name> ErrExperimentalZxCTypesDisallowed(
     "{0} is an experimental type that must be enabled by with `--experimental zx_c_types`");
 constexpr ErrorDef<181> ErrReferenceInLibraryAttribute(
     "attributes on the 'library' declaration do not support referencing constants");
-constexpr ErrorDef<182, const AttributeArg *> ErrLegacyWithoutRemoval(
-    "the argument '{0}' is not allowed on an element that is never removed");
-constexpr ErrorDef<183, const AttributeArg *, std::string_view, const AttributeArg *,
-                   std::string_view, SourceSpan>
-    ErrLegacyConflictsWithParent(
-        "the argument {0}={1} conflicts with {2}={3} at {4}; a child element "
-        "cannot be added back at LEGACY if its parent is removed");
+constexpr RetiredDef<182> ErrLegacyWithoutRemoval;
+constexpr RetiredDef<183> ErrLegacyConflictsWithParent;
 constexpr ErrorDef<184, std::string_view> ErrUnexpectedControlCharacter(
     "unexpected control character in string literal; use the Unicode escape `\\u{{0}}` instead");
 constexpr ErrorDef<185> ErrUnicodeEscapeMissingBraces(
@@ -432,7 +427,7 @@ constexpr ErrorDef<215, const Element *, Version, std::string_view> ErrInvalidRe
     "'{2}' marked added={1}; please define it");
 constexpr ErrorDef<216, const Element *, Version, AbiKind, AbiValue, SourceSpan, std::string_view>
     ErrInvalidRemovedAbi(
-        "{0} is marked removed={1}, but its {2} ({t3}) is reused at {4}; use "
+        "{0} is marked removed={1}, but its {2} ({3}) is reused at {4}; use "
         "replaced={1}, renamed=\"{5}\" instead of removed={1} if you intend to "
         "replace the ABI, otherwise choose a different {2}");
 constexpr ErrorDef<217, const Element *, Version, AbiKind, AbiValue, AbiValue, SourceSpan>

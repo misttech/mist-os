@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::buffer_allocator::BufferAllocator,
-    std::ops::{Bound, Range, RangeBounds},
-    std::slice::SliceIndex,
-};
+use crate::buffer_allocator::BufferAllocator;
+use std::ops::{Bound, Range, RangeBounds};
+use std::slice::SliceIndex;
 
 pub use crate::buffer_allocator::BufferFuture;
 

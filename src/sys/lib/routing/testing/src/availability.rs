@@ -2,20 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
-        ServiceInstance,
-    },
-    cm_rust::*,
-    cm_rust_testing::*,
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    moniker::Moniker,
-    std::{
-        marker::PhantomData,
-        path::{Path, PathBuf},
-    },
+use crate::{
+    CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
+    ServiceInstance,
 };
+use cm_rust::*;
+use cm_rust_testing::*;
+use moniker::Moniker;
+use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 pub struct CommonAvailabilityTest<T: RoutingTestModelBuilder> {
     builder: PhantomData<T>,

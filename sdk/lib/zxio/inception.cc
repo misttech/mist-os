@@ -6,6 +6,7 @@
 #include <lib/zx/stream.h>
 #include <lib/zx/vmo.h>
 #include <lib/zxio/cpp/inception.h>
+#include <zircon/availability.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -72,7 +73,7 @@ zx_status_t zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node> node,
     case fio::wire::NodeInfoDeprecated::Tag::kService:
       type = ZXIO_OBJECT_TYPE_SERVICE;
       break;
-#if __Fuchsia_API_level__ >= 18
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
     case fio::wire::NodeInfoDeprecated::Tag::kSymlink:
       type = ZXIO_OBJECT_TYPE_SYMLINK;
       break;

@@ -5,24 +5,17 @@
 //! Types for working with and exposing packet statistic counters.
 
 use net_types::ip::{Ip, Ipv4, Ipv6};
-
-use crate::{
-    context::{ContextPair, CounterContext},
-    device::{ethernet::EthernetDeviceCounters, ArpCounters, DeviceCounters},
-    inspect::Inspector,
-    ip::{
-        icmp::{
-            IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
-            NdpRxCounters, NdpTxCounters,
-        },
-        nud::{NudCounters, NudCountersInner},
-        IpCounters, IpLayerIpExt,
-    },
-    transport::{
-        tcp::{TcpCounters, TcpCountersInner},
-        udp::{UdpCounters, UdpCountersInner},
-    },
+use netstack3_base::{ContextPair, CounterContext, Inspector};
+use netstack3_device::ethernet::EthernetDeviceCounters;
+use netstack3_device::{ArpCounters, DeviceCounters};
+use netstack3_ip::icmp::{
+    IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
+    NdpRxCounters, NdpTxCounters,
 };
+use netstack3_ip::nud::{NudCounters, NudCountersInner};
+use netstack3_ip::{IpCounters, IpLayerIpExt};
+use netstack3_tcp::{TcpCounters, TcpCountersInner};
+use netstack3_udp::{UdpCounters, UdpCountersInner};
 
 /// An API struct for accessing all stack counters.
 pub struct CountersApi<C>(C);

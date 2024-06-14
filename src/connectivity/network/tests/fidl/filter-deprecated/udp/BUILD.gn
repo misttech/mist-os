@@ -10,7 +10,6 @@ rustc_test("udp") {
   deps = [
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
     "//src/connectivity/network/tests/fidl/filter-deprecated/common",
-    "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fuchsia-async",
   ]

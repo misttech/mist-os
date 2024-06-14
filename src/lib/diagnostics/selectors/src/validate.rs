@@ -2,13 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    error::{StringPatternError, ValidationError},
-    types::{
-        self, ComparisonOperator, FilterExpression, Identifier, InclusionOperator, OneOrMany,
-        Operator, Value,
-    },
-};
+use crate::error::{StringPatternError, ValidationError};
+use crate::types;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 
 // NOTE: if we could use the negative_impls unstable feature, we could have a single ValidateExt
@@ -25,18 +20,12 @@ pub trait ValidateTreeSelectorExt {
     fn validate(&self) -> Result<(), ValidationError>;
 }
 
-pub trait ValidateMetadataSelectorExt {
-    fn validate(&self) -> Result<(), ValidationError>;
-}
-
 pub trait Selector {
     type Component: ComponentSelector;
     type Tree: TreeSelector;
-    type Metadata: MetadataSelector;
 
     fn component(&self) -> Option<&Self::Component>;
     fn tree(&self) -> Option<&Self::Tree>;
-    fn metadata(&self) -> Option<&Self::Metadata>;
 }
 
 pub trait ComponentSelector {
@@ -49,10 +38,6 @@ pub trait TreeSelector {
 
     fn node_path(&self) -> Option<&[Self::Segment]>;
     fn property(&self) -> Option<&Self::Segment>;
-}
-
-pub trait MetadataSelector {
-    fn filters(&self) -> &[types::FilterExpression<'_>];
 }
 
 pub trait StringSelector {
@@ -69,9 +54,6 @@ impl<T: Selector> ValidateExt for T {
             }
             (None, _) => return Err(ValidationError::MissingComponentSelector),
             (_, None) => return Err(ValidationError::MissingTreeSelector),
-        }
-        if let Some(metadata) = self.metadata() {
-            metadata.validate()?;
         }
         Ok(())
     }
@@ -108,95 +90,6 @@ impl<T: TreeSelector> ValidateTreeSelectorExt for T {
     }
 }
 
-impl<T: MetadataSelector> ValidateMetadataSelectorExt for T {
-    fn validate(&self) -> Result<(), ValidationError> {
-        for filter in self.filters() {
-            filter.validate_identifier_and_operator()?;
-            filter.validate_identifier_and_value()?;
-            filter.validate_operator_and_value()?;
-        }
-        Ok(())
-    }
-}
-
-// This macro is purely a utility fo validating that all the values in the given `$one_or_many` are
-// of a given type.
-macro_rules! match_one_or_many_value {
-    ($one_or_many:ident, $variant:pat) => {
-        match $one_or_many {
-            OneOrMany::One($variant) => true,
-            OneOrMany::Many(values) => values.iter().all(|value| matches!(value, $variant)),
-            _ => false,
-        }
-    };
-}
-
-impl FilterExpression<'_> {
-    /// Validates that all the values are of a type that can be used in an operation with this
-    /// identifier.
-    fn validate_identifier_and_value(&self) -> Result<(), ValidationError> {
-        let is_valid = match (&self.identifier, &self.value) {
-            (Identifier::Filename | Identifier::LifecycleEventType | Identifier::Tags, value) => {
-                match_one_or_many_value!(value, Value::StringLiteral(_))
-            }
-            (
-                Identifier::Pid | Identifier::Tid | Identifier::LineNumber | Identifier::Timestamp,
-                value,
-            ) => {
-                match_one_or_many_value!(value, Value::Number(_))
-            }
-            // TODO(https://fxbug.dev/42168030): it should also be possible to compare severities with a fixed
-            // set of numbers.
-            (Identifier::Severity, value) => {
-                match_one_or_many_value!(value, Value::Severity(_))
-            }
-        };
-        if is_valid {
-            Ok(())
-        } else {
-            Err(ValidationError::InvalidValueType(self.identifier.clone(), self.value.ty()))
-        }
-    }
-
-    /// Validates that this identifier can be used in an operation defined by the given `operator`.
-    fn validate_identifier_and_operator(&self) -> Result<(), ValidationError> {
-        match (&self.identifier, &self.operator) {
-            (
-                Identifier::Filename
-                | Identifier::LifecycleEventType
-                | Identifier::Pid
-                | Identifier::Tid
-                | Identifier::LineNumber
-                | Identifier::Severity,
-                Operator::Comparison(ComparisonOperator::Equal)
-                | Operator::Comparison(ComparisonOperator::NotEq)
-                | Operator::Inclusion(InclusionOperator::In),
-            ) => Ok(()),
-            (Identifier::Severity | Identifier::Timestamp, Operator::Comparison(_)) => Ok(()),
-            (
-                Identifier::Tags,
-                Operator::Inclusion(InclusionOperator::HasAny | InclusionOperator::HasAll),
-            ) => Ok(()),
-            _ => Err(ValidationError::InvalidOperator(
-                self.identifier.clone(),
-                self.operator.clone(),
-            )),
-        }
-    }
-
-    fn validate_operator_and_value(&self) -> Result<(), ValidationError> {
-        // Validate the operation can be used with the type of value.
-        match (&self.operator, &self.value) {
-            (Operator::Inclusion(_), OneOrMany::Many(_)) => Ok(()),
-            (Operator::Comparison(_), OneOrMany::One(_)) => Ok(()),
-            (Operator::Inclusion(_), OneOrMany::One(_))
-            | (Operator::Comparison(_), OneOrMany::Many(_)) => {
-                Err(ValidationError::InvalidOperatorRhs(self.operator.clone(), self.value.ty()))
-            }
-        }
-    }
-}
-
 #[derive(Default)]
 struct StringSelectorValidationOpts {
     allow_recursive_glob: bool,
@@ -206,8 +99,6 @@ trait ValidateStringSelectorExt {
     fn validate(&self, opts: StringSelectorValidationOpts) -> Result<(), ValidationError>;
 }
 
-// TODO(https://fxbug.dev/42132713): we might want to just implement this differently for FIDL and the
-// internal types. The parser should cover all of the string pattern requirements. Verify.
 impl<T: StringSelector> ValidateStringSelectorExt for T {
     fn validate(&self, opts: StringSelectorValidationOpts) -> Result<(), ValidationError> {
         match (self.exact_match(), self.pattern()) {
@@ -271,8 +162,6 @@ fn validate_pattern(pattern: &str) -> Result<(), ValidationError> {
 impl Selector for fdiagnostics::Selector {
     type Component = fdiagnostics::ComponentSelector;
     type Tree = fdiagnostics::TreeSelector;
-    // TODO(https://fxbug.dev/42132713): placeholder implementation until we have metadata in the FIDL API.
-    type Metadata = ();
 
     fn component(&self) -> Option<&Self::Component> {
         self.component_selector.as_ref()
@@ -280,17 +169,6 @@ impl Selector for fdiagnostics::Selector {
 
     fn tree(&self) -> Option<&Self::Tree> {
         self.tree_selector.as_ref()
-    }
-
-    fn metadata(&self) -> Option<&Self::Metadata> {
-        // TODO(https://fxbug.dev/42132713): placeholder implementation until we have metadata in the FIDL API.
-        None
-    }
-}
-
-impl MetadataSelector for () {
-    fn filters(&self) -> &[types::FilterExpression<'_>] {
-        unreachable!("placholder impl. Metadata FIDL not implemented yet")
     }
 }
 
@@ -341,7 +219,6 @@ impl StringSelector for fdiagnostics::StringSelector {
 impl<'a> Selector for types::Selector<'a> {
     type Component = types::ComponentSelector<'a>;
     type Tree = types::TreeSelector<'a>;
-    type Metadata = types::MetadataSelector<'a>;
 
     fn component(&self) -> Option<&Self::Component> {
         Some(&self.component)
@@ -349,10 +226,6 @@ impl<'a> Selector for types::Selector<'a> {
 
     fn tree(&self) -> Option<&Self::Tree> {
         Some(&self.tree)
-    }
-
-    fn metadata(&self) -> Option<&Self::Metadata> {
-        self.metadata.as_ref()
     }
 }
 
@@ -373,12 +246,6 @@ impl<'a> TreeSelector for types::TreeSelector<'a> {
 
     fn property(&self) -> Option<&Self::Segment> {
         self.property.as_ref()
-    }
-}
-
-impl<'a> MetadataSelector for types::MetadataSelector<'a> {
-    fn filters(&self) -> &[types::FilterExpression<'a>] {
-        self.filters()
     }
 }
 

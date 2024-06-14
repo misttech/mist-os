@@ -6,17 +6,14 @@
 #![deny(unused_results)]
 
 use anyhow::Context as _;
-use ffx_net_test_realm_args as ntr_args;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
-use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_test_realm as fntr;
-use fidl_fuchsia_sys2 as fsys;
 use tracing::error;
+use {
+    ffx_net_test_realm_args as ntr_args, fidl_fuchsia_developer_remotecontrol as fremotecontrol,
+    fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
+    fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_test_realm as fntr, fidl_fuchsia_sys2 as fsys,
+};
 
 async fn connect_to_protocol<S: fidl::endpoints::DiscoverableProtocolMarker>(
     remote_control: &fremotecontrol::RemoteControlProxy,

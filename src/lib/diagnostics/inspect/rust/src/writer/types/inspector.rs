@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::writer::{private::InspectTypeInternal, Error, Heap, Node, State};
+use crate::writer::private::InspectTypeInternal;
+use crate::writer::{Error, Heap, Node, State};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter};
 use inspect_format::{constants, BlockContainer, Container};
-use std::{borrow::Cow, cmp::max, fmt, sync::Arc};
+use std::borrow::Cow;
+use std::cmp::max;
+use std::fmt;
+use std::sync::Arc;
 use tracing::error;
 
 #[cfg(target_os = "fuchsia")]

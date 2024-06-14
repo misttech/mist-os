@@ -29,7 +29,7 @@
 
 - name: 'Component Framework'
   api_primary: 'geb@google.com'
-  api_secondary: 'ypomortsev@google.com'
+  api_secondary: 'dgilhooley@google.com'
   description: |
     The set of APIs that are used to define components, interact with
     components, and integrate with the Component Framework. These are the low
@@ -166,7 +166,7 @@
 
 - name: 'Graphics'
   api_primary: 'jbauman@google.com'
-  api_secondary: 'dalesat@google.com'
+  api_secondary: 'emircan@google.com'
   description: |
     The set of APIs that are used to transport and compose images on the system.
     It includes interfaces for communicating with graphics hardware, as well as
@@ -179,8 +179,8 @@
     - fidl: 'fuchsia.ui.gfx'
 
 - name: 'HCI'
-  api_primary: 'quiche@google.com'
-  api_secondary: 'neelsa@google.com'
+  api_primary: 'neelsa@google.com'
+  api_secondary: 'emircan@google.com'
   description: |
     <p>Covers input, accessibility, internationalization.</p>
     <p>
@@ -236,7 +236,7 @@
 
 - name: 'Media'
   api_primary: 'dalesat@google.com'
-  api_secondary: ''
+  api_secondary: 'ypomortsev@google.com'
   description: |
     The set of APIs used to capture, process and render audio and video streams.
     The media APIs also encompass adjacent concerns such as volume control and
@@ -251,7 +251,7 @@
     - fidl: 'fuchsia.mediacodec'
 
 - name: 'Metrics'
-  api_primary: 'camrdale@google.com'
+  api_primary: 'frousseau@google.com'
   api_secondary: ''
   description: |
     The set of APIs that allow clients to log events that are associated with
@@ -333,8 +333,8 @@
     - fidl: 'fuchsia.tee'
 
 - name: 'Sessions'
-  api_primary: 'ypomortsev@google.com'
-  api_secondary: ''
+  api_primary: 'quiche@google.com'
+  api_secondary: 'neelsa@google.com'
   description: |
     <p>
       A set of APIs to coordinate a product's user experience. Specifically the
@@ -349,6 +349,8 @@
     </p>
   examples:
     - fidl: 'fuchsia.element'
+    - fidl: 'fuchsia.session'
+    - fidl: 'fuchsia.session.power'
 
 - name: 'Software Delivery'
   api_primary: 'kevinwells@google.com'
@@ -424,8 +426,8 @@
   api_secondary: ''
 
 - name: 'View System'
-  api_primary: 'neelsa@google.com'
-  api_secondary: 'quiche@google.com'
+  api_primary: 'emircan@google.com'
+  api_secondary: 'neelsa@google.com'
   description: |
     The set of APIs that need to reason about and interact with visual regions
     ("views") and their lifecycle. They generally are not tied to a particular

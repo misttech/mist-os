@@ -11,7 +11,6 @@ import("//sdk/ctf/build/verify_json_schemas.gni")
 # This list should only contain schemas that are currently exported outside of
 # the Fuchsia source tree.
 schemas = [
-  # "banjo_library.json",
   "cc_prebuilt_library.json",
   "cc_source_library.json",
   "common.json",
@@ -64,6 +63,7 @@ verify_json_schemas("verify_json_schemas") {
 
 if (is_host) {
   python_host_test("verify_json_schemas_test") {
+    enable_mypy = true
     main_source = "//sdk/ctf/build/scripts/verify_json_schemas_test.py"
     sources = [ "//sdk/ctf/build/scripts/verify_json_schemas.py" ]
   }

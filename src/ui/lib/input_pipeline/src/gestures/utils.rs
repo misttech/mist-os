@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::gesture_arena::TouchpadEvent,
-    crate::utils::{euclidean_distance, Position},
-    std::collections::HashMap,
-};
+use super::gesture_arena::TouchpadEvent;
+use crate::utils::{euclidean_distance, Position};
+use std::collections::HashMap;
 
 /// Result of movement_from_events.
 #[derive(Debug, PartialEq)]
@@ -48,10 +46,12 @@ pub(super) fn movement_from_events(
 #[cfg(test)]
 mod tests {
 
-    use {
-        super::*, crate::gestures::gesture_arena::TouchpadEvent, crate::touch_binding,
-        crate::utils::Position, fuchsia_zircon as fx, test_case::test_case,
-    };
+    use super::*;
+    use crate::gestures::gesture_arena::TouchpadEvent;
+    use crate::touch_binding;
+    use crate::utils::Position;
+    use fuchsia_zircon as fx;
+    use test_case::test_case;
 
     fn make_touch_contact(id: u32, position: Position) -> touch_binding::TouchContact {
         touch_binding::TouchContact { id, position, pressure: None, contact_size: None }

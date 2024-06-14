@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use starnix_sync::Mutex;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 use crate::vfs::{FsStr, FsString, XattrOp};
-use starnix_uapi::{errno, error, errors::Errno};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{errno, error};
 
 #[derive(Default)]
 pub struct MemoryXattrStorage {

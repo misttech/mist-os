@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::lifecycle::{ActionError, CreateError, DestroyError, ResolveError, StartError},
-    anyhow::{format_err, Error},
-    cm_types::Name,
-    moniker::Moniker,
-};
+use crate::lifecycle::{ActionError, CreateError, DestroyError, ResolveError, StartError};
+use anyhow::{format_err, Error};
+use cm_types::Name;
+use moniker::Moniker;
 
 static LIFECYCLE_ERROR_HELP: &'static str =
     "To learn more, see https://fuchsia.dev/go/components/run-errors";

@@ -45,6 +45,7 @@ int StartComponent() {
 }  // namespace
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetLogSettings({}, {"f2fs"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.BuildAndInitializeWithTags({"f2fs"});
   return StartComponent();
 }

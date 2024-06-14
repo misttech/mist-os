@@ -46,10 +46,16 @@ class LoopTest : public ::testing::Test {
     ASSERT_TRUE(loop_control_.is_valid());
   }
 
-  std::string GetFreeLoopDevicePath() {
+  int GetFreeLoopDeviceNumber() {
     int free_loop_device_num(ioctl(loop_control_.get(), LOOP_CTL_GET_FREE, nullptr));
     EXPECT_TRUE(free_loop_device_num >= 0);
-    return "/dev/loop" + std::to_string(free_loop_device_num);
+    return free_loop_device_num;
+  }
+
+  int RemoveLoopDevice(int loop_device_num) {
+    int removed_loop_device_num(ioctl(loop_control_.get(), LOOP_CTL_REMOVE, loop_device_num));
+    EXPECT_TRUE(removed_loop_device_num >= 0);
+    return removed_loop_device_num;
   }
 
  private:
@@ -59,7 +65,7 @@ class LoopTest : public ::testing::Test {
 #define ASSERT_SUCCESS(call) ASSERT_THAT((call), SyscallSucceeds())
 
 TEST_F(LoopTest, ReopeningDevicePreservesOffset) {
-  auto loop_device_path = GetFreeLoopDevicePath();
+  std::string loop_device_path = "/dev/loop" + std::to_string(GetFreeLoopDeviceNumber());
   test_helper::ScopedFD free_loop_device(open(loop_device_path.c_str(), O_RDONLY, 0644));
   ASSERT_TRUE(free_loop_device.is_valid());
 
@@ -81,6 +87,24 @@ TEST_F(LoopTest, ReopeningDevicePreservesOffset) {
   loop_info64 second_observed_info;
   ASSERT_SUCCESS(ioctl(free_loop_device.get(), LOOP_GET_STATUS64, &second_observed_info));
   EXPECT_EQ(first_observed_info.lo_offset, second_observed_info.lo_offset);
+}
+
+TEST_F(LoopTest, RemoveLoopDeviceFromKernelDeviceRegistry) {
+  int free_loop_device_num = GetFreeLoopDeviceNumber();
+  int removed_loop_device_num = RemoveLoopDevice(free_loop_device_num);
+  EXPECT_EQ(removed_loop_device_num, free_loop_device_num);
+  std::string devfs_path = "/dev/";
+  DIR* dir = opendir(devfs_path.c_str());
+  ASSERT_TRUE(dir);
+  while (struct dirent* entry = readdir(dir)) {
+    std::string name = entry->d_name;
+    if (name.find("loop") != std::string::npos) {
+      std::string device_path = "/dev/" + name;
+      int device_fd = open(device_path.c_str(), O_RDONLY);
+      ASSERT_GT(device_fd, 0) << "device path is: " << device_path << strerror(errno);
+    }
+  }
+  closedir(dir);
 }
 
 }  // namespace

@@ -2,28 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
-        model::component::WeakComponentInstance,
-    },
-    ::routing::capability_source::InternalCapability,
-    async_trait::async_trait,
-    cm_types::{Name, Path},
-    fidl::endpoints::{self, DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc::{unbounded, UnboundedSender},
-        prelude::*,
-    },
-    lazy_static::lazy_static,
-    namespace::NamespaceError,
-    sandbox::Capability,
-    serve_processargs::{BuildNamespaceError, NamespaceBuilder},
-    std::sync::Arc,
-    tracing::warn,
-    vfs::execution_scope::ExecutionScope,
-};
+use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
+use crate::model::component::WeakComponentInstance;
+use ::routing::capability_source::InternalCapability;
+use async_trait::async_trait;
+use cm_types::{Name, Path};
+use fidl::endpoints::{self, DiscoverableProtocolMarker, ServerEnd};
+use futures::channel::mpsc::{unbounded, UnboundedSender};
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use namespace::NamespaceError;
+use sandbox::Capability;
+use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
+use std::sync::Arc;
+use tracing::warn;
+use vfs::execution_scope::ExecutionScope;
+use {fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx};
 
 lazy_static! {
     static ref CAPABILITY_NAME: Name = fcomponent::NamespaceMarker::PROTOCOL_NAME.parse().unwrap();
@@ -179,14 +173,14 @@ impl FrameworkCapability for NamespaceFrameworkCapability {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{ProtocolMarker, Proxy};
+    use fuchsia_component::client;
+    use futures::TryStreamExt;
+    use sandbox::{Dict, Receiver};
     use {
-        assert_matches::assert_matches,
-        fidl::endpoints::{ProtocolMarker, Proxy},
         fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
         fuchsia_async as fasync,
-        fuchsia_component::client,
-        futures::TryStreamExt,
-        sandbox::{Dict, Receiver},
     };
 
     async fn handle_echo_request_stream(response: &str, mut stream: fecho::EchoRequestStream) {

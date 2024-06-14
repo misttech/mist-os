@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use surpass::{painter::Props, GeomId, GeomPresTransform, Order, Path};
+use surpass::painter::Props;
+use surpass::{GeomId, GeomPresTransform, Order, Path};
 
 use crate::small_bit_set::SmallBitSet;
 
-use super::{interner::Interned, state::LayerSharedState};
+use super::interner::Interned;
+use super::state::LayerSharedState;
 
 #[derive(Debug)]
 pub struct Layer {

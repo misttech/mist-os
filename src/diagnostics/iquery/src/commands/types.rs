@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::types::Error,
-    async_trait::async_trait,
-    diagnostics_data::{Data, DiagnosticsData},
-    serde::Serialize,
-    std::fmt::Display,
-};
+use crate::types::Error;
+use async_trait::async_trait;
+use diagnostics_data::{Data, DiagnosticsData};
+use serde::Serialize;
+use std::fmt::Display;
 
 #[async_trait]
 pub trait Command {

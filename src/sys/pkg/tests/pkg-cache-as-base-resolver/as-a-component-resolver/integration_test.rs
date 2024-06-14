@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_component::RealmMarker,
-    fidl_fuchsia_component_decl::ChildRef,
-    fidl_test_ping::PingMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root},
-};
+use fidl::endpoints::create_proxy;
+use fidl_fuchsia_component::RealmMarker;
+use fidl_fuchsia_component_decl::ChildRef;
+use fidl_test_ping::PingMarker;
+use fuchsia_async as fasync;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root};
 
 #[fasync::run_singlethreaded(test)]
 async fn base_resolver_test() {

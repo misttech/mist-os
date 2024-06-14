@@ -7,18 +7,19 @@
 
 //! Test utilities for starting a blobfs server.
 
-use {
-    anyhow::{anyhow, Context as _, Error},
-    delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob},
-    fdio::{SpawnAction, SpawnOptions},
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_merkle::Hash,
-    fuchsia_zircon::{self as zx, prelude::*},
-    futures::prelude::*,
-    std::{borrow::Cow, collections::BTreeSet, ffi::CString},
-};
+use anyhow::{anyhow, Context as _, Error};
+use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
+use fdio::{SpawnAction, SpawnOptions};
+use fidl::endpoints::ClientEnd;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_merkle::Hash;
+use fuchsia_zircon::prelude::*;
+use fuchsia_zircon::{self as zx};
+use futures::prelude::*;
+use std::borrow::Cow;
+use std::collections::BTreeSet;
+use std::ffi::CString;
+use {fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio};
 
 const RAMDISK_BLOCK_SIZE: u64 = 512;
 static FXFS_BLOB_VOLUME_NAME: &str = "blob";
@@ -596,7 +597,8 @@ async fn wait_for_process_async(proc: fuchsia_zircon::Process) -> Result<(), Err
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::io::Write as _};
+    use super::*;
+    use std::io::Write as _;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn clean_start_and_stop() {

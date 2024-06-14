@@ -4,10 +4,10 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
-use assembly_config_schema::{
-    assembly_config::{CompiledComponentDefinition, CompiledPackageDefinition},
-    product_config::TrustedApp as ProductTrustedApp,
+use assembly_config_schema::assembly_config::{
+    CompiledComponentDefinition, CompiledPackageDefinition,
 };
+use assembly_config_schema::product_config::TrustedApp as ProductTrustedApp;
 use assembly_util::{BlobfsCompiledPackageDestination, CompiledPackageDestination};
 use fuchsia_url::AbsoluteComponentUrl;
 use std::io::Write;

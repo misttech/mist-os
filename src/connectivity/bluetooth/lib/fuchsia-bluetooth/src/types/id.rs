@@ -5,7 +5,8 @@
 use anyhow::{format_err, Error};
 use fidl_fuchsia_bluetooth as fidl;
 use fuchsia_inspect_contrib::log::WriteInspect;
-use std::{fmt, str::FromStr};
+use std::fmt;
+use std::str::FromStr;
 
 /// Valid id strings have only Hex characters (0-9, a-f) and are 16 chars long
 /// to match the 64 bit representation of a PeerId.

@@ -11,7 +11,7 @@ namespace bt::gap {
 namespace {
 
 const char* const kInspectPeerIdPropertyName = "peer_id";
-const char* const kInspectPairingStateNodeName = "pairing_state";
+const char* const kInspectPairingStateNodeName = "secure_simple_pairing_state";
 
 }  // namespace
 
@@ -28,9 +28,9 @@ BrEdrConnection::BrEdrConnection(Peer::WeakPtr peer,
       peer_(std::move(peer)),
       link_(std::move(link)),
       request_(std::move(request)),
-      pairing_state_(std::make_unique<PairingState>(
+      pairing_state_manager_(std::make_unique<PairingStateManager>(
           peer_,
-          link_.get(),
+          link_->GetWeakPtr(),
           request_ && request_->AwaitingOutgoing(),
           std::move(send_auth_request_cb),
           fit::bind_member<&BrEdrConnection::OnPairingStateStatus>(this))),
@@ -62,7 +62,7 @@ BrEdrConnection::~BrEdrConnection() {
   }
 
   sco_manager_.reset();
-  pairing_state_.reset();
+  pairing_state_manager_.reset();
   link_.reset();
 }
 
@@ -139,16 +139,18 @@ void BrEdrConnection::AttachInspect(inspect::Node& parent, std::string name) {
   inspect_properties_.peer_id = inspect_node_.CreateString(
       kInspectPeerIdPropertyName, peer_id_.ToString());
 
-  pairing_state_->AttachInspect(inspect_node_, kInspectPairingStateNodeName);
+  pairing_state_manager_->AttachInspect(inspect_node_,
+                                        kInspectPairingStateNodeName);
 }
 
 void BrEdrConnection::OnPairingStateStatus(hci_spec::ConnectionHandle handle,
                                            hci::Result<> status) {
-  if (bt_is_error(status,
-                  DEBUG,
-                  "gap-bredr",
-                  "PairingState error status, disconnecting (peer id: %s)",
-                  bt_str(peer_id_))) {
+  if (bt_is_error(
+          status,
+          DEBUG,
+          "gap-bredr",
+          "SecureSimplePairingState error status, disconnecting (peer id: %s)",
+          bt_str(peer_id_))) {
     if (disconnect_cb_) {
       disconnect_cb_();
     }

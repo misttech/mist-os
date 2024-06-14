@@ -4,17 +4,16 @@
 
 mod stressor;
 
-use {
-    crate::stressor::Stressor,
-    anyhow::Result,
-    futures::{future::BoxFuture, FutureExt},
-    moniker::Moniker,
-    rand::prelude::SliceRandom,
-    rand::rngs::SmallRng,
-    rand::Rng,
-    stress_test_actor::{actor_loop, Action},
-    tracing::warn,
-};
+use crate::stressor::Stressor;
+use anyhow::Result;
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use moniker::Moniker;
+use rand::prelude::SliceRandom;
+use rand::rngs::SmallRng;
+use rand::Rng;
+use stress_test_actor::{actor_loop, Action};
+use tracing::warn;
 
 const COLLECTION_NAME: &'static str = "dynamic_children";
 const ECHO_CLIENT_URL: &'static str = "#meta/unreliable_echo_client.cm";

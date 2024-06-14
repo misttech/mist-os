@@ -4,10 +4,8 @@
 
 use std::num::NonZeroUsize;
 
-use crate::{
-    math,
-    shapes::command_path::{Command, CommandPath, CommandPathBuilder},
-};
+use crate::math;
+use crate::shapes::command_path::{Command, CommandPath, CommandPathBuilder};
 
 #[derive(Clone, Copy, Debug)]
 struct CubicSegment {

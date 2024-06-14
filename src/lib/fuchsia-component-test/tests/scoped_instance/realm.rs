@@ -1,19 +1,15 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{format_err, Context, Error},
-    component_events::{
-        events::*,
-        matcher::EventMatcher,
-        sequence::{EventSequence, Ordering},
-    },
-    fidl_fidl_examples_routing_echo as fecho,
-    fuchsia_component::client::connect_to_childs_protocol,
-    fuchsia_component_test::ScopedInstance,
-    futures::future::join_all,
-    tracing::*,
-};
+use anyhow::{format_err, Context, Error};
+use component_events::events::*;
+use component_events::matcher::EventMatcher;
+use component_events::sequence::{EventSequence, Ordering};
+use fidl_fidl_examples_routing_echo as fecho;
+use fuchsia_component::client::connect_to_childs_protocol;
+use fuchsia_component_test::ScopedInstance;
+use futures::future::join_all;
+use tracing::*;
 
 #[derive(argh::FromArgs)]
 /// Helper binary to test binding to components v2 children.

@@ -3,18 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
-use netlink_packet_utils::{
-    byteorder::{ByteOrder, NativeEndian},
-    nla::{Nla, NlaBuffer, NlasIterator},
-    parsers::{parse_mac, parse_string, parse_u16, parse_u32},
-    DecodeError, Emitable, Parseable,
-};
+use netlink_packet_utils::byteorder::{ByteOrder, NativeEndian};
+use netlink_packet_utils::nla::{Nla, NlaBuffer, NlasIterator};
+use netlink_packet_utils::parsers::{parse_mac, parse_string, parse_u16, parse_u32};
+use netlink_packet_utils::{DecodeError, Emitable, Parseable};
 use std::mem::size_of_val;
 
-use crate::nl80211::{
-    constants::*,
-    nested::{to_nested_nlas, to_nested_values},
-};
+use crate::nl80211::constants::*;
+use crate::nl80211::nested::{to_nested_nlas, to_nested_values};
 
 mod band;
 mod bss;

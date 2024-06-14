@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    camino::Utf8PathBuf,
-    fuchsia_url::AbsolutePackageUrl,
-    scrutiny_utils::url::from_package_name,
-    sdk_metadata::ProductBundle,
-    serde::{Deserialize, Serialize},
-    std::path::{Path, PathBuf},
-};
+use anyhow::{anyhow, Context, Result};
+use camino::Utf8PathBuf;
+use fuchsia_url::AbsolutePackageUrl;
+use scrutiny_utils::url::from_package_name;
+use sdk_metadata::ProductBundle;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 pub struct ConfigBuilder {
     model: ModelConfig,

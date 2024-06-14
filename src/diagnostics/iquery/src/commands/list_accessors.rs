@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{commands::types::*, types::Error},
-    argh::{ArgsInfo, FromArgs},
-    async_trait::async_trait,
-    serde::Serialize,
-    std::fmt,
-};
+use crate::commands::types::*;
+use crate::types::Error;
+use argh::{ArgsInfo, FromArgs};
+use async_trait::async_trait;
+use serde::Serialize;
+use std::fmt;
 
 /// Lists all available ArchiveAccessor in the system and their selector for use in "accessor"
 /// arguments in other sub-commands.

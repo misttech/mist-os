@@ -9,11 +9,12 @@
 
 use std::collections::HashMap;
 
-use delegated_provisioning_constants as constants;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use tracing::info;
+use {
+    delegated_provisioning_constants as constants, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+};
 
 #[fuchsia::test]
 async fn delegated_provisioning_test() {

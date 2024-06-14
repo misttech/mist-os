@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io.test/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/component_context.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
-#include <sys/stat.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
@@ -20,10 +21,7 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "fuchsia/io/cpp/fidl.h"
-#include "fuchsia/io/test/cpp/fidl.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
-#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/minfs/bcache.h"
 #include "src/storage/minfs/directory.h"
@@ -33,11 +31,14 @@
 #include "src/storage/minfs/runner.h"
 #include "src/storage/minfs/vnode.h"
 
+namespace fio = fuchsia_io;
+namespace fio_test = fuchsia_io_test;
+
 namespace minfs {
 
 constexpr uint64_t kBlockCount = 1 << 11;
 
-class MinfsHarness : public fuchsia::io::test::Io1Harness {
+class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
  public:
   explicit MinfsHarness() : vfs_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     vfs_loop_.StartThread("vfs_thread");
@@ -53,9 +54,9 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     runner_ = *std::move(runner);
 
     // One connection must be maintained to avoid filesystem termination.
-    auto root_server = root_client_.NewRequest();
-    zx::result status =
-        runner_->ServeRoot(fidl::ServerEnd<fuchsia_io::Directory>(root_server.TakeChannel()));
+    auto [root_client, root_server] = fidl::Endpoints<fio::Directory>::Create();
+    root_client_ = std::move(root_client);
+    zx::result status = runner_->ServeRoot(std::move(root_server));
     ZX_ASSERT(status.is_ok());
   }
 
@@ -66,67 +67,62 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     vfs_loop_.JoinThreads();
   }
 
-  void GetConfig(GetConfigCallback callback) final {
-    fuchsia::io::test::Io1Config config;
+  void GetConfig(GetConfigCompleter::Sync& completer) final {
+    fio_test::Io1Config config;
 
     // Supported options
-    config.supports_open2 = true;
-    config.supports_get_token = true;
-    config.supports_append = true;
-    config.supports_modify_directory = true;
-    config.supported_attributes = fuchsia::io::NodeAttributesQuery::CREATION_TIME |
-                                  fuchsia::io::NodeAttributesQuery::MODIFICATION_TIME |
-                                  fuchsia::io::NodeAttributesQuery::ID |
-                                  fuchsia::io::NodeAttributesQuery::CONTENT_SIZE |
-                                  fuchsia::io::NodeAttributesQuery::STORAGE_SIZE |
-                                  fuchsia::io::NodeAttributesQuery::LINK_COUNT;
+    config.supports_open2(true);
+    config.supports_get_token(true);
+    config.supports_append(true);
+    config.supports_modify_directory(true);
+    config.supported_attributes(
+        fio::NodeAttributesQuery::kCreationTime | fio::NodeAttributesQuery::kModificationTime |
+        fio::NodeAttributesQuery::kId | fio::NodeAttributesQuery::kContentSize |
+        fio::NodeAttributesQuery::kStorageSize | fio::NodeAttributesQuery::kLinkCount);
 
-    callback(config);
+    completer.Reply(config);
   }
 
-  void GetDirectory(fuchsia::io::test::Directory root, fuchsia::io::OpenFlags flags,
-                    fidl::InterfaceRequest<fuchsia::io::Directory> directory_request) final {
-    // Create a unique directory within the root of minfs for each request and popuplate it with the
+  void GetDirectory(GetDirectoryRequest& request, GetDirectoryCompleter::Sync& completer) final {
+    // Create a unique directory within the root of minfs for each request and populate it with the
     // requested contents.
     auto directory = CreateUniqueDirectory();
-    PopulateDirectory(root.entries, *directory);
-    zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(
-        fuchsia_io::OpenFlags{static_cast<uint32_t>(flags)});
+    PopulateDirectory(request.root().entries(), *directory);
+    zx::result options = fs::VnodeConnectionOptions::FromOpen1Flags(request.flags());
     ZX_ASSERT_MSG(options.is_ok(), "Failed to validate flags: %s", options.status_string());
     zx_status_t status =
-        runner_->Serve(std::move(directory), directory_request.TakeChannel(), *options);
+        runner_->Serve(std::move(directory), request.directory_request().TakeChannel(), *options);
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to serve test directory: %s",
                   zx_status_get_string(status));
   }
 
-  void PopulateDirectory(
-      const std::vector<std::unique_ptr<fuchsia::io::test::DirectoryEntry>>& entries,
-      Directory& dir) {
+  void PopulateDirectory(const std::vector<fidl::Box<fio_test::DirectoryEntry>>& entries,
+                         Directory& dir) {
     for (const auto& entry : entries) {
       AddEntry(*entry, dir);
     }
   }
 
-  void AddEntry(const fuchsia::io::test::DirectoryEntry& entry, Directory& parent) {
+  void AddEntry(const fio_test::DirectoryEntry& entry, Directory& parent) {
     switch (entry.Which()) {
-      case fuchsia::io::test::DirectoryEntry::Tag::kDirectory: {
-        zx::result vnode = parent.Create(entry.directory().name, fs::CreationType::kDirectory);
+      case fio_test::DirectoryEntry::Tag::kDirectory: {
+        zx::result vnode = parent.Create(entry.directory()->name(), fs::CreationType::kDirectory);
         ZX_ASSERT_MSG(vnode.is_ok(), "Failed to create a directory: %s", vnode.status_string());
         auto directory = fbl::RefPtr<Directory>::Downcast(*std::move(vnode));
         ZX_ASSERT_MSG(directory != nullptr, "A vnode of the wrong type was created");
-        PopulateDirectory(entry.directory().entries, *directory);
+        PopulateDirectory(entry.directory()->entries(), *directory);
         // The directory was opened when it was created.
         directory->Close();
         break;
       }
-      case fuchsia::io::test::DirectoryEntry::Tag::kFile: {
-        zx::result file = parent.Create(entry.file().name, fs::CreationType::kFile);
+      case fio_test::DirectoryEntry::Tag::kFile: {
+        zx::result file = parent.Create(entry.file()->name(), fs::CreationType::kFile);
         ZX_ASSERT_MSG(file.is_ok(), "Failed to create a file: %s", file.status_string());
-        if (!entry.file().contents.empty()) {
+        const auto& contents = entry.file()->contents();
+        if (!contents.empty()) {
           size_t actual = 0;
-          zx_status_t status =
-              file->Write(entry.file().contents.data(), entry.file().contents.size(),
-                          /*offset=*/0, &actual);
+          zx_status_t status = file->Write(contents.data(), contents.size(),
+                                           /*offset=*/0, &actual);
           ZX_ASSERT_MSG(status == ZX_OK, "Failed to write to file: %s",
                         zx_status_get_string(status));
         }
@@ -134,12 +130,10 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
         file->Close();
         break;
       }
-      case fuchsia::io::test::DirectoryEntry::Tag::kRemoteDirectory:
+      case fio_test::DirectoryEntry::Tag::kRemoteDirectory:
         ZX_PANIC("Remote directories are not supported");
-      case fuchsia::io::test::DirectoryEntry::Tag::kExecutableFile:
+      case fio_test::DirectoryEntry::Tag::kExecutableFile:
         ZX_PANIC("Executable files are not supported");
-      case fuchsia::io::test::DirectoryEntry::Tag::Invalid:
-        ZX_PANIC("Unknown/Invalid DirectoryEntry type!");
     }
   }
 
@@ -168,21 +162,28 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
 
   // Used to create a new unique directory within minfs for every call to |GetDirectory|.
   uint32_t directory_count_ = 0;
-  fuchsia::io::DirectoryPtr root_client_;
+  fidl::ClientEnd<fio::Directory> root_client_;
 };
 
 }  // namespace minfs
 
 int main(int argc, const char** argv) {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   fuchsia_logging::SetTags({"io_conformance_harness_minfs"});
 
-  minfs::MinfsHarness harness;
-  fidl::BindingSet<fuchsia::io::test::Io1Harness> bindings;
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
+  zx::result result = outgoing.ServeFromStartupInfo();
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << result.status_string();
+    return EXIT_FAILURE;
+  }
 
-  // Expose the Io1Harness protocol as an outgoing service.
-  auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-  context->outgoing()->AddPublicService(bindings.GetHandler(&harness));
-  zx_status_t status = loop.Run();
-  return status;
+  result = outgoing.AddProtocol<fio_test::Io1Harness>(std::make_unique<minfs::MinfsHarness>());
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to server test harness: " << result.status_string();
+    return EXIT_FAILURE;
+  }
+
+  loop.Run();
+  return EXIT_SUCCESS;
 }

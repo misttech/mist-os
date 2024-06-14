@@ -3,35 +3,31 @@
 // found in the LICENSE file.
 
 use super::framebuffer_server::{init_viewport_scene, start_presentation_loop, FramebufferServer};
-use crate::{
-    device::{kobject::DeviceMetadata, DeviceMode, DeviceOps},
-    fs::sysfs::DeviceDirectory,
-    mm::MemoryAccessorExt,
-    task::{CurrentTask, Kernel},
-    vfs::{fileops_impl_vmo, FileObject, FileOps, FsNode},
-};
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_math as fmath;
-use fidl_fuchsia_ui_composition as fuicomposition;
-use fidl_fuchsia_ui_display_singleton as fuidisplay;
-use fidl_fuchsia_ui_views as fuiviews;
+use crate::device::kobject::DeviceMetadata;
+use crate::device::{DeviceMode, DeviceOps};
+use crate::fs::sysfs::DeviceDirectory;
+use crate::mm::MemoryAccessorExt;
+use crate::task::{CurrentTask, Kernel};
+use crate::vfs::{fileops_impl_vmo, FileObject, FileOps, FsNode};
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, log_info, log_warn};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    device_type::DeviceType,
-    errno, error,
-    errors::Errno,
-    fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo,
-    open_flags::OpenFlags,
-    user_address::{UserAddress, UserRef},
-    FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO, FBIOPUT_VSCREENINFO, FB_TYPE_PACKED_PIXELS,
-    FB_VISUAL_TRUECOLOR,
+    errno, error, fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo, FBIOGET_FSCREENINFO,
+    FBIOGET_VSCREENINFO, FBIOPUT_VSCREENINFO, FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR,
 };
 use std::sync::Arc;
 use zerocopy::AsBytes;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_math as fmath,
+    fidl_fuchsia_ui_composition as fuicomposition, fidl_fuchsia_ui_display_singleton as fuidisplay,
+    fidl_fuchsia_ui_views as fuiviews, fuchsia_zircon as zx,
+};
 
 #[derive(Default, Debug)]
 pub struct AspectRatio {

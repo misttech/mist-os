@@ -4,17 +4,15 @@
 
 use anyhow::Context as _;
 use argh::{ArgsInfo, FromArgs};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_interfaces as finterfaces;
-use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
-use std::{
-    collections::HashMap,
-    convert::{TryFrom as _, TryInto as _},
-    num::NonZeroU64,
+use std::collections::HashMap;
+use std::convert::{TryFrom as _, TryInto as _};
+use std::num::NonZeroU64;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_interfaces as finterfaces,
+    fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration,
 };
 
 pub(crate) mod dhcpd;

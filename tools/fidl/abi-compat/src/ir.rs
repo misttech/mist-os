@@ -7,7 +7,12 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
-use std::{collections::HashMap, fmt::Display, fs, io::BufReader, path::Path, rc::Rc};
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::fs;
+use std::io::BufReader;
+use std::path::Path;
+use std::rc::Rc;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct AttributeArgument {
@@ -211,7 +216,7 @@ pub enum Declaration {
 
 #[derive(Deserialize, Debug)]
 pub struct IR {
-    pub available: HashMap<String, String>,
+    pub available: HashMap<String, Vec<String>>,
     bits_declarations: Vec<BitsDeclaration>,
     enum_declarations: Vec<EnumDeclaration>,
     pub protocol_declarations: Vec<ProtocolDeclaration>,
@@ -307,7 +312,7 @@ open protocol Example {
     )
     .expect("loading simple test library");
 
-    assert_eq!(hashmap! {"fuchsia".to_owned() => "1".to_owned()}, ir.available);
+    assert_eq!(hashmap! {"fuchsia".to_owned() => vec!["1".to_owned()]}, ir.available);
 
     assert_eq!(1, ir.table_declarations.len());
 }
@@ -315,7 +320,10 @@ open protocol Example {
 #[cfg(test)]
 mod testing {
     use super::{Result, IR};
-    use std::{ffi::OsString, path::Path, process::Command, rc::Rc};
+    use std::ffi::OsString;
+    use std::path::Path;
+    use std::process::Command;
+    use std::rc::Rc;
 
     // A minimal zx library for tests.
     const ZX_SOURCE: &'static str = "

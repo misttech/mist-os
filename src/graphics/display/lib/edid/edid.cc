@@ -4,15 +4,19 @@
 
 #include "src/graphics/display/lib/edid/edid.h"
 
+#include <lib/fit/result.h>
+
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <iterator>
 #include <memory>
+#include <sstream>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
+#include <fbl/string_buffer.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
@@ -42,6 +46,64 @@ bool base_validate(const T* block) {
 }  // namespace
 
 namespace edid {
+
+namespace {
+
+// Unpacks the ID Manufacturer Name Field specified in the base EDID.
+//
+// The ID Manufacturer name is a 3-character code containing three upper case
+// letters. They are encoded in the base EDID byte 08h and 09h based on a 5-bit
+// compressed ASCII code.
+//
+// E-EDID standard Section 3.4.1 "ID Manufacture Name", page 21.
+std::string UnpackIdManufacturerName(uint8_t byte_08h, uint8_t byte_09h) {
+  int compressed_character1 = (byte_08h & 0b01111100) >> 2;
+  int compressed_character2 = ((byte_08h & 0b00000011) << 3) | ((byte_09h & 0b11100000) >> 5);
+  int compressed_character3 = byte_09h & 0b0011111;
+
+  // Some EDIDs may contain invalid manufacturer name codes. We replace the
+  // invalid characters with the fallback character 'A'.
+  if (compressed_character1 < 1 || compressed_character1 > 26) {
+    zxlogf(WARNING, "Invalid manufacturer name code character #1: %d", compressed_character1);
+    compressed_character1 = 1;
+  }
+  if (compressed_character2 < 1 || compressed_character2 > 26) {
+    zxlogf(WARNING, "Invalid manufacturer name code character #2: %d", compressed_character2);
+    compressed_character2 = 1;
+  }
+  if (compressed_character3 < 1 || compressed_character3 > 26) {
+    zxlogf(WARNING, "Invalid manufacturer name code character #3: %d", compressed_character3);
+    compressed_character3 = 1;
+  }
+
+  // The cast won't overflow because the compressed_character values are
+  // guaranteed to be in the range [1, 26].
+  const char characters[3] = {
+      static_cast<char>(compressed_character1 + 'A' - 1),
+      static_cast<char>(compressed_character2 + 'A' - 1),
+      static_cast<char>(compressed_character3 + 'A' - 1),
+  };
+  return std::string(characters, std::size(characters));
+}
+
+bool IsDisplayDescriptor(const Descriptor& descriptor) {
+  // A Descriptor can be either a Detailed Timing Descriptor or a Display
+  // Descriptor. For Display Descriptors, its first two bytes must be 0x0000,
+  // while for Detailed Timing Descriptors the first two bytes
+  // (`pixel_clock_10khz`) must not be 0x0000.
+  //
+  // Accessing any field within the union before figuring out its underlying
+  // type is an undefined behavior in C++. So we use reinterpret_cast to access
+  // its first two bytes.
+  const uint8_t* descriptor_bytes = reinterpret_cast<const uint8_t*>(&descriptor);
+
+  // sizeof(Descriptor) > 2, so it's always valid to access the first two bytes.
+  const uint8_t descriptor_type_indicator_low_byte = *descriptor_bytes;
+  const uint8_t descriptor_type_indicator_high_byte = *(descriptor_bytes + 1);
+  return descriptor_type_indicator_low_byte == 0x00 && descriptor_type_indicator_high_byte == 0x00;
+}
+
+}  // namespace
 
 const char* GetEisaVendorName(uint16_t manufacturer_name_code) {
   uint8_t c1 = static_cast<uint8_t>((((manufacturer_name_code >> 8) & 0x7c) >> 2) + 'A' - 1);
@@ -117,10 +179,10 @@ ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact) {
   // I2C command patterns (segment write always precedes data read), though the
   // chance is rare.
   if (!transact(ctx, msgs + 1, 2)) {
-    return ReadEdidResult::MakeError("Failed to read base edid");
+    return fit::error("Failed to read base edid");
   }
   if (!base_edid.validate()) {
-    return ReadEdidResult::MakeError("Failed to validate base edid");
+    return fit::error("Failed to validate base edid");
   }
 
   uint16_t edid_length = static_cast<uint16_t>((base_edid.num_extensions + 1) * kBlockSize);
@@ -129,7 +191,7 @@ ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact) {
   fbl::Vector<uint8_t> edid;
   edid.resize(edid_length, &ac);
   if (!ac.check()) {
-    return ReadEdidResult::MakeError("Failed to allocate edid storage");
+    return fit::error("Failed to allocate edid storage");
   }
 
   memcpy(edid.data(), reinterpret_cast<void*>(&base_edid), kBlockSize);
@@ -145,106 +207,175 @@ ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact) {
 
     bool transact_success = include_segment ? transact(ctx, msgs, 3) : transact(ctx, msgs + 1, 2);
     if (!transact_success) {
-      return ReadEdidResult::MakeError("Failed to read full edid");
+      return fit::error("Failed to read full edid");
     }
   }
 
-  return ReadEdidResult::MakeEdidBytes(std::move(edid));
+  return fit::ok(std::move(edid));
 }
 
-bool Edid::Init(void* ctx, ddc_i2c_transact transact, const char** err_msg) {
+fit::result<const char*> Edid::Init(void* ctx, ddc_i2c_transact transact) {
   auto read_edid_result = ReadEdidFromDdcForTesting(ctx, transact);
-  if (read_edid_result.is_error) {
-    ZX_DEBUG_ASSERT(read_edid_result.error_message != nullptr);
-    *err_msg = read_edid_result.error_message;
-    return false;
+  if (read_edid_result.is_error()) {
+    return read_edid_result.take_error();
   }
-  edid_bytes_ = std::move(read_edid_result.edid_bytes);
-  return Init(edid_bytes_.data(), static_cast<uint16_t>(edid_bytes_.size()), err_msg);
+  bytes_ = std::move(read_edid_result).value();
+  return Validate();
 }
 
-bool Edid::Init(const uint8_t* bytes, uint16_t len, const char** err_msg) {
-  // The maximum size of an edid is 255 * 128 bytes, so any 16 bit multiple is fine.
-  if (len == 0 || len % kBlockSize != 0) {
-    *err_msg = "Invalid edid length";
-    return false;
-  }
-  bytes_ = bytes;
-  len_ = len;
-  if (!(base_edid_ = GetBlock<BaseEdid>(0)) || !base_edid_->validate()) {
-    *err_msg = "Failed to validate base edid";
-    return false;
-  }
-  if (((base_edid_->num_extensions + 1) * kBlockSize) != len) {
-    *err_msg = "Bad extension count";
-    return false;
-  }
-  if (!base_edid_->digital()) {
-    *err_msg = "Analog displays not supported";
-    return false;
+fit::result<const char*> Edid::Init(cpp20::span<const uint8_t> bytes) {
+  if (bytes.empty() || bytes.size() % kBlockSize != 0) {
+    return fit::error("Invalid edid length");
   }
 
-  for (uint8_t i = 1; i < len / kBlockSize; i++) {
+  bytes_ = fbl::Vector<uint8_t>();
+
+  fbl::AllocChecker alloc_checker;
+  bytes_.resize(bytes.size(), 0, &alloc_checker);
+  if (!alloc_checker.check()) {
+    return fit::error("Failed to allocate memory for EDID");
+  }
+  std::copy(bytes.begin(), bytes.end(), bytes_.begin());
+
+  return Validate();
+}
+
+std::string Edid::GetManufacturerId() const {
+  const BaseEdid& base = base_edid();
+  return UnpackIdManufacturerName(base.manufacturer_id1, base.manufacturer_id2);
+}
+
+const char* Edid::GetManufacturerName() const {
+  std::string manufacturer_id = GetManufacturerId();
+  return lookup_eisa_vid(EISA_ID(manufacturer_id[0], manufacturer_id[1], manufacturer_id[2]));
+}
+
+std::string Edid::GetDisplayProductName() const {
+  for (auto it = internal::descriptor_iterator(this); it.is_valid(); ++it) {
+    const Descriptor* descriptor_raw = it.get();
+    ZX_DEBUG_ASSERT(descriptor_raw != nullptr);
+
+    // `descriptor` may not be aligned correctly. Copy the bytes to a locally-
+    // constructed `Descriptor` first.
+    Descriptor descriptor;
+    memcpy(&descriptor, descriptor_raw, sizeof(Descriptor));
+
+    if (!IsDisplayDescriptor(descriptor)) {
+      continue;
+    }
+
+    const Descriptor::Monitor& display_descriptor = descriptor.monitor;
+    if (display_descriptor.type == Descriptor::Monitor::kName) {
+      std::string_view name(reinterpret_cast<const char*>(display_descriptor.data),
+                            std::size(display_descriptor.data));
+
+      // The E-EDID standard requires that the display product name data string
+      // is terminated with ASCII code 0Ah (line feed) if there are less than
+      // 13 characters in the string. Thus, we truncate the string at the first
+      // line feed character.
+      //
+      // E-EDID standard, Section 3.10.3.4 "Display Product Name (ASCII) String
+      // Descriptor Definition", page 44.
+      static constexpr char kStringTerminatorCharacter = 0x0a;
+      size_t terminator_pos = name.find(kStringTerminatorCharacter);
+      std::string_view actual_name = name.substr(/*pos=*/0, /*n=*/terminator_pos);
+
+      return std::string(actual_name);
+    }
+  }
+
+  // No display product name is provided in the Display Descriptors. Return
+  // an empty string.
+  return {};
+}
+
+std::string Edid::GetDisplayProductSerialNumber() const {
+  for (auto it = internal::descriptor_iterator(this); it.is_valid(); ++it) {
+    const Descriptor* descriptor_raw = it.get();
+    ZX_DEBUG_ASSERT(descriptor_raw != nullptr);
+
+    // `descriptor` may not be aligned correctly. Copy the bytes to a locally-
+    // constructed `Descriptor` first.
+    Descriptor descriptor;
+    memcpy(&descriptor, descriptor_raw, sizeof(Descriptor));
+
+    if (!IsDisplayDescriptor(descriptor)) {
+      continue;
+    }
+
+    const Descriptor::Monitor& display_descriptor = descriptor.monitor;
+    if (display_descriptor.type == Descriptor::Monitor::kSerial) {
+      // The E-EDID standard requires that the serial number data string must be
+      // ASCII-encoded. So `data` can be directly casted to a string_view.
+      //
+      // E-EDID standard, Section 3.10.3.1 "Display Product Serial Number
+      // Descriptor Definition", page 38.
+      std::string_view serial_number(reinterpret_cast<const char*>(display_descriptor.data),
+                                     std::size(display_descriptor.data));
+
+      // The E-EDID standard requires that the serial number data string must be
+      // terminated with ASCII code 0Ah (line feed) if there are less than 13
+      // characters in the string.
+      //
+      // E-EDID standard, Section 3.10.3.1 "Display Product Serial Number
+      // Descriptor Definition", page 38.
+      static constexpr char kStringTerminatorCharacter = 0x0a;
+      size_t terminator_pos = serial_number.find(kStringTerminatorCharacter);
+      std::string_view actual_serial_number = serial_number.substr(/*pos=*/0, /*n=*/terminator_pos);
+
+      return std::string(actual_serial_number);
+    }
+  }
+
+  // No display product serial number is provided in the Display Descriptors.
+  // Fall back to the "ID Serial Number" field defined in the base EDID.
+  //
+  // E-EDID standard, Section 3.4.3 "ID Serial Number", page 22.
+  std::ostringstream fallback_serial_number;
+  const BaseEdid& base = base_edid();
+
+  fallback_serial_number << base.serial_number;
+  return fallback_serial_number.str();
+}
+
+fit::result<const char*> Edid::Validate() {
+  const BaseEdid& base = base_edid();
+  if (!base.validate()) {
+    return fit::error("Failed to validate base edid");
+  }
+  if (((base.num_extensions + 1) * kBlockSize) != bytes_.size()) {
+    return fit::error("Bad extension count");
+  }
+  if (!base.digital()) {
+    return fit::error("Analog displays not supported");
+  }
+
+  for (uint8_t i = 1; i < bytes_.size() / kBlockSize; i++) {
     if (bytes_[i * kBlockSize] == CeaEdidTimingExtension::kTag) {
       if (!GetBlock<CeaEdidTimingExtension>(i)->validate()) {
-        *err_msg = "Failed to validate extensions";
-        return false;
+        return fit::error("Failed to validate extensions");
       }
     }
   }
-
-  monitor_serial_[0] = monitor_name_[0] = '\0';
-  for (auto it = descriptor_iterator(this); it.is_valid(); ++it) {
-    char* dest;
-    if (it->timing.pixel_clock_10khz != 0) {
-      continue;
-    } else if (it->monitor.type == Descriptor::Monitor::kName) {
-      dest = monitor_name_;
-    } else if (it->monitor.type == Descriptor::Monitor::kSerial) {
-      dest = monitor_serial_;
-    } else {
-      continue;
-    }
-
-    // Look for '\n' if it exists, otherwise take the whole string.
-    uint32_t len;
-    for (len = 0; len < sizeof(Descriptor::Monitor::data) && it->monitor.data[len] != 0x0A; ++len) {
-      // Empty body
-    }
-
-    // Copy the string and remember to null-terminate.
-    memcpy(dest, it->monitor.data, len);
-    dest[len] = '\0';
-  }
-
-  // If we didn't find a valid serial descriptor, use the base serial number
-  if (monitor_serial_[0] == '\0') {
-    sprintf(monitor_serial_, "%d", base_edid_->serial_number);
-  }
-
-  uint8_t c1 = static_cast<uint8_t>(((base_edid_->manufacturer_id1 & 0x7c) >> 2) + 'A' - 1);
-  uint8_t c2 = static_cast<uint8_t>(
-      (((base_edid_->manufacturer_id1 & 0x03) << 3) | (base_edid_->manufacturer_id2 & 0xe0) >> 5) +
-      'A' - 1);
-  uint8_t c3 = static_cast<uint8_t>(((base_edid_->manufacturer_id2 & 0x1f)) + 'A' - 1);
-
-  manufacturer_id_[0] = c1;
-  manufacturer_id_[1] = c2;
-  manufacturer_id_[2] = c3;
-  manufacturer_id_[3] = '\0';
-  manufacturer_name_ = lookup_eisa_vid(EISA_ID(c1, c2, c3));
-
-  return true;
+  return fit::ok();
 }
 
-template <typename T>
-const T* Edid::GetBlock(uint8_t block_num) const {
-  const uint8_t* bytes = bytes_ + block_num * kBlockSize;
-  return bytes[0] == T::kTag ? reinterpret_cast<const T*>(bytes) : nullptr;
+int Edid::horizontal_size_mm() const {
+  static constexpr int kMillimetersPerCentimeter = 10;
+  // The multiplication result meets the API contract because
+  // `horizontal_size_cm` is at most 255.
+  return int{base_edid().horizontal_size_cm} * kMillimetersPerCentimeter;
+}
+
+int Edid::vertical_size_mm() const {
+  static constexpr int kMillimetersPerCentimeter = 10;
+  // The multiplication result meets the API contract because
+  // `vertical_size_cm` is at most 255.
+  return int{base_edid().vertical_size_cm} * kMillimetersPerCentimeter;
 }
 
 bool Edid::is_hdmi() const {
-  data_block_iterator dbs(this);
+  internal::data_block_iterator dbs(this);
   if (!dbs.is_valid() || dbs.cea_revision() < 0x03) {
     return false;
   }
@@ -422,13 +553,13 @@ void timing_iterator::Advance() {
   }
 
   if (state_ == kStds) {
-    while (++state_index_ < std::size(edid_->base_edid_->standard_timings)) {
-      const StandardTimingDescriptor* desc = edid_->base_edid_->standard_timings + state_index_;
+    while (++state_index_ < std::size(edid_->base_edid().standard_timings)) {
+      const StandardTimingDescriptor* desc = edid_->base_edid().standard_timings + state_index_;
       if (desc->byte1 == 0x01 && desc->byte2 == 0x01) {
         continue;
       }
       std::optional<display::DisplayTiming> display_timing =
-          StandardTimingDescriptorToDisplayTiming(*edid_->base_edid_, *desc);
+          StandardTimingDescriptorToDisplayTiming(edid_->base_edid(), *desc);
       if (display_timing.has_value()) {
         display_timing_ = *display_timing;
       }
@@ -439,120 +570,14 @@ void timing_iterator::Advance() {
   }
 }
 
-audio_data_block_iterator& audio_data_block_iterator::operator++() {
-  while (dbs_.is_valid()) {
-    uint32_t num_sads = static_cast<uint32_t>(dbs_->length() / sizeof(ShortAudioDescriptor));
-    if (dbs_->type() != ShortAudioDescriptor::kType || ++sad_idx_ > num_sads) {
-      ++dbs_;
-      sad_idx_ = UINT8_MAX;
-      continue;
-    }
-    descriptor_ = dbs_->payload.audio[sad_idx_];
-    return *this;
-  }
-
-  edid_ = nullptr;
-  return *this;
-}
-
-Edid::descriptor_iterator& Edid::descriptor_iterator::operator++() {
-  if (!edid_) {
-    return *this;
-  }
-
-  if (block_idx_ == 0) {
-    descriptor_idx_++;
-
-    if (descriptor_idx_ < std::size(edid_->base_edid_->detailed_descriptors)) {
-      descriptor_ = edid_->base_edid_->detailed_descriptors + descriptor_idx_;
-      if (descriptor_->timing.pixel_clock_10khz != 0 || descriptor_->monitor.type != 0x10) {
-        return *this;
-      }
-    }
-
-    block_idx_++;
-    descriptor_idx_ = UINT32_MAX;
-  }
-
-  while (block_idx_ < (edid_->len_ / kBlockSize)) {
-    auto cea_extn_block = edid_->GetBlock<CeaEdidTimingExtension>(block_idx_);
-    size_t offset = sizeof(CeaEdidTimingExtension::payload);
-    if (cea_extn_block &&
-        cea_extn_block->dtd_start_idx > offsetof(CeaEdidTimingExtension, payload)) {
-      offset = cea_extn_block->dtd_start_idx - offsetof(CeaEdidTimingExtension, payload);
-    }
-
-    descriptor_idx_++;
-    offset += sizeof(Descriptor) * descriptor_idx_;
-
-    // Return if the descriptor is within bounds and either a timing descriptor or not
-    // a dummy monitor descriptor, otherwise advance to the next block
-    if (offset + sizeof(DetailedTimingDescriptor) <= sizeof(CeaEdidTimingExtension::payload)) {
-      descriptor_ = reinterpret_cast<const Descriptor*>(cea_extn_block->payload + offset);
-      if (descriptor_->timing.pixel_clock_10khz != 0 ||
-          descriptor_->monitor.type != Descriptor::Monitor::kDummyType) {
-        return *this;
-      }
-    }
-
-    block_idx_++;
-    descriptor_idx_ = UINT32_MAX;
-  }
-
-  edid_ = nullptr;
-  return *this;
-}
-
-Edid::data_block_iterator::data_block_iterator(const Edid* edid) : edid_(edid) {
-  ++(*this);
-  if (is_valid()) {
-    cea_revision_ = edid_->GetBlock<CeaEdidTimingExtension>(block_idx_)->revision_number;
-  }
-}
-
-Edid::data_block_iterator& Edid::data_block_iterator::operator++() {
-  if (!edid_) {
-    return *this;
-  }
-
-  while (block_idx_ < (edid_->len_ / kBlockSize)) {
-    auto cea_extn_block = edid_->GetBlock<CeaEdidTimingExtension>(block_idx_);
-    size_t dbc_end = 0;
-    if (cea_extn_block &&
-        cea_extn_block->dtd_start_idx > offsetof(CeaEdidTimingExtension, payload)) {
-      dbc_end = cea_extn_block->dtd_start_idx - offsetof(CeaEdidTimingExtension, payload);
-    }
-
-    db_idx_++;
-    uint32_t db_to_skip = db_idx_;
-
-    uint32_t offset = 0;
-    while (offset < dbc_end) {
-      auto* dblk = reinterpret_cast<const DataBlock*>(cea_extn_block->payload + offset);
-      if (db_to_skip == 0) {
-        db_ = dblk;
-        return *this;
-      }
-      db_to_skip--;
-      offset += (dblk->length() + 1);  // length doesn't include the data block header byte
-    }
-
-    block_idx_++;
-    db_idx_ = UINT32_MAX;
-  }
-
-  edid_ = nullptr;
-  return *this;
-}
-
 void Edid::Print(void (*print_fn)(const char* str)) const {
   char str_buf[128];
   print_fn("Raw edid:\n");
-  for (auto i = 0; i < edid_length(); i++) {
+  for (size_t i = 0; i < edid_length(); i++) {
     constexpr int kBytesPerLine = 16;
     char* b = str_buf;
     if (i % kBytesPerLine == 0) {
-      b += sprintf(b, "%04x: ", i);
+      b += sprintf(b, "%04zx: ", i);
     }
     sprintf(b, "%02x%s", edid_bytes()[i], i % kBytesPerLine == kBytesPerLine - 1 ? "\n" : " ");
     print_fn(str_buf);
@@ -561,7 +586,8 @@ void Edid::Print(void (*print_fn)(const char* str)) const {
 
 bool Edid::supports_basic_audio() const {
   uint8_t block_idx = 1;  // Skip block 1, since it can't be a CEA block
-  while (block_idx < (len_ / kBlockSize)) {
+  const int num_blocks = static_cast<int>(bytes_.size() / kBlockSize);
+  while (block_idx < num_blocks) {
     auto cea_extn_block = GetBlock<CeaEdidTimingExtension>(block_idx);
     if (cea_extn_block && cea_extn_block->revision_number >= 2) {
       return cea_extn_block->basic_audio();

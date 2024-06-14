@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::PathHashMappingError,
-    fuchsia_hash::Hash,
-    fuchsia_pkg::PackagePath,
-    std::{
-        io::{self, BufRead as _},
-        marker::PhantomData,
-        str::FromStr as _,
-    },
-};
+use crate::errors::PathHashMappingError;
+use fuchsia_hash::Hash;
+use fuchsia_pkg::PackagePath;
+use std::io::{self, BufRead as _};
+use std::marker::PhantomData;
+use std::str::FromStr as _;
 
 /// PhantomData type marker to indicate a `PathHashMapping` is a "data/static_packages" file.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -86,10 +82,10 @@ impl<T> PathHashMapping<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fuchsia_pkg::test::random_package_path,
-        proptest::prelude::*,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_pkg::test::random_package_path;
+    use proptest::prelude::*;
 
     #[test]
     fn deserialize_empty_file() {

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::data, super::data_import_from_chromiumos,
-    fidl_fuchsia_input_report as fidl_input_report, lazy_static::lazy_static,
-    std::collections::HashMap,
-};
+use super::{data, data_import_from_chromiumos};
+use fidl_fuchsia_input_report as fidl_input_report;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 /// Mouse have a sensor that tells how far they moved in "counts", depends
 /// on sensor, mouse will report different CPI (counts per inch). Currently,
@@ -153,13 +152,11 @@ fn to_hex(id: u32) -> String {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::super::{data, data_import_from_chromiumos},
-        super::*,
-        regex::Regex,
-        std::collections::HashSet,
-        test_case::test_case,
-    };
+    use super::super::{data, data_import_from_chromiumos};
+    use super::*;
+    use regex::Regex;
+    use std::collections::HashSet;
+    use test_case::test_case;
 
     #[test_case("*", "*", 1000, "default mouse" =>
       MouseModel {

@@ -2,50 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use ::input_pipeline::light_sensor::{
+    Calibration as LightSensorCalibration, Configuration as LightSensorConfiguration,
+    FactoryFileLoader,
+};
+use ::input_pipeline::light_sensor_handler::make_light_sensor_handler_and_spawn_led_watcher;
+use ::input_pipeline::text_settings_handler::TextSettingsHandler;
+use ::input_pipeline::CursorMessage;
+use anyhow::{Context, Error};
+use fidl_fuchsia_factory::MiscFactoryStoreProviderMarker;
+use fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream;
+use fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream;
+use fidl_fuchsia_recovery_policy::DeviceRequestStream;
+use fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream;
+use fidl_fuchsia_ui_brightness::ControlMarker as BrightnessControlMarker;
+use fidl_fuchsia_ui_pointerinjector_configuration::SetupProxy;
+use fidl_fuchsia_ui_policy::DeviceListenerRegistryRequestStream;
+use focus_chain_provider::FocusChainProviderPublisher;
+use fsettings::LightMarker;
+use fuchsia_component::client::connect_to_protocol;
+use futures::lock::Mutex;
+use futures::StreamExt;
+use input_pipeline::factory_reset_handler::FactoryResetHandler;
+use input_pipeline::ime_handler::ImeHandler;
+use input_pipeline::input_pipeline::{
+    InputDeviceBindingHashMap, InputPipeline, InputPipelineAssembly,
+};
+use input_pipeline::light_sensor_handler::CalibratedLightSensorHandler;
+use input_pipeline::media_buttons_handler::MediaButtonsHandler;
+use input_pipeline::mouse_injector_handler::MouseInjectorHandler;
+use input_pipeline::touch_injector_handler::TouchInjectorHandler;
+use input_pipeline::{dead_keys_handler, input_device, keymap_handler, metrics};
+use scene_management::SceneManagerTrait;
+use std::collections::HashSet;
+use std::rc::Rc;
+use std::sync::Arc;
+use tracing::{error, info, warn};
 use {
-    ::input_pipeline::{
-        light_sensor::{
-            Calibration as LightSensorCalibration, Configuration as LightSensorConfiguration,
-            FactoryFileLoader,
-        },
-        light_sensor_handler::make_light_sensor_handler_and_spawn_led_watcher,
-        text_settings_handler::TextSettingsHandler,
-        CursorMessage,
-    },
-    anyhow::{Context, Error},
-    fidl_fuchsia_factory::MiscFactoryStoreProviderMarker,
-    fidl_fuchsia_input_injection::InputDeviceRegistryRequestStream,
-    fidl_fuchsia_lightsensor::SensorRequestStream as LightSensorRequestStream,
-    fidl_fuchsia_recovery_policy::DeviceRequestStream,
-    fidl_fuchsia_recovery_ui::FactoryResetCountdownRequestStream,
-    fidl_fuchsia_settings as fsettings,
-    fidl_fuchsia_ui_brightness::ControlMarker as BrightnessControlMarker,
-    fidl_fuchsia_ui_pointerinjector_configuration::SetupProxy,
-    fidl_fuchsia_ui_policy::DeviceListenerRegistryRequestStream,
-    focus_chain_provider::FocusChainProviderPublisher,
-    fsettings::LightMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_inspect as inspect, fuchsia_zircon as zx,
-    futures::{lock::Mutex, StreamExt},
-    input_pipeline::{
-        dead_keys_handler,
-        factory_reset_handler::FactoryResetHandler,
-        ime_handler::ImeHandler,
-        input_device,
-        input_pipeline::{InputDeviceBindingHashMap, InputPipeline, InputPipelineAssembly},
-        keymap_handler,
-        light_sensor_handler::CalibratedLightSensorHandler,
-        media_buttons_handler::MediaButtonsHandler,
-        metrics,
-        mouse_injector_handler::MouseInjectorHandler,
-        touch_injector_handler::TouchInjectorHandler,
-    },
-    scene_management::SceneManagerTrait,
-    std::collections::HashSet,
-    std::rc::Rc,
-    std::sync::Arc,
-    tracing::{error, info, warn},
+    fidl_fuchsia_settings as fsettings, fuchsia_async as fasync, fuchsia_inspect as inspect,
+    fuchsia_zircon as zx,
 };
 
 /// Begins handling input events. The returned future will complete when

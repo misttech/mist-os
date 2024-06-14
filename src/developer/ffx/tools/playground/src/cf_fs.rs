@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_trait::async_trait;
 use component_debug::realm::{GetAllInstancesError, Instance};
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_sys2 as sys2;
 use fuchsia_zircon_status::Status;
 use futures::channel::oneshot;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::ops::Bound;
-use std::sync::{Arc, Mutex};
-use vfs::attributes;
+use std::sync::{Arc, Mutex, Weak};
 use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::dirents_sink::{self, AppendResult};
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
@@ -21,7 +17,8 @@ use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::node::Node;
-use vfs::ToObjectRequest;
+use vfs::{attributes, ToObjectRequest};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as sys2};
 
 /// This contains a cache of the entire component hierarchy, as a map from
 /// path-like string keys to instance information. We refresh this cache every
@@ -30,7 +27,7 @@ use vfs::ToObjectRequest;
 /// (https://fxbug.dev/331829928)
 enum CacheState {
     /// We have a fresh cache ready for use.
-    Here(BTreeMap<String, (Instance, Option<Arc<CFDirectory>>)>),
+    Here(BTreeMap<String, (Instance, Option<Weak<CFDirectory>>)>),
     /// There is no cache ready but someone is refreshing it now. The senders in
     /// the vec will all be sent to when it's time to check again.
     Refreshing(Vec<oneshot::Sender<()>>),
@@ -38,7 +35,7 @@ enum CacheState {
     /// state should change it to `Refreshing` and start refreshing the cache.
     /// The stale cache state, if available, is included as the argument to the
     /// variant.
-    NeedsRefresh(Option<BTreeMap<String, (Instance, Option<Arc<CFDirectory>>)>>),
+    NeedsRefresh(Option<BTreeMap<String, (Instance, Option<Weak<CFDirectory>>)>>),
 }
 
 /// Lock-protected portion of [`CFDirectory`]
@@ -178,13 +175,13 @@ impl CFDirectory {
     /// footguns with locking semantics.
     async fn with_cache<T>(
         &self,
-        f: impl FnOnce(&mut BTreeMap<String, (Instance, Option<Arc<CFDirectory>>)>) -> T,
+        f: impl FnOnce(&mut BTreeMap<String, (Instance, Option<Weak<CFDirectory>>)>) -> T,
     ) -> Result<T, GetAllInstancesError> {
         enum NextAction {
             Wait(oneshot::Receiver<()>),
             Refresh(
                 sys2::RealmQueryProxy,
-                Option<BTreeMap<String, (Instance, Option<Arc<CFDirectory>>)>>,
+                Option<BTreeMap<String, (Instance, Option<Weak<CFDirectory>>)>>,
             ),
         }
 
@@ -346,13 +343,16 @@ impl CFDirectory {
                 match self
                     .with_cache(|cache| {
                         if let Some((_, node)) = cache.get_mut(&path_to_here) {
-                            let node = node.get_or_insert_with(|| {
-                                Arc::new(CFDirectory {
+                            if let Some(node) = node.as_ref().and_then(Weak::upgrade) {
+                                Ok(node)
+                            } else {
+                                let new_node = Arc::new(CFDirectory {
                                     inner: Arc::clone(&self.inner),
                                     path: path_to_here,
-                                })
-                            });
-                            Ok(Arc::clone(node))
+                                });
+                                *node = Some(Arc::downgrade(&new_node));
+                                Ok(new_node)
+                            }
                         } else {
                             Err(Status::NOT_FOUND)
                         }
@@ -369,7 +369,6 @@ impl CFDirectory {
     }
 }
 
-#[async_trait]
 impl Node for CFDirectory {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         Ok(fio::NodeAttributes {
@@ -405,7 +404,6 @@ impl Node for CFDirectory {
     }
 }
 
-#[async_trait]
 impl Directory for CFDirectory {
     fn open2(
         self: Arc<Self>,

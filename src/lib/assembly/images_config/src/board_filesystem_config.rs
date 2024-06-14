@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct BoardFilesystemConfig {
     /// Required board configuration for a zbi. All assemblies must produce a ZBI.
     #[serde(default)]
+    #[file_relative_paths]
     pub zbi: Zbi,
 
     /// Board configuration for a vbmeta if necessary. The bootloader determines whether a vbmeta
@@ -40,7 +41,7 @@ pub struct BoardFilesystemConfig {
 }
 
 /// Parameters describing how to generate the ZBI.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct Zbi {
     /// The compression format for the ZBI.
@@ -50,6 +51,7 @@ pub struct Zbi {
     /// An optional script to post-process the ZBI.
     /// This is often used to prepare the ZBI for flashing/updating.
     #[serde(default)]
+    #[file_relative_paths]
     pub postprocessing_script: Option<PostProcessingScript>,
 }
 
@@ -68,15 +70,24 @@ pub enum ZbiCompression {
 }
 
 /// A script to process the ZBI after it is constructed.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct PostProcessingScript {
+    /// TODO(lijiaming) This is going to be deprecated once we move all the users to use the board_script_path.
     /// The path to the script on host.
-    /// This script _musts_ take the following arguments:
+    /// This script _must_ take the following arguments:
     ///   -z <path to ZBI>
     ///   -o <output path>
     ///   -B <build directory, relative to script's source directory>
-    pub path: Utf8PathBuf,
+    #[serde(default)]
+    pub path: Option<Utf8PathBuf>,
+
+    /// The path to the script, relative to board configuration.
+    /// This script _must_ take the following arguments:
+    ///   -z <path to ZBI>
+    ///   -o <output path>
+    #[file_relative_paths]
+    pub board_script_path: Option<FileRelativePathBuf>,
 
     /// Additional arguments to pass to the script after the above arguments.
     #[serde(default)]

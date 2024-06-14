@@ -11,14 +11,14 @@ use fidl_fuchsia_bluetooth_gatt2::{
     SecurityRequirements, Server_Marker, Server_Proxy, ServiceHandle, ServiceInfo, ServiceKind,
     ValueChangedParameters,
 };
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{PeerId, Uuid};
-use fuchsia_component as app;
 use fuchsia_sync::RwLock;
 use futures::stream::TryStreamExt;
 use serde_json::value::Value;
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
+use std::str::FromStr;
 use tracing::{error, info, warn};
+use {fuchsia_async as fasync, fuchsia_component as app};
 
 use crate::bluetooth::constants::{
     CHARACTERISTIC_EXTENDED_PROPERTIES_UUID, GATT_MAX_ATTRIBUTE_VALUE_LENGTH,

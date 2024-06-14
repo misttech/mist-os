@@ -17,6 +17,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
+	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 )
 
@@ -25,6 +26,9 @@ type DeviceResolverMode = string
 const (
 	// Resolve devices with ffx.
 	FfxResolver = "ffx"
+
+	// Resolve devices with constant hostnames.
+	ConstantResolver = "constant"
 )
 
 type DeviceConfig struct {
@@ -48,7 +52,7 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 	fs.StringVar(&c.sshKeyFile, "ssh-private-key", os.Getenv(constants.SSHKeyEnvKey), "SSH private key file that can access the device")
 	fs.StringVar(&c.deviceName, "device", os.Getenv(constants.NodenameEnvKey), "device name")
 	fs.StringVar(&c.deviceHostname, "device-hostname", os.Getenv(constants.DeviceAddrEnvKey), "device hostname or IPv4/IPv6 address")
-	fs.StringVar(&c.deviceResolverMode, "device-resolver", FfxResolver, "device resolver (default: ffx)")
+	fs.StringVar(&c.deviceResolverMode, "resolver-mode", ConstantResolver, "device resolver (default: Constant Resolver)")
 	fs.IntVar(&c.deviceSshPort, "device-ssh-port", 22, "device port")
 	fs.StringVar(&c.deviceFinderPath, "device-finder-path", "", "device-finder tool path")
 	fs.StringVar(&c.SerialSocketPath, "device-serial", "", "device serial path")
@@ -74,6 +78,14 @@ func (c *DeviceConfig) Validate() error {
 			return err
 		}
 	}
+
+	if c.deviceResolverMode == ConstantResolver && c.deviceHostname == "" {
+		return fmt.Errorf("device hostname cannot be empty when using constant resolver")
+	}
+
+	if c.deviceResolverMode == FfxResolver && c.deviceName == "" && c.deviceHostname == "" {
+		return fmt.Errorf("either device name or device hostname must be specified when using ffx resolver")
+	}
 	return nil
 }
 
@@ -81,21 +93,30 @@ func (c *DeviceConfig) deviceResolver(
 	ctx context.Context,
 	ffx *ffx.FFXTool,
 ) (device.DeviceResolver, error) {
-	if c.deviceHostname != "" {
+	switch c.deviceResolverMode {
+	case ConstantResolver:
 		return device.NewConstantHostResolver(
 			ctx,
 			c.deviceName,
 			c.deviceHostname,
 			c.deviceSshPort,
 		), nil
-	}
-
-	switch c.deviceResolverMode {
 	case FfxResolver:
+		// If the device name is not set, attempt to resolve it using the hostname.
+		if c.deviceName == "" && c.deviceHostname != "" {
+			target, err := ffx.WaitForTarget(ctx, c.deviceHostname)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find target with hostname: %s: %w", c.deviceHostname, err)
+			}
+			logger.Infof(ctx, "resolved device name %v from hostname %v", target.NodeName, c.deviceHostname)
+			c.deviceName = target.NodeName
+		}
+		if c.deviceName == "" {
+			return nil, fmt.Errorf("device name cannot be empty when using ffx resolver")
+		}
 		return device.NewFfxResolver(ctx, ffx, c.deviceName)
-
 	default:
-		return nil, fmt.Errorf("Invalid device-resolver mode %v", c.deviceResolverMode)
+		return nil, fmt.Errorf("Invalid device resolver mode %v", c.deviceResolverMode)
 	}
 }
 

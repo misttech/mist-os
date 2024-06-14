@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Result},
-    fidl::endpoints::{ClientEnd, ServerEnd},
-    fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::channel::oneshot,
-    futures::{pin_mut, select, FutureExt, StreamExt},
-    std::cell::RefCell,
-    std::collections::HashMap,
-    std::fmt::Display,
-    std::rc::Rc,
-    tracing::{error, warn},
-    url::Url,
-};
+use anyhow::{Context as _, Result};
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use futures::channel::oneshot;
+use futures::{pin_mut, select, FutureExt, StreamExt};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::rc::Rc;
+use tracing::{error, warn};
+use url::Url;
+use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 enum ProviderStatus {
@@ -235,12 +233,10 @@ fn stop_provider(url: &Url, provider: fuzz::ControllerProviderProxy) -> Result<(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream},
-        fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::{join, Future, TryStreamExt},
-    };
+    use super::*;
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
+    use futures::{join, Future, TryStreamExt};
+    use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     // Test fixtures and helpers.
 

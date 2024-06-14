@@ -6,8 +6,7 @@ use crate::cobalt;
 use crate::ota::state_machine::{Event, EventProcessor, StateHandler};
 use fuchsia_async::{self as fasync, Task};
 use futures::channel::mpsc;
-use futures::SinkExt;
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use mockall::automock;
 use recovery_metrics_registry::cobalt_registry as metrics;
 

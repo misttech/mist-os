@@ -76,16 +76,12 @@ mod tests {
     use anyhow::{format_err, Error};
     use assert_matches::assert_matches;
     use fuchsia_async::Timer;
-    use futures::{
-        channel::oneshot,
-        future::{poll_fn, try_join},
-        lock::Mutex,
-        task::noop_waker_ref,
-    };
-    use std::{
-        task::{Context, Poll},
-        time::Duration,
-    };
+    use futures::channel::oneshot;
+    use futures::future::{poll_fn, try_join};
+    use futures::lock::Mutex;
+    use futures::task::noop_waker_ref;
+    use std::task::{Context, Poll};
+    use std::time::Duration;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn basics(run: usize) {

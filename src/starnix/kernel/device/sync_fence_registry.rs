@@ -1,12 +1,12 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use fidl_fuchsia_starnix_device as fstardevice;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use starnix_sync::Mutex;
-use std::{collections::HashMap, ops::DerefMut, sync::Arc};
+use std::collections::HashMap;
+use std::ops::DerefMut;
+use std::sync::Arc;
 use zx::{AsHandleRef, HandleBased, Koid};
+use {fidl_fuchsia_starnix_device as fstardevice, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct SyncFenceRegistry {
     sync_fence_map: Arc<Mutex<HashMap<Koid, zx::Event>>>,

@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::indexer::*,
-    crate::resolved_driver::{DriverPackageType, ResolvedDriver},
-    anyhow::Context,
-    fidl_fuchsia_component_resolution as fresolution,
-    std::{collections::HashSet, rc::Rc},
-};
+use crate::indexer::*;
+use crate::resolved_driver::{DriverPackageType, ResolvedDriver};
+use anyhow::Context;
+use fidl_fuchsia_component_resolution as fresolution;
+use std::collections::HashSet;
+use std::rc::Rc;
 
 fn log_error(err: anyhow::Error) -> anyhow::Error {
     tracing::error!("{:#?}", err);
@@ -53,7 +52,7 @@ pub async fn load_base_drivers(
     .map_err(log_error)?;
     for resolved_driver in &resolved_drivers {
         let mut composite_node_spec_manager = indexer.composite_node_spec_manager.borrow_mut();
-        composite_node_spec_manager.new_driver_available(resolved_driver.clone());
+        composite_node_spec_manager.new_driver_available(resolved_driver);
     }
     indexer.load_base_repo(resolved_drivers);
     Ok(())
@@ -98,8 +97,7 @@ pub async fn load_drivers(
 mod tests {
     use super::*;
     use crate::resolved_driver::load_driver;
-    use fidl_fuchsia_component_decl as fdecl;
-    use fidl_fuchsia_io as fio;
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
     #[fuchsia::test]
     async fn test_load_fallback_driver() {

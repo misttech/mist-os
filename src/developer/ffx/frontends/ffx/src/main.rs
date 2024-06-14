@@ -8,12 +8,16 @@ use ffx_command::{
     return_bug, return_user_error, CliArgsInfo, Error, FfxCommandLine, FfxContext, FfxToolInfo,
     MetricsSession, Optionality, Result, ToolRunner, ToolSuite,
 };
-use ffx_config::{environment::ExecutableKind, EnvironmentContext};
+use ffx_config::environment::ExecutableKind;
+use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use ffx_lib_args::FfxBuiltIn;
 use ffx_lib_sub_command::SubCommand;
 use fho_search::ExternalSubToolSuite;
-use std::{collections::HashSet, os::unix::process::ExitStatusExt, process::ExitStatus, sync::Arc};
+use std::collections::HashSet;
+use std::os::unix::process::ExitStatusExt;
+use std::process::ExitStatus;
+use std::sync::Arc;
 
 /// The command to be invoked and everything it needs to invoke
 struct FfxSubCommand {

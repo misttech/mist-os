@@ -6,14 +6,10 @@
 //            tests that start with `fails_` actually fail to compile *independently* from one
 //            another.
 
-use std::{
-    fmt, hint,
-    marker::PhantomData,
-    mem,
-    ops::{Bound, Deref, DerefMut, RangeBounds},
-    ptr::NonNull,
-    slice,
-};
+use std::marker::PhantomData;
+use std::ops::{Bound, Deref, DerefMut, RangeBounds};
+use std::ptr::NonNull;
+use std::{fmt, hint, mem, slice};
 
 use crossbeam_utils::atomic::AtomicCell;
 

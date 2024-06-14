@@ -5,15 +5,12 @@ use super::stats::LogStreamStats;
 use crate::logs::stored_message::{
     GenericStoredMessage, LegacyStoredMessage, StructuredStoredMessage,
 };
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
 use futures::Stream;
-use std::{
-    marker::PhantomData,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// An `Encoding` is able to parse a `Message` from raw bytes.
 pub trait Encoding {
@@ -111,9 +108,8 @@ mod tests {
     use super::*;
     use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsField, Severity};
-    use diagnostics_log_encoding::{
-        encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
-    };
+    use diagnostics_log_encoding::encode::Encoder;
+    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use diagnostics_message::{fx_log_packet_t, METADATA_SIZE};
     use fuchsia_zircon as zx;
     use futures::StreamExt;

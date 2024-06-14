@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <zircon/assert.h>
@@ -86,6 +87,53 @@ constexpr void DebugAssertBanjoDisplayModeIsValid(const display_mode_t& display_
   ZX_DEBUG_ASSERT_MSG((display_mode.flags & (~kFlagMask)) == 0u,
                       "flags 0x%x has unknown bits: 0x%x", display_mode.flags,
                       display_mode.flags & (~kFlagMask));
+}
+
+constexpr void DebugAssertFidlDisplayModeIsValid(
+    const fuchsia_hardware_display_engine::wire::DisplayMode& display_mode) {
+  // The >= 0 assertions are always true for uint32_t members in the
+  // `DisplayMode` struct and will be eventually optimized by the compiler.
+  //
+  // These assertions, depsite being always true, match the member
+  // definitions in `DisplayTiming` and they make it easier for readers to
+  // reason about the code without checking the types of each struct member.
+
+  ZX_DEBUG_ASSERT(display_mode.pixel_clock_hz >= 0);
+  ZX_DEBUG_ASSERT(display_mode.pixel_clock_hz <= kMaxPixelClockHz);
+
+  ZX_DEBUG_ASSERT(display_mode.h_addressable >= 0);
+  ZX_DEBUG_ASSERT(display_mode.h_addressable <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(display_mode.h_front_porch >= 0);
+  ZX_DEBUG_ASSERT(display_mode.h_front_porch <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(display_mode.h_sync_pulse >= 0);
+  ZX_DEBUG_ASSERT(display_mode.h_sync_pulse <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(display_mode.h_blanking >= display_mode.h_front_porch);
+  ZX_DEBUG_ASSERT(display_mode.h_blanking >= display_mode.h_sync_pulse);
+  ZX_DEBUG_ASSERT(display_mode.h_blanking - display_mode.h_front_porch >=
+                  display_mode.h_sync_pulse);
+  ZX_DEBUG_ASSERT(display_mode.h_blanking - display_mode.h_front_porch -
+                      display_mode.h_sync_pulse <=
+                  kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(display_mode.v_addressable >= 0);
+  ZX_DEBUG_ASSERT(display_mode.v_addressable <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(display_mode.v_front_porch >= 0);
+  ZX_DEBUG_ASSERT(display_mode.v_front_porch <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(display_mode.v_sync_pulse >= 0);
+  ZX_DEBUG_ASSERT(display_mode.v_sync_pulse <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(display_mode.v_blanking >= display_mode.v_front_porch);
+  ZX_DEBUG_ASSERT(display_mode.v_blanking >= display_mode.v_sync_pulse);
+  ZX_DEBUG_ASSERT(display_mode.v_blanking - display_mode.v_front_porch >=
+                  display_mode.v_sync_pulse);
+  ZX_DEBUG_ASSERT(display_mode.v_blanking - display_mode.v_front_porch -
+                      display_mode.v_sync_pulse <=
+                  kMaxTimingValue);
 }
 
 constexpr void DebugAssertBanjoDisplaySettingIsValid(const display_setting_t& display_setting) {
@@ -189,6 +237,58 @@ DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
                             : SyncPolarity::kNegative,
       .vblank_alternates = (banjo_display_mode.flags & MODE_FLAG_ALTERNATING_VBLANK) != 0,
       .pixel_repetition = (banjo_display_mode.flags & MODE_FLAG_DOUBLE_CLOCKED) ? 1 : 0,
+  };
+}
+
+DisplayTiming ToDisplayTiming(
+    const fuchsia_hardware_display_engine::wire::DisplayMode& fidl_display_mode) {
+  DebugAssertFidlDisplayModeIsValid(fidl_display_mode);
+
+  // A valid DisplayMode guarantees that both h_front_porch and h_sync_pulse
+  // are no more than kMaxTimingValue, so (h_front_porch + h_addressable) won't
+  // overflow.
+  //
+  // It also guarantees that h_blanking >= h_front_porch + h_sync_pulse, and
+  // h_blanking - (h_front_porch + h_sync_pulse) won't overflow and will fit
+  // in [0, kMaxTimingValue] -- so we can use int32_t.
+  int32_t horizontal_back_porch_px =
+      static_cast<int32_t>(fidl_display_mode.h_blanking -
+                           (fidl_display_mode.h_front_porch + fidl_display_mode.h_sync_pulse));
+
+  // Ditto for the vertical back porch.
+  int32_t vertical_back_porch_lines =
+      static_cast<int32_t>(fidl_display_mode.v_blanking -
+                           (fidl_display_mode.v_front_porch + fidl_display_mode.v_sync_pulse));
+
+  return DisplayTiming{
+      .horizontal_active_px = static_cast<int32_t>(fidl_display_mode.h_addressable),
+      .horizontal_front_porch_px = static_cast<int32_t>(fidl_display_mode.h_front_porch),
+      .horizontal_sync_width_px = static_cast<int32_t>(fidl_display_mode.h_sync_pulse),
+      .horizontal_back_porch_px = horizontal_back_porch_px,
+      .vertical_active_lines = static_cast<int32_t>(fidl_display_mode.v_addressable),
+      .vertical_front_porch_lines = static_cast<int32_t>(fidl_display_mode.v_front_porch),
+      .vertical_sync_width_lines = static_cast<int32_t>(fidl_display_mode.v_sync_pulse),
+      .vertical_back_porch_lines = vertical_back_porch_lines,
+      .pixel_clock_frequency_hz = fidl_display_mode.pixel_clock_hz,
+      .fields_per_frame =
+          (fidl_display_mode.flags & fuchsia_hardware_display_engine::wire::ModeFlag::kInterlaced)
+              ? FieldsPerFrame::kInterlaced
+              : FieldsPerFrame::kProgressive,
+      .hsync_polarity = (fidl_display_mode.flags &
+                         fuchsia_hardware_display_engine::wire::ModeFlag::kHsyncPositive)
+                            ? SyncPolarity::kPositive
+                            : SyncPolarity::kNegative,
+      .vsync_polarity = (fidl_display_mode.flags &
+                         fuchsia_hardware_display_engine::wire::ModeFlag::kVsyncPositive)
+                            ? SyncPolarity::kPositive
+                            : SyncPolarity::kNegative,
+      .vblank_alternates =
+          static_cast<bool>(fidl_display_mode.flags &
+                            fuchsia_hardware_display_engine::wire::ModeFlag::kAlternatingVblank),
+      .pixel_repetition = (fidl_display_mode.flags &
+                           fuchsia_hardware_display_engine::wire::ModeFlag::kDoubleClocked)
+                              ? 1
+                              : 0,
   };
 }
 

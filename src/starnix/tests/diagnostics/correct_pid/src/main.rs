@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use component_events::{
-    events::{EventStream, ExitStatus, Stopped},
-    matcher::EventMatcher,
-};
+use component_events::events::{EventStream, ExitStatus, Stopped};
+use component_events::matcher::EventMatcher;
 use diagnostics_reader::{ArchiveReader, Inspect, Logs};
 use fidl::Socket;
 use fidl_fuchsia_component::BinderMarker;

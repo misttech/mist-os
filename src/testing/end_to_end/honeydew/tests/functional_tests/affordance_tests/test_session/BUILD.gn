@@ -13,13 +13,12 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
     transport = "fuchsia-controller"
-    environments = [ emu_env ]
-  }
-
-  # Group containing all of the Session affordance functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [ ":session_test_fc($host_toolchain)" ]
+    environments = [
+      # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+      aemu_env,
+      vim3_env,
+      nuc11_env,
+    ]
   }
 }
 
@@ -32,6 +31,12 @@ group("test_session") {
   testonly = true
   deps = [
     ":packages",
-    ":tests($host_toolchain)",
+    ":session_test_fc($host_toolchain)",
   ]
+}
+
+# Group containing all of the Session affordance functional test cases and their dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [ ":test_session" ]
 }

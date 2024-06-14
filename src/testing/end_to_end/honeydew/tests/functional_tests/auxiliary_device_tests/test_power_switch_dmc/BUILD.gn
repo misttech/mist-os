@@ -5,19 +5,22 @@
 import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
-assert(is_host, "Python E2E tests are host-only")
-
-python_mobly_test("power_switch_dmc_test_fc") {
-  main_source = "test_power_switch_dmc.py"
-  libraries = [
-    "//src/testing/end_to_end/honeydew",
-    "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-  ]
-  transport = "fuchsia-controller"
-  environments = [ vim3_env ]
+if (is_host) {
+  python_mobly_test("power_switch_dmc_test_fc") {
+    main_source = "test_power_switch_dmc.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    transport = "fuchsia-controller"
+    environments = [
+      vim3_env,
+      nuc11_env,
+    ]
+  }
 }
 
-# Group containing all of the PowerSwitchDmc functional test cases.
+# Group containing all of the PowerSwitchDmc functional test cases and its dependencies.
 group("tests") {
   testonly = true
   public_deps = [ ":power_switch_dmc_test_fc($host_toolchain)" ]

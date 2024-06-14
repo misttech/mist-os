@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use ext4_extract::remote_bundle;
+use ext4_extract::remote_bundle::Owner;
 use ext4_metadata::{ExtendedAttributes, ROOT_INODE_NUM};
 use static_assertions::const_assert;
 use std::io::Result;
-use {ext4_extract::remote_bundle, ext4_extract::remote_bundle::Owner};
 
 /// Read-only by everyone because `remote_bundle`s are never writeable and we don't put anything
 /// executable in HAL metadata.

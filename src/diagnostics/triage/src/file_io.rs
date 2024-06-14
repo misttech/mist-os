@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Error},
-    fuchsia_triage::{ActionTagDirective, DiagnosticData, ParseResult, Source},
-    std::{collections::HashMap, fs, path::Path},
-};
+use anyhow::{bail, Error};
+use fuchsia_triage::{ActionTagDirective, DiagnosticData, ParseResult, Source};
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 
 // Third field is whether the file is required.
 const SNAPSHOT_FILES: [(&str, Source, bool); 5] = [

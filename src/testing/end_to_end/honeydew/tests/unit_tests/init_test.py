@@ -37,6 +37,7 @@ _INPUT_ARGS: dict[str, Any] = {
         logs_level="debug",
         mdns_enabled=False,
         subtools_search_path=None,
+        proxy_timeout_secs=None,
     ),
     "target_name": _TARGET_NAME,
     "target_ip_port": _REMOTE_TARGET_IP_PORT_OBJ,
@@ -80,8 +81,6 @@ class InitTests(unittest.TestCase):
 
         mock_fc_context.assert_called_once_with(
             config={
-                "log.dir": _INPUT_ARGS["ffx_config"].logs_dir,
-                "log.level": _INPUT_ARGS["ffx_config"].logs_level,
                 "daemon.autostart": "false",
             },
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
@@ -132,8 +131,6 @@ class InitTests(unittest.TestCase):
 
         mock_fc_context.assert_called_once_with(
             config={
-                "log.dir": _INPUT_ARGS["ffx_config"].logs_dir,
-                "log.level": _INPUT_ARGS["ffx_config"].logs_level,
                 "daemon.autostart": "false",
             },
             isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,

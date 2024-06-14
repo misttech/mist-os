@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_ui_views::{ViewRef, ViewRefControl},
-    fuchsia_zircon::{AsHandleRef, EventPair, HandleBased, Rights, Status},
-};
+use anyhow::Error;
+use fidl_fuchsia_ui_views::{ViewRef, ViewRefControl};
+use fuchsia_zircon::{AsHandleRef, EventPair, HandleBased, Rights, Status};
 
 pub struct ViewRefPair {
     pub control_ref: ViewRefControl,

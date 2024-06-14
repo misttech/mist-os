@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{channel::mpsc, FutureExt, Stream, StreamExt};
+use futures::channel::mpsc;
+use futures::{FutureExt, Stream, StreamExt};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::sink::UnboundedSink;
 
@@ -89,15 +89,13 @@ pub trait TimeoutDuration {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::assert_variant,
-        fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx, DurationNum},
-        futures::channel::mpsc::UnboundedSender,
-        std::pin::pin,
-        std::task::Poll,
-    };
+    use super::*;
+    use crate::assert_variant;
+    use fuchsia_async as fasync;
+    use fuchsia_zircon::{self as zx, DurationNum};
+    use futures::channel::mpsc::UnboundedSender;
+    use std::pin::pin;
+    use std::task::Poll;
 
     type TestEvent = u32;
     impl TimeoutDuration for TestEvent {

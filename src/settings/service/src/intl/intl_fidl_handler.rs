@@ -4,8 +4,7 @@
 
 use crate::base::{SettingInfo, SettingType};
 use crate::handler::base::Request;
-use crate::ingress::Scoped;
-use crate::ingress::{request, watch};
+use crate::ingress::{request, watch, Scoped};
 use crate::job::source::{Error as JobError, ErrorResponder};
 use crate::job::Job;
 

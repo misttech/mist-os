@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{trace_header, ParseResult, INIT_RECORD_TYPE};
-use nom::{combinator::all_consuming, number::complete::le_u64};
+use nom::combinator::all_consuming;
+use nom::number::complete::le_u64;
 use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -44,7 +45,8 @@ impl InitRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fxt_builder::FxtBuilder, RawTraceRecord};
+    use crate::fxt_builder::FxtBuilder;
+    use crate::RawTraceRecord;
 
     #[test]
     fn basic_ticks_to_monotonic() {

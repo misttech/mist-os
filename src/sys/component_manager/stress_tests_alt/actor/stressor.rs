@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Result};
+use fuchsia_component::client::connect_to_protocol;
+use moniker::{ChildName, Moniker};
 use {
-    anyhow::{format_err, Result},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys,
-    fuchsia_component::client::connect_to_protocol,
-    moniker::{ChildName, Moniker},
 };
 
 pub struct Stressor {

@@ -5,32 +5,26 @@
 use derivative::Derivative;
 use macro_rules_attribute::apply;
 use starnix_sync::{Mutex, RwLock};
-use std::{
-    collections::{BTreeSet, HashMap, VecDeque},
-    sync::{Arc, Weak},
-};
+use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::sync::{Arc, Weak};
 
-use crate::{
-    fs::devpts::{get_device_type_for_pts, DEVPTS_COUNT},
-    mutable_state::{state_accessor, state_implementation},
-    task::{CurrentTask, EventHandler, ProcessGroup, Session, WaitCanceler, WaitQueue, Waiter},
-    vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
+use crate::fs::devpts::{get_device_type_for_pts, DEVPTS_COUNT};
+use crate::mutable_state::{state_accessor, state_implementation};
+use crate::task::{
+    CurrentTask, EventHandler, ProcessGroup, Session, WaitCanceler, WaitQueue, Waiter,
 };
+use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use starnix_logging::track_stub;
 use starnix_sync::{LockBefore, Locked, ProcessGroupState};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::signals::{Signal, SIGINT, SIGQUIT, SIGSTOP};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    auth::FsCred,
-    cc_t,
-    device_type::DeviceType,
-    error,
-    errors::Errno,
-    pid_t,
-    signals::{Signal, SIGINT, SIGQUIT, SIGSTOP},
-    tcflag_t, uapi,
-    vfs::FdEvents,
-    ECHO, ECHOCTL, ECHOE, ECHOK, ECHOKE, ECHONL, ECHOPRT, ICANON, ICRNL, IEXTEN, IGNCR, INLCR,
-    ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF, VEOL, VEOL2, VERASE, VINTR,
-    VQUIT, VSUSP, XTABS,
+    cc_t, error, pid_t, tcflag_t, uapi, ECHO, ECHOCTL, ECHOE, ECHOK, ECHOKE, ECHONL, ECHOPRT,
+    ICANON, ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY,
+    VEOF, VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, XTABS,
 };
 
 // CANON_MAX_BYTES is the number of bytes that fit into a single line of

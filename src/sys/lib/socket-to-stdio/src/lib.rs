@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Context as _,
-    fidl_fuchsia_io as fio,
-    futures::{future::Either, stream::StreamExt as _, AsyncReadExt as _, AsyncWriteExt as _},
-    std::io::StdoutLock,
-    termion::raw::IntoRawMode as _,
-};
+use anyhow::Context as _;
+use fidl_fuchsia_io as fio;
+use futures::future::Either;
+use futures::stream::StreamExt as _;
+use futures::{AsyncReadExt as _, AsyncWriteExt as _};
+use std::io::StdoutLock;
+use termion::raw::IntoRawMode as _;
 
 /// Abstracts stdout for `connect_socket_to_stdio`. Allows callers to determine if stdout should be
 /// exclusively owned for the duration of the call.

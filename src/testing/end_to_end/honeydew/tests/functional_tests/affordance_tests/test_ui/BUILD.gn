@@ -13,7 +13,12 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
     transport = "fuchsia-controller"
-    environments = [ emu_env ]
+    environments = [
+      # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+      aemu_env,
+      vim3_env,
+      nuc11_env,
+    ]
   }
 
   python_mobly_test("user_input_test_fc") {
@@ -23,15 +28,11 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
     transport = "fuchsia-controller"
-    environments = [ emu_env ]
-  }
-
-  # Group containing all of the UI affordance functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":screenshot_test_ffx($host_toolchain)",
-      ":user_input_test_fc($host_toolchain)",
+    environments = [
+      # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+      aemu_env,
+      vim3_env,
+      nuc11_env,
     ]
   }
 }
@@ -41,10 +42,27 @@ group("packages") {
   public_deps = [ "//src/ui/examples:flatland-examples" ]
 }
 
-group("test_ui") {
+group("test_screenshot") {
   testonly = true
   public_deps = [
     ":packages",
-    ":tests($host_toolchain)",
+    ":screenshot_test_ffx($host_toolchain)",
+  ]
+}
+
+group("test_user_input") {
+  testonly = true
+  public_deps = [
+    ":packages",
+    ":user_input_test_fc($host_toolchain)",
+  ]
+}
+
+# Group containing all of the UI affordance functional test cases and their dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":test_screenshot",
+    ":test_user_input",
   ]
 }

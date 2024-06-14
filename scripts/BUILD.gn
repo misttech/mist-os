@@ -24,6 +24,7 @@ group("tests") {
     ":build_id_conv_test($host_toolchain)",
     "fxtest:tests",
     "fxutils:tests",
+    "lib:tests",
     "versioning:tests",
   ]
 }

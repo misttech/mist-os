@@ -3,33 +3,32 @@
 // found in the LICENSE file.
 
 use crate::task::TaskBuilder;
-use fidl_fuchsia_io as fio;
-use fuchsia_zircon as zx;
 use selinux::security_server::SecurityServer;
 use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
-use std::{ffi::CString, mem::MaybeUninit, sync::Arc};
+use std::ffi::CString;
+use std::mem::MaybeUninit;
+use std::sync::Arc;
 use zerocopy::{AsBytes, NoCell};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
-use crate::{
-    device::init_common_devices,
-    fs::{fuchsia::RemoteFs, tmpfs::TmpFs},
-    mm::{
-        syscalls::{do_mmap, sys_mremap},
-        MemoryAccessor, MemoryAccessorExt, PAGE_SIZE,
-    },
-    task::{CurrentTask, Kernel, Task},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_not_dir, Anon, CacheMode, FdNumber, FileHandle,
-        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsContext, FsNode, FsNodeOps, FsStr,
-    },
+use crate::device::init_common_devices;
+use crate::fs::fuchsia::RemoteFs;
+use crate::fs::tmpfs::TmpFs;
+use crate::mm::syscalls::{do_mmap, sys_mremap};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
+use crate::task::{CurrentTask, Kernel, Task};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    fileops_impl_nonseekable, fs_node_impl_not_dir, Anon, CacheMode, FdNumber, FileHandle,
+    FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsContext,
+    FsNode, FsNodeOps, FsStr,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
-use starnix_uapi::{
-    errors::Errno, open_flags::OpenFlags, statfs, user_address::UserAddress, vfs::default_statfs,
-    MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::{statfs, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
 
 /// Create a FileSystemHandle for use in testing.
 ///

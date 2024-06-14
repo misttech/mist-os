@@ -4,15 +4,13 @@
 
 #![cfg(test)]
 
-use {
-    anyhow::Error,
-    fidl_fuchsia_factory::{
-        AlphaFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderMarker,
-        MiscFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderMarker,
-        WeaveFactoryStoreProviderMarker, WidevineFactoryStoreProviderMarker,
-    },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+use anyhow::Error;
+use fidl_fuchsia_factory::{
+    AlphaFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderMarker,
+    MiscFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderMarker,
+    WeaveFactoryStoreProviderMarker, WidevineFactoryStoreProviderMarker,
 };
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 macro_rules! connect_to_factory_store_provider {
     ($t:ty) => {{

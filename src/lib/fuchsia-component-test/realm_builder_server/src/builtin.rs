@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component_test as ftest, fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, HandleBased},
-    std::{collections::HashMap, sync::Arc},
-    tracing::*,
-    vfs::{
-        directory::entry_container::Directory, directory::helper::DirectlyMutable,
-        directory::immutable::simple as simpledir, execution_scope::ExecutionScope,
-        file::vmo::VmoFile, path::Path as VfsPath,
-    },
-};
+use anyhow::{format_err, Context, Error};
+use fidl::endpoints::ServerEnd;
+use fuchsia_zircon::{self as zx, HandleBased};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::*;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::immutable::simple as simpledir;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::VmoFile;
+use vfs::path::Path as VfsPath;
+use {fidl_fuchsia_component_test as ftest, fidl_fuchsia_io as fio};
 
 enum DirectoryOrFile {
     Directory(HashMap<String, DirectoryOrFile>),
@@ -130,10 +130,12 @@ fn build_directory(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl::endpoints::create_proxy, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
-        futures::TryStreamExt, maplit::hashset, std::collections::HashSet,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy;
+    use futures::TryStreamExt;
+    use maplit::hashset;
+    use std::collections::HashSet;
+    use {fidl_fuchsia_mem as fmem, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn read_only_directory_contains_expected_files() {

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder},
-    cm_rust::*,
-    cm_rust_testing::*,
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    std::marker::PhantomData,
-};
+use crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder};
+use cm_rust::*;
+use cm_rust_testing::*;
+use std::marker::PhantomData;
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 pub struct CommonRightsTest<T: RoutingTestModelBuilder> {
     builder: PhantomData<T>,

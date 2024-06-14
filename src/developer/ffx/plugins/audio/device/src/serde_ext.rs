@@ -4,19 +4,14 @@
 
 //! Helpers to serialize fuchsia_audio types with serde.
 
-use fidl_fuchsia_audio_device as fadevice;
-use fuchsia_audio::{
-    dai::{DaiFormatSet, DaiFrameFormat, DaiSampleFormat},
-    device::{ClockDomain, GainCapabilities, GainState, PlugEvent, PlugState},
-    format::SampleType,
-    format_set::{ChannelAttributes, ChannelSet, PcmFormatSet},
-};
-use fuchsia_zircon_types as zx_types;
-use serde::{
-    ser::{SerializeMap, SerializeSeq},
-    Serialize, Serializer,
-};
+use fuchsia_audio::dai::{DaiFormatSet, DaiFrameFormat, DaiSampleFormat};
+use fuchsia_audio::device::{ClockDomain, GainCapabilities, GainState, PlugEvent, PlugState};
+use fuchsia_audio::format::SampleType;
+use fuchsia_audio::format_set::{ChannelAttributes, ChannelSet, PcmFormatSet};
+use serde::ser::{SerializeMap, SerializeSeq};
+use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
+use {fidl_fuchsia_audio_device as fadevice, fuchsia_zircon_types as zx_types};
 
 /// Serialize an value that can be converted to a string to the string.
 pub fn serialize_tostring<S>(value: &impl ToString, serializer: S) -> Result<S::Ok, S::Error>

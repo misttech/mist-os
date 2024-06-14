@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Context, Result},
-    fuchsia_hash::Hash,
-    fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant, RepositoryUrl},
-    std::fmt::Display,
-    tracing::warn,
-};
+use anyhow::{bail, Context, Result};
+use fuchsia_hash::Hash;
+use fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant, RepositoryUrl};
+use std::fmt::Display;
+use tracing::warn;
 
 // TODO(https://fxbug.dev/42052037): Eliminate this API by requiring clients to declare a repository.
 pub fn from_package_name<D: Display>(name: D) -> Result<AbsolutePackageUrl> {

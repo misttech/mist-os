@@ -4,15 +4,14 @@
 
 #[cfg(test)]
 mod tests {
-    use {
-        blob_writer::BlobWriter,
-        delivery_blob::{CompressionMode, Type1Blob},
-        fidl_fuchsia_fxfs::MountOptions,
-        fs_management::{filesystem::Filesystem, Fxfs},
-        fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        ramdevice_client::RamdiskClient,
-        rand::{thread_rng, Rng},
-    };
+    use blob_writer::BlobWriter;
+    use delivery_blob::{CompressionMode, Type1Blob};
+    use fidl_fuchsia_fxfs::MountOptions;
+    use fs_management::filesystem::Filesystem;
+    use fs_management::Fxfs;
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use ramdevice_client::RamdiskClient;
+    use rand::{thread_rng, Rng};
     const DEVICE_SIZE: u64 = 128 * 1024 * 1024;
     const BLOCK_SIZE: u64 = 4 * 1024;
     const BLOCK_COUNT: u64 = DEVICE_SIZE / BLOCK_SIZE;

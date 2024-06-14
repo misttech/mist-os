@@ -30,7 +30,8 @@ impl Measurable for fidl::PackageIndexEntry {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, proptest::prelude::*};
+    use super::*;
+    use proptest::prelude::*;
 
     /// Truncates `s` to be at most `max_len` bytes.
     fn truncate_str(s: &str, max_len: usize) -> &str {

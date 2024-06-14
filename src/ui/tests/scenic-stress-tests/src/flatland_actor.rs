@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::flatland_instance::FlatlandInstance,
-    async_trait::async_trait,
-    fuchsia_component_test::RealmInstance,
-    rand::{rngs::SmallRng, Rng},
-    std::sync::Arc,
-    stress_test::actor::{Actor, ActorError},
-};
+use crate::flatland_instance::FlatlandInstance;
+use async_trait::async_trait;
+use fuchsia_component_test::RealmInstance;
+use rand::rngs::SmallRng;
+use rand::Rng;
+use std::sync::Arc;
+use stress_test::actor::{Actor, ActorError};
 
 pub struct FlatlandActor {
     root: FlatlandInstance,

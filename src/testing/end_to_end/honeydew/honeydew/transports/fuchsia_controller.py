@@ -67,11 +67,7 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
                 self._config.isolate_dir
             )
 
-            # To collect Fuchsia-Controller logs
             config: dict[str, str] = {}
-            if self._config.logs_dir:
-                config["log.dir"] = self._config.logs_dir
-                config["log.level"] = self._config.logs_level
 
             # Do not autostart the daemon if it is not running.
             # If Fuchsia-Controller need to start a daemon then it needs to know

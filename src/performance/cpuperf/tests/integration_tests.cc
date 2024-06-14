@@ -14,7 +14,7 @@
 #include "src/performance/lib/perfmon/controller.h"
 #include "verify_test.h"
 
-static fuchsia_logging::LogSettings g_log_settings;
+static fxl::LogSettings g_log_settings;
 
 static void RunAndVerify(const char* spec_path) {
   // Early exit if there is no perfmon device. We could be running on QEMU.

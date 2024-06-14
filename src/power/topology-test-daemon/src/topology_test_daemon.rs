@@ -3,17 +3,20 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use fidl_fuchsia_power_broker as fbroker;
-use fidl_fuchsia_power_system as fsystem;
-use fidl_fuchsia_power_topology_test as fpt;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
-use std::{future::Future, pin::Pin};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::rc::Rc;
 use tracing::{error, info, warn};
+use {
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
+    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync,
+};
 
 const APPLICATION_ACTIVITY_CONTROLLER: &'static str = "application_activity_controller";
 

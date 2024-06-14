@@ -5,8 +5,7 @@
 mod tee_client_api;
 
 use self::tee_client_api::*;
-use std::mem;
-use std::ptr;
+use std::{mem, ptr};
 use tracing::error;
 
 use self::tee_client_api::{

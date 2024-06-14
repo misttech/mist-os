@@ -14,8 +14,9 @@
 #include <vector>
 
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_atom.h"
+#include "src/graphics/drivers/msd-arm-mali/src/timeout_source.h"
 
-class JobScheduler {
+class JobScheduler : public TimeoutSource {
  public:
   class Owner {
    public:
@@ -30,8 +31,8 @@ class JobScheduler {
     virtual void EnterProtectedMode() = 0;
     virtual bool ExitProtectedMode() = 0;
     virtual void OutputHangMessage(bool hardware_hang) = 0;
+    virtual void PowerOnGpuForRunnableAtoms() = 0;
   };
-  using Clock = std::chrono::steady_clock;
   using ClockCallback = std::function<Clock::time_point()>;
 
   JobScheduler(Owner* owner, uint32_t job_slots);
@@ -51,7 +52,9 @@ class JobScheduler {
 
   // Gets the duration until the earliest currently executing or waiting atom should time out, or
   // max if there's no timeout pending.
-  virtual Clock::duration GetCurrentTimeoutDuration();
+  Clock::duration GetCurrentTimeoutDuration() override;
+  void TimeoutTriggered() override { HandleTimedOutAtoms(); }
+  bool CheckForDeviceThreadDelay() override { return true; }
 
   virtual void HandleTimedOutAtoms();
 
@@ -63,6 +66,20 @@ class JobScheduler {
   // Sets whether the scheduler will attempt to schedule work on the GPU. When scheduling is
   // re-enabled, this method will attempt to schedule work on the GPU.
   void SetSchedulingEnabled(bool enabled);
+
+  bool HasRunnableWork() {
+    for (auto& slot : executing_atoms_) {
+      if (slot) {
+        return true;
+      }
+    }
+    for (auto& slot : runnable_atoms_) {
+      if (!slot.empty()) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   std::vector<std::string> DumpStatus();
 

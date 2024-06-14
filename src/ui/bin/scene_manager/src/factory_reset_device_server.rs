@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error, fidl_fuchsia_recovery_policy::DeviceRequestStream,
-    futures::channel::mpsc::UnboundedSender,
-};
+use anyhow::Error;
+use fidl_fuchsia_recovery_policy::DeviceRequestStream;
+use futures::channel::mpsc::UnboundedSender;
 
 /// A struct which forwards `DeviceRequestStream`s over an
 /// `mpsc::UnboundedSender`.
@@ -34,10 +33,10 @@ impl RecoveryPolicyDeviceServer {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_recovery_policy::DeviceMarker,
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_recovery_policy::DeviceMarker;
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_handle_request_forwards_stream_and_returns_ok() {

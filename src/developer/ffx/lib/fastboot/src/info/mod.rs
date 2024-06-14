@@ -5,7 +5,8 @@
 use crate::common::prepare;
 use anyhow::{anyhow, Result};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, Variable};
-use futures::{prelude::*, try_join};
+use futures::prelude::*;
+use futures::try_join;
 use std::io::Write;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};

@@ -8,7 +8,6 @@ blobfs.cache-eviction-policy=NEVER_EVICT
 ?kernel.compression.strategy=lz4
 ?kernel.enable-debugging-syscalls=false
 ?kernel.enable-serial-syscalls=false
-?kernel.oom.behavior=reboot
 ?kernel.oom.evict-continuous=true
 ?kernel.page-scanner.lru-action=compress_only
 ?kernel.ppb.borrow-in-supplypages=true
@@ -16,7 +15,6 @@ blobfs.cache-eviction-policy=NEVER_EVICT
 ?kernel.ppb.loan=true
 ?kernel.ppb.replace-on-unloan=true
 ?kernel.render-dlog-to-crashlog=true
-?kernel.serial=none
 ?netsvc.disable=true
 ?virtcon.disable=true
 ?virtcon.hide-on-boot

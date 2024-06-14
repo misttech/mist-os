@@ -17,13 +17,11 @@ mod span;
 use anyhow::{anyhow, bail, Result};
 use argh::FromArgs;
 
-use std::{
-    env,
-    fs::{self, File},
-    io::{self, BufRead, BufReader},
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::env;
+use std::fs::{self, File};
+use std::io::{self, BufRead, BufReader};
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use crate::api::Api;
 

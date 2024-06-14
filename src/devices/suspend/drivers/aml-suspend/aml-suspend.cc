@@ -26,11 +26,16 @@ namespace suspend {
 namespace {
 
 constexpr char kDeviceName[] = "aml-suspend-device";
-// LINT.IfChange
 constexpr zx::duration kDebugSuspendDuration = zx::sec(5);
-// LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/interfaces/affordances/system_power_state_controller.py)
 
+constexpr uint64_t kInspectHistorySize = 128;
 }  // namespace
+
+AmlSuspend::AmlSuspend(fdf::DriverStartArgs start_args,
+                       fdf::UnownedSynchronizedDispatcher dispatcher)
+    : fdf::DriverBase("aml-suspend", std::move(start_args), std::move(dispatcher)),
+      inspect_events_(inspector().root().CreateChild("suspend_events"), kInspectHistorySize),
+      devfs_connector_(fit::bind_member<&AmlSuspend::Serve>(this)) {}
 
 zx::result<zx::resource> AmlSuspend::GetCpuResource() {
   zx::result resource = incoming()->Connect<fuchsia_kernel::CpuResource>();
@@ -118,8 +123,7 @@ void AmlSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
 
   auto suspend_to_idle =
       fuchsia_hardware_suspend::wire::SuspendState::Builder(arena).resume_latency(0).Build();
-  std::vector<fuchsia_hardware_suspend::wire::SuspendState> suspend_states = {
-      std::move(suspend_to_idle)};
+  std::vector<fuchsia_hardware_suspend::wire::SuspendState> suspend_states = {suspend_to_idle};
 
   auto resp = fuchsia_hardware_suspend::wire::SuspenderGetSuspendStatesResponse::Builder(arena)
                   .suspend_states(std::move(suspend_states))
@@ -143,13 +147,19 @@ void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& com
     return;
   }
 
+  inspect_events_.CreateEntry(
+      [](inspect::Node& n) { n.RecordInt("suspended", zx_clock_get_monotonic()); });
   zx_status_t result =
       zx_system_suspend_enter(cpu_resource_.get(), zx::deadline_after(kDebugSuspendDuration).get());
 
   if (result != ZX_OK) {
     FDF_LOG(ERROR, "zx_system_suspend_enter failed: %s", zx_status_get_string(result));
+    inspect_events_.CreateEntry(
+        [](inspect::Node& n) { n.RecordInt("suspend_failed", zx_clock_get_monotonic()); });
     completer.ReplyError(result);
   } else {
+    inspect_events_.CreateEntry(
+        [](inspect::Node& n) { n.RecordInt("resumed", zx_clock_get_monotonic()); });
     completer.ReplySuccess(resp);
   }
 }

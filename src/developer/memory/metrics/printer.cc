@@ -17,13 +17,24 @@
 #include "third_party/rapidjson/include/rapidjson/ostreamwrapper.h"
 #include "third_party/rapidjson/include/rapidjson/rapidjson.h"
 #include "third_party/rapidjson/include/rapidjson/writer.h"
-
 namespace {
+
+// TODO(https://fxbug.dev/42136089): replace with std::saturate_cast when available.
+rapidjson::SizeType safecast(size_t v) {
+  static_assert(std::numeric_limits<rapidjson::SizeType>::min() <=
+                std::numeric_limits<size_t>::min());
+  static_assert(std::numeric_limits<rapidjson::SizeType>::max() <=
+                std::numeric_limits<size_t>::max());
+  return static_cast<rapidjson::SizeType>(
+      std::clamp<size_t>(v, std::numeric_limits<rapidjson::SizeType>::min(),
+                         std::numeric_limits<rapidjson::SizeType>::max()));
+}
 
 rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
   TRACE_DURATION("memory_metrics", "Printer::DocumentFromCapture");
   rapidjson::Document j(rapidjson::kObjectType);
   auto& a = j.GetAllocator();
+  j.AddMember("Time", capture.time(), a);
 
   rapidjson::Value kernel(rapidjson::kObjectType);
   const auto& k = capture.kmem();
@@ -38,27 +49,54 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
       .AddMember("other", k.other_bytes, a);
 
   // Add additional kernel fields if kmem_extended is populated.
-  const auto& k_ext = capture.kmem_extended();
-  if (k_ext.total_bytes > 0) {
+  // `kmem()` and `kmem_extended()` consistency is guaranteed.
+  if (capture.kmem_extended()) {
+    const auto& k_ext = capture.kmem_extended().value();
     kernel.AddMember("vmo_pager_total", k_ext.vmo_pager_total_bytes, a)
         .AddMember("vmo_pager_newest", k_ext.vmo_pager_newest_bytes, a)
         .AddMember("vmo_pager_oldest", k_ext.vmo_pager_oldest_bytes, a)
         .AddMember("vmo_discardable_locked", k_ext.vmo_discardable_locked_bytes, a)
-        .AddMember("vmo_discardable_unlocked", k_ext.vmo_discardable_unlocked_bytes, a);
+        .AddMember("vmo_discardable_unlocked", k_ext.vmo_discardable_unlocked_bytes, a)
+        .AddMember("vmo_reclaim_disabled", k_ext.vmo_reclaim_disabled_bytes, a);
   }
+  j.AddMember("Kernel", kernel, a);
 
-  const auto& k_zram = capture.kmem_compression();
-  bool has_zram = k_zram.compressed_storage_bytes > 0;
-  if (has_zram) {
-    kernel.AddMember("zram_compressed_total", k_zram.compressed_storage_bytes, a)
-        .AddMember("zram_uncompressed", k_zram.uncompressed_storage_bytes, a)
-        .AddMember("zram_fragmentation", k_zram.compressed_fragmentation_bytes, a);
+  if (capture.kmem_compression()) {
+    rapidjson::Value kmem_stats_compression(rapidjson::kObjectType);
+
+    const auto& k_zram = capture.kmem_compression().value();
+    constexpr size_t log_time_size =
+        sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time) /
+        sizeof(zx_info_kmem_stats_compression_t::pages_decompressed_within_log_time[0]);
+    rapidjson::Value log_time(rapidjson::kArrayType);
+    log_time.Reserve(log_time_size, a);
+    for (auto v : k_zram.pages_decompressed_within_log_time) {
+      log_time.PushBack(v, a);
+    }
+
+    kmem_stats_compression
+        .AddMember("uncompressed_storage_bytes", k_zram.uncompressed_storage_bytes, a)
+        .AddMember("compressed_storage_bytes", k_zram.compressed_storage_bytes, a)
+        .AddMember("compressed_fragmentation_bytes", k_zram.compressed_fragmentation_bytes, a)
+        .AddMember("compression_time", k_zram.compression_time, a)
+        .AddMember("decompression_time", k_zram.decompression_time, a)
+        .AddMember("total_page_compression_attempts", k_zram.total_page_compression_attempts, a)
+        .AddMember("failed_page_compression_attempts", k_zram.failed_page_compression_attempts, a)
+        .AddMember("total_page_decompressions", k_zram.total_page_decompressions, a)
+        .AddMember("compressed_page_evictions", k_zram.compressed_page_evictions, a)
+        .AddMember("eager_page_compressions", k_zram.eager_page_compressions, a)
+        .AddMember("memory_pressure_page_compressions", k_zram.memory_pressure_page_compressions, a)
+        .AddMember("critical_memory_page_compressions", k_zram.critical_memory_page_compressions, a)
+        .AddMember("pages_decompressed_unit_ns", k_zram.pages_decompressed_unit_ns, a)
+        .AddMember("pages_decompressed_within_log_time", log_time, a);
+
+    j.AddMember("kmem_stats_compression", kmem_stats_compression, a);
   }
 
   struct NameCount {
     std::string_view name_;
-    mutable size_t count;
-    explicit NameCount(const char* n) : name_(n, strlen(n)), count(1) {}
+    mutable size_t count = 1;
+    explicit NameCount(const char* n) : name_(n, strlen(n)) {}
 
     bool operator==(const NameCount& kc) const { return name_ == kc.name_; }
   };
@@ -71,12 +109,12 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
   TRACE_DURATION_BEGIN("memory_metrics", "Printer::DocumentFromCapture::Processes");
   std::unordered_set<NameCount, NameCountHash> name_count;
   rapidjson::Value processes(rapidjson::kArrayType);
-  processes.Reserve(capture.koid_to_process().size(), a);
+  processes.Reserve(safecast(capture.koid_to_process().size()), a);
   rapidjson::Value process_header(rapidjson::kArrayType);
   processes.PushBack(process_header.PushBack("koid", a).PushBack("name", a).PushBack("vmos", a), a);
   for (const auto& [_, p] : capture.koid_to_process()) {
     rapidjson::Value vmos(rapidjson::kArrayType);
-    vmos.Reserve(p.vmos.size(), a);
+    vmos.Reserve(safecast(p.vmos.size()), a);
     for (const auto& v : p.vmos) {
       vmos.PushBack(v, a);
       auto [it, inserted] = name_count.emplace(capture.koid_to_vmo().find(v)->second.name);
@@ -102,7 +140,7 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
 
   rapidjson::Value vmo_names(rapidjson::kArrayType);
   for (const auto& nc : sorted_counts) {
-    vmo_names.PushBack(rapidjson::StringRef(nc.name_.data()), a);
+    vmo_names.PushBack(rapidjson::StringRef(nc.name_.data(), nc.name_.length()), a);
   }
   TRACE_DURATION_END("memory_metrics", "Printer::DocumentFromCapture::Names");
 
@@ -114,7 +152,7 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
       .PushBack("parent_koid", a)
       .PushBack("committed_bytes", a)
       .PushBack("allocated_bytes", a);
-  if (has_zram) {
+  if (capture.kmem_compression()) {
     vmo_header.PushBack("populated_bytes", a);
   }
   vmos.PushBack(vmo_header, a);
@@ -125,16 +163,14 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
         .PushBack(v.parent_koid, a)
         .PushBack(v.committed_bytes, a)
         .PushBack(v.allocated_bytes, a);
-    if (has_zram) {
+    if (capture.kmem_compression()) {
       vmo_value.PushBack(v.populated_bytes, a);
     }
     vmos.PushBack(vmo_value, a);
   }
   TRACE_DURATION_END("memory_metrics", "Printer::DocumentFromCapture::Vmos");
 
-  j.AddMember("Time", capture.time(), a)
-      .AddMember("Kernel", kernel, a)
-      .AddMember("Processes", processes, a)
+  j.AddMember("Processes", processes, a)
       .AddMember("VmoNames", vmo_names, a)
       .AddMember("Vmos", vmos, a);
 
@@ -156,7 +192,7 @@ const char* FormatSize(uint64_t bytes, char* buf) {
     bytes /= 1024;
     ui++;
   }
-  unsigned int round_up = ((r % 102) >= 51);
+  uint16_t round_up = ((r % 102) >= 51);
   r = (r / 102) + round_up;
   if (r == 10) {
     bytes++;
@@ -281,7 +317,7 @@ void Printer::OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t pid
   if (sorted == SORTED) {
     sorted_summaries = summaries;
     std::sort(sorted_summaries.begin(), sorted_summaries.end(),
-              [](ProcessSummary a, ProcessSummary b) {
+              [](const ProcessSummary& a, const ProcessSummary& b) {
                 return a.sizes().private_bytes > b.sizes().private_bytes;
               });
   }
@@ -298,12 +334,14 @@ void Printer::OutputSummary(const Summary& summary, Sorted sorted, zx_koid_t pid
         names.push_back(name);
       }
       if (sorted == SORTED) {
-        std::sort(names.begin(), names.end(), [&name_to_sizes](std::string a, std::string b) {
-          const auto& sa = name_to_sizes.at(a);
-          const auto& sb = name_to_sizes.at(b);
-          return sa.private_bytes == sb.private_bytes ? sa.scaled_bytes > sb.scaled_bytes
-                                                      : sa.private_bytes > sb.private_bytes;
-        });
+        std::sort(names.begin(), names.end(),
+                  [&name_to_sizes](const std::string& a, const std::string& b) {
+                    const auto& sa = name_to_sizes.at(a);
+                    const auto& sb = name_to_sizes.at(b);
+                    return sa.private_bytes == sb.private_bytes
+                               ? sa.scaled_bytes > sb.scaled_bytes
+                               : sa.private_bytes > sb.private_bytes;
+                  });
       }
       for (const auto& name : names) {
         const auto& sizes = name_to_sizes.at(name);

@@ -10,10 +10,13 @@ use fuchsia_bluetooth::types::{Peer, PeerId, Technology};
 use fuchsia_sync::Mutex;
 use futures::future::{pending, BoxFuture};
 use futures::{select, FutureExt, Stream, StreamExt};
-use std::{collections::HashMap, mem, sync::Arc};
+use std::collections::HashMap;
+use std::mem;
+use std::sync::Arc;
 use tracing::{debug, info, trace, warn};
 
-use crate::{host_dispatcher::*, watch_peers::PeerWatcher};
+use crate::host_dispatcher::*;
+use crate::watch_peers::PeerWatcher;
 
 #[derive(Default)]
 struct AccessSession {

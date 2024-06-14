@@ -2,17 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_test_processbuilder::{EnvVar, UtilRequest, UtilRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_runtime::{self as fruntime, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::prelude::*,
-    std::env,
-    std::fs,
-};
+use anyhow::{Context as _, Error};
+use fidl_test_processbuilder::{EnvVar, UtilRequest, UtilRequestStream};
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_runtime::{self as fruntime, HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::prelude::*;
+use std::{env, fs};
 
 async fn run_util_server(mut stream: UtilRequestStream) -> Result<(), Error> {
     // If we've been given a lifecycle channel, figure out its koid

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_tee_manager::{ProviderRequest, ProviderRequestStream},
-    futures::stream::TryStreamExt as _,
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_tee_manager::{ProviderRequest, ProviderRequestStream};
+use futures::stream::TryStreamExt as _;
 
 /// `ProviderServer` implements the fuchsia.tee.manager.Provider FIDL protocol.
 pub struct ProviderServer {

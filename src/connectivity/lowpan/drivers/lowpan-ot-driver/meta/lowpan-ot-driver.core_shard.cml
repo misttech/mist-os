@@ -108,6 +108,11 @@
             from: "#network",
             to: [ "#lowpan-ot-driver" ],
         },
+        {
+            protocol: [ "fuchsia.feedback.CrashReporter" ],
+            from: "#feedback",
+            to: "#lowpan-ot-driver",
+        },
 
         // offers for lowpan-monitor
         {

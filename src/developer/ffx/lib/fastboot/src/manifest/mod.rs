@@ -2,24 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    common::{
-        cmd::{BootParams, Command, ManifestParams},
-        prepare, Boot, Flash, Unlock,
-    },
-    file_resolver::{
-        resolvers::{Resolver, ZipArchiveResolver},
-        FileResolver,
-    },
-    manifest::{
-        resolvers::{
-            ArchiveResolver, FlashManifestResolver, FlashManifestTarResolver, ManifestResolver,
-        },
-        v1::FlashManifest as FlashManifestV1,
-        v2::FlashManifest as FlashManifestV2,
-        v3::FlashManifest as FlashManifestV3,
-    },
+use crate::common::cmd::{BootParams, Command, ManifestParams};
+use crate::common::{prepare, Boot, Flash, Unlock};
+use crate::file_resolver::resolvers::{Resolver, ZipArchiveResolver};
+use crate::file_resolver::FileResolver;
+use crate::manifest::resolvers::{
+    ArchiveResolver, FlashManifestResolver, FlashManifestTarResolver, ManifestResolver,
 };
+use crate::manifest::v1::FlashManifest as FlashManifestV1;
+use crate::manifest::v2::FlashManifest as FlashManifestV2;
+use crate::manifest::v3::FlashManifest as FlashManifestV3;
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_partitions_config::{PartitionAndImage, PartitionImageMapper, Slot};
 use async_trait::async_trait;
@@ -31,11 +23,9 @@ use pbms::load_product_bundle;
 use sdk_metadata::{ProductBundle, ProductBundleV2};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value, Value};
-use std::{
-    fs::File,
-    io::{BufReader, Read, Write},
-    path::PathBuf,
-};
+use std::fs::File;
+use std::io::{BufReader, Read, Write};
+use std::path::PathBuf;
 use termion::{color, style};
 
 pub mod resolvers;

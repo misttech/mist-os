@@ -5,7 +5,8 @@
 use anyhow::{Context, Error};
 use fidl_fuchsia_bluetooth_power::{ReporterRequestStream, WatcherRequestStream};
 use fuchsia_component::server::{ServiceFs, ServiceObj};
-use futures::{future::BoxFuture, FutureExt, StreamExt};
+use futures::future::BoxFuture;
+use futures::{FutureExt, StreamExt};
 use std::sync::Arc;
 use tracing::info;
 

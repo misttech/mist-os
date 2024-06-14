@@ -262,29 +262,29 @@ mod tests {
 
         let json = r#"
             {
-                "bootloader_partitions" : [
+                "bootloader_partitions": [
                     {
-                        "image" : "TEMPDIR/u-boot.bin.signed.b4",
-                        "name" : "bootloader",
-                        "type" : "skip_metadata"
+                        "image": "u-boot.bin.signed.b4",
+                        "name": "bootloader",
+                        "type": "skip_metadata"
                     }
                 ],
-                "bootstrap_partitions" : [
+                "bootstrap_partitions": [
                     {
-                        "condition" : {
-                        "value" : "0xe9000000",
-                        "variable" : "emmc-total-bytes"
+                        "condition": {
+                            "value": "0xe9000000",
+                            "variable": "emmc-total-bytes"
                         },
-                        "image" : "TEMPDIR/gpt.fuchsia.3728.bin",
-                        "name" : "gpt"
+                        "image": "gpt.fuchsia.3728.bin",
+                        "name": "gpt"
                     },
                     {
-                        "condition" : {
-                        "value" : "0xec000000",
-                        "variable" : "emmc-total-bytes"
+                        "condition": {
+                            "value": "0xec000000",
+                            "variable": "emmc-total-bytes"
                         },
-                        "image" : "TEMPDIR/gpt.fuchsia.3776.bin",
-                        "name" : "gpt"
+                        "image": "gpt.fuchsia.3776.bin",
+                        "name": "gpt"
                     }
                 ],
                 partitions: [
@@ -309,12 +309,12 @@ mod tests {
                 ],
                 hardware_revision: "hw",
                 unlock_credentials: [
-                    "TEMPDIR/unlock_creds.zip",
+                    "unlock_creds.zip",
                 ],
             }
         "#;
-        let mut cursor = std::io::Cursor::new(json.replace("TEMPDIR", tempdir.as_str()));
-        let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
+        let partitions_config_path = tempdir.join("partitions_config.json");
+        File::create(partitions_config_path.as_path()).unwrap().write_all(json.as_bytes()).unwrap();
 
         let create_temp_file = |name: &str| {
             let path = tempdir.join(name);
@@ -334,6 +334,8 @@ mod tests {
         create_temp_file("zedboot.zbi");
         create_temp_file("zedboot.vbmeta");
         create_temp_file("fastboot");
+
+        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -405,9 +407,9 @@ mod tests {
                     "path": "storage-full.blk"
                 },
                 {
-                    "name" : "fvm.fastboot",
-                    "path" : "fvm.fastboot.blk",
-                    "type" : "blk"
+                    "name": "fvm.fastboot",
+                    "path": "fvm.fastboot.blk",
+                    "type": "blk"
                 },
                 {
                     "type": "kernel",

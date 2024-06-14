@@ -8,7 +8,8 @@
 mod tests {
     use anyhow::Result;
     use ffx_config::{SdkRoot, TestEnv};
-    use ffx_isolate::{test::TestCommandLineInfo, Isolate, SearchContext};
+    use ffx_isolate::test::TestCommandLineInfo;
+    use ffx_isolate::{Isolate, SearchContext};
     use serde_json::Value;
     use std::path::PathBuf;
     use tempfile::TempDir;

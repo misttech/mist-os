@@ -105,6 +105,9 @@
                 // https://fxbug.dev/42094401
                 "AllInetTests/TcpSocketTest.MsgTruncPeek/*",
 
+                // Setting PMTUD is not supported.
+                "AllInetTests/TcpSocketTest.SetPMTUD/*",
+
                 // https://fxbug.dev/42117720
                 "AllInetTests/TcpSocketTest.TcpInqSetSockOpt/*",
 

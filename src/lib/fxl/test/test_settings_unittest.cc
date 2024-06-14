@@ -29,7 +29,8 @@ class TestSettingsFixture : public ::testing::Test {
         old_stderr_(dup(STDERR_FILENO)),
         random_seed_(getenv("TEST_LOOP_RANDOM_SEED")) {}
   ~TestSettingsFixture() {
-    fuchsia_logging::SetLogSettings({.min_log_level = old_severity_});
+    fuchsia_logging::LogSettingsBuilder builder;
+    builder.WithMinLogSeverity(old_severity_).BuildAndInitialize();
     dup2(old_stderr_.get(), STDERR_FILENO);
     if (random_seed_) {
       setenv("TEST_LOOP_RANDOM_SEED", random_seed_, /*overwrite=*/true);

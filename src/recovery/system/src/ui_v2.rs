@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use carnelian::app::Config;
+use carnelian::drawing::DisplayRotation;
 use carnelian::{
-    app::Config, drawing::DisplayRotation, App, AppAssistant, AppAssistantPtr, AppSender,
-    AssistantCreator, AssistantCreatorFunc, ViewAssistantPtr, ViewKey,
+    App, AppAssistant, AppAssistantPtr, AppSender, AssistantCreator, AssistantCreatorFunc,
+    ViewAssistantPtr, ViewKey,
 };
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
-use fidl_fuchsia_recovery_ui as frui;
-use fuchsia_async as fasync;
 use futures::TryStreamExt;
 use ota_lib::OtaComponent;
 use recovery_ui::proxy_view_assistant::ProxyViewAssistant;
@@ -21,6 +21,7 @@ use recovery_util::ota::controller::{Controller, ControllerImpl, SendEvent};
 use recovery_util::ota::state_machine::{Event, OtaStatus, State, StateMachine};
 use std::rc::Rc;
 use std::sync::Arc;
+use {fidl_fuchsia_recovery_ui as frui, fuchsia_async as fasync};
 
 #[cfg(feature = "debug_console")]
 use {

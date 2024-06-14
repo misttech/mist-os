@@ -77,8 +77,7 @@ impl<T> Once<T> {
 mod test {
     use super::*;
     use futures_lite::future::block_on;
-    use std::sync::atomic::AtomicUsize;
-    use std::sync::atomic::Ordering;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[test]
     fn test_get_or_init() {

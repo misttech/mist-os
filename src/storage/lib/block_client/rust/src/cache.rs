@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{BufferSlice, MutableBufferSlice, RemoteBlockClientSync, VmoId},
-    anyhow::{ensure, Error},
-    fuchsia_zircon as zx,
-    linked_hash_map::LinkedHashMap,
-    std::io::SeekFrom,
-    std::io::Write,
-    tracing::error,
-};
+use super::{BufferSlice, MutableBufferSlice, RemoteBlockClientSync, VmoId};
+use anyhow::{ensure, Error};
+use fuchsia_zircon as zx;
+use linked_hash_map::LinkedHashMap;
+use std::io::{SeekFrom, Write};
+use tracing::error;
 
 const VMO_SIZE: u64 = 262_144;
 const BLOCK_SIZE: u64 = 8192;
@@ -294,12 +291,10 @@ impl std::io::Seek for Cache {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Cache, Stats},
-        crate::RemoteBlockClientSync,
-        ramdevice_client::RamdiskClient,
-        std::io::{Read as _, Seek as _, SeekFrom, Write as _},
-    };
+    use super::{Cache, Stats};
+    use crate::RemoteBlockClientSync;
+    use ramdevice_client::RamdiskClient;
+    use std::io::{Read as _, Seek as _, SeekFrom, Write as _};
 
     const RAMDISK_BLOCK_SIZE: u64 = 1024;
     const RAMDISK_BLOCK_COUNT: u64 = 1023; // Deliberate for testing max offset.

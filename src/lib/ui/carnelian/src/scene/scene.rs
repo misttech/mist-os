@@ -2,34 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    facets::{
-        FacetEntry, FacetId, FacetMap, FacetPtr, RectangleFacet, SpacingFacet, TextFacet,
-        TextFacetOptions,
-    },
-    group::{GroupId, GroupMap, GroupMember, GroupMemberData},
-    layout::{ArrangerPtr, Axis, Flex, FlexBuilder, StackBuilder},
-    raster_for_corner_knockouts, BlendMode, FillRule, LayerGroup, Rendering,
+use super::facets::{
+    FacetEntry, FacetId, FacetMap, FacetPtr, RectangleFacet, SpacingFacet, TextFacet,
+    TextFacetOptions,
 };
-use crate::{
-    color::Color,
-    drawing::{path_for_cursor, FontFace},
-    render::{
-        generic::{GenericOrder, OrderError},
-        Composition, Context as RenderContext, Fill, Layer, Order, PreClear, Raster, RenderExt,
-        Style,
-    },
-    Coord, IntPoint, Point, Rect, Size, ViewAssistantContext,
+use super::group::{GroupId, GroupMap, GroupMember, GroupMemberData};
+use super::layout::{ArrangerPtr, Axis, Flex, FlexBuilder, StackBuilder};
+use super::{raster_for_corner_knockouts, BlendMode, FillRule, LayerGroup, Rendering};
+use crate::color::Color;
+use crate::drawing::{path_for_cursor, FontFace};
+use crate::render::generic::{GenericOrder, OrderError};
+use crate::render::{
+    Composition, Context as RenderContext, Fill, Layer, Order, PreClear, Raster, RenderExt, Style,
 };
+use crate::{Coord, IntPoint, Point, Rect, Size, ViewAssistantContext};
 use anyhow::{bail, Error};
 use euclid::{size2, vec2};
 use fuchsia_trace::duration;
 use fuchsia_zircon::{AsHandleRef, Event, Signals};
-use std::{
-    any::Any,
-    collections::{BTreeMap, HashMap},
-    fmt::{self, Debug},
-};
+use std::any::Any;
+use std::collections::{BTreeMap, HashMap};
+use std::fmt::{self, Debug};
 
 // Maximum order supported by scene. 3 layers are reserved for
 /// scene features such as rounded corners.

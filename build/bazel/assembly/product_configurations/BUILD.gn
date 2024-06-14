@@ -29,6 +29,7 @@ group("verifications") {
 
 if (is_host) {
   python_host_test("test_verify_product_configuration") {
+    enable_mypy = true
     main_source = "test_verify_product_configuration.py"
     sources = [ "verify_product_configuration.py" ]
   }

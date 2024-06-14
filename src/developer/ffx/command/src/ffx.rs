@@ -6,11 +6,16 @@ use crate::{user_error, Error, FfxContext, MetricsSession, Result};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_command_error::bug;
+use ffx_config::environment::ExecutableKind;
 use ffx_config::logging::LogDestination;
-use ffx_config::{environment::ExecutableKind, EnvironmentContext, FfxConfigBacked};
+use ffx_config::{EnvironmentContext, FfxConfigBacked};
 use ffx_writer::Format;
+use std::collections::HashMap;
+use std::fmt::Write;
 use std::os::unix::process::ExitStatusExt;
-use std::{collections::HashMap, fmt::Write, path::PathBuf, process::ExitStatus, str::FromStr};
+use std::path::PathBuf;
+use std::process::ExitStatus;
+use std::str::FromStr;
 
 /// The environment variable name used for overriding the command name in help
 /// output.

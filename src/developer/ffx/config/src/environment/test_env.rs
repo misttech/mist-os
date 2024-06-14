@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{logging::LogDestination, ConfigMap, Environment, EnvironmentContext};
+use crate::logging::LogDestination;
+use crate::{ConfigMap, Environment, EnvironmentContext};
 use anyhow::{Context, Result};
-use std::{
-    cell::Cell,
-    collections::HashMap,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::cell::Cell;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tempfile::{NamedTempFile, TempDir};
 use tracing::level_filters::LevelFilter;
 

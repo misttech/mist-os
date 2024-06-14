@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{blob_written, compress_and_write_blob, get_missing_blobs, TestEnv},
-    assert_matches::assert_matches,
-    fidl_fuchsia_io as fio, fidl_fuchsia_paver as fpaver,
-    fidl_fuchsia_pkg::{self as fpkg, NeededBlobsMarker},
-    fidl_fuchsia_pkg_ext::BlobId,
-    fidl_fuchsia_space::ErrorCode,
-    fuchsia_async as fasync,
-    fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
-    fuchsia_zircon::{self as zx, Status},
-    futures::TryFutureExt as _,
-    mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
-    rand::prelude::*,
-    std::collections::BTreeSet,
-};
+use crate::{blob_written, compress_and_write_blob, get_missing_blobs, TestEnv};
+use assert_matches::assert_matches;
+use fidl_fuchsia_pkg::{self as fpkg, NeededBlobsMarker};
+use fidl_fuchsia_pkg_ext::BlobId;
+use fidl_fuchsia_space::ErrorCode;
+use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
+use fuchsia_zircon::{self as zx, Status};
+use futures::TryFutureExt as _;
+use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
+use rand::prelude::*;
+use std::collections::BTreeSet;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_paver as fpaver, fuchsia_async as fasync};
 
 #[fuchsia::test]
 async fn gc_error_pending_commit() {

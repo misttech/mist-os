@@ -1,13 +1,11 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::config::{BridgeControlRegister, SecondaryStatusRegister, Type01Config},
-    crate::device::Device,
-    crate::util::format_bytes,
-    std::fmt,
-    zerocopy::Ref,
-};
+use crate::config::{BridgeControlRegister, SecondaryStatusRegister, Type01Config};
+use crate::device::Device;
+use crate::util::format_bytes;
+use std::fmt;
+use zerocopy::Ref;
 
 // A PCI Bridge is a Device with a different (Type 01) configuration layout, but much of the
 // information displayed is similar.

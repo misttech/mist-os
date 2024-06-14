@@ -165,10 +165,8 @@ pub fn example_host(id: HostId, active: bool, discoverable: bool) -> fsys::HostI
 mod tests {
     use super::*;
 
-    use {
-        diagnostics_assertions::assert_data_tree, fidl_fuchsia_bluetooth as fbt,
-        fuchsia_inspect as inspect,
-    };
+    use diagnostics_assertions::assert_data_tree;
+    use {fidl_fuchsia_bluetooth as fbt, fuchsia_inspect as inspect};
 
     #[test]
     fn from_fidl_id_not_present() {

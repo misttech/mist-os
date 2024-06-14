@@ -10,10 +10,8 @@ use core::marker::PhantomData;
 use derivative::Derivative;
 use packet::{BufferMut, Serializer};
 
-use crate::{
-    testutil::{FakeFrameCtx, WithFakeFrameContext},
-    ContextProvider, CounterContext, SendableFrameMeta,
-};
+use crate::testutil::{FakeFrameCtx, WithFakeFrameContext};
+use crate::{ContextProvider, CounterContext, SendableFrameMeta};
 
 /// A test helper used to provide an implementation of a core context.
 #[derive(Derivative)]

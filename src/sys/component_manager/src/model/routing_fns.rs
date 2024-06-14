@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        component::WeakComponentInstance,
-        routing::{self, RouteRequest},
-    },
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    router_error::Explain,
-    std::sync::Arc,
-    tracing::error,
-    vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
-};
+use crate::model::component::WeakComponentInstance;
+use crate::model::routing::{self, RouteRequest};
+use router_error::Explain;
+use std::sync::Arc;
+use tracing::error;
+use vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub struct RouteEntry {
     component: WeakComponentInstance,

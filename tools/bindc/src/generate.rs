@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use bind::compiler;
-use bind::linter;
 use bind::parser::bind_library;
 use bind::parser::common::Include;
+use bind::{compiler, linter};
 use std::collections::HashSet;
 
-use crate::cpp_generator;
-use crate::rust_generator;
-use crate::GeneratedBindingType;
+use crate::{cpp_generator, rust_generator, GeneratedBindingType};
 
 pub trait BindingGenerator {
     fn generate_using_declaration(self: &Self, using_decl: &Include) -> String;

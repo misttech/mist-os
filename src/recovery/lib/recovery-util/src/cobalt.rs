@@ -2,21 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Context, Error};
+use fidl_fuchsia_cobalt::{AggregateAndUploadMarker, AggregateAndUploadSynchronousProxy};
+use fidl_fuchsia_metrics::{
+    MetricEventLoggerFactoryMarker, MetricEventLoggerFactoryProxy, MetricEventLoggerProxy,
+    ProjectSpec,
+};
+use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol};
 #[cfg(test)]
 use mockall::automock;
-use {
-    anyhow::{format_err, Context, Error},
-    fidl_fuchsia_cobalt::{AggregateAndUploadMarker, AggregateAndUploadSynchronousProxy},
-    fidl_fuchsia_metrics::{
-        MetricEventLoggerFactoryMarker, MetricEventLoggerFactoryProxy, MetricEventLoggerProxy,
-        ProjectSpec,
-    },
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_channel_to_protocol,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
-    tracing::error,
-};
+use tracing::error;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[cfg_attr(test, automock)]
 pub trait Cobalt {
@@ -153,16 +149,14 @@ pub use recovery_metrics_registry::cobalt_registry as metrics;
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_metrics::{
-            MetricEvent, MetricEventLoggerMarker, MetricEventLoggerRequest, MetricEventPayload,
-        },
-        futures::TryStreamExt,
-        mock_metrics::MockMetricEventLoggerFactory,
-        std::sync::Arc,
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_metrics::{
+        MetricEvent, MetricEventLoggerMarker, MetricEventLoggerRequest, MetricEventPayload,
     };
+    use futures::TryStreamExt;
+    use mock_metrics::MockMetricEventLoggerFactory;
+    use std::sync::Arc;
 
     /// Tests that the get_logger_from_factory can return the correct logger proxy
     #[fasync::run_singlethreaded(test)]

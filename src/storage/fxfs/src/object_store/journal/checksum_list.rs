@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        checksum::{fletcher64, Checksum},
-        errors::FxfsError,
-        range::RangeExt,
-    },
-    anyhow::{ensure, Error},
-    std::{collections::BTreeMap, ops::Range},
-    storage_device::Device,
-};
+use crate::checksum::{fletcher64, Checksum};
+use crate::errors::FxfsError;
+use crate::range::RangeExt;
+use anyhow::{ensure, Error};
+use std::collections::BTreeMap;
+use std::ops::Range;
+use storage_device::Device;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ChecksumState {
@@ -249,11 +246,10 @@ impl ChecksumList {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::ChecksumList,
-        crate::checksum::fletcher64,
-        storage_device::{fake_device::FakeDevice, Device},
-    };
+    use super::ChecksumList;
+    use crate::checksum::fletcher64;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::Device;
 
     #[fuchsia::test]
     async fn test_verify() {

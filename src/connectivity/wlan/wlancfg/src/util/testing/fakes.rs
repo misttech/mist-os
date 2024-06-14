@@ -3,29 +3,25 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
+use crate::client::roaming::local_roam_manager::LocalRoamManagerApi;
+use crate::client::roaming::roam_monitor::RoamMonitorApi;
+use crate::client::{scan, types as client_types};
+use crate::config_management::{
+    Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
+    PastConnectionList, SavedNetworksManagerApi,
+};
+use crate::telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS;
+use crate::util::pseudo_energy::EwmaSignalData;
+use async_trait::async_trait;
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use rand::Rng;
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
+use tracing::{info, warn};
 use {
-    crate::{
-        client::{
-            roaming::{local_roam_manager::LocalRoamManagerApi, roam_monitor::RoamMonitorApi},
-            scan, types as client_types,
-        },
-        config_management::{
-            Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
-            PastConnectionList, SavedNetworksManagerApi,
-        },
-        telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS,
-        util::pseudo_energy::EwmaSignalData,
-    },
-    async_trait::async_trait,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{channel::mpsc, lock::Mutex},
-    rand::Rng,
-    std::{
-        collections::{HashMap, VecDeque},
-        sync::Arc,
-    },
-    tracing::{info, warn},
 };
 
 pub struct FakeSavedNetworksManager {
@@ -214,7 +210,7 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
         credential: Credential,
     ) -> Result<Option<NetworkConfig>, NetworkConfigError> {
         if self.fail_all_stores {
-            return Err(NetworkConfigError::StashWriteError);
+            return Err(NetworkConfigError::FileWriteError);
         }
         let config = NetworkConfig::new(network_id.clone(), credential, false)?;
         return Ok(self

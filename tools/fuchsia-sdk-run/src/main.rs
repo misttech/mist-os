@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display, Write},
-    os::unix::process::CommandExt,
-    process::{Command, Output, Stdio},
-};
+use std::collections::HashMap;
+use std::fmt::{Debug, Display, Write};
+use std::os::unix::process::CommandExt;
+use std::process::{Command, Output, Stdio};
 
 use anyhow::Context;
 use argh::FromArgs;
 use ffx_command::{Ffx, FFX_WRAPPER_INVOKE};
-use ffx_config::{environment::ExecutableKind::MainFfx, EnvironmentContext, SdkRoot};
+use ffx_config::environment::ExecutableKind::MainFfx;
+use ffx_config::{EnvironmentContext, SdkRoot};
 use ffx_config_domain::ConfigDomain;
 
 use camino::Utf8Path;

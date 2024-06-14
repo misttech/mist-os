@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::HashSet, ops::Range};
+use std::collections::HashSet;
+use std::ops::Range;
 
 // https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml
 const EPHEMERAL_PORT_RANGE: Range<u32> = 49152..65535;

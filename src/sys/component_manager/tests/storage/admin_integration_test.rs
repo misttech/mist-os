@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{events::*, matcher::*},
-    fidl::endpoints::{create_endpoints, create_proxy, ClientEnd},
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
-        DEFAULT_COLLECTION_NAME,
-    },
-    futures::{
-        channel::mpsc, future::BoxFuture, sink::SinkExt, Future, FutureExt, StreamExt, TryStreamExt,
-    },
-    maplit::hashset,
-    std::collections::HashSet,
+use component_events::events::*;
+use component_events::matcher::*;
+use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
+    DEFAULT_COLLECTION_NAME,
 };
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::sink::SinkExt;
+use futures::{Future, FutureExt, StreamExt, TryStreamExt};
+use maplit::hashset;
+use std::collections::HashSet;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 /// Returns a new mock that writes a file and terminates. The future indicates when writing the file has completed.
 fn new_data_user_mock<T: Into<String>, U: Into<String>>(

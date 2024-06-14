@@ -2,26 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_bluetooth_a2dp::{AudioModeMarker, AudioModeRequestStream};
+use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
+use fidl_fuchsia_bluetooth_internal_a2dp::{ControllerMarker, ControllerRequestStream};
+use fidl_fuchsia_component::BinderMarker;
+use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, SessionAudioConsumerFactoryMarker};
+use fidl_fuchsia_media_sessions2::PublisherMarker;
+use fidl_fuchsia_mediacodec::CodecFactoryMarker;
+use fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker;
+use fidl_fuchsia_power_battery::BatteryManagerMarker;
+use fidl_fuchsia_settings::AudioMarker;
+use fidl_fuchsia_sysmem2::AllocatorMarker;
+use fidl_fuchsia_tracing_provider::RegistryMarker;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStream, TryStreamExt};
+use tracing::info;
 use {
-    anyhow::Error,
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_bluetooth_a2dp::{AudioModeMarker, AudioModeRequestStream},
     fidl_fuchsia_bluetooth_avdtp_test as fidl_avdtp, fidl_fuchsia_bluetooth_avrcp as fidl_avrcp,
-    fidl_fuchsia_bluetooth_bredr::ProfileMarker,
-    fidl_fuchsia_bluetooth_internal_a2dp::{ControllerMarker, ControllerRequestStream},
-    fidl_fuchsia_component::BinderMarker,
-    fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, SessionAudioConsumerFactoryMarker},
-    fidl_fuchsia_media_sessions2::PublisherMarker,
-    fidl_fuchsia_mediacodec::CodecFactoryMarker,
-    fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
-    fidl_fuchsia_power_battery::BatteryManagerMarker,
-    fidl_fuchsia_settings::AudioMarker,
-    fidl_fuchsia_sysmem2::AllocatorMarker,
-    fidl_fuchsia_tracing_provider::RegistryMarker,
     fuchsia_async as fasync,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    futures::{StreamExt, TryStream, TryStreamExt},
-    tracing::info,
 };
 
 async fn process_request_stream<S>(mut stream: S, tag: &str)

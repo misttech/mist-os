@@ -7,3 +7,9 @@ filegroup(
     srcs = glob(["*.bzl"]),
     visibility = ["//fuchsia:__pkg__"],
 )
+
+filegroup(
+    name = "templates",
+    srcs = glob(["*.template"]) + ["api_version_template.bzl"],
+    visibility = ["//fuchsia/workspace/sdk_export:__pkg__"],
+)

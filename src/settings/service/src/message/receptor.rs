@@ -8,8 +8,7 @@ use crate::message::message_client::MessageClient;
 use anyhow::{format_err, Error};
 use futures::channel::mpsc::UnboundedReceiver;
 use futures::task::{Context, Poll};
-use futures::Stream;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use std::pin::Pin;
 
 type EventReceiver = UnboundedReceiver<MessageEvent>;

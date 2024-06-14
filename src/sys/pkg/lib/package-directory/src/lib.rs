@@ -4,20 +4,17 @@
 
 #![allow(clippy::let_unit_value)]
 
-use {
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{collections::HashSet, convert::TryInto as _},
-    tracing::error,
-    vfs::{
-        common::send_on_open_with_error,
-        directory::{entry::EntryInfo, entry_container::Directory},
-        ObjectRequestRef,
-    },
-};
+use fidl::endpoints::ServerEnd;
+use std::collections::HashSet;
+use std::convert::TryInto as _;
+use tracing::error;
+use vfs::common::send_on_open_with_error;
+use vfs::directory::entry::EntryInfo;
+use vfs::directory::entry_container::Directory;
+use vfs::ObjectRequestRef;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 mod meta_as_dir;
-mod meta_as_file;
 mod meta_file;
 mod meta_subdir;
 mod non_meta_subdir;
@@ -26,7 +23,8 @@ mod root_dir_cache;
 
 pub use root_dir::{PathError, ReadFileError, RootDir, SubpackagesError};
 pub use root_dir_cache::RootDirCache;
-pub use vfs::{execution_scope::ExecutionScope, path::Path as VfsPath};
+pub use vfs::execution_scope::ExecutionScope;
+pub use vfs::path::Path as VfsPath;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -61,7 +59,8 @@ pub enum Error {
 
 impl From<&Error> for zx::Status {
     fn from(e: &Error) -> Self {
-        use {fuchsia_fs::node::OpenError, Error::*};
+        use fuchsia_fs::node::OpenError;
+        use Error::*;
         match e {
             MissingMetaFar => zx::Status::NOT_FOUND,
             OpenMetaFar(OpenError::OpenError(s)) => *s,
@@ -281,15 +280,14 @@ async fn verify_open_adjusts_flags(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        fuchsia_hash::Hash,
-        fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        futures::StreamExt,
-        std::any::Any,
-        vfs::directory::dirents_sink::{self, AppendResult, Sealed, Sink},
-    };
+    use super::*;
+    use assert_matches::assert_matches;
+    use fuchsia_hash::Hash;
+    use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
+    use fuchsia_pkg_testing::PackageBuilder;
+    use futures::StreamExt;
+    use std::any::Any;
+    use vfs::directory::dirents_sink::{self, AppendResult, Sealed, Sink};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn serve() {

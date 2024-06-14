@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotMarker, ScreenshotTakeRequest},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
-    std::convert::TryInto,
-    std::fs,
-    std::io::BufWriter,
-};
+use fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotMarker, ScreenshotTakeRequest};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon as zx;
+use std::convert::TryInto;
+use std::fs;
+use std::io::BufWriter;
 
 const SCREENSHOT_FILE: &'static str = "/custom_artifacts/screenshot.png";
 

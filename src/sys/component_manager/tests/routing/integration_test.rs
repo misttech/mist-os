@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints;
+use fuchsia_component::client;
 use {
-    fidl::endpoints, fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
+    fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::client,
 };
 
 #[fasync::run_singlethreaded(test)]

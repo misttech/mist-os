@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{facade::PaverFacade, types::Method};
+use super::facade::PaverFacade;
+use super::types::Method;
 use crate::server::Facade;
 use anyhow::Error;
 use async_trait::async_trait;

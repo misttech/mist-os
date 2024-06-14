@@ -161,8 +161,8 @@ following responsibilities:
         <tr>
             <!-- Cannot using HTML, and getting links to be re-written, so putting direct link. -->
             <td><a href="https://fuchsia.dev/fuchsia-src/contribute/governance/areas/#{{ area.name|replace(" ", "-")|lower() }}">{{ area.name }}</a</td>
-            <td>{{ area.api_primary }}</td>
-            <td>{% if area.api_secondary == "" %}<i>none.</i>{% else %}{{ area.api_secondary }}{% endif %}</td>
+            <td>{% if area.api_primary == "" %}<i>none</i>{% else %}{{ area.api_primary }}{% endif %}</td>
+            <td>{% if area.api_secondary == "" %}<i>none</i>{% else %}{{ area.api_secondary }}{% endif %}</td>
         </tr>
         {% endfor %}
     </tbody>

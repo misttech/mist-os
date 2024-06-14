@@ -7,29 +7,27 @@ use bstr::BString;
 use fuchsia_zircon as zx;
 use gpu::gpu_device_init;
 use gralloc::gralloc_device_init;
-use input_device::{uinput::register_uinput_device, InputDevice};
+use input_device::uinput::register_uinput_device;
+use input_device::InputDevice;
 use magma_device::magma_device_init;
 use selinux::security_server;
-use starnix_core::{
-    device::{
-        android::bootloader_message_store::android_bootloader_message_store_init,
-        ashmem::ashmem_device_init,
-        framebuffer::{fb_device_init, AspectRatio},
-        perfetto_consumer::start_perfetto_consumer_thread,
-        remote_block_device::remote_block_device_init,
-    },
-    task::{CurrentTask, Kernel, KernelFeatures},
-    vfs::FsString,
-};
+use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
+use starnix_core::device::ashmem::ashmem_device_init;
+use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};
+use starnix_core::device::perfetto_consumer::start_perfetto_consumer_thread;
+use starnix_core::device::remote_block_device::remote_block_device_init;
+use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
+use starnix_core::vfs::FsString;
 use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::{error, errors::Errno};
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
 use std::sync::Arc;
 
-use fidl_fuchsia_sysinfo as fsysinfo;
-use fidl_fuchsia_ui_composition as fuicomposition;
-use fidl_fuchsia_ui_input3 as fuiinput;
-use fidl_fuchsia_ui_policy as fuipolicy;
-use fidl_fuchsia_ui_views as fuiviews;
+use {
+    fidl_fuchsia_sysinfo as fsysinfo, fidl_fuchsia_ui_composition as fuicomposition,
+    fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
+    fidl_fuchsia_ui_views as fuiviews,
+};
 
 /// A collection of parsed features, and their arguments.
 #[derive(Default, Debug)]
@@ -99,7 +97,6 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("magma", _) => features.magma = true,
             ("gfxstream", _) => features.gfxstream = true,
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
-            ("log_dump_on_exit", _) => features.kernel.log_dump_on_exit = true,
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.into());
             }

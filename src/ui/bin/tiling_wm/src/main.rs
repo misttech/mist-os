@@ -2,18 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Error};
+use fidl::endpoints::{create_proxy, ControlHandle, Proxy, RequestStream};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use fuchsia_scenic::flatland::{IdGenerator, ViewCreationTokenPair};
+use fuchsia_scenic::ViewRefPair;
+use futures::channel::mpsc::UnboundedSender;
+use futures::{StreamExt, TryStreamExt};
+use std::collections::HashMap;
+use tracing::{error, info, warn};
 use {
-    anyhow::{Context, Error},
-    fidl::endpoints::{create_proxy, ControlHandle, Proxy, RequestStream},
     fidl_fuchsia_element as element, fidl_fuchsia_session_scene as scene,
     fidl_fuchsia_ui_composition as ui_comp, fidl_fuchsia_ui_views as ui_views,
-    fuchsia_async as fasync,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs, server::ServiceObj},
-    fuchsia_scenic::{flatland::IdGenerator, flatland::ViewCreationTokenPair, ViewRefPair},
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc::UnboundedSender, StreamExt, TryStreamExt},
-    std::collections::HashMap,
-    tracing::{error, info, warn},
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 // The maximum number of concurrent services to serve.
@@ -323,6 +325,9 @@ impl TilingWm {
         let fullscreen_height = self.layout_info.logical_size.unwrap().height;
         let fullscreen_width = self.layout_info.logical_size.unwrap().width;
         let num_tiles = self.tiles.len() as u32;
+        if num_tiles == 0 {
+            return;
+        }
         let mut columns = (num_tiles as f32).sqrt().ceil() as u32;
         let mut rows = (columns + num_tiles - 1) / columns;
         if fullscreen_height > fullscreen_width {

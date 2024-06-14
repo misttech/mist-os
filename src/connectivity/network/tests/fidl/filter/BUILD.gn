@@ -42,6 +42,7 @@ rustc_test("filter") {
     "src/ip_hooks.rs",
     "src/lib.rs",
     "src/matchers.rs",
+    "src/nat.rs",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }

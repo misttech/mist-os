@@ -11,10 +11,10 @@ use emulator_instance::targets as emulator_targets;
 use emulator_targets::EmulatorTargetAction;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_events::TargetConnectionState;
-use ffx_daemon_target::{
-    target::{self, Target, TargetProtocol, TargetTransport, TargetUpdateBuilder},
-    target_collection::{TargetCollection, TargetUpdateFilter},
+use ffx_daemon_target::target::{
+    self, Target, TargetProtocol, TargetTransport, TargetUpdateBuilder,
 };
+use ffx_daemon_target::target_collection::{TargetCollection, TargetUpdateFilter};
 use ffx_stream_util::TryStreamUtilExt;
 use ffx_target::{FastbootInterface, TargetInfoQuery};
 use fidl::endpoints::ProtocolMarker;
@@ -24,13 +24,11 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 use futures::channel::oneshot::Sender;
 use futures::TryStreamExt;
 use protocols::prelude::*;
-use std::{
-    net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
-    path::PathBuf,
-    rc::Rc,
-    sync::Arc,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
-};
+use std::net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tasks::TaskManager;
 
 mod reboot;
@@ -700,7 +698,9 @@ mod tests {
     use futures::channel::oneshot::channel;
     use protocols::testing::FakeDaemonBuilder;
     use serde_json::{json, Map, Value};
-    use std::{cell::RefCell, path::Path, str::FromStr};
+    use std::cell::RefCell;
+    use std::path::Path;
+    use std::str::FromStr;
     use tempfile::tempdir;
 
     #[fuchsia_async::run_singlethreaded(test)]

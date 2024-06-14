@@ -15,21 +15,19 @@ use diagnostics_hierarchy::Property;
 use diagnostics_log::{OnInterestChanged, Publisher, PublisherOptions, TestRecord};
 use diagnostics_log_encoding::encode::{Argument, Value};
 use fidl::endpoints::create_request_stream;
-use fidl_fuchsia_archivist_test as fpuppet;
 use fidl_fuchsia_diagnostics::Severity;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_async::{Task, TaskGroup, Timer};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_inspect::{component, health::Reporter, Inspector};
-use fuchsia_zircon as zx;
-use futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    lock::Mutex,
-    FutureExt, StreamExt, TryStreamExt,
-};
+use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::{component, Inspector};
+use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::lock::Mutex;
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use inspect_testing::ExampleInspectData;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
+use {fidl_fuchsia_archivist_test as fpuppet, fuchsia_zircon as zx};
 
 enum IncomingServices {
     Puppet(fpuppet::PuppetRequestStream),

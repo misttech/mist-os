@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{key::Tk, key_data::kde, Error},
-    mundane::bytes,
-    wlan_common::ie::rsn::cipher::Cipher,
-};
+use crate::key::Tk;
+use crate::key_data::kde;
+use crate::Error;
+use mundane::bytes;
+use wlan_common::ie::rsn::cipher::Cipher;
 
 /// This IGTK provider does not support key rotations yet.
 #[derive(Debug)]

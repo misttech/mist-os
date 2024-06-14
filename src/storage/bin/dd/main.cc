@@ -178,7 +178,7 @@ bool IsBlockPath(std::string_view path) {
 
 bool IsSkipBlockPath(std::string_view path) {
   // E.g. /dev/class/skip-block/000 or
-  // /dev/sys/platform/05:00:f/aml-raw_nand/nand/zircon-a/skip-block
+  // /dev/sys/platform/raw_nand/aml-raw_nand/nand/zircon-a/skip-block
   return (cpp20::starts_with(path, "/dev") && cpp20::ends_with(path, "/skip-block")) ||
          cpp20::starts_with(path, "/dev/class/skip-block");
 }

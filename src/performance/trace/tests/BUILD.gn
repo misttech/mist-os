@@ -194,7 +194,6 @@ shared_library("self_contained_provider") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace:trace-with-static-engine",
-    "//zircon/system/ulib/trace-provider:trace-provider-fdio-connect",
     "//zircon/system/ulib/trace-provider:trace-provider-with-static-engine",
   ]
 }

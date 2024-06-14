@@ -2,32 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        fileops_impl_nonseekable, fs_args, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
-        CacheMode, DirectoryEntryType, FileObject, FileOps, FileSystem, FileSystemHandle,
-        FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr, InputBuffer,
-        OutputBuffer, VecDirectory, VecDirectoryEntry,
-    },
+use crate::task::CurrentTask;
+use crate::vfs::{
+    fileops_impl_nonseekable, fs_args, fs_node_impl_dir_readonly, fs_node_impl_not_dir, CacheMode,
+    DirectoryEntryType, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr, InputBuffer, OutputBuffer,
+    VecDirectory, VecDirectoryEntry,
 };
 use bstr::B;
-use fidl_fuchsia_hardware_adb as fadb;
-use fuchsia_zircon as zx;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{
-    errno, error,
-    errors::Errno,
-    file_mode::mode,
-    gid_t, ino_t,
-    open_flags::OpenFlags,
-    statfs, uid_t, usb_functionfs_event, usb_functionfs_event_type_FUNCTIONFS_BIND,
-    usb_functionfs_event_type_FUNCTIONFS_ENABLE,
-    vfs::{default_statfs, FdEvents},
+    errno, error, gid_t, ino_t, statfs, uid_t, usb_functionfs_event,
+    usb_functionfs_event_type_FUNCTIONFS_BIND, usb_functionfs_event_type_FUNCTIONFS_ENABLE,
 };
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
+use std::sync::Arc;
 use zerocopy::IntoBytes;
+use {fidl_fuchsia_hardware_adb as fadb, fuchsia_zircon as zx};
 
 // The node identifiers of different nodes in FunctionFS.
 const ROOT_NODE_ID: ino_t = 1;

@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "src/devices/power/drivers/fusb302/fusb302-fifos.h"
+#include "src/devices/power/drivers/fusb302/fusb302-protocol.h"
 #include "src/devices/power/drivers/fusb302/fusb302-sensors.h"
 #include "src/devices/power/drivers/fusb302/registers.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message-type.h"
@@ -24,7 +25,10 @@ namespace fusb302 {
 
 Fusb302Signals::Fusb302Signals(fidl::ClientEnd<fuchsia_hardware_i2c::Device>& i2c_channel,
                                Fusb302Sensors& sensors, Fusb302Protocol& protocol)
-    : i2c_(i2c_channel), sensors_(sensors), protocol_(protocol) {}
+    : i2c_(i2c_channel),
+      sensors_(sensors),
+      protocol_(protocol),
+      goodcrc_interrupts_enabled_(protocol.UsesHardwareAcceleratedGoodCrcNotifications()) {}
 
 static_assert(std::is_trivially_destructible_v<Fusb302Signals>,
               "Move non-trivial destructors outside the header");
@@ -75,8 +79,12 @@ HardwareStateChanges Fusb302Signals::ServiceInterrupts() {
   // This interrupt must be processed after the receive interrupt, so the PD
   // protocol layer learns it doesn't need to send a GoodCRC anymore.
   if (interrupt_b.i_gcrcsent()) {
-    FDF_LOG(TRACE, "Interrupt: sent hardware-generated GoodCRC");
-    protocol_.DidTransmitGoodCrc();
+    if (protocol_.UsesHardwareAcceleratedGoodCrcNotifications()) {
+      FDF_LOG(TRACE, "Interrupt: sent hardware-generated GoodCRC");
+      protocol_.DidTransmitHardwareGeneratedGoodCrc();
+    } else {
+      FDF_LOG(WARNING, "Interrupt: sent hardware-generated GoodCRC - unexpected and ignored");
+    }
   }
 
   // Normalize Soft Reset messages to Soft Reset interrupts.
@@ -98,8 +106,8 @@ HardwareStateChanges Fusb302Signals::ServiceInterrupts() {
   }
 
   if (interrupt_a.i_retryfail()) {
-    FDF_LOG(ERROR,
-            "Interrupt: timed out waiting for GoodCRC. Transmitted message keeps getting lost.");
+    FDF_LOG(WARNING,
+            "Interrupt: timed out waiting for GoodCRC. Cable or host missing USB PD support?");
     protocol_.DidTimeoutWaitingForGoodCrc();
   }
 
@@ -164,8 +172,9 @@ zx::result<> Fusb302Signals::InitInterruptUnit() {
     return zx::error(status);
   }
 
-  zx::result<> result =
-      MaskBReg::ReadModifyWrite(i2c_, [&](MaskBReg& mask_b) { mask_b.set_m_gcrcsent(false); });
+  zx::result<> result = MaskBReg::ReadModifyWrite(i2c_, [&](MaskBReg& mask_b) {
+    mask_b.set_m_gcrcsent(!protocol_.UsesHardwareAcceleratedGoodCrcNotifications());
+  });
   if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to write MaskB register: %s", result.status_string());
     return result;

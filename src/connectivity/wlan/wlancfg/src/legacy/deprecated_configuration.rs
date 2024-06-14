@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::mode_management::phy_manager::PhyManagerApi,
-    fidl_fuchsia_wlan_product_deprecatedconfiguration as fidl_deprecated,
-    futures::{lock::Mutex, select, StreamExt},
-    ieee80211::MacAddr,
-    std::sync::Arc,
-    tracing::{error, info},
-};
+use crate::mode_management::phy_manager::PhyManagerApi;
+use fidl_fuchsia_wlan_product_deprecatedconfiguration as fidl_deprecated;
+use futures::lock::Mutex;
+use futures::{select, StreamExt};
+use ieee80211::MacAddr;
+use std::sync::Arc;
+use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct DeprecatedConfigurator {
@@ -53,24 +52,18 @@ impl DeprecatedConfigurator {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{
-            mode_management::{
-                phy_manager::{CreateClientIfacesReason, PhyManagerError},
-                recovery::RecoverySummary,
-                Defect,
-            },
-            regulatory_manager::REGION_CODE_LEN,
-        },
-        async_trait::async_trait,
-        fidl::endpoints::create_proxy,
-        fuchsia_async as fasync,
-        futures::task::Poll,
-        std::pin::pin,
-        std::unimplemented,
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use crate::mode_management::phy_manager::{CreateClientIfacesReason, PhyManagerError};
+    use crate::mode_management::recovery::RecoverySummary;
+    use crate::mode_management::Defect;
+    use crate::regulatory_manager::REGION_CODE_LEN;
+    use async_trait::async_trait;
+    use fidl::endpoints::create_proxy;
+    use fuchsia_async as fasync;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use std::unimplemented;
+    use wlan_common::assert_variant;
 
     #[derive(Debug)]
     struct StubPhyManager(Option<MacAddr>);

@@ -5,33 +5,34 @@
 /// This module tests the diagnostics code with the actual component hierarchy.
 #[cfg(test)]
 mod tests {
+    use crate::model::component::testing::wait_until_event_get_timestamp;
+    use crate::model::component::{ComponentInstance, StartReason};
+    use crate::model::events::registry::EventSubscription;
+    use crate::model::start::Start;
+    use crate::model::testing::routing_test_helpers::RoutingTest;
+    use crate::model::testing::test_helpers::{
+        component_decl_with_test_runner, ActionsTest, ComponentInfo,
+    };
+    use cm_rust::{Availability, UseEventStreamDecl, UseSource};
+    use cm_rust_testing::*;
+    use cm_types::Name;
+    use diagnostics::escrow::DurationStats;
+    use diagnostics::lifecycle::ComponentLifecycleTimeStats;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty, HistogramAssertion};
+    use diagnostics_hierarchy::DiagnosticsHierarchy;
+    use fidl::endpoints::ServerEnd;
+    use fuchsia_inspect::DiagnosticsHierarchyGetter;
+    use fuchsia_zircon::AsHandleRef;
+    use futures::channel::mpsc;
+    use futures::StreamExt;
+    use hooks::EventType;
+    use inspect::{ExponentialHistogramParams, LinearHistogramParams};
+    use moniker::Moniker;
+    use std::future;
+    use std::sync::Arc;
     use {
-        crate::model::{
-            component::{testing::wait_until_event_get_timestamp, ComponentInstance, StartReason},
-            events::registry::EventSubscription,
-            start::Start,
-            testing::routing_test_helpers::RoutingTest,
-            testing::test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
-        },
-        cm_rust::{Availability, UseEventStreamDecl, UseSource},
-        cm_rust_testing::*,
-        cm_types::Name,
-        diagnostics::escrow::DurationStats,
-        diagnostics::lifecycle::ComponentLifecycleTimeStats,
-        diagnostics_assertions::{assert_data_tree, AnyProperty, HistogramAssertion},
-        diagnostics_hierarchy::DiagnosticsHierarchy,
-        fidl::endpoints::ServerEnd,
         fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_inspect as inspect,
-        fuchsia_inspect::DiagnosticsHierarchyGetter,
-        fuchsia_sync as fsync, fuchsia_zircon as zx,
-        fuchsia_zircon::AsHandleRef,
-        futures::{channel::mpsc, StreamExt},
-        hooks::EventType,
-        inspect::{ExponentialHistogramParams, LinearHistogramParams},
-        moniker::Moniker,
-        std::future,
-        std::sync::Arc,
+        fuchsia_inspect as inspect, fuchsia_sync as fsync, fuchsia_zircon as zx,
     };
 
     fn get_data(

@@ -4,25 +4,21 @@
 
 //! test_list_tool generates test-list.json.
 
-use {
-    anyhow::{format_err, Context, Error},
-    camino::{Utf8Path, Utf8PathBuf},
-    fidl::unpersist,
-    fidl_fuchsia_component_decl::Component,
-    fidl_fuchsia_data as fdata,
-    fuchsia_url::AbsoluteComponentUrl,
-    maplit::btreeset,
-    serde::{Deserialize, Serialize},
-    std::{
-        cmp::{Eq, PartialEq},
-        collections::HashMap,
-        fmt::Debug,
-        fs,
-        io::Read,
-    },
-    structopt::StructOpt,
-    test_list::{ExecutionEntry, FuchsiaComponentExecutionEntry, TestList, TestListEntry, TestTag},
-};
+use anyhow::{format_err, Context, Error};
+use camino::{Utf8Path, Utf8PathBuf};
+use fidl::unpersist;
+use fidl_fuchsia_component_decl::Component;
+use fidl_fuchsia_data as fdata;
+use fuchsia_url::AbsoluteComponentUrl;
+use maplit::btreeset;
+use serde::{Deserialize, Serialize};
+use std::cmp::{Eq, PartialEq};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::fs;
+use std::io::Read;
+use structopt::StructOpt;
+use test_list::{ExecutionEntry, FuchsiaComponentExecutionEntry, TestList, TestListEntry, TestTag};
 
 const META_FAR_PREFIX: &'static str = "meta/";
 const TEST_REALM_FACET_NAME: &'static str = "fuchsia.test.type";
@@ -468,7 +464,9 @@ fn run_tool() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_component_decl as fdecl, tempfile::tempdir};
+    use super::*;
+    use fidl_fuchsia_component_decl as fdecl;
+    use tempfile::tempdir;
 
     #[test]
     fn test_find_meta_far() {

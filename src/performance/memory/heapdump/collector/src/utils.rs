@@ -3,11 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
-use fuchsia_zircon::{
-    self as zx,
-    sys::{zx_handle_t, zx_status_t, zx_vaddr_t},
-    AsHandleRef,
-};
+use fuchsia_zircon::sys::{zx_handle_t, zx_status_t, zx_vaddr_t};
+use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::ffi::c_void;
 
 #[cfg(target_arch = "aarch64")]

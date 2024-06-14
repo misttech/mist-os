@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fuchsia_async as fasync, futures::FutureExt};
+use fuchsia_async as fasync;
+use futures::FutureExt;
 
 #[fasync::run_singlethreaded]
 async fn main() {

@@ -2,29 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{config::ElfProgramConfig, runtime_dir::RuntimeDirectory, Job},
-    async_trait::async_trait,
-    fidl::endpoints::ClientEnd,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_component_runner::ComponentControllerOnEscrowRequest,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_process_lifecycle::{LifecycleEvent, LifecycleProxy},
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Process, Task},
-    futures::{
-        future::{join_all, BoxFuture, FutureExt},
-        stream::BoxStream,
-        StreamExt,
-    },
-    moniker::Moniker,
-    runner::component::Controllable,
-    std::{
-        ops::DerefMut,
-        sync::{Arc, Mutex},
-    },
-    tracing::{error, warn},
-};
+use crate::config::ElfProgramConfig;
+use crate::runtime_dir::RuntimeDirectory;
+use crate::Job;
+use async_trait::async_trait;
+use fidl::endpoints::{ClientEnd, Proxy};
+use fidl_fuchsia_component_runner::ComponentControllerOnEscrowRequest;
+use fidl_fuchsia_process_lifecycle::{LifecycleEvent, LifecycleProxy};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Process, Task};
+use futures::future::{join_all, BoxFuture, FutureExt};
+use futures::stream::BoxStream;
+use futures::StreamExt;
+use moniker::Moniker;
+use runner::component::Controllable;
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
+use tracing::{error, warn};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Immutable information about the component.
 ///

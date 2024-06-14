@@ -3,14 +3,10 @@
 // found in the LICENSE file.
 
 #![allow(unused)]
-use crate::{
-    geometry::{IntPoint, IntSize},
-    input::*,
-};
-use {
-    fuchsia_zircon::Time,
-    std::collections::{BTreeMap, VecDeque},
-};
+use crate::geometry::{IntPoint, IntSize};
+use crate::input::*;
+use fuchsia_zircon::Time;
+use std::collections::{BTreeMap, VecDeque};
 
 #[derive(Clone, Copy)]
 struct ContactDetails {

@@ -180,7 +180,7 @@ inline OneWaySendRequest& OneWaySendRequest::payload(::test_driveroneway::Payloa
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_driveroneway::Payload> : public std::true_type {};
+struct IsFidlType<::test_driveroneway::Payload> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_driveroneway::Payload> {
@@ -192,14 +192,14 @@ struct TypeTraits<::test_driveroneway::Payload> {
 };
 
 template <>
-struct IsStruct<::test_driveroneway::Payload> : public std::true_type {};
+struct IsStruct<::test_driveroneway::Payload> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_driveroneway::Payload, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_driveroneway::Payload, 4> {};
 
 template <>
-struct IsFidlType<::test_driveroneway::OneWaySendRequest> : public std::true_type {};
+struct IsFidlType<::test_driveroneway::OneWaySendRequest> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_driveroneway::OneWaySendRequest> {
@@ -211,7 +211,7 @@ struct TypeTraits<::test_driveroneway::OneWaySendRequest> {
 };
 
 template <>
-struct IsStruct<::test_driveroneway::OneWaySendRequest> : public std::true_type {};
+struct IsStruct<::test_driveroneway::OneWaySendRequest> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_driveroneway::OneWaySendRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final

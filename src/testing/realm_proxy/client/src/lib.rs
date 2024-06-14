@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Result},
-    fidl::endpoints::{
-        create_endpoints, ClientEnd, DiscoverableProtocolMarker, ServerEnd, ServiceMarker,
-        ServiceProxy,
-    },
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_testing_harness::{RealmProxy_Marker, RealmProxy_Proxy},
-    fuchsia_component::client::connect_to_protocol,
+use anyhow::{bail, Result};
+use fidl::endpoints::{
+    create_endpoints, ClientEnd, DiscoverableProtocolMarker, ServerEnd, ServiceMarker, ServiceProxy,
 };
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_testing_harness::{RealmProxy_Marker, RealmProxy_Proxy};
+use fuchsia_component::client::connect_to_protocol;
 
 pub mod error;
 pub use error::Error;

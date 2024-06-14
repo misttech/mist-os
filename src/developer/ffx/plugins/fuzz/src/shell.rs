@@ -2,24 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fuzzer::Fuzzer;
+use crate::reader::{ParsedCommand, Reader};
+use anyhow::{anyhow, bail, Context as _, Error, Result};
+use errors::ffx_bail;
+use ffx_fuzz_args::*;
+use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl_fuchsia_io::OpenFlags;
+use fuchsia_fuzzctl::{get_corpus_type, get_fuzzer_urls, Duration, Manager, OutputSink, Writer};
+use futures::{pin_mut, select, FutureExt};
+use serde_json::json;
+use std::cell::RefCell;
+use std::fs;
+use std::sync::{Arc, Mutex};
+use termion::{clear, cursor};
+use url::Url;
 use {
-    crate::fuzzer::Fuzzer,
-    crate::reader::{ParsedCommand, Reader},
-    anyhow::{anyhow, bail, Context as _, Error, Result},
-    errors::ffx_bail,
-    ffx_fuzz_args::*,
-    fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_fuzzer as fuzz,
-    fidl_fuchsia_io::OpenFlags,
     fidl_fuchsia_sys2 as fsys,
-    fuchsia_fuzzctl::{get_corpus_type, get_fuzzer_urls, Duration, Manager, OutputSink, Writer},
-    futures::{pin_mut, select, FutureExt},
-    serde_json::json,
-    std::cell::RefCell,
-    std::fs,
-    std::sync::{Arc, Mutex},
-    termion::{clear, cursor},
-    url::Url,
 };
 
 /// The default output directory variable used by `Shell::attach`.
@@ -655,23 +655,23 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
 
 #[cfg(test)]
 mod test_fixtures {
+    use super::Shell;
+    use crate::reader::test_fixtures::ScriptReader;
+    use anyhow::{anyhow, Context as _, Result};
+    use ffx_fuzz_args::FuzzerState;
+    use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _, ServerEnd};
+    use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+    use fuchsia_fuzzctl::Duration;
+    use fuchsia_fuzzctl_test::{
+        create_task, serve_manager, BufferSink, FakeController, Test, TEST_URL,
+    };
+    use futures::StreamExt;
+    use std::fmt::Display;
+    use std::path::PathBuf;
+    use url::Url;
     use {
-        super::Shell,
-        crate::reader::test_fixtures::ScriptReader,
-        anyhow::{anyhow, Context as _, Result},
-        ffx_fuzz_args::FuzzerState,
-        fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _, ServerEnd},
-        fidl_fuchsia_developer_remotecontrol as rcs,
-        fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-        fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-        fuchsia_fuzzctl::Duration,
-        fuchsia_fuzzctl_test::{
-            create_task, serve_manager, BufferSink, FakeController, Test, TEST_URL,
-        },
-        futures::StreamExt,
-        std::fmt::Display,
-        std::path::PathBuf,
-        url::Url,
+        fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_sys2 as fsys,
+        fuchsia_async as fasync,
     };
 
     /// Represents a set of test fakes used to test `Shell`.
@@ -839,16 +839,14 @@ mod test_fixtures {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::test_fixtures::ShellScript,
-        super::DEFAULT_FUZZING_OUTPUT_VARIABLE,
-        anyhow::Result,
-        fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-        fuchsia_fuzzctl::{digest_path, Duration},
-        fuchsia_fuzzctl_test::{verify_saved, Test, TEST_URL},
-        fuchsia_zircon_status as zx,
-        std::path::PathBuf,
-    };
+    use super::test_fixtures::ShellScript;
+    use super::DEFAULT_FUZZING_OUTPUT_VARIABLE;
+    use anyhow::Result;
+    use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+    use fuchsia_fuzzctl::{digest_path, Duration};
+    use fuchsia_fuzzctl_test::{verify_saved, Test, TEST_URL};
+    use fuchsia_zircon_status as zx;
+    use std::path::PathBuf;
 
     #[fuchsia::test]
     async fn test_empty() -> Result<()> {

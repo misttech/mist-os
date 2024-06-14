@@ -4,20 +4,19 @@
 
 use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
-use fuchsia_inspect::{
-    hierarchy::filter_hierarchy,
-    hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter, HierarchyMatcher},
-    Inspector,
+use fuchsia_inspect::hierarchy::{
+    filter_hierarchy, DiagnosticsHierarchy, DiagnosticsHierarchyGetter, HierarchyMatcher,
 };
+use fuchsia_inspect::Inspector;
 use lazy_static::lazy_static;
-use rand::{distributions::Uniform, rngs::StdRng, Rng, SeedableRng};
+use rand::distributions::Uniform;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use selectors::VerboseError;
-use std::{
-    borrow::Cow,
-    collections::{HashSet, VecDeque},
-    sync::Arc,
-    time::Duration,
-};
+use std::borrow::Cow;
+use std::collections::{HashSet, VecDeque};
+use std::sync::Arc;
+use std::time::Duration;
 
 lazy_static! {
     static ref SELECTOR_TILL_LEVEL_30: Vec<String> = generate_selectors_till_level(30);

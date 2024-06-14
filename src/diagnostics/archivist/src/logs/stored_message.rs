@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    identity::ComponentIdentity,
-    logs::{debuglog, stats::LogStreamStats},
-};
+use crate::identity::ComponentIdentity;
+use crate::logs::debuglog;
+use crate::logs::stats::LogStreamStats;
 use anyhow::{format_err, Result};
 use diagnostics_data::{LogsData, Severity};
 use diagnostics_message::error::MessageError;
 use diagnostics_message::{LoggerMessage, METADATA_SIZE};
 use fuchsia_zircon as zx;
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
+use std::sync::Arc;
 
 pub type GenericStoredMessage = Box<dyn StoredMessage>;
 

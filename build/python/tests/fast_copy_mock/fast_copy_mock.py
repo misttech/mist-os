@@ -4,7 +4,7 @@
 
 import functools
 import os
-from typing import Any, Callable, List, Tuple, Union
+from typing import Any, Callable
 
 from assembly.common import FileEntry
 
@@ -14,12 +14,12 @@ __all__ = [
     "mock_fast_copy_in",
 ]
 
-FilePath = Union[str, os.PathLike]
+FilePath = str | os.PathLike[str]
 
 
 def fast_copy_mock(
-    src: FilePath, dst: FilePath, tracked_copies: List[FileEntry]
-) -> None:
+    src: FilePath, dst: FilePath, tracked_copies: list[FileEntry]
+) -> FilePath | None:
     """A bindable-mock of assembly.fast_copy() that tracks all of the copies
     that it's asked to perform in the passed-in list.
     """
@@ -27,15 +27,19 @@ def fast_copy_mock(
     return src
 
 
-def create_fast_copy_mock_instance() -> Tuple[Callable, List[FileEntry]]:
+def create_fast_copy_mock_instance() -> (
+    tuple[functools.partial[FilePath | None], list[FileEntry]]
+):
     """Create a mock implementation of fast_copy() that's bound to a list of
     FileEntries in which it records all the copies it's asked to make.
     """
-    copies = []
+    copies: list[FileEntry] = []
     return (functools.partial(fast_copy_mock, tracked_copies=copies), copies)
 
 
-def mock_fast_copy_in(context: Any) -> Tuple[Callable, List[FileEntry]]:
+def mock_fast_copy_in(
+    context: Any,
+) -> tuple[functools.partial[FilePath | None], list[FileEntry]]:
     """Insert a new mock of `fast_copy` into the context, and return it."""
     (mock_instance, copies) = create_fast_copy_mock_instance()
     context.fast_copy = mock_instance

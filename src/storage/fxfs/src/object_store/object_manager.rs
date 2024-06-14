@@ -2,37 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        errors::FxfsError,
-        filesystem::{ApplyContext, ApplyMode, JournalingObject},
-        log::*,
-        metrics,
-        object_handle::INVALID_OBJECT_ID,
-        object_store::{
-            allocator::{Allocator, Reservation},
-            directory::Directory,
-            journal::{self, JournalCheckpoint},
-            transaction::{
-                AssocObj, AssociatedObject, MetadataReservation, Mutation, Transaction, TxnMutation,
-            },
-            tree_cache::TreeCache,
-            volume::{list_volumes, VOLUMES_DIRECTORY},
-            LastObjectId, LockState, ObjectDescriptor, ObjectStore,
-        },
-        round::round_div,
-        serialized_types::{Version, LATEST_VERSION},
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    fuchsia_inspect::{Property as _, UintProperty},
-    futures::FutureExt as _,
-    once_cell::sync::OnceCell,
-    rustc_hash::FxHashMap as HashMap,
-    std::{
-        collections::hash_map::Entry,
-        sync::{Arc, RwLock},
-    },
+use crate::errors::FxfsError;
+use crate::filesystem::{ApplyContext, ApplyMode, JournalingObject};
+use crate::log::*;
+use crate::metrics;
+use crate::object_handle::INVALID_OBJECT_ID;
+use crate::object_store::allocator::{Allocator, Reservation};
+use crate::object_store::directory::Directory;
+use crate::object_store::journal::{self, JournalCheckpoint};
+use crate::object_store::transaction::{
+    AssocObj, AssociatedObject, MetadataReservation, Mutation, Transaction, TxnMutation,
 };
+use crate::object_store::tree_cache::TreeCache;
+use crate::object_store::volume::{list_volumes, VOLUMES_DIRECTORY};
+use crate::object_store::{ObjectDescriptor, ObjectStore};
+use crate::round::round_div;
+use crate::serialized_types::{Version, LATEST_VERSION};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use fuchsia_inspect::{Property as _, UintProperty};
+use futures::FutureExt as _;
+use once_cell::sync::OnceCell;
+use rustc_hash::FxHashMap as HashMap;
+use std::collections::hash_map::Entry;
+use std::num::Saturating;
+use std::sync::{Arc, RwLock};
 
 // Data written to the journal eventually needs to be flushed somewhere (typically into layer
 // files).  Here we conservatively assume that could take up to four times as much space as it does
@@ -192,43 +185,6 @@ impl ObjectManager {
         store_id == inner.root_store_object_id || store_id == inner.root_parent_store_object_id
     }
 
-    /// When replaying the journal, we need to replay mutation records into the LSM tree, but we
-    /// cannot properly open the store until all the records have been replayed since some of the
-    /// records we replay might affect how we open, e.g. they might pertain to new layer files
-    /// backing this store.  The stores will get properly opened once we finish replaying the
-    /// journal.  This should *only* be called during replay.  At any other time, `open_store`
-    /// should be used.
-    fn lazy_open_store(&self, store_object_id: u64) -> Arc<ObjectStore> {
-        let mut inner = self.inner.write().unwrap();
-        assert_ne!(store_object_id, inner.allocator_object_id);
-        let root_parent_store_object_id = inner.root_parent_store_object_id;
-        let root_store = inner.stores.get(&inner.root_store_object_id).unwrap().clone();
-        let fs = root_store.filesystem();
-        inner
-            .stores
-            .entry(store_object_id)
-            .or_insert_with(|| {
-                // This assumes that all stores are children of the root store.
-                assert_ne!(store_object_id, root_parent_store_object_id);
-                assert_ne!(store_object_id, root_store.store_object_id());
-                let store = ObjectStore::new(
-                    Some(root_store),
-                    store_object_id,
-                    fs,
-                    None,
-                    Box::new(TreeCache::new()),
-                    None,
-                    LockState::Unknown,
-                    LastObjectId::default(),
-                );
-                if let Some(on_new_store) = &self.on_new_store {
-                    on_new_store(&store);
-                }
-                store
-            })
-            .clone()
-    }
-
     /// Returns the store which might or might not be locked.
     pub fn store(&self, store_object_id: u64) -> Option<Arc<ObjectStore>> {
         self.inner.read().unwrap().stores.get(&store_object_id).cloned()
@@ -260,11 +216,7 @@ impl ObjectManager {
         let object_ids = list_volumes(self.volume_directory.get().unwrap()).await?;
 
         for store_id in object_ids {
-            let store = self.lazy_open_store(store_id);
-            store
-                .on_replay_complete()
-                .await
-                .with_context(|| format!("Store {} failed to load after replay", store_id))?;
+            self.open_store(&root_store, store_id).await?;
         }
 
         ensure!(
@@ -315,7 +267,8 @@ impl ObjectManager {
         self.inner.read().unwrap().allocator.clone().unwrap()
     }
 
-    fn apply_mutation(
+    /// Applies `mutation` to `object` with `context`.
+    pub fn apply_mutation(
         &self,
         object_id: u64,
         mutation: Mutation,
@@ -372,25 +325,23 @@ impl ObjectManager {
                 }
             }
             if object_id == inner.allocator_object_id {
-                Some(inner.allocator.clone().unwrap() as Arc<dyn JournalingObject>)
+                inner.allocator.clone().unwrap() as Arc<dyn JournalingObject>
             } else {
-                inner.stores.get(&object_id).map(|x| x.clone() as Arc<dyn JournalingObject>)
+                inner.stores.get(&object_id).unwrap().clone() as Arc<dyn JournalingObject>
             }
-        }
-        .unwrap_or_else(|| {
-            assert!(context.mode.is_replay());
-            self.lazy_open_store(object_id)
-        });
+        };
         associated_object.map(|o| o.will_apply_mutation(&mutation, object_id, self));
         object.apply_mutation(mutation, context, associated_object)
     }
 
-    /// Called by the journaling system to replay the given mutations.  `checkpoint` indicates the
-    /// location in the journal file for this transaction and `end_offset` is the ending journal
-    /// offset.
-    pub fn replay_mutations(
+    /// Replays `mutations` for a single transaction.  `journal_offsets` contains the per-object
+    /// starting offsets; if the current transaction offset precedes an offset, the mutations for
+    /// that object are ignored.  `context` contains the location in the journal file for this
+    /// transaction and `end_offset` is the ending journal offset for this transaction.
+    pub async fn replay_mutations(
         &self,
         mutations: Vec<(u64, Mutation)>,
+        journal_offsets: &HashMap<u64, u64>,
         context: &ApplyContext<'_, '_>,
         end_offset: u64,
     ) -> Result<(), Error> {
@@ -403,6 +354,9 @@ impl ObjectManager {
                 None
             }
         };
+
+        let allocator_object_id = self.inner.read().unwrap().allocator_object_id;
+
         for (object_id, mutation) in mutations {
             if let Mutation::UpdateBorrowed(borrowed) = mutation {
                 if let Some(txn_size) = txn_size {
@@ -412,8 +366,36 @@ impl ObjectManager {
                 }
                 continue;
             }
+
+            // Don't replay mutations if the object doesn't want it.
+            if let Some(&offset) = journal_offsets.get(&object_id) {
+                if context.checkpoint.file_offset < offset {
+                    continue;
+                }
+            }
+
+            // If this is the first time we've encountered this store, we'll need to open it.
+            if object_id != allocator_object_id {
+                self.open_store(&self.root_store(), object_id).await?;
+            }
+
             self.apply_mutation(object_id, mutation, context, AssocObj::None)?;
         }
+        Ok(())
+    }
+
+    /// Opens the specified store if it isn't already.  This is *not* thread-safe.
+    async fn open_store(&self, parent: &Arc<ObjectStore>, object_id: u64) -> Result<(), Error> {
+        if self.inner.read().unwrap().stores.contains_key(&object_id) {
+            return Ok(());
+        }
+        let store = ObjectStore::open(parent, object_id, Box::new(TreeCache::new()))
+            .await
+            .with_context(|| format!("Failed to open store {object_id}"))?;
+        if let Some(on_new_store) = &self.on_new_store {
+            on_new_store(&store);
+        }
+        assert!(self.inner.write().unwrap().stores.insert(object_id, store).is_none());
         Ok(())
     }
 
@@ -638,7 +620,7 @@ impl ObjectManager {
                             inner.required_reservation(),
                             inner.borrowed_metadata_space,
                             inner.required_reservation() - inner.borrowed_metadata_space,
-                            allocator.get_disk_bytes() - allocator.get_used_bytes(),
+                            Saturating(allocator.get_disk_bytes()) - allocator.get_used_bytes(),
                             allocator.owner_bytes_debug(),
                         )
                     })?,

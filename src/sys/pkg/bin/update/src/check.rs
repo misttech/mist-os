@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{args, monitor_state::monitor_state},
-    anyhow::{Context, Error},
-    fidl_fuchsia_update::{CheckOptions, Initiator, ManagerMarker, ManagerProxy, MonitorMarker},
-    fuchsia_component::client::connect_to_protocol,
-};
+use crate::args;
+use crate::monitor_state::monitor_state;
+use anyhow::{Context, Error};
+use fidl_fuchsia_update::{CheckOptions, Initiator, ManagerMarker, ManagerProxy, MonitorMarker};
+use fuchsia_component::client::connect_to_protocol;
 
 pub async fn handle_check_now_cmd(cmd: args::CheckNow) -> Result<(), Error> {
     let update_manager =

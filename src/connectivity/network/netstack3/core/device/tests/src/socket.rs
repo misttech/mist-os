@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use netstack3_core::{
-    device::DeviceId,
-    device_socket::TargetDevice,
-    sync::Mutex,
-    testutil::{CtxPairExt as _, FakeCtxBuilder, TEST_ADDRS_V4},
-};
+use netstack3_base::testutil::TEST_ADDRS_V4;
+use netstack3_core::device::DeviceId;
+use netstack3_core::device_socket::TargetDevice;
+use netstack3_core::sync::Mutex;
+use netstack3_core::testutil::{CtxPairExt as _, FakeCtxBuilder};
 
 #[test]
 fn drop_real_ids() {

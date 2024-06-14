@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    run_command,
-    tests::utils::{
-        inspect_accessor_data, make_inspect_with_length, make_inspects,
-        make_inspects_for_lifecycle, setup_fake_archive_accessor, setup_fake_rcs,
-    },
+use crate::run_command;
+use crate::tests::utils::{
+    inspect_accessor_data, make_inspect_with_length, make_inspects, make_inspects_for_lifecycle,
+    setup_fake_archive_accessor, setup_fake_rcs,
 };
 use errors::ResultExt as _;
 use ffx_writer::{Format, MachineWriter, TestBuffers};

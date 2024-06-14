@@ -34,7 +34,7 @@ required for running the test suite.
    TEST_TOOLCHAIN={{ '<var>' }}RUST_SRC{{ '</var>' }}/src/ci/docker/scripts/fuchsia-test-runner.py
 
    python3 $TEST_TOOLCHAIN start \
-     --rust $DEV_ROOT/rust/install/fuchsia-rust \
+     --rust-build $DEV_ROOT/rust/build/fuchsia-rust \
      --sdk $DEV_ROOT/sdk \
      --target {{ '<var>' }}x86_64|arm64{{ '</var>' }}-unknown-fuchsia
    ```

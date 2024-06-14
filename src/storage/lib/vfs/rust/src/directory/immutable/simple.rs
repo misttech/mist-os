@@ -8,12 +8,9 @@
 #[cfg(test)]
 mod tests;
 
-use crate::directory::{immutable::connection, simple};
-
 use std::sync::Arc;
 
-pub type Connection = connection::ImmutableConnection;
-pub type Simple = simple::Simple<Connection>;
+pub use crate::directory::simple::Simple;
 
 /// Creates an immutable empty "simple" directory.  This directory holds a "static" set of entries,
 /// allowing the server to add or remove entries via the

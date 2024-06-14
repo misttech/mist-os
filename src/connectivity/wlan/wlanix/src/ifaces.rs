@@ -2,26 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bss_scorer::BssScorer;
+use crate::security::{get_authenticator, Credential};
+use anyhow::{bail, format_err, Context, Error};
+use async_trait::async_trait;
+use fidl::endpoints::create_proxy;
+use fuchsia_async::TimeoutExt;
+use fuchsia_sync::Mutex;
+use futures::channel::oneshot;
+use futures::{select, FutureExt, TryStreamExt};
+use ieee80211::Bssid;
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::sync::Arc;
+use tracing::info;
+use wlan_common::bss::BssDescription;
+use wlan_common::scan::Compatibility;
 use {
-    crate::{
-        bss_scorer::BssScorer,
-        security::{get_authenticator, Credential},
-    },
-    anyhow::{bail, format_err, Context, Error},
-    async_trait::async_trait,
-    fidl::endpoints::create_proxy,
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_device_service as fidl_device_service,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async::TimeoutExt,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
-    futures::{channel::oneshot, select, FutureExt, TryStreamExt},
-    ieee80211::Bssid,
-    std::{collections::HashMap, convert::TryFrom, sync::Arc},
-    tracing::info,
-    wlan_common::{bss::BssDescription, scan::Compatibility},
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
 };
 
 #[async_trait]
@@ -417,7 +418,8 @@ fn connect_txn_event_name(event: &fidl_sme::ConnectTransactionEvent) -> &'static
 
 #[cfg(test)]
 pub mod test_utils {
-    use {super::*, fidl_fuchsia_wlan_internal as fidl_internal};
+    use super::*;
+    use fidl_fuchsia_wlan_internal as fidl_internal;
 
     pub static FAKE_IFACE_RESPONSE: fidl_device_service::QueryIfaceResponse =
         fidl_device_service::QueryIfaceResponse {
@@ -680,20 +682,19 @@ pub mod test_utils {
 
 #[cfg(test)]
 mod tests {
+    use super::test_utils::FAKE_IFACE_RESPONSE;
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use futures::task::Poll;
+    use futures::StreamExt;
+    use ieee80211::{MacAddrBytes, Ssid};
+    use test_case::test_case;
+    use wlan_common::channel::{Cbw, Channel};
+    use wlan_common::test_utils::fake_stas::FakeProtectionCfg;
+    use wlan_common::{assert_variant, fake_fidl_bss_description};
     use {
-        super::{test_utils::FAKE_IFACE_RESPONSE, *},
-        fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_wlan_common_security as fidl_security,
         fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
-        futures::{task::Poll, StreamExt},
-        ieee80211::{MacAddrBytes, Ssid},
-        test_case::test_case,
-        wlan_common::{
-            assert_variant,
-            channel::{Cbw, Channel},
-            fake_fidl_bss_description,
-            test_utils::fake_stas::FakeProtectionCfg,
-        },
     };
 
     fn setup_test() -> (

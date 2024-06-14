@@ -30,15 +30,10 @@
 //! devices to easily check if the driver is violating any protocol assumptions on descriptor
 //! layouts.
 
-use {
-    crate::{
-        mem::{DeviceRange, DriverMem, DriverRange},
-        queue::{Desc, DescChain, DescChainIter, DescError, DescType, DriverNotify},
-        ring::Desc as RingDesc,
-        ring::DescAccess,
-    },
-    thiserror::Error,
-};
+use crate::mem::{DeviceRange, DriverMem, DriverRange};
+use crate::queue::{Desc, DescChain, DescChainIter, DescError, DescType, DriverNotify};
+use crate::ring::{Desc as RingDesc, DescAccess};
+use thiserror::Error;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Remaining {
@@ -537,11 +532,9 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem> std::io::Write for WritableChain<'a,
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::fake_queue::{Chain, IdentityDriverMem, TestQueue},
-        std::io::{Read, Write},
-    };
+    use super::*;
+    use crate::fake_queue::{Chain, IdentityDriverMem, TestQueue};
+    use std::io::{Read, Write};
 
     fn check_read<'a>(result: Option<Result<DeviceRange<'a>, ChainError>>, expected: &[u8]) {
         let range = result.unwrap().unwrap();

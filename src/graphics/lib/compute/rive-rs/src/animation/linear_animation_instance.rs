@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    animation::{LinearAnimation, Loop},
-    artboard::Artboard,
-    core::Object,
-};
+use crate::animation::{LinearAnimation, Loop};
+use crate::artboard::Artboard;
+use crate::core::Object;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Direction {

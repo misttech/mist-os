@@ -4,7 +4,8 @@
 
 #![cfg(test)]
 
-use audio_encoder_test_lib::{pcm_audio::*, test_suite::*};
+use audio_encoder_test_lib::pcm_audio::*;
+use audio_encoder_test_lib::test_suite::*;
 
 use encoder_test_data::*;
 use fidl_fuchsia_media::*;

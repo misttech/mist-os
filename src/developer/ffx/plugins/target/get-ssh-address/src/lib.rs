@@ -12,7 +12,9 @@ use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
     DaemonError, TargetAddrInfo, TargetCollectionProxy, TargetMarker, TargetQuery,
 };
-use std::{io::Write, net::IpAddr, time::Duration};
+use std::io::Write;
+use std::net::IpAddr;
+use std::time::Duration;
 use timeout::timeout;
 
 #[derive(FfxTool)]

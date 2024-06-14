@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    aes_gcm_siv::{aead::Aead, Aes128GcmSiv, Aes256GcmSiv, Key, KeyInit},
-    fuchsia_zircon::{self as zx},
-    itertools::Itertools,
-    serde::{Deserialize, Deserializer, Serialize, Serializer},
-    std::{
-        collections::{hash_map::Entry, HashMap},
-        fmt::Debug,
-        ops::{Deref, DerefMut},
-        os::fd::{FromRawFd as _, IntoRawFd as _},
-    },
-    thiserror::Error,
-};
+use aes_gcm_siv::aead::Aead;
+use aes_gcm_siv::{Aes128GcmSiv, Aes256GcmSiv, Key, KeyInit};
+use fuchsia_zircon::{self as zx};
+use itertools::Itertools;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
+use std::os::fd::{FromRawFd as _, IntoRawFd as _};
+use thiserror::Error;
 
 /// KeyBag is a store for collections of wrapped keys.  This is stored in plaintext,
 /// and each key is only accessible if the appropriate wrapping key is known.
@@ -404,12 +402,10 @@ impl KeyBagManager {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Aes256Key, Error, KeyBagManager, UnwrapError, WrappingKey},
-        assert_matches::assert_matches,
-        std::os::fd::{FromRawFd as _, IntoRawFd as _, OwnedFd},
-        tempfile::NamedTempFile,
-    };
+    use super::{Aes256Key, Error, KeyBagManager, UnwrapError, WrappingKey};
+    use assert_matches::assert_matches;
+    use std::os::fd::{FromRawFd as _, IntoRawFd as _, OwnedFd};
+    use tempfile::NamedTempFile;
 
     fn open_dir(path: impl openat::AsPath) -> OwnedFd {
         let dir = openat::Dir::open(path).unwrap();

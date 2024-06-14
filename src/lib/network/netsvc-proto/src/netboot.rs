@@ -16,9 +16,8 @@ use packet::{
     ParseMetadata, SerializeTarget,
 };
 use std::num::NonZeroU16;
-use zerocopy::{
-    byteorder::little_endian::U32, AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned,
-};
+use zerocopy::byteorder::little_endian::U32;
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 // Re-export witness type.
 pub use witness::ErrorValue;

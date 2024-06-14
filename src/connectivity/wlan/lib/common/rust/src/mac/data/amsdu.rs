@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        big_endian::BigEndianU16,
-        buffer_reader::BufferReader,
-        mac::{round_up, MacAddr},
-    },
-    zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned},
-};
+use crate::big_endian::BigEndianU16;
+use crate::buffer_reader::BufferReader;
+use crate::mac::{round_up, MacAddr};
+use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 // IEEE Std 802.11-2016, 9.3.2.2.2
 #[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
@@ -59,11 +55,9 @@ impl<B: ByteSlice> AmsduSubframe<B> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::mac::{self, data},
-        crate::test_utils::fake_frames::*,
-        zerocopy::Ref,
-    };
+    use crate::mac::{self, data};
+    use crate::test_utils::fake_frames::*;
+    use zerocopy::Ref;
 
     #[test]
     fn msdu_iter_aggregated() {

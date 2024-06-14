@@ -5,38 +5,42 @@
 //! The loopback device.
 
 use alloc::vec::Vec;
-use core::{convert::Infallible as Never, fmt::Debug};
+use core::convert::Infallible as Never;
+use core::fmt::Debug;
+use derivative::Derivative;
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use net_types::{
-    ethernet::Mac,
-    ip::{Ip, IpAddress, Ipv4, Ipv6, Mtu},
-    SpecifiedAddr,
-};
+use log::trace;
+use net_types::ethernet::Mac;
+use net_types::ip::{Ipv4, Ipv6, Mtu};
+use netstack3_base::sync::Mutex;
 use netstack3_base::{
-    sync::Mutex, CoreTimerContext, Device, DeviceIdContext, FrameDestination, RecvFrameContext,
-    RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
+    FrameDestination, RecvFrameContext, RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta,
+    StrongDeviceIdentifier, TimerContext, WeakDeviceIdentifier,
 };
+use netstack3_ip::{IpPacketDestination, IpTypesIpExt};
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
 };
-use tracing::trace;
 
-use crate::internal::{
-    base::{DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters},
-    id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
-    queue::{
-        rx::{ReceiveDequeFrameContext, ReceiveQueue, ReceiveQueueState, ReceiveQueueTypes},
-        tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState},
-        DequeueState, TransmitQueueFrameError,
-    },
-    socket::{
-        DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
-        ReceivedFrame,
-    },
-    state::{DeviceStateSpec, IpLinkDeviceState},
+use crate::internal::base::{
+    DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, EthernetDeviceCounters,
 };
+use crate::internal::id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, WeakDeviceId};
+use crate::internal::queue::rx::{
+    ReceiveDequeFrameContext, ReceiveQueue, ReceiveQueueState, ReceiveQueueTypes,
+};
+use crate::internal::queue::tx::{
+    BufVecU8Allocator, TransmitQueue, TransmitQueueHandler, TransmitQueueState,
+};
+use crate::internal::queue::{DequeueState, TransmitQueueFrameError};
+use crate::internal::socket::{
+    DeviceSocketHandler, DeviceSocketMetadata, DeviceSocketSendTypes, EthernetHeaderParams,
+    ReceivedFrame,
+};
+use crate::internal::state::{DeviceStateSpec, IpLinkDeviceState};
 
 /// The MAC address corresponding to the loopback interface.
 const LOOPBACK_MAC: Mac = Mac::UNSPECIFIED;
@@ -66,7 +70,7 @@ pub enum LoopbackDevice {}
 impl Device for LoopbackDevice {}
 
 impl DeviceStateSpec for LoopbackDevice {
-    type Link<BT: DeviceLayerTypes> = LoopbackDeviceState;
+    type Link<BT: DeviceLayerTypes> = LoopbackDeviceState<WeakDeviceId<BT>>;
     type External<BT: DeviceLayerTypes> = BT::LoopbackDeviceState;
     type CreationProperties = LoopbackCreationProperties;
     type Counters = EthernetDeviceCounters;
@@ -100,59 +104,77 @@ pub struct LoopbackCreationProperties {
 }
 
 /// State for a loopback device.
-pub struct LoopbackDeviceState {
+pub struct LoopbackDeviceState<D: WeakDeviceIdentifier> {
     /// Loopback device counters.
     pub counters: EthernetDeviceCounters,
     /// The MTU this device was created with (immutable).
     pub mtu: Mtu,
     /// Loopback device receive queue.
-    pub rx_queue: ReceiveQueue<LoopbackRxQueueMeta, Buf<Vec<u8>>>,
+    pub rx_queue: ReceiveQueue<LoopbackRxQueueMeta<D>, Buf<Vec<u8>>>,
     /// Loopback device transmit queue.
-    pub tx_queue: TransmitQueue<LoopbackTxQueueMeta, Buf<Vec<u8>>, BufVecU8Allocator>,
+    pub tx_queue: TransmitQueue<LoopbackTxQueueMeta<D>, Buf<Vec<u8>>, BufVecU8Allocator>,
 }
 
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
 /// Metadata associated with a frame in the Loopback TX queue.
-pub struct LoopbackTxQueueMeta;
+pub struct LoopbackTxQueueMeta<D: WeakDeviceIdentifier> {
+    /// Device that should be used to deliver the packet. If not set then the
+    /// packet delivered as if it came from the loopback device.
+    target_device: Option<D>,
+}
+
 /// Metadata associated with a frame in the Loopback RX queue.
-pub struct LoopbackRxQueueMeta;
-impl From<LoopbackTxQueueMeta> for LoopbackRxQueueMeta {
-    fn from(LoopbackTxQueueMeta: LoopbackTxQueueMeta) -> Self {
-        Self
+pub struct LoopbackRxQueueMeta<D: WeakDeviceIdentifier> {
+    /// Device that should be used to deliver the packet. If not set then the
+    /// packet delivered as if it came from the loopback device.
+    target_device: Option<D>,
+}
+
+impl<D: WeakDeviceIdentifier> From<LoopbackTxQueueMeta<D>> for LoopbackRxQueueMeta<D> {
+    fn from(LoopbackTxQueueMeta { target_device }: LoopbackTxQueueMeta<D>) -> Self {
+        Self { target_device }
     }
 }
 
-impl<BT: DeviceLayerTypes> OrderedLockAccess<ReceiveQueueState<LoopbackRxQueueMeta, Buf<Vec<u8>>>>
+impl<BT: DeviceLayerTypes>
+    OrderedLockAccess<ReceiveQueueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>
     for IpLinkDeviceState<LoopbackDevice, BT>
 {
-    type Lock = Mutex<ReceiveQueueState<LoopbackRxQueueMeta, Buf<Vec<u8>>>>;
+    type Lock = Mutex<ReceiveQueueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.rx_queue.queue)
     }
 }
 
-impl<BT: DeviceLayerTypes> OrderedLockAccess<DequeueState<LoopbackRxQueueMeta, Buf<Vec<u8>>>>
+impl<BT: DeviceLayerTypes>
+    OrderedLockAccess<DequeueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>
     for IpLinkDeviceState<LoopbackDevice, BT>
 {
-    type Lock = Mutex<DequeueState<LoopbackRxQueueMeta, Buf<Vec<u8>>>>;
+    type Lock = Mutex<DequeueState<LoopbackRxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.rx_queue.deque)
     }
 }
 
 impl<BT: DeviceLayerTypes>
-    OrderedLockAccess<TransmitQueueState<LoopbackTxQueueMeta, Buf<Vec<u8>>, BufVecU8Allocator>>
-    for IpLinkDeviceState<LoopbackDevice, BT>
+    OrderedLockAccess<
+        TransmitQueueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>, BufVecU8Allocator>,
+    > for IpLinkDeviceState<LoopbackDevice, BT>
 {
-    type Lock = Mutex<TransmitQueueState<LoopbackTxQueueMeta, Buf<Vec<u8>>, BufVecU8Allocator>>;
+    type Lock = Mutex<
+        TransmitQueueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>, BufVecU8Allocator>,
+    >;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.queue)
     }
 }
 
-impl<BT: DeviceLayerTypes> OrderedLockAccess<DequeueState<LoopbackTxQueueMeta, Buf<Vec<u8>>>>
+impl<BT: DeviceLayerTypes>
+    OrderedLockAccess<DequeueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>
     for IpLinkDeviceState<LoopbackDevice, BT>
 {
-    type Lock = Mutex<DequeueState<LoopbackTxQueueMeta, Buf<Vec<u8>>>>;
+    type Lock = Mutex<DequeueState<LoopbackTxQueueMeta<WeakDeviceId<BT>>, Buf<Vec<u8>>>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.deque)
     }
@@ -167,90 +189,112 @@ impl DeviceSocketSendTypes for LoopbackDevice {
 impl<CC, BC> ReceiveDequeFrameContext<LoopbackDevice, BC> for CC
 where
     CC: DeviceIdContext<LoopbackDevice>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv4>, BC>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv6>, BC>
-        + ResourceCounterContext<CC::DeviceId, DeviceCounters>
-        + ResourceCounterContext<CC::DeviceId, EthernetDeviceCounters>
-        + DeviceSocketHandler<LoopbackDevice, BC>
-        + ReceiveQueueTypes<LoopbackDevice, BC, Meta = LoopbackRxQueueMeta>,
+        + ResourceCounterContext<Self::DeviceId, EthernetDeviceCounters>
+        + ReceiveQueueTypes<
+            LoopbackDevice,
+            BC,
+            Meta = LoopbackRxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        >,
+    // Loopback needs to deliver messages to `AnyDevice`.
+    CC: DeviceIdAnyCompatContext<LoopbackDevice>
+        + RecvFrameContext<RecvIpFrameMeta<<CC as DeviceIdContext<AnyDevice>>::DeviceId, Ipv4>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<<CC as DeviceIdContext<AnyDevice>>::DeviceId, Ipv6>, BC>
+        + ResourceCounterContext<<CC as DeviceIdContext<AnyDevice>>::DeviceId, DeviceCounters>
+        + DeviceSocketHandler<AnyDevice, BC>,
     CC::Buffer: BufferMut + Debug,
+    BC: DeviceLayerTypes,
 {
     fn handle_frame(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        LoopbackRxQueueMeta: Self::Meta,
+        rx_meta: Self::Meta,
         mut buf: Self::Buffer,
     ) {
-        self.increment(device_id, |counters: &DeviceCounters| &counters.recv_frame);
-        let (frame, whole_body) = match buf
-            .parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck)
-        {
-            Err(e) => {
-                self.increment(device_id, |counters: &DeviceCounters| &counters.recv_parse_error);
-                trace!("dropping invalid ethernet frame over loopback: {:?}", e);
-                return;
-            }
-            Ok(e) => e,
-        };
+        let (frame, whole_body) =
+            match buf.parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck) {
+                Err(e) => {
+                    self.increment(&device_id.clone().into(), |counters: &DeviceCounters| {
+                        &counters.recv_parse_error
+                    });
+                    trace!("dropping invalid ethernet frame over loopback: {:?}", e);
+                    return;
+                }
+                Ok(e) => e,
+            };
+
+        let target_device: <CC as DeviceIdContext<AnyDevice>>::DeviceId =
+            match rx_meta.target_device.map(|d| d.upgrade()) {
+                // This is a packet that should be delivered on `target_device`.
+                Some(Some(dev)) => dev,
+
+                // `target_device` is gone. Drop the packet.
+                Some(None) => return,
+
+                // This is a packet sent to the loopback device.
+                None => device_id.clone().into(),
+            };
+
+        self.increment(&target_device, |counters: &DeviceCounters| &counters.recv_frame);
 
         let frame_dest = FrameDestination::from_dest(frame.dst_mac(), Mac::UNSPECIFIED);
         let ethertype = frame.ethertype();
 
-        DeviceSocketHandler::<LoopbackDevice, _>::handle_frame(
+        DeviceSocketHandler::<AnyDevice, _>::handle_frame(
             self,
             bindings_ctx,
-            device_id,
+            &target_device,
             ReceivedFrame::from_ethernet(frame, frame_dest).into(),
             whole_body,
         );
 
-        let ethertype = match ethertype {
-            Some(e) => e,
-            None => {
-                self.increment(device_id, |counters: &EthernetDeviceCounters| {
-                    &counters.recv_no_ethertype
-                });
-                trace!("dropping ethernet frame without ethertype");
-                return;
-            }
-        };
-
         match ethertype {
-            EtherType::Ipv4 => {
-                self.increment(device_id, |counters: &DeviceCounters| {
+            Some(EtherType::Ipv4) => {
+                self.increment(&target_device, |counters: &DeviceCounters| {
                     &counters.recv_ipv4_delivered
                 });
                 self.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv4>::new(device_id.clone(), Some(frame_dest)),
+                    RecvIpFrameMeta::<_, Ipv4>::new(target_device, Some(frame_dest)),
                     buf,
                 );
             }
-            EtherType::Ipv6 => {
-                self.increment(device_id, |counters: &DeviceCounters| {
+            Some(EtherType::Ipv6) => {
+                self.increment(&target_device, |counters: &DeviceCounters| {
                     &counters.recv_ipv6_delivered
                 });
                 self.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv6>::new(device_id.clone(), Some(frame_dest)),
+                    RecvIpFrameMeta::<_, Ipv6>::new(target_device, Some(frame_dest)),
                     buf,
                 );
             }
-            ethertype @ EtherType::Arp | ethertype @ EtherType::Other(_) => {
+            Some(ethertype @ (EtherType::Arp | EtherType::Other(_))) => {
                 self.increment(device_id, |counters: &EthernetDeviceCounters| {
                     &counters.recv_unsupported_ethertype
                 });
                 trace!("not handling loopback frame of type {:?}", ethertype)
             }
+            None => {
+                self.increment(device_id, |counters: &EthernetDeviceCounters| {
+                    &counters.recv_no_ethertype
+                });
+                trace!("dropping ethernet frame without ethertype");
+            }
         }
     }
 }
 
-impl<CC, BC> SendableFrameMeta<CC, BC> for DeviceSocketMetadata<LoopbackDevice, CC::DeviceId>
+impl<CC, BC> SendableFrameMeta<CC, BC>
+    for DeviceSocketMetadata<LoopbackDevice, <CC as DeviceIdContext<LoopbackDevice>>::DeviceId>
 where
-    CC: TransmitQueueHandler<LoopbackDevice, BC, Meta = LoopbackTxQueueMeta>
-        + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
+    CC: TransmitQueueHandler<
+            LoopbackDevice,
+            BC,
+            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        > + ResourceCounterContext<<CC as DeviceIdContext<LoopbackDevice>>::DeviceId, DeviceCounters>
+        + DeviceIdContext<AnyDevice>,
+    BC: DeviceLayerTypes,
 {
     fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, body: S) -> Result<(), S>
     where
@@ -258,6 +302,7 @@ where
         S::Buffer: BufferMut,
     {
         let Self { device_id, metadata } = self;
+        let tx_meta = LoopbackTxQueueMeta::default();
         match metadata {
             Some(EthernetHeaderParams { dest_addr, protocol }) => send_as_ethernet_frame_to_dst(
                 core_ctx,
@@ -266,56 +311,69 @@ where
                 body,
                 protocol,
                 dest_addr,
+                LoopbackTxQueueMeta::default(),
             ),
-            None => send_ethernet_frame(core_ctx, bindings_ctx, &device_id, body),
+            None => send_ethernet_frame(core_ctx, bindings_ctx, &device_id, body, tx_meta),
         }
     }
 }
 
 /// Sends an IP frame `packet` over `device_id`.
-pub fn send_ip_frame<CC, BC, A, S>(
+pub fn send_ip_frame<CC, BC, I, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
-    _local_addr: SpecifiedAddr<A>,
+    device_id: &<CC as DeviceIdContext<LoopbackDevice>>::DeviceId,
+    destination: IpPacketDestination<I, &<CC as DeviceIdContext<AnyDevice>>::DeviceId>,
     packet: S,
 ) -> Result<(), S>
 where
-    CC: TransmitQueueHandler<LoopbackDevice, BC, Meta = LoopbackTxQueueMeta>
-        + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
-    A: IpAddress,
-    A::Version: EthernetIpExt,
+    CC: TransmitQueueHandler<
+            LoopbackDevice,
+            BC,
+            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        > + ResourceCounterContext<<CC as DeviceIdContext<LoopbackDevice>>::DeviceId, DeviceCounters>
+        + DeviceIdContext<AnyDevice>,
+    BC: DeviceLayerTypes,
+    I: EthernetIpExt + IpTypesIpExt,
     S: Serializer,
     S::Buffer: BufferMut,
 {
-    core_ctx.with_counters(|counters: &DeviceCounters| {
-        let () = A::Version::map_ip(
-            (),
-            |()| counters.send_ipv4_frame.increment(),
-            |()| counters.send_ipv6_frame.increment(),
-        );
-    });
+    core_ctx.increment(device_id, DeviceCounters::send_frame::<I>);
+
+    let target_device = match destination {
+        IpPacketDestination::Loopback(device) => Some(device.downgrade()),
+        IpPacketDestination::Broadcast(_)
+        | IpPacketDestination::Multicast(_)
+        | IpPacketDestination::Neighbor(_) => None,
+    };
     send_as_ethernet_frame_to_dst(
         core_ctx,
         bindings_ctx,
         device_id,
         packet,
-        <A::Version as EthernetIpExt>::ETHER_TYPE,
+        I::ETHER_TYPE,
         LOOPBACK_MAC,
+        LoopbackTxQueueMeta { target_device },
     )
 }
 
 fn send_as_ethernet_frame_to_dst<CC, BC, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
+    device_id: &<CC as DeviceIdContext<LoopbackDevice>>::DeviceId,
     packet: S,
     protocol: EtherType,
     dst_mac: Mac,
+    meta: LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
 ) -> Result<(), S>
 where
-    CC: TransmitQueueHandler<LoopbackDevice, BC, Meta = LoopbackTxQueueMeta>
-        + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
+    CC: TransmitQueueHandler<
+            LoopbackDevice,
+            BC,
+            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        > + ResourceCounterContext<<CC as DeviceIdContext<LoopbackDevice>>::DeviceId, DeviceCounters>
+        + DeviceIdContext<AnyDevice>,
+    BC: DeviceLayerTypes,
     S: Serializer,
     S::Buffer: BufferMut,
 {
@@ -333,27 +391,33 @@ where
         MIN_BODY_LEN,
     ));
 
-    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame).map_err(|s| s.into_inner())
+    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame, meta).map_err(|s| s.into_inner())
 }
 
 fn send_ethernet_frame<CC, BC, S>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
+    device_id: &<CC as DeviceIdContext<LoopbackDevice>>::DeviceId,
     frame: S,
+    meta: LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
 ) -> Result<(), S>
 where
-    CC: TransmitQueueHandler<LoopbackDevice, BC, Meta = LoopbackTxQueueMeta>
-        + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
+    CC: TransmitQueueHandler<
+            LoopbackDevice,
+            BC,
+            Meta = LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        > + ResourceCounterContext<<CC as DeviceIdContext<LoopbackDevice>>::DeviceId, DeviceCounters>
+        + DeviceIdContext<AnyDevice>,
     S: Serializer,
     S::Buffer: BufferMut,
+    BC: DeviceLayerTypes,
 {
     core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_total_frames);
     match TransmitQueueHandler::<LoopbackDevice, _>::queue_tx_frame(
         core_ctx,
         bindings_ctx,
         device_id,
-        LoopbackTxQueueMeta,
+        meta,
         frame,
     ) {
         Ok(()) => {

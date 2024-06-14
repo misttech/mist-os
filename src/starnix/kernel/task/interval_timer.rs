@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo},
-    task::{
-        timers::{ClockId, TimerId},
-        Kernel, ThreadGroup,
-    },
-    time::utc,
-};
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
+use crate::signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo};
+use crate::task::timers::{ClockId, TimerId};
+use crate::task::{Kernel, ThreadGroup};
+use crate::time::utc;
 use futures::stream::AbortHandle;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::Mutex;
-use starnix_uapi::{itimerspec, ownership::TempRef, time::timespec_from_duration, SI_TIMER};
+use starnix_uapi::ownership::TempRef;
+use starnix_uapi::time::timespec_from_duration;
+use starnix_uapi::{itimerspec, SI_TIMER};
 use std::sync::{Arc, Weak};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[derive(Default)]
 pub struct TimerRemaining {
@@ -131,28 +128,25 @@ impl IntervalTimer {
 
             // Check on notify enum to determine the signal target.
             if let Some(thread_group) = thread_group.upgrade() {
-                let signal_target = match self.signal_event.notify {
-                    SignalEventNotify::Signal => self.signal_event.signo.and_then(|signal| {
-                        thread_group
-                            .read()
-                            .get_signal_target(signal.into())
-                            .map(TempRef::into_static)
-                    }),
-                    SignalEventNotify::None => None, // No need to do anything.
+                match self.signal_event.notify {
+                    SignalEventNotify::Signal => {
+                        if let Some(signal_info) = self.signal_info() {
+                            thread_group.write().send_signal(signal_info);
+                        }
+                    }
+                    SignalEventNotify::None => {}
                     SignalEventNotify::Thread { .. } => {
                         track_stub!(TODO("https://fxbug.dev/322875029"), "SIGEV_THREAD timer");
-                        None
                     }
                     SignalEventNotify::ThreadId(tid) => {
                         // Check if the target thread exists in the thread group.
-                        thread_group.read().get_task(tid).map(TempRef::into_static)
-                    }
-                };
-
-                if let Some(target) = &signal_target {
-                    if let Some(signal_info) = self.signal_info() {
-                        send_signal(target, signal_info)
-                            .unwrap_or_else(|e| log_warn!("Failed to queue timer signal: {}", e));
+                        thread_group.read().get_task(tid).map(TempRef::into_static).map(|target| {
+                            if let Some(signal_info) = self.signal_info() {
+                                send_signal(&target, signal_info).unwrap_or_else(|e| {
+                                    log_warn!("Failed to queue timer signal: {}", e)
+                                });
+                            }
+                        });
                     }
                 }
             }

@@ -359,8 +359,35 @@ class Scheduler {
   static void SetCurrCpuActive(bool is_active) {
     Scheduler& scheduler = *Get();
     Guard<MonitoredSpinLock, IrqSave> guard{&scheduler.queue_lock_, SOURCE_TAG};
-    scheduler.SetCpuActive(is_active);
+    scheduler.SetIsActive(is_active);
   }
+
+  // Peek at the current active mask for all schedulers.
+  //
+  // Note that this is just a lockless atomic load.  Baring special
+  // circumstances, the set of active schedulers can change at any time.
+  static cpu_mask_t PeekActiveMask() { return active_schedulers_.load(ktl::memory_order_relaxed); }
+
+  // Peek at the current active mask state for a given CPU's scheduler.
+  //
+  // Note that this is just a lockless atomic load.  Baring special
+  // circumstances, the set of active schedulers can change at any time.
+  static bool PeekIsActive(cpu_num_t cpu) {
+    const cpu_mask_t mask = cpu_num_to_mask(cpu);
+    return (PeekActiveMask() & mask) != 0;
+  }
+
+  // Accessors for the "idle" state mask; similar to the active state mask.
+  void SetIdle(bool is_idle) {
+    const cpu_mask_t mask = cpu_num_to_mask(this_cpu_);
+    if (is_idle) {
+      idle_schedulers_.fetch_or(mask, ktl::memory_order_relaxed);
+    } else {
+      idle_schedulers_.fetch_and(~mask, ktl::memory_order_relaxed);
+    }
+  }
+  static cpu_mask_t PeekIdleMask() { return idle_schedulers_.load(ktl::memory_order_relaxed); }
+  static bool PeekIsIdle(cpu_num_t cpu) { return (PeekIdleMask() & cpu_num_to_mask(cpu)) != 0; }
 
  private:
   // fwd decl of a helper class used for PI Join/Split operations
@@ -473,26 +500,73 @@ class Scheduler {
   // Returns the Scheduler instance for the given CPU.
   static Scheduler* Get(cpu_num_t cpu);
 
-  // Returns a CPU to run the given thread on.  The thread's lock must be held
-  // exclusively during this operation.  This is almost always called when
-  // threads are transitioning from a wait queue to a scheduler, therefore the
-  // thread's state is only protected by the thread's lock; not by any scheduler
-  // or wait queue lock.
+  // Find an appropriate CPU for a thread to run on, then lock that scheduler,
+  // confirm that it is still active, and invoke the user-supplied callback with
+  // the scheduler's queue_lock held.
+  //
+  // This method may need to search for a target CPU for the thread more than
+  // once if the initially chosen scheduler becomes deactivated after it was
+  // selected, but before it was locked.
+  template <typename Callable>
+  static cpu_num_t FindActiveSchedulerForThread(Thread* thread, FindTargetCpuReason reason,
+                                                Callable action) TA_REQ_SHARED(thread->get_lock()) {
+    while (true) {
+      const cpu_num_t target_cpu = FindTargetCpu(thread, reason);
+      Scheduler* const target = Get(target_cpu);
+      Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+
+      if (target->IsLockedSchedulerActive()) {
+        action(thread, target);
+        return target_cpu;
+      }
+
+      IncFindTargetCpuRetriesKcounter();
+    }
+  }
+
+  // A helper function used by FindActiveSchedulerForThread.  Returns a CPU to
+  // run the given thread on, but does not lock that scheduler, meaning that the
+  // selected scheduler can become de-activated before the caller can lock it.
+  //
+  // Typically, users will want to use FindActiveSchedulerForThread instead,
+  // which will supply a locked scheduler which is guaranteed to be active.
+  //
   static cpu_num_t FindTargetCpu(Thread* thread, FindTargetCpuReason reason)
       TA_REQ_SHARED(thread->get_lock());
 
-  // Change this scheduler's CPU's active state in the global mp_active_mask.
-  // We require that the scheduler's queue_lock be held during the operation.
-  // This enforces the invariant that "the scheduler's active bit only changes
-  // while holding the scheduler's queue lock".
+  // Increment the kcounter which tracks the number of times that an extra
+  // attempt to find an active scheduler was needed during
+  // FindActiveSchedulerForThread.  Sadly, the method cannot increment the
+  // counter directly because of the way that kcounters need to be declared, in
+  // a translation unit in an anonymous namespace, with no ability to fwd
+  // declare the counter.
+  static void IncFindTargetCpuRetriesKcounter();
+
+  // Change this scheduler's CPU's active state. We require that the scheduler's
+  // queue_lock be held during the operation. This enforces the invariant that
+  // "the scheduler's active bit only changes while holding the scheduler's
+  // queue lock".
   //
   // This means that things like "FindTargetCpu" are free to check the global
   // active mask to see whether or not we _think_ that a given scheduler is
   // likely to be active for selection purposes, but when it comes time to
   // actually add a thread to a scheduler's queues, we check the active state of
-  // the scheduler's assigned CPU from within the safety of the queue lock, fo
-  void SetCpuActive(bool is_active) TA_REQ(queue_lock_) { mp_set_curr_cpu_active(is_active); }
-  bool IsCpuActive() TA_REQ(queue_lock_) { return mp_is_cpu_active(this_cpu_); }
+  // the scheduler's assigned CPU from within the safety of the queue lock using
+  // IsLockedSchedulerActive()
+  void SetIsActive(bool is_active) TA_REQ(queue_lock_) {
+    const cpu_mask_t mask = cpu_num_to_mask(this_cpu_);
+    if (is_active) {
+      active_schedulers_.fetch_or(mask, ktl::memory_order_relaxed);
+    } else {
+      active_schedulers_.fetch_and(~mask, ktl::memory_order_relaxed);
+    }
+    arch_set_blocking_disallowed(!is_active);
+  }
+
+  // Check to see if |this| scheduler is currently active while holding its
+  // queue_lock, ensuring that it will stay in its current state until after we
+  // drop the lock.
+  bool IsLockedSchedulerActive() TA_REQ(queue_lock_) { return PeekIsActive(this_cpu_); }
 
   // Handle all of the common tasks associated with each of the possible PI
   // interactions.  The outline of this is:
@@ -871,11 +945,41 @@ class Scheduler {
   // the scheduler that the thread is currently a member of (see
   // AssertInScheduler, above).
   //
+  // MarkInFindActiveSchedulerForThreadCbk tells the static analyzer that we are
+  // in the callback for an FindActiveSchedulerForThread operation, meaning that
+  // we must hold both the thread's lock and the queue_lock for the thread and
+  // scheduler involved in the operation.
+  //
   // See StealWork for a practical example of where these methods are useful.
   //
   static inline void MarkHasSchedulerAccess(const Scheduler& s) TA_ASSERT(s.queue_lock_) {}
   static inline void MarkHasOwnedThreadAccess(const Thread& t)
       TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT_SHARED(t.get_lock()) {}
+  static inline void MarkInFindActiveSchedulerForThreadCbk(const Thread& t, const Scheduler& s)
+      TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT(t.get_lock()) TA_ASSERT(s.queue_lock_) {}
+
+  // A mask of all of the currently active scheduler's in the system.  An
+  // "active" scheduler is one who will accept threads to be executed.  An
+  // "in-active" scheduler will not, and is typically the scheduler for a CPU
+  // which is in the process of being taken offline.
+  //
+  // Note that to change the active state of a scheduler for CPU X (eg; to
+  // toggle the state of bit X in the active_schedulers_ mask) that scheduler's
+  // queue_lock_ must be held.  Therefore, observations of the schedulers'
+  // active mask must typically be assumed to be volatile.  As soon as the mask
+  // is observed, it can immediately change.
+  static inline ktl::atomic<cpu_mask_t> active_schedulers_{0};
+
+  // A mask of all of the currently idle scheduler's in the system.  An
+  // "idle" scheduler is one which last selected the idle/power thread to run,
+  // while a "busy" scheduler is one which is running a non-idle thread.
+  //
+  // Like the active mask, the idle mask is volatile and subject to change at
+  // any time barring special circumstances.
+  static inline ktl::atomic<cpu_mask_t> idle_schedulers_{0};
+
+  // Flow id counter for sched_latency flow events.
+  inline static RelaxedAtomic<uint64_t> next_flow_id_{1};
 
   // The run queue of fair scheduled threads ready to run, but not currently running.
   TA_GUARDED(queue_lock_)
@@ -1009,9 +1113,6 @@ class Scheduler {
   // cache performance.
   RelaxedAtomic<SchedDuration> exported_total_expected_runtime_ns_{SchedNs(0)};
   RelaxedAtomic<SchedUtilization> exported_total_deadline_utilization_{SchedUtilization{0}};
-
-  // Flow id counter for sched_latency flow events.
-  inline static RelaxedAtomic<uint64_t> next_flow_id_{1};
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_H_

@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Port, Resource, Status, Vmar},
-    fuchsia_zircon_sys as sys,
-};
+use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Port, Resource, Status, Vmar};
+use fuchsia_zircon_sys as sys;
 
 /// Wrapper type for guest physical addresses.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -147,10 +145,10 @@ pub enum PortData {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_component::client::connect_to_protocol,
-        fuchsia_zircon::HandleBased,
-    };
+    use super::*;
+    use fidl_fuchsia_kernel as fkernel;
+    use fuchsia_component::client::connect_to_protocol;
+    use fuchsia_zircon::HandleBased;
 
     async fn get_hypervisor() -> Resource {
         let resource = connect_to_protocol::<fkernel::HypervisorResourceMarker>()

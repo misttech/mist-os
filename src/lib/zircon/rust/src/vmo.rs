@@ -4,13 +4,15 @@
 
 //! Type-safe bindings for Zircon vmo objects.
 
-use crate::ok;
-use crate::{object_get_info, object_get_property, object_set_property, ObjectQuery, Topic};
-use crate::{AsHandleRef, Bti, Handle, HandleBased, HandleRef, Koid, Resource, Rights, Status};
-use crate::{Property, PropertyQuery};
+use crate::{
+    object_get_info, object_get_property, object_set_property, ok, AsHandleRef, Bti, Handle,
+    HandleBased, HandleRef, Koid, ObjectQuery, Property, PropertyQuery, Resource, Rights, Status,
+    Topic,
+};
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
-use std::{mem::MaybeUninit, ptr};
+use std::mem::MaybeUninit;
+use std::ptr;
 use zerocopy::FromBytes;
 
 /// An object representing a Zircon

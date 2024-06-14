@@ -4,14 +4,12 @@
 
 #![cfg(target_os = "fuchsia")]
 
-use {
-    crate::sources::FTStreamProvider,
-    anyhow::Error,
-    freetype_ffi::{FT_Stream, FT_StreamRec},
-    fuchsia_zircon as zx,
-    libc::{c_uchar, c_ulong, c_void},
-    std::{cmp, ptr, slice},
-};
+use crate::sources::FTStreamProvider;
+use anyhow::Error;
+use freetype_ffi::{FT_Stream, FT_StreamRec};
+use fuchsia_zircon as zx;
+use libc::{c_uchar, c_ulong, c_void};
+use std::{cmp, ptr, slice};
 
 struct VmoStreamInternal {
     vmo: zx::Vmo,

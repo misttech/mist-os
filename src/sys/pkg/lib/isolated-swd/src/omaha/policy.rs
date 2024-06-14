@@ -4,12 +4,10 @@
 
 use futures::future::BoxFuture;
 use futures::prelude::*;
-use omaha_client::{
-    common::{App, CheckOptions, CheckTiming, ProtocolState, UpdateCheckSchedule},
-    policy::{CheckDecision, Policy, PolicyData, PolicyEngine, UpdateDecision},
-    request_builder::RequestParams,
-    time::TimeSource,
-};
+use omaha_client::common::{App, CheckOptions, CheckTiming, ProtocolState, UpdateCheckSchedule};
+use omaha_client::policy::{CheckDecision, Policy, PolicyData, PolicyEngine, UpdateDecision};
+use omaha_client::request_builder::RequestParams;
+use omaha_client::time::TimeSource;
 use omaha_client_fuchsia::install_plan::FuchsiaInstallPlan;
 
 /// The Policy implementation for isolated SWD.
@@ -150,11 +148,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        omaha_client::{protocol::request::InstallSource, time::MockTimeSource},
-        omaha_client_fuchsia::install_plan::UpdatePackageUrl,
-    };
+    use super::*;
+    use omaha_client::protocol::request::InstallSource;
+    use omaha_client::time::MockTimeSource;
+    use omaha_client_fuchsia::install_plan::UpdatePackageUrl;
 
     #[test]
     fn test_compute_next_update_time() {

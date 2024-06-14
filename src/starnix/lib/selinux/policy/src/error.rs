@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    extensible_bitmap::{MAP_NODE_BITS, MAX_BITMAP_ITEMS},
-    metadata::{
-        CONFIG_HANDLE_UNKNOWN_MASK, CONFIG_MLS_FLAG, POLICYDB_SIGNATURE,
-        POLICYDB_STRING_MAX_LENGTH, POLICYDB_VERSION_MAX, POLICYDB_VERSION_MIN, SELINUX_MAGIC,
-    },
-    security_context::SecurityLevel,
-    symbols::{ClassDefault, ClassDefaultRange},
-    RoleId, SecurityContext, SecurityContextError, TypeId, UserId,
+use super::extensible_bitmap::{MAP_NODE_BITS, MAX_BITMAP_ITEMS};
+use super::metadata::{
+    CONFIG_HANDLE_UNKNOWN_MASK, CONFIG_MLS_FLAG, POLICYDB_SIGNATURE, POLICYDB_STRING_MAX_LENGTH,
+    POLICYDB_VERSION_MAX, POLICYDB_VERSION_MIN, SELINUX_MAGIC,
 };
+use super::security_context::SecurityLevel;
+use super::symbols::{ClassDefault, ClassDefaultRange};
+use super::{RoleId, SecurityContext, SecurityContextError, TypeId, UserId};
 
 use selinux_common as sc;
 use thiserror::Error;

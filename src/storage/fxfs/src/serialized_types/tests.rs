@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::serialized_types::{versioned_type, Version, Versioned, VersionedLatest},
-    fprint::TypeFingerprint,
-    serde::{Deserialize, Serialize},
-    std::io::Cursor,
-};
+use crate::serialized_types::{versioned_type, Version, Versioned, VersionedLatest};
+use fprint::TypeFingerprint;
+use serde::{Deserialize, Serialize};
+use std::io::Cursor;
 
 // Note we don't use the standard serialized_types::EARLIEST_SUPPORTED_VERSION for tests.
 const EARLIEST_SUPPORTED_VERSION: Version = Version { major: 1, minor: 0 };

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    boot::boot,
-    common::{
-        cmd::{ManifestParams, OemFile},
-        flash_and_reboot, is_locked, Boot, Flash, Partition as PartitionTrait,
-        Product as ProductTrait, Unlock, MISSING_PRODUCT, UNLOCK_ERR,
-    },
-    file_resolver::FileResolver,
+use crate::boot::boot;
+use crate::common::cmd::{ManifestParams, OemFile};
+use crate::common::{
+    flash_and_reboot, is_locked, Boot, Flash, Partition as PartitionTrait, Product as ProductTrait,
+    Unlock, MISSING_PRODUCT, UNLOCK_ERR,
 };
+use crate::file_resolver::FileResolver;
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
@@ -152,10 +150,8 @@ impl Boot for FlashManifest {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR},
-        test::{setup, TestResolver},
-    };
+    use crate::common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR};
+    use crate::test::{setup, TestResolver};
     use regex::Regex;
     use serde_json::{from_str, json};
     use std::path::PathBuf;
@@ -335,9 +331,7 @@ mod test {
         let output = String::from_utf8(writer).expect("utf-8 string");
         for partition in &v.0[1].partitions {
             let name_listing = Regex::new(&partition.name()).expect("test regex");
-            let path_listing = Regex::new(&partition.file()).expect("test regex");
             assert_eq!(name_listing.find_iter(&output).count(), 1);
-            assert_eq!(path_listing.find_iter(&output).count(), 1);
         }
         Ok(())
     }
@@ -446,10 +440,8 @@ mod test {
         let output = String::from_utf8(writer).expect("utf-8 string");
         for (i, partition) in v.0[0].bootloader_partitions.iter().enumerate() {
             let name_listing = Regex::new(&partition.name()).expect("test regex");
-            let path_listing = Regex::new(&partition.file()).expect("test regex");
             let expected = if i == 1 { 1 } else { 0 };
             assert_eq!(name_listing.find_iter(&output).count(), expected);
-            assert_eq!(path_listing.find_iter(&output).count(), expected);
         }
         Ok(())
     }

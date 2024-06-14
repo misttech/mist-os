@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::{kobject::DeviceMetadata, simple_device_ops, DeviceMode},
-    fs::sysfs::DeviceDirectory,
-    mm::{
-        create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions,
-        MemoryAccessorExt, ProtectionFlags,
-    },
-    task::{CurrentTask, EventHandler, LogSubscription, Syslog, WaitCanceler, Waiter},
-    vfs::{
-        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNode,
-        FsNodeInfo, NamespaceNode, SeekTarget,
-    },
+use crate::device::kobject::DeviceMetadata;
+use crate::device::{simple_device_ops, DeviceMode};
+use crate::fs::sysfs::DeviceDirectory;
+use crate::mm::{
+    create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt,
+    ProtectionFlags,
+};
+use crate::task::{CurrentTask, EventHandler, LogSubscription, Syslog, WaitCanceler, Waiter};
+use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
+use crate::vfs::{
+    fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNode,
+    FsNodeInfo, NamespaceNode, SeekTarget,
 };
 use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
@@ -23,10 +22,14 @@ use starnix_logging::{log_info, track_stub};
 use starnix_sync::{
     DeviceOpen, FileOpsCore, FileOpsToHandle, LockBefore, Locked, Mutex, Unlocked, WriteOps,
 };
-use starnix_uapi::{
-    auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
-    open_flags::OpenFlags, user_address::UserAddress, vfs::FdEvents,
-};
+use starnix_uapi::auth::FsCred;
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::vfs::FdEvents;
 use std::mem::MaybeUninit;
 
 #[derive(Default)]

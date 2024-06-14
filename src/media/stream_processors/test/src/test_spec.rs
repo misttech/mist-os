@@ -4,12 +4,16 @@
 
 #![allow(clippy::large_futures)]
 
-use crate::{
-    elementary_stream::*, output_validator::*, stream::*, stream_runner::*, FatalError, Result,
-};
+use crate::elementary_stream::*;
+use crate::output_validator::*;
+use crate::stream::*;
+use crate::stream_runner::*;
+use crate::{FatalError, Result};
 use anyhow::Context as _;
 use fidl_fuchsia_media::StreamProcessorProxy;
-use futures::{future::BoxFuture, stream::FuturesUnordered, TryStreamExt};
+use futures::future::BoxFuture;
+use futures::stream::FuturesUnordered;
+use futures::TryStreamExt;
 use std::rc::Rc;
 
 pub enum OutputSize {

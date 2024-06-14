@@ -7,7 +7,10 @@ use anyhow::{Context as _, Error};
 use argh::FromArgs;
 use cm_rust::NativeIntoFidl;
 use fidl::persist;
-use std::{collections::BTreeMap, fs, io::Write, path::PathBuf};
+use std::collections::BTreeMap;
+use std::fs;
+use std::io::Write;
+use std::path::PathBuf;
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Generates a Configuration Value File (cvf) from a given manifest and JSON value file.

@@ -180,26 +180,37 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, Reconnects) {
 TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, ReconnectsAfterErrorOnInitialConnection) {
   DynamicCurrentChannelProvider provider(dispatcher(), services(),
                                          std::make_unique<MonotonicBackoff>());
-
-  RunLoopUntilIdle();
-
-  Annotations annotations;
-  provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
-
-  RunLoopUntilIdle();
-  EXPECT_THAT(annotations, UnorderedElementsAreArray(
-                               {Pair(kChannelKey, ErrorOrString(Error::kConnectionError))}));
-
+  // Inject a service provider which rejects connections until we allow them.
   auto channel_server = std::make_unique<stubs::ChannelControl>(stubs::ChannelControlBase::Params{
       .current = kChannelValue,
   });
-  InjectServiceProvider(channel_server.get());
+  bool allow_connection = false;
+  InjectServiceProvider(
+      std::make_unique<vfs::Service>([&](zx::channel channel, async_dispatcher_t* dispatcher) {
+        if (!allow_connection) {
+          channel.reset();
+        } else {
+          auto handler = channel_server->GetHandler();
+          handler(fidl::InterfaceRequest<fuchsia::update::channelcontrol::ChannelControl>{
+              std::move(channel)});
+        }
+      }),
+      stubs::ChannelControl::Name_);
 
+  // Ensure we get a connection error on the first attempt.
+  RunLoopUntilIdle();
+  Annotations annotations;
+  provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
+  RunLoopUntilIdle();
+  ASSERT_EQ(channel_server->NumConnections(), 0u);
+  EXPECT_THAT(annotations, UnorderedElementsAreArray(
+                               {Pair(kChannelKey, ErrorOrString(Error::kConnectionError))}));
+
+  // Enable the service, and wait for enough time to pass for another attempt to be made.
+  allow_connection = true;
   RunLoopFor(zx::sec(1));
   ASSERT_EQ(channel_server->NumConnections(), 1u);
-
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
-
   RunLoopUntilIdle();
   EXPECT_THAT(annotations,
               UnorderedElementsAreArray({Pair(kChannelKey, ErrorOrString(kChannelValue))}));

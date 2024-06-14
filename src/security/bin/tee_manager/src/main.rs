@@ -8,20 +8,19 @@ mod config;
 mod device_server;
 mod provider_server;
 
-use {
-    crate::config::Config,
-    crate::device_server::{serve_application_passthrough, serve_device_info_passthrough},
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints::{DiscoverableProtocolMarker as _, ServerEnd},
-    fidl_fuchsia_hardware_tee::{DeviceConnectorMarker, DeviceConnectorProxy},
-    fidl_fuchsia_tee::{self as fuchsia_tee, DeviceInfoMarker},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_fs::directory as vfs,
-    fuchsia_fs::OpenFlags,
-    futures::{prelude::*, select, stream::FusedStream},
-    std::path::{Path, PathBuf},
-    uuid::Uuid,
-};
+use crate::config::Config;
+use crate::device_server::{serve_application_passthrough, serve_device_info_passthrough};
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints::{DiscoverableProtocolMarker as _, ServerEnd};
+use fidl_fuchsia_hardware_tee::{DeviceConnectorMarker, DeviceConnectorProxy};
+use fidl_fuchsia_tee::{self as fuchsia_tee, DeviceInfoMarker};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_fs::{directory as vfs, OpenFlags};
+use futures::prelude::*;
+use futures::select;
+use futures::stream::FusedStream;
+use std::path::{Path, PathBuf};
+use uuid::Uuid;
 
 const DEV_TEE_PATH: &str = "/dev/class/tee";
 
@@ -144,17 +143,14 @@ fn uuid_to_fuchsia_tee_uuid(uuid: &Uuid) -> fuchsia_tee::Uuid {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::{endpoints, Error, HandleBased as _},
-        fidl_fuchsia_hardware_tee::DeviceConnectorRequest,
-        fidl_fuchsia_io as fio,
-        fidl_fuchsia_tee::ApplicationMarker,
-        fidl_fuchsia_tee_manager::ProviderProxy,
-        fuchsia_async as fasync,
-        fuchsia_zircon_status::Status,
-        futures::channel::mpsc,
-    };
+    use super::*;
+    use fidl::{endpoints, Error, HandleBased as _};
+    use fidl_fuchsia_hardware_tee::DeviceConnectorRequest;
+    use fidl_fuchsia_tee::ApplicationMarker;
+    use fidl_fuchsia_tee_manager::ProviderProxy;
+    use fuchsia_zircon_status::Status;
+    use futures::channel::mpsc;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     fn spawn_device_connector<F>(
         request_handler: impl Fn(DeviceConnectorRequest) -> F + 'static,

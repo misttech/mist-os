@@ -17,6 +17,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <poll.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -750,7 +751,7 @@ class base_socket {
         return proc.Process(
             client()->GetBindToDevice(),
             [](const auto& response) -> const fidl::StringView& { return response.value; });
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
       case SO_BINDTOIFINDEX:
         return proc.Process(client()->GetBindToInterfaceIndex(), [](const auto& response) {
           // It's unfortunate to cast through `int32_t`, but since this is what
@@ -828,7 +829,7 @@ class base_socket {
       case SO_BINDTODEVICE:
         return proc.Process<fidl::StringView>(
             [this](fidl::StringView value) { return client()->SetBindToDevice(value); });
-#if __Fuchsia_API_level__ >= 20
+#if FUCHSIA_API_LEVEL_AT_LEAST(20)
       case SO_BINDTOIFINDEX:
         // It's unfortunate to cast through `int32_t`, but since this is what
         // Linux uses to represent interface IDs, we want to be able to accept

@@ -7,17 +7,14 @@ mod fvm;
 mod gpt;
 mod pkg;
 
-use {
-    crate::fvm::{get_partition_size, FvmRamdisk},
-    anyhow::{Context, Error},
-    fidl_fuchsia_boot::{ArgumentsMarker, BoolPair},
-    fidl_fuchsia_hardware_block_partition::PartitionMarker,
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::directory::{WatchEvent, Watcher},
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    tracing::{error, info},
-};
+use crate::fvm::{get_partition_size, FvmRamdisk};
+use anyhow::{Context, Error};
+use fidl_fuchsia_boot::{ArgumentsMarker, BoolPair};
+use fidl_fuchsia_hardware_block_partition::PartitionMarker;
+use fuchsia_fs::directory::{WatchEvent, Watcher};
+use futures::prelude::*;
+use tracing::{error, info};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// This GUID is used by the installer to identify partitions that contain
 /// data that will be installed to disk. The `fx mkinstaller` tool generates
@@ -132,17 +129,13 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::block_wrapper::WrappedBlockDevice,
-        ::gpt::{
-            disk::LogicalBlockSize,
-            partition_types::{OperatingSystem, Type},
-            GptConfig,
-        },
-        ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
-        std::collections::BTreeMap,
-    };
+    use super::*;
+    use crate::block_wrapper::WrappedBlockDevice;
+    use ::gpt::disk::LogicalBlockSize;
+    use ::gpt::partition_types::{OperatingSystem, Type};
+    use ::gpt::GptConfig;
+    use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
+    use std::collections::BTreeMap;
 
     async fn create_ramdisk_with_partitions(uuids: Vec<&'static str>) -> RamdiskClient {
         // 16MB

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::{RuleDecodeError, RuleParseError},
-    fidl_fuchsia_pkg_rewrite as fidl,
-    fuchsia_url::{AbsolutePackageUrl, ParseError, RepositoryUrl},
-    serde::{Deserialize, Serialize},
-};
+use crate::errors::{RuleDecodeError, RuleParseError};
+use fidl_fuchsia_pkg_rewrite as fidl;
+use fuchsia_url::{AbsolutePackageUrl, ParseError, RepositoryUrl};
+use serde::{Deserialize, Serialize};
 
 /// A `Rule` can be used to re-write parts of a [`AbsolutePackageUrl`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

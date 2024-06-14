@@ -11,7 +11,9 @@ use ffx_target_ssh_args::SshCommand;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetIpPort, TargetProxy};
 use fidl_fuchsia_net::{IpAddress, Ipv4Address};
-use std::{path::PathBuf, process::Command, time::Duration};
+use std::path::PathBuf;
+use std::process::Command;
+use std::time::Duration;
 use timeout::timeout;
 
 #[derive(FfxTool)]
@@ -114,11 +116,13 @@ async fn make_ssh_command(cmd: SshCommand, addr: TargetAddr) -> Result<Command> 
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_config::{environment::test_init, ConfigLevel};
+    use ffx_config::environment::test_init;
+    use ffx_config::ConfigLevel;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use serde_json::json;
-    use std::{fs, str::FromStr};
+    use std::fs;
+    use std::str::FromStr;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_address_family() -> Result<()> {

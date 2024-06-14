@@ -2,24 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{installer::InstallResult, metrics::CobaltMetricsReporter, timer::FuchsiaTimer};
+use crate::installer::InstallResult;
+use crate::metrics::CobaltMetricsReporter;
+use crate::timer::FuchsiaTimer;
 use anyhow::{anyhow, Context as _, Error};
 use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy};
 use fidl_fuchsia_update_config::{OptOutMarker, OptOutPreference, OptOutProxy};
 use fidl_fuchsia_update_ext::{query_commit_status, CommitStatus};
 use fuchsia_async::TimeoutExt;
 use fuchsia_component::client::connect_to_protocol;
-use futures::{future::BoxFuture, future::FutureExt, lock::Mutex, prelude::*};
-use omaha_client::{
-    common::{App, CheckOptions, CheckTiming, ProtocolState, UpdateCheckSchedule},
-    policy::{CheckDecision, Policy, PolicyEngine, UpdateDecision},
-    protocol::request::InstallSource,
-    request_builder::RequestParams,
-    time::{ComplexTime, PartialComplexTime, TimeSource, Timer},
-    unless::Unless,
-};
+use futures::future::{BoxFuture, FutureExt};
+use futures::lock::Mutex;
+use futures::prelude::*;
+use omaha_client::common::{App, CheckOptions, CheckTiming, ProtocolState, UpdateCheckSchedule};
+use omaha_client::policy::{CheckDecision, Policy, PolicyEngine, UpdateDecision};
+use omaha_client::protocol::request::InstallSource;
+use omaha_client::request_builder::RequestParams;
+use omaha_client::time::{ComplexTime, PartialComplexTime, TimeSource, Timer};
+use omaha_client::unless::Unless;
 use omaha_client_fuchsia::install_plan;
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::{error, info, warn};
 
 mod rate_limiter;
@@ -668,8 +671,9 @@ mod tests {
     use fuchsia_zircon::{self as zx, Peered};
     use omaha_client::time::{MockTimeSource, StandardTimeSource};
     use proptest::prelude::*;
+    use std::collections::VecDeque;
     use std::sync::atomic::{AtomicU8, Ordering};
-    use std::{collections::VecDeque, time::Instant};
+    use std::time::Instant;
     use zx::HandleBased;
 
     // We do periodic update check roughly every hour.

@@ -32,9 +32,6 @@
 
 include_shell_commands_package = true
 
-# Kernel command line arguments.
-product_bootfs_labels = [ "//products/kernel_cmdline:oom.reboot-timeout--low" ]
-
 # Use the product assembly config target to specify the product configuration.
 #
 # This should be overridden by products which inherit from minimal.
@@ -62,3 +59,4 @@ cipd_assembly_artifact_targets = [
 
 use_bazel_images_only = true
 assembly_board_configs = [ "//boards" ]
+assembly_partitions_configs = [ "//boards/partitions" ]

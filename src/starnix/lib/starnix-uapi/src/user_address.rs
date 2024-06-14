@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    errors::{error, Errno},
-    math::round_up_to_increment,
-    uapi,
-    user_buffer::UserBuffer,
-};
+use super::errors::{error, Errno};
+use super::math::round_up_to_increment;
+use super::uapi;
+use super::user_buffer::UserBuffer;
 use fuchsia_zircon::sys::zx_vaddr_t;
-use std::{fmt, marker::PhantomData, mem, ops};
+use std::marker::PhantomData;
+use std::{fmt, mem, ops};
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 #[derive(

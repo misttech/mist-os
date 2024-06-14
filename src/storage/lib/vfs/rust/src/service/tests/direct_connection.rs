@@ -8,21 +8,15 @@ use super::{endpoint, host};
 
 use crate::file::test_utils::run_server_client;
 
-use {
-    assert_matches::assert_matches,
-    fidl::{
-        endpoints::{Proxy, RequestStream},
-        Error,
-    },
-    fidl_fuchsia_io as fio,
-    fidl_test_placeholders::{EchoProxy, EchoRequest, EchoRequestStream},
-    fuchsia_zircon_status::Status,
-    futures::{
-        channel::{mpsc, oneshot},
-        stream::StreamExt,
-    },
-    std::sync::Mutex,
-};
+use assert_matches::assert_matches;
+use fidl::endpoints::{Proxy, RequestStream};
+use fidl::Error;
+use fidl_fuchsia_io as fio;
+use fidl_test_placeholders::{EchoProxy, EchoRequest, EchoRequestStream};
+use fuchsia_zircon_status::Status;
+use futures::channel::{mpsc, oneshot};
+use futures::stream::StreamExt;
+use std::sync::Mutex;
 
 async fn echo_server(
     mut requests: EchoRequestStream,

@@ -9,7 +9,6 @@
 //! the library to also be used in the host.
 
 use tracing::Level;
-use tracing_log::LogTracer;
 
 #[cfg(target_os = "fuchsia")]
 mod fuchsia;
@@ -48,12 +47,6 @@ impl IntoSeverity for Level {
     }
 }
 
-/// Logs emitted with the `log` crate will be ingested by the registered `Publisher`.
-pub(crate) fn ingest_log_events() -> Result<(), PublishError> {
-    LogTracer::init()?;
-    Ok(())
-}
-
 /// Adds a panic hook which will log an `ERROR` log with the panic information.
 pub(crate) fn install_panic_hook(prefix: Option<&'static str>) {
     let previous_hook = std::panic::take_hook();
@@ -68,7 +61,6 @@ pub(crate) fn install_panic_hook(prefix: Option<&'static str>) {
 /// `PublisherOptions`.
 pub struct PublishOptions<'t> {
     pub(crate) publisher: PublisherOptions<'t>,
-    pub(crate) ingest_log_events: bool,
     pub(crate) install_panic_hook: bool,
     pub(crate) panic_prefix: Option<&'static str>,
 }
@@ -77,7 +69,6 @@ impl<'t> Default for PublishOptions<'t> {
     fn default() -> Self {
         Self {
             publisher: PublisherOptions::default(),
-            ingest_log_events: true,
             install_panic_hook: true,
             panic_prefix: None,
         }
@@ -90,14 +81,6 @@ impl<'t> PublishOptions<'t> {
     /// Default: true.
     pub fn install_panic_hook(mut self, enable: bool) -> Self {
         self.install_panic_hook = enable;
-        self
-    }
-
-    /// Whether or not to ingest log events emitted by the `log` crate macros.
-    ///
-    /// Default: true.
-    pub fn ingest_log_events(mut self, enable: bool) -> Self {
-        self.ingest_log_events = enable;
         self
     }
 

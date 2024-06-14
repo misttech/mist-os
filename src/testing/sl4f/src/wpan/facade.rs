@@ -212,8 +212,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::prelude::*;
     use lazy_static::lazy_static;
-    use lowpan_driver_common::DummyDevice;
-    use lowpan_driver_common::ServeTo;
+    use lowpan_driver_common::{DummyDevice, ServeTo};
 
     lazy_static! {
         static ref MOCK_TESTER: MockTester = MockTester::new();

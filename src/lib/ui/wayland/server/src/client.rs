@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::display::{Display, DISPLAY_SINGLETON_OBJECT_ID};
+use crate::object::{MessageReceiver, ObjectLookupError, ObjectMap, ObjectRef, RequestReceiver};
+use crate::seat::InputDispatcher;
+use crate::xdg_shell::XdgSurface;
+use anyhow::{anyhow, Error};
+use futures::channel::mpsc;
+use futures::prelude::*;
+use futures::select;
+use std::any::Any;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+use wayland_server_protocol::WlDisplayEvent;
 use {
-    crate::display::{Display, DISPLAY_SINGLETON_OBJECT_ID},
-    crate::object::{MessageReceiver, ObjectLookupError, ObjectMap, ObjectRef, RequestReceiver},
-    crate::seat::InputDispatcher,
-    crate::xdg_shell::XdgSurface,
-    anyhow::{anyhow, Error},
     fuchsia_async as fasync, fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
     fuchsia_zircon as zx,
-    futures::channel::mpsc,
-    futures::prelude::*,
-    futures::select,
-    std::{
-        any::Any,
-        cell::{Cell, RefCell},
-        rc::Rc,
-    },
-    wayland_server_protocol::WlDisplayEvent,
 };
 
 type Task = Box<dyn FnMut(&mut Client) -> Result<(), Error> + 'static>;

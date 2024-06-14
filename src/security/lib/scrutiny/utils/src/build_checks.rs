@@ -2,24 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        artifact::ArtifactReader,
-        io::ReadSeek,
-        key_value::parse_key_value,
-        package::{extract_system_image_hash_string, read_content_blob, ReadContentBlobError},
-    },
-    anyhow::{Error, Result},
-    difference::{Changeset, Difference},
-    fuchsia_archive::Utf8Reader as FarReader,
-    serde::{Deserialize, Serialize},
-    std::collections::{HashMap, HashSet},
-    std::fmt::Display,
-    std::fs::read_to_string,
-    std::path::Path,
-    std::str::{from_utf8, FromStr},
-    thiserror::Error,
-};
+use crate::artifact::ArtifactReader;
+use crate::io::ReadSeek;
+use crate::key_value::parse_key_value;
+use crate::package::{extract_system_image_hash_string, read_content_blob, ReadContentBlobError};
+use anyhow::{Error, Result};
+use difference::{Changeset, Difference};
+use fuchsia_archive::Utf8Reader as FarReader;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
+use std::fs::read_to_string;
+use std::path::Path;
+use std::str::{from_utf8, FromStr};
+use thiserror::Error;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Error)]
 #[serde(rename_all = "snake_case")]
@@ -987,20 +983,16 @@ impl FileChecker for PackageFileChecker {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::package::META_CONTENTS_PATH,
-        anyhow::anyhow,
-        fuchsia_archive::write as far_write,
-        maplit::hashmap,
-        serde_json::json,
-        std::{
-            collections::BTreeMap,
-            io::{BufWriter, Cursor, Read, Write},
-            path::PathBuf,
-        },
-        tempfile::NamedTempFile,
-    };
+    use super::*;
+    use crate::package::META_CONTENTS_PATH;
+    use anyhow::anyhow;
+    use fuchsia_archive::write as far_write;
+    use maplit::hashmap;
+    use serde_json::json;
+    use std::collections::BTreeMap;
+    use std::io::{BufWriter, Cursor, Read, Write};
+    use std::path::PathBuf;
+    use tempfile::NamedTempFile;
 
     struct TestArtifactReader {
         artifacts: HashMap<PathBuf, Vec<u8>>,

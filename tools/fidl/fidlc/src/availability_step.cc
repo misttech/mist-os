@@ -162,7 +162,6 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
   const auto replaced = attribute->GetArg("replaced");
   const auto renamed = attribute->GetArg("renamed");
   const auto note = attribute->GetArg("note");
-  const auto legacy = attribute->GetArg("legacy");
 
   // These errors do not block further analysis.
   if (!is_library && attribute->args.empty()) {
@@ -218,7 +217,6 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
       .added = GetVersion(added),
       .deprecated = GetVersion(deprecated),
       .removed = GetVersion(removed_or_replaced),
-      .legacy = GetLegacy(legacy),
       .replaced = replaced != nullptr,
   };
   if (is_library) {
@@ -282,30 +280,28 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
                      child_what, when, parent_what);
   };
 
-  // Reports an error for the legacy arg given its status.
-  auto report_legacy = [&](const AttributeArg* arg,
-                           Availability::InheritResult::LegacyStatus status) {
-    switch (status) {
-      case Availability::InheritResult::LegacyStatus::kOk:
-        break;
-      case Availability::InheritResult::LegacyStatus::kNeverRemoved:
-        reporter()->Fail(ErrLegacyWithoutRemoval, arg->span, arg);
-        break;
-      case Availability::InheritResult::LegacyStatus::kWithoutParent: {
-        const auto* inherited_arg = AncestorArgument(element, {"removed", "replaced"});
-        reporter()->Fail(ErrLegacyConflictsWithParent, arg->span, arg, arg->value->span.data(),
-                         inherited_arg, inherited_arg->value->span.data(), inherited_arg->span);
-        break;
-      }
-    }
-  };
-
   if (auto source = AvailabilityToInheritFrom(element)) {
     const auto result = element->availability.Inherit(source.value());
     report(added, result.added);
     report(deprecated, result.deprecated);
     report(removed_or_replaced, result.removed);
-    report_legacy(legacy, result.legacy);
+  }
+
+  if (element->availability.state() != Availability::State::kInherited)
+    return;
+  if (auto& platform = library()->platform.value();
+      !platform.is_unversioned() && version_selection()->Contains(platform)) {
+    auto& target_set = version_selection()->LookupSet(platform);
+    if (target_set.size() > 1 && element->availability.state() == Availability::State::kInherited &&
+        removed) {
+      auto set = element->availability.set();
+      for (auto target_version : target_set) {
+        if (set.Contains(target_version)) {
+          element->availability.SetLegacy();
+          break;
+        }
+      }
+    }
   }
 }
 
@@ -344,16 +340,6 @@ std::optional<Version> AvailabilityStep::GetVersion(const AttributeArg* maybe_ar
     return std::nullopt;
   }
   return version;
-}
-
-std::optional<Availability::Legacy> AvailabilityStep::GetLegacy(const AttributeArg* maybe_arg) {
-  if (!(maybe_arg && maybe_arg->value->IsResolved())) {
-    return std::nullopt;
-  }
-  ZX_ASSERT(maybe_arg->value->Value().kind == ConstantValue::Kind::kBool);
-  return static_cast<const BoolConstantValue*>(&maybe_arg->value->Value())->value
-             ? Availability::Legacy::kYes
-             : Availability::Legacy::kNo;
 }
 
 std::optional<Availability> AvailabilityStep::AvailabilityToInheritFrom(const Element* element) {

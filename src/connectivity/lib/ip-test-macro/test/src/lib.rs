@@ -62,7 +62,7 @@ mod test {
     use crate::net_types::ip::{Ip, IpAddress, Ipv4, Ipv6};
     use ip_test_macro::ip_test;
 
-    trait IpExt {
+    trait IpExt: Ip {
         const SIMPLE_VALUE: u8;
     }
 
@@ -78,8 +78,8 @@ mod test {
         I::SIMPLE_VALUE
     }
 
-    #[ip_test]
-    fn test_ip_test<I: Ip + IpExt>() {
+    #[ip_test(I, net_types = "crate::net_types")]
+    fn test_ip_test<I: IpExt>() {
         let x = simple_specialized_for_ip::<I>();
         if I::VERSION == 4 {
             assert!(x == 1);
@@ -95,9 +95,9 @@ mod test {
         test_ip_test_v6();
     }
 
-    #[ip_test]
+    #[ip_test(I, net_types = "crate::net_types")]
     #[should_panic]
-    fn test_should_panic<I: Ip + IpExt>() {
+    fn test_should_panic<I: IpExt>() {
         assert_eq!(0, simple_specialized_for_ip::<I>());
     }
 
@@ -106,7 +106,7 @@ mod test {
 
         use super::*;
 
-        #[ip_test]
+        #[ip_test(I, net_types = "crate::net_types")]
         #[test_case(true, "bool")]
         #[test_case(1usize, "usize")]
         #[test_case(I::VERSION, "usize")]
@@ -117,14 +117,14 @@ mod test {
         fn templated_fn<I>() -> &'static str {
             std::any::type_name::<I>()
         }
-        #[ip_test]
+        #[ip_test(I, net_types = "crate::net_types")]
         #[test_case(std::any::type_name::<I>(), "Ipv")]
         #[test_case(Some(templated_fn::<I>()), "Ipv"; "with_name")]
         fn test_with_i_as_template_param<I: Ip>(full_name: impl core::fmt::Debug, name: &str) {
             assert!(format!("{:?}", full_name).contains(name))
         }
 
-        #[ip_test]
+        #[ip_test(I, net_types = "crate::net_types")]
         #[test_case(Some(Some(I::Addr::new())))]
         fn test_with_i_in_arg_type<I: Ip>(addr: Option<Option<I::Addr>>) {
             let _: I::Addr = addr.unwrap().unwrap();
@@ -134,7 +134,7 @@ mod test {
             <I::Addr as IpAddress>::new()
         }
 
-        #[ip_test]
+        #[ip_test(I, net_types = "crate::net_types")]
         #[test_case(produce_default_addr::<I>)]
         fn test_with_i_in_other_type_trait_bounds<I: Ip, F: FnOnce() -> I::Addr>(f: F) {
             let _addr = f();
@@ -150,7 +150,7 @@ mod test {
         /// macro and the fake one used here. Use the fake one, which inserts
         /// the test name in the argument list, to verify that the test name
         /// is being passed along with the arguments by the #[ip_test] macro.
-        #[ip_test]
+        #[ip_test(I, net_types = "crate::net_types")]
         #[test_case(123, 456; "name_from_macro")]
         fn case_with_name<I: Ip>(a: u8, b: u16, name: &str) {
             assert_eq!((a, b), (123, 456));

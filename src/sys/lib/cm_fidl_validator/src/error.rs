@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    cm_types::ParseError, fidl_fuchsia_component_decl as fdecl, std::fmt, std::fmt::Display,
-    thiserror::Error,
-};
+use cm_types::ParseError;
+use fidl_fuchsia_component_decl as fdecl;
+use std::fmt;
+use std::fmt::Display;
+use thiserror::Error;
 
 /// Enum type that can represent any error encountered during validation.
 #[derive(Debug, Error, PartialEq, Clone)]

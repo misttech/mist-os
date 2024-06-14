@@ -4,12 +4,10 @@
 
 pub mod constants;
 
-use {
-    anyhow::{anyhow, ensure, Context as _, Error},
-    fidl_fuchsia_hardware_block::BlockProxy,
-    fidl_fuchsia_hardware_block_partition::PartitionProxy,
-    fuchsia_zircon::{self as zx, HandleBased as _},
-};
+use anyhow::{anyhow, ensure, Context as _, Error};
+use fidl_fuchsia_hardware_block::BlockProxy;
+use fidl_fuchsia_hardware_block_partition::PartitionProxy;
+use fuchsia_zircon::{self as zx, HandleBased as _};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum DiskFormat {
@@ -244,13 +242,11 @@ async fn detect_disk_format_res(block_proxy: &dyn DetectableDevice) -> Result<Di
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{constants, detect_disk_format_res, DiskFormat},
-        anyhow::Error,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_hardware_block::{BlockInfo, BlockMarker, BlockRequest, Flag},
-        futures::{pin_mut, select, FutureExt, TryStreamExt},
-    };
+    use super::{constants, detect_disk_format_res, DiskFormat};
+    use anyhow::Error;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_hardware_block::{BlockInfo, BlockMarker, BlockRequest, Flag};
+    use futures::{pin_mut, select, FutureExt, TryStreamExt};
 
     async fn get_detected_disk_format(
         content: &[u8],

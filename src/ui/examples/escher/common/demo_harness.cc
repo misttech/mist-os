@@ -176,6 +176,9 @@ void DemoHarness::CreateSwapchain() {
         continue;
 
       // TODO: remove this once Magma supports SRGB swapchains.
+      // Note, the above TODO is unclear: if SRGB isn't supported for this currently-considered
+      // vk::SurfaceFormatKHR, then the color space comparison above will cause us to continue on
+      // to the next format without reaching the code below.
       if (sf.format == vk::Format::eB8G8R8A8Unorm) {
         format = sf.format;
         break;

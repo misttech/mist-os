@@ -20,6 +20,7 @@
 #include <fbl/algorithm.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mp.h>
+#include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <pretty/cpp/sizes.h>
 #include <vm/physmap.h>
@@ -65,9 +66,8 @@ zx_status_t PmmNode::AddArena(const pmm_arena_info_t* info) TA_NO_THREAD_SAFETY_
   dprintf(INFO, "PMM: adding arena %p name '%s' base %#" PRIxPTR " size %#zx\n", info, info->name,
           info->base, info->size);
 
-  // Make sure we're in early boot (ints disabled and no active CPUs according
-  // to the scheduler).
-  DEBUG_ASSERT(mp_get_active_mask() == 0);
+  // Make sure we're in early boot (ints disabled and no active Schedulers)
+  DEBUG_ASSERT(Scheduler::PeekActiveMask() == 0);
   DEBUG_ASSERT(arch_ints_disabled());
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(info->base));
@@ -956,7 +956,7 @@ void PmmNode::ForPagesInPhysRangeLocked(paddr_t start, size_t count, F func) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(start));
   // We only intend ForPagesInRange() to be used after arenas have been added to the global
   // pmm_node.
-  DEBUG_ASSERT(mp_get_active_mask() != 0);
+  DEBUG_ASSERT(Scheduler::PeekActiveMask() != 0);
 
   if (unlikely(active_arenas().empty())) {
     // We're in a unit test, using ManagedPmmNode which has no arenas.  So fall back to the global

@@ -4,16 +4,16 @@
 
 //!
 
-use {
-    crate::reader::{
-        error::ReaderError, DiagnosticsHierarchy, MissingValueReason, PartialNodeHierarchy,
-        ReadableTree, Snapshot,
-    },
-    fuchsia_async::{DurationExt, TimeoutExt},
-    futures::{future::BoxFuture, prelude::*},
-    inspect_format::LinkNodeDisposition,
-    std::{collections::BTreeMap, time::Duration},
+use crate::reader::error::ReaderError;
+use crate::reader::{
+    DiagnosticsHierarchy, MissingValueReason, PartialNodeHierarchy, ReadableTree, Snapshot,
 };
+use fuchsia_async::{DurationExt, TimeoutExt};
+use futures::future::BoxFuture;
+use futures::prelude::*;
+use inspect_format::LinkNodeDisposition;
+use std::collections::BTreeMap;
+use std::time::Duration;
 
 /// Contains the snapshot of the hierarchy and snapshots of all the lazy nodes in the hierarchy.
 #[derive(Debug)]
@@ -158,12 +158,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{reader, Inspector, InspectorConfig},
-        diagnostics_assertions::{assert_data_tree, assert_json_diff},
-        inspect_format::constants,
-    };
+    use super::*;
+    use crate::{reader, Inspector, InspectorConfig};
+    use diagnostics_assertions::{assert_data_tree, assert_json_diff};
+    use inspect_format::constants;
 
     #[fuchsia::test]
     async fn test_read() -> Result<(), anyhow::Error> {

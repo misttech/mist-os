@@ -4,10 +4,10 @@
 
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_routes as fnet_routes;
-use fidl_fuchsia_net_routes_ext::{
-    self as fnet_routes_ext, admin::FidlRouteAdminIpExt, FidlRouteIpExt,
-};
-use net_types::{ip::Ip, SpecifiedAddr};
+use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext, FidlRouteIpExt};
+use net_types::ip::Ip;
+use net_types::SpecifiedAddr;
 use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 
 /// Common test setup that can be shared by all routes tests.

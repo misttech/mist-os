@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    app::{strategies::base::AppStrategy, Config, InternalSender, MessageInternal},
-    drawing::DisplayRotation,
-    geometry::IntSize,
-    input::{self, listen_for_user_input, report::InputReportHandler, DeviceId},
-    view::{
-        strategies::{
-            base::{DisplayDirectParams, ViewStrategyParams, ViewStrategyPtr},
-            display_direct::DisplayDirectViewStrategy,
-        },
-        ViewKey,
-    },
-};
+use crate::app::strategies::base::AppStrategy;
+use crate::app::{Config, InternalSender, MessageInternal};
+use crate::drawing::DisplayRotation;
+use crate::geometry::IntSize;
+use crate::input::report::InputReportHandler;
+use crate::input::{self, listen_for_user_input, DeviceId};
+use crate::view::strategies::base::{DisplayDirectParams, ViewStrategyParams, ViewStrategyPtr};
+use crate::view::strategies::display_direct::DisplayDirectViewStrategy;
+use crate::view::ViewKey;
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
 use euclid::size2;
@@ -24,18 +20,16 @@ use fidl_fuchsia_hardware_display::{
 };
 use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync};
-use fuchsia_fs::directory as vfs_watcher;
-use fuchsia_fs::OpenFlags;
+use fuchsia_fs::{directory as vfs_watcher, OpenFlags};
 use fuchsia_zircon::{self as zx, Status};
-use futures::{channel::mpsc::UnboundedSender, StreamExt, TryFutureExt, TryStreamExt};
+use futures::channel::mpsc::UnboundedSender;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use keymaps::Keymap;
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    fs,
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 async fn watch_directory_async(
     dir: PathBuf,

@@ -23,7 +23,8 @@ use fuchsia_bluetooth::types::{
     Address, BondingData, HostData, HostId, HostInfo, Identity, Peer, PeerId,
 };
 use fuchsia_inspect::{self as inspect, unique_name, NumericProperty, Property};
-use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_sync::RwLock;
 use fuchsia_zircon::{self as zx, AsHandleRef, Duration};
 use futures::channel::{mpsc, oneshot};
@@ -35,14 +36,11 @@ use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{
-    build_config, generic_access_service,
-    host_device::{HostDevice, HostDiscoverableSession, HostListener},
-    services::pairing::pairing_dispatcher::{PairingDispatcher, PairingDispatcherHandle},
-    store::stash::Stash,
-    types,
-    watch_peers::PeerWatcher,
-};
+use crate::host_device::{HostDevice, HostDiscoverableSession, HostListener};
+use crate::services::pairing::pairing_dispatcher::{PairingDispatcher, PairingDispatcherHandle};
+use crate::store::stash::Stash;
+use crate::watch_peers::PeerWatcher;
+use crate::{build_config, generic_access_service, types};
 
 pub use fidl_fuchsia_device::DEFAULT_DEVICE_NAME;
 
@@ -1315,7 +1313,8 @@ pub(crate) mod test {
     use fidl_fuchsia_bluetooth_host::{
         BondingDelegateRequestStream, HostRequest, HostRequestStream,
     };
-    use futures::{future::join, StreamExt};
+    use futures::future::join;
+    use futures::StreamExt;
 
     pub(crate) fn make_test_dispatcher(
         watch_peers_publisher: hanging_get::Publisher<HashMap<PeerId, Peer>>,

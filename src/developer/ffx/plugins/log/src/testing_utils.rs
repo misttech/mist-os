@@ -5,7 +5,8 @@
 // TODO(https://fxbug.dev/42080002): Move this somewhere else and
 // make the logic more generic.
 
-use std::{cell::Cell, rc::Rc};
+use std::cell::Cell;
+use std::rc::Rc;
 
 use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity, Timestamp};
 use event_listener::Event;
@@ -24,10 +25,8 @@ use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorRequest, ArchiveAccessorRequestStream,
 };
 use fuchsia_async::Task;
-use futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    StreamExt,
-};
+use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::StreamExt;
 
 const NODENAME: &str = "Rust";
 

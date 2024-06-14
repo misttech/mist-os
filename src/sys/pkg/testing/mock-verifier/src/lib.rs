@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_update_verify as fidl,
-    fuchsia_async::Task,
-    futures::{future, FutureExt as _, StreamExt as _},
-    std::sync::Arc,
-};
+use fidl_fuchsia_update_verify as fidl;
+use fuchsia_async::Task;
+use futures::{future, FutureExt as _, StreamExt as _};
+use std::sync::Arc;
 
 /// A call hook that can be used to inject responses into the Verifier service.
 pub trait Hook: Send + Sync {
@@ -91,21 +89,41 @@ impl MockVerifierService {
             })
             .await
     }
+
+    /// Spawns an `fasync::Task` which serves fuchsia.update.verify service.
+    pub fn spawn_healthcheck_service(self: Arc<Self>) -> (fidl::VerifierProxy, Task<()>) {
+        let (proxy, stream) =
+            ::fidl::endpoints::create_proxy_and_stream::<fidl::VerifierMarker>().unwrap();
+
+        let task = Task::spawn(self.run_healthcheck_service(stream));
+
+        (proxy, task)
+    }
+
+    /// Serves fuchsia.update.verify/Verifier.Verify
+    pub async fn run_healthcheck_service(self: Arc<Self>, stream: fidl::VerifierRequestStream) {
+        let Self { call_hook } = &*self;
+        stream
+            .for_each(|request| match request.expect("received verifier request") {
+                fidl::VerifierRequest::Verify { options, responder } => call_hook
+                    .verify(options)
+                    .map(|res| responder.send(res).expect("sent verifier response")),
+            })
+            .await
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl_fuchsia_update_verify::VerifyError,
-        fuchsia_async as fasync,
-        std::sync::atomic::{AtomicU32, Ordering},
-    };
+    use super::*;
+    use fidl_fuchsia_update_verify::VerifyError;
+    use fuchsia_async as fasync;
+    use std::sync::atomic::{AtomicU32, Ordering};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_verifier() {
         let mock = Arc::new(MockVerifierService::new(|_| Ok(())));
-        let (proxy, _server) = mock.spawn_blobfs_verifier_service();
+        let (proxy, _server) = mock.spawn_healthcheck_service();
 
         let verify_result = proxy.verify(&Default::default()).await.expect("made fidl call");
 
@@ -115,7 +133,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_verifier_fails() {
         let mock = Arc::new(MockVerifierService::new(|_| Err(VerifyError::Internal)));
-        let (proxy, _server) = mock.spawn_blobfs_verifier_service();
+        let (proxy, _server) = mock.spawn_healthcheck_service();
 
         let verify_result = proxy.verify(&Default::default()).await.expect("made fidl call");
 
@@ -130,7 +148,7 @@ mod tests {
             called_clone.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }));
-        let (proxy, _server) = mock.spawn_blobfs_verifier_service();
+        let (proxy, _server) = mock.spawn_healthcheck_service();
 
         let verify_result = proxy.verify(&Default::default()).await.expect("made fidl call");
 

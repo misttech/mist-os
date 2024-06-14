@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    scrutiny::prelude::DataCollection,
-    serde::{Deserialize, Serialize},
-    std::{
-        collections::{HashMap, HashSet},
-        path::PathBuf,
-    },
-    thiserror::Error,
-};
+use scrutiny::prelude::DataCollection;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use thiserror::Error;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Error)]
 #[serde(rename_all = "snake_case")]

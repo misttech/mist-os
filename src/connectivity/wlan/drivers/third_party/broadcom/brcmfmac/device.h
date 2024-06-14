@@ -15,11 +15,13 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_DEVICE_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.factory.wlan/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/fidl.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/arena.h>
 #include <lib/fdf/cpp/channel.h>
@@ -49,6 +51,7 @@ class DeviceInspect;
 class WlanInterface;
 class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
                public fidl::WireAsyncEventHandler<fdf::NodeController>,
+               public fidl::WireServer<fuchsia_factory_wlan::Iovar>,
                public ::wlan::drivers::components::NetworkDevice::Callbacks {
  public:
   virtual ~Device();
@@ -125,6 +128,9 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   // Helper functions
   void DestroyAllIfaces(fit::callback<void()>&& on_complete);
   void DestroyIface(uint16_t iface_id, fit::callback<void(zx_status_t)>&& on_complete);
+  // fidl::WireServer<fuchsia_factory_wlan_iovar::Iovar> Implementation
+  void Get(GetRequestView request, GetCompleter::Sync& _completer) override;
+  void Set(SetRequestView request, SetCompleter::Sync& _completer) override;
 
  protected:
   // This should be called by bus implementations when the driver is being shut down, for example
@@ -140,6 +146,11 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   void NetDevInitReply(zx_status_t status);
   std::unique_ptr<WlanInterface>* GetInterfaceForRole(fuchsia_wlan_common::wire::WlanMacRole role);
   std::unique_ptr<WlanInterface>* GetInterfaceForId(uint16_t interface_id);
+  void ServeFactory(fidl::ServerEnd<fuchsia_factory_wlan::Iovar> server) {
+    factory_bindings_.AddBinding(fdf_dispatcher_get_async_dispatcher(GetDriverDispatcher()),
+                                 std::move(server), this, fidl::kIgnoreBindingClosure);
+  }
+  zx_status_t AddFactoryNode();
 
   std::unique_ptr<brcmf_bus> brcmf_bus_;
   std::unique_ptr<brcmf_pub> brcmf_pub_;
@@ -159,7 +170,11 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   std::unique_ptr<WlanInterface> client_interface_;
   std::unique_ptr<WlanInterface> ap_interface_;
   fdf::ServerBindingGroup<fuchsia_wlan_phyimpl::WlanPhyImpl> bindings_;
+  fidl::ServerBindingGroup<fuchsia_factory_wlan::Iovar> factory_bindings_;
   std::optional<wlan::drivers::components::NetworkDevice::Callbacks::InitTxn> netdev_init_txn_;
+  driver_devfs::Connector<fuchsia_factory_wlan::Iovar> devfs_connector_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> factory_controller_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> factory_node_;
 };
 
 }  // namespace brcmfmac

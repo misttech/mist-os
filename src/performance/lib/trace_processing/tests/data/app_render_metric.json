@@ -46,6 +46,28 @@
             "ts": 0
         },
         {
+            "args": {
+                "name": "driver_host.cm"
+            },
+            "cat": "__metadata",
+            "name": "process_name",
+            "ph": "M",
+            "pid": 5694,
+            "tid": 0,
+            "ts": 0
+        },
+        {
+            "args": {
+                "name": "vsync-interrupt-thread"
+            },
+            "cat": "__metadata",
+            "name": "thread_name",
+            "ph": "M",
+            "pid": 5694,
+            "tid": 14045,
+            "ts": 0
+        },
+        {
             "cat": "gfx",
             "id": 1,
             "name": "scenic_event",
@@ -67,6 +89,16 @@
             "args": {
                 "display_id": 1
             }
+        },
+        {
+            "cat": "gfx",
+            "name": "VSYNC",
+            "ts": 10,
+            "pid": 5694,
+            "tid": 14045,
+            "ph": "X",
+            "dur": 0.1,
+            "args": {}
         },
         {
             "dur": 1.5,

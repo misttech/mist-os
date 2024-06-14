@@ -5,10 +5,12 @@
 use anyhow::{anyhow, Context, Result};
 use ffx_scrutiny_verify_args::static_pkgs::Command;
 use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_frontend::command_builder::CommandBuilder;
+use scrutiny_frontend::launcher;
 use scrutiny_plugins::static_pkgs::StaticPkgsCollection;
 use scrutiny_utils::golden::{CompareResult, GoldenFile};
-use std::{collections::HashSet, path::PathBuf};
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 const SOFT_TRANSITION_MSG : &str = "
 If you are making a change in fuchsia.git that causes this, you need to perform a soft transition:

@@ -73,24 +73,25 @@ void Digester::Digest(const Capture& capture, class Digest* digest) {
                                                 kmem.other_bytes);
     digest->buckets_.emplace_back("Free", kmem.free_bytes);
 
-    const auto& kmem_ext = capture.kmem_extended();
-    if (kmem_ext.vmo_pager_total_bytes > 0) {
-      digest->buckets_.emplace_back("[Addl]PagerTotal", kmem_ext.vmo_pager_total_bytes);
-      digest->buckets_.emplace_back("[Addl]PagerNewest", kmem_ext.vmo_pager_newest_bytes);
-      digest->buckets_.emplace_back("[Addl]PagerOldest", kmem_ext.vmo_pager_oldest_bytes);
+    if (capture.kmem_extended()) {
+      const auto& kmem_ext = capture.kmem_extended().value();
+      if (kmem_ext.vmo_pager_total_bytes > 0) {
+        digest->buckets_.emplace_back("[Addl]PagerTotal", kmem_ext.vmo_pager_total_bytes);
+        digest->buckets_.emplace_back("[Addl]PagerNewest", kmem_ext.vmo_pager_newest_bytes);
+        digest->buckets_.emplace_back("[Addl]PagerOldest", kmem_ext.vmo_pager_oldest_bytes);
+      }
+      if (kmem_ext.vmo_discardable_locked_bytes > 0 ||
+          kmem_ext.vmo_discardable_unlocked_bytes > 0) {
+        digest->buckets_.emplace_back("[Addl]DiscardableLocked",
+                                      kmem_ext.vmo_discardable_locked_bytes);
+        digest->buckets_.emplace_back("[Addl]DiscardableUnlocked",
+                                      kmem_ext.vmo_discardable_unlocked_bytes);
+      }
     }
 
-    if (kmem_ext.vmo_discardable_locked_bytes > 0 || kmem_ext.vmo_discardable_unlocked_bytes > 0) {
-      digest->buckets_.emplace_back("[Addl]DiscardableLocked",
-                                    kmem_ext.vmo_discardable_locked_bytes);
-      digest->buckets_.emplace_back("[Addl]DiscardableUnlocked",
-                                    kmem_ext.vmo_discardable_unlocked_bytes);
-    }
-
-    const auto& kmem_zram = capture.kmem_compression();
-    if (kmem_zram.compressed_storage_bytes > 0) {
+    if (capture.kmem_compression()) {
       digest->buckets_.emplace_back("[Addl]ZramCompressedBytes",
-                                    kmem_zram.compressed_storage_bytes);
+                                    capture.kmem_compression()->compressed_storage_bytes);
     }
   }
 }

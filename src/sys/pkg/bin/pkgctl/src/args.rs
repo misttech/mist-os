@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs, fidl_fuchsia_pkg_ext::BlobId, fidl_fuchsia_pkg_rewrite_ext::RuleConfig,
-    std::path::PathBuf,
-};
+use argh::FromArgs;
+use fidl_fuchsia_pkg_ext::BlobId;
+use fidl_fuchsia_pkg_rewrite_ext::RuleConfig;
+use std::path::PathBuf;
 
 #[derive(FromArgs, Debug, PartialEq)]
 /// Various operations on packages, package repositories, and the package cache.
@@ -269,7 +269,8 @@ fn repo_config_format(value: &str) -> Result<RepoConfigFormat, String> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     const REPO_URL: &str = "fuchsia-pkg://fuchsia.com";
     const CONFIG_JSON: &str = r#"{"version": "1", "content": []}"#;

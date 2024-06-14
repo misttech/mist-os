@@ -5,72 +5,60 @@
 pub mod instance;
 pub mod manager;
 
+use crate::bedrock::program::StopRequestSuccess;
+use crate::framework::controller;
+use crate::model::actions::{
+    start, ActionsManager, DestroyAction, ResolveAction, ShutdownAction, ShutdownType, StartAction,
+    UnresolveAction,
+};
+use crate::model::context::ModelContext;
+use crate::model::environment::Environment;
+use crate::model::routing::{self, RoutingError};
+use crate::model::start::Start;
+use ::namespace::Entry as NamespaceEntry;
+use ::routing::component_instance::{
+    ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
+    WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
+};
+use ::routing::error::ComponentInstanceError;
+use ::routing::policy::GlobalPolicyChecker;
+use ::routing::resolving::{ComponentResolutionContext, ResolvedComponent, ResolvedPackage};
+use async_trait::async_trait;
+use cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl};
+use cm_types::{Name, Url};
+use cm_util::TaskGroup;
+use component_id_index::InstanceId;
+use config_encoder::ConfigFields;
+use errors::{
+    ActionError, AddDynamicChildError, DestroyActionError, ModelError, OpenExposedDirError,
+    OpenOutgoingDirError, ResolveActionError, StartActionError, StopActionError,
+    StructuredConfigError,
+};
+use futures::future::{join_all, BoxFuture};
+use futures::lock::{MappedMutexGuard, Mutex, MutexGuard};
+use hooks::{Event, EventPayload, Hooks};
+use instance::{
+    InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
+    StopOutcomeWithEscrow,
+};
+use manager::ComponentManagerInstance;
+use moniker::{ChildName, Moniker};
+use router_error::{Explain, RouterError};
+use sandbox::{Capability, Dict, Open, Request, Routable, Router};
+use std::clone::Clone;
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::ops::DerefMut;
+use std::sync::{Arc, Weak};
+use std::time::Duration;
+use tracing::{debug, error, warn};
+use version_history::AbiRevision;
+use vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest};
+use vfs::execution_scope::ExecutionScope;
 use {
-    crate::{
-        bedrock::program::StopRequestSuccess,
-        framework::controller,
-        model::{
-            actions::{
-                start, ActionsManager, DestroyAction, ResolveAction, ShutdownAction, ShutdownType,
-                StartAction, UnresolveAction,
-            },
-            context::ModelContext,
-            environment::Environment,
-            routing::{self, RoutingError},
-            start::Start,
-        },
-    },
-    ::namespace::Entry as NamespaceEntry,
-    ::routing::{
-        component_instance::{
-            ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
-            WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
-        },
-        error::ComponentInstanceError,
-        policy::GlobalPolicyChecker,
-        resolving::{ComponentResolutionContext, ResolvedComponent, ResolvedPackage},
-    },
-    async_trait::async_trait,
-    cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl},
-    cm_types::{Name, Url},
-    cm_util::TaskGroup,
-    component_id_index::InstanceId,
-    config_encoder::ConfigFields,
-    errors::{
-        ActionError, AddDynamicChildError, DestroyActionError, ModelError, OpenExposedDirError,
-        OpenOutgoingDirError, ResolveActionError, StartActionError, StopActionError,
-        StructuredConfigError,
-    },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{
-        future::{join_all, BoxFuture},
-        lock::{MappedMutexGuard, Mutex, MutexGuard},
-    },
-    hooks::{Event, EventPayload, Hooks},
-    instance::{
-        InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
-        StopOutcomeWithEscrow,
-    },
-    manager::ComponentManagerInstance,
-    moniker::{ChildName, Moniker},
-    router_error::{Explain, RouterError},
-    sandbox::{Capability, Dict, Open, Request, Routable, Router},
-    std::{
-        clone::Clone,
-        collections::{HashMap, HashSet},
-        fmt,
-        ops::DerefMut,
-        sync::{Arc, Weak},
-        time::Duration,
-    },
-    tracing::{debug, error, warn},
-    version_history::AbiRevision,
-    vfs::{
-        directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest},
-        execution_scope::ExecutionScope,
-    },
 };
 
 pub type WeakComponentInstance = WeakComponentInstanceInterface<ComponentInstance>;
@@ -1370,40 +1358,42 @@ pub mod testing {
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::testing::wait_until_event_get_timestamp,
-        super::*,
-        crate::model::{
-            actions::{shutdown, test_utils::is_discovered, StopAction},
-            events::registry::EventSubscription,
-            testing::{
-                mocks::ControllerActionResponse,
-                out_dir::OutDir,
-                routing_test_helpers::{RoutingTest, RoutingTestBuilder},
-                test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
-            },
-        },
-        ::routing::{bedrock::structured_dict::ComponentInput, resolving::ComponentAddress},
-        assert_matches::assert_matches,
-        cm_fidl_validator::error::DeclType,
-        cm_rust::{
-            Availability, ChildRef, DependencyType, ExposeSource, OfferDecl, OfferProtocolDecl,
-            OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
-        },
-        cm_rust_testing::*,
-        errors::{AddChildError, DynamicCapabilityError},
-        fasync::TestExecutor,
-        fidl::endpoints::DiscoverableProtocolMarker,
-        fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx, AsHandleRef},
-        futures::{channel::mpsc, FutureExt, StreamExt, TryStreamExt},
-        hooks::EventType,
-        instance::UnresolvedInstanceState,
-        routing_test_helpers::component_id_index::make_index_file,
-        std::{panic, task::Poll},
-        tracing::info,
-        vfs::{path::Path as VfsPath, service::host, ToObjectRequest},
+    use super::testing::wait_until_event_get_timestamp;
+    use super::*;
+    use crate::model::actions::test_utils::is_discovered;
+    use crate::model::actions::{shutdown, StopAction};
+    use crate::model::events::registry::EventSubscription;
+    use crate::model::testing::mocks::ControllerActionResponse;
+    use crate::model::testing::out_dir::OutDir;
+    use crate::model::testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder};
+    use crate::model::testing::test_helpers::{
+        component_decl_with_test_runner, ActionsTest, ComponentInfo,
     };
+    use ::routing::bedrock::structured_dict::ComponentInput;
+    use ::routing::resolving::ComponentAddress;
+    use assert_matches::assert_matches;
+    use cm_fidl_validator::error::DeclType;
+    use cm_rust::{
+        Availability, ChildRef, DependencyType, ExposeSource, OfferDecl, OfferProtocolDecl,
+        OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
+    };
+    use cm_rust_testing::*;
+    use errors::{AddChildError, DynamicCapabilityError};
+    use fasync::TestExecutor;
+    use fidl::endpoints::DiscoverableProtocolMarker;
+    use fuchsia_zircon::{self as zx, AsHandleRef};
+    use futures::channel::mpsc;
+    use futures::{FutureExt, StreamExt, TryStreamExt};
+    use hooks::EventType;
+    use instance::UnresolvedInstanceState;
+    use routing_test_helpers::component_id_index::make_index_file;
+    use std::panic;
+    use std::task::Poll;
+    use tracing::info;
+    use vfs::path::Path as VfsPath;
+    use vfs::service::host;
+    use vfs::ToObjectRequest;
+    use {fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn started_event_timestamp_matches_component() {

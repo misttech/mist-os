@@ -28,7 +28,7 @@ class SpdxWriterTest(unittest.TestCase):
 
         return super().setUp()
 
-    def test_empty_doc(self):
+    def test_empty_doc(self) -> None:
         self.writer.save_to_string()
         self.assertEqual(
             self.writer.save_to_string(),
@@ -57,7 +57,7 @@ class SpdxWriterTest(unittest.TestCase):
 }""",
         )
 
-    def test_add_package_with_licenses(self):
+    def test_add_package_with_licenses(self) -> None:
         self.mock_file_access.read_text.side_effect = (
             lambda label: f"TEXT FROM {label.path_str}"
         )
@@ -192,7 +192,7 @@ class SpdxWriterTest(unittest.TestCase):
 }""",
         )
 
-    def test_nested_spdx_document(self):
+    def test_nested_spdx_document(self) -> None:
         nested_doc_spdx_json = json.loads(
             """{
     "spdxVersion": "SPDX-2.2",

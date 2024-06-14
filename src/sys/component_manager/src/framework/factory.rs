@@ -2,28 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
-        model::component::WeakComponentInstance,
-    },
-    ::routing::capability_source::InternalCapability,
-    async_trait::async_trait,
-    cm_types::Name,
-    cm_util::TaskGroup,
-    fidl::{
-        endpoints::{self, ClientEnd, DiscoverableProtocolMarker, ServerEnd},
-        epitaph::ChannelEpitaphExt,
-    },
-    fidl_fuchsia_component_sandbox as fsandbox,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    router_error::Explain,
-    sandbox::{Dict, Receiver},
-    std::sync::Arc,
-    tracing::warn,
-};
+use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
+use crate::model::component::WeakComponentInstance;
+use ::routing::capability_source::InternalCapability;
+use async_trait::async_trait;
+use cm_types::Name;
+use cm_util::TaskGroup;
+use fidl::endpoints::{self, ClientEnd, DiscoverableProtocolMarker, ServerEnd};
+use fidl::epitaph::ChannelEpitaphExt;
+use fidl_fuchsia_component_sandbox as fsandbox;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use router_error::Explain;
+use sandbox::{Dict, Receiver};
+use std::sync::Arc;
+use tracing::warn;
 
 lazy_static! {
     static ref CAPABILITY_NAME: Name = fsandbox::FactoryMarker::PROTOCOL_NAME.parse().unwrap();
@@ -185,9 +179,8 @@ impl FrameworkCapability for FactoryFrameworkCapability {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_component_sandbox as fsandbox;
-    use fuchsia_async as fasync;
     use fuchsia_zircon::{self as zx, HandleBased};
+    use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
     fn factory() -> (fasync::TaskGroup, fsandbox::FactoryProxy) {
         let mut tasks = fasync::TaskGroup::new();

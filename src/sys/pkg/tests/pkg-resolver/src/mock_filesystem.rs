@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::{RequestStream, ServerEnd},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::Status,
-    futures::future::BoxFuture,
-    futures::future::FutureExt,
-    futures::stream::StreamExt,
-    std::{collections::HashMap, sync::Arc},
-};
+use fidl::endpoints::{RequestStream, ServerEnd};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::Status;
+use futures::future::{BoxFuture, FutureExt};
+use futures::stream::StreamExt;
+use std::collections::HashMap;
+use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 type OpenCounter = Arc<Mutex<HashMap<String, u64>>>;
 

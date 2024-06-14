@@ -2,28 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        asset::{AssetCollectionBuilder, AssetLoader, AssetLoaderImpl},
-        debug,
-        family::{FamilyOrAliasBuilder, FontFamilyBuilder},
-        inspect::ServiceInspectData,
-        typeface::{Typeface, TypefaceCollectionBuilder, TypefaceError, TypefaceId},
-        FontService,
-    },
-    anyhow::{format_err, Error},
-    font_info::FontInfoLoaderImpl,
-    fuchsia_inspect as finspect, fuchsia_trace as trace,
-    manifest::{v2, FontManifestWrapper, FontsManifest},
-    std::{
-        collections::BTreeMap,
-        fmt::{self, Display},
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
-    thiserror::Error,
-    unicase::UniCase,
-};
+use super::asset::{AssetCollectionBuilder, AssetLoader, AssetLoaderImpl};
+use super::family::{FamilyOrAliasBuilder, FontFamilyBuilder};
+use super::inspect::ServiceInspectData;
+use super::typeface::{Typeface, TypefaceCollectionBuilder, TypefaceError, TypefaceId};
+use super::{debug, FontService};
+use anyhow::{format_err, Error};
+use font_info::FontInfoLoaderImpl;
+use manifest::{v2, FontManifestWrapper, FontsManifest};
+use std::collections::BTreeMap;
+use std::fmt::{self, Display};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use thiserror::Error;
+use unicase::UniCase;
+use {fuchsia_inspect as finspect, fuchsia_trace as trace};
 
 /// Builder for [`FontService`]. Allows populating the fields that remain immutable for the
 /// lifetime of the service.
@@ -462,19 +455,15 @@ pub enum FontServiceBuilderError {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::font_service::{
-            family::{FamilyOrAlias, FontFamily},
-            typeface::Collection as TypefaceCollection,
-            AssetId,
-        },
-        char_set::CharSet,
-        fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width, WEIGHT_BOLD, WEIGHT_NORMAL},
-        manifest::serde_ext::StyleOptions,
-        maplit::{btreemap, btreeset},
-        pretty_assertions::assert_eq,
-    };
+    use super::*;
+    use crate::font_service::family::{FamilyOrAlias, FontFamily};
+    use crate::font_service::typeface::Collection as TypefaceCollection;
+    use crate::font_service::AssetId;
+    use char_set::CharSet;
+    use fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width, WEIGHT_BOLD, WEIGHT_NORMAL};
+    use manifest::serde_ext::StyleOptions;
+    use maplit::{btreemap, btreeset};
+    use pretty_assertions::assert_eq;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_multiple_overlapping_manifests() -> Result<(), Error> {

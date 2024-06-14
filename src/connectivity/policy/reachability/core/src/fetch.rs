@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context},
-    async_trait::async_trait,
-    fuchsia_async::{net::TcpStream, TimeoutExt},
-    fuchsia_zircon as zx,
-    futures::{AsyncReadExt, AsyncWriteExt, TryFutureExt},
-    std::net,
-    tracing::warn,
-};
+use anyhow::{format_err, Context};
+use async_trait::async_trait;
+use fuchsia_async::net::TcpStream;
+use fuchsia_async::TimeoutExt;
+use fuchsia_zircon as zx;
+use futures::{AsyncReadExt, AsyncWriteExt, TryFutureExt};
+use std::net;
+use tracing::warn;
 
 const FETCH_TIMEOUT: zx::Duration = zx::Duration::from_seconds(10);
 
@@ -126,16 +125,15 @@ impl Fetch for Fetcher {
 mod test {
     use super::*;
 
-    use std::{
-        net::{Ipv4Addr, SocketAddr},
-        pin::pin,
-    };
+    use std::net::{Ipv4Addr, SocketAddr};
+    use std::pin::pin;
 
-    use {
-        fuchsia_async::{self as fasync, net::TcpListener},
-        futures::{future::Fuse, io::BufReader, AsyncBufReadExt, FutureExt, StreamExt},
-        test_case::test_case,
-    };
+    use fuchsia_async::net::TcpListener;
+    use fuchsia_async::{self as fasync};
+    use futures::future::Fuse;
+    use futures::io::BufReader;
+    use futures::{AsyncBufReadExt, FutureExt, StreamExt};
+    use test_case::test_case;
 
     fn server() -> anyhow::Result<(SocketAddr, Fuse<impl futures::Future<Output = Vec<String>>>)> {
         let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0);

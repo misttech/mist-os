@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::network_config::{Credential, NetworkConfig, NetworkIdentifier, SecurityType},
-    crate::client::types as client_types,
-    wlan_stash::policy as policy_stash,
-};
+use super::network_config::{Credential, NetworkConfig, NetworkIdentifier, SecurityType};
+use crate::client::types as client_types;
+use std::collections::HashMap;
+use wlan_stash::policy as storage;
 
-impl From<policy_stash::NetworkIdentifier> for NetworkIdentifier {
-    fn from(item: policy_stash::NetworkIdentifier) -> Self {
+impl From<storage::NetworkIdentifier> for NetworkIdentifier {
+    fn from(item: storage::NetworkIdentifier) -> Self {
         Self {
             ssid: client_types::Ssid::from_bytes_unchecked(item.ssid),
             security_type: item.security_type.into(),
@@ -17,85 +16,92 @@ impl From<policy_stash::NetworkIdentifier> for NetworkIdentifier {
     }
 }
 
-impl From<NetworkIdentifier> for policy_stash::NetworkIdentifier {
+impl From<NetworkIdentifier> for storage::NetworkIdentifier {
     fn from(item: NetworkIdentifier) -> Self {
         Self { ssid: item.ssid.into(), security_type: item.security_type.into() }
     }
 }
 
-impl From<policy_stash::SecurityType> for SecurityType {
-    fn from(item: policy_stash::SecurityType) -> Self {
+impl From<storage::SecurityType> for SecurityType {
+    fn from(item: storage::SecurityType) -> Self {
         match item {
-            policy_stash::SecurityType::None => SecurityType::None,
-            policy_stash::SecurityType::Wep => SecurityType::Wep,
-            policy_stash::SecurityType::Wpa => SecurityType::Wpa,
-            policy_stash::SecurityType::Wpa2 => SecurityType::Wpa2,
-            policy_stash::SecurityType::Wpa3 => SecurityType::Wpa3,
+            storage::SecurityType::None => SecurityType::None,
+            storage::SecurityType::Wep => SecurityType::Wep,
+            storage::SecurityType::Wpa => SecurityType::Wpa,
+            storage::SecurityType::Wpa2 => SecurityType::Wpa2,
+            storage::SecurityType::Wpa3 => SecurityType::Wpa3,
         }
     }
 }
 
-impl From<SecurityType> for policy_stash::SecurityType {
+impl From<SecurityType> for storage::SecurityType {
     fn from(item: SecurityType) -> Self {
         match item {
-            SecurityType::None => policy_stash::SecurityType::None,
-            SecurityType::Wep => policy_stash::SecurityType::Wep,
-            SecurityType::Wpa => policy_stash::SecurityType::Wpa,
-            SecurityType::Wpa2 => policy_stash::SecurityType::Wpa2,
-            SecurityType::Wpa3 => policy_stash::SecurityType::Wpa3,
+            SecurityType::None => storage::SecurityType::None,
+            SecurityType::Wep => storage::SecurityType::Wep,
+            SecurityType::Wpa => storage::SecurityType::Wpa,
+            SecurityType::Wpa2 => storage::SecurityType::Wpa2,
+            SecurityType::Wpa3 => storage::SecurityType::Wpa3,
         }
     }
 }
 
-impl From<policy_stash::Credential> for Credential {
-    fn from(item: policy_stash::Credential) -> Self {
+impl From<storage::Credential> for Credential {
+    fn from(item: storage::Credential) -> Self {
         match item {
-            policy_stash::Credential::None => Credential::None,
-            policy_stash::Credential::Password(pass) => Credential::Password(pass),
-            policy_stash::Credential::Psk(psk) => Credential::Psk(psk),
+            storage::Credential::None => Credential::None,
+            storage::Credential::Password(pass) => Credential::Password(pass),
+            storage::Credential::Psk(psk) => Credential::Psk(psk),
         }
     }
 }
 
-impl From<Credential> for policy_stash::Credential {
+impl From<Credential> for storage::Credential {
     fn from(item: Credential) -> Self {
         match item {
-            Credential::None => policy_stash::Credential::None,
-            Credential::Password(pass) => policy_stash::Credential::Password(pass),
-            Credential::Psk(psk) => policy_stash::Credential::Psk(psk),
+            Credential::None => storage::Credential::None,
+            Credential::Password(pass) => storage::Credential::Password(pass),
+            Credential::Psk(psk) => storage::Credential::Psk(psk),
         }
     }
 }
 
-impl From<NetworkConfig> for policy_stash::PersistentData {
+impl From<NetworkConfig> for storage::PersistentStorageData {
     fn from(item: NetworkConfig) -> Self {
-        Self { credential: item.credential.into(), has_ever_connected: item.has_ever_connected }
+        Self {
+            ssid: item.ssid.to_vec(),
+            security_type: item.security_type.into(),
+            credential: item.credential.into(),
+            has_ever_connected: item.has_ever_connected,
+        }
     }
 }
 
-pub fn network_config_vec_to_persistent_data(
-    network_config: &Vec<NetworkConfig>,
-) -> Vec<policy_stash::PersistentData> {
-    network_config.iter().map(|c| c.clone().into()).collect()
+/// Convert configs to the persistent data for configs. It takes in a map of NetworkConfigs
+/// corresponding to the way network configs are internally tracked.
+pub fn persistent_data_from_config_map(
+    network_config: &HashMap<NetworkIdentifier, Vec<NetworkConfig>>,
+) -> Vec<storage::PersistentStorageData> {
+    network_config.values().flatten().map(|c| c.clone().into()).collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{super::*, *},
-        wlan_stash::policy as pstash,
-    };
+    use super::super::*;
+    use super::*;
+    use test_case::test_case;
+    use wlan_stash::policy as storage;
 
     #[fuchsia::test]
     fn network_identifier_to_stash_from_policy() {
         assert_eq!(
-            pstash::NetworkIdentifier::from(NetworkIdentifier {
+            storage::NetworkIdentifier::from(NetworkIdentifier {
                 ssid: client_types::Ssid::try_from("ssid").unwrap(),
                 security_type: SecurityType::Wep,
             }),
-            pstash::NetworkIdentifier {
+            storage::NetworkIdentifier {
                 ssid: client_types::Ssid::try_from("ssid").unwrap().into(),
-                security_type: pstash::SecurityType::Wep,
+                security_type: storage::SecurityType::Wep,
             }
         );
     }
@@ -103,9 +109,9 @@ mod tests {
     #[fuchsia::test]
     fn network_identifier_to_policy_from_stash() {
         assert_eq!(
-            NetworkIdentifier::from(pstash::NetworkIdentifier {
+            NetworkIdentifier::from(storage::NetworkIdentifier {
                 ssid: client_types::Ssid::try_from("ssid").unwrap().into(),
-                security_type: pstash::SecurityType::Wep,
+                security_type: storage::SecurityType::Wep,
             }),
             NetworkIdentifier {
                 ssid: client_types::Ssid::try_from("ssid").unwrap(),
@@ -116,74 +122,102 @@ mod tests {
 
     #[fuchsia::test]
     fn security_type_to_stash_from_policy() {
-        assert_eq!(pstash::SecurityType::from(SecurityType::None), pstash::SecurityType::None);
-        assert_eq!(pstash::SecurityType::from(SecurityType::Wep), pstash::SecurityType::Wep);
-        assert_eq!(pstash::SecurityType::from(SecurityType::Wpa), pstash::SecurityType::Wpa);
-        assert_eq!(pstash::SecurityType::from(SecurityType::Wpa2), pstash::SecurityType::Wpa2);
-        assert_eq!(pstash::SecurityType::from(SecurityType::Wpa3), pstash::SecurityType::Wpa3);
+        assert_eq!(storage::SecurityType::from(SecurityType::None), storage::SecurityType::None);
+        assert_eq!(storage::SecurityType::from(SecurityType::Wep), storage::SecurityType::Wep);
+        assert_eq!(storage::SecurityType::from(SecurityType::Wpa), storage::SecurityType::Wpa);
+        assert_eq!(storage::SecurityType::from(SecurityType::Wpa2), storage::SecurityType::Wpa2);
+        assert_eq!(storage::SecurityType::from(SecurityType::Wpa3), storage::SecurityType::Wpa3);
     }
 
     #[fuchsia::test]
     fn security_type_to_policy_from_stash() {
-        assert_eq!(SecurityType::from(pstash::SecurityType::None), SecurityType::None);
-        assert_eq!(SecurityType::from(pstash::SecurityType::Wep), SecurityType::Wep);
-        assert_eq!(SecurityType::from(pstash::SecurityType::Wpa), SecurityType::Wpa);
-        assert_eq!(SecurityType::from(pstash::SecurityType::Wpa2), SecurityType::Wpa2);
-        assert_eq!(SecurityType::from(pstash::SecurityType::Wpa3), SecurityType::Wpa3);
+        assert_eq!(SecurityType::from(storage::SecurityType::None), SecurityType::None);
+        assert_eq!(SecurityType::from(storage::SecurityType::Wep), SecurityType::Wep);
+        assert_eq!(SecurityType::from(storage::SecurityType::Wpa), SecurityType::Wpa);
+        assert_eq!(SecurityType::from(storage::SecurityType::Wpa2), SecurityType::Wpa2);
+        assert_eq!(SecurityType::from(storage::SecurityType::Wpa3), SecurityType::Wpa3);
     }
 
     #[fuchsia::test]
     fn credential_to_stash_from_policy() {
-        assert_eq!(pstash::Credential::from(Credential::None), pstash::Credential::None);
+        assert_eq!(storage::Credential::from(Credential::None), storage::Credential::None);
         assert_eq!(
-            pstash::Credential::from(Credential::Password(b"foo_pass123".to_vec())),
-            pstash::Credential::Password(b"foo_pass123".to_vec())
+            storage::Credential::from(Credential::Password(b"foo_pass123".to_vec())),
+            storage::Credential::Password(b"foo_pass123".to_vec())
         );
         assert_eq!(
-            pstash::Credential::from(Credential::Psk(b"foo_psk123".to_vec())),
-            pstash::Credential::Psk(b"foo_psk123".to_vec())
+            storage::Credential::from(Credential::Psk(b"foo_psk123".to_vec())),
+            storage::Credential::Psk(b"foo_psk123".to_vec())
         );
     }
 
     #[fuchsia::test]
     fn credential_to_policy_from_stash() {
-        assert_eq!(Credential::from(pstash::Credential::None), Credential::None);
+        assert_eq!(Credential::from(storage::Credential::None), Credential::None);
         assert_eq!(
-            Credential::from(pstash::Credential::Password(b"foo_pass123".to_vec())),
+            Credential::from(storage::Credential::Password(b"foo_pass123".to_vec())),
             Credential::Password(b"foo_pass123".to_vec())
         );
         assert_eq!(
-            Credential::from(pstash::Credential::Password(b"foo_psk123".to_vec())),
+            Credential::from(storage::Credential::Password(b"foo_psk123".to_vec())),
             Credential::Password(b"foo_psk123".to_vec())
         );
     }
 
-    #[fuchsia::test]
-    fn persistent_data_from_network_config() {
+    #[test_case(true)]
+    #[test_case(false)]
+    fn persistent_data_from_network_config_has_connected(has_ever_connected: bool) {
         // Check that from() works when has_ever_connected is true and false.
-        let has_ever_connected = false;
-        let id = NetworkIdentifier::try_from("ssid", SecurityType::Wpa3).unwrap();
+        let ssid = "ssid";
+        let security_type = SecurityType::Wpa3;
+        let stash_security = storage::SecurityType::Wpa3;
+        let id = NetworkIdentifier::try_from(ssid, security_type).unwrap();
         let credential = Credential::Password(b"foo_pass".to_vec());
         let network_config = NetworkConfig::new(id, credential, has_ever_connected)
             .expect("failed to create network config");
         assert_eq!(
-            pstash::PersistentData::from(network_config),
-            pstash::PersistentData {
-                credential: pstash::Credential::Password(b"foo_pass".to_vec()),
-                has_ever_connected: false
+            storage::PersistentStorageData::from(network_config),
+            storage::PersistentStorageData {
+                ssid: ssid.as_bytes().to_vec(),
+                security_type: stash_security,
+                credential: storage::Credential::Password(b"foo_pass".to_vec()),
+                has_ever_connected
             }
         );
+    }
 
+    #[test_case(SecurityType::Wpa, storage::SecurityType::Wpa)]
+    fn persistent_data_from_network_config_security(
+        security: SecurityType,
+        storage_security: storage::SecurityType,
+    ) {
+        // Check that from() works for different security types
+        let ssid = "ssid";
+        let id = NetworkIdentifier::try_from(ssid, security).unwrap();
         let has_ever_connected = true;
-        let id = NetworkIdentifier::try_from("ssid", SecurityType::None).unwrap();
-        let credential = Credential::None;
+
+        // Use a password for WPA, PSK for WEP, or None for open networks.
+        let (credential, storage_credential) = match security {
+            SecurityType::None => (Credential::None, storage::Credential::None),
+            SecurityType::Wep => {
+                let psk_bytes = vec![1; network_config::WPA_PSK_BYTE_LEN];
+                (Credential::Psk(psk_bytes.clone()), storage::Credential::Psk(psk_bytes))
+            }
+            SecurityType::Wpa | SecurityType::Wpa2 | SecurityType::Wpa3 => (
+                Credential::Password(b"foo_pass".to_vec()),
+                storage::Credential::Password(b"foo_pass".to_vec()),
+            ),
+        };
+
         let network_config = NetworkConfig::new(id, credential, has_ever_connected)
             .expect("failed to create network config");
         assert_eq!(
-            pstash::PersistentData::from(network_config),
-            pstash::PersistentData {
-                credential: pstash::Credential::None,
-                has_ever_connected: true
+            storage::PersistentStorageData::from(network_config),
+            storage::PersistentStorageData {
+                ssid: ssid.as_bytes().to_vec(),
+                security_type: storage_security,
+                credential: storage_credential,
+                has_ever_connected
             }
         );
     }

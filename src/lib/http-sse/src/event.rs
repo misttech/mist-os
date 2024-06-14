@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    std::io::{self, Write},
-    thiserror::Error,
-};
+use std::io::{self, Write};
+use thiserror::Error;
 
 /// An Event from an http sse stream
 #[derive(Clone, Debug, PartialEq, Eq)]

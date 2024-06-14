@@ -1,40 +1,49 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{format_err, Error},
-    bt_test_harness::{
-        access::{expectation, AccessHarness},
-        core_realm::DEFAULT_TEST_DEVICE_NAME,
-        host_watcher::{activate_fake_host, HostWatcherHarness},
-    },
-    fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy,
-    fidl_fuchsia_hardware_bluetooth::{AdvertisingData, LowEnergyPeerParameters, PeerProxy},
-    fuchsia_bluetooth::{
-        constants::INTEGRATION_TIMEOUT,
-        expectation::asynchronous::{ExpectableExt, ExpectableStateExt},
-        types::Address,
-    },
-    hci_emulator_client::Emulator,
+use anyhow::{format_err, Error};
+use bt_test_harness::access::{expectation, AccessHarness};
+use bt_test_harness::core_realm::DEFAULT_TEST_DEVICE_NAME;
+use bt_test_harness::host_watcher::{activate_fake_host, HostWatcherHarness};
+use fidl_fuchsia_bluetooth_sys::ProcedureTokenProxy;
+use fidl_fuchsia_hardware_bluetooth::{
+    AdvertisingData, PeerParameters, PeerProxy, PeerSetLeAdvertisementRequest,
 };
+use fuchsia_bluetooth::constants::INTEGRATION_TIMEOUT;
+use fuchsia_bluetooth::expectation::asynchronous::{ExpectableExt, ExpectableStateExt};
+use fuchsia_bluetooth::types::Address;
+use hci_emulator_client::Emulator;
 
 async fn create_le_peer(hci: &Emulator, address: Address) -> Result<PeerProxy, Error> {
-    let peer_params = LowEnergyPeerParameters {
+    let (peer, remote) = fidl::endpoints::create_proxy()?;
+    let peer_params = PeerParameters {
         address: Some(address.into()),
         connectable: Some(true),
-        advertisement: Some(AdvertisingData {
-            data: vec![0x02, 0x01, 0x02], // Flags field set to "general discoverable"
-        }),
-        scan_response: None,
+        channel: Some(remote),
         ..Default::default()
     };
-
-    let (peer, remote) = fidl::endpoints::create_proxy()?;
     let _ = hci
         .emulator()
-        .add_low_energy_peer(&peer_params, remote)
+        .add_low_energy_peer(peer_params)
         .await?
         .map_err(|e| format_err!("Failed to register fake peer: {:#?}", e))?;
+
+    let request = PeerSetLeAdvertisementRequest {
+        le_address: Some(address.into()),
+        advertisement: Some(AdvertisingData {
+            data: Some(
+                vec![0x02, 0x01, 0x02], // Flags field set to "general discoverable"
+            ),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }),
+        scan_response: Some(AdvertisingData {
+            data: None,
+            __source_breaking: fidl::marker::SourceBreaking,
+        }),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+    let _ = peer.set_le_advertisement(&request).await.unwrap();
+
     Ok(peer)
 }
 
@@ -70,7 +79,6 @@ async fn test_watch_peers((access, host_watcher): (AccessHarness, HostWatcherHar
     let first_address = Address::Random([1, 0, 0, 0, 0, 0]);
     let second_address = Address::Public([2, 0, 0, 0, 0, 0]);
     let _first_peer = create_le_peer(&hci, first_address).await.unwrap();
-
     let _discovery_token = start_discovery(&access).await.unwrap();
 
     // We should be notified of the first peer
@@ -98,7 +106,6 @@ async fn test_disconnect((access, host_watcher): (AccessHarness, HostWatcherHarn
 
     let peer_address = Address::Random([6, 5, 0, 0, 0, 0]);
     let _peer = create_le_peer(&hci, peer_address).await.unwrap();
-
     let _discovery = start_discovery(&access).await.unwrap();
 
     let state = access

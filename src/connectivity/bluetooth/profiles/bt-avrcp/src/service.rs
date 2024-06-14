@@ -2,27 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    fidl::prelude::*,
-    fidl_fuchsia_bluetooth_avrcp::*,
-    fidl_fuchsia_bluetooth_avrcp_test::*,
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::types::PeerId,
-    fuchsia_component::server::{ServiceFs, ServiceObj},
-    fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc,
-        future::{FutureExt, TryFutureExt},
-        stream::{StreamExt, TryStreamExt},
-        Future,
-    },
-    tracing::{info, warn},
-};
+use anyhow::{format_err, Error};
+use fidl::prelude::*;
+use fidl_fuchsia_bluetooth_avrcp::*;
+use fidl_fuchsia_bluetooth_avrcp_test::*;
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use futures::channel::mpsc;
+use futures::future::{FutureExt, TryFutureExt};
+use futures::stream::{StreamExt, TryStreamExt};
+use futures::Future;
+use tracing::{info, warn};
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
-use crate::{
-    browse_controller_service, controller_service, peer::Controller, peer_manager::ServiceRequest,
-};
+use crate::peer::Controller;
+use crate::peer_manager::ServiceRequest;
+use crate::{browse_controller_service, controller_service};
 
 /// Spawns a future that listens and responds to requests for a controller object over FIDL.
 fn spawn_avrcp_clients(
@@ -231,19 +226,17 @@ mod tests {
     use bt_avctp::{AvcCommand, AvcPeer, AvcResponseType};
     use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream};
     use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy, ProfileRequestStream};
-    use fuchsia_bluetooth::{profile::Psm, types::Channel};
+    use fuchsia_bluetooth::profile::Psm;
+    use fuchsia_bluetooth::types::Channel;
     use packet_encoding::Decodable;
     use std::collections::HashSet;
     use std::pin::pin;
     use std::sync::Arc;
 
-    use crate::{
-        packets::PlaybackStatus as PacketPlaybackStatus,
-        packets::*,
-        peer::RemotePeerHandle,
-        peer_manager::{PeerManager, TargetDelegate},
-        profile::{AvrcpProtocolVersion, AvrcpService, AvrcpTargetFeatures},
-    };
+    use crate::packets::{PlaybackStatus as PacketPlaybackStatus, *};
+    use crate::peer::RemotePeerHandle;
+    use crate::peer_manager::{PeerManager, TargetDelegate};
+    use crate::profile::{AvrcpProtocolVersion, AvrcpService, AvrcpTargetFeatures};
 
     fn handle_get_controller(profile_proxy: ProfileProxy, request: ServiceRequest) {
         match request {

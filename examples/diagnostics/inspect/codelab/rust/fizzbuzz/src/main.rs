@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error},
-    fidl_fuchsia_examples_inspect::{FizzBuzzRequest, FizzBuzzRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::{self as inspect, component, HistogramProperty, NumericProperty},
-    fuchsia_zircon::{self as zx},
-    futures::{StreamExt, TryStreamExt},
-    std::sync::Arc,
-    tracing::{error, info},
-};
+use anyhow::{Context, Error};
+use fidl_fuchsia_examples_inspect::{FizzBuzzRequest, FizzBuzzRequestStream};
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::{self as inspect, component, HistogramProperty, NumericProperty};
+use fuchsia_zircon::{self as zx};
+use futures::{StreamExt, TryStreamExt};
+use std::sync::Arc;
+use tracing::{error, info};
 
 struct FizzBuzzServerMetrics {
     incoming_connection_count: inspect::UintProperty,

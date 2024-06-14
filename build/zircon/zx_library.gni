@@ -310,7 +310,16 @@ template("zx_library") {
     #
     lib_deps = []
     if (defined(invoker.deps)) {
-      lib_deps = invoker.deps
+      # Rewrite any foo.as-needed deps to just foo.
+      foreach(label, invoker.deps) {
+        if (get_path_info(get_label_info(label, "name"), "extension") ==
+            "as-needed") {
+          label = get_label_info(label, "dir") + ":" +
+                  get_path_info(get_label_info(label, "name"), "name") + "(" +
+                  get_label_info(label, "toolchain") + ")"
+        }
+        lib_deps += [ label ]
+      }
     }
     lib_public_deps = []
     if (defined(invoker.public_deps)) {

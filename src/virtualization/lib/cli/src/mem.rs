@@ -1,17 +1,13 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::platform::PlatformServices,
-    anyhow::anyhow,
-    anyhow::Context,
-    anyhow::Error,
-    fidl_fuchsia_virtualization::{
-        GuestMarker, GuestStatus, MemControllerMarker, MemControllerProxy,
-    },
-    fuchsia_zircon_status as zx_status, guest_cli_args as arguments,
-    std::fmt,
+use crate::platform::PlatformServices;
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_virtualization::{
+    GuestMarker, GuestStatus, MemControllerMarker, MemControllerProxy,
 };
+use std::fmt;
+use {fuchsia_zircon_status as zx_status, guest_cli_args as arguments};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct RequestSizeResult {
@@ -119,10 +115,10 @@ async fn do_stats(controller: MemControllerProxy) -> Result<VirtioMemStats, Erro
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, fidl::endpoints::create_proxy_and_stream, fuchsia_async as fasync,
-        futures::StreamExt,
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
 
     #[fasync::run_until_stalled(test)]
     async fn mem_valid_request_plugged_returns_ok() {

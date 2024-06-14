@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{environment::EnvironmentContext, nested::nested_get, ConfigValue};
+use crate::environment::EnvironmentContext;
+use crate::nested::nested_get;
+use crate::ConfigValue;
 use anyhow::anyhow;
 use ffx_config_domain::ConfigMap;
 use serde_json::Value;

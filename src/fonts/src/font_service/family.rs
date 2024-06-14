@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{
-        inspect::zero_pad,
-        typeface::{
-            Collection as TypefaceCollection, Typeface, TypefaceCollectionBuilder, TypefaceId,
-            TypefaceInfoAndCharSet, TypefaceInspectData,
-        },
-        AssetId,
-    },
-    fidl_fuchsia_fonts::GenericFontFamily,
-    fuchsia_inspect as finspect,
-    heck::KebabCase,
-    itertools::Itertools,
-    manifest::{serde_ext::StyleOptions, v2},
-    std::{collections::BTreeMap, sync::Arc},
-    unicase::UniCase,
+use super::inspect::zero_pad;
+use super::typeface::{
+    Collection as TypefaceCollection, Typeface, TypefaceCollectionBuilder, TypefaceId,
+    TypefaceInfoAndCharSet, TypefaceInspectData,
 };
+use super::AssetId;
+use fidl_fuchsia_fonts::GenericFontFamily;
+use fuchsia_inspect as finspect;
+use heck::KebabCase;
+use itertools::Itertools;
+use manifest::serde_ext::StyleOptions;
+use manifest::v2;
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use unicase::UniCase;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum FamilyOrAlias {
@@ -301,15 +299,13 @@ impl AliasInspectData {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        char_collection::char_collect,
-        diagnostics_assertions::assert_data_tree,
-        fidl_fuchsia_fonts::{Slant, Width},
-        maplit::{btreemap, btreeset},
-        pretty_assertions::assert_eq,
-    };
+    use super::*;
+    use anyhow::Error;
+    use char_collection::char_collect;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_fonts::{Slant, Width};
+    use maplit::{btreemap, btreeset};
+    use pretty_assertions::assert_eq;
 
     #[fuchsia::test]
     fn test_aliases_from_family() -> Result<(), Error> {

@@ -2,25 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::DeviceMode,
-    mm::PAGE_SIZE,
-    security::{get_fs_node_security_id, post_setxattr},
-    signals::{send_standard_signal, SignalInfo},
-    task::{CurrentTask, Kernel, WaitQueue, Waiter},
-    time::utc,
-    vfs::{
-        checked_add_offset_and_length,
-        fsverity::FsVerityState,
-        inotify,
-        pipe::{Pipe, PipeHandle},
-        rw_queue::RwQueue,
-        socket::SocketHandle,
-        DefaultDirEntryOps, DirEntryOps, FileObject, FileOps, FileSystem, FileSystemHandle,
-        FileWriteGuard, FileWriteGuardMode, FileWriteGuardState, FsNodeReleaser, FsStr, FsString,
-        MountInfo, NamespaceNode, OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks,
-        WeakFileHandle, MAX_LFS_FILESIZE,
-    },
+use crate::device::DeviceMode;
+use crate::mm::PAGE_SIZE;
+use crate::security::{get_fs_node_security_id, post_setxattr};
+use crate::signals::{send_standard_signal, SignalInfo};
+use crate::task::{CurrentTask, Kernel, WaitQueue, Waiter};
+use crate::time::utc;
+use crate::vfs::fsverity::FsVerityState;
+use crate::vfs::pipe::{Pipe, PipeHandle};
+use crate::vfs::rw_queue::RwQueue;
+use crate::vfs::socket::SocketHandle;
+use crate::vfs::{
+    checked_add_offset_and_length, inotify, DefaultDirEntryOps, DirEntryOps, FileObject, FileOps,
+    FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardState,
+    FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps, RecordLockCommand,
+    RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
 };
 use bitflags::bitflags;
 use fuchsia_zircon as zx;
@@ -31,30 +27,29 @@ use starnix_sync::{
     DeviceOpen, FileOpsCore, FsNodeAllocate, LockBefore, LockEqualOrBefore, Locked, Mutex, RwLock,
     RwLockReadGuard,
 };
-use starnix_uapi::{
-    as_any::AsAny,
-    auth::{
-        Credentials, FsCred, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
-        CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
-    },
-    device_type::DeviceType,
-    errno, error,
-    errors::{Errno, EACCES},
-    file_mode::{mode, Access, FileMode},
-    fsverity_descriptor, gid_t, ino_t,
-    open_flags::OpenFlags,
-    ownership::Releasable,
-    resource_limits::Resource,
-    signals::SIGXFSZ,
-    statx, statx_timestamp,
-    time::{timespec_from_time, NANOS_PER_SECOND},
-    timespec, uapi, uid_t, FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE,
-    FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE, LOCK_EX, LOCK_NB, LOCK_SH,
-    LOCK_UN, STATX_ATIME, STATX_ATTR_VERITY, STATX_BASIC_STATS, STATX_BLOCKS, STATX_CTIME,
-    STATX_GID, STATX_INO, STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID, STATX__RESERVED,
-    XATTR_TRUSTED_PREFIX, XATTR_USER_PREFIX,
+use starnix_uapi::as_any::AsAny;
+use starnix_uapi::auth::{
+    Credentials, FsCred, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
+    CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
-use std::sync::{atomic::Ordering, Arc, Weak};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::{Errno, EACCES};
+use starnix_uapi::file_mode::{mode, Access, FileMode};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::Releasable;
+use starnix_uapi::resource_limits::Resource;
+use starnix_uapi::signals::SIGXFSZ;
+use starnix_uapi::time::{timespec_from_time, NANOS_PER_SECOND};
+use starnix_uapi::{
+    errno, error, fsverity_descriptor, gid_t, ino_t, statx, statx_timestamp, timespec, uapi, uid_t,
+    FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE, FALLOC_FL_PUNCH_HOLE,
+    FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE, LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, STATX_ATIME,
+    STATX_ATTR_VERITY, STATX_BASIC_STATS, STATX_BLOCKS, STATX_CTIME, STATX_GID, STATX_INO,
+    STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID, STATX__RESERVED, XATTR_TRUSTED_PREFIX,
+    XATTR_USER_PREFIX,
+};
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Weak};
 use syncio::zxio_node_attr_has_t;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -984,10 +979,10 @@ pub enum TimeUpdateType {
 }
 
 // Public re-export of macros allows them to be used like regular rust items.
-pub(crate) use fs_node_impl_dir_readonly;
-pub(crate) use fs_node_impl_not_dir;
-pub(crate) use fs_node_impl_symlink;
-pub(crate) use fs_node_impl_xattr_delegate;
+pub(crate) use {
+    fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink,
+    fs_node_impl_xattr_delegate,
+};
 
 pub struct SpecialNode;
 
@@ -2200,7 +2195,8 @@ impl Releasable for FsNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{testing::*, vfs::buffers::VecOutputBuffer};
+    use crate::testing::*;
+    use crate::vfs::buffers::VecOutputBuffer;
     use selinux::security_server::{Mode as SecurityServerMode, SecurityServer};
     use starnix_sync::Unlocked;
 

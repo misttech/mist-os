@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::metrics,
-    fidl_fuchsia_update_installer_ext::{Initiator as ExtInitiator, Options},
-    fuchsia_url::AbsolutePackageUrl,
-    std::time::{Instant, SystemTime},
-};
+use super::metrics;
+use fidl_fuchsia_update_installer_ext::{Initiator as ExtInitiator, Options};
+use fuchsia_url::AbsolutePackageUrl;
+use std::time::{Instant, SystemTime};
 
 /// Configuration for an update attempt.
 #[derive(Debug, PartialEq, Eq, Clone)]

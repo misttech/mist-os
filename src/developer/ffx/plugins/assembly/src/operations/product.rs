@@ -169,12 +169,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     // Set the developer overrides, if any.
     if let Some(developer_overrides) = developer_overrides {
         builder
-            .add_developer_overrides(
-                developer_overrides.developer_only_options,
-                developer_overrides.kernel,
-                developer_overrides.packages,
-                developer_overrides.packages_to_compile,
-            )
+            .add_developer_overrides(developer_overrides)
             .context("Setting developer overrides")?;
     }
 
@@ -379,6 +374,17 @@ fn print_developer_overrides_banner(
         println!("  Additional packages:");
         for details in &overrides.packages {
             println!("    {} -> {}", details.set, details.package);
+        }
+    }
+
+    if !overrides.shell_commands.is_empty() {
+        println!();
+        println!("  Additional shell command stubs:");
+        for (entry, components) in &overrides.shell_commands {
+            println!("    package: \"{entry}\"");
+            for component in components {
+                println!("      {component}")
+            }
         }
     }
 

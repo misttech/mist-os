@@ -50,7 +50,7 @@ func TestTargetListEmpty(t *testing.T) {
 func TestTargetList(t *testing.T) {
 	expected_entries := []TargetEntry{
 		{NodeName: "1", Addresses: []string{"127.0.0.1"}, TargetState: "Product"},
-		{NodeName: "2", Addresses: []string{"127.0.0.1"}, TargetState: "Product"},
+		{NodeName: "2", Addresses: []string{"127.0.0.2"}, TargetState: "Product"},
 	}
 	data, err := json.Marshal(expected_entries)
 	if err != nil {
@@ -78,5 +78,13 @@ func TestTargetList(t *testing.T) {
 	}
 	if diff := cmp.Diff(entries, expected_entries[:1]); diff != "" {
 		t.Fatalf("unexpected entries, diff:\n%s", diff)
+	}
+
+	target, err := ffx.WaitForTarget(context.Background(), "127.0.0.1")
+	if err != nil {
+		t.Fatalf("Failed to run target list: %s", err)
+	}
+	if target.NodeName != "1" {
+		t.Fatalf("unexpected device name, expected 1, got %s", target.NodeName)
 	}
 }

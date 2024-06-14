@@ -64,6 +64,7 @@ if (current_toolchain != default_toolchain) {
   # This is a redirect from the host toolchain to the default toolchain, as it
   # is added to the host_labels group, not the product definition inputs.
   group("cargo_toml_gen") {
+    testonly = true
     public_deps = [ ":cargo_toml_gen($default_toolchain)" ]
     visibility = [
       # This is the supported group for developers to add tools to, going
@@ -78,6 +79,8 @@ if (current_toolchain != default_toolchain) {
   gn_desc_out = "$root_build_dir/gn_desc.json"
 
   action("cargo_toml_gen") {
+    testonly = true
+
     # Nothing in-tree should depend on Cargo files.
     visibility = [
       # The only expected use of this target, going forward (the above group)
@@ -113,7 +116,11 @@ if (current_toolchain != default_toolchain) {
       "--fuchsia_dir",
       rebase_path("//", root_build_dir),
     ]
-    deps = [ gn_desc_label ]
+    deps = [
+      "//build/rust:api_level_cfg_flags",
+      "//zircon/kernel:rust-cfg-big-zircon-kernel($host_toolchain)",
+      gn_desc_label,
+    ]
   }
 }
 

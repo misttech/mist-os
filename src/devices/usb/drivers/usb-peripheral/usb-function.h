@@ -6,18 +6,20 @@
 #define SRC_DEVICES_USB_DRIVERS_USB_PERIPHERAL_USB_FUNCTION_H_
 
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.usb.peripheral/cpp/fidl.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <threads.h>
 
 #include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/ref_counted.h>
-
-#include "src/devices/usb/drivers/usb-peripheral/usb-peripheral.h"
+#include <usb/usb.h>
 
 namespace usb_peripheral {
 
+class UsbPeripheral;
 class UsbFunction;
 using UsbFunctionType = ddk::Device<UsbFunction>;
 
@@ -28,8 +30,9 @@ class UsbFunction : public UsbFunctionType,
                     public fbl::RefCounted<UsbFunction>,
                     public fidl::Server<fuchsia_hardware_usb_function::UsbFunction> {
  public:
-  UsbFunction(zx_device_t* parent, UsbPeripheral* peripheral, FunctionDescriptor desc,
-              uint8_t configuration, async_dispatcher_t* dispatcher)
+  UsbFunction(zx_device_t* parent, UsbPeripheral* peripheral,
+              fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor desc, uint8_t configuration,
+              async_dispatcher_t* dispatcher)
       : UsbFunctionType(parent),
         configuration_(configuration),
         peripheral_(peripheral),
@@ -65,7 +68,10 @@ class UsbFunction : public UsbFunctionType,
     return reinterpret_cast<usb_descriptor_header_t*>(descriptors_.data());
   }
 
-  inline const FunctionDescriptor& GetFunctionDescriptor() const { return function_descriptor_; }
+  inline const fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor& GetFunctionDescriptor()
+      const {
+    return function_descriptor_;
+  }
 
   inline uint8_t GetNumInterfaces() const { return num_interfaces_; }
 
@@ -91,14 +97,7 @@ class UsbFunction : public UsbFunctionType,
 
   // fuchsia_hardware_usb_function.UsbFunction protocol implementation.
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
-                         ConnectToEndpointCompleter::Sync& completer) override {
-    auto status = peripheral_->ConnectToEndpoint(request.ep_addr(), std::move(request.ep()));
-    if (status != ZX_OK) {
-      completer.Reply(fit::as_error(status));
-      return;
-    }
-    completer.Reply(fit::ok());
-  }
+                         ConnectToEndpointCompleter::Sync& completer) override;
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbFunction);
@@ -108,7 +107,7 @@ class UsbFunction : public UsbFunctionType,
   ddk::UsbFunctionInterfaceProtocolClient function_intf_;
   thrd_t thread_;
   int CompletionThread();
-  const FunctionDescriptor function_descriptor_;
+  const fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor function_descriptor_;
 
   uint8_t num_interfaces_ = 0;
   fbl::Array<uint8_t> descriptors_;

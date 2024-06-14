@@ -8,7 +8,7 @@
 #include <fuchsia/hwinfo/cpp/fidl.h>
 #include <fuchsia/hwinfo/cpp/fidl_test_base.h>
 
-#include "src/developer/forensics/testing/stubs/fidl_server.h"
+#include "src/developer/forensics/testing/stubs/fidl_server_hlcpp.h"
 
 namespace forensics {
 namespace stubs {

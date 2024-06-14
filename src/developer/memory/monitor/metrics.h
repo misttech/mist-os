@@ -16,7 +16,6 @@
 #include "src/developer/memory/metrics/bucket_match.h"
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
-#include "src/developer/memory/metrics/watcher.h"
 #include "src/developer/memory/monitor/memory_metrics_registry.cb.h"
 #include "src/lib/fxl/macros.h"
 
@@ -50,12 +49,12 @@ class Metrics {
  private:
   void CollectMetrics();
   void WriteDigestToInspect(const memory::Digest& digest);
-  void AddKmemEvents(const zx_info_kmem_stats_t& kmem,
-                     std::vector<fuchsia::metrics::MetricEvent>* events);
-  void AddKmemEventsWithUptime(const zx_info_kmem_stats_t& kmem, zx_time_t capture_time,
-                               std::vector<fuchsia::metrics::MetricEvent>* events);
-  cobalt_registry::MemoryLeakMigratedMetricDimensionTimeSinceBoot GetUpTimeEventCode(
-      const zx_time_t current);
+  static void AddKmemEvents(const zx_info_kmem_stats_t& kmem,
+                            std::vector<fuchsia::metrics::MetricEvent>* events);
+  static void AddKmemEventsWithUptime(const zx_info_kmem_stats_t& kmem, zx_time_t capture_time,
+                                      std::vector<fuchsia::metrics::MetricEvent>* events);
+  static cobalt_registry::MemoryLeakMigratedMetricDimensionTimeSinceBoot GetUpTimeEventCode(
+      zx_time_t capture_time);
 
   zx::duration poll_frequency_;
   async_dispatcher_t* dispatcher_;

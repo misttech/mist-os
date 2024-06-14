@@ -26,10 +26,10 @@
 //! want to use the higher level [`queue`](crate::queue), and [`chain`](crate::chain) modules that
 //! provide easier to use wrappers.
 
-use {
-    crate::mem::DeviceRange,
-    std::{marker::PhantomData, mem, sync::atomic},
-};
+use crate::mem::DeviceRange;
+use std::marker::PhantomData;
+use std::mem;
+use std::sync::atomic;
 
 /// Descriptor has a next field.
 pub const VRING_DESC_F_NEXT: u16 = 1 << 0;
@@ -564,10 +564,8 @@ pub(crate) mod as_driver {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::fake_queue::{Chain, FakeQueue, IdentityDriverMem},
-    };
+    use super::*;
+    use crate::fake_queue::{Chain, FakeQueue, IdentityDriverMem};
 
     #[test]
     fn test_size() {

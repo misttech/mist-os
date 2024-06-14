@@ -2,32 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Error};
+use fidl::endpoints::{ProtocolMarker, Proxy};
+use fuchsia_async::{Duration, Task};
+use fuchsia_inspect::{Inspector, Node as InspectNode};
+use fuchsia_inspect_contrib::auto_persist;
+use futures::channel::mpsc;
+use futures::channel::oneshot::{self, Canceled};
+use futures::{Future, FutureExt, StreamExt};
+use std::pin::Pin;
+use tracing::{error, info};
+use wlan_ffi_transport::{BufferProvider, EthernetTx, WlanRx};
+use wlan_fidl_ext::{ResponderExt, SendResultExt, WithName};
+use wlan_mlme::device::completers::InitCompleter;
+use wlan_mlme::device::DeviceOps;
+use wlan_mlme::{DriverEvent, DriverEventSink};
+use wlan_sme::serve::create_sme;
 use {
-    anyhow::{format_err, Error},
-    fidl::endpoints::{ProtocolMarker, Proxy},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_async::{Duration, Task},
-    fuchsia_inspect::{Inspector, Node as InspectNode},
-    fuchsia_inspect_contrib::auto_persist,
-    fuchsia_zircon as zx,
-    futures::{
-        channel::{
-            mpsc,
-            oneshot::{self, Canceled},
-        },
-        Future, FutureExt, StreamExt,
-    },
-    std::pin::Pin,
-    tracing::{error, info},
-    wlan_ffi_transport::{BufferProvider, EthernetTx, WlanRx},
-    wlan_fidl_ext::{ResponderExt, SendResultExt, WithName},
-    wlan_mlme::{
-        device::{completers::InitCompleter, DeviceOps},
-        DriverEvent, DriverEventSink,
-    },
-    wlan_sme::serve::create_sme,
-    wlan_trace as wtrace,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx, wlan_trace as wtrace,
 };
 
 const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
@@ -575,20 +568,19 @@ async fn serve_wlan_softmac_ifc_bridge(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::format_err,
-        diagnostics_assertions::assert_data_tree,
-        fuchsia_async::TestExecutor,
-        fuchsia_inspect::InspectorConfig,
-        futures::{stream::FuturesUnordered, task::Poll},
-        std::pin::pin,
-        test_case::test_case,
-        wlan_common::assert_variant,
-        wlan_ffi_transport::FakeFfiBufferProvider,
-        wlan_mlme::device::test_utils::{FakeDevice, FakeDeviceConfig},
-        zx::Vmo,
-    };
+    use super::*;
+    use anyhow::format_err;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_async::TestExecutor;
+    use fuchsia_inspect::InspectorConfig;
+    use futures::stream::FuturesUnordered;
+    use futures::task::Poll;
+    use std::pin::pin;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
+    use wlan_ffi_transport::FakeFfiBufferProvider;
+    use wlan_mlme::device::test_utils::{FakeDevice, FakeDeviceConfig};
+    use zx::Vmo;
 
     struct BootstrapGenericSmeTestHarness {
         _softmac_ifc_bridge_request_stream: fidl_softmac::WlanSoftmacIfcBridgeRequestStream,

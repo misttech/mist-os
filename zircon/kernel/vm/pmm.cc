@@ -31,10 +31,8 @@
 #include <kernel/timer.h>
 #include <ktl/algorithm.h>
 #include <lk/init.h>
-#include <object/memory_watchdog.h>
 #include <vm/physmap.h>
 #include <vm/pmm_checker.h>
-#include <vm/scanner.h>
 #include <vm/vm.h>
 
 #include "pmm_arena.h"
@@ -282,110 +280,12 @@ LK_INIT_HOOK(
 
 static Timer dump_free_mem_timer;
 
-// Allocate memory until the PMM returns ZX_ERR_NO_MEMORY, then free it all.
-//
-// The idea is to cause the system to briefly dip into an out of memory state.
-static int cmd_oom_dip() {
-  list_node list = LIST_INITIAL_VALUE(list);
-  while (pmm_node.AllocPages(1, 0, &list) != ZX_ERR_NO_MEMORY) {
-  }
-  pmm_node.FreeList(&list);
-  printf("allocated until ZX_ERR_NO_MEMORY (and then freed)\n");
-  return ZX_OK;
-}
-
-static int cmd_oom(int argc, const cmd_args* argv) {
-  uint64_t rate = 0;
-  bool hard = false;
-  if (argc > 2) {
-    if (!strcmp(argv[2].str, "dip")) {
-      return cmd_oom_dip();
-    }
-
-    if (!strcmp(argv[2].str, "hard")) {
-      hard = true;
-    } else {
-      rate = strtoul(argv[2].str, nullptr, 0) * 1024 * 1024 / PAGE_SIZE;
-    }
-  }
-
-  // When we reach the oom state the kernel may 'try harder' to reclaim memory and prevent us from
-  // hitting OOM. To avoid this we disable the scanner (and evictor) to prevent additional memory
-  // from becoming classified as evictable, and then evict anything that is already considered.
-  printf("Disabling VM scanner\n");
-  scanner_push_disable_count();
-  uint64_t pages_evicted = pmm_evictor()->EvictOneShotSynchronous(
-      UINT64_MAX, Evictor::EvictionLevel::IncludeNewest, Evictor::Output::NoPrint);
-  if (pages_evicted > 0) {
-    printf("Leaked %" PRIu64 " pages from eviction\n", pages_evicted);
-  }
-
-  uint64_t pages_till_oom;
-  // In case we are racing with someone freeing pages we will leak in a loop until we are sure
-  // we have hit the oom state.
-  while ((pages_till_oom = GetMemoryWatchdog().DebugNumBytesTillPressureLevel(
-                               MemoryWatchdog::PressureLevel::kOutOfMemory) /
-                           PAGE_SIZE) > 0) {
-    list_node list = LIST_INITIAL_VALUE(list);
-    if (rate > 0) {
-      uint64_t pages_leaked = 0;
-      while (pages_leaked < pages_till_oom) {
-        uint64_t alloc_pages = ktl::min(rate, pages_till_oom - pages_leaked);
-        if (pmm_node.AllocPages(alloc_pages, 0, &list) == ZX_OK) {
-          pages_leaked += alloc_pages;
-          printf("Leaked %lu pages\n", pages_leaked);
-        }
-        Thread::Current::SleepRelative(ZX_SEC(1));
-      }
-    } else {
-      if (pmm_node.AllocPages(pages_till_oom, 0, &list) == ZX_OK) {
-        printf("Leaked %lu pages\n", pages_till_oom);
-      }
-    }
-    // Ignore any errors under the assumption we had a racy allocation and try again next time
-    // around the loop.
-  }
-
-  if (hard) {
-    printf("Continuing to leak pages forever\n");
-    // Keep leaking as fast possible.
-    while (true) {
-      vm_page_t* p;
-      pmm_alloc_page(0, &p);
-    }
-  }
-
-  return ZX_OK;
-}
-
 static int cmd_usage(const char* cmd_name, bool is_panic) {
   printf("usage:\n");
   printf("%s dump                                     : dump pmm info \n", cmd_name);
   if (!is_panic) {
     printf("%s free                                     : periodically dump free mem count\n",
            cmd_name);
-    printf(
-        "%s oom [<rate>]                             : leak memory until OOM is triggered, "
-        "optionally specify the rate at which to leak (in MB per second). "
-        "This tries to reliably get the system into OOM state, so might disable some kinds of "
-        "kernel reclamation that prevent going into OOM. If you want to test system response "
-        "to memory pressure, unaltered from the default behavior, use mem_avail_state instead.\n",
-        cmd_name);
-    printf("%s oom dip                                  : allocate until no mem, then free\n",
-           cmd_name);
-    printf(
-        "%s oom hard                                 : leak memory aggressively and keep on "
-        "leaking\n",
-        cmd_name);
-    printf("%s mem_avail_state info                     : dump memory availability state info\n",
-           cmd_name);
-    printf(
-        "%s mem_avail_state [step] <state> [<nsecs>] : allocate memory to go to memstate "
-        "<state>, hold the state for <nsecs> (10s by default). Only works if going to <state> "
-        "from current state requires allocating memory, can't free up pre-allocated memory. In "
-        "optional [step] mode, allocation pauses for 1 second at each intermediate memory "
-        "availability state until <state> is reached.\n",
-        cmd_name);
     printf("%s drop_user_pt                             : drop all user hardware page tables\n",
            cmd_name);
     printf("%s checker status                           : prints the status of the pmm checker\n",
@@ -430,83 +330,6 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
     } else {
       dump_free_mem_timer.Cancel();
       show_mem = false;
-    }
-  } else if (!strcmp(argv[1].str, "oom")) {
-    if (argc > 3) {
-      return cmd_usage(name, is_panic);
-    }
-    return cmd_oom(argc, argv);
-  } else if (!strcmp(argv[1].str, "mem_avail_state")) {
-    if (argc < 3) {
-      return cmd_usage(name, is_panic);
-    }
-    if (!strcmp(argv[2].str, "info")) {
-      GetMemoryWatchdog().Dump();
-    } else {
-      bool step = false;
-      int index = 2;
-      if (!strcmp(argv[2].str, "step")) {
-        step = true;
-        index++;
-      }
-
-      MemoryWatchdog::PressureLevel state =
-          static_cast<MemoryWatchdog::PressureLevel>(argv[index++].u);
-      if (state >= MemoryWatchdog::PressureLevel::kNumLevels) {
-        printf("Invalid memstate %u. Specify a value between 0 and %u.\n", state,
-               MemoryWatchdog::PressureLevel::kNumLevels - 1u);
-        return cmd_usage(name, is_panic);
-      }
-
-      uint64_t pages_to_alloc, pages_to_free = 0;
-      list_node list = LIST_INITIAL_VALUE(list);
-
-      if (step) {
-        uint8_t s = MemoryWatchdog::PressureLevel::kNumLevels - 1;
-        while (true) {
-          // In case we are racing with someone freeing pages we will leak in a loop until we are
-          // sure we have hit the required memory availability state.
-          uint64_t pages_allocated = 0;
-          while ((pages_to_alloc = GetMemoryWatchdog().DebugNumBytesTillPressureLevel(
-                                       MemoryWatchdog::PressureLevel(s)) /
-                                   PAGE_SIZE) > 0) {
-            if (pmm_node.AllocPages(pages_to_alloc, 0, &list) == ZX_OK) {
-              printf("Leaked %lu pages\n", pages_to_alloc);
-              pages_allocated += pages_to_alloc;
-            }
-          }
-          pages_to_free += pages_allocated;
-          if (s == state) {
-            break;
-          }
-          s--;
-          if (pages_allocated) {
-            printf("Sleeping for 1 second...\n");
-            Thread::Current::SleepRelative(ZX_SEC(1));
-          }
-        }
-      } else {
-        // In case we are racing with someone freeing pages we will leak in a loop until we are
-        // sure we have hit the required memory availability state.
-        while ((pages_to_alloc =
-                    GetMemoryWatchdog().DebugNumBytesTillPressureLevel(state) / PAGE_SIZE) > 0) {
-          if (pmm_node.AllocPages(pages_to_alloc, 0, &list) == ZX_OK) {
-            printf("Leaked %lu pages\n", pages_to_alloc);
-            pages_to_free += pages_to_alloc;
-          }
-        }
-      }
-
-      if (pages_to_free > 0) {
-        uint64_t nsecs = 10;
-        if (argc > index) {
-          nsecs = argv[index].u;
-        }
-        printf("Sleeping for %lu seconds...\n", nsecs);
-        Thread::Current::SleepRelative(ZX_SEC(nsecs));
-        pmm_node.FreeList(&list);
-        printf("Freed %lu pages\n", pages_to_free);
-      }
     }
   } else if (!strcmp(argv[1].str, "drop_user_pt")) {
     VmAspace::DropAllUserPageTables();

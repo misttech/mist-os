@@ -27,19 +27,16 @@ pub fn canonicalize_path(path: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::ServerEnd,
-        fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
-        std::{fs, path::Path},
-        tempfile::TempDir,
-        vfs::{
-            directory::entry_container::Directory,
-            execution_scope::ExecutionScope,
-            file::vmo::{read_only, read_write},
-            pseudo_directory,
-        },
-    };
+    use super::*;
+    use fidl::endpoints::ServerEnd;
+    use std::fs;
+    use std::path::Path;
+    use tempfile::TempDir;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::{read_only, read_write};
+    use vfs::pseudo_directory;
+    use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
 
     #[fasync::run_singlethreaded(test)]
     async fn open_and_read_file_test() {

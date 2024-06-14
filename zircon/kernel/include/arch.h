@@ -25,14 +25,6 @@ void arch_init();
 // Perform any per-CPU set up required.
 void arch_late_init_percpu();
 
-// Called just before initiating a system suspend to give the arch layer a
-// chance to save state.  Must be called with interrupts disabled.
-void arch_prep_suspend();
-
-// Called immediately after resuming from a system suspend to let the arch layer
-// reinitialize arch components.  Must be called with interrupts disabled.
-void arch_resume();
-
 // Initialize |iframe| for running a userspace thread.
 // The rest of the current thread's state must already have been
 // appropriately initialized (as viewable from a debugger at the

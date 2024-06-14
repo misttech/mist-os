@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_zircon as zx,
-    pin_project::pin_project,
-    std::{ffi::CStr, future::Future, marker::PhantomData, mem, pin::Pin, ptr, task::Poll},
-};
+use fuchsia_zircon as zx;
+use pin_project::pin_project;
+use std::ffi::CStr;
+use std::future::Future;
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::Poll;
+use std::{mem, ptr};
 
 pub use sys::{
     trace_site_t, TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH, TRACE_BLOB_TYPE_PERFETTO,

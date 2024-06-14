@@ -6,15 +6,13 @@
 //!
 //! [custom output format]: https://source.android.com/docs/core/tests/vts/performance#iterations
 
-use {
-    crate::helpers::*,
-    anyhow::{ensure, Context as _, Error},
-    fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_test::{self as ftest},
-    fuchsiaperf::FuchsiaPerfBenchmarkResult,
-    serde::Deserialize,
-    std::collections::BTreeMap,
-};
+use crate::helpers::*;
+use anyhow::{ensure, Context as _, Error};
+use fidl_fuchsia_component_runner as frunner;
+use fidl_fuchsia_test::{self as ftest};
+use fuchsiaperf::FuchsiaPerfBenchmarkResult;
+use serde::Deserialize;
+use std::collections::BTreeMap;
 
 pub async fn run_binder_latency(
     test: ftest::Invocation,

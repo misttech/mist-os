@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::wire,
-    anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_virtualization_hardware::VirtioMemControlHandle,
-    fuchsia_inspect as inspect,
-    fuchsia_inspect::{NumericProperty, Property},
-    fuchsia_zircon::{self as zx},
-    std::io::{Read, Write},
-    virtio_device::chain::{ReadableChain, Remaining, WritableChain},
-    virtio_device::mem::DriverMem,
-    virtio_device::queue::DriverNotify,
-    zerocopy::{AsBytes, FromBytes},
-};
+use crate::wire;
+use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_virtualization_hardware::VirtioMemControlHandle;
+use fuchsia_inspect as inspect;
+use fuchsia_inspect::{NumericProperty, Property};
+use fuchsia_zircon::{self as zx};
+use std::io::{Read, Write};
+use virtio_device::chain::{ReadableChain, Remaining, WritableChain};
+use virtio_device::mem::DriverMem;
+use virtio_device::queue::DriverNotify;
+use zerocopy::{AsBytes, FromBytes};
 
 fn read_request<'a, 'b, N: DriverNotify, M: DriverMem>(
     chain: &mut ReadableChain<'a, 'b, N, M>,
@@ -293,17 +291,15 @@ impl<B: MemBackend> MemDevice<B> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        diagnostics_assertions::assert_data_tree,
-        fidl::endpoints::{create_proxy_and_stream, RequestStream},
-        fidl_fuchsia_virtualization_hardware::{VirtioMemMarker, VirtioMemProxy},
-        fuchsia_inspect::Inspector,
-        futures::StreamExt,
-        std::cell::RefCell,
-        std::ops::Range,
-        virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue},
-    };
+    use super::*;
+    use diagnostics_assertions::assert_data_tree;
+    use fidl::endpoints::{create_proxy_and_stream, RequestStream};
+    use fidl_fuchsia_virtualization_hardware::{VirtioMemMarker, VirtioMemProxy};
+    use fuchsia_inspect::Inspector;
+    use futures::StreamExt;
+    use std::cell::RefCell;
+    use std::ops::Range;
+    use virtio_device::fake_queue::{ChainBuilder, IdentityDriverMem, TestQueue};
 
     const ONE_MIB: u64 = 1 * 1024 * 1024;
 

@@ -8,8 +8,10 @@ use heck::CamelCase;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 
+use syn::punctuated::*;
 use syn::spanned::Spanned;
-use syn::{punctuated::*, token::*, *};
+use syn::token::*;
+use syn::*;
 
 type Result<T> = std::result::Result<T, Error>;
 

@@ -7,10 +7,8 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use futures::{FutureExt, StreamExt, TryStreamExt};
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 const OBSERVED_ID: &str = "1111222233334444111111111111111111111111111111111111111111111111";
 const IGNORED_ID: &str = "2222222233334444111111111111111111111111111111111111111111112222";

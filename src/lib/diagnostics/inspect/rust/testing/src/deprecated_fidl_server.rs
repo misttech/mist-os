@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::table::*,
-    anyhow::Error,
-    fidl_fuchsia_inspect_deprecated::{self as fidl_inspect, InspectRequest, InspectRequestStream},
-    fuchsia_async as fasync,
-    futures::{TryFutureExt, TryStreamExt},
-};
+use crate::table::*;
+use anyhow::Error;
+use fidl_fuchsia_inspect_deprecated::{self as fidl_inspect, InspectRequest, InspectRequestStream};
+use fuchsia_async as fasync;
+use futures::{TryFutureExt, TryStreamExt};
 
 pub fn spawn_inspect_server(mut stream: InspectRequestStream, node: NodeObject) {
     fasync::Task::spawn(

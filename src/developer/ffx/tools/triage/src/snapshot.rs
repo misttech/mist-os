@@ -6,11 +6,9 @@ use anyhow::{Context, Result};
 use ffx_snapshot::snapshot_impl;
 use ffx_snapshot_args::SnapshotCommand;
 use fidl_fuchsia_feedback::DataProviderProxy;
-use std::{
-    fs::File,
-    io::copy,
-    path::{Path, PathBuf},
-};
+use std::fs::File;
+use std::io::copy;
+use std::path::{Path, PathBuf};
 use zip::ZipArchive;
 
 /// Creates new snapshot at given directory path and unzips it.

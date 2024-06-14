@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use rustc_hash::FxHashMap;
-use surpass::{painter::Props, GeomId, Order};
+use surpass::painter::Props;
+use surpass::{GeomId, Order};
 
 use crate::small_bit_set::SmallBitSet;
 
@@ -153,15 +155,12 @@ impl Composition {
 mod tests {
     use super::*;
 
-    use surpass::{
-        painter::{Color, RGBA},
-        Path, TILE_HEIGHT, TILE_WIDTH,
-    };
+    use surpass::painter::{Color, RGBA};
+    use surpass::{Path, TILE_HEIGHT, TILE_WIDTH};
 
-    use crate::{
-        buffer::{layout::LinearLayout, BufferBuilder},
-        CpuRenderer, Fill, FillRule, Func, GeomPresTransform, PathBuilder, Point, Style,
-    };
+    use crate::buffer::layout::LinearLayout;
+    use crate::buffer::BufferBuilder;
+    use crate::{CpuRenderer, Fill, FillRule, Func, GeomPresTransform, PathBuilder, Point, Style};
 
     const BLACK_SRGB: [u8; 4] = [0x00, 0x00, 0x00, 0xFF];
     const GRAY_SRGB: [u8; 4] = [0xBB, 0xBB, 0xBB, 0xFF];

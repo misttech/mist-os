@@ -6,12 +6,12 @@ use crate::assert::assert_logs_sequence;
 use crate::puppet::PuppetProxyExt;
 use crate::test_topology;
 use crate::utils::LogSettingsExt;
-use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{self as fdiagnostics, Severity};
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage};
-use fuchsia_async as fasync;
 use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
-use futures::{channel::mpsc, StreamExt};
+use futures::channel::mpsc;
+use futures::StreamExt;
+use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
 
 const PUPPET_NAME: &str = "puppet";
 

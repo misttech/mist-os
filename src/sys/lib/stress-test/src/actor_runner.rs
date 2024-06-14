@@ -2,19 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        actor::{Actor, ActorError},
-        counter::CounterTx,
-    },
-    fuchsia_async::{Task, Time, Timer},
-    futures::{
-        future::{AbortHandle, Abortable, Aborted},
-        lock::Mutex,
-    },
-    std::{sync::Arc, time::Duration},
-    tracing::debug,
-};
+use crate::actor::{Actor, ActorError};
+use crate::counter::CounterTx;
+use fuchsia_async::{Task, Time, Timer};
+use futures::future::{AbortHandle, Abortable, Aborted};
+use futures::lock::Mutex;
+use std::sync::Arc;
+use std::time::Duration;
+use tracing::debug;
 
 /// The thread that runs an actor indefinitely
 #[derive(Clone)]

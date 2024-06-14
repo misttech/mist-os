@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context, Result};
-use std::{
-    cell::{Cell, RefCell},
-    collections::{BTreeMap, HashMap},
-    fs::create_dir_all,
-    io::{copy, Read},
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::cell::{Cell, RefCell};
+use std::collections::{BTreeMap, HashMap};
+use std::fs::create_dir_all;
+use std::io::{copy, Read};
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use tar::{Archive, Header};
 
 /// Prefix for "whiteout" files, whose purpose is to hide files from lower layers.

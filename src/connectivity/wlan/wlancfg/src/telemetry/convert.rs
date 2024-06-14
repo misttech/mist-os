@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_zircon::{self as zx, DurationNum},
-    wlan_common::bss::Protection as BssProtection,
-    wlan_metrics_registry as metrics,
-};
+use fuchsia_zircon::{self as zx, DurationNum};
+use wlan_common::bss::Protection as BssProtection;
+use {fidl_fuchsia_wlan_sme as fidl_sme, wlan_metrics_registry as metrics};
 
 pub fn convert_disconnect_source(
     source: &fidl_sme::DisconnectSource,

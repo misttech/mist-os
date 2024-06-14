@@ -5,7 +5,8 @@
 use crate::{Tool, ToolCommand, ToolCommandLog, ToolProvider};
 
 use anyhow::{anyhow, Context, Result};
-use ffx_config::{global_env_context, sdk::Sdk};
+use ffx_config::global_env_context;
+use ffx_config::sdk::Sdk;
 use futures::executor::block_on;
 use std::path::PathBuf;
 use std::process::Command;

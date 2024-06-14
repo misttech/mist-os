@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_process as fprocess;
 #[cfg(feature = "syscall_stats")]
 use fuchsia_inspect::NumericProperty;
 use fuchsia_inspect_contrib::profile_duration;
@@ -12,28 +10,29 @@ use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
 use starnix_sync::{Locked, Unlocked};
 use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess};
 
-use crate::{
-    arch::execution::{new_syscall, restore_cfi_directives},
-    execution::get_core_dump_info,
-    fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
-    generate_cfi_directives,
-    mm::MemoryManager,
-    signals::{dequeue_signal, prepare_to_restart_syscall},
-    syscalls::table::dispatch_syscall,
-    task::{
-        ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, Kernel,
-        SeccompStateValue, TaskFlags, ThreadGroup,
-    },
-    vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr},
+use crate::arch::execution::{new_syscall, restore_cfi_directives};
+use crate::execution::get_core_dump_info;
+use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
+use crate::generate_cfi_directives;
+use crate::mm::MemoryManager;
+use crate::signals::{dequeue_signal, prepare_to_restart_syscall};
+use crate::syscalls::table::dispatch_syscall;
+use crate::task::{
+    ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, Kernel, SeccompStateValue,
+    TaskFlags, ThreadGroup,
+};
+use crate::vfs::{
+    FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr,
 };
 use starnix_logging::{log_trace, trace_instant, TraceScope, CATEGORY_STARNIX};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore};
-use starnix_syscalls::{
-    decls::{Syscall, SyscallDecl},
-    SyscallResult,
-};
-use starnix_uapi::{errno, errors::Errno, mount_flags::MountFlags};
+use starnix_syscalls::decls::{Syscall, SyscallDecl};
+use starnix_syscalls::SyscallResult;
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::mount_flags::MountFlags;
 
 /// Contains context to track the most recently failing system call.
 ///
@@ -128,15 +127,9 @@ pub fn process_completed_restricted_exit(
     loop {
         // Checking for a signal might cause the task to exit, so check before processing exit
         {
-            let flags = current_task.flags();
             {
-                if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
-                    || (!flags.contains(TaskFlags::EXITED)
-                        && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
-                {
-                    if !current_task.is_exitted() {
-                        dequeue_signal(current_task);
-                    }
+                if !current_task.is_exitted() {
+                    dequeue_signal(current_task);
                 }
                 // The syscall may need to restart for a non-signal-related
                 // reason. This call does nothing if we aren't restarting.
@@ -174,7 +167,7 @@ pub fn process_completed_restricted_exit(
                 .ptrace
                 .as_ref()
                 .is_some_and(|ptrace| ptrace.stop_status == crate::task::PtraceStatus::Continuing)
-                && task_state.signals.is_any_pending()
+                && task_state.is_any_signal_pending()
                 && !current_task.is_exitted()
             {
                 continue;
@@ -346,7 +339,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{signals::SignalInfo, task::StopState, testing::*};
+    use crate::signals::SignalInfo;
+    use crate::task::StopState;
+    use crate::testing::*;
     use starnix_uapi::signals::{SIGCONT, SIGSTOP};
 
     #[::fuchsia::test]
@@ -368,7 +363,7 @@ mod tests {
             move || {
                 let task = task.upgrade().expect("task must be alive");
                 // Wait for the task to have a waiter.
-                while !task.read().signals.run_state.is_blocked() {
+                while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
 
@@ -410,7 +405,7 @@ mod tests {
             move || {
                 let task = task.upgrade().expect("task must be alive");
                 // Wait for the task to have a waiter.
-                while !task.read().signals.run_state.is_blocked() {
+                while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
 

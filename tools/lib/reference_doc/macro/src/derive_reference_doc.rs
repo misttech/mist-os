@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    darling::{ast, FromDeriveInput, FromField, FromMeta},
-    proc_macro2::TokenStream as TokenStream2,
-    quote::{quote, ToTokens, TokenStreamExt},
-};
+use darling::{ast, FromDeriveInput, FromField, FromMeta};
+use proc_macro2::TokenStream as TokenStream2;
+use quote::{quote, ToTokens, TokenStreamExt};
 
 const LIST_INDENT_SPACES: usize = 4;
 

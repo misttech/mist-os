@@ -176,6 +176,9 @@ zx::result<> profiler::Component::Start(ComponentWatcher::ComponentEventHandler 
 }
 
 zx::result<> profiler::Component::Stop() {
+  if (zx::result res = component_watcher_.Reset(); res.is_error()) {
+    return res;
+  }
   if (auto stop_res = lifecycle_controller_client_->StopInstance({{
           .moniker = moniker_,
       }});

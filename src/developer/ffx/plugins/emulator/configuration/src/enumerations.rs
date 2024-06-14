@@ -11,7 +11,9 @@ use emulator_instance::{FlagData, NetworkingMode, PortMapping};
 use schemars::JsonSchema;
 use sdk_metadata::{display_impl, VirtualDeviceV1};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Display, path::PathBuf};
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]

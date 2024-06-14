@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{environment::EnvironmentKind, EnvironmentContext};
+use crate::environment::EnvironmentKind;
+use crate::EnvironmentContext;
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8Path;
-use std::path::Path;
-use std::{fs::create_dir_all, path::PathBuf};
+use std::fs::create_dir_all;
+use std::path::{Path, PathBuf};
 
 use std::env::var;
 

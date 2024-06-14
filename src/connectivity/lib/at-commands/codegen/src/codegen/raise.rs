@@ -5,17 +5,14 @@
 //! Module containing methods for generating code to "raise" from the low level
 //! generic ASTs to the high level, typed, generated AT command and response types.
 
-use {
-    super::{
-        common::{to_initial_capital, type_names::*, write_indent, write_newline, TABSTOP},
-        error::Result,
-    },
-    crate::definition::{
-        Argument, Arguments, Command, Definition, DelimitedArguments, PossiblyOptionType,
-        PrimitiveType, Type,
-    },
-    std::io,
+use super::common::type_names::*;
+use super::common::{to_initial_capital, write_indent, write_newline, TABSTOP};
+use super::error::Result;
+use crate::definition::{
+    Argument, Arguments, Command, Definition, DelimitedArguments, PossiblyOptionType,
+    PrimitiveType, Type,
 };
+use std::io;
 
 /// Entry point to generate `raise` methods at a given indentation.
 pub fn codegen<W: io::Write>(sink: &mut W, indent: u64, definitions: &[Definition]) -> Result {

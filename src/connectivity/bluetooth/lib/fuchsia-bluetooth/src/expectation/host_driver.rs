@@ -5,7 +5,8 @@
 //! Expectations for the Bluetooth Host Driver (bt-host)
 
 use super::Predicate;
-use crate::{over, types::HostInfo};
+use crate::over;
+use crate::types::HostInfo;
 
 pub fn name(expected_name: &str) -> Predicate<HostInfo> {
     let name = Some(expected_name.to_string());

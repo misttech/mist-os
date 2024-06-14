@@ -9,7 +9,8 @@ use fidl_fuchsia_update_config::{
     OptOutRequestStream,
 };
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
-use futures::{channel::mpsc, prelude::*};
+use futures::channel::mpsc;
+use futures::prelude::*;
 use tracing::warn;
 
 /// ServiceFs, configured for single-threaded execution and handling services listed in

@@ -4,12 +4,11 @@
 
 use anyhow::{format_err, Context, Result};
 use fidl::endpoints::create_endpoints;
-use fidl_fuchsia_intl as fintl;
 use fidl_fuchsia_intl_test::*;
-use fidl_fuchsia_settings as fsettings;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at};
 use futures::StreamExt;
 use realm_client::{extend_namespace, InstalledNamespace};
+use {fidl_fuchsia_intl as fintl, fidl_fuchsia_settings as fsettings};
 
 async fn create_realm(options: RealmOptions) -> Result<InstalledNamespace> {
     let realm_factory = connect_to_protocol::<RealmFactoryMarker>()?;

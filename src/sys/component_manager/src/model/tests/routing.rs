@@ -59,7 +59,7 @@ use {
     },
     hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     maplit::btreemap,
-    moniker::{ChildName, Moniker},
+    moniker::{ChildName, ExtendedMoniker, Moniker},
     router_error::{DowncastErrorForTest, RouterError},
     routing::component_instance::ComponentInstanceInterface,
     routing_test_helpers::{
@@ -3420,7 +3420,8 @@ async fn source_component_stopping_when_routing() {
             .unwrap()
             .route(sandbox::Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new(root.as_weak()),
+                target: WeakComponentToken::new_component(root.as_weak()),
+                debug: false,
             })
             .await
             .unwrap();
@@ -3484,7 +3485,8 @@ async fn source_component_stopped_after_routing_before_open() {
         .unwrap()
         .route(sandbox::Request {
             availability: Availability::Required,
-            target: WeakComponentToken::new(root.as_weak()),
+            target: WeakComponentToken::new_component(root.as_weak()),
+            debug: false,
         })
         .await
         .unwrap();
@@ -3553,7 +3555,8 @@ async fn source_component_shutdown_after_routing_before_open() {
         .unwrap()
         .route(sandbox::Request {
             availability: Availability::Required,
-            target: WeakComponentToken::new(root.as_weak()),
+            target: WeakComponentToken::new_component(root.as_weak()),
+            debug: false,
         })
         .await
         .unwrap();
@@ -3608,7 +3611,10 @@ impl Hook for BlockingResolvedHook {
         match &event.payload {
             EventPayload::Resolved { component, .. } => {
                 let expected_moniker = self.receiver.lock().await.next().await.unwrap();
-                assert_eq!(component.moniker(), expected_moniker);
+                let ExtendedMoniker::ComponentInstance(moniker) = component.moniker() else {
+                    panic!("did not expect component_manager");
+                };
+                assert_eq!(moniker, expected_moniker);
             }
             _ => (),
         };

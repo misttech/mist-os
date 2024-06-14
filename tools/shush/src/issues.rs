@@ -9,11 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use crate::{
-    api::{Api, ComponentId, CreateIssue, IssueId, Status, UpdateIssue},
-    lint::{Lint, LintFile},
-    owners::FileOwnership,
-};
+use crate::api::{Api, ComponentId, CreateIssue, IssueId, Status, UpdateIssue};
+use crate::lint::{Lint, LintFile};
+use crate::owners::FileOwnership;
 
 struct ComponentDefs {
     defs: HashMap<String, ComponentId>,

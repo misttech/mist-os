@@ -5,7 +5,8 @@
 use anyhow::Context;
 use credentials::Credentials;
 use fho::Result;
-use gcs::{auth, error::GcsError};
+use gcs::auth;
+use gcs::error::GcsError;
 pub use pbms::AuthFlowChoice;
 use thiserror::Error;
 

@@ -8,17 +8,15 @@
 
 mod font_service;
 
-use {
-    self::font_service::{FontServiceBuilder, ProviderRequestStream},
-    anyhow::{format_err, Context, Result},
-    argh::FromArgs,
-    config::Config,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::component::inspector,
-    fuchsia_trace as trace, fuchsia_trace_provider as trace_provider,
-    std::path::PathBuf,
-    tracing::{debug, error, info, warn},
-};
+use self::font_service::{FontServiceBuilder, ProviderRequestStream};
+use anyhow::{format_err, Context, Result};
+use argh::FromArgs;
+use config::Config;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::component::inspector;
+use std::path::PathBuf;
+use tracing::{debug, error, info, warn};
+use {fuchsia_trace as trace, fuchsia_trace_provider as trace_provider};
 
 const FONT_MANIFEST_PATH: &str = "/config/data/all.font_manifest.json";
 /// TODO(https://fxbug.dev/42120295): Remove after Chromium tests are made hermetic.

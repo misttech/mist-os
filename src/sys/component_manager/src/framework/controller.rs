@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.cti
 
+use crate::model::actions::StopAction;
+use crate::model::component::{IncomingCapabilities, StartReason, WeakComponentInstance};
+use fidl::endpoints::{ProtocolMarker, RequestStream};
+use futures::prelude::*;
+use sandbox::Capability;
+use tracing::{error, warn};
 use {
-    crate::model::{
-        actions::StopAction,
-        component::{IncomingCapabilities, StartReason, WeakComponentInstance},
-    },
-    fidl::endpoints::{ProtocolMarker, RequestStream},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
     fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::prelude::*,
-    sandbox::Capability,
-    tracing::{error, warn},
 };
 
 pub async fn run_controller(

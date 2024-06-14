@@ -166,7 +166,8 @@ zx::result<> AmlCpuPerformanceDomain::AddChild(
 
   auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
                    .connector(std::move(connector.value()))
-                   .connector_supports(fuchsia_device_fs::ConnectionType::kDevice)
+                   .connector_supports(fuchsia_device_fs::ConnectionType::kDevice |
+                                       fuchsia_device_fs::ConnectionType::kController)
                    .inspect(inspector_.DuplicateVmo())
                    .class_name("cpu-ctrl");
 

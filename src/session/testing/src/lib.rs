@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fuchsia_async::{self as fasync},
-    futures::TryStreamExt,
-};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
+use fuchsia_async::{self as fasync};
+use futures::TryStreamExt;
 
 /// Spawn a request handler for the provided server end.
 ///

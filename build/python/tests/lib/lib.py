@@ -5,13 +5,13 @@
 # found in the LICENSE file.
 
 
-def f():
+def f() -> None:
     print("lib.f")
 
 
-def truthy():
+def truthy() -> bool:
     return True
 
 
-def falsy():
+def falsy() -> bool:
     return False

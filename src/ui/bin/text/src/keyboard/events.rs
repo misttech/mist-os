@@ -1,13 +1,12 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    anyhow::{format_err, Error, Result},
-    fidl_fuchsia_input as input, fidl_fuchsia_ui_input as ui_input,
-    fidl_fuchsia_ui_input3::{self as ui_input3, LockState, Modifiers},
-    keymaps::{usages::input3_key_to_hid_usage, LockStateKeys, ModifierState},
-    std::collections::HashSet,
-};
+use anyhow::{format_err, Error, Result};
+use fidl_fuchsia_ui_input3::{self as ui_input3, LockState, Modifiers};
+use keymaps::usages::input3_key_to_hid_usage;
+use keymaps::{LockStateKeys, ModifierState};
+use std::collections::HashSet;
+use {fidl_fuchsia_input as input, fidl_fuchsia_ui_input as ui_input};
 
 const EMPTY_TIME: u64 = 0;
 const EMPTY_DEVICE_ID: u32 = 0;
@@ -216,7 +215,10 @@ impl TryFrom<KeyEvent> for ui_input3::KeyEvent {
 
 #[cfg(test)]
 mod test {
-    use {super::*, fuchsia_zircon as zx, keymaps::usages::Usages, maplit::hashset};
+    use super::*;
+    use fuchsia_zircon as zx;
+    use keymaps::usages::Usages;
+    use maplit::hashset;
 
     static TEST_TIMESTAMP: i64 = 123;
 

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_net_name as fnet_name;
-use fuchsia_zircon as zx;
+use {fidl_fuchsia_net_name as fnet_name, fuchsia_zircon as zx};
 
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
 use tracing::{trace, warn};

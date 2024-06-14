@@ -3,19 +3,20 @@
 // found in the LICENSE file.
 
 mod commands;
+use crate::commands::{CmdHelper, Command, ReplControl};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_power_battery_test::BatterySimulatorProxy;
+use fuchsia_component::client::connect_to_protocol;
+use futures::channel::mpsc::{channel, SendError};
+use futures::{Sink, SinkExt, Stream, StreamExt, TryFutureExt};
+use rustyline::error::ReadlineError;
+use rustyline::{CompletionType, Config, EditMode, Editor};
+use std::pin::pin;
+use std::time::Duration;
+use std::{fmt, thread};
 use {
-    crate::commands::{CmdHelper, Command, ReplControl},
-    anyhow::{format_err, Error},
     fidl_fuchsia_power_battery as fpower, fidl_fuchsia_power_battery_test as spower,
-    fidl_fuchsia_power_battery_test::BatterySimulatorProxy,
     fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    futures::{
-        channel::mpsc::{channel, SendError},
-        Sink, SinkExt, Stream, StreamExt, TryFutureExt,
-    },
-    rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor},
-    std::{fmt, pin::pin, thread, time::Duration},
 };
 
 static PROMPT: &str = "\x1b[34mbattman>\x1b[0m ";

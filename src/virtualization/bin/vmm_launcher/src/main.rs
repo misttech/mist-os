@@ -4,14 +4,12 @@
 
 mod vmm_launcher;
 
-use {
-    anyhow::Context,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component::RealmMarker,
-    fidl_fuchsia_virtualization::GuestLifecycleMarker,
-    fuchsia_component::{client, server},
-    vmm_launcher_config::Config,
-};
+use anyhow::Context;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_component::RealmMarker;
+use fidl_fuchsia_virtualization::GuestLifecycleMarker;
+use fuchsia_component::{client, server};
+use vmm_launcher_config::Config;
 
 #[fuchsia::main(logging = true, threads = 1)]
 async fn main() -> Result<(), anyhow::Error> {

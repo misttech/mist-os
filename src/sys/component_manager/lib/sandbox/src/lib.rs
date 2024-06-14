@@ -21,7 +21,7 @@ mod unit;
 mod open;
 
 #[cfg(target_os = "fuchsia")]
-mod registry;
+mod fidl;
 
 pub use self::capability::{Capability, ConversionError, RemoteError};
 pub use self::component::{WeakComponentToken, WeakComponentTokenAny};
@@ -35,4 +35,4 @@ pub use self::router::{Request, Routable, Router};
 pub use self::unit::Unit;
 
 #[cfg(target_os = "fuchsia")]
-pub use {capability::CapabilityTrait, open::Open};
+pub use {fidl::RemotableCapability, open::Open};

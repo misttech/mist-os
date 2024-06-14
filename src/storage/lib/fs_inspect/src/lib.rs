@@ -10,15 +10,11 @@
 //! option. This will validate that the inspect tree hierarchy is consistent and that basic
 //! information is reported correctly. See `src/storage/fs_test/inspect.cc` for details.
 
-use {
-    async_trait::async_trait,
-    fuchsia_inspect::{LazyNode, Node},
-    futures::FutureExt,
-    std::{
-        collections::hash_map::HashMap,
-        sync::{Arc, Mutex, Weak},
-    },
-};
+use async_trait::async_trait;
+use fuchsia_inspect::{LazyNode, Node};
+use futures::FutureExt;
+use std::collections::hash_map::HashMap;
+use std::sync::{Arc, Mutex, Weak};
 
 const INFO_NODE_NAME: &'static str = "fs.info";
 const USAGE_NODE_NAME: &'static str = "fs.usage";

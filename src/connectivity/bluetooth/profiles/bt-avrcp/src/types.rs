@@ -2,23 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    bt_avctp::Error as AvctpError,
-    futures::{
-        stream::{FusedStream, Stream},
-        task::AtomicWaker,
-    },
-    std::{
-        pin::Pin,
-        sync::{
-            atomic::{AtomicBool, Ordering::SeqCst},
-            Arc,
-        },
-        task::{Context, Poll},
-    },
-    thiserror::Error,
-};
+use anyhow::Error;
+use bt_avctp::Error as AvctpError;
+use futures::stream::{FusedStream, Stream};
+use futures::task::AtomicWaker;
+use std::pin::Pin;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use thiserror::Error;
 
 use crate::packets::Error as PacketError;
 

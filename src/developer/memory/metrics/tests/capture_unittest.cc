@@ -342,9 +342,9 @@ TEST_F(CaptureUnitTest, Compression) {
   EXPECT_EQ(ZX_OK, ret);
 
   EXPECT_EQ(_kmem_compression_1.uncompressed_storage_bytes,
-            c.kmem_compression().uncompressed_storage_bytes);
+            c.kmem_compression()->uncompressed_storage_bytes);
   EXPECT_EQ(_kmem_compression_1.compressed_storage_bytes,
-            c.kmem_compression().compressed_storage_bytes);
+            c.kmem_compression()->compressed_storage_bytes);
 
   EXPECT_EQ(1U, c.koid_to_process().size());
   const auto& process = c.process_for_koid(proc_koid);

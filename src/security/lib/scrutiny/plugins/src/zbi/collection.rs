@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    scrutiny::prelude::DataCollection,
-    scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
-    scrutiny_utils::zbi::ZbiSection,
-    serde::{Deserialize, Serialize},
-    std::collections::HashSet,
-    std::path::PathBuf,
-    thiserror::Error,
-};
+use scrutiny::prelude::DataCollection;
+use scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex};
+use scrutiny_utils::zbi::ZbiSection;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::path::PathBuf;
+use thiserror::Error;
 
 /// Error that may occur when reading the ZBI.
 #[derive(Clone, Debug, Deserialize, Serialize, Error)]

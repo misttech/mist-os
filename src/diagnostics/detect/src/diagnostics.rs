@@ -4,11 +4,9 @@
 
 // Fetches diagnostic data.
 
-use {
-    anyhow::Error,
-    fuchsia_triage::{DiagnosticData, Source},
-    inspect_fetcher::InspectFetcher,
-};
+use anyhow::Error;
+use fuchsia_triage::{DiagnosticData, Source};
+use inspect_fetcher::InspectFetcher;
 
 // The capability name for the Inspect reader
 const INSPECT_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.FeedbackArchiveAccessor";

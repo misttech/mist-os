@@ -2,26 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::buffer::{round_down, round_up, Buffer},
-    event_listener::{Event, EventListener},
-    futures::{Future, FutureExt as _},
-    std::{
-        collections::BTreeMap,
-        ops::Range,
-        pin::Pin,
-        sync::Mutex,
-        task::{Context, Poll},
-    },
-};
+use crate::buffer::{round_down, round_up, Buffer};
+use event_listener::{Event, EventListener};
+use futures::{Future, FutureExt as _};
+use std::collections::BTreeMap;
+use std::ops::Range;
+use std::pin::Pin;
+use std::sync::Mutex;
+use std::task::{Context, Poll};
 
 #[cfg(target_os = "fuchsia")]
 mod buffer_source {
-    use {
-        fuchsia_runtime::vmar_root_self,
-        fuchsia_zircon::{self as zx, AsHandleRef},
-        std::{ffi::CString, ops::Range},
-    };
+    use fuchsia_runtime::vmar_root_self;
+    use fuchsia_zircon::{self as zx, AsHandleRef};
+    use std::ffi::CString;
+    use std::ops::Range;
 
     /// A buffer source backed by a VMO.
     #[derive(Debug)]
@@ -81,7 +76,9 @@ mod buffer_source {
 
 #[cfg(not(target_os = "fuchsia"))]
 mod buffer_source {
-    use std::{cell::UnsafeCell, ops::Range, pin::Pin};
+    use std::cell::UnsafeCell;
+    use std::ops::Range;
+    use std::pin::Pin;
 
     /// A basic heap-backed buffer source.
     #[derive(Debug)]
@@ -334,16 +331,14 @@ impl BufferAllocator {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::buffer_allocator::{order, BufferAllocator, BufferSource},
-        fuchsia_async as fasync,
-        futures::{future::join_all, pin_mut},
-        rand::{prelude::SliceRandom, thread_rng, Rng},
-        std::sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    };
+    use crate::buffer_allocator::{order, BufferAllocator, BufferSource};
+    use fuchsia_async as fasync;
+    use futures::future::join_all;
+    use futures::pin_mut;
+    use rand::prelude::SliceRandom;
+    use rand::{thread_rng, Rng};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
 
     #[fuchsia::test]
     async fn test_odd_sized_buffer_source() {

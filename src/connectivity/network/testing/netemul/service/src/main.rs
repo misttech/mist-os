@@ -2,45 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Context as _};
+use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
+use fidl_fuchsia_netemul::{
+    self as fnetemul, ChildDef, ChildUses, ManagedRealmMarker, ManagedRealmRequest, RealmOptions,
+    SandboxRequest, SandboxRequestStream,
+};
+use fuchsia_component::server::{ServiceFs, ServiceFsDir};
+use fuchsia_component_test::{
+    self as fcomponent, Capability, ChildOptions, LocalComponentHandles, RealmBuilder,
+    RealmBuilderParams, RealmInstance, Ref, Route,
+};
+use futures::channel::mpsc;
+use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use std::borrow::Cow;
+use std::collections::hash_map::{Entry, HashMap};
+use std::pin::pin;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::{debug, error, info, warn};
+use vfs::directory::entry::OpenRequest;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable as _;
+use vfs::directory::immutable::simple::Simple as SimpleImmutableDir;
+use vfs::remote::RemoteLike;
 use {
-    anyhow::{anyhow, Context as _},
-    fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_netemul::{
-        self as fnetemul, ChildDef, ChildUses, ManagedRealmMarker, ManagedRealmRequest,
-        RealmOptions, SandboxRequest, SandboxRequestStream,
-    },
-    fidl_fuchsia_netemul_network as fnetemul_network, fidl_fuchsia_sys2 as fsys2,
-    fidl_fuchsia_tracing_provider as ftracing_provider,
-    fuchsia_component::server::{ServiceFs, ServiceFsDir},
-    fuchsia_component_test::{
-        self as fcomponent, Capability, ChildOptions, LocalComponentHandles, RealmBuilder,
-        RealmBuilderParams, RealmInstance, Ref, Route,
-    },
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_netemul_network as fnetemul_network,
+    fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_tracing_provider as ftracing_provider,
     fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc, FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _,
-        TryStreamExt as _,
-    },
-    std::pin::pin,
-    std::{
-        borrow::Cow,
-        collections::hash_map::{Entry, HashMap},
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc,
-        },
-    },
-    thiserror::Error,
-    tracing::{debug, error, info, warn},
-    vfs::{
-        directory::{
-            entry::OpenRequest, entry_container::Directory, helper::DirectlyMutable as _,
-            immutable::simple::Simple as SimpleImmutableDir,
-        },
-        remote::RemoteLike,
-    },
 };
 
 type Result<T = (), E = anyhow::Error> = std::result::Result<T, E>;
@@ -950,14 +941,14 @@ mod tests {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::Proxy as _;
-    use fidl_fuchsia_device as fdevice;
-    use fidl_fuchsia_netemul as fnetemul;
     use fidl_fuchsia_netemul_test::{self as fnetemul_test, CounterMarker};
     use fixture::fixture;
-    use fuchsia_async as fasync;
     use fuchsia_fs::directory as fvfs_watcher;
     use std::convert::TryFrom as _;
     use test_case::test_case;
+    use {
+        fidl_fuchsia_device as fdevice, fidl_fuchsia_netemul as fnetemul, fuchsia_async as fasync,
+    };
 
     // We can't just use a counter for the sandbox identifier, as we do in `main`, because tests
     // each run in separate processes, but use the same backing collection of components created

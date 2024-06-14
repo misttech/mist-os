@@ -4,16 +4,12 @@
 
 pub mod aggregations;
 
-use {
-    crate::aggregations::SumAndCount,
-    fuchsia_async as fasync,
-    fuchsia_inspect::{ArrayProperty, Node as InspectNode},
-    fuchsia_zircon::{self as zx, DurationNum},
-    std::{
-        collections::VecDeque,
-        fmt::{self, Debug},
-    },
-};
+use crate::aggregations::SumAndCount;
+use fuchsia_async as fasync;
+use fuchsia_inspect::{ArrayProperty, Node as InspectNode};
+use fuchsia_zircon::{self as zx, DurationNum};
+use std::collections::VecDeque;
+use std::fmt::{self, Debug};
 
 pub struct WindowedStats<T> {
     stats: VecDeque<T>,
@@ -256,10 +252,10 @@ impl TimeSeries<SumAndCount> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::aggregations::create_saturating_add_fn,
-        diagnostics_assertions::assert_data_tree, fuchsia_inspect::Inspector,
-    };
+    use super::*;
+    use crate::aggregations::create_saturating_add_fn;
+    use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::Inspector;
 
     #[test]
     fn windowed_stats_some_windows_populated() {

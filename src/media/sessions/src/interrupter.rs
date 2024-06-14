@@ -7,10 +7,8 @@ use async_utils::stream::StreamMap;
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_media::*;
 use futures::stream::{FusedStream, Stream};
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tracing::warn;
 
 const LOG_TAG: &str = "interrupter";
@@ -110,10 +108,8 @@ impl FusedStream for Interrupter {
 mod test {
     use super::*;
     use assert_matches::assert_matches;
-    use futures::{
-        future,
-        stream::{StreamExt, TryStreamExt},
-    };
+    use futures::future;
+    use futures::stream::{StreamExt, TryStreamExt};
 
     fn test_interrupter() -> (Interrupter, UsageReporterRequestStream) {
         let (usage_reporter, usage_reporter_requests) =

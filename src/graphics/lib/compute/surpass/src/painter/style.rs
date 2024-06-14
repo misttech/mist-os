@@ -2,18 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    fmt, hash,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::{fmt, hash};
 
-use crate::{
-    simd::{f32x8, u32x8},
-    AffineTransform, CanonBits, Point,
-};
+use crate::simd::{f32x8, u32x8};
+use crate::{AffineTransform, CanonBits, Point};
 
 pub(crate) trait Ratio {
     fn zero() -> Self;

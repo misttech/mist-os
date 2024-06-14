@@ -11,18 +11,16 @@ use fidl_fuchsia_diagnostics::*;
 use fidl_fuchsia_logger::LogSinkMarker;
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_media_sessions2::*;
-use fuchsia_async as fasync;
-use fuchsia_component::{client, server::*};
+use fuchsia_component::client;
+use fuchsia_component::server::*;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
-use fuchsia_inspect as inspect;
-use futures::{
-    channel::mpsc,
-    sink::SinkExt,
-    stream::{StreamExt, TryStreamExt},
-};
+use futures::channel::mpsc;
+use futures::sink::SinkExt;
+use futures::stream::{StreamExt, TryStreamExt};
 use std::collections::HashMap;
+use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 const MEDIASESSION_URL: &str = "#meta/mediasession.cm";
 const MEDIASESSION_NAME: &str = "mediasession";

@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::metrics::fetch::FileDataFetcher,
-    regex::{Match, Regex},
-};
+use crate::metrics::fetch::FileDataFetcher;
+use regex::{Match, Regex};
 
 /// Analyzes the klog and syslog streams looking for a match to `re` and
 /// collects the capture groups matches when `re` matches. Note that optional

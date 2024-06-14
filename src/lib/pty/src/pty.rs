@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_hardware_pty::{DeviceMarker, DeviceProxy, WindowSize},
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_trace as ftrace,
-    fuchsia_zircon::{self as zx, HandleBased as _, ProcessInfo, ProcessInfoFlags},
-    std::{ffi::CStr, fs::File, os::fd::OwnedFd},
-};
+use anyhow::{Context as _, Error};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_hardware_pty::{DeviceMarker, DeviceProxy, WindowSize};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_trace as ftrace;
+use fuchsia_zircon::{self as zx, HandleBased as _, ProcessInfo, ProcessInfoFlags};
+use std::ffi::CStr;
+use std::fs::File;
+use std::os::fd::OwnedFd;
 
 /// An object used for interacting with the shell.
 #[derive(Clone)]
@@ -172,13 +172,12 @@ impl ShellProcess {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        cstr::cstr,
-        fuchsia_async as fasync,
-        std::os::unix::io::AsRawFd as _,
-        {futures::io::AsyncWriteExt as _, zx::AsHandleRef as _},
-    };
+    use super::*;
+    use cstr::cstr;
+    use fuchsia_async as fasync;
+    use futures::io::AsyncWriteExt as _;
+    use std::os::unix::io::AsRawFd as _;
+    use zx::AsHandleRef as _;
 
     #[fasync::run_singlethreaded(test)]
     async fn can_create_pty() -> Result<(), Error> {

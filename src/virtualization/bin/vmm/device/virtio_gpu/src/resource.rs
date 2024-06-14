@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::wire,
-    anyhow::{anyhow, Error},
-    fidl_fuchsia_ui_composition::BufferCollectionImportToken,
-    fuchsia_zircon::{self as zx, HandleBased},
-    virtio_device::mem::DeviceRange,
-};
+use crate::wire;
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_ui_composition::BufferCollectionImportToken;
+use fuchsia_zircon::{self as zx, HandleBased};
+use virtio_device::mem::DeviceRange;
 
 #[cfg(not(test))]
 use {
@@ -333,7 +331,8 @@ impl<'a> Resource2D<'a> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, virtio_device::fake_queue::IdentityDriverMem};
+    use super::*;
+    use virtio_device::fake_queue::IdentityDriverMem;
 
     #[fuchsia::test]
     async fn test_attach_backing() {

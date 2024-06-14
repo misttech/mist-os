@@ -43,7 +43,7 @@ closed protocol Reader {
     /// and return `data` read upon success
     strict ReadAt(struct {
         count uint64;
-        offset uint64;
+        offset uint32;
     }) -> (struct {
         status zx.Status;
         data vector<uint8>:MAX_BUF;

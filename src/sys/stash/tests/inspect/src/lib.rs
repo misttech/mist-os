@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    diagnostics_assertions::assert_data_tree,
-    diagnostics_reader::{ArchiveReader, Inspect},
-};
+use anyhow::Error;
+use diagnostics_assertions::assert_data_tree;
+use diagnostics_reader::{ArchiveReader, Inspect};
 
 #[fuchsia::test]
 async fn stash_inspect() -> Result<(), Error> {

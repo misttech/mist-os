@@ -13,32 +13,26 @@ use crate::{
     open_get_proxy_assert, open_get_vmo_file_proxy_assert_ok,
 };
 
-use crate::{
-    directory::{
-        entry::EntryInfo,
-        entry_container::Directory,
-        helper::DirectlyMutable,
-        immutable::Simple,
-        test_utils::{run_server_client, DirentsSameInodeBuilder},
-    },
-    execution_scope::ExecutionScope,
-    file,
-    path::Path,
-    test_utils::node::{open2_get_proxy, open_get_proxy},
-    test_utils::{build_flag_combinations, run_client},
-};
+use crate::directory::entry::EntryInfo;
+use crate::directory::entry_container::Directory;
+use crate::directory::helper::DirectlyMutable;
+use crate::directory::immutable::Simple;
+use crate::directory::test_utils::{run_server_client, DirentsSameInodeBuilder};
+use crate::execution_scope::ExecutionScope;
+use crate::file;
+use crate::path::Path;
+use crate::test_utils::node::{open2_get_proxy, open_get_proxy};
+use crate::test_utils::{build_flag_combinations, run_client};
 
-use {
-    assert_matches::assert_matches,
-    fidl::endpoints::{create_proxy, Proxy},
-    fidl_fuchsia_io as fio,
-    fuchsia_async::TestExecutor,
-    fuchsia_zircon_status::Status,
-    futures::TryStreamExt,
-    static_assertions::assert_eq_size,
-    std::sync::{Arc, Mutex},
-    vfs_macros::pseudo_directory,
-};
+use assert_matches::assert_matches;
+use fidl::endpoints::{create_proxy, Proxy};
+use fidl_fuchsia_io as fio;
+use fuchsia_async::TestExecutor;
+use fuchsia_zircon_status::Status;
+use futures::TryStreamExt;
+use static_assertions::assert_eq_size;
+use std::sync::{Arc, Mutex};
+use vfs_macros::pseudo_directory;
 
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
@@ -1585,5 +1579,42 @@ fn watch_addition_with_two_scopes() {
             assert_close!(etc1_proxy);
             assert_close!(root_proxy);
         }
+    });
+}
+
+#[test]
+fn watch_remove_all_entries() {
+    let root = pseudo_directory! {
+        "file1" => file::read_only(""),
+        "file2" => file::read_only(""),
+    };
+
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, root.clone(), |proxy| async move {
+        let watcher = assert_watch!(proxy, fio::WatchMask::REMOVED);
+        root.remove_all_entries();
+
+        assert_watcher_one_message_watched_events!(
+            watcher,
+            { REMOVED, "file1" },
+            { REMOVED, "file2"}
+        );
+
+        drop(watcher);
+        assert_close!(proxy);
+    });
+}
+
+#[test]
+fn open_directory_containing_itself() {
+    let root = pseudo_directory! {};
+    root.add_entry("dir", root.clone()).unwrap();
+
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |root| async move {
+        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
+
+        let sub_dir = open_get_directory_proxy_assert_ok!(&root, flags, "dir/dir/dir/dir");
+
+        assert_close!(sub_dir);
+        assert_close!(root);
     });
 }

@@ -8,17 +8,17 @@ use alloc::vec::Vec;
 use core::convert::Infallible as Never;
 
 use derivative::Derivative;
-use netstack3_base::{sync::Mutex, Device, DeviceIdContext};
+use log::trace;
+use netstack3_base::sync::Mutex;
+use netstack3_base::{Device, DeviceIdContext};
 use packet::{
     new_buf_vec, Buf, BufferAlloc, ContiguousBuffer, GrowBufferMut, NoReuseBufferProvider,
     ReusableBuffer, Serializer,
 };
 
-use crate::internal::{
-    base::DeviceSendFrameError,
-    queue::{fifo, DequeueState, EnqueueResult, TransmitQueueFrameError},
-    socket::{DeviceSocketHandler, ParseSentFrameError, SentFrame},
-};
+use crate::internal::base::DeviceSendFrameError;
+use crate::internal::queue::{fifo, DequeueState, EnqueueResult, TransmitQueueFrameError};
+use crate::internal::socket::{DeviceSocketHandler, ParseSentFrameError, SentFrame};
 
 /// State associated with a device transmit queue.
 #[derive(Derivative)]
@@ -161,12 +161,76 @@ pub(super) fn deliver_to_device_sockets<
             bytes,
         ),
         Err(ParseSentFrameError) => {
-            tracing::trace!(
-                "failed to parse outgoing frame on {:?} ({} bytes)",
-                device_id,
-                bytes.len()
-            )
+            trace!("failed to parse outgoing frame on {:?} ({} bytes)", device_id, bytes.len())
         }
+    }
+}
+
+impl EnqueueResult {
+    fn maybe_wake_tx<D, BC: TransmitQueueBindingsContext<D>>(
+        self,
+        bindings_ctx: &mut BC,
+        device_id: &D,
+    ) {
+        match self {
+            Self::QueuePreviouslyWasOccupied => (),
+            Self::QueueWasPreviouslyEmpty => bindings_ctx.wake_tx_task(device_id),
+        }
+    }
+}
+
+enum EnqueueStatus<Meta, Buffer> {
+    NotAttempted(Meta, Buffer),
+    Attempted,
+}
+
+// Extracted to a function without the generic serializer parameter to ease code
+// generation.
+fn insert_and_notify<
+    D: Device,
+    BC: TransmitQueueBindingsContext<CC::DeviceId>,
+    CC: TransmitQueueContext<D, BC> + DeviceSocketHandler<D, BC>,
+>(
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
+    inserter: Option<fifo::QueueTxInserter<'_, CC::Meta, CC::Buffer>>,
+    meta: CC::Meta,
+    body: CC::Buffer,
+) -> EnqueueStatus<CC::Meta, CC::Buffer> {
+    match inserter {
+        // No TX queue so send the frame immediately.
+        None => EnqueueStatus::NotAttempted(meta, body),
+        Some(inserter) => {
+            inserter.insert(meta, body).maybe_wake_tx(bindings_ctx, device_id);
+            EnqueueStatus::Attempted
+        }
+    }
+}
+
+// Extracted to a function without the generic serializer parameter to ease code
+// generation.
+fn handle_post_enqueue<
+    D: Device,
+    BC: TransmitQueueBindingsContext<CC::DeviceId>,
+    CC: TransmitQueueContext<D, BC> + DeviceSocketHandler<D, BC>,
+>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
+    status: EnqueueStatus<CC::Meta, CC::Buffer>,
+) -> Result<(), DeviceSendFrameError<()>> {
+    match status {
+        EnqueueStatus::NotAttempted(meta, body) => {
+            // TODO(https://fxbug.dev/42077654): Deliver the frame to packet
+            // sockets and to the device atomically.
+            deliver_to_device_sockets(core_ctx, bindings_ctx, device_id, &body, &meta);
+            // Send the frame while not holding the TX queue exclusively to
+            // not block concurrent senders from making progress.
+            core_ctx
+                .send_frame(bindings_ctx, device_id, meta, body)
+                .map_err(|_| DeviceSendFrameError::DeviceNotReady(()))
+        }
+        EnqueueStatus::Attempted => Ok(()),
     }
 }
 
@@ -190,47 +254,23 @@ where
         S: Serializer,
         S::Buffer: ReusableBuffer,
     {
-        enum EnqueueStatus<N> {
-            NotAttempted(N),
-            Attempted,
-        }
-
         let result =
             self.with_transmit_queue_mut(device_id, |TransmitQueueState { allocator, queue }| {
-                let get_buffer = |body: S| {
-                    body.serialize_outer(NoReuseBufferProvider(allocator))
-                        .map_err(|(_e, s)| TransmitQueueFrameError::SerializeError(s))
+                let inserter = match queue {
+                    None => None,
+                    Some(q) => match q.tx_inserter() {
+                        Some(i) => Some(i),
+                        None => return Err(TransmitQueueFrameError::QueueFull(body)),
+                    },
                 };
-
-                match queue {
-                    // No TX queue so send the frame immediately.
-                    None => get_buffer(body).map(|buf| EnqueueStatus::NotAttempted((buf, meta))),
-                    Some(queue) => queue.queue_tx_frame(meta, body, get_buffer).map(|res| {
-                        match res {
-                            EnqueueResult::QueueWasPreviouslyEmpty => {
-                                bindings_ctx.wake_tx_task(device_id);
-                            }
-                            EnqueueResult::QueuePreviouslyWasOccupied => {}
-                        }
-
-                        EnqueueStatus::Attempted
-                    }),
-                }
+                let body = body
+                    .serialize_outer(NoReuseBufferProvider(allocator))
+                    .map_err(|(_e, s)| TransmitQueueFrameError::SerializeError(s))?;
+                Ok(insert_and_notify::<_, _, CC>(bindings_ctx, device_id, inserter, meta, body))
             })?;
 
-        match result {
-            EnqueueStatus::NotAttempted((body, meta)) => {
-                // TODO(https://fxbug.dev/42077654): Deliver the frame to packet
-                // sockets and to the device atomically.
-                deliver_to_device_sockets(self, bindings_ctx, device_id, &body, &meta);
-                // Send the frame while not holding the TX queue exclusively to
-                // not block concurrent senders from making progress.
-                self.send_frame(bindings_ctx, device_id, meta, body).map_err(|_| {
-                    TransmitQueueFrameError::NoQueue(DeviceSendFrameError::DeviceNotReady(()))
-                })
-            }
-            EnqueueStatus::Attempted => Ok(()),
-        }
+        handle_post_enqueue(self, bindings_ctx, device_id, result)
+            .map_err(TransmitQueueFrameError::NoQueue)
     }
 }
 
@@ -254,16 +294,15 @@ mod tests {
 
     use net_declare::net_mac;
     use net_types::ethernet::Mac;
-    use netstack3_base::{
-        testutil::{FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId},
-        ContextPair, CtxPair, WorkQueueReport,
+    use netstack3_base::testutil::{
+        FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId,
     };
+    use netstack3_base::{ContextPair, CtxPair, WorkQueueReport};
     use test_case::test_case;
 
-    use crate::internal::{
-        queue::{api::TransmitQueueApi, MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN},
-        socket::{EthernetFrame, Frame},
-    };
+    use crate::internal::queue::api::TransmitQueueApi;
+    use crate::internal::queue::{MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN};
+    use crate::internal::socket::{EthernetFrame, Frame};
 
     #[derive(Default)]
     struct FakeTxQueueState {

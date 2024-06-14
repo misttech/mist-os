@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    cm_types::IterablePath,
-    fidl_fuchsia_component_sandbox as fsandbox,
-    router_error::RouterError,
-    sandbox::{Capability, Dict, Request, Routable},
-};
+use async_trait::async_trait;
+use cm_types::IterablePath;
+use fidl_fuchsia_component_sandbox as fsandbox;
+use router_error::RouterError;
+use sandbox::{Capability, Dict, Request, Routable};
 
 #[async_trait]
 pub trait DictExt {

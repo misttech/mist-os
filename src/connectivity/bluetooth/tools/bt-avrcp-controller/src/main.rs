@@ -2,32 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    argh::FromArgs,
-    fidl::endpoints::create_endpoints,
-    fidl_fuchsia_bluetooth_avrcp::{
-        self as fidl_avrcp, AttributeRequestOption, BrowseControllerMarker, BrowseControllerProxy,
-        ControllerEvent, ControllerEventStream, ControllerMarker, ControllerProxy,
-        MediaAttributeId, Notifications, PeerManagerMarker, PlayerApplicationSettingAttributeId,
-        MAX_ATTRIBUTES,
-    },
-    fidl_fuchsia_bluetooth_avrcp_test::{
-        BrowseControllerExtMarker, BrowseControllerExtProxy, ControllerExtMarker,
-        ControllerExtProxy, PeerManagerExtMarker,
-    },
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::types::PeerId,
-    fuchsia_component::client::connect_to_protocol,
-    futures::{
-        channel::mpsc::{channel, SendError},
-        select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt,
-    },
-    hex::FromHex,
-    rustyline::{error::ReadlineError, CompletionType, Config, EditMode, Editor},
-    std::pin::pin,
-    std::{str::FromStr as _, thread},
+use anyhow::{format_err, Context as _, Error};
+use argh::FromArgs;
+use fidl::endpoints::create_endpoints;
+use fidl_fuchsia_bluetooth_avrcp::{
+    self as fidl_avrcp, AttributeRequestOption, BrowseControllerMarker, BrowseControllerProxy,
+    ControllerEvent, ControllerEventStream, ControllerMarker, ControllerProxy, MediaAttributeId,
+    Notifications, PeerManagerMarker, PlayerApplicationSettingAttributeId, MAX_ATTRIBUTES,
 };
+use fidl_fuchsia_bluetooth_avrcp_test::{
+    BrowseControllerExtMarker, BrowseControllerExtProxy, ControllerExtMarker, ControllerExtProxy,
+    PeerManagerExtMarker,
+};
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_component::client::connect_to_protocol;
+use futures::channel::mpsc::{channel, SendError};
+use futures::{select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryStreamExt};
+use hex::FromHex;
+use rustyline::error::ReadlineError;
+use rustyline::{CompletionType, Config, EditMode, Editor};
+use std::pin::pin;
+use std::str::FromStr as _;
+use std::thread;
 
 use crate::commands::{avc_match_string, Cmd, CmdHelper, ReplControl};
 

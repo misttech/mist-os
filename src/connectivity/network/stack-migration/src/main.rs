@@ -4,13 +4,14 @@
 
 use async_utils::stream::FlattenUnorderedExt as _;
 use cobalt_client::traits::AsEventCode as _;
-use fidl_fuchsia_metrics as fmetrics;
-use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_inspect::Property as _;
 use futures::StreamExt as _;
 use networking_metrics_registry::networking_metrics_registry as metrics_registry;
 use tracing::{error, info, warn};
+use {
+    fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration,
+};
 
 const DEFAULT_NETSTACK: NetstackVersion = NetstackVersion::Netstack2;
 

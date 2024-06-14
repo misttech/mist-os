@@ -4,7 +4,8 @@
 
 use camino::Utf8PathBuf;
 use schemars::JsonSchema;
-use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::Error;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Diagnostics configuration options for the diagnostics area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]

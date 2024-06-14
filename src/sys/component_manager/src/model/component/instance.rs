@@ -2,83 +2,69 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess};
+use crate::bedrock::program_output_dict::build_program_output_dictionary;
+use crate::framework::{build_framework_dictionary, controller};
+use crate::model::actions::{shutdown, ActionsManager, DiscoverAction, StopAction};
+use crate::model::component::{
+    Component, ComponentInstance, ExtendedInstance, IncarnationId, Package, StartReason,
+    WeakComponentInstance, WeakExtendedInstance,
+};
+use crate::model::context::ModelContext;
+use crate::model::environment::Environment;
+use crate::model::escrow::{self, EscrowedState};
+use crate::model::namespace::create_namespace;
+use crate::model::routing::legacy::RouteRequestExt;
+use crate::model::routing::router_ext::{RouterExt, WeakComponentTokenExt};
+use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
+use crate::model::routing::{self, RoutingError};
+use crate::model::start::Start;
+use crate::model::storage::build_storage_admin_dictionary;
+use crate::model::token::{InstanceToken, InstanceTokenState};
+use crate::sandbox_util::RoutableExt;
+use ::routing::bedrock::sandbox_construction::{
+    self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
+};
+use ::routing::bedrock::structured_dict::{ComponentInput, StructuredDictMap};
+use ::routing::capability_source::ComponentCapability;
+use ::routing::component_instance::{
+    ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
+};
+use ::routing::error::ComponentInstanceError;
+use ::routing::resolving::{ComponentAddress, ComponentResolutionContext};
+use ::routing::DictExt;
+use async_trait::async_trait;
+use async_utils::async_once::Once;
+use clonable_error::ClonableError;
+use cm_fidl_validator::error::{DeclType, Error as ValidatorError};
+use cm_logger::scoped::ScopedLogger;
+use cm_rust::{
+    CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
+    FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
+};
+use cm_types::Name;
+use config_encoder::ConfigFields;
+use errors::{
+    AddChildError, AddDynamicChildError, CreateNamespaceError, DynamicCapabilityError,
+    OpenOutgoingDirError, ResolveActionError, StopError,
+};
+use fidl::endpoints::ServerEnd;
+use futures::future::BoxFuture;
+use hooks::{CapabilityReceiver, EventPayload};
+use moniker::{ChildName, ExtendedMoniker, Moniker};
+use router_error::RouterError;
+use sandbox::{
+    Capability, Dict, Open, RemotableCapability, Request, Routable, Router, WeakComponentToken,
+};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::sync::Arc;
+use tracing::warn;
+use vfs::directory::immutable::simple as pfs;
+use vfs::path::Path;
 use {
-    crate::{
-        bedrock::{
-            program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
-            program_output_dict::build_program_output_dictionary,
-        },
-        framework::{build_framework_dictionary, controller},
-        model::{
-            actions::{shutdown, ActionsManager, DiscoverAction, StopAction},
-            component::{
-                Component, ComponentInstance, IncarnationId, Package, StartReason,
-                WeakComponentInstance, WeakExtendedInstance,
-            },
-            context::ModelContext,
-            environment::Environment,
-            escrow::{self, EscrowedState},
-            namespace::create_namespace,
-            routing::{
-                self,
-                router_ext::RouterExt,
-                router_ext::WeakComponentTokenExt,
-                service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
-                RoutingError,
-            },
-            routing_fns::RouteEntry,
-            start::Start,
-            storage::build_storage_admin_dictionary,
-            token::{InstanceToken, InstanceTokenState},
-        },
-        sandbox_util::RoutableExt,
-    },
-    ::routing::{
-        bedrock::{
-            sandbox_construction::{
-                self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
-            },
-            structured_dict::{ComponentInput, StructuredDictMap},
-        },
-        capability_source::ComponentCapability,
-        component_instance::{
-            ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
-        },
-        resolving::{ComponentAddress, ComponentResolutionContext},
-        DictExt,
-    },
-    async_trait::async_trait,
-    async_utils::async_once::Once,
-    clonable_error::ClonableError,
-    cm_fidl_validator::error::DeclType,
-    cm_fidl_validator::error::Error as ValidatorError,
-    cm_logger::scoped::ScopedLogger,
-    cm_rust::{
-        CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
-        FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
-    },
-    cm_types::Name,
-    config_encoder::ConfigFields,
-    errors::{
-        AddChildError, AddDynamicChildError, CreateNamespaceError, DynamicCapabilityError,
-        OpenOutgoingDirError, ResolveActionError, StopError,
-    },
-    fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::future::BoxFuture,
-    hooks::{CapabilityReceiver, EventPayload},
-    moniker::{ChildName, Moniker},
-    sandbox::{
-        Capability, CapabilityTrait, Dict, Open, Request, Routable, Router, WeakComponentToken,
-    },
-    std::{
-        collections::{HashMap, HashSet},
-        fmt,
-        sync::Arc,
-    },
-    tracing::warn,
-    vfs::{directory::immutable::simple as pfs, path::Path},
 };
 
 /// The mutable state of a component instance.
@@ -609,17 +595,18 @@ impl ResolvedInstanceState {
     /// [`Router`]s. This [`Dict`] is used to generate the `exposed_dir`. This function creates a new [`Dict`],
     /// so allocation cost is paid only when called.
     pub async fn make_exposed_dict(&self) -> Dict {
+        let component = self.weak_component.upgrade().unwrap();
         let dict = Router::dict_routers_to_open(
-            &WeakComponentToken::new(self.weak_component.clone()),
-            &self.weak_component.upgrade().unwrap().execution_scope,
+            &WeakComponentToken::new_component(self.weak_component.clone()),
+            &component.execution_scope,
             &self.sandbox.component_output_dict,
         );
-        Self::extend_exposed_dict_with_legacy(&self.weak_component, self.decl(), &dict);
+        Self::extend_exposed_dict_with_legacy(&component, self.decl(), &dict);
         dict
     }
 
     fn extend_exposed_dict_with_legacy(
-        component: &WeakComponentInstance,
+        component: &Arc<ComponentInstance>,
         decl: &cm_rust::ComponentDecl,
         target_dict: &Dict,
     ) {
@@ -627,23 +614,12 @@ impl ResolvedInstanceState {
         let exposes = decl.exposes.iter().filter(|e| !sandbox_construction::is_supported_expose(e));
         let exposes_by_target_name = routing::aggregate_exposes(exposes);
         for (target_name, exposes) in exposes_by_target_name {
-            // If there are multiple exposes, choosing the first expose for `cap`. `cap` is only used
-            // for debug info.
-            //
-            // TODO(https://fxbug.dev/42124541): This could lead to incomplete debug output because the source name
-            // is what's printed, so if the exposes have different source names only one of them will
-            // appear in the output. However, in practice routing is unlikely to fail for an aggregate
-            // because the algorithm typically terminates once an aggregate is found. Find a more robust
-            // solution, such as including all exposes or switching to the target name.
-            let first_expose = *exposes.first().expect("empty exposes is impossible");
-            let cap = ComponentCapability::Expose(first_expose.clone());
-            let type_name = cap.type_name();
             let request = match routing::request_for_namespace_capability_expose(exposes) {
                 Some(r) => r,
                 None => continue,
             };
-            let open = Open::new(RouteEntry::new(component.clone(), request, type_name.into()));
-            match target_dict.insert_capability(target_name, open.into()) {
+            let capability = request.into_capability(component);
+            match target_dict.insert_capability(target_name, capability) {
                 Ok(()) => (),
                 Err(e) => warn!("failed to insert {} in target dict: {e:?}", target_name),
             };
@@ -1267,15 +1243,26 @@ struct CapabilityRequestedHook {
 
 #[async_trait]
 impl Routable for CapabilityRequestedHook {
-    async fn route(&self, request: Request) -> Result<Capability, router_error::RouterError> {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+        fn cm_unexpected() -> RouterError {
+            RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
+        }
+
+        let ExtendedMoniker::ComponentInstance(target_moniker) = request.target.moniker() else {
+            return Err(cm_unexpected());
+        };
         self.source
             .ensure_started(&StartReason::AccessCapability {
-                target: request.target.moniker().clone(),
+                target: target_moniker,
                 name: self.name.clone(),
             })
             .await?;
         let source = self.source.upgrade().map_err(RoutingError::from)?;
-        let target = request.target.upgrade().map_err(RoutingError::from)?;
+        let ExtendedInstance::Component(target) =
+            request.target.upgrade().map_err(RoutingError::from)?
+        else {
+            return Err(cm_unexpected());
+        };
         let (receiver, sender) = CapabilityReceiver::new();
         let event = target.new_event(EventPayload::CapabilityRequested {
             source_moniker: source.moniker.clone(),
@@ -1283,10 +1270,12 @@ impl Routable for CapabilityRequestedHook {
             receiver: receiver.clone(),
         });
         source.hooks.dispatch(&event).await;
-        if receiver.is_taken() {
-            Ok(sender.into())
+        let capability =
+            if receiver.is_taken() { sender.into() } else { self.capability.clone().into() };
+        if !request.debug {
+            Ok(capability)
         } else {
-            Ok(self.capability.clone().into())
+            Ok(Capability::Component(WeakComponentToken::new_component(self.source.clone())))
         }
     }
 }

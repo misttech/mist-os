@@ -1,4 +1,5 @@
-use {anyhow::Result, fuchsia_async as fasync};
+use anyhow::Result;
+use fuchsia_async as fasync;
 
 // [START example]
 #[fasync::run_singlethreaded(test)]

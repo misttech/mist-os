@@ -622,8 +622,8 @@ func (t *Device) Wait(context.Context) error {
 }
 
 // Config returns fields describing the target.
-func (t *Device) TestConfig(netboot bool) (any, error) {
-	return TargetInfo(t, netboot, t.config.PDU)
+func (t *Device) TestConfig(expectsSSH bool) (any, error) {
+	return TargetInfo(t, expectsSSH, t.config.PDU)
 }
 
 func parseOutSigners(keyPaths []string) ([]ssh.Signer, error) {

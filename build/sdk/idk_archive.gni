@@ -57,10 +57,10 @@ template("idk_archive") {
     outputs = [ files.tarmaker_manifest ]
     deps = [ invoker.idk ]
 
-    binary_label = "//build/sdk:generate_idk_archive_manifest"
+    binary_label = "//build/sdk:generate_archive_manifest_from_idk_directory"
 
     args = [
-      "--exported-idk-dir",
+      "--input-dir",
       rebase_path(files.exported_dir, root_build_dir),
       "--output",
       rebase_path(files.tarmaker_manifest, root_build_dir),

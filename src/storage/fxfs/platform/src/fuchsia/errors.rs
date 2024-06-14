@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    delivery_blob::{compression::ChunkedArchiveError, DeliveryBlobError},
-    fuchsia_zircon::Status,
-    fxfs::{errors::FxfsError, log::*},
-};
+use delivery_blob::compression::ChunkedArchiveError;
+use delivery_blob::DeliveryBlobError;
+use fuchsia_zircon::Status;
+use fxfs::errors::FxfsError;
+use fxfs::log::*;
 
 pub fn map_to_status(err: anyhow::Error) -> Status {
     if let Some(status) = err.root_cause().downcast_ref::<Status>() {

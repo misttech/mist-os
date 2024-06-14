@@ -2,37 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        access_point::types,
-        mode_management::{Defect, IfaceFailure},
-        telemetry::{TelemetryEvent, TelemetrySender},
-        util::{
-            listener::{
-                ApListenerMessageSender, ApStateUpdate, ApStatesUpdate, ConnectedClientInformation,
-                Message::NotifyListeners,
-            },
-            state_machine::{self, ExitReason, IntoStateExt},
-        },
-    },
-    anyhow::format_err,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async::{self as fasync, DurationExt},
-    fuchsia_sync::Mutex,
-    fuchsia_zircon::{self as zx, DurationNum},
-    futures::{
-        channel::{mpsc, oneshot},
-        future::FutureExt,
-        select,
-        stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt},
-    },
-    std::{convert::Infallible, sync::Arc},
-    tracing::{info, warn},
-    wlan_common::{
-        channel::{Cbw, Channel},
-        RadioConfig,
-    },
+use crate::access_point::types;
+use crate::mode_management::{Defect, IfaceFailure};
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use crate::util::listener::Message::NotifyListeners;
+use crate::util::listener::{
+    ApListenerMessageSender, ApStateUpdate, ApStatesUpdate, ConnectedClientInformation,
 };
+use crate::util::state_machine::{self, ExitReason, IntoStateExt};
+use anyhow::format_err;
+use fidl_fuchsia_wlan_sme as fidl_sme;
+use fuchsia_async::{self as fasync, DurationExt};
+use fuchsia_sync::Mutex;
+use fuchsia_zircon::{self as zx, DurationNum};
+use futures::channel::{mpsc, oneshot};
+use futures::future::FutureExt;
+use futures::select;
+use futures::stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt};
+use std::convert::Infallible;
+use std::sync::Arc;
+use tracing::{info, warn};
+use wlan_common::channel::{Cbw, Channel};
+use wlan_common::RadioConfig;
 
 const AP_STATUS_INTERVAL_SEC: i64 = 10;
 
@@ -561,15 +552,15 @@ async fn started_state(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::util::listener,
-        fidl::endpoints::create_proxy,
-        fidl_fuchsia_wlan_common as fidl_common,
-        futures::{stream::StreamFuture, task::Poll, Future},
-        std::pin::pin,
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use crate::util::listener;
+    use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_wlan_common as fidl_common;
+    use futures::stream::StreamFuture;
+    use futures::task::Poll;
+    use futures::Future;
+    use std::pin::pin;
+    use wlan_common::assert_variant;
 
     struct TestValues {
         deps: CommonStateDependencies,

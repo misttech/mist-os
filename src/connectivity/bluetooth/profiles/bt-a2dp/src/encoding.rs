@@ -3,20 +3,17 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context as _, Error};
-use bt_a2dp as a2dp;
 use fidl_fuchsia_media::{AudioFormat, AudioUncompressedFormat, DomainFormat, PcmFormat};
-use fuchsia_async as fasync;
 use fuchsia_audio_codec::StreamProcessor;
-use fuchsia_trace as trace;
 use fuchsia_zircon::{self as zx, DurationNum};
-use futures::{
-    io::AsyncWrite,
-    stream::BoxStream,
-    task::{Context, Poll},
-    FutureExt, Stream, StreamExt,
-};
-use std::{collections::VecDeque, pin::Pin};
+use futures::io::AsyncWrite;
+use futures::stream::BoxStream;
+use futures::task::{Context, Poll};
+use futures::{FutureExt, Stream, StreamExt};
+use std::collections::VecDeque;
+use std::pin::Pin;
 use tracing::info;
+use {bt_a2dp as a2dp, fuchsia_async as fasync, fuchsia_trace as trace};
 
 pub struct EncodedStream {
     /// The input media stream

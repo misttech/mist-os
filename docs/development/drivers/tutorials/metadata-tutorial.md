@@ -11,7 +11,7 @@ metadata between drivers with less code.
 You can find an example of drivers sending, retrieving and forwarding metadata
 [here](/examples/drivers/metadata).
 
-## Metadata defintion
+## Metadata definition
 First, the type of metadata must be defined as a FIDL type:
 
 ```

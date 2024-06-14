@@ -4,19 +4,16 @@
 
 #![cfg(test)]
 
-use {
-    crate::task_metrics::{
-        runtime_stats_source::*,
-        task_info::{TaskInfo, TaskState},
-    },
-    async_trait::async_trait,
-    fuchsia_async::{self as fasync, DurationExt},
-    fuchsia_zircon::sys as zx_sys,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{channel::oneshot, lock::Mutex},
-    injectable_time::{IncrementingFakeTime, TimeSource},
-    std::{collections::VecDeque, sync::Arc},
-};
+use crate::task_metrics::runtime_stats_source::*;
+use crate::task_metrics::task_info::{TaskInfo, TaskState};
+use async_trait::async_trait;
+use fuchsia_async::{self as fasync, DurationExt};
+use fuchsia_zircon::{self as zx, sys as zx_sys, AsHandleRef};
+use futures::channel::oneshot;
+use futures::lock::Mutex;
+use injectable_time::{IncrementingFakeTime, TimeSource};
+use std::collections::VecDeque;
+use std::sync::Arc;
 
 /// Mock for a Task. Holds a queue of runtime infos (measurements) that will be fetched for test
 /// purposes.

@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_utils::stream::FutureMap,
-    fidl_fuchsia_bluetooth_bredr as bredr,
-    fuchsia_bluetooth::types::PeerId,
-    futures::StreamExt,
-    profile_client::{ProfileClient, ProfileEvent},
-    std::collections::hash_map::Entry,
-    tracing::{debug, error, info},
-};
+use async_utils::stream::FutureMap;
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_bluetooth::types::PeerId;
+use futures::StreamExt;
+use profile_client::{ProfileClient, ProfileEvent};
+use std::collections::hash_map::Entry;
+use tracing::{debug, error, info};
 
 use crate::peer_task::PeerTask;
 
@@ -83,8 +81,7 @@ mod tests {
 
     use async_test_helpers::run_while;
     use async_utils::PollExt;
-    use fuchsia_async as fasync;
-    use test_profile_server;
+    use {fuchsia_async as fasync, test_profile_server};
 
     #[fuchsia::test]
     fn search_result_creates_peer_task() {

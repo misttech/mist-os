@@ -10,10 +10,12 @@ use fidl_fuchsia_bluetooth_avdtp_test::{
     PeerManagerControlHandle, PeerManagerRequest, PeerManagerRequestStream,
 };
 use fuchsia_async as fasync;
-use fuchsia_bluetooth::{detachable_map::DetachableWeak, types::PeerId};
+use fuchsia_bluetooth::detachable_map::DetachableWeak;
+use fuchsia_bluetooth::types::PeerId;
 use fuchsia_sync::Mutex;
 use futures::{TryFutureExt, TryStreamExt};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use crate::peer::Peer;
@@ -396,11 +398,13 @@ mod tests {
     use fidl_fuchsia_bluetooth_avdtp_test::*;
     use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
     use fuchsia_async as fasync;
-    use fuchsia_bluetooth::{detachable_map::DetachableMap, types::Channel};
+    use fuchsia_bluetooth::detachable_map::DetachableMap;
+    use fuchsia_bluetooth::types::Channel;
     use futures::StreamExt;
 
     use crate::media_task::tests::TestMediaTaskBuilder;
-    use crate::stream::{tests::make_sbc_endpoint, Stream, Streams};
+    use crate::stream::tests::make_sbc_endpoint;
+    use crate::stream::{Stream, Streams};
 
     /// Reads from the AVDTP request stream, sending back acknowledgements, unless otherwise noted.
     async fn listen_for_avdtp_requests(remote: Channel) {

@@ -5,9 +5,10 @@
 use crate::input_device::{Handled, InputDeviceEvent, InputDeviceType, InputEvent};
 use crate::input_handler::InputHandler;
 use async_trait::async_trait;
+use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::{
-    self as inspect, health::Reporter, ExponentialHistogramParams, HistogramProperty, Inspector,
-    NumericProperty, Property,
+    self as inspect, ExponentialHistogramParams, HistogramProperty, Inspector, NumericProperty,
+    Property,
 };
 use fuchsia_zircon as zx;
 use futures::lock::Mutex;
@@ -348,24 +349,21 @@ fn record_lazy_recent_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        input_device::{self, InputDeviceDescriptor},
-        keyboard_binding::KeyboardDeviceDescriptor,
-        light_sensor::types::Rgbc,
-        light_sensor_binding::{LightSensorDeviceDescriptor, LightSensorEvent},
-        mouse_binding::{
-            MouseDeviceDescriptor, MouseLocation, MousePhase, PrecisionScroll, RawWheelDelta,
-            WheelDelta,
-        },
-        testing_utilities::{
-            consumer_controls_device_descriptor, create_consumer_controls_event,
-            create_fake_handled_input_event, create_fake_input_event, create_keyboard_event,
-            create_mouse_event, create_touch_contact, create_touch_screen_event,
-            create_touchpad_event,
-        },
-        touch_binding::{TouchScreenDeviceDescriptor, TouchpadDeviceDescriptor},
-        utils::Position,
+    use crate::input_device::{self, InputDeviceDescriptor};
+    use crate::keyboard_binding::KeyboardDeviceDescriptor;
+    use crate::light_sensor::types::Rgbc;
+    use crate::light_sensor_binding::{LightSensorDeviceDescriptor, LightSensorEvent};
+    use crate::mouse_binding::{
+        MouseDeviceDescriptor, MouseLocation, MousePhase, PrecisionScroll, RawWheelDelta,
+        WheelDelta,
     };
+    use crate::testing_utilities::{
+        consumer_controls_device_descriptor, create_consumer_controls_event,
+        create_fake_handled_input_event, create_fake_input_event, create_keyboard_event,
+        create_mouse_event, create_touch_contact, create_touch_screen_event, create_touchpad_event,
+    };
+    use crate::touch_binding::{TouchScreenDeviceDescriptor, TouchpadDeviceDescriptor};
+    use crate::utils::Position;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_input_report::InputDeviceMarker;

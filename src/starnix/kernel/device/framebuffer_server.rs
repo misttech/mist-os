@@ -12,39 +12,34 @@
 
 use crate::task::Kernel;
 use anyhow::anyhow;
-use fidl::{
-    endpoints::{create_proxy, create_request_stream, ClientEnd},
-    HandleBased,
-};
-use fidl_fuchsia_element as felement;
-use fidl_fuchsia_images2 as fimages2;
-use fidl_fuchsia_math as fmath;
-use fidl_fuchsia_sysmem2 as fsysmem2;
-use fidl_fuchsia_ui_composition as fuicomposition;
-use fidl_fuchsia_ui_views as fuiviews;
+use fidl::endpoints::{create_proxy, create_request_stream, ClientEnd};
+use fidl::HandleBased;
 use flatland_frame_scheduling_lib::{
     PresentationInfo, PresentedInfo, SchedulingLib, ThroughputScheduler,
 };
-use fuchsia_async as fasync;
 use fuchsia_component::client::{
     connect_to_protocol, connect_to_protocol_at_dir_root, connect_to_protocol_sync,
 };
-use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
-use fuchsia_scenic::{flatland::ViewCreationTokenPair, BufferCollectionTokenPair};
-use fuchsia_zircon as zx;
-use futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    FutureExt, StreamExt,
-};
+use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
+use fuchsia_framebuffer::FrameUsage;
+use fuchsia_scenic::flatland::ViewCreationTokenPair;
+use fuchsia_scenic::BufferCollectionTokenPair;
+use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::{FutureExt, StreamExt};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_sync::Mutex;
-use std::{
-    ops::{Deref, DerefMut},
-    sync::{mpsc::channel, Arc},
+use std::ops::{Deref, DerefMut};
+use std::sync::mpsc::channel;
+use std::sync::Arc;
+use {
+    fidl_fuchsia_element as felement, fidl_fuchsia_images2 as fimages2, fidl_fuchsia_math as fmath,
+    fidl_fuchsia_sysmem2 as fsysmem2, fidl_fuchsia_ui_composition as fuicomposition,
+    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 use starnix_logging::log_error;
-use starnix_uapi::{errno, errors::Errno};
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
 
 /// The offset at which the framebuffer will be placed.
 pub const TRANSLATION_X: i32 = 0;

@@ -63,23 +63,19 @@ pub mod action;
 pub mod branch;
 pub mod buffered;
 
-use {
-    anyhow::Context as _,
-    std::{
-        convert::Infallible,
-        fmt::{Debug, Display},
-        marker::PhantomData,
-        ops::{ControlFlow, RangeBounds},
-        thread,
-    },
-};
+use anyhow::Context as _;
+use std::convert::Infallible;
+use std::fmt::{Debug, Display};
+use std::marker::PhantomData;
+use std::ops::{ControlFlow, RangeBounds};
+use std::thread;
 
-pub use crate::event::{
-    convert::Try,
-    extract::{extract, extract_and_match, Stateful},
-    filter::{on_join_bss, on_scan, on_set_channel, on_set_country, on_start_mac, on_transmit},
-    Handled::{Matched, Unmatched},
+pub use crate::event::convert::Try;
+pub use crate::event::extract::{extract, extract_and_match, Stateful};
+pub use crate::event::filter::{
+    on_join_bss, on_scan, on_set_channel, on_set_country, on_start_mac, on_transmit,
 };
+pub use crate::event::Handled::{Matched, Unmatched};
 
 // The WLAN tap `WlanSoftmacStart` function has no parameters and so, unlike other events, there is
 // no corresponding FIDL type to import. This zero-sized type represents this event. For example,

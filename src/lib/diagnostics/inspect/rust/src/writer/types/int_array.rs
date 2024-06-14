@@ -81,11 +81,9 @@ impl ArithmeticArrayProperty for IntArrayProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        assert_update_is_atomic,
-        writer::{testing_utils::GetBlockExt, Length},
-        Inspector,
-    };
+    use crate::writer::testing_utils::GetBlockExt;
+    use crate::writer::Length;
+    use crate::{assert_update_is_atomic, Inspector};
 
     #[fuchsia::test]
     fn test_int_array() {

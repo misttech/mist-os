@@ -2,32 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::{BinderDriver, DeviceOps, RemoteBinderConnection},
-    mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags},
-    task::{with_current_task, CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString, NamespaceNode,
-    },
-};
+use crate::device::{BinderDriver, DeviceOps, RemoteBinderConnection};
+use crate::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
+use crate::task::{with_current_task, CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString, NamespaceNode};
 use anyhow::{Context, Error};
 use derivative::Derivative;
-use fidl::{
-    endpoints::{ClientEnd, ControlHandle, RequestStream, ServerEnd},
-    AsHandleRef,
-};
-use fidl_fuchsia_posix as fposix;
-use fidl_fuchsia_starnix_binder as fbinder;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{
-    channel::oneshot,
-    future::{FutureExt, TryFutureExt},
-    pin_mut, select,
-    task::Poll,
-    Future, Stream, StreamExt, TryStreamExt,
-};
+use fidl::endpoints::{ClientEnd, ControlHandle, RequestStream, ServerEnd};
+use fidl::AsHandleRef;
+use futures::channel::oneshot;
+use futures::future::{FutureExt, TryFutureExt};
+use futures::task::Poll;
+use futures::{pin_mut, select, Future, Stream, StreamExt, TryStreamExt};
 use starnix_lifecycle::DropWaiter;
 use starnix_logging::{
     log_error, log_warn, trace_duration, trace_flow_begin, trace_flow_end, trace_flow_step,
@@ -35,21 +22,19 @@ use starnix_logging::{
 };
 use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use starnix_uapi::{
-    device_type::DeviceType,
-    errno, errno_from_code, error,
-    errors::{Errno, ErrnoCode, EAGAIN, EINTR},
-    open_flags::OpenFlags,
-    pid_t, uapi,
-    user_address::{UserAddress, UserCString, UserRef},
-    vfs::FdEvents,
-    PATH_MAX,
-};
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    ffi::CStr,
-    rc::Rc,
-    sync::{Arc, Weak},
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errors::{Errno, ErrnoCode, EAGAIN, EINTR};
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::vfs::FdEvents;
+use starnix_uapi::{errno, errno_from_code, error, pid_t, uapi, PATH_MAX};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::ffi::CStr;
+use std::rc::Rc;
+use std::sync::{Arc, Weak};
+use {
+    fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 // The name used to track the duration of a remote binder ioctl.
@@ -1053,20 +1038,19 @@ async fn select_first<O>(f1: impl Future<Output = O>, f2: impl Future<Output = O
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        device::{binder::tests::run_process_accessor, BinderFs},
-        mm::MemoryAccessor,
-        testing::*,
-        vfs::{FileSystemOptions, WhatToMount},
-    };
-    use fidl::{
-        endpoints::{create_endpoints, create_proxy, Proxy},
-        HandleBased,
-    };
+    use crate::device::binder::tests::run_process_accessor;
+    use crate::device::BinderFs;
+    use crate::mm::MemoryAccessor;
+    use crate::testing::*;
+    use crate::vfs::{FileSystemOptions, WhatToMount};
+    use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
+    use fidl::HandleBased;
     use once_cell::sync::Lazy;
     use rand::distributions::{Alphanumeric, DistString};
-    use starnix_uapi::{file_mode::mode, mount_flags::MountFlags};
-    use std::{collections::BTreeMap, ffi::CString};
+    use starnix_uapi::file_mode::mode;
+    use starnix_uapi::mount_flags::MountFlags;
+    use std::collections::BTreeMap;
+    use std::ffi::CString;
 
     static REMOTE_CONTROLLER_CLIENT: Lazy<
         Mutex<BTreeMap<String, ClientEnd<fbinder::RemoteControllerMarker>>>,

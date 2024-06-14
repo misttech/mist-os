@@ -16,16 +16,27 @@ class ComponentWatcher {
   explicit ComponentWatcher(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
   zx::result<> Watch();
+  zx::result<> Reset();
   void HandleEvent(fidl::Result<fuchsia_component::EventStream::GetNext>& res);
 
   using ComponentEventHandler = fit::function<void(std::string moniker, std::string url)>;
+
+  // Run a handler when we receive a start/stop event for a moniker
   zx::result<> WatchForMoniker(std::string moniker, ComponentEventHandler handler);
+
+  // Run a handler when we receive a start/stop event for a url.
+  //
+  // This is less precise than watching for a moniker since multiple components may share a url, but
+  // is used for when we don't handle launching the component directly and don't know the moniker,
+  // such as with tests.
+  zx::result<> WatchForUrl(std::string url, ComponentEventHandler handler);
 
  private:
   fidl::Client<fuchsia_component::EventStream> stream_client_;
   async_dispatcher_t* dispatcher_;
 
   std::map<std::string, ComponentEventHandler> moniker_watchers_;
+  std::map<std::string, ComponentEventHandler> url_watchers_;
 };
 }  // namespace profiler
 

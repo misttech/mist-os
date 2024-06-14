@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::traits::test_realm_component::TestRealmComponent,
-    fuchsia_component_test::{ChildOptions, RealmBuilder, Ref},
-};
+use crate::traits::test_realm_component::TestRealmComponent;
+use fuchsia_component_test::{ChildOptions, RealmBuilder, Ref};
 
 enum LegacyOrModernUrl {
     ModernUrl(String),

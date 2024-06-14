@@ -4,21 +4,17 @@
 
 //! Utility functions for fuchsia.io directories.
 
-use {
-    crate::{
-        file::ReadError,
-        node::{self, CloneError, CloseError, OpenError, RenameError},
-    },
-    fidl::endpoints::{ClientEnd, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fuchsia_async::{Duration, DurationExt, TimeoutExt},
-    fuchsia_zircon_status as zx_status,
-    futures::future::BoxFuture,
-    futures::stream::{self, BoxStream, StreamExt},
-    std::{collections::VecDeque, str::Utf8Error},
-    thiserror::Error,
-    zerocopy::{FromBytes, FromZeros, NoCell, Ref, Unaligned},
-};
+use crate::file::ReadError;
+use crate::node::{self, CloneError, CloseError, OpenError, RenameError};
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use fuchsia_async::{Duration, DurationExt, TimeoutExt};
+use futures::future::BoxFuture;
+use futures::stream::{self, BoxStream, StreamExt};
+use std::collections::VecDeque;
+use std::str::Utf8Error;
+use thiserror::Error;
+use zerocopy::{FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
 mod watcher;
 pub use watcher::{WatchEvent, WatchMessage, Watcher, WatcherCreateError, WatcherStreamError};
@@ -366,10 +362,8 @@ pub async fn create_randomly_named_file(
     prefix: &str,
     flags: fio::OpenFlags,
 ) -> Result<(String, fio::FileProxy), OpenError> {
-    use rand::{
-        distributions::{Alphanumeric, DistString as _},
-        SeedableRng as _,
-    };
+    use rand::distributions::{Alphanumeric, DistString as _};
+    use rand::SeedableRng as _;
     let mut rng = rand::rngs::SmallRng::from_entropy();
 
     let flags = flags | fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT;
@@ -779,21 +773,17 @@ pub async fn read_file_to_string(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::file::write,
-        assert_matches::assert_matches,
-        fuchsia_async as fasync,
-        futures::channel::oneshot,
-        proptest::prelude::*,
-        tempfile::TempDir,
-        vfs::{
-            directory::entry_container::Directory,
-            execution_scope::ExecutionScope,
-            file::vmo::{read_only, read_write},
-            pseudo_directory,
-        },
-    };
+    use super::*;
+    use crate::file::write;
+    use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
+    use futures::channel::oneshot;
+    use proptest::prelude::*;
+    use tempfile::TempDir;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::file::vmo::{read_only, read_write};
+    use vfs::pseudo_directory;
 
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 

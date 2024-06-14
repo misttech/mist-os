@@ -4,15 +4,12 @@
 
 use anyhow::Error;
 use async_trait::async_trait;
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_fs::file;
-use futures::FutureExt;
-use futures::TryStreamExt;
+use futures::{FutureExt, TryStreamExt};
 use hyper::service::{make_service_fn, service_fn};
 use std::convert::Infallible;
 use std::net::{Ipv4Addr, SocketAddr};
-use tracing;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, tracing};
 
 #[async_trait]
 pub trait ServerController: Sized + Sync + Send {

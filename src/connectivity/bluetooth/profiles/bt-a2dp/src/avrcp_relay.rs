@@ -6,19 +6,19 @@ use anyhow::{format_err, Context as _, Error};
 use async_helpers::maybe_stream::MaybeStream;
 use battery_client::{BatteryClient, BatteryInfo, BatteryLevel};
 use fidl::endpoints;
-use fidl_fuchsia_bluetooth_avrcp as avrcp;
-use fidl_fuchsia_media as media;
-use fidl_fuchsia_media_sessions2 as sessions2;
 use fidl_table_validation::ValidFidlTable;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, Property};
-use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
+use fuchsia_inspect_contrib::inspect_log;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_derive::{AttachError, Inspect};
-use fuchsia_zircon as zx;
 use futures::{select, StreamExt};
 use std::fmt::Debug;
 use tracing::{debug, info, trace};
+use {
+    fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
+    fidl_fuchsia_media_sessions2 as sessions2, fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 #[derive(Debug, Clone, ValidFidlTable, PartialEq)]
 #[fidl_table_src(sessions2::PlayerStatus)]
@@ -457,7 +457,8 @@ mod tests {
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_power_battery as fpower;
     use fuchsia_inspect_derive::WithInspect;
-    use futures::{task::Poll, Future};
+    use futures::task::Poll;
+    use futures::Future;
     use std::pin::{pin, Pin};
     use test_battery_manager::TestBatteryManager;
 

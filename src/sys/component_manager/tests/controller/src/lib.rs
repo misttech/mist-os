@@ -2,30 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use cm_rust::{ComponentDecl, FidlIntoNative};
+use fidl::endpoints::{
+    create_endpoints, create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd,
+};
+use fuchsia_component_test::{
+    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+};
+use fuchsia_runtime::{HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use futures::channel::{mpsc, oneshot};
+use futures::future::BoxFuture;
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use std::sync::{Arc, Mutex};
+use test_case::test_case;
+use vfs::directory::entry_container::Directory as _;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::read_only;
+use vfs::pseudo_directory;
 use {
-    cm_rust::{ComponentDecl, FidlIntoNative},
-    fidl::endpoints::{
-        create_endpoints, create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd,
-    },
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
-    fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-    },
-    fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
-    futures::{
-        channel::{mpsc, oneshot},
-        future::BoxFuture,
-        FutureExt, SinkExt, StreamExt, TryStreamExt,
-    },
-    std::sync::{Arc, Mutex},
-    test_case::test_case,
-    vfs::{
-        directory::entry_container::Directory as _, execution_scope::ExecutionScope,
-        file::vmo::read_only, pseudo_directory,
-    },
 };
 
 const COLLECTION_NAME: &'static str = "col";

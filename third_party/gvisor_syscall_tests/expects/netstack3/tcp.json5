@@ -43,6 +43,7 @@
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
                 "AllInetTests/TcpSocketTest.MsgTruncLargeSize/*",
                 "AllInetTests/TcpSocketTest.MsgTruncPeek/*",
+                "AllInetTests/TcpSocketTest.SetPMTUD/*",
                 "AllInetTests/TcpSocketTest.TcpInqSetSockOpt/*",
                 "AllInetTests/TcpSocketTest.TcpInq/*",
                 "AllInetTests/TcpSocketTest.TcpSCMPriority/*",

@@ -178,18 +178,14 @@ fn validate_handle_type(handle_type: HandleType) -> Result<(), DeliveryError> {
 
 #[cfg(test)]
 mod test_util {
-    use {
-        fidl::endpoints::ServerEnd,
-        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        sandbox::{Connector, Receiver},
-        std::sync::Arc,
-        vfs::{
-            directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
-            execution_scope::ExecutionScope,
-            path::Path,
-            remote::RemoteLike,
-        },
-    };
+    use fidl::endpoints::ServerEnd;
+    use sandbox::{Connector, Receiver};
+    use std::sync::Arc;
+    use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use vfs::remote::RemoteLike;
+    use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     pub fn multishot() -> (Connector, Receiver) {
         let (receiver, sender) = Receiver::new();
@@ -235,24 +231,21 @@ mod test_util {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::namespace::ignore_not_found as ignore,
-        anyhow::{anyhow, Result},
-        assert_matches::assert_matches,
-        fidl::endpoints::{Proxy, ServerEnd},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_fs::directory::DirEntry,
-        fuchsia_zircon as zx,
-        fuchsia_zircon::{AsHandleRef, HandleBased, Peered, Signals, Time},
-        futures::TryStreamExt,
-        maplit::hashmap,
-        sandbox::OneShotHandle,
-        std::pin::pin,
-        std::str::FromStr,
-        test_util::{mock_dir, multishot},
-        vfs::directory::entry::serve_directory,
-    };
+    use super::*;
+    use crate::namespace::ignore_not_found as ignore;
+    use anyhow::{anyhow, Result};
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{Proxy, ServerEnd};
+    use fuchsia_fs::directory::DirEntry;
+    use fuchsia_zircon::{AsHandleRef, HandleBased, Peered, Signals, Time};
+    use futures::TryStreamExt;
+    use maplit::hashmap;
+    use sandbox::OneShotHandle;
+    use std::pin::pin;
+    use std::str::FromStr;
+    use test_util::{mock_dir, multishot};
+    use vfs::directory::entry::serve_directory;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fuchsia::test]
     async fn test_empty() -> Result<()> {

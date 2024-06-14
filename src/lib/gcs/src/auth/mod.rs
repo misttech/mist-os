@@ -19,14 +19,12 @@ pub mod device;
 pub mod info;
 pub mod pkce;
 
-use {
-    crate::error::GcsError,
-    anyhow::Result,
-    hyper::{Body, Method, Request},
-    info::{CLIENT_ID, CLIENT_SECRET, OAUTH_REFRESH_TOKEN_ENDPOINT},
-    serde::{Deserialize, Serialize},
-    std::fmt,
-};
+use crate::error::GcsError;
+use anyhow::Result;
+use hyper::{Body, Method, Request};
+use info::{CLIENT_ID, CLIENT_SECRET, OAUTH_REFRESH_TOKEN_ENDPOINT};
+use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Clone, PartialEq)]
 pub struct GcsCredentials {

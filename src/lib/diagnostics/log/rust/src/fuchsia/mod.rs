@@ -7,22 +7,28 @@ use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx};
-use std::{cell::Cell, collections::HashSet, fmt::Debug, ops::Deref, sync::OnceLock};
+use std::cell::Cell;
+use std::collections::HashSet;
+use std::fmt::Debug;
+use std::ops::Deref;
+use std::sync::OnceLock;
 use thiserror::Error;
-use tracing::{
-    span::{Attributes, Id, Record},
-    subscriber::Subscriber,
-    Event, Metadata,
-};
+use tracing::span::{Attributes, Id, Record};
+use tracing::subscriber::Subscriber;
+use tracing::{Event, Metadata};
 use tracing_core::span::Current;
-use tracing_subscriber::{layer::Layered, prelude::*, registry::Registry};
+use tracing_log::LogTracer;
+use tracing_subscriber::layer::Layered;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::registry::Registry;
 mod filter;
 mod sink;
 
 use filter::InterestFilter;
 use sink::{Sink, SinkConfig};
 
-pub use diagnostics_log_encoding::{encode::TestRecord, Metatag};
+pub use diagnostics_log_encoding::encode::TestRecord;
+pub use diagnostics_log_encoding::Metatag;
 pub use paste::paste;
 
 #[cfg(test)]
@@ -137,9 +143,10 @@ publisher_options!((PublisherOptions, self,), (PublishOptions, self, publisher))
 fn initialize_publishing(opts: PublishOptions<'_>) -> Result<Publisher, PublishError> {
     let publisher = Publisher::new(opts.publisher)?;
 
-    if opts.ingest_log_events {
-        crate::ingest_log_events()?;
-    }
+    // NB: We don't use `LogTracer::init` here because we control log's
+    // max_level directly from the filter. See `crate::fuchsia::filter` for
+    // more.
+    log::set_boxed_logger(Box::new(LogTracer::new()))?;
 
     if opts.install_panic_hook {
         crate::install_panic_hook(opts.panic_prefix);
@@ -214,7 +221,6 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
                 tags,
                 wait_for_initial_interest,
             },
-        ingest_log_events,
         install_panic_hook,
         panic_prefix,
     } = opts;
@@ -231,7 +237,6 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
                 wait_for_initial_interest,
                 blocking,
             },
-            ingest_log_events,
             install_panic_hook,
             panic_prefix,
         };
@@ -307,8 +312,7 @@ impl Default for Publisher {
 impl Publisher {
     /// Construct a new `Publisher` using the given options.
     ///
-    /// If options such as `install_panic_hook` and `ingest_log_events` are enabled, then this
-    /// constructor should be called only once.
+    /// Should be called only once.
     pub fn new(opts: PublisherOptions<'_>) -> Result<Self, PublishError> {
         let proxy = match opts.log_sink_proxy {
             Some(log_sink) => log_sink,

@@ -13,11 +13,9 @@ use fidl_fuchsia_time_external::{
     PushSourceWatchStatusResponder, Status, TimeSample,
 };
 use fuchsia_zircon as zx;
-use futures::{
-    channel::mpsc::{channel, Receiver, Sender},
-    lock::Mutex,
-    StreamExt, TryStreamExt,
-};
+use futures::channel::mpsc::{channel, Receiver, Sender};
+use futures::lock::Mutex;
+use futures::{StreamExt, TryStreamExt};
 use std::sync::{Arc, Weak};
 use tracing::warn;
 use watch_handler::{Sender as WatchSender, WatchHandler};
@@ -276,7 +274,8 @@ impl UpdateAlgorithm for TestUpdateAlgorithm {
 mod test {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl::{endpoints::create_proxy_and_stream, Error as FidlError};
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::Error as FidlError;
     use fidl_fuchsia_time_external::{PushSourceMarker, PushSourceProxy};
     use fuchsia_async as fasync;
     use futures::{FutureExt, SinkExt};

@@ -6,8 +6,7 @@ use async_trait::async_trait;
 use chrono::Local;
 use ffx_version_args::VersionCommand;
 use ffx_writer::{MachineWriter, ToolIO};
-use fho::FfxContext;
-use fho::{Deferred, FfxMain, FfxTool, Result};
+use fho::{Deferred, FfxContext, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::{self as ffx};
 use std::time::Duration;
 use timeout::timeout;
@@ -60,11 +59,9 @@ async fn get_daemon_version(proxy: ffx::DaemonProxy) -> Result<VersionInfo> {
 pub(crate) mod test {
     use super::*;
     use fidl_fuchsia_developer_ffx::DaemonRequest;
-    use futures::{
-        channel::oneshot::{self, Receiver},
-        future::Shared,
-        FutureExt, TryStreamExt,
-    };
+    use futures::channel::oneshot::{self, Receiver};
+    use futures::future::Shared;
+    use futures::{FutureExt, TryStreamExt};
 
     pub const FAKE_DAEMON_HASH: &str = "fake daemon fake";
     pub const FAKE_FRONTEND_HASH: &str = "fake frontend fake";

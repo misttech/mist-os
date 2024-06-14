@@ -4,27 +4,21 @@
 
 //! Server support for symbolic links.
 
-use {
-    crate::{
-        common::{
-            decode_extended_attribute_value, encode_extended_attribute_value,
-            extended_attributes_sender, inherit_rights_for_clone, send_on_open_with_error,
-        },
-        execution_scope::ExecutionScope,
-        name::parse_name,
-        node::Node,
-        object_request::Representation,
-        ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
-    },
-    fidl::endpoints::{ControlHandle as _, Responder, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    futures::StreamExt,
-    std::{
-        future::{ready, Future},
-        sync::Arc,
-    },
+use crate::common::{
+    decode_extended_attribute_value, encode_extended_attribute_value, extended_attributes_sender,
+    inherit_rights_for_clone, send_on_open_with_error,
 };
+use crate::execution_scope::ExecutionScope;
+use crate::name::parse_name;
+use crate::node::Node;
+use crate::object_request::Representation;
+use crate::{ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
+use fidl::endpoints::{ControlHandle as _, Responder, ServerEnd};
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon_status::Status;
+use futures::StreamExt;
+use std::future::{ready, Future};
+use std::sync::Arc;
 
 pub trait Symlink: Node {
     fn read_target(&self) -> impl Future<Output = Result<Vec<u8>, Status>> + Send;
@@ -233,7 +227,7 @@ impl<T: Symlink> Connection<T> {
     ) -> Result<(), Status> {
         let target_name = parse_name(target_name).map_err(|_| Status::INVALID_ARGS)?;
 
-        let (target_parent, _flags) = self
+        let target_parent = self
             .scope
             .token_registry()
             .get_owner(target_parent_token.into())?
@@ -323,25 +317,18 @@ pub fn serve(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Connection, Symlink},
-        crate::{
-            common::rights_to_posix_mode_bits,
-            execution_scope::ExecutionScope,
-            node::{IsDirectory, Node},
-            ToObjectRequest,
-        },
-        assert_matches::assert_matches,
-        async_trait::async_trait,
-        fidl::endpoints::create_proxy,
-        fidl_fuchsia_io as fio,
-        fuchsia_zircon_status::Status,
-        futures::StreamExt,
-        std::{
-            collections::HashMap,
-            sync::{Arc, Mutex},
-        },
-    };
+    use super::{Connection, Symlink};
+    use crate::common::rights_to_posix_mode_bits;
+    use crate::execution_scope::ExecutionScope;
+    use crate::node::{IsDirectory, Node};
+    use crate::ToObjectRequest;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_io as fio;
+    use fuchsia_zircon_status::Status;
+    use futures::StreamExt;
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
 
     const TARGET: &[u8] = b"target";
 
@@ -386,7 +373,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl Node for TestSymlink {
         async fn get_attributes(
             &self,

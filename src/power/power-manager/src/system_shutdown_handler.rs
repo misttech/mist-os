@@ -9,8 +9,6 @@ use crate::shutdown_request::ShutdownRequest;
 use crate::types::Seconds;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_power_statecontrol as fpowercontrol;
-use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, Property};
@@ -18,11 +16,14 @@ use fuchsia_zircon::{self as zx, Status as zx_status};
 use futures::prelude::*;
 use futures::TryStreamExt;
 use serde_derive::Deserialize;
-use serde_json as json;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use tracing::*;
+use {
+    fidl_fuchsia_hardware_power_statecontrol as fpowercontrol, fidl_fuchsia_sys2 as fsys,
+    serde_json as json,
+};
 
 /// Node: SystemShutdownHandler
 ///

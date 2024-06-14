@@ -6,8 +6,7 @@ use crate::private::Sealed;
 use crate::storage_factory::{DefaultLoader, NoneT};
 use crate::UpdateState;
 use anyhow::{bail, format_err, Context, Error};
-use fidl::Status;
-use fidl::{persist, unpersist, Persistable};
+use fidl::{persist, unpersist, Persistable, Status};
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{Task, Time, Timer};
 use fuchsia_fs::file::ReadError;
@@ -452,12 +451,11 @@ mod tests {
     use fasync::TestExecutor;
     use fidl::endpoints::ControlHandle;
     use fidl::epitaph::ChannelEpitaphExt;
-    use fidl_fuchsia_io as fio;
     use fidl_test_storage::{TestStruct, WrongStruct};
-    use fuchsia_async as fasync;
     use futures::TryStreamExt;
     use std::task::Poll;
     use test_case::test_case;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     const VALUE0: i32 = 3;
     const VALUE1: i32 = 33;

@@ -5,10 +5,8 @@
 //! Type-safe bindings for Zircon status.
 
 use fuchsia_zircon_types as sys;
-use std::error;
 use std::ffi::NulError;
-use std::fmt;
-use std::io;
+use std::{error, fmt, io};
 
 pub use sys::zx_status_t;
 

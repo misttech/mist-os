@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Result},
-    fidl_fuchsia_device::ControllerProxy,
-    fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy},
-    fidl_fuchsia_io as fio,
-    fs_management::format::{detect_disk_format, DiskFormat},
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_fs::directory::{WatchEvent, Watcher},
-    fuchsia_zircon as zx,
-    futures::TryStreamExt,
-    std::path::{Path, PathBuf},
-};
+use anyhow::{anyhow, Context, Result};
+use fidl_fuchsia_device::ControllerProxy;
+use fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy};
+use fs_management::format::{detect_disk_format, DiskFormat};
+use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_fs::directory::{WatchEvent, Watcher};
+use futures::TryStreamExt;
+use std::path::{Path, PathBuf};
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub mod fvm;
 pub mod zxcrypt;
@@ -163,10 +160,9 @@ pub async fn find_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<Pa
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, fidl_fuchsia_hardware_block_volume::ALLOCATE_PARTITION_FLAG_INACTIVE,
-        ramdevice_client::RamdiskClient,
-    };
+    use super::*;
+    use fidl_fuchsia_hardware_block_volume::ALLOCATE_PARTITION_FLAG_INACTIVE;
+    use ramdevice_client::RamdiskClient;
     const BLOCK_SIZE: u64 = 512;
     const BLOCK_COUNT: u64 = 64 * 1024 * 1024 / BLOCK_SIZE;
     const FVM_SLICE_SIZE: usize = 1024 * 1024;

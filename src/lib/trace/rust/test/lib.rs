@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_trace as trace;
-use std::{future::poll_fn, task::Poll};
+use std::future::poll_fn;
+use std::task::Poll;
 
 #[no_mangle]
 pub extern "C" fn rs_test_trace_enabled() -> bool {

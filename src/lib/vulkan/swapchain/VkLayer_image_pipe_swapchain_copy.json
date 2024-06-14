@@ -19,6 +19,14 @@
                 "spec_version": "25"
             },
             {
+                "name": "VK_KHR_get_surface_capabilities2",
+                "spec_version": "1"
+            },
+            {
+                "name": "VK_KHR_surface_protected_capabilities",
+                "spec_version": "1"
+            },
+            {
                 "name": "VK_FUCHSIA_imagepipe_surface",
                 "spec_version": "1"
             }

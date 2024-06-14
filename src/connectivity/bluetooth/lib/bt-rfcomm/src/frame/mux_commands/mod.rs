@@ -35,10 +35,8 @@ pub use remote_port_negotiation::RemotePortNegotiationParams;
 mod test_command;
 pub use test_command::TestCommandParams;
 
-use crate::{
-    frame::{CommandResponse, FrameParseError},
-    DLCI,
-};
+use crate::frame::{CommandResponse, FrameParseError};
+use crate::DLCI;
 
 decodable_enum! {
     /// The supported Multiplexer Commands in RFCOMM. These commands are sent/received

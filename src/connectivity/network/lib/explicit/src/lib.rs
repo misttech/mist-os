@@ -14,7 +14,8 @@
 #![no_std]
 #![deny(missing_docs)]
 
-use core::{convert::Infallible as Never, task::Poll};
+use core::convert::Infallible as Never;
+use core::task::Poll;
 
 /// An extension trait adding functionality to [`Result`].
 pub trait ResultExt<T, E> {

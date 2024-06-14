@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_mem as mem,
-    fuchsia_zircon::{self as zx, HandleBased},
-};
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_mem as mem;
+use fuchsia_zircon::{self as zx, HandleBased};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct AssetId(pub u32);

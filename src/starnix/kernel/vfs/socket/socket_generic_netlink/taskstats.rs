@@ -11,7 +11,8 @@ use netlink_packet_core::{
     ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload, NETLINK_HEADER_LEN,
 };
 use netlink_packet_generic::GenlFamily;
-use netlink_packet_utils::{nla::Nla, Emitable};
+use netlink_packet_utils::nla::Nla;
+use netlink_packet_utils::Emitable;
 use starnix_logging::track_stub;
 
 use super::{GenericMessage, GenericNetlinkFamily};

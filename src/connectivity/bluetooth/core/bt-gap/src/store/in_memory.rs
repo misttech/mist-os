@@ -4,10 +4,8 @@
 
 #![cfg(test)]
 
-use {
-    fuchsia_bluetooth::types::{Address, BondingData, HostData, PeerId},
-    std::collections::HashMap,
-};
+use fuchsia_bluetooth::types::{Address, BondingData, HostData, PeerId};
+use std::collections::HashMap;
 
 use crate::store::stash::Request;
 

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_ui_gfx::Command as GfxCommand;
 use fidl_fuchsia_ui_gfx::{
     AddChildCmd, AddLayerCmd, AddPartCmd, ColorRgb, ColorRgbValue, ColorRgba, ColorRgbaValue,
-    CreateResourceCmd, DetachChildrenCmd, DetachCmd, DetachLightCmd, DetachLightsCmd, Quaternion,
-    QuaternionValue, ReleaseResourceCmd, RemoveAllLayersCmd, RemoveLayerCmd, ResourceArgs,
-    SceneAddAmbientLightCmd, SceneAddDirectionalLightCmd, SceneAddPointLightCmd, SetAnchorCmd,
-    SetCameraClipSpaceTransformCmd, SetCameraCmd, SetClipCmd, SetColorCmd,
-    SetDisplayRotationCmdHack, SetEventMaskCmd, SetLayerStackCmd, SetLightColorCmd,
+    Command as GfxCommand, CreateResourceCmd, DetachChildrenCmd, DetachCmd, DetachLightCmd,
+    DetachLightsCmd, Quaternion, QuaternionValue, ReleaseResourceCmd, RemoveAllLayersCmd,
+    RemoveLayerCmd, ResourceArgs, SceneAddAmbientLightCmd, SceneAddDirectionalLightCmd,
+    SceneAddPointLightCmd, SetAnchorCmd, SetCameraClipSpaceTransformCmd, SetCameraCmd, SetClipCmd,
+    SetColorCmd, SetDisplayRotationCmdHack, SetEventMaskCmd, SetLayerStackCmd, SetLightColorCmd,
     SetLightDirectionCmd, SetMaterialCmd, SetRendererCmd, SetRotationCmd, SetScaleCmd, SetShapeCmd,
     SetSizeCmd, SetTextureCmd, SetTranslationCmd, SetViewPropertiesCmd, Vec2, Vec3, Vector2Value,
     Vector3Value, ViewProperties,

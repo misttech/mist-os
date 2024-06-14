@@ -6,23 +6,19 @@ use alloc::vec::Vec;
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 
-use net_types::{
-    ethernet::Mac,
-    ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu},
-    SpecifiedAddr,
+use net_types::ethernet::Mac;
+use net_types::ip::{AddrSubnet, Ipv4, Ipv6, Mtu};
+use net_types::SpecifiedAddr;
+use netstack3_base::testutil::{TestAddrs, TestIpExt};
+use netstack3_core::error::NotFoundError;
+use netstack3_core::testutil::{
+    CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
 };
-use netstack3_core::{
-    error::NotFoundError,
-    testutil::{
-        CtxPairExt as _, FakeBindingsCtx, FakeCtx, TestAddrs, TestIpExt, DEFAULT_INTERFACE_METRIC,
-    },
-    IpExt,
-};
-use netstack3_device::{
-    loopback::{self, LoopbackCreationProperties, LoopbackDevice, LoopbackRxQueueMeta},
-    queue::ReceiveQueueContext,
-};
-use netstack3_ip::{self as ip, device::IpAddressId as _};
+use netstack3_core::IpExt;
+use netstack3_device::loopback::{self, LoopbackCreationProperties, LoopbackDevice};
+use netstack3_device::queue::ReceiveQueueContext;
+use netstack3_ip::device::IpAddressId as _;
+use netstack3_ip::{self as ip};
 use packet::{Buf, ParseBuffer as _};
 use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
 
@@ -46,8 +42,8 @@ fn loopback_mtu() {
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-#[ip_test]
-fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn test_loopback_add_remove_addrs<I: TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();
     let device = ctx
         .core_api()
@@ -86,8 +82,8 @@ fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpExt>() {
     assert_matches!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, addr), Err(NotFoundError));
 }
 
-#[ip_test]
-fn loopback_sends_ethernet<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn loopback_sends_ethernet<I: TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();
     let device = ctx.core_api().device::<LoopbackDevice>().add_device_with_default_state(
         LoopbackCreationProperties { mtu: MTU },
@@ -96,11 +92,11 @@ fn loopback_sends_ethernet<I: Ip + TestIpExt + IpExt>() {
     ctx.test_api().enable_device(&device.clone().into());
     let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
-    let local_addr = I::TEST_ADDRS.local_ip;
+    let destination = ip::IpPacketDestination::<I, _>::from_addr(I::TEST_ADDRS.local_ip);
     const BODY: &[u8] = b"IP body".as_slice();
 
     let body = Buf::new(Vec::from(BODY), ..);
-    loopback::send_ip_frame(&mut core_ctx.context(), bindings_ctx, &device, local_addr, body)
+    loopback::send_ip_frame(&mut core_ctx.context(), bindings_ctx, &device, destination, body)
         .expect("can send");
 
     // There is no transmit queue so the frames will immediately go into the
@@ -108,9 +104,7 @@ fn loopback_sends_ethernet<I: Ip + TestIpExt + IpExt>() {
     let mut frames = ReceiveQueueContext::<LoopbackDevice, _>::with_receive_queue_mut(
         &mut core_ctx.context(),
         &device,
-        |queue_state| {
-            queue_state.take_frames().map(|(LoopbackRxQueueMeta, frame)| frame).collect::<Vec<_>>()
-        },
+        |queue_state| queue_state.take_frames().map(|(_meta, frame)| frame).collect::<Vec<_>>(),
     );
 
     let frame = assert_matches!(frames.as_mut_slice(), [frame] => frame);

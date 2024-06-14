@@ -1,23 +1,22 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use anyhow::{format_err, Context as _, Error};
+use fidl_fuchsia_net_stack::StackMarker;
+use fuchsia_component::client;
+use net_declare::fidl_subnet;
+use net_types::ip::Ipv6;
+use prettytable::{cell, format, row, Table};
+use std::collections::HashMap;
+use std::io::{Read as _, Write as _};
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::pin::pin;
+use structopt::StructOpt;
+use tracing::info;
 use {
-    anyhow::{format_err, Context as _, Error},
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_net_stack::StackMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::client,
-    net_declare::fidl_subnet,
-    net_types::ip::Ipv6,
-    prettytable::{cell, format, row, Table},
-    std::collections::HashMap,
-    std::io::{Read as _, Write as _},
-    std::net::{SocketAddr, TcpListener, TcpStream},
-    std::pin::pin,
-    structopt::StructOpt,
-    tracing::info,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_async as fasync,
 };
 
 const BUS_NAME: &str = "test-bus";

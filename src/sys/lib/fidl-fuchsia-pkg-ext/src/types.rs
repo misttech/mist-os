@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::errors::{
-        BlobIdFromSliceError, BlobIdParseError, CupMissingField, ResolutionContextError,
-    },
-    fidl_fuchsia_pkg as fidl,
-    proptest_derive::Arbitrary,
-    serde::{Deserialize, Serialize},
-    std::{fmt, str},
-    typed_builder::TypedBuilder,
+use crate::errors::{
+    BlobIdFromSliceError, BlobIdParseError, CupMissingField, ResolutionContextError,
 };
+use fidl_fuchsia_pkg as fidl;
+use proptest_derive::Arbitrary;
+use serde::{Deserialize, Serialize};
+use std::{fmt, str};
+use typed_builder::TypedBuilder;
 
 pub(crate) const BLOB_ID_SIZE: usize = 32;
 
@@ -197,7 +195,9 @@ impl From<ResolutionContext> for fidl::ResolutionContext {
 }
 
 mod hex_serde {
-    use {super::BLOB_ID_SIZE, hex::FromHex, serde::Deserialize};
+    use super::BLOB_ID_SIZE;
+    use hex::FromHex;
+    use serde::Deserialize;
 
     pub fn serialize<S>(bytes: &[u8; BLOB_ID_SIZE], serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -259,7 +259,9 @@ impl TryFrom<fidl::CupData> for CupData {
 
 #[cfg(test)]
 mod test_blob_id {
-    use {super::*, assert_matches::assert_matches, proptest::prelude::*};
+    use super::*;
+    use assert_matches::assert_matches;
+    use proptest::prelude::*;
 
     prop_compose! {
         fn invalid_hex_char()(c in "[[:ascii:]&&[^0-9a-fA-F]]") -> char {
@@ -360,7 +362,8 @@ mod test_blob_id {
 
 #[cfg(test)]
 mod test_resolution_context {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn try_from_slice_succeeds() {

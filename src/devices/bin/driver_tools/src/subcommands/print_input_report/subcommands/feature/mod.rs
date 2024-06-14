@@ -4,13 +4,13 @@
 
 pub mod args;
 
-use {
-    anyhow::{Context, Result},
-    args::FeatureCommand,
-    fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
-    futures::lock::Mutex,
-    std::{io::Write, ops::DerefMut, sync::Arc},
-};
+use anyhow::{Context, Result};
+use args::FeatureCommand;
+use futures::lock::Mutex;
+use std::io::Write;
+use std::ops::DerefMut;
+use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
 
 pub async fn feature(
     cmd: &FeatureCommand,

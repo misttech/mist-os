@@ -2,31 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{repo_keys::RepoKeys, repository::PmRepository},
-    anyhow::{Context, Result},
-    camino::{Utf8Path, Utf8PathBuf},
-    fidl_fuchsia_pkg_ext::RepositoryKey,
-    fuchsia_hash::Hash,
-    fuchsia_pkg::{PackageBuilder, PackageManifest},
-    fuchsia_url::RelativePackageUrl,
-    futures::io::AllowStdIo,
-    maplit::hashmap,
-    std::{
-        collections::HashSet,
-        fs::{copy, create_dir, create_dir_all, File},
-        path::{Path, PathBuf},
-    },
-    tempfile::TempDir,
-    tuf::{
-        crypto::{Ed25519PrivateKey, HashAlgorithm},
-        metadata::{Delegation, Delegations, MetadataDescription, MetadataPath, TargetPath},
-        pouf::Pouf1,
-        repo_builder::RepoBuilder,
-        repository::FileSystemRepositoryBuilder,
-    },
-    walkdir::WalkDir,
-};
+use crate::repo_keys::RepoKeys;
+use crate::repository::PmRepository;
+use anyhow::{Context, Result};
+use camino::{Utf8Path, Utf8PathBuf};
+use fidl_fuchsia_pkg_ext::RepositoryKey;
+use fuchsia_hash::Hash;
+use fuchsia_pkg::{PackageBuilder, PackageManifest};
+use fuchsia_url::RelativePackageUrl;
+use futures::io::AllowStdIo;
+use maplit::hashmap;
+use std::collections::HashSet;
+use std::fs::{copy, create_dir, create_dir_all, File};
+use std::path::{Path, PathBuf};
+use tempfile::TempDir;
+use tuf::crypto::{Ed25519PrivateKey, HashAlgorithm};
+use tuf::metadata::{Delegation, Delegations, MetadataDescription, MetadataPath, TargetPath};
+use tuf::pouf::Pouf1;
+use tuf::repo_builder::RepoBuilder;
+use tuf::repository::FileSystemRepositoryBuilder;
+use walkdir::WalkDir;
 
 #[cfg(not(target_os = "fuchsia"))]
 use crate::repo_client::RepoClient;

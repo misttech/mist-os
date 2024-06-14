@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use donut_lib::*;
+use fidl::endpoints::{create_endpoints, create_proxy};
+use fuchsia_component::client::connect_to_protocol;
+use structopt::StructOpt;
 use {
-    anyhow::Error,
-    donut_lib::*,
-    fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_policy as wlan_policy,
     fidl_fuchsia_wlan_product_deprecatedconfiguration as wlan_deprecated, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    structopt::StructOpt,
 };
 
 /// Communicates with the client policy provider to get the components required to get a client

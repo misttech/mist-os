@@ -6,9 +6,11 @@ use anyhow::{Context, Result};
 use errors::ffx_bail;
 use ffx_scrutiny_verify_args::routes::{default_capability_types, Command};
 use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::{command_builder::CommandBuilder, launcher};
+use scrutiny_frontend::command_builder::CommandBuilder;
+use scrutiny_frontend::launcher;
 use scrutiny_plugins::verify::{CapabilityRouteResults, ResultsForCapabilityType};
-use std::{collections::HashSet, path::PathBuf};
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 struct Query {
     capability_types: Vec<String>,

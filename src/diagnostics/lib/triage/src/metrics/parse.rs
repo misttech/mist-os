@@ -2,27 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::metrics::{
-        context::ParsingContext, variable::VariableName, ExpressionTree, Function, MathFunction,
-        MetricValue,
-    },
-    anyhow::{format_err, Error},
-    nom::{
-        branch::alt,
-        bytes::complete::{is_not, tag, take_while, take_while_m_n},
-        character::{
-            complete::{char, none_of, one_of},
-            is_alphabetic, is_alphanumeric,
-        },
-        combinator::{all_consuming, map, opt, peek, recognize},
-        error::{convert_error, VerboseError},
-        multi::{fold_many0, many0, separated_list},
-        sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
-        Err::{self, Incomplete},
-        IResult, InputLength, Slice,
-    },
-};
+use crate::metrics::context::ParsingContext;
+use crate::metrics::variable::VariableName;
+use crate::metrics::{ExpressionTree, Function, MathFunction, MetricValue};
+use anyhow::{format_err, Error};
+use nom::branch::alt;
+use nom::bytes::complete::{is_not, tag, take_while, take_while_m_n};
+use nom::character::complete::{char, none_of, one_of};
+use nom::character::{is_alphabetic, is_alphanumeric};
+use nom::combinator::{all_consuming, map, opt, peek, recognize};
+use nom::error::{convert_error, VerboseError};
+use nom::multi::{fold_many0, many0, separated_list};
+use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
+use nom::Err::{self, Incomplete};
+use nom::{IResult, InputLength, Slice};
 
 pub type ParsingResult<'a, O> = IResult<ParsingContext<'a>, O, VerboseError<ParsingContext<'a>>>;
 
@@ -414,14 +407,10 @@ pub(crate) fn parse_expression(i: &str, namespace: &str) -> Result<ExpressionTre
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            assert_problem,
-            metrics::{Fetcher, MetricState, TrialDataFetcher},
-        },
-        std::collections::HashMap,
-    };
+    use super::*;
+    use crate::assert_problem;
+    use crate::metrics::{Fetcher, MetricState, TrialDataFetcher};
+    use std::collections::HashMap;
 
     // Res, simplify_fn, and get_parse are necessary because IResult can't be compared and can't
     //   easily be matched/decomposed. Res can be compared and debug-formatted.

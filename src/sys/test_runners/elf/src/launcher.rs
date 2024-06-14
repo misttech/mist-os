@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fidl_fuchsia_process as fproc, fuchsia_runtime as runtime,
-    fuchsia_zircon::{self as zx, HandleBased},
-    lazy_static::lazy_static,
-    test_runners_lib::{
-        elf::{Component, KernelError},
-        errors::*,
-        launch,
-        logs::LoggerStream,
-    },
-};
+use async_trait::async_trait;
+use fuchsia_zircon::{self as zx, HandleBased};
+use lazy_static::lazy_static;
+use test_runners_lib::elf::{Component, KernelError};
+use test_runners_lib::errors::*;
+use test_runners_lib::launch;
+use test_runners_lib::logs::LoggerStream;
+use {fidl_fuchsia_process as fproc, fuchsia_runtime as runtime};
 
 lazy_static! {
     static ref NEXT_VDSO: zx::Handle = {

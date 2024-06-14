@@ -7,11 +7,13 @@
 use super::*;
 use assert_matches::assert_matches;
 use diagnostics_data::*;
-use diagnostics_log_encoding::{encode::Encoder, Record};
+use diagnostics_log_encoding::encode::Encoder;
+use diagnostics_log_encoding::Record;
 use fidl_fuchsia_diagnostics::Severity as StreamSeverity;
 use fidl_fuchsia_logger::{LogLevelFilter, LogMessage};
 use lazy_static::lazy_static;
-use std::{io::Cursor, sync::Arc};
+use std::io::Cursor;
+use std::sync::Arc;
 
 lazy_static! {
     static ref TEST_IDENTITY: Arc<MonikerWithUrl> = {

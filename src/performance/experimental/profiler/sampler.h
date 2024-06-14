@@ -5,6 +5,7 @@
 #ifndef SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_
 #define SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SAMPLER_H_
 
+#include <fidl/fuchsia.cpu.profiler/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
 #include <lib/syslog/cpp/macros.h>
@@ -39,8 +40,11 @@ struct Sample {
 
 class Sampler {
  public:
-  explicit Sampler(async_dispatcher_t* dispatcher, TargetTree&& targets)
-      : dispatcher_(dispatcher), targets_(std::move(targets)) {}
+  explicit Sampler(async_dispatcher_t* dispatcher, TargetTree targets,
+                   std::vector<fuchsia_cpu_profiler::SamplingConfig> sample_specs)
+      : dispatcher_(dispatcher),
+        targets_(std::move(targets)),
+        sample_specs_(std::move(sample_specs)) {}
 
   virtual zx::result<> Start(size_t buffer_size_mb);
   virtual zx::result<> Stop();
@@ -65,6 +69,7 @@ class Sampler {
   async::TaskMethod<profiler::Sampler, &profiler::Sampler::CollectSamples> sample_task_{this};
 
   TargetTree targets_;
+  std::vector<fuchsia_cpu_profiler::SamplingConfig> sample_specs_;
   std::vector<zx::ticks> inspecting_durations_;
   std::unordered_map<zx_koid_t, std::vector<Sample>> samples_;
 

@@ -123,7 +123,7 @@ inline ExampleUseOfVectors& ExampleUseOfVectors::vector_of_vector_of_bool(::std:
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_vectors::ExampleUseOfVectors> : public std::true_type {};
+struct IsFidlType<::test_vectors::ExampleUseOfVectors> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_vectors::ExampleUseOfVectors> {
@@ -135,7 +135,7 @@ struct TypeTraits<::test_vectors::ExampleUseOfVectors> {
 };
 
 template <>
-struct IsStruct<::test_vectors::ExampleUseOfVectors> : public std::true_type {};
+struct IsStruct<::test_vectors::ExampleUseOfVectors> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_vectors::ExampleUseOfVectors, ::fidl::internal::NaturalCodingConstraintEmpty> final

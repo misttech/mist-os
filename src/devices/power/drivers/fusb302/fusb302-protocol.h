@@ -38,15 +38,86 @@ enum class TransmissionState : uint8_t {
   kSuccess,
 };
 
+// Method used to generate or track GoodCRC replies to incoming USB PD packets.
+enum class GoodCrcGenerationMode : uint8_t {
+  // No hardware-accelerated GoodCRC generation is available.
+  //
+  // In this mode, the software USB PD Protocol Layer implementation generates
+  // GoodCRC packets and drives the hardware to transmit them.
+  //
+  // This mode assumes that the hardware is not configured to generate any
+  // packets. For example, the FUSB302B's AutoCRC functionality would be
+  // disabled.
+  //
+  // This mode has proven to be too slow when the fusb302 Fuchsia driver is used
+  // with the FUSB302B chip on the Khadas VIM3 board. The logic may be useful in
+  // an RTOS environment.
+  kSoftware,
+
+  // Hardware-accelerated GoodCRC generation blocks PD packet transmission.
+  //
+  // In this mode, the software USB PD Protocol Layer implementation waits to be
+  // notified that the hardware-accelerated GoodCRC generation and transmission
+  // is done, before driving the transmission of a PD packet.
+  //
+  // Waiting ensures that all PD packets are transmitted after the GoodCRCs
+  // acknowledging any packets that they may reply to. Waiting comes at the cost
+  // of delaying transmissions until the hardware-accelerated GoodCRC
+  // notifications are delivered to the driver.
+  kTracked,
+
+  // Hardware-accelerated GoodCRC generation is not tracked by software.
+  //
+  // In this mode, the software USB PD Protocol Layer implementation assumes
+  // that hardware-accelerated GoodCRC generation is enabled, and that it
+  // completes before the software attempts to transmit a new PD packet.
+  kAssumed,
+};
+
 // FUSB302-specific implementation of the USB PD Protocol Layer.
 //
 // The FUSB302 hardware can take on some aspects of the PD Protocol Layer. This
 // class is responsible for a complete implementation, while delegating some
 // parts to hardware.
+//
+// Receiving messages works as follows:
+// * The hardware control logic is responsible for calling DrainReceiveFifo()
+//   when the hardware signals that its receive FIFO is not empty.
+// * The USB PD implementation uses HasUnreadMessage() and FirstUnreadMessage()
+//   to process received messages. MarkMessageAsRead() must be called after a
+//   message is processed, before transmitting any reply to the message.
+// * The hardware control logic is responsible for calling
+//   DidTransmitHardwareGeneratedGoodCrc() when the hardware signals that it
+//   generated and transmitted a GoodCRC reply for a received PD packet.
+//
+// Transmitting messages works as follows:
+// * next_transmitted_message_id() produces the MessageID to be used in the
+//   usb_pd::Header constructor for a usb_pd::Message.
+// * Transmit() drives the hardware to transmit a usb_pd::Message over the PD
+//   connection.
+// * DrainReceiveFifo(), documented in the reception section above, tracks
+//   the USB PD connection partner's acknowledgement of Transmit() messages.
+// * The hardware control logic is responsible for calling
+//   DidTimeoutWaitingForGoodCrc() when a message transmitted via Transmit()
+//   is not acknowledged (via GoodCRC) by the other side of the USB PD
+//   connection within the time mandated by the USB PD specification.
+//
+// The implementation supports 3 integration models with a hardware-accelerated
+// GoodCRC generation module, which map to the 3 member variables of the
+// `GoodCrcGenerationMode` enum.
+//
+// * kSoftware - MarkMessageAsRead() generates a GoodCRC packet for the returned
+//   packet, and drives the hardware to transmit it
+// * kTracked - DidTransmitHardwareGeneratedGoodCrc() is called when the
+//   hardware generates and transmits a GoodCRC packet; Transmit() queues its
+//   argument for transmission if any previously received packet lacks a GoodCRC
+//   reply; DidTransmitHardwareGeneratedGoodCrc() transmits any queued packet
+// * kAssumed - GoodCRC generation is completely ignored by the software
+//   implementation
 class Fusb302Protocol {
  public:
   // `fifos` must remain alive throughout the new instance's lifetime.
-  explicit Fusb302Protocol(Fusb302Fifos& fifos);
+  explicit Fusb302Protocol(GoodCrcGenerationMode good_crc_generation_mode, Fusb302Fifos& fifos);
 
   Fusb302Protocol(const Fusb302Protocol&) = delete;
   Fusb302Protocol& operator=(const Fusb302Protocol&) = delete;
@@ -135,7 +206,12 @@ class Fusb302Protocol {
   // Hardware-side PD protocol layer says it replied with a GoodCRC message.
   //
   // This signal comes from the interrupt unit.
-  void DidTransmitGoodCrc();
+  void DidTransmitHardwareGeneratedGoodCrc();
+
+  // If false, `DidTransmitHardwareGeneratedGoodCrc()` must never be called.
+  bool UsesHardwareAcceleratedGoodCrcNotifications() const {
+    return good_crc_generation_mode_ == GoodCrcGenerationMode::kTracked;
+  }
 
  private:
   // Prepare `good_crc_template_` for transmission.
@@ -156,6 +232,11 @@ class Fusb302Protocol {
   // owner (Fusb302).
   Fusb302Fifos& fifos_;
 
+  const GoodCrcGenerationMode good_crc_generation_mode_;
+
+  // The USB PD packet header for the next software-generated GoodCRC.
+  //
+  // Not used when hardware-generated GoodCRC is used.
   usb_pd::Header good_crc_template_;
 
   // Received messages that haven't been processed yet.
@@ -164,6 +245,12 @@ class Fusb302Protocol {
   // messages queued up: a GoodCRC for a Request, two replies (Accept, PS_RDY),
   // and a follow-up query such as Get_Sink_Capabilities.
   fbl::RingBuffer<usb_pd::Message, 8> received_message_queue_;
+
+  // Message that must be transmitted after a hardware-generated GoodCRC.
+  //
+  // Only used when the software USB PD protocol implementation tracks
+  // hardware-generated GoodCRC replies.
+  std::optional<usb_pd::Message> queued_transmission_;
 
   // If `transmission_state` is `kPending`, this MessageID was used, and we're
   // waiting for a GoodCRC. Otherwise, this is MessageID will be used for the
@@ -186,6 +273,7 @@ class Fusb302Protocol {
   // GoodCRC for the last received message (which has the MessageID).
   std::optional<usb_pd::MessageId> next_expected_message_id_;
 
+  // Only used when waiting on notifications for hardware-generated GoodCRC.
   bool good_crc_transmission_pending_ = false;
 
   TransmissionState transmission_state_ = TransmissionState::kSuccess;

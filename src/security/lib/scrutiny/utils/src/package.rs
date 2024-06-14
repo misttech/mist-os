@@ -2,26 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{artifact::ArtifactReader, io::ReadSeek, key_value::parse_key_value},
-    anyhow::{Context, Result},
-    fuchsia_archive::Utf8Reader,
-    fuchsia_merkle::{Hash, MerkleTree},
-    fuchsia_url::{PackageName, PackageVariant},
-    serde::{
-        de::{self, Deserializer, Error as _, MapAccess, Visitor},
-        ser::Serializer,
-        Deserialize, Serialize,
-    },
-    std::{
-        collections::HashMap,
-        fmt,
-        fs::File,
-        path::{Path, PathBuf},
-        str::{from_utf8, FromStr},
-    },
-    thiserror::Error,
-};
+use crate::artifact::ArtifactReader;
+use crate::io::ReadSeek;
+use crate::key_value::parse_key_value;
+use anyhow::{Context, Result};
+use fuchsia_archive::Utf8Reader;
+use fuchsia_merkle::{Hash, MerkleTree};
+use fuchsia_url::{PackageName, PackageVariant};
+use serde::de::{self, Deserializer, Error as _, MapAccess, Visitor};
+use serde::ser::Serializer;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fmt;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::str::{from_utf8, FromStr};
+use thiserror::Error;
 
 #[derive(Debug, Deserialize, Serialize, Error)]
 #[serde(rename_all = "snake_case")]
@@ -327,24 +323,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{
-            extract_system_image_hash_string, verify_package_merkle, PackageError,
-            SystemImageError, META_CONTENTS_PATH, PKGFS_BINARY_PATH,
-            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY,
-        },
-        crate::artifact::ArtifactReader,
-        crate::io::ReadSeek,
-        anyhow::{anyhow, Result},
-        fuchsia_archive::write as far_write,
-        fuchsia_merkle::{Hash, HASH_SIZE},
-        maplit::{btreemap, hashmap},
-        std::{
-            collections::{BTreeMap, HashMap, HashSet},
-            io::{BufWriter, Cursor, Read},
-            path::{Path, PathBuf},
-        },
+    use super::{
+        extract_system_image_hash_string, verify_package_merkle, PackageError, SystemImageError,
+        META_CONTENTS_PATH, PKGFS_BINARY_PATH, PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY,
     };
+    use crate::artifact::ArtifactReader;
+    use crate::io::ReadSeek;
+    use anyhow::{anyhow, Result};
+    use fuchsia_archive::write as far_write;
+    use fuchsia_merkle::{Hash, HASH_SIZE};
+    use maplit::{btreemap, hashmap};
+    use std::collections::{BTreeMap, HashMap, HashSet};
+    use std::io::{BufWriter, Cursor, Read};
+    use std::path::{Path, PathBuf};
 
     struct TestArtifactReader {
         artifacts: HashMap<PathBuf, Vec<u8>>,

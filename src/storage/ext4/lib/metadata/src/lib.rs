@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    serde::{Deserialize, Serialize},
-    std::collections::BTreeMap,
-    thiserror::Error,
-};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use thiserror::Error;
 
 // This is deliberately the same as ext4.
 pub const ROOT_INODE_NUM: u64 = 2;
@@ -214,11 +212,9 @@ pub struct Symlink {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Metadata, NodeInfo, ROOT_INODE_NUM, S_IFDIR, S_IFLNK, S_IFREG},
-        assert_matches::assert_matches,
-        std::collections::BTreeMap,
-    };
+    use super::{Metadata, NodeInfo, ROOT_INODE_NUM, S_IFDIR, S_IFLNK, S_IFREG};
+    use assert_matches::assert_matches;
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_serialize_and_deserialize() {

@@ -2,19 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::HashMap, num::NonZeroU64};
+use std::collections::HashMap;
+use std::num::NonZeroU64;
 
 use derivative::Derivative;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_net::Subnet;
-use fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated;
-use fidl_fuchsia_net_masquerade as fnet_masquerade;
 use fnet_masquerade::Error;
 use fuchsia_async::DurationExt as _;
 use fuchsia_zircon::DurationNum as _;
-use futures::{future, stream::LocalBoxStream, StreamExt as _, TryStreamExt as _};
+use futures::stream::LocalBoxStream;
+use futures::{future, StreamExt as _, TryStreamExt as _};
 use net_declare::fidl_subnet;
 use tracing::error;
+use {
+    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
+    fidl_fuchsia_net_masquerade as fnet_masquerade,
+};
 
 use crate::filter::FilterEnabledState;
 use crate::InterfaceState;
@@ -382,10 +386,8 @@ impl RespondAndMaybeShutdown for MasqueradeState {
 
 #[cfg(test)]
 pub mod test {
-    use std::{
-        collections::HashSet,
-        sync::{Arc, Mutex},
-    };
+    use std::collections::HashSet;
+    use std::sync::{Arc, Mutex};
 
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;

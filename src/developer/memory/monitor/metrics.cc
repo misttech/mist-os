@@ -8,19 +8,18 @@
 #include <lib/trace/event.h>
 #include <zircon/time.h>
 
-#include <algorithm>
-#include <array>
 #include <string>
 
 #include <src/lib/cobalt/cpp/metric_event_builder.h>
 
 #include "lib/fpromise/result.h"
 #include "src/developer/memory/metrics/digest.h"
-#include "src/developer/memory/metrics/printer.h"
 
 namespace monitor {
 
-using namespace memory;
+using memory::Capture;
+using memory::Digest;
+
 using cobalt_registry::MemoryMigratedMetricDimensionBucket;
 using TimeSinceBoot = cobalt_registry::MemoryLeakMigratedMetricDimensionTimeSinceBoot;
 

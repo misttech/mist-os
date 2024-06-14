@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_io as fio,
-    fuchsia_fs::{directory::*, file::*, node::OpenError},
-    fuchsia_zircon::{Event, Status},
-    std::path::Path,
-    tracing::debug,
-};
+use fidl_fuchsia_io as fio;
+use fuchsia_fs::directory::*;
+use fuchsia_fs::file::*;
+use fuchsia_fs::node::OpenError;
+use fuchsia_zircon::{Event, Status};
+use std::path::Path;
+use tracing::debug;
 
 // A convenience wrapper over a FIDL DirectoryProxy.
 // Functions of this struct do not tolerate FIDL errors and will panic when they encounter them.

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{mapping::replace, EnvironmentContext};
+use crate::mapping::replace;
+use crate::EnvironmentContext;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
@@ -20,7 +21,8 @@ pub(crate) fn data(ctx: &EnvironmentContext, value: Value) -> Option<Value> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{environment::ExecutableKind, ConfigMap};
+    use crate::environment::ExecutableKind;
+    use crate::ConfigMap;
 
     #[test]
     fn test_mapper() {

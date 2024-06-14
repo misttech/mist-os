@@ -2,13 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        parse::{PackageName, PackageVariant},
-        RelativePackageUrl,
-    },
-    proptest::prelude::*,
-};
+use crate::parse::{PackageName, PackageVariant};
+use crate::RelativePackageUrl;
+use proptest::prelude::*;
 
 /// Valid characters for a Fuchsia package path.  These characters are any unicode character,
 /// except for '/', '\0', '.', and '\n'.

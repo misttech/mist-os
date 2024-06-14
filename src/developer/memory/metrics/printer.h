@@ -6,7 +6,6 @@
 #define SRC_DEVELOPER_MEMORY_METRICS_PRINTER_H_
 
 #include <iostream>
-#include <sstream>
 #include <string>
 
 #include "src/developer/memory/metrics/capture.h"
@@ -17,9 +16,9 @@
 namespace memory {
 
 extern const size_t kMaxFormattedStringSize;
-const char* FormatSize(uint64_t size, char* buffer);
+const char* FormatSize(uint64_t bytes, char* buf);
 
-enum Sorted { UNSORTED, SORTED };
+enum Sorted : uint8_t { UNSORTED, SORTED };
 
 class Printer {
  public:

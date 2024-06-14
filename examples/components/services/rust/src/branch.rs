@@ -7,10 +7,11 @@
 //!
 //! This program is written as a test so that it can be easily launched with `fx test`.
 
+use fuchsia_component::client as fclient;
+use tracing::*;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_examples_services as fexamples, fidl_fuchsia_io as fio,
-    fuchsia_component::client as fclient, tracing::*,
 };
 
 const COLLECTION_NAME: &'static str = "account_providers";

@@ -2,54 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        component::map_to_raw_status,
-        directory::FxDirectory,
-        errors::map_to_status,
-        fxblob::BlobDirectory,
-        memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
-        volume::{FxVolume, FxVolumeAndRoot, MemoryPressureConfig, RootDir},
-        RemoteCrypt,
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream},
-    fidl_fuchsia_fxfs::{
-        BlobCreatorMarker, BlobReaderMarker, CheckOptions, MountOptions, ProjectIdMarker,
-        VolumeRequest, VolumeRequestStream,
-    },
-    fidl_fuchsia_io as fio,
-    fs_inspect::{FsInspectTree, FsInspectVolume},
-    fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, AsHandleRef},
-    futures::{stream::FuturesUnordered, StreamExt, TryStreamExt},
-    fxfs::{
-        errors::FxfsError,
-        fsck,
-        log::*,
-        metrics,
-        object_store::{
-            transaction::{lock_keys, LockKey, Options},
-            volume::RootVolume,
-            Directory, ObjectDescriptor, ObjectStore,
-        },
-    },
-    fxfs_crypto::Crypt,
-    fxfs_trace::{trace_future_args, TraceFutureExt},
-    rustc_hash::FxHashMap as HashMap,
-    std::sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, OnceLock, Weak,
-    },
-    vfs::{
-        directory::{
-            entry_container::{self, MutableDirectory},
-            helper::DirectlyMutable,
-        },
-        path::Path,
-    },
+use crate::fuchsia::component::map_to_raw_status;
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::fxblob::BlobDirectory;
+use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
+use crate::fuchsia::profile::new_profile_state;
+use crate::fuchsia::volume::{FxVolume, FxVolumeAndRoot, MemoryPressureConfig, RootDir};
+use crate::fuchsia::RemoteCrypt;
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
+use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
+use fidl_fuchsia_fxfs::{
+    BlobCreatorMarker, BlobReaderMarker, CheckOptions, MountOptions, ProjectIdMarker,
+    VolumeRequest, VolumeRequestStream,
 };
+use fs_inspect::{FsInspectTree, FsInspectVolume};
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::stream::FuturesUnordered;
+use futures::{StreamExt, TryStreamExt};
+use fxfs::errors::FxfsError;
+use fxfs::log::*;
+use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+use fxfs::object_store::volume::RootVolume;
+use fxfs::object_store::{Directory, ObjectDescriptor, ObjectStore};
+use fxfs::{fsck, metrics};
+use fxfs_crypto::Crypt;
+use fxfs_trace::{trace_future_args, TraceFutureExt};
+use rustc_hash::FxHashMap as HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock, Weak};
+use vfs::directory::entry_container::{self, MutableDirectory};
+use vfs::directory::helper::DirectlyMutable;
+use vfs::path::Path;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const MEBIBYTE: u64 = 1024 * 1024;
 
@@ -119,23 +105,25 @@ impl MountedVolumesGuard<'_> {
             !self.mounted_volumes.contains_key(&store.store_object_id()),
             FxfsError::AlreadyBound
         );
-        if as_blob {
-            let volume = self
-                .mount_store::<BlobDirectory>(name, store, MemoryPressureConfig::default())
-                .await?;
-            if let Some((profile_name, _)) = &(*self.volumes_directory.profiling_state.lock().await)
-            {
-                if let Err(e) = volume.volume().record_or_replay_profile(profile_name).await {
-                    error!(
-                        "Failed to record or replay profile '{}' for volume {}: {:?}",
-                        profile_name, name, e
-                    );
-                }
-            }
-            Ok(volume)
+        let volume = if as_blob {
+            self.mount_store::<BlobDirectory>(name, store, MemoryPressureConfig::default()).await?
         } else {
-            self.mount_store::<FxDirectory>(name, store, MemoryPressureConfig::default()).await
+            self.mount_store::<FxDirectory>(name, store, MemoryPressureConfig::default()).await?
+        };
+        // If there is an ongoing profile activity, we should apply it to the mounted volume.
+        if let Some((profile_name, _)) = &(*self.volumes_directory.profiling_state.lock().await) {
+            if let Err(e) = volume
+                .volume()
+                .record_or_replay_profile(new_profile_state(as_blob), profile_name)
+                .await
+            {
+                error!(
+                    "Failed to record or replay profile '{}' for volume {}: {:?}",
+                    profile_name, name, e
+                );
+            }
         }
+        Ok(volume)
     }
 
     // Mounts the given store.  A lock *must* be held on the volume directory.
@@ -263,12 +251,27 @@ impl VolumesDirectory {
         Ok(me)
     }
 
+    /// Delete a profile for a given volume. Fails if that volume isn't mounted or if there is
+    /// active profile recording or replay.
     pub async fn delete_profile(
         self: &Arc<Self>,
         volume: &str,
         profile: &str,
     ) -> Result<(), zx::Status> {
-        for (_, (vol_name, volume_and_root)) in &*(self.mounted_volumes.lock().await) {
+        // Volumes lock is taken first to provide consistent lock ordering with mounting a volume.
+        let volumes = self.mounted_volumes.lock().await;
+        let state = self.profiling_state.lock().await;
+
+        // Only allow deletion when no operations are in flight. This removes confusion around
+        // deleting a profile while one is recording with the same name, as the profile will not be
+        // available for deletion until the recording completes. This would also mean that deleting
+        // during a recording may succeed for deleting an older version but will be confusingly
+        // replaced moments later.
+        if state.is_some() {
+            warn!("Failing profile deletion while profile operations are in flight.");
+            return Err(zx::Status::UNAVAILABLE);
+        }
+        for (_, (vol_name, volume_and_root)) in &*volumes {
             if vol_name == volume {
                 let dir = Arc::new(FxDirectory::new(
                     None,
@@ -285,15 +288,18 @@ impl VolumesDirectory {
         Err(zx::Status::NOT_FOUND)
     }
 
-    async fn finish_profiling(self: &Arc<Self>) {
+    /// Stop all ongoing replays, and complete and persist ongoing recordings.
+    pub async fn stop_profile_tasks(self: &Arc<Self>) {
         let volumes = self.mounted_volumes.lock().await;
         let mut state = self.profiling_state.lock().await;
         for (_, (_, volume_and_root)) in &*volumes {
-            volume_and_root.volume().finish_profiling().await;
+            volume_and_root.volume().stop_profile_tasks().await;
         }
         *state = None;
     }
 
+    /// Record a named profile for a number of seconds, fails if there is an in flight recording or
+    /// replay.
     pub async fn record_or_replay_profile(
         self: Arc<Self>,
         name: String,
@@ -304,20 +310,24 @@ impl VolumesDirectory {
         let mut state = self.profiling_state.lock().await;
         if state.is_none() {
             for (_, (volume_name, volume_and_root)) in &*volumes {
-                if volume_and_root.root().clone().into_any().downcast::<BlobDirectory>().is_ok() {
-                    // Just log the errors, don't stop half-way.
-                    if let Err(e) = volume_and_root.volume().record_or_replay_profile(&name).await {
-                        error!(
-                            "Failed to record or replay profile '{}' for volume {}: {:?}",
-                            &name, volume_name, e
-                        );
-                    }
+                let is_blob =
+                    volume_and_root.root().clone().into_any().downcast::<BlobDirectory>().is_ok();
+                // Just log the errors, don't stop half-way.
+                if let Err(e) = volume_and_root
+                    .volume()
+                    .record_or_replay_profile(new_profile_state(is_blob), &name)
+                    .await
+                {
+                    error!(
+                        "Failed to record or replay profile '{}' for volume {}: {:?}",
+                        &name, volume_name, e
+                    );
                 }
             }
             let this = self.clone();
             let timer_task = fasync::Task::spawn(async move {
                 fasync::Timer::new(fasync::Duration::from_seconds(duration_secs.into())).await;
-                this.finish_profiling().await;
+                this.stop_profile_tasks().await;
             });
             *state = Some((name, timer_task));
             Ok(())
@@ -393,7 +403,7 @@ impl VolumesDirectory {
 
     /// Terminates all opened volumes.
     pub async fn terminate(self: &Arc<Self>) {
-        self.finish_profiling().await;
+        self.stop_profile_tasks().await;
         self.lock().await.terminate().await
     }
 
@@ -724,30 +734,32 @@ impl VolumesDirectory {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::fuchsia::{testing::open_file_checked, volumes_directory::VolumesDirectory},
-        fidl::endpoints::{create_proxy, create_request_stream, ServerEnd},
-        fidl_fuchsia_fs::AdminMarker,
-        fidl_fuchsia_fxfs::{KeyPurpose, MountOptions, VolumeMarker, VolumeProxy},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        fuchsia_fs::file,
-        fuchsia_zircon::Status,
-        futures::join,
-        fxfs::{
-            errors::FxfsError, filesystem::FxFilesystem, fsck::fsck,
-            object_store::allocator::Allocator, object_store::volume::root_volume,
-        },
-        fxfs_crypto::Crypt,
-        fxfs_insecure_crypto::InsecureCrypt,
-        rand::Rng as _,
-        std::{
-            sync::{atomic::Ordering, Arc, Weak},
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::{directory::entry_container::Directory, execution_scope::ExecutionScope, path::Path},
-    };
+    use crate::fuchsia::testing::open_file_checked;
+    use crate::fuchsia::volumes_directory::VolumesDirectory;
+    use fidl::endpoints::{create_proxy, create_request_stream, ServerEnd};
+    use fidl_fuchsia_fs::AdminMarker;
+    use fidl_fuchsia_fxfs::{KeyPurpose, MountOptions, VolumeMarker, VolumeProxy};
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
+    use fuchsia_fs::file;
+    use fuchsia_zircon::Status;
+    use futures::join;
+    use fxfs::errors::FxfsError;
+    use fxfs::filesystem::FxFilesystem;
+    use fxfs::fsck::fsck;
+    use fxfs::object_store::allocator::Allocator;
+    use fxfs::object_store::volume::root_volume;
+    use fxfs_crypto::Crypt;
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use rand::Rng as _;
+    use std::sync::atomic::Ordering;
+    use std::sync::{Arc, Weak};
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
+    use vfs::directory::entry_container::Directory;
+    use vfs::execution_scope::ExecutionScope;
+    use vfs::path::Path;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn test_volume_creation() {
@@ -1819,7 +1831,7 @@ mod tests {
             volumes_directory
                 .delete_profile(PREMOUNT_NOBLOB, RECORDING_NAME)
                 .await
-                .expect_err("Profile should not exist");
+                .expect("Finding profile to delete.");
             volumes_directory
                 .delete_profile(LIVE_BLOB, RECORDING_NAME)
                 .await
@@ -1827,7 +1839,7 @@ mod tests {
             volumes_directory
                 .delete_profile(LIVE_NOBLOB, RECORDING_NAME)
                 .await
-                .expect_err("Profile should not exist");
+                .expect("Finding profile to delete.");
 
             volumes_directory.terminate().await;
         }
@@ -1885,6 +1897,14 @@ mod tests {
             .await
             .expect("Recording");
 
+        // Deletion fails during in-flight recording.
+        assert_eq!(
+            volumes_directory.delete_profile("foo", "foo").await.expect_err("File shouldn't exist"),
+            Status::UNAVAILABLE
+        );
+
+        volumes_directory.stop_profile_tasks().await;
+
         // Missing volume name.
         assert_eq!(
             volumes_directory.delete_profile("bar", "foo").await.expect_err("File shouldn't exist"),
@@ -1896,14 +1916,6 @@ mod tests {
             volumes_directory.delete_profile("foo", "bar").await.expect_err("File shouldn't exist"),
             Status::NOT_FOUND
         );
-
-        // Deletion fails as the file is not visible until after the recording completes.
-        assert_eq!(
-            volumes_directory.delete_profile("foo", "foo").await.expect_err("File shouldn't exist"),
-            Status::NOT_FOUND
-        );
-
-        volumes_directory.finish_profiling().await;
 
         // Deletion should now succeed as the profile will be placed as part of `finish_profiling()`
         volumes_directory.delete_profile("foo", "foo").await.expect("Deleting");

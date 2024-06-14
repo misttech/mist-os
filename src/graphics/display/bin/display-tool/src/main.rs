@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    argh::FromArgs,
-    display_utils::{Coordinator, DisplayId, PixelFormat},
-    fuchsia_async as fasync,
-    futures::{
-        future::{FutureExt, TryFutureExt},
-        select,
-    },
-    rgb::Rgb888,
-};
+use anyhow::Error;
+use argh::FromArgs;
+use display_utils::{Coordinator, DisplayId, PixelFormat};
+use fuchsia_async as fasync;
+use futures::future::{FutureExt, TryFutureExt};
+use futures::select;
+use rgb::Rgb888;
 
 mod commands;
 mod draw;

@@ -8,8 +8,9 @@ import lib
 import sys
 
 
-def main():
+def main() -> int:
     lib.f()
+    return 0
 
 
 if __name__ == "__main__":

@@ -612,6 +612,9 @@ void JobScheduler::UpdatePowerManager() {
       active = true;
   }
   owner_->UpdateGpuActive(active);
+  if (HasRunnableWork()) {
+    owner_->PowerOnGpuForRunnableAtoms();
+  }
 }
 
 void JobScheduler::SetSchedulingEnabled(bool enabled) {

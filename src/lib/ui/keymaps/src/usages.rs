@@ -160,7 +160,8 @@ pub fn hid_usage_to_input3_key(usage_id: u16) -> Option<fidl_fuchsia_input::Key>
 
 #[cfg(test)]
 mod tests {
-    use {super::*, test_case::test_case};
+    use super::*;
+    use test_case::test_case;
 
     #[test]
     fn input3_key_to_hid() {

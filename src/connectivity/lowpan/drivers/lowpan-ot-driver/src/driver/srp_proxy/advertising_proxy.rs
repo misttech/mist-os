@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use super::*;
-use fidl::endpoints::create_endpoints;
-use fidl::endpoints::Proxy;
+use fidl::endpoints::{create_endpoints, Proxy};
 use fidl_fuchsia_net_mdns::*;
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;

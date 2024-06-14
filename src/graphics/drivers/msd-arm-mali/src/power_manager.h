@@ -26,6 +26,8 @@ class PowerManager {
     virtual void ReportPowerChangeComplete(bool powered_on, bool success) = 0;
   };
 
+  using Clock = std::chrono::steady_clock;
+
   explicit PowerManager(Owner* owner, uint64_t default_core_bitmask);
 
   // Called on the device thread or the initial driver thread.
@@ -44,6 +46,13 @@ class PowerManager {
   uint64_t l2_ready_status() const {
     std::lock_guard<std::mutex> lock(ready_status_mutex_);
     return l2_ready_status_;
+  }
+
+  Clock::duration GetGpuPowerdownTimeout() const {
+    if (current_gpu_powerdown_timeout_ == Clock::time_point::max()) {
+      return Clock::duration::max();
+    }
+    return current_gpu_powerdown_timeout_ - Clock::now();
   }
 
   // This is called whenever the GPU starts or stops processing work.
@@ -85,6 +94,7 @@ class PowerManager {
   // The set of cores that were requested be enabled.
   uint64_t required_cores_{0};
   bool power_down_on_idle_{false};
+  Clock::time_point current_gpu_powerdown_timeout_{Clock::time_point::max()};
 
   mutable std::mutex ready_status_mutex_;
   FIT_GUARDED(ready_status_mutex_) uint64_t tiler_ready_status_ = 0;

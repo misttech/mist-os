@@ -186,7 +186,6 @@ class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::
 class TestEnvironment : fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    firmware_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
     auto dir_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     firmware_server_.SetDispatcher(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     // Serve our firmware directory (will start serving FIDL requests on dir_endpoints with
@@ -236,7 +235,7 @@ class TestEnvironment : fdf_testing::Environment {
 
  private:
   compat::DeviceServer device_server_;
-  fbl::RefPtr<fs::PseudoDir> firmware_dir_;
+  fbl::RefPtr<fs::PseudoDir> firmware_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
   fs::SynchronousVfs firmware_server_;
 };
 

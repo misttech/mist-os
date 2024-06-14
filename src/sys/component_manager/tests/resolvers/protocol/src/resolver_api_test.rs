@@ -7,18 +7,18 @@
 //! values are generally passed through. (Note that some normalization may
 //! still occur. The test URLs in this test should match the normalized values.)
 
+use anyhow::{Context as _, Error};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fuchsia_component::server;
+use fuchsia_component_test::{ChildOptions, LocalComponentHandles, RealmBuilder};
+use futures::channel::mpsc;
+use futures::prelude::*;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
+use tracing::*;
 use {
-    anyhow::{Context as _, Error},
-    fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_resolution as fcresolution,
     fuchsia_async as fasync,
-    fuchsia_component::server,
-    fuchsia_component_test::{ChildOptions, LocalComponentHandles, RealmBuilder},
-    futures::channel::mpsc,
-    futures::prelude::*,
-    std::collections::HashSet,
-    std::sync::{Arc, Mutex},
-    tracing::*,
 };
 
 const ENVIRONMENT_NAME: &'static str = "resolver_env";

@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    data_encoding::HEXLOWER,
-    mundane::public::ed25519 as mundane_ed25519,
-    serde::{Deserialize, Deserializer, Serialize, Serializer},
-    serde_json::json,
-    std::{fmt, fs::File, io, io::Write, path::Path},
-    tuf::crypto::{Ed25519PrivateKey, KeyType, PrivateKey, PublicKey, SignatureScheme},
-};
+use data_encoding::HEXLOWER;
+use mundane::public::ed25519 as mundane_ed25519;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::json;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+use std::{fmt, io};
+use tuf::crypto::{Ed25519PrivateKey, KeyType, PrivateKey, PublicKey, SignatureScheme};
 
 const DEFAULT_KEYTYPE_GENERATION: &KeyType = &KeyType::Ed25519;
 
@@ -409,7 +410,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::test_utils, assert_matches::assert_matches, camino::Utf8Path};
+    use super::*;
+    use crate::test_utils;
+    use assert_matches::assert_matches;
+    use camino::Utf8Path;
 
     macro_rules! assert_keys {
         ($actual:expr, $expected:expr) => {

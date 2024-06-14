@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Result, lsusb::args::Args};
+use anyhow::Result;
+use lsusb::args::Args;
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<()> {

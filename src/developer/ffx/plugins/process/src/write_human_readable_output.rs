@@ -4,8 +4,7 @@
 
 //!  Utilities that prints information in a human-readable format.
 
-use crate::processes_data;
-use crate::Writer;
+use crate::{processes_data, Writer};
 use anyhow::Result;
 use fuchsia_zircon_types as zx_types;
 use processes_data::processed;

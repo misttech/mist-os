@@ -2,37 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async},
-    mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED},
-    task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
-    vfs::{
-        socket::{
-            Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
-            SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
-        },
-        AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer,
-    },
+use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
+use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
+use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
+use crate::vfs::socket::{
+    Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps, SocketPeer,
+    SocketProtocol, SocketShutdownFlags, SocketType,
 };
+use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_uapi::errors::{Errno, ENOTSUP};
+use starnix_uapi::user_buffer::UserBuffer;
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    c_int, errno, errno_from_zxio_code, error,
-    errors::{Errno, ENOTSUP},
-    from_status_like_fdio, uapi, ucred,
-    user_buffer::UserBuffer,
-    vfs::FdEvents,
-    MSG_DONTWAIT, MSG_WAITALL, SOL_SOCKET, SO_ATTACH_FILTER,
+    c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, uapi, ucred, MSG_DONTWAIT,
+    MSG_WAITALL, SO_ATTACH_FILTER,
 };
 
 use fidl::endpoints::DiscoverableProtocolMarker as _;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
-use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
-use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
 use std::sync::{Arc, OnceLock};
+use syncio::zxio::{SOL_SOCKET, SO_DOMAIN, SO_PROTOCOL, SO_TYPE};
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorCode};
+use {
+    fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fuchsia_zircon as zx,
+};
 
 /// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.
 struct SocketProviderServiceConnector;
@@ -85,7 +82,10 @@ impl ZxioBackedSocket {
         .map_err(|status| from_status_like_fdio!(status))?
         .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
-        Ok(ZxioBackedSocket { zxio: Arc::new(zxio) })
+        Ok(Self::new_with_zxio(zxio))
+    }
+    pub fn new_with_zxio(zxio: syncio::Zxio) -> ZxioBackedSocket {
+        ZxioBackedSocket { zxio: Arc::new(zxio) }
     }
 
     pub fn sendmsg(
@@ -209,6 +209,31 @@ impl ZxioBackedSocket {
 }
 
 impl SocketOps for ZxioBackedSocket {
+    fn get_socket_info(&self) -> Result<(SocketDomain, SocketType, SocketProtocol), Errno> {
+        let getsockopt = |optname: u32| -> Result<u32, Errno> {
+            Ok(u32::from_ne_bytes(
+                self.zxio
+                    .getsockopt(SOL_SOCKET, optname, std::mem::size_of::<u32>() as u32)
+                    .map_err(|status| from_status_like_fdio!(status))?
+                    .map_err(|out_code| errno_from_zxio_code!(out_code))?
+                    .try_into()
+                    .unwrap(),
+            ))
+        };
+
+        let domain_raw = getsockopt(SO_DOMAIN)?;
+        let domain = SocketDomain::from_raw(domain_raw.try_into().map_err(|_| errno!(EINVAL))?)
+            .ok_or_else(|| errno!(EINVAL))?;
+
+        let type_raw = getsockopt(SO_TYPE)?;
+        let socket_type = SocketType::from_raw(type_raw).ok_or_else(|| errno!(EINVAL))?;
+
+        let protocol_raw = getsockopt(SO_PROTOCOL)?;
+        let protocol = SocketProtocol::from_raw(protocol_raw);
+
+        Ok((domain, socket_type, protocol))
+    }
+
     fn connect(
         &self,
         _socket: &SocketHandle,
@@ -241,11 +266,11 @@ impl SocketOps for ZxioBackedSocket {
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
-        Ok(Socket::new_with_ops(
+        Ok(Socket::new_with_ops_and_info(
+            Box::new(ZxioBackedSocket { zxio: Arc::new(zxio) }),
             socket.domain,
             socket.socket_type,
             socket.protocol,
-            Box::new(ZxioBackedSocket { zxio: Arc::new(zxio) }),
         ))
     }
 

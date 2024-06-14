@@ -11,11 +11,10 @@ use crate::config::default_settings::DefaultSetting;
 use crate::display::build_display_default_settings;
 use crate::ingress::fidl::InterfaceSpec;
 use crate::storage::testing::InMemoryStorageFactory;
-use crate::AgentConfiguration;
-use crate::EnabledInterfacesConfiguration;
-use crate::EnvironmentBuilder;
-use crate::ServiceConfiguration;
-use crate::ServiceFlags;
+use crate::{
+    AgentConfiguration, EnabledInterfacesConfiguration, EnvironmentBuilder, ServiceConfiguration,
+    ServiceFlags,
+};
 
 const ENV_NAME: &str = "settings_service_configuration_test_environment";
 

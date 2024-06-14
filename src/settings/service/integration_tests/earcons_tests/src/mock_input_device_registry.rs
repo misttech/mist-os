@@ -10,8 +10,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::LocalComponentHandles;
 use futures::channel::mpsc::Sender;
-use futures::StreamExt;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 
 pub type ButtonEventSender = Sender<MediaButtonsListenerProxy>;
 

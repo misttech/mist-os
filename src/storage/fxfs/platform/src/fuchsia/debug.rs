@@ -2,44 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        component::map_to_raw_status, fuchsia::errors::map_to_status,
-        volumes_directory::VolumesDirectory,
-    },
-    async_trait::async_trait,
-    fidl_fuchsia_fxfs::DebugRequest,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, Status},
-    fxfs::{
-        filesystem::FxFilesystem,
-        lsm_tree::types::LayerIterator,
-        object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
-        object_store::{
-            AttributeKey, DataObjectHandle, HandleOptions, ObjectKey, ObjectKeyData, ObjectStore,
-        },
-    },
-    std::{
-        collections::BTreeMap,
-        ops::Bound,
-        sync::{Arc, Mutex, Weak},
-    },
-    vfs::{
-        attributes,
-        common::rights_to_posix_mode_bits,
-        directory::{
-            dirents_sink::{self, AppendResult},
-            entry::{DirectoryEntry, OpenRequest},
-            entry_container::Directory,
-            helper::DirectlyMutable,
-            traversal_position::TraversalPosition,
-        },
-        execution_scope::ExecutionScope,
-        file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode},
-        node::Node,
-        ObjectRequestRef, ToObjectRequest,
-    },
+use crate::component::map_to_raw_status;
+use crate::fuchsia::errors::map_to_status;
+use crate::volumes_directory::VolumesDirectory;
+use fidl_fuchsia_fxfs::DebugRequest;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::{self as zx, Status};
+use fxfs::filesystem::FxFilesystem;
+use fxfs::lsm_tree::types::LayerIterator;
+use fxfs::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
+use fxfs::object_store::{
+    AttributeKey, DataObjectHandle, HandleOptions, ObjectKey, ObjectKeyData, ObjectStore,
 };
+use std::collections::BTreeMap;
+use std::ops::Bound;
+use std::sync::{Arc, Mutex, Weak};
+use vfs::common::rights_to_posix_mode_bits;
+use vfs::directory::dirents_sink::{self, AppendResult};
+use vfs::directory::entry::{DirectoryEntry, OpenRequest};
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::traversal_position::TraversalPosition;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
+use vfs::node::Node;
+use vfs::{attributes, ObjectRequestRef, ToObjectRequest};
 
 // To avoid dependency cycles, FxfsDebug stores weak references back to internal structures.  This
 // convenience method returns an appropriate error when these internal structures are dropped.
@@ -83,7 +70,6 @@ impl DirectoryEntry for InternalFile {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for InternalFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let props = self.handle().await?.get_properties().await.map_err(map_to_status)?;
@@ -271,9 +257,7 @@ impl ObjectStoreDirectory {
         } else {
             return Ok(());
         };
-        for layer in layers_dir.filter_map(|name, _| Some(name.to_string())) {
-            layers_dir.remove_entry(layer, false)?;
-        }
+        layers_dir.remove_all_entries();
         let mut idx = 0;
         let layers = store
             .tree()
@@ -316,7 +300,6 @@ impl DirectoryEntry for ObjectDirectory {
     }
 }
 
-#[async_trait]
 impl Node for ObjectDirectory {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let id = upgrade_weak(&self.store)?.store_object_id();
@@ -356,7 +339,6 @@ impl Node for ObjectDirectory {
     }
 }
 
-#[async_trait]
 impl Directory for ObjectDirectory {
     fn open(
         self: Arc<Self>,
@@ -568,5 +550,9 @@ pub async fn handle_debug_request(
         }
         DebugRequest::DeleteProfile { responder, volume, profile } => responder
             .send(volumes.delete_profile(&volume, &profile).await.map_err(Status::into_raw)),
+        DebugRequest::StopProfileTasks { responder } => {
+            volumes.stop_profile_tasks().await;
+            responder.send(Ok(()))
+        }
     }
 }

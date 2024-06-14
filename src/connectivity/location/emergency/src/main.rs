@@ -2,45 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    emergency_lib::{
-        bss_cache::{Bss, BssCache, BssId, RealBssCache, UpdateError},
-        bss_resolver::{BssResolver, RealBssResolver, ResolverError},
-    },
-    emergency_metrics_registry::{
-        self as metrics,
-        EmergencyGetCurrentFailureMigratedMetricDimensionCause as GetCurrentFailure,
-        EmergencyGetCurrentResultMigratedMetricDimensionResult as GetCurrentResult,
-        WlanSensorReportMigratedMetricDimensionResult as WlanSensorReportResult,
-        EMERGENCY_GET_CURRENT_ACCURACY_MIGRATED_METRIC_ID as GET_CURRENT_ACCURACY_METRIC_ID,
-        EMERGENCY_GET_CURRENT_FAILURE_MIGRATED_METRIC_ID as GET_CURRENT_FAILURE_METRIC_ID,
-        EMERGENCY_GET_CURRENT_LATENCY_MIGRATED_METRIC_ID as GET_CURRENT_LATENCY_METRIC_ID,
-        EMERGENCY_GET_CURRENT_RESULT_MIGRATED_METRIC_ID as GET_CURRENT_RESULT_METRIC_ID,
-        WLAN_SENSOR_REPORT_MIGRATED_METRIC_ID,
-    },
-    fidl_contrib::{
-        protocol_connector::ConnectedProtocol, protocol_connector::ProtocolSender,
-        ProtocolConnector,
-    },
-    fidl_fuchsia_location::Error as LocationError,
-    fidl_fuchsia_location_position::{
-        EmergencyProviderRequest, EmergencyProviderRequestStream, Position,
-    },
-    fidl_fuchsia_location_sensor::{
-        WlanBaseStationWatcherRequest, WlanBaseStationWatcherRequestStream,
-    },
-    fidl_fuchsia_metrics::{
-        MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
-    },
-    fidl_fuchsia_net_http::LoaderMarker as HttpLoaderMarker,
-    fuchsia_async as fasync,
-    fuchsia_cobalt_builders::MetricEventExt,
-    fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    futures::{lock::Mutex, prelude::*},
-    std::time::{Duration, Instant},
-    tracing::info,
+use anyhow::{format_err, Context, Error};
+use emergency_lib::bss_cache::{Bss, BssCache, BssId, RealBssCache, UpdateError};
+use emergency_lib::bss_resolver::{BssResolver, RealBssResolver, ResolverError};
+use emergency_metrics_registry::{
+    self as metrics, EmergencyGetCurrentFailureMigratedMetricDimensionCause as GetCurrentFailure,
+    EmergencyGetCurrentResultMigratedMetricDimensionResult as GetCurrentResult,
+    WlanSensorReportMigratedMetricDimensionResult as WlanSensorReportResult,
+    EMERGENCY_GET_CURRENT_ACCURACY_MIGRATED_METRIC_ID as GET_CURRENT_ACCURACY_METRIC_ID,
+    EMERGENCY_GET_CURRENT_FAILURE_MIGRATED_METRIC_ID as GET_CURRENT_FAILURE_METRIC_ID,
+    EMERGENCY_GET_CURRENT_LATENCY_MIGRATED_METRIC_ID as GET_CURRENT_LATENCY_METRIC_ID,
+    EMERGENCY_GET_CURRENT_RESULT_MIGRATED_METRIC_ID as GET_CURRENT_RESULT_METRIC_ID,
+    WLAN_SENSOR_REPORT_MIGRATED_METRIC_ID,
 };
+use fidl_contrib::protocol_connector::{ConnectedProtocol, ProtocolSender};
+use fidl_contrib::ProtocolConnector;
+use fidl_fuchsia_location::Error as LocationError;
+use fidl_fuchsia_location_position::{
+    EmergencyProviderRequest, EmergencyProviderRequestStream, Position,
+};
+use fidl_fuchsia_location_sensor::{
+    WlanBaseStationWatcherRequest, WlanBaseStationWatcherRequestStream,
+};
+use fidl_fuchsia_metrics::{
+    MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
+};
+use fidl_fuchsia_net_http::LoaderMarker as HttpLoaderMarker;
+use fuchsia_async as fasync;
+use fuchsia_cobalt_builders::MetricEventExt;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use std::time::{Duration, Instant};
+use tracing::info;
 
 const CONCURRENCY_LIMIT: Option<usize> = None;
 const API_KEY_FILE: &str = "/config/data/google_maps_api_key.txt";
@@ -268,22 +263,21 @@ fn report_bss_update_metrics(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        futures::channel::mpsc,
-        futures::future,
-        std::{pin::pin, task::Poll},
-        test_doubles::{FakeBssCache, StubBssResolver},
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use futures::channel::mpsc;
+    use futures::future;
+    use std::pin::pin;
+    use std::task::Poll;
+    use test_doubles::{FakeBssCache, StubBssResolver};
 
     mod base_station_watcher {
-        use {
-            super::*, emergency_lib::bss_cache::UpdateError,
-            fidl::endpoints::create_request_stream,
-            fidl_fuchsia_location_sensor::WlanBaseStationWatcherMarker,
-            fidl_fuchsia_wlan_policy::ScanResultIteratorMarker, test_case::test_case,
-        };
+        use super::*;
+        use emergency_lib::bss_cache::UpdateError;
+        use fidl::endpoints::create_request_stream;
+        use fidl_fuchsia_location_sensor::WlanBaseStationWatcherMarker;
+        use fidl_fuchsia_wlan_policy::ScanResultIteratorMarker;
+        use test_case::test_case;
 
         #[fasync::run_until_stalled(test)]
         async fn propagates_stations_downward() {
@@ -426,14 +420,12 @@ mod tests {
     }
 
     mod emergency_provider {
-        use {
-            super::*,
-            assert_matches::assert_matches,
-            emergency_lib::bss_resolver::ResolverError,
-            fidl_fuchsia_location_position::{EmergencyProviderMarker, PositionExtras},
-            fidl_fuchsia_metrics::MetricEventPayload,
-            test_case::test_case,
-        };
+        use super::*;
+        use assert_matches::assert_matches;
+        use emergency_lib::bss_resolver::ResolverError;
+        use fidl_fuchsia_location_position::{EmergencyProviderMarker, PositionExtras};
+        use fidl_fuchsia_metrics::MetricEventPayload;
+        use test_case::test_case;
 
         fn position_with_unknown_accuracy() -> Position {
             Position {
@@ -739,10 +731,9 @@ mod tests {
 
 #[cfg(test)]
 mod test_doubles {
-    use {
-        super::*, async_trait::async_trait,
-        fidl_fuchsia_wlan_policy::ScanResultIteratorProxyInterface,
-    };
+    use super::*;
+    use async_trait::async_trait;
+    use fidl_fuchsia_wlan_policy::ScanResultIteratorProxyInterface;
 
     pub(super) struct FakeBssCache {
         update_result: Result<(), UpdateError>,

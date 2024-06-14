@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{CheckAccessReason, FileSystemHandle, Namespace, NamespaceNode},
-};
+use crate::task::CurrentTask;
+use crate::vfs::{CheckAccessReason, FileSystemHandle, Namespace, NamespaceNode};
 use starnix_logging::log_trace;
 use starnix_sync::RwLock;
-use starnix_uapi::{
-    auth::CAP_SYS_CHROOT,
-    errno, error,
-    errors::Errno,
-    file_mode::{Access, FileMode},
-};
+use starnix_uapi::auth::CAP_SYS_CHROOT;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::{Access, FileMode};
+use starnix_uapi::{errno, error};
 use std::sync::Arc;
 
 /// The mutable state for an FsContext.
@@ -170,12 +166,11 @@ impl FsContext {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        fs::tmpfs::TmpFs,
-        testing::{create_kernel_and_task, create_kernel_task_and_unlocked_with_pkgfs},
-        vfs::FsContext,
-    };
-    use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags};
+    use crate::fs::tmpfs::TmpFs;
+    use crate::testing::{create_kernel_and_task, create_kernel_task_and_unlocked_with_pkgfs};
+    use crate::vfs::FsContext;
+    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::open_flags::OpenFlags;
 
     #[::fuchsia::test]
     async fn test_umask() {

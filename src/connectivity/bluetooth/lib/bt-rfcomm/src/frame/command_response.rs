@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::frame::{error::FrameParseError, FrameTypeMarker};
+use crate::frame::error::FrameParseError;
+use crate::frame::FrameTypeMarker;
 use crate::Role;
 
 /// The C/R bit in RFCOMM. This is used both at the frame level and the multiplexer

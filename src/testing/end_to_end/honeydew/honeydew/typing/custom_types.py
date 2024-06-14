@@ -171,14 +171,16 @@ class FFXConfig:
             passed to `--config discovery.mdns.enabled` arg of FFX
         subtools_search_path: A path of where ffx should
             look for plugins.
+        proxy_timeout_secs: Proxy timeout in secs.
     """
 
     binary_path: str
     isolate_dir: fuchsia_controller.IsolateDir
     logs_dir: str
-    logs_level: str
+    logs_level: str | None
     mdns_enabled: bool
     subtools_search_path: str | None
+    proxy_timeout_secs: int | None
 
     def __str__(self) -> str:
         return (
@@ -188,6 +190,7 @@ class FFXConfig:
             f"logs_level={self.logs_level}, "
             f"mdns_enabled={self.mdns_enabled}, "
             f"subtools_search_path={self.subtools_search_path}, "
+            f"proxy_timeout_secs={self.proxy_timeout_secs}, "
         )
 
 

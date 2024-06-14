@@ -2,27 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_fuchsia_bluetooth_le::{CentralEvent, CentralMarker, CentralProxy},
-    fidl_fuchsia_hardware_bluetooth::EmulatorProxy,
-    fuchsia_bluetooth::{
-        expectation::asynchronous::{expectable, Expectable, ExpectableExt, ExpectableState},
-        types::le::RemoteDevice,
-    },
-    futures::future::BoxFuture,
-    futures::{FutureExt, TryStreamExt},
-    std::{
-        ops::{Deref, DerefMut},
-        sync::Arc,
-    },
-    test_harness::{SharedState, TestHarness},
+use anyhow::{Context as _, Error};
+use fidl_fuchsia_bluetooth_le::{CentralEvent, CentralMarker, CentralProxy};
+use fidl_fuchsia_hardware_bluetooth::EmulatorProxy;
+use fuchsia_bluetooth::expectation::asynchronous::{
+    expectable, Expectable, ExpectableExt, ExpectableState,
 };
+use fuchsia_bluetooth::types::le::RemoteDevice;
+use futures::future::BoxFuture;
+use futures::{FutureExt, TryStreamExt};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use test_harness::{SharedState, TestHarness};
 
-use crate::{
-    core_realm::{CoreRealm, SHARED_STATE_INDEX},
-    host_watcher::ActivatedFakeHost,
-};
+use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
+use crate::host_watcher::ActivatedFakeHost;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum ScanStateChange {

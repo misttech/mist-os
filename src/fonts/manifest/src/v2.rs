@@ -4,22 +4,20 @@
 
 //! Version 2 of the Font Manifest schema.
 
-use {
-    crate::serde_ext::*,
-    anyhow::{ensure, Error},
-    char_set::CharSet,
-    fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width, WEIGHT_NORMAL},
-    fuchsia_url::AbsolutePackageUrl,
-    itertools::Itertools,
-    offset_string::OffsetString,
-    serde::{
-        de::{Deserializer, Error as DeError},
-        ser::Serializer,
-    },
-    serde::{Deserialize, Serialize},
-    std::{iter, ops::Deref, path::PathBuf},
-    unicase::UniCase,
-};
+use crate::serde_ext::*;
+use anyhow::{ensure, Error};
+use char_set::CharSet;
+use fidl_fuchsia_fonts::{GenericFontFamily, Slant, Width, WEIGHT_NORMAL};
+use fuchsia_url::AbsolutePackageUrl;
+use itertools::Itertools;
+use offset_string::OffsetString;
+use serde::de::{Deserializer, Error as DeError};
+use serde::ser::Serializer;
+use serde::{Deserialize, Serialize};
+use std::iter;
+use std::ops::Deref;
+use std::path::PathBuf;
+use unicase::UniCase;
 
 /// Version 2 of the Font Manifest schema.
 ///

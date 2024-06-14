@@ -3,23 +3,18 @@
 // found in the LICENSE file.
 
 use crate::task::{with_new_current_task, CurrentTask, Task};
-use futures::{channel::oneshot, TryFutureExt};
+use futures::channel::oneshot;
+use futures::TryFutureExt;
 use starnix_logging::log_error;
 use starnix_sync::{Locked, Mutex, Unlocked};
-use starnix_uapi::{
-    errno,
-    errors::Errno,
-    ownership::{release_after, WeakRef},
-};
-use std::{
-    ffi::CString,
-    future::Future,
-    sync::{
-        mpsc::{sync_channel, SendError, SyncSender, TrySendError},
-        Arc,
-    },
-    thread::JoinHandle,
-};
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::{release_after, WeakRef};
+use std::ffi::CString;
+use std::future::Future;
+use std::sync::mpsc::{sync_channel, SendError, SyncSender, TrySendError};
+use std::sync::Arc;
+use std::thread::JoinHandle;
 
 type BoxedClosure = Box<dyn FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static>;
 

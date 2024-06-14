@@ -102,7 +102,7 @@ This is critical for a few cases:
 
 - Some special `generated_file()` targets whose output is used
   as an implicit input by other targets, but which cannot be depended
-  on directly, such as `//build/bazel:legacy_ninja_build_outputs`
+  on directly.
 
 - A few targets that hard-coded infra tools expect to always be built
   in the tree.

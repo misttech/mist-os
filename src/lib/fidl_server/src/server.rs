@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context, Error, Result},
-    fidl::endpoints::{ProtocolMarker, Request, RequestStream},
-    fuchsia_async as fasync,
-    futures::TryStreamExt,
-    tracing::error,
-};
+use anyhow::{Context, Error, Result};
+use fidl::endpoints::{ProtocolMarker, Request, RequestStream};
+use fuchsia_async as fasync;
+use futures::TryStreamExt;
+use tracing::error;
 
 /// RequestHandler handles incoming FIDL requests.
 pub trait RequestHandler<P: ProtocolMarker>: Send {

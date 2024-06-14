@@ -7,14 +7,12 @@ mod eval;
 mod spec;
 mod test_server;
 
-use {
-    fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    test_server::TestServer,
-    thiserror::Error,
-    tracing::{error, info},
-};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use test_server::TestServer;
+use thiserror::Error;
+use tracing::{error, info};
+use {fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync};
 
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {

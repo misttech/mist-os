@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_trait::async_trait,
-    fuchsia_async::{self as fasync, TimeoutExt},
-    fuchsia_zircon as zx,
-    futures::{future::FutureExt, Future},
-    std::{io, time::Duration},
-    trust_dns_proto::{Executor, Time},
-};
+use async_trait::async_trait;
+use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_zircon as zx;
+use futures::future::FutureExt;
+use futures::Future;
+use std::io;
+use std::time::Duration;
+use trust_dns_proto::{Executor, Time};
 
 pub mod async_resolver;
 pub mod config;

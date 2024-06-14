@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::expect::{expect_call, Status},
-    anyhow::Error,
-    fidl_fuchsia_bluetooth::PeerId,
-    fidl_fuchsia_bluetooth_sys::{
-        AccessMarker, AccessProxy, AccessRequest, AccessRequestStream, Error as AccessError,
-        InputCapability, OutputCapability, PairingDelegateProxy, PairingMarker, PairingOptions,
-        PairingProxy, PairingRequest, PairingRequestStream,
-    },
-    fuchsia_zircon::Duration,
+use crate::expect::{expect_call, Status};
+use anyhow::Error;
+use fidl_fuchsia_bluetooth::PeerId;
+use fidl_fuchsia_bluetooth_sys::{
+    AccessMarker, AccessProxy, AccessRequest, AccessRequestStream, Error as AccessError,
+    InputCapability, OutputCapability, PairingDelegateProxy, PairingMarker, PairingOptions,
+    PairingProxy, PairingRequest, PairingRequestStream,
 };
+use fuchsia_zircon::Duration;
 
 /// Provides a simple mock implementation of `fuchsia.bluetooth.sys.Pairing`.
 pub struct PairingMock {
@@ -107,9 +105,9 @@ impl AccessMock {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        crate::timeout_duration, fidl_fuchsia_bluetooth_sys::PairingDelegateMarker, futures::join,
-    };
+    use crate::timeout_duration;
+    use fidl_fuchsia_bluetooth_sys::PairingDelegateMarker;
+    use futures::join;
 
     #[fuchsia_async::run_until_stalled(test)]
     async fn test_expect_disconnect() {

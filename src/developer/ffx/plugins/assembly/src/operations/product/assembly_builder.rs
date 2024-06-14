@@ -5,16 +5,18 @@
 use crate::compiled_package::CompiledPackageBuilder;
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_data::ConfigDataBuilder;
-use assembly_config_schema::{
-    assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
-    board_config::{BoardInputBundle, HardwareInfo},
-    common::PackagedDriverDetails,
-    developer_overrides::{DeveloperOnlyOptions, KernelOptions},
-    image_assembly_config::{BoardDriverArguments, KernelConfig},
-    platform_config::BuildType,
-    product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
-    BoardInformation, DriverDetails, PackageDetails, PackageSet,
+use assembly_config_schema::assembly_config::{
+    AssemblyInputBundle, CompiledPackageDefinition, ShellCommands,
 };
+use assembly_config_schema::board_config::{BoardInputBundle, HardwareInfo};
+use assembly_config_schema::common::PackagedDriverDetails;
+use assembly_config_schema::developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides};
+use assembly_config_schema::image_assembly_config::{BoardDriverArguments, KernelConfig};
+use assembly_config_schema::platform_config::BuildType;
+use assembly_config_schema::product_config::{
+    ProductConfigData, ProductPackageDetails, ProductPackagesConfig,
+};
+use assembly_config_schema::{BoardInformation, DriverDetails, PackageDetails, PackageSet};
 use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::{DriverManifestBuilder, DriverPackageType};
 use assembly_file_relative_path::SupportsFileRelativePaths;
@@ -112,16 +114,23 @@ impl ImageAssemblyConfigBuilder {
     /// Add developer overrides to the builder
     pub fn add_developer_overrides(
         &mut self,
-        developer_only_options: DeveloperOnlyOptions,
-        kernel_options: KernelOptions,
-        packages: Vec<PackageDetails>,
-        packages_to_compile: Vec<CompiledPackageDefinition>,
+        developer_overrides: DeveloperOverrides,
     ) -> Result<()> {
+        let DeveloperOverrides {
+            target_name: _,
+            developer_only_options,
+            kernel,
+            platform: _,
+            packages,
+            packages_to_compile,
+            shell_commands,
+        } = developer_overrides;
+
         // Set the developer-only options for the buidler to use.
         self.developer_only_options = Some(developer_only_options);
 
         // Add the kernel command line args from the developer
-        self.kernel_args.extend(kernel_options.command_line_args.into_iter());
+        self.kernel_args.extend(kernel.command_line_args.into_iter());
 
         // Add packages specified by the developer
         for package_details in packages {
@@ -137,6 +146,12 @@ impl ImageAssemblyConfigBuilder {
                     compiled_package_def.name
                 )
             })?;
+        }
+
+        for (package, binaries) in shell_commands {
+            for binary in binaries {
+                self.add_shell_command_entry(&package, binary)?;
+            }
         }
 
         Ok(())
@@ -1014,7 +1029,8 @@ mod tests {
     use assembly_test_util::generate_test_manifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolCommandLog;
-    use assembly_util::{CompiledPackageDestination, TestCompiledPackageDestination::ForTest};
+    use assembly_util::CompiledPackageDestination;
+    use assembly_util::TestCompiledPackageDestination::ForTest;
     use fuchsia_pkg::{BlobInfo, MetaPackage, PackageBuilder, PackageManifestBuilder};
     use serde_json::json;
     use std::fs::File;

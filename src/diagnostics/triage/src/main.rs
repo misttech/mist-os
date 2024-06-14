@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    structopt::StructOpt,
-    tracing::*,
-    triage_app_lib::{app::App, Options},
-};
+use anyhow::Error;
+use structopt::StructOpt;
+use tracing::*;
+use triage_app_lib::app::App;
+use triage_app_lib::Options;
 
 /// Reports an [Error] to stdout and logs at "error" level.
 fn report_failure(e: Error) {

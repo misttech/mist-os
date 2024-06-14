@@ -11,19 +11,17 @@ use crate::{IpVersions, State};
 use anyhow::{format_err, Context, Error};
 use cobalt_client::traits::AsEventCode;
 use fidl_fuchsia_metrics::MetricEvent;
-use fuchsia_async as fasync;
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon as zx;
 use futures::channel::{mpsc, oneshot};
 use futures::{select, Future, StreamExt};
-use network_policy_metrics_registry as metrics;
 use static_assertions::const_assert_eq;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::{info, warn};
 use windowed_stats::aggregations::SumAndCount;
+use {fuchsia_async as fasync, fuchsia_zircon as zx, network_policy_metrics_registry as metrics};
 
 pub async fn create_metrics_logger(
     factory_proxy: fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,

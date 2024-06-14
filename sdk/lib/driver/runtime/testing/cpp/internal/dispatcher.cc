@@ -11,7 +11,12 @@
 
 namespace fdf_internal {
 
-TestSynchronizedDispatcher::TestSynchronizedDispatcher(DispatcherType type) {
+namespace {
+uintptr_t owner_gen = 0xdeadbeef;
+}
+
+TestSynchronizedDispatcher::TestSynchronizedDispatcher(DispatcherType type)
+    : owner_driver_(reinterpret_cast<void*>(owner_gen++)) {
   if (type == DispatcherType::Default) {
     zx::result result =
         StartDefault(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "fdf-default");
@@ -38,7 +43,7 @@ TestSynchronizedDispatcher::~TestSynchronizedDispatcher() {
 zx::result<> TestSynchronizedDispatcher::StartManaged(fdf::SynchronizedDispatcher::Options options,
                                                       std::string_view dispatcher_name) {
   auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
-      this, options, dispatcher_name,
+      owner_driver_, options, dispatcher_name,
       [this](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown_.Signal(); });
   if (dispatcher.is_error()) {
     return dispatcher.take_error();
@@ -52,7 +57,7 @@ zx::result<> TestSynchronizedDispatcher::StartDefault(fdf::SynchronizedDispatche
   // Default dispatchers are created as unmanaged dispatchers so that they are safe to access from
   // the main thread.
   auto dispatcher = fdf_internal::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
-      this, options, dispatcher_name,
+      owner_driver_, options, dispatcher_name,
       [this](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown_.Signal(); });
   if (dispatcher.is_error()) {
     return dispatcher.take_error();

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fdio::Namespace,
-    fidl::endpoints::{ClientEnd, Proxy},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
-    fuchsia_component::client::connect_to_protocol,
-    std::fmt::Debug,
-    uuid::Uuid,
-};
+use fdio::Namespace;
+use fidl::endpoints::{ClientEnd, Proxy};
+use fuchsia_component::client::connect_to_protocol;
+use std::fmt::Debug;
+use uuid::Uuid;
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox};
 
 mod error;
 pub use error::Error;

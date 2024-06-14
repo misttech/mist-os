@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
-    num::NonZeroU64,
-};
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU64;
 
-use fidl_fuchsia_net_filter as fnet_filter;
-use fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated;
 use fidl_fuchsia_net_filter_ext::{
     self as fnet_filter_ext, Change, Domain, InstalledIpRoutine, InterfaceMatcher, IpHook,
     Matchers, Namespace, NamespaceId, Resource, ResourceId, Routine, RoutineId, RoutineType,
@@ -16,6 +13,10 @@ use fidl_fuchsia_net_filter_ext::{
 };
 use fuchsia_async::DurationExt as _;
 use fuchsia_zircon::DurationNum as _;
+use {
+    fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
+};
 
 use anyhow::{bail, Context as _};
 use tracing::{error, info};

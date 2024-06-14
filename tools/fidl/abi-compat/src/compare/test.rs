@@ -9,11 +9,9 @@ pub(super) fn compare_fidl_type(name: &str, source_fragment: &str) -> Compatibil
     use anyhow::Context as _;
     use flyweights::FlyStr;
 
-    use crate::{
-        compare::{compare_types, Type},
-        convert::{Context, ConvertType},
-        ir::IR,
-    };
+    use crate::compare::{compare_types, Type};
+    use crate::convert::{Context, ConvertType};
+    use crate::ir::IR;
 
     const V1: &'static str = "1";
     const V2: &'static str = "2";

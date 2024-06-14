@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context as _, Error},
-    fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fuchsia_zircon as zx,
-};
+use anyhow::{anyhow, Context as _, Error};
+use fidl_fuchsia_device::ControllerMarker;
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fuchsia_zircon as zx;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BlockDevice {

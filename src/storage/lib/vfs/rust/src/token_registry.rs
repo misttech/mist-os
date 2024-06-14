@@ -4,20 +4,14 @@
 
 //! Implementation of [`TokenRegistry`].
 
-use {
-    crate::directory::entry_container::MutableDirectory,
-    fidl::Handle,
-    fidl::{Event, HandleBased, Rights},
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    pin_project::{pin_project, pinned_drop},
-    std::{
-        collections::hash_map::{Entry, HashMap},
-        ops::{Deref, DerefMut},
-        pin::Pin,
-        sync::{Arc, Mutex},
-    },
-};
+use crate::directory::entry_container::MutableDirectory;
+use fidl::{Event, Handle, HandleBased, Rights};
+use fuchsia_zircon_status::Status;
+use pin_project::{pin_project, pinned_drop};
+use std::collections::hash_map::{Entry, HashMap};
+use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
+use std::sync::{Arc, Mutex};
 
 #[cfg(not(target_os = "fuchsia"))]
 use fuchsia_async::emulated_handle::{AsHandleRef, Koid};
@@ -81,10 +75,7 @@ impl TokenRegistry {
 
     /// Returns the information provided by get_node_and_flags for the given token.  Returns None if
     /// no such token exists (perhaps because the owner has been dropped).
-    pub fn get_owner(
-        &self,
-        token: Handle,
-    ) -> Result<Option<(Arc<dyn MutableDirectory>, fio::OpenFlags)>, Status> {
+    pub fn get_owner(&self, token: Handle) -> Result<Option<Arc<dyn MutableDirectory>>, Status> {
         let koid = token.get_koid()?;
         let this = self.inner.lock().unwrap();
 
@@ -92,7 +83,7 @@ impl TokenRegistry {
             Some(owner) => {
                 // SAFETY: This is safe because Tokenizable's drop will ensure that unregister is
                 // called to avoid any dangling pointers.
-                Ok(Some(unsafe { (**owner).get_node_and_flags() }))
+                Ok(Some(unsafe { (**owner).get_node() }))
             }
             None => Ok(None),
         }
@@ -114,7 +105,7 @@ pub trait TokenInterface: 'static {
     /// the `get_owner` method.  For now this always returns Arc<dyn MutableDirectory> but it should
     /// be possible to change this so that files can be represented in future if and when the need
     /// arises.
-    fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags);
+    fn get_node(&self) -> Arc<dyn MutableDirectory>;
 
     /// Returns the token registry.
     fn token_registry(&self) -> &TokenRegistry;
@@ -158,13 +149,11 @@ impl<T: TokenInterface> PinnedDrop for Tokenizable<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        self::mocks::{MockChannel, MockDirectory},
-        super::{TokenRegistry, Tokenizable, DEFAULT_TOKEN_RIGHTS},
-        fidl::{AsHandleRef, HandleBased, Rights},
-        futures::pin_mut,
-        std::sync::Arc,
-    };
+    use self::mocks::{MockChannel, MockDirectory};
+    use super::{TokenRegistry, Tokenizable, DEFAULT_TOKEN_RIGHTS};
+    use fidl::{AsHandleRef, HandleBased, Rights};
+    use futures::pin_mut;
+    use std::sync::Arc;
 
     #[test]
     fn client_register_same_token() {
@@ -209,7 +198,7 @@ mod tests {
                 // Note this ugly cast in place of `Arc::ptr_eq(&client, &res)` here is to ensure we
                 // don't compare vtable pointers, which are not strictly guaranteed to be the same
                 // across casts done in different code generation units at compilation time.
-                assert_eq!(Arc::as_ptr(&client.1) as *const (), Arc::as_ptr(&res.0) as *const ());
+                assert_eq!(Arc::as_ptr(&client.1) as *const (), Arc::as_ptr(&res) as *const ());
             }
 
             token
@@ -255,29 +244,24 @@ mod tests {
     }
 
     mod mocks {
-        use crate::{
-            directory::{
-                dirents_sink,
-                entry_container::{Directory, DirectoryWatcher, MutableDirectory},
-                traversal_position::TraversalPosition,
-            },
-            execution_scope::ExecutionScope,
-            node::{IsDirectory, Node},
-            path::Path,
-            token_registry::{TokenInterface, TokenRegistry},
-            ObjectRequestRef,
-        };
-
-        use {
-            async_trait::async_trait, fidl::endpoints::ServerEnd, fidl_fuchsia_io as fio,
-            fuchsia_zircon_status::Status, std::sync::Arc,
-        };
+        use crate::directory::dirents_sink;
+        use crate::directory::entry_container::{Directory, DirectoryWatcher, MutableDirectory};
+        use crate::directory::traversal_position::TraversalPosition;
+        use crate::execution_scope::ExecutionScope;
+        use crate::node::{IsDirectory, Node};
+        use crate::path::Path;
+        use crate::token_registry::{TokenInterface, TokenRegistry};
+        use crate::ObjectRequestRef;
+        use fidl::endpoints::ServerEnd;
+        use fidl_fuchsia_io as fio;
+        use fuchsia_zircon_status::Status;
+        use std::sync::Arc;
 
         pub(super) struct MockChannel(pub Arc<TokenRegistry>, pub Arc<MockDirectory>);
 
         impl TokenInterface for MockChannel {
-            fn get_node_and_flags(&self) -> (Arc<dyn MutableDirectory>, fio::OpenFlags) {
-                (self.1.clone(), fio::OpenFlags::RIGHT_READABLE)
+            fn get_node(&self) -> Arc<dyn MutableDirectory> {
+                self.1.clone()
             }
 
             fn token_registry(&self) -> &TokenRegistry {
@@ -293,7 +277,6 @@ mod tests {
             }
         }
 
-        #[async_trait]
         impl Node for MockDirectory {
             async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
                 unimplemented!("Not implemented!")
@@ -307,7 +290,6 @@ mod tests {
             }
         }
 
-        #[async_trait]
         impl Directory for MockDirectory {
             fn open(
                 self: Arc<Self>,
@@ -350,7 +332,6 @@ mod tests {
             }
         }
 
-        #[async_trait]
         impl MutableDirectory for MockDirectory {
             async fn unlink(
                 self: Arc<Self>,
@@ -376,15 +357,6 @@ mod tests {
             }
 
             async fn sync(&self) -> Result<(), Status> {
-                unimplemented!("Not implemented!");
-            }
-
-            async fn rename(
-                self: Arc<Self>,
-                _src_dir: Arc<dyn MutableDirectory>,
-                _src_name: Path,
-                _dst_name: Path,
-            ) -> Result<(), Status> {
                 unimplemented!("Not implemented!");
             }
         }

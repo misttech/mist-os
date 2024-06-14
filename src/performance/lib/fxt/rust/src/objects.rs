@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::args::{Arg, RawArg};
+use crate::session::ResolveCtx;
+use crate::string::StringRef;
+use crate::thread::{ProcessKoid, ProcessRef};
 use crate::{
-    args::{Arg, RawArg},
-    session::ResolveCtx,
-    string::StringRef,
-    thread::{ProcessKoid, ProcessRef},
     trace_header, ParseResult, Provider, KERNEL_OBJ_RECORD_TYPE, USERSPACE_OBJ_RECORD_TYPE,
 };
 use flyweights::FlyStr;
-use nom::{combinator::all_consuming, number::complete::le_u64};
+use nom::combinator::all_consuming;
+use nom::number::complete::le_u64;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct UserspaceObjRecord {
@@ -201,9 +202,10 @@ impl From<u32> for KernelObjType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        args::RawArgValue, fxt_builder::FxtBuilder, string::STRING_REF_INLINE_BIT, RawTraceRecord,
-    };
+    use crate::args::RawArgValue;
+    use crate::fxt_builder::FxtBuilder;
+    use crate::string::STRING_REF_INLINE_BIT;
+    use crate::RawTraceRecord;
     use std::num::{NonZeroU16, NonZeroU8};
 
     #[test]

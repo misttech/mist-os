@@ -6,7 +6,8 @@ use anyhow::Context as _;
 use argh::FromArgs;
 use diagnostics_data::InspectData;
 use self_profiles_report::SelfProfilesReport;
-use std::{io::Write, path::PathBuf};
+use std::io::Write;
+use std::path::PathBuf;
 
 /// a small tool to render a human-readable report from inspect snapshots containing self-profiling
 /// data.

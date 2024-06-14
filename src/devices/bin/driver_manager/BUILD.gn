@@ -37,7 +37,6 @@ source_set("inspect") {
   public_deps = [
     "//sdk/lib/inspect/component/cpp",
     "//src/lib/ddk",
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
   ]
@@ -68,6 +67,8 @@ source_set("driver_runner") {
     "bind/bind_node_set.h",
     "bind/bind_result_tracker.cc",
     "bind/bind_result_tracker.h",
+    "bootup_tracker.cc",
+    "bootup_tracker.h",
     "composite_node_spec_v2.cc",
     "composite_node_spec_v2.h",
     "controller_allowlist_passthrough.cc",

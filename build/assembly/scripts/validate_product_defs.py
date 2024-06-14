@@ -25,7 +25,6 @@ import os
 import re
 import sys
 from depfile import DepFile
-from typing import List, Tuple
 
 disallowed_gn_args = [
     "base_package_labels",
@@ -37,7 +36,7 @@ assignment_matcher_string = r"^\s*" + gn_args_group + r"(?!\s*=\s*\[\])"
 assignment_matcher = re.compile(assignment_matcher_string)
 
 
-def find_product_defs(dir: str) -> List[str]:
+def find_product_defs(dir: str) -> list[str]:
     results = []
     with os.scandir(dir) as contents:
         for entry in contents:
@@ -48,7 +47,7 @@ def find_product_defs(dir: str) -> List[str]:
     return results
 
 
-def find_vendor_product_defs(dir: str) -> List[str]:
+def find_vendor_product_defs(dir: str) -> list[str]:
     results = []
     vendor_dir = os.path.join(dir, "vendor")
     if os.path.isdir(vendor_dir):
@@ -63,7 +62,7 @@ def find_vendor_product_defs(dir: str) -> List[str]:
     return results
 
 
-def validate_product_def(path: str) -> List[Tuple[int, str]]:
+def validate_product_def(path: str) -> list[tuple[int, str]]:
     """Validate that the product def at 'path' doesn't use deprecated GN args.
 
     This returns a list of (<line number>, <error>) tuples for the file, it does
@@ -78,7 +77,7 @@ def validate_product_def(path: str) -> List[Tuple[int, str]]:
     return results
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--source-root", default=".", help="The root Fuchsia source dir"
@@ -99,14 +98,14 @@ def main():
     # Setup logging / error-printing methods and utilities
     output = []
 
-    def log(string: str):
+    def log(string: str) -> None:
         """log (display or create output for) a non-error string"""
         if args.verbose:
             print(string)
         if args.output:
             output.append(string)
 
-    def error(string: str):
+    def error(string: str) -> None:
         """output an error string"""
         print(string, file=sys.stderr)
         if args.output:

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Context as _, Result},
-    fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Peered, Task},
-    std::str::from_utf8,
-};
+use anyhow::{bail, Context as _, Result};
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Peered, Task};
+use std::str::from_utf8;
+use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync};
 
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<()> {

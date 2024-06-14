@@ -5,9 +5,9 @@
 pub mod kde;
 
 use crate::Error;
-use nom::IResult;
-use nom::{call, complete, many0, named, take, try_parse, Needed};
-use wlan_common::ie::{rsn::rsne, wpa, Id};
+use nom::{call, complete, many0, named, take, try_parse, IResult, Needed};
+use wlan_common::ie::rsn::rsne;
+use wlan_common::ie::{wpa, Id};
 
 #[derive(Debug, PartialEq)]
 pub enum Element {
@@ -63,11 +63,9 @@ pub fn extract_elements(key_data: &[u8]) -> Result<Vec<Element>, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wlan_common::{
-        assert_variant,
-        ie::rsn::{akm, cipher},
-        organization::Oui,
-    };
+    use wlan_common::assert_variant;
+    use wlan_common::ie::rsn::{akm, cipher};
+    use wlan_common::organization::Oui;
 
     #[test]
     fn test_complex_key_data() {

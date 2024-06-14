@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    fidl_examples_keyvaluestore_baseline::{Item, StoreRequest, StoreRequestStream, WriteError},
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    regex::Regex,
-    std::cell::RefCell,
-    std::collections::hash_map::Entry,
-    std::collections::HashMap,
-};
+use anyhow::{Context as _, Error};
+use fidl_examples_keyvaluestore_baseline::{Item, StoreRequest, StoreRequestStream, WriteError};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use regex::Regex;
+use std::cell::RefCell;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 lazy_static! {
     static ref KEY_VALIDATION_REGEX: Regex =

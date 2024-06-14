@@ -14,11 +14,16 @@ import textwrap
 import json
 import os
 import sys
+from typing import Any
 
 width = 4
 
 
-def get_pretty_str(changes, str_list=None, indent=0):
+def get_pretty_str(
+    changes: dict[tuple[str, str], Any],
+    str_list: list[str] | None = None,
+    indent: int = 0,
+) -> str:
     if not str_list:
         str_list = []
     for key, value in changes.items():
@@ -35,12 +40,18 @@ def get_pretty_str(changes, str_list=None, indent=0):
             )
     if indent == 0:
         return "\n".join(str_list)
+    return ""
 
 
 class GoldenMismatchError(Exception):
     """Exception raised when golden and current are not identical."""
 
-    def __init__(self, mismatch, breaks, non_breaks):
+    def __init__(
+        self,
+        mismatch: list[tuple[str, str]],
+        breaks: dict[tuple[str, str], Any],
+        non_breaks: dict[tuple[str, str], Any],
+    ) -> None:
         self.breaks = breaks
         self.non_breaks = non_breaks
 
@@ -49,7 +60,7 @@ class GoldenMismatchError(Exception):
             cmd_str += "\n" + update_cmd(path[0], path[1])
         self.cmd_str = cmd_str
 
-    def __str__(self):
+    def __str__(self) -> str:
         # Notice of any changes detected, including those not yet classified
         # as breaking or non-breaking.
         ret_str = (
@@ -122,10 +133,10 @@ class GoldenMismatchError(Exception):
 class InvalidJsonError(Exception):
     """Exception raised when invalid JSON in a golden file is detected."""
 
-    def __init__(self, invalid_schema):
+    def __init__(self, invalid_schema: str) -> None:
         self.invalid_schema = invalid_schema
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"Detected invalid JSON Schema {self.invalid_schema}.\n"
             f"Consult with sdk-dev@fuchsia.dev to update this golden file.\n"
@@ -136,11 +147,11 @@ class MissingInputError(Exception):
     """Exception raised when a missing golden,
     current, or stamp file is detected."""
 
-    def __init__(self, missing, schema=True):
+    def __init__(self, missing: str, schema: bool = True) -> None:
         self.missing = missing
         self.schema = schema
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.schema:
             return (
                 f"Detected missing JSON Schema {self.missing}.\n"
@@ -157,12 +168,14 @@ class SchemaListMismatchError(Exception):
     list contain a different number of schemas or when
     there is a mismatch of the schema filenames."""
 
-    def __init__(self, goldens, currents, err_type):
+    def __init__(
+        self, goldens: list[str], currents: list[str], err_type: int
+    ) -> None:
         self.goldens = goldens
         self.currents = currents
         self.err_type = err_type
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.err_type == 0:
             return (
                 f"Detected that the golden list contains "
@@ -181,7 +194,7 @@ class SchemaListMismatchError(Exception):
             )
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--golden",
@@ -214,7 +227,7 @@ def main():
         with open(args.stamp, "w") as stamp_file:
             stamp_file.write("Verified!\n")
     except FileNotFoundError:
-        err = str(MissingInputError(missing=args.stamp, schema=False))
+        err = MissingInputError(missing=args.stamp, schema=False)
 
     if not err:
         return 0
@@ -225,7 +238,9 @@ def main():
     return 1
 
 
-def fail_on_breaking_changes(current_list, golden_list):
+def fail_on_breaking_changes(
+    current_list: list[str], golden_list: list[str]
+) -> None:
     """Fails if current and golden aren't identical."""
 
     if not len(golden_list) == len(current_list):
@@ -237,7 +252,7 @@ def fail_on_breaking_changes(current_list, golden_list):
     current_list.sort()
     total_non_breaking_changes = dict()
     total_breaking_changes = dict()
-    mismatches = []
+    mismatches: list[tuple[str, str]] = []
 
     for schema in zip(golden_list, current_list):
         if not (
@@ -277,11 +292,11 @@ def fail_on_breaking_changes(current_list, golden_list):
         try:
             curr_data = json.load(curr_file)
         except json.decoder.JSONDecodeError:
-            mismatches += (schema[1], schema[0])
+            mismatches.append((schema[1], schema[0]))
         curr_file.close()
 
-        non_breaking_changes = []
-        breaking_changes = []
+        non_breaking_changes: list[dict[str, Any]] = []
+        breaking_changes: list[dict[str, Any]] = []
         compare_schema_structure(
             curr_data, schema_data, non_breaking_changes, breaking_changes
         )
@@ -315,8 +330,12 @@ def fail_on_breaking_changes(current_list, golden_list):
 
 # Compare the input schemas' keys. Return breaking and non-breaking changes.
 def compare_schema_structure(
-    curr_data, gold_data, non_breaking=[], breaking_changes=[], level="root"
-):
+    curr_data: dict[str, Any],
+    gold_data: dict[str, Any],
+    non_breaking: list[dict[str, Any]] = [],
+    breaking_changes: list[dict[str, Any]] = [],
+    level: str = "root",
+) -> None:
     if isinstance(curr_data, dict) and isinstance(gold_data, dict):
         curr_keys = set(curr_data.keys())
         gold_keys = set(gold_data.keys())
@@ -445,14 +464,14 @@ def compare_schema_structure(
 
 
 def check_json_value(
-    key,
-    gold_data,
-    curr_data,
-    level,
-    expected_type,
-    breaking_changes,
-    non_breaking,
-):
+    key: str,
+    gold_data: dict[str, Any],
+    curr_data: dict[str, Any],
+    level: str,
+    expected_type: type,
+    breaking_changes: list[dict[str, Any]],
+    non_breaking: list[dict[str, Any]],
+) -> None:
     """Classify specific changes as breaking or
     non-breaking accordingly, if they exist.
 
@@ -526,11 +545,13 @@ def check_json_value(
                 )
 
 
-def append_to_list(list_var, key, value):
+def append_to_list(
+    list_var: list[dict[str, Any]], key: str, value: Any
+) -> None:
     list_var.append({key: value})
 
 
-def update_cmd(current, golden):
+def update_cmd(current: str, golden: str) -> str:
     """For presentation only. Never execute the cmd output pragmatically because
     it may present a security exploit."""
     return 'cp "{}" "{}"'.format(

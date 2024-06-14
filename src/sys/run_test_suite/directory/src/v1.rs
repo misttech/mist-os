@@ -2,21 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        ArtifactMetadata, ArtifactSubDirectory, CommonResult, MaybeUnknown, Outcome, SchemaVersion,
-        SuiteResult, TestCaseResult, TestRunResult, RUN_NAME, RUN_SUMMARY_NAME,
-    },
-    serde::{Deserialize, Serialize},
-    std::{
-        borrow::Cow,
-        collections::HashMap,
-        fs::File,
-        io::{BufReader, BufWriter, Error, Write},
-        path::{Path, PathBuf},
-    },
-    test_list::TestTag,
+use crate::{
+    ArtifactMetadata, ArtifactSubDirectory, CommonResult, MaybeUnknown, Outcome, SchemaVersion,
+    SuiteResult, TestCaseResult, TestRunResult, RUN_NAME, RUN_SUMMARY_NAME,
 };
+use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Error, Write};
+use std::path::{Path, PathBuf};
+use test_list::TestTag;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 struct SerializableCommon<'a> {

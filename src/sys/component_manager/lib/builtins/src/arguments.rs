@@ -2,23 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Context, Error},
-    cm_types::Name,
-    fidl::endpoints::{ControlHandle as _, Responder as _},
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio,
-    fuchsia_fs::{file, file::ReadError, node::OpenError, OpenFlags},
-    fuchsia_zbi::{ZbiParser, ZbiResult, ZbiType},
-    fuchsia_zircon_status::Status,
-    futures::prelude::*,
-    lazy_static::lazy_static,
-    std::{
-        collections::{hash_map::Iter, HashMap},
-        env,
-        sync::Arc,
-    },
-    tracing::info,
-};
+use anyhow::{anyhow, Context, Error};
+use cm_types::Name;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_fs::file::ReadError;
+use fuchsia_fs::node::OpenError;
+use fuchsia_fs::{file, OpenFlags};
+use fuchsia_zbi::{ZbiParser, ZbiResult, ZbiType};
+use fuchsia_zircon_status::Status;
+use futures::prelude::*;
+use lazy_static::lazy_static;
+use std::collections::hash_map::Iter;
+use std::collections::HashMap;
+use std::env;
+use std::sync::Arc;
+use tracing::info;
+use {fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio};
 
 lazy_static! {
     static ref BOOT_ARGS_CAPABILITY_NAME: Name = "fuchsia.boot.Arguments".parse().unwrap();
@@ -278,11 +277,10 @@ impl Arguments {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        fuchsia_fs::{directory, file::close, file::write},
-    };
+    use super::*;
+    use fuchsia_async as fasync;
+    use fuchsia_fs::directory;
+    use fuchsia_fs::file::{close, write};
 
     fn serve_bootargs(args: Arc<Arguments>) -> Result<fboot::ArgumentsProxy, Error> {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fboot::ArgumentsMarker>()?;

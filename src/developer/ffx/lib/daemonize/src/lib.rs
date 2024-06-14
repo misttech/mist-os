@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{os::unix::process::CommandExt, process::Command};
+use std::os::unix::process::CommandExt;
+use std::process::Command;
 
 /// daemonize adds a pre_exec to call daemon(3) causing the spawned
 /// process to be forked again and detached from the controlling

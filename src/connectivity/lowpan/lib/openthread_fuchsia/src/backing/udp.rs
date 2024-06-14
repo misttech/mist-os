@@ -562,8 +562,7 @@ unsafe extern "C" fn otPlatUdpLeaveMulticastGroup(
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::net::Ipv6Addr;
-    use std::net::SocketAddrV6;
+    use std::net::{Ipv6Addr, SocketAddrV6};
 
     #[test]
     fn test_dest_needs_scope() {

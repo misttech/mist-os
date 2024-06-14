@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    argh::FromArgs,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fuchsia_component::client,
-    futures::future,
-    tracing::*,
-};
+use anyhow::{format_err, Context, Error};
+use argh::FromArgs;
+use fuchsia_component::client;
+use futures::future;
+use tracing::*;
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl};
 
 #[derive(FromArgs, Debug)]
 /// Options for the branch component.

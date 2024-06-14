@@ -58,35 +58,6 @@ uint32_t ToStreamOptions(fuchsia_io::Rights rights, bool append) {
   return stream_options;
 }
 
-zx_status_t ConnectService(const fbl::RefPtr<fs::Vnode>& vnode, VnodeConnectionOptions options,
-                           fidl::ServerEnd<fio::Node> server_end) {
-  // For service connections, we don't know the final protocol that will be spoken over |server_end|
-  // as it is dependent on the service Vnode type/connector. However, if |fio::OpenFlags::kDescribe|
-  // is set, the channel first speaks |fuchsia.io/Node| to send the OnOpen event, then switches to
-  // the service protocol.
-  //
-  // TODO(https://fxbug.dev/324111653): In io2/Open2, service connections do not support the
-  // OnRepresentation event, and use of epitaphs when closing channels is explicitly defined.
-  // We will likely need to remove support for protocol switching in io1 to support the migration.
-  if (options.ToIoV1Flags() & ~(fio::OpenFlags::kDescribe | fio::OpenFlags::kNotDirectory)) {
-    constexpr zx_status_t kStatus = ZX_ERR_INVALID_ARGS;
-    if (options.flags & fio::OpenFlags::kDescribe) {
-      [[maybe_unused]] fidl::Status status = fidl::WireSendEvent(server_end)->OnOpen(kStatus, {});
-    } else {
-      [[maybe_unused]] zx_status_t status = server_end.Close(kStatus);
-    }
-    return kStatus;
-  }
-  if (options.flags & fio::OpenFlags::kDescribe) {
-    fidl::Status status = fidl::WireSendEvent(server_end)
-                              ->OnOpen(ZX_OK, fio::wire::NodeInfoDeprecated::WithService({}));
-    if (!status.ok()) {
-      return status.status();
-    }
-  }
-  return vnode->ConnectService(server_end.TakeChannel());
-}
-
 }  // namespace
 
 void FilesystemInfo::SetFsId(const zx::event& event) {
@@ -309,14 +280,27 @@ zx_status_t FuchsiaVfs::Link(zx::event token, fbl::RefPtr<Vnode> oldparent, std:
 
 zx_status_t FuchsiaVfs::Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
                               VnodeConnectionOptions options) {
-  zx_status_t status = ServeImpl(vnode, std::move(server_end), options);
-  if (status != ZX_OK && !(options.flags & fuchsia_io::OpenFlags::kNodeReference)) {
-    vnode->Close();
+  zx_status_t status = ServeImpl(vnode, server_end, options);
+  if (status != ZX_OK) {
+    FS_PRETTY_TRACE_DEBUG("[FuchsiaVfs::Serve] Error: ", zx_status_get_string(status));
+    if (!(options.flags & fuchsia_io::OpenFlags::kNodeReference)) {
+      vnode->Close();  // Balance open count for non-node reference connections.
+    }
+    // If |server_end| wasn't consumed, send an event if required and close it with an epitaph.
+    if (server_end.is_valid()) {
+      fidl::ServerEnd<fio::Node> node{std::move(server_end)};
+      if (options.flags & fio::wire::OpenFlags::kDescribe) {
+        // Ignore errors since there is nothing we can do if this fails.
+        [[maybe_unused]] auto result = fidl::WireSendEvent(node)->OnOpen(status, {});
+      }
+      // Close the channel with an epitaph indicating the failure mode.
+      node.Close(status);
+    }
   }
   return status;
 }
 
-zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
+zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel& server_end,
                                   VnodeConnectionOptions options) {
   if (zx::result result = vnode->ValidateOptions(options); result.is_error()) {
     return result.error_value();
@@ -336,11 +320,10 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel s
   // for the protocol which will be served.
   options.rights = internal::DownscopeRights(options.rights, protocol);
 
-  fidl::ServerEnd<fuchsia_io::Node> node(std::move(server_end));
   std::unique_ptr<internal::Connection> connection;
   switch (protocol) {
     case VnodeProtocol::kFile: {
-      zx::result koid = GetObjectKoid(node.channel());
+      zx::result koid = GetObjectKoid(server_end);
       if (koid.is_error()) {
         return koid.error_value();
       }
@@ -361,7 +344,7 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel s
       break;
     }
     case VnodeProtocol::kDirectory: {
-      zx::result koid = GetObjectKoid(node.channel());
+      zx::result koid = GetObjectKoid(server_end);
       if (koid.is_error()) {
         return koid.error_value();
       }
@@ -374,7 +357,10 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel s
       break;
     }
     case VnodeProtocol::kService: {
-      return ConnectService(vnode, options, std::move(node));
+      if (options.ToIoV1Flags() & ~(fio::OpenFlags::kDescribe | fio::OpenFlags::kNotDirectory)) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+      return vnode->ConnectService(std::move(server_end));
     }
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     case VnodeProtocol::kSymlink: {
@@ -385,24 +371,18 @@ zx_status_t FuchsiaVfs::ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel s
 
   // Send an |fuchsia.io/OnOpen| event if requested. At this point we know the connection is either
   // a Node connection, or a File/Directory that composes the node protocol.
+  fidl::UnownedServerEnd<fio::Node> node{server_end.borrow()};
   if (options.flags & fuchsia_io::OpenFlags::kDescribe) {
-    zx::result sent_describe =
+    zx_status_t status =
         connection->WithNodeInfoDeprecated([&node](fio::wire::NodeInfoDeprecated info) {
-          // We ignore any errors sending the OnOpen event. Even if there are errors below, it's
-          // possible that a client may have already sent messages into the channel and closed their
-          // end without processing the response.
-          [[maybe_unused]] fidl::Status status =
-              fidl::WireSendEvent(node)->OnOpen(ZX_OK, std::move(info));
+          return fidl::WireSendEvent(node)->OnOpen(ZX_OK, std::move(info)).status();
         });
-    if (sent_describe.is_error()) {
-      // Ignore errors since there is nothing we can do if sending this fails.
-      [[maybe_unused]] fidl::Status status =
-          fidl::WireSendEvent(node)->OnOpen(sent_describe.error_value(), {});
-      return sent_describe.error_value();
+    if (status != ZX_OK) {
+      return status;
     }
   }
 
-  return RegisterConnection(std::move(connection), node.channel()).status_value();
+  return RegisterConnection(std::move(connection), server_end).status_value();
 }
 
 zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,
@@ -423,15 +403,32 @@ zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,
 }
 
 zx::result<> FuchsiaVfs::Serve2(Vfs::Open2Result open_result, fuchsia_io::Rights rights,
-                                zx::channel& object_request,
+                                zx::channel object_request,
                                 const fuchsia_io::wire::ConnectionProtocols* protocols) {
+  zx::result result = Serve2Impl(std::move(open_result), rights, object_request, protocols);
+  // On any errors, if the channel wasn't consumed, ensure we close it with an epitaph.
+  if (result.is_error()) {
+    FS_PRETTY_TRACE_DEBUG("[FuchsiaVfs::Serve2] Error: ", result.status_string());
+    if (object_request.is_valid()) {
+      fidl::ServerEnd<fio::Node> node{std::move(object_request)};
+      node.Close(result.error_value());
+    }
+  }
+  return result;
+}
+
+zx::result<> FuchsiaVfs::Serve2Impl(Vfs::Open2Result open_result, fuchsia_io::Rights rights,
+                                    zx::channel& object_request,
+                                    const fuchsia_io::wire::ConnectionProtocols* protocols) {
   const fio::wire::NodeOptions* node_options =
       protocols && protocols->is_node() ? &protocols->node() : nullptr;
   const fbl::RefPtr<fs::Vnode>& vnode = open_result.vnode();
-  std::unique_ptr<internal::Connection> connection;
+  fs::VnodeProtocol protocol = open_result.protocol();
   // Downscope the rights granted to the connection to only include those for this protocol.
-  rights = internal::DownscopeRights(rights, open_result.protocol());
-  switch (open_result.protocol()) {
+  rights = internal::DownscopeRights(rights, protocol);
+  // Create the connection that will handle requests for this Vnode.
+  std::unique_ptr<internal::Connection> connection;
+  switch (protocol) {
     case fs::VnodeProtocol::kDirectory: {
       zx::result koid = GetObjectKoid(object_request);
       if (koid.is_error()) {
@@ -470,14 +467,9 @@ zx::result<> FuchsiaVfs::Serve2(Vfs::Open2Result open_result, fuchsia_io::Rights
       break;
     }
     case fs::VnodeProtocol::kService: {
-      ZX_ASSERT(!protocols || protocols->is_connector());
-      // TODO(b/324112857): There's nothing we can do if this fails since |Vnode::ConnectService|
-      // consumes the channel. We should change it so that on failure, the channel is not consumed.
-      // We should then close the channel with an epitaph using the error.
-      [[maybe_unused]] zx_status_t status = vnode->ConnectService(std::move(object_request));
-      return zx::ok();
+      ZX_DEBUG_ASSERT(!protocols || protocols->is_connector());
+      return zx::make_result(vnode->ConnectService(std::move(object_request)));
     }
-
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     case VnodeProtocol::kSymlink: {
       return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -507,13 +499,11 @@ zx::result<> FuchsiaVfs::Serve2(Vfs::Open2Result open_result, fuchsia_io::Rights
     }
   }
 
-  // Register the connection with the VFS. On success, the connection will be bound to the channel
-  // and will start serving requests.
+  // Register the connection with the VFS. On success, the connection is bound to the channel, and
+  // starts servicing requests.
   zx::result result = RegisterConnection(std::move(connection), object_request);
   if (result.is_ok()) {
-    // On success, the connection is responsible for closing the vnode via a fuchsia.io/Node.Close
-    // request is processed, or when the client end of |object_request| is closed.
-    open_result.TakeVnode();
+    open_result.TakeVnode();  // On success, the connection is responsible for closing the Vnode.
   }
   return result;
 }

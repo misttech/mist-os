@@ -4,10 +4,9 @@
 
 use fidl::endpoints::{create_endpoints, ServerEnd};
 use fidl::AsHandleRef;
-use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
-use fuchsia_zircon as zx;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
+use {fidl_fuchsia_memory_heapdump_process as fheapdump_process, fuchsia_zircon as zx};
 
 use crate::allocations_table::AllocationsTable;
 use crate::resources_table::{ResourceKey, ResourcesTable};

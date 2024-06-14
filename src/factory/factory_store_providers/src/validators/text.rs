@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::validators::{Validator, ValidatorError},
-    anyhow::Error,
-    std::str::from_utf8,
-};
+use crate::validators::{Validator, ValidatorError};
+use anyhow::Error;
+use std::str::from_utf8;
 
 /// Validator that checks if the given file is composed entirely of UTF-8 characters.
 #[derive(Debug)]

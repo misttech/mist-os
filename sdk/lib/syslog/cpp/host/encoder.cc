@@ -25,11 +25,9 @@ void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
   auto header = MsgHeader::CreatePtr(buffer);
   header->buffer = buffer;
   header->Init(buffer, severity);
-#ifndef __Fuchsia__
   auto severity_string = GetNameForLogSeverity(severity);
   header->WriteString(severity_string.data());
   header->WriteString(": ");
-#endif
   header->WriteChar('[');
   header->WriteString(StripDots(*file));
   header->WriteChar('(');

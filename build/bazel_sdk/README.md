@@ -29,11 +29,14 @@ $ fx build generate_fuchsia_sdk_repository
 ```
 
 NOTE: By default this target will only build the Bazel SDK for the `target_cpu`.
+Additionally, certain product-board configurations may limit the number of
+target api levels to build support for.
 If you need a build a full Bazel SDK locally, use `fx args` to add the following
-GN argument:
+GN arguments:
 
 ```
 bazel_fuchsia_sdk_all_cpus = true
+override_build_time_supported_api_levels = false
 ```
 
 Running this command will create the core SDK and run the generators which

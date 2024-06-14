@@ -4,17 +4,17 @@
 
 pub mod bootfs;
 
-use {
-    bootfs::{
-        zbi_bootfs_dirent_t, zbi_bootfs_header_t, ZBI_BOOTFS_MAGIC, ZBI_BOOTFS_MAX_NAME_LEN,
-        ZBI_BOOTFS_PAGE_SIZE,
-    },
-    byteorder::{ByteOrder, LittleEndian},
-    fuchsia_zircon as zx,
-    std::{ffi::CStr, mem::size_of, str::Utf8Error},
-    thiserror::Error,
-    zerocopy::{ByteSlice, Ref},
+use bootfs::{
+    zbi_bootfs_dirent_t, zbi_bootfs_header_t, ZBI_BOOTFS_MAGIC, ZBI_BOOTFS_MAX_NAME_LEN,
+    ZBI_BOOTFS_PAGE_SIZE,
 };
+use byteorder::{ByteOrder, LittleEndian};
+use fuchsia_zircon as zx;
+use std::ffi::CStr;
+use std::mem::size_of;
+use std::str::Utf8Error;
+use thiserror::Error;
+use zerocopy::{ByteSlice, Ref};
 
 const ZBI_BOOTFS_DIRENT_SIZE: usize = size_of::<zbi_bootfs_dirent_t>();
 const ZBI_BOOTFS_HEADER_SIZE: usize = size_of::<zbi_bootfs_header_t>();
@@ -253,13 +253,13 @@ impl<'parser> Iterator for BootfsParserIterator<'parser> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Error,
-        fuchsia_zircon::HandleBased,
-        lazy_static::lazy_static,
-        std::{collections::HashMap, fs::File, io::prelude::*},
-    };
+    use super::*;
+    use anyhow::Error;
+    use fuchsia_zircon::HandleBased;
+    use lazy_static::lazy_static;
+    use std::collections::HashMap;
+    use std::fs::File;
+    use std::io::prelude::*;
 
     static GOLDEN_DIR: &str = "/pkg/data/golden/";
     static BASIC_BOOTFS_UNCOMPRESSED_FILE: &str = "/pkg/data/basic.bootfs.uncompressed";

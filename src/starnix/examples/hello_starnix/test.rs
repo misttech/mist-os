@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use component_events::{
-    events::{EventStream, ExitStatus, Stopped, StoppedPayload},
-    matcher::EventMatcher,
-};
+use component_events::events::{EventStream, ExitStatus, Stopped, StoppedPayload};
+use component_events::matcher::EventMatcher;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fuchsia_component_test::ScopedInstance;
 use futures::StreamExt;

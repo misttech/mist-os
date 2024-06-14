@@ -2,38 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        deletion_actor::DeletionActor, file_actor::FileActor, instance_actor::InstanceActor, Args,
-    },
-    anyhow::{anyhow, format_err},
-    async_trait::async_trait,
-    diagnostics_reader::{ArchiveReader, Inspect},
-    either::Either,
-    fidl::endpoints::Proxy as _,
-    fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
-    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
-    fs_management::{filesystem::Filesystem, FSConfig},
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_inspect::hierarchy::DiagnosticsHierarchy,
-    fuchsia_zircon::Vmo,
-    futures::{lock::Mutex as FuturesMutex, StreamExt as _},
-    key_bag::Aes256Key,
-    rand::{rngs::SmallRng, Rng, SeedableRng},
-    std::ops::Deref,
-    std::path::PathBuf,
-    std::sync::{Arc, Mutex},
-    std::time::Duration,
-    storage_stress_test_utils::{
-        data::{Compressibility, FileFactory, UncompressedSize},
-        fvm::{get_volume_path, FvmInstance, Guid},
-        io::Directory,
-    },
-    stress_test::{actor::ActorRunner, environment::Environment, random_seed},
-};
+use crate::deletion_actor::DeletionActor;
+use crate::file_actor::FileActor;
+use crate::instance_actor::InstanceActor;
+use crate::Args;
+use anyhow::{anyhow, format_err};
+use async_trait::async_trait;
+use diagnostics_reader::{ArchiveReader, Inspect};
+use either::Either;
+use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_device::ControllerMarker;
+use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions};
+use fs_management::filesystem::Filesystem;
+use fs_management::FSConfig;
+use fuchsia_component::client::connect_to_protocol_at_path;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_inspect::hierarchy::DiagnosticsHierarchy;
+use fuchsia_zircon::Vmo;
+use futures::lock::Mutex as FuturesMutex;
+use futures::StreamExt as _;
+use key_bag::Aes256Key;
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
+use std::ops::Deref;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use storage_stress_test_utils::data::{Compressibility, FileFactory, UncompressedSize};
+use storage_stress_test_utils::fvm::{get_volume_path, FvmInstance, Guid};
+use storage_stress_test_utils::io::Directory;
+use stress_test::actor::ActorRunner;
+use stress_test::environment::Environment;
+use stress_test::random_seed;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
 // All partitions in this test have their type set to this arbitrary GUID.
 const TYPE_GUID: Guid =

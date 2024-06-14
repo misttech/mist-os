@@ -24,8 +24,11 @@ class DeviceReader : public Reader {
   void ReadMoreData() override;
 
   fuchsia::tracing::kernel::ReaderSyncPtr ktrace_reader_;
-  size_t offset_ = 0;
-  char buffer_[kChunkSize];
+  uint32_t offset_ = 0;
+
+  // We read data into this buffer in byte sized chunks, but we want to read out aligned 8 byte
+  // fxt words.
+  alignas(8) char buffer_[kChunkSize];
 
   DeviceReader(const DeviceReader&) = delete;
   DeviceReader(DeviceReader&&) = delete;

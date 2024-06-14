@@ -57,7 +57,7 @@ var ipv6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]out
 	{8, 14}:  Pass,
 	{8, 15}:  Pass,
 	{8, 16}:  Pass,
-	{8, 17}:  Pass,
+	{8, 17}:  Flaky,
 	{9, 3}:   Pass,
 	{9, 4}:   Pass,
 	{10, 1}:  Pass,

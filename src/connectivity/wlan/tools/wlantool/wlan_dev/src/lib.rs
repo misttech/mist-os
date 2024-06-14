@@ -2,31 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints;
+use fidl_fuchsia_wlan_common::{self as fidl_common, WlanMacRole};
+use fidl_fuchsia_wlan_device_service::{
+    self as wlan_service, DeviceMonitorProxy, QueryIfaceResponse,
+};
+use fidl_fuchsia_wlan_sme::ConnectTransactionEvent;
+use futures::prelude::*;
+use ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid, NULL_ADDR};
+use itertools::Itertools;
+use std::fmt;
+use wlan_common::bss::{BssDescription, Protection};
+use wlan_common::scan::ScanResult;
+use wlan_common::security::wep::WepKey;
+use wlan_common::security::wpa::credential::{Passphrase, Psk};
+use wlan_common::security::SecurityError;
 use {
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints,
-    fidl_fuchsia_wlan_common::{self as fidl_common, WlanMacRole},
     fidl_fuchsia_wlan_common_security as fidl_security,
-    fidl_fuchsia_wlan_device_service::{
-        self as wlan_service, DeviceMonitorProxy, QueryIfaceResponse,
-    },
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_fuchsia_wlan_sme::ConnectTransactionEvent,
-    fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_sys,
-    futures::prelude::*,
-    ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid, NULL_ADDR},
-    itertools::Itertools,
-    std::fmt,
-    wlan_common::{
-        bss::{BssDescription, Protection},
-        scan::ScanResult,
-        security::{
-            wep::WepKey,
-            wpa::credential::{Passphrase, Psk},
-            SecurityError,
-        },
-    },
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon_status as zx_status,
+    fuchsia_zircon_types as zx_sys,
 };
 
 #[cfg(target_os = "fuchsia")]
@@ -753,16 +749,14 @@ fn format_iface_query_response(resp: QueryIfaceResponse) -> String {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fidl::endpoints::create_proxy,
-        fidl_fuchsia_wlan_device_service::DeviceMonitorMarker,
-        fuchsia_async as fasync,
-        futures::task::Poll,
-        ieee80211::SsidError,
-        std::pin::pin,
-        wlan_common::{assert_variant, fake_bss_description},
-    };
+    use super::*;
+    use fidl::endpoints::create_proxy;
+    use fidl_fuchsia_wlan_device_service::DeviceMonitorMarker;
+    use fuchsia_async as fasync;
+    use futures::task::Poll;
+    use ieee80211::SsidError;
+    use std::pin::pin;
+    use wlan_common::{assert_variant, fake_bss_description};
 
     #[fuchsia::test]
     fn negotiate_authentication() {

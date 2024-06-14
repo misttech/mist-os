@@ -2,25 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::constants::*,
-    crate::corpus,
-    crate::diagnostics::Forwarder,
-    crate::duration::deadline_after,
-    crate::input::{Input, InputPair},
-    crate::writer::{OutputSink, Writer},
-    anyhow::{anyhow, bail, Context as _, Error, Result},
-    fidl::endpoints::create_request_stream,
-    fidl::Error::ClientChannelClosed,
-    fidl_fuchsia_fuzzer::{self as fuzz, Artifact as FidlArtifact},
-    fuchsia_async::Timer,
-    fuchsia_zircon_status as zx,
-    futures::future::{pending, Either},
-    futures::{pin_mut, select, try_join, Future, FutureExt},
-    std::cell::RefCell,
-    std::cmp::max,
-    std::path::Path,
-};
+use crate::constants::*;
+use crate::corpus;
+use crate::diagnostics::Forwarder;
+use crate::duration::deadline_after;
+use crate::input::{Input, InputPair};
+use crate::writer::{OutputSink, Writer};
+use anyhow::{anyhow, bail, Context as _, Error, Result};
+use fidl::endpoints::create_request_stream;
+use fidl::Error::ClientChannelClosed;
+use fidl_fuchsia_fuzzer::{self as fuzz, Artifact as FidlArtifact};
+use fuchsia_async::Timer;
+use fuchsia_zircon_status as zx;
+use futures::future::{pending, Either};
+use futures::{pin_mut, select, try_join, Future, FutureExt};
+use std::cell::RefCell;
+use std::cmp::max;
+use std::path::Path;
 
 /// Represents a `fuchsia.fuzzer.Controller` connection to a fuzzer.
 #[derive(Debug)]
@@ -421,16 +419,13 @@ fn check_status(name: &str, status: zx::Status) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::util::digest_path,
-        anyhow::{Context as _, Result},
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-        fuchsia_async as fasync,
-        fuchsia_fuzzctl::{Controller, Input, InputPair},
-        fuchsia_fuzzctl_test::{create_task, serve_controller, verify_saved, FakeController, Test},
-        fuchsia_zircon_status as zx,
-    };
+    use crate::util::digest_path;
+    use anyhow::{Context as _, Result};
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+    use fuchsia_fuzzctl::{Controller, Input, InputPair};
+    use fuchsia_fuzzctl_test::{create_task, serve_controller, verify_saved, FakeController, Test};
+    use {fuchsia_async as fasync, fuchsia_zircon_status as zx};
 
     // Creates a test setup suitable for unit testing `Controller`.
     fn perform_test_setup(

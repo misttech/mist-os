@@ -2,51 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::fuchsia::{
-        directory::FxDirectory,
-        errors::map_to_status,
-        node::{FxNode, OpenedNode},
-        paged_object_handle::PagedObjectHandle,
-        pager::{
-            default_page_in, MarkDirtyRange, PageInRange, PagerBacked,
-            PagerPacketReceiverRegistration,
-        },
-        volume::{info_to_filesystem_info, FxVolume},
-    },
-    anyhow::Error,
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, HandleBased, Status},
-    futures::future::BoxFuture,
-    fxfs::{
-        filesystem::{SyncOptions, MAX_FILE_SIZE},
-        log::*,
-        object_handle::{ObjectHandle, ReadObjectHandle},
-        object_store::{
-            transaction::{lock_keys, LockKey, Options},
-            DataObjectHandle, ObjectDescriptor, Timestamp,
-        },
-    },
-    fxfs_macros::ToWeakNode,
-    std::{
-        ops::Range,
-        sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc,
-        },
-    },
-    storage_device::buffer,
-    vfs::{
-        attributes,
-        common::rights_to_posix_mode_bits,
-        directory::entry_container::MutableDirectory,
-        execution_scope::ExecutionScope,
-        file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode},
-        name::Name,
-        ObjectRequestRef, ProtocolsExt,
-    },
+use crate::fuchsia::directory::FxDirectory;
+use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::node::{FxNode, OpenedNode};
+use crate::fuchsia::paged_object_handle::PagedObjectHandle;
+use crate::fuchsia::pager::{
+    default_page_in, MarkDirtyRange, PageInRange, PagerBacked, PagerPacketReceiverRegistration,
 };
+use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume};
+use anyhow::Error;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon::{self as zx, HandleBased, Status};
+use futures::future::BoxFuture;
+use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
+use fxfs::log::*;
+use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
+use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+use fxfs::object_store::{DataObjectHandle, ObjectDescriptor, Timestamp};
+use fxfs_macros::ToWeakNode;
+use std::ops::Range;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use storage_device::buffer;
+use vfs::common::rights_to_posix_mode_bits;
+use vfs::directory::entry_container::MutableDirectory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode};
+use vfs::name::Name;
+use vfs::{attributes, ObjectRequestRef, ProtocolsExt};
 
 /// In many operating systems, it is possible to delete a file with open handles. In this case the
 /// file will continue to use space on disk but will not openable and the storage it uses will be
@@ -281,7 +264,6 @@ impl vfs::node::IsDirectory for FxFile {
     }
 }
 
-#[async_trait]
 impl vfs::node::Node for FxFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
         let props = self.handle.get_properties().await.map_err(map_to_status)?;
@@ -582,26 +564,22 @@ impl GetVmo for FxFile {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::fuchsia::testing::{
-            close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
-        },
-        anyhow::format_err,
-        fidl_fuchsia_io as fio,
-        fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions},
-        fuchsia_async as fasync,
-        fuchsia_fs::file,
-        fuchsia_zircon::Status,
-        futures::join,
-        fxfs::object_handle::INVALID_OBJECT_ID,
-        rand::{thread_rng, Rng},
-        std::sync::{
-            atomic::{self, AtomicBool},
-            Arc,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
-        vfs::common::rights_to_posix_mode_bits,
+    use crate::fuchsia::testing::{
+        close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
     };
+    use anyhow::format_err;
+    use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
+    use fuchsia_fs::file;
+    use fuchsia_zircon::Status;
+    use futures::join;
+    use fxfs::object_handle::INVALID_OBJECT_ID;
+    use rand::{thread_rng, Rng};
+    use std::sync::atomic::{self, AtomicBool};
+    use std::sync::Arc;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
+    use vfs::common::rights_to_posix_mode_bits;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test(threads = 10)]
     async fn test_empty_file() {

@@ -4,14 +4,11 @@
 
 use anyhow::{anyhow, Context, Result};
 use fidl::endpoints::{create_proxy, ProtocolMarker};
-use fidl_fuchsia_power_broker as fpb;
-use fidl_fuchsia_power_system as fps;
-use fuchsia_async as fasync;
 use fuchsia_component::client;
 use futures::channel::mpsc;
-use futures::future;
-use futures::{Future, SinkExt, StreamExt};
+use futures::{future, Future, SinkExt, StreamExt};
 use tracing::{debug, error};
+use {fidl_fuchsia_power_broker as fpb, fidl_fuchsia_power_system as fps, fuchsia_async as fasync};
 
 const ELEMENT_NAME: &str = "timekeeper-pe";
 
@@ -20,7 +17,7 @@ const POWER_OFF: u8 = 0x00;
 
 const REQUIRED_LEVEL: u8 = fps::ExecutionStateLevel::WakeHandling.into_primitive();
 
-pub async fn manage(activity_signal: mpsc::Sender<()>) -> Result<fasync::Task<()>> {
+pub async fn manage(activity_signal: mpsc::Sender<super::Command>) -> Result<fasync::Task<()>> {
     let governor_proxy = client::connect_to_protocol::<fps::ActivityGovernorMarker>()
         .with_context(|| {
             format!("while connecting to: {:?}", fps::ActivityGovernorMarker::DEBUG_NAME)
@@ -35,7 +32,7 @@ pub async fn manage(activity_signal: mpsc::Sender<()>) -> Result<fasync::Task<()
 async fn manage_internal<F, G>(
     governor_proxy: fps::ActivityGovernorProxy,
     topology_proxy: fpb::TopologyProxy,
-    mut activity: mpsc::Sender<()>,
+    mut activity: mpsc::Sender<super::Command>,
     // Injected in tests.
     loop_fn: F,
 ) -> Result<fasync::Task<()>>
@@ -48,7 +45,7 @@ where
         .await
         .context("in a call to ActivityGovernor/GetPowerElements")?;
 
-    let _ignore = activity.send(()).await;
+    let _ignore = activity.send(super::Command::PowerManagement).await;
     if let Some(execution_state) = power_elements.execution_state {
         if let Some(token) = execution_state.passive_dependency_token {
             let deps = vec![fpb::LevelDependency {
@@ -156,6 +153,7 @@ async fn management_loop(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Command;
     use fidl::endpoints;
     use fidl::endpoints::Proxy;
     use fuchsia_zircon as zx;
@@ -267,7 +265,7 @@ mod tests {
                 .expect("infallible");
         let (t_proxy, mut _t_stream) =
             endpoints::create_proxy_and_stream::<fpb::TopologyMarker>().expect("infallible");
-        let (_activity_s, mut activity_r) = mpsc::channel::<()>(1);
+        let (_activity_s, mut activity_r) = mpsc::channel::<Command>(1);
 
         // Run the server side activity governor.
         fasync::Task::local(async move {

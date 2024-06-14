@@ -6,26 +6,21 @@ use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
-use net_types::{
-    ip::{AddrSubnet, Ip, IpAddress as _, IpVersion, Ipv4, Ipv6, Mtu},
-    Witness, ZonedAddr,
+use net_types::ip::{AddrSubnet, IpAddress as _, IpVersion, Mtu};
+use net_types::{Witness, ZonedAddr};
+use netstack3_base::testutil::TestIpExt;
+use netstack3_core::sync::RemoveResourceResult;
+use netstack3_core::testutil::{
+    CtxPairExt as _, FakeBindingsCtx, FakeCtx, PureIpDeviceAndIpVersion, DEFAULT_INTERFACE_METRIC,
 };
-use netstack3_core::{
-    sync::RemoveResourceResult,
-    testutil::{
-        CtxPairExt as _, FakeBindingsCtx, FakeCtx, PureIpDeviceAndIpVersion, TestIpExt,
-        DEFAULT_INTERFACE_METRIC,
-    },
-    types::WorkQueueReport,
-    IpExt, StackState,
+use netstack3_core::types::WorkQueueReport;
+use netstack3_core::{IpExt, StackState};
+use netstack3_device::pure_ip::{
+    self, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceReceiveFrameMetadata,
 };
-use netstack3_device::{
-    pure_ip::{
-        self, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceReceiveFrameMetadata,
-    },
-    queue::TransmitQueueConfiguration,
-    DeviceId,
-};
+use netstack3_device::queue::TransmitQueueConfiguration;
+use netstack3_device::DeviceId;
+use netstack3_ip::IpPacketDestination;
 use packet::{Buf, Serializer as _};
 use packet_formats::ip::{IpPacketBuilder, IpProto};
 use test_case::test_case;
@@ -33,7 +28,7 @@ use test_case::test_case;
 const MTU: Mtu = Mtu::new(1234);
 const TTL: u8 = 64;
 
-fn default_ip_packet<I: Ip + TestIpExt>() -> Buf<Vec<u8>> {
+fn default_ip_packet<I: TestIpExt>() -> Buf<Vec<u8>> {
     Buf::new(Vec::new(), ..)
         .encapsulate(I::PacketBuilder::new(
             I::TEST_ADDRS.remote_ip.get(),
@@ -74,8 +69,8 @@ fn update_tx_queue_config() {
     tx_queue_api.set_configuration(&device, TransmitQueueConfiguration::Fifo);
 }
 
-#[ip_test]
-fn receive_frame<I: Ip + TestIpExt + IpExt>() {
+#[ip_test(I)]
+fn receive_frame<I: TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();
     let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
         PureIpDeviceCreationProperties { mtu: MTU },
@@ -105,10 +100,10 @@ fn receive_frame<I: Ip + TestIpExt + IpExt>() {
     check_frame_counters::<I>(&ctx.core_ctx, 1);
 }
 
-#[ip_test]
+#[ip_test(I)]
 #[test_case(TransmitQueueConfiguration::None; "no queue")]
 #[test_case(TransmitQueueConfiguration::Fifo; "fifo queue")]
-fn send_frame<I: Ip + TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfiguration) {
+fn send_frame<I: TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfiguration) {
     let mut ctx = FakeCtx::default();
     let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
         PureIpDeviceCreationProperties { mtu: MTU },
@@ -139,10 +134,11 @@ fn send_frame<I: Ip + TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfigura
 
     {
         let (mut core_ctx, bindings_ctx) = ctx.contexts();
-        pure_ip::send_ip_frame::<_, _, I, _>(
+        pure_ip::send_ip_frame(
             &mut core_ctx,
             bindings_ctx,
             &device,
+            IpPacketDestination::<I, _>::from_addr(I::TEST_ADDRS.local_ip),
             default_ip_packet::<I>(),
         )
         .expect("send should succeed");
@@ -178,10 +174,10 @@ fn send_frame<I: Ip + TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfigura
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
-#[ip_test]
+#[ip_test(I)]
 // Verify that a socket can listen on an IP address that is assigned to a
 // pure IP device.
-fn available_to_socket_layer<I: Ip + TestIpExt + IpExt>() {
+fn available_to_socket_layer<I: TestIpExt + IpExt>() {
     let mut ctx = FakeCtx::default();
     let device = ctx
         .core_api()

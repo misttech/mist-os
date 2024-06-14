@@ -121,11 +121,11 @@ class VmCowPages final : public VmHierarchyBase,
     return parent_ && parent_locked().is_hidden_locked();
   }
 
+  bool is_discardable() const { return !!discardable_tracker_; }
+
   bool can_evict() const {
     canary_.Assert();
-    bool result = page_source_ && page_source_->properties().is_preserving_page_content;
-    DEBUG_ASSERT(result == debug_is_user_pager_backed());
-    return result;
+    return page_source_ && page_source_->properties().is_preserving_page_content;
   }
 
   bool can_root_source_evict_locked() const TA_REQ(lock()) {
@@ -148,9 +148,7 @@ class VmCowPages final : public VmHierarchyBase,
     // 2. They are slice children of root pager-backed VMOs, since slices directly reference the
     // parent's pages.
     auto* cow = is_slice_locked() ? parent_.get() : this;
-    bool result = cow->page_source_ && cow->page_source_->properties().is_preserving_page_content;
-    DEBUG_ASSERT(result == cow->debug_is_user_pager_backed());
-    return result;
+    return cow->page_source_ && cow->page_source_->properties().is_preserving_page_content;
   }
 
   // The modified state is only supported for root pager-backed VMOs, and will get queried (and
@@ -568,15 +566,11 @@ class VmCowPages final : public VmHierarchyBase,
 
   bool DebugIsHighMemoryPriority() const TA_EXCL(lock());
 
-  // Discard all the pages from a discardable vmo in the |kReclaimable| state. For this call to
-  // succeed, the vmo should have been in the reclaimable state for at least
-  // |min_duration_since_reclaimable|. If successful, the |discardable_state_| is set to
-  // |kDiscarded|, and the vmo is moved from the reclaim candidates list. The pages are removed /
-  // discarded from the vmo and appended to the |freed_list| passed in; the caller takes ownership
-  // of the removed pages and is responsible for freeing them. Returns the number of pages
-  // discarded.
-  uint64_t DiscardPages(zx_duration_t min_duration_since_reclaimable, list_node_t* freed_list)
-      TA_EXCL(lock());
+  // Discard all the pages from a discardable vmo in the |kReclaimable| state. If successful, the
+  // |discardable_state_| is set to |kDiscarded|. The pages are removed from the vmo and appended to
+  // the |freed_list| passed in; the caller takes ownership of the removed pages and is responsible
+  // for freeing them. Returns the number of pages discarded.
+  uint64_t DiscardPages(list_node_t* freed_list) TA_EXCL(lock());
 
   // See DiscardableVmoTracker::DebugDiscardablePageCounts().
   struct DiscardablePageCounts {
@@ -638,9 +632,7 @@ class VmCowPages final : public VmHierarchyBase,
   bool is_hidden_locked() const TA_REQ(lock()) { return !!(options_ & VmCowPagesOptions::kHidden); }
   bool is_slice_locked() const TA_REQ(lock()) { return !!(options_ & VmCowPagesOptions::kSlice); }
   bool can_decommit_zero_pages_locked() const TA_REQ(lock()) {
-    bool result = !(options_ & VmCowPagesOptions::kCannotDecommitZeroPages);
-    DEBUG_ASSERT(result == !debug_is_contiguous());
-    return result;
+    return !(options_ & VmCowPagesOptions::kCannotDecommitZeroPages);
   }
 
   // can_borrow_locked() returns true if the VmCowPages is capable of borrowing pages, but whether
@@ -666,7 +658,6 @@ class VmCowPages final : public VmHierarchyBase,
     }
 
     bool source_is_suitable = page_source_->properties().is_preserving_page_content;
-    DEBUG_ASSERT(source_is_suitable == debug_is_user_pager_backed());
 
     // This ensures that if borrowing is globally disabled (no borrowing sites enabled), that we'll
     // return false.  We could delete this bool without damaging correctness, but we want to
@@ -697,23 +688,11 @@ class VmCowPages final : public VmHierarchyBase,
   }
 
   bool direct_source_supplies_zero_pages() const {
-    bool result = page_source_ && !page_source_->properties().is_preserving_page_content;
-    DEBUG_ASSERT(result == debug_is_contiguous());
-    return result;
+    return page_source_ && !page_source_->properties().is_preserving_page_content;
   }
 
   bool can_decommit() const {
-    bool result = !page_source_ || !page_source_->properties().is_preserving_page_content;
-    DEBUG_ASSERT(result == !debug_is_user_pager_backed());
-    return result;
-  }
-
-  bool debug_is_user_pager_backed() const {
-    return page_source_ && page_source_->properties().is_user_pager;
-  }
-
-  bool debug_is_contiguous() const {
-    return page_source_ && page_source_->properties().is_providing_specific_physical_pages;
+    return !page_source_ || !page_source_->properties().is_preserving_page_content;
   }
 
   bool is_cow_clonable_locked() const TA_REQ(lock()) {
@@ -805,15 +784,11 @@ class VmCowPages final : public VmHierarchyBase,
   }
 
   bool is_source_preserving_page_content() const {
-    bool result = page_source_ && page_source_->properties().is_preserving_page_content;
-    DEBUG_ASSERT(result == debug_is_user_pager_backed());
-    return result;
+    return page_source_ && page_source_->properties().is_preserving_page_content;
   }
 
   bool is_source_supplying_specific_physical_pages() const {
-    bool result = page_source_ && page_source_->properties().is_providing_specific_physical_pages;
-    DEBUG_ASSERT(result == debug_is_contiguous());
-    return result;
+    return page_source_ && page_source_->properties().is_providing_specific_physical_pages;
   }
 
   // Walks up the parent tree and returns the root, or |this| if there is no parent.
@@ -1189,6 +1164,17 @@ class VmCowPages final : public VmHierarchyBase,
   // Borrows the guard for |lock_| and may drop the lock temporarily during execution.
   bool RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset, VmCompressor* compressor,
                                       Guard<CriticalMutex>& guard) TA_REQ(lock());
+
+  // Internal helper for performing reclamation against a discardable VMO. Assumes that the page is
+  // owned by this VMO at the specified offset. If any discarding happens |freed_list| is given
+  // ownership of any reclaimed pages and the number of pages is returned. The passed in |page|
+  // must be the first page in the discardable VMO to trigger a discard, otherwise it will fail.
+  zx::result<uint64_t> ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset,
+                                                list_node_t* freed_list) TA_REQ(lock());
+
+  // Internal helper for discarding a VMO. Will discard if VMO is unlocked, putting pages in
+  // |freed_list| and returning the count.
+  zx::result<uint64_t> DiscardPagesLocked(list_node_t* freed_list) TA_REQ(lock());
 
   // Internal helper for modifying just this value of high_priority_count_ without performing any
   // propagating.

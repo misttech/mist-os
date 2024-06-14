@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {itertools::Itertools, paste::paste, std::fmt::Display};
+use itertools::Itertools;
+use paste::paste;
+use std::fmt::Display;
 
 #[derive(Clone, Copy, Debug)]
 pub struct NamedField<T, A> {

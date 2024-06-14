@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{facade::DeviceFacade, types::DeviceMethod};
+use crate::device::facade::DeviceFacade;
+use crate::device::types::DeviceMethod;
 use crate::server::Facade;
 use anyhow::Error;
 use async_trait::async_trait;

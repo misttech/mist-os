@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context, Error},
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_hardware_audio::*,
-    fidl_fuchsia_io as fio,
-    futures::TryFutureExt,
-    std::path::{Path, PathBuf},
-};
+use anyhow::{format_err, Context, Error};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_hardware_audio::*;
+use fidl_fuchsia_io as fio;
+use futures::TryFutureExt;
+use std::path::{Path, PathBuf};
 
 // CodecInterface can only be used from a single client since no more than one place at the time
 // can poll the proxy's hanging gets (WatchPlugState and WatchGainState).
@@ -83,11 +81,15 @@ impl CodecInterface {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::config::Config, crate::configurator::Configurator,
-        crate::discover::find_codecs, crate::testing::tests::get_dev_proxy, anyhow::anyhow,
-        async_trait::async_trait, futures::lock::Mutex, std::sync::Arc,
-    };
+    use super::*;
+    use crate::config::Config;
+    use crate::configurator::Configurator;
+    use crate::discover::find_codecs;
+    use crate::testing::tests::get_dev_proxy;
+    use anyhow::anyhow;
+    use async_trait::async_trait;
+    use futures::lock::Mutex;
+    use std::sync::Arc;
 
     pub struct TestConfigurator {}
 

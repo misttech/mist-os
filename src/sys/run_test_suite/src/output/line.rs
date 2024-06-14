@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::output::{
-        ArtifactType, DirectoryArtifactType, DynArtifact, DynDirectoryArtifact, EntityId,
-        EntityInfo, ReportedOutcome, Reporter, Timestamp,
-    },
-    std::io::{Error, Write},
-    vte::{Parser, Perform},
+use crate::output::{
+    ArtifactType, DirectoryArtifactType, DynArtifact, DynDirectoryArtifact, EntityId, EntityInfo,
+    ReportedOutcome, Reporter, Timestamp,
 };
+use std::io::{Error, Write};
+use vte::{Parser, Perform};
 
 /// A reporter that composes an inner reporter. Filters out ANSI in artifact output.
 pub(crate) struct AnsiFilterReporter<R: Reporter> {

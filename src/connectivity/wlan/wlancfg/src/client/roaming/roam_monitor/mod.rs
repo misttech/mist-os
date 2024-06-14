@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        client::{connection_selection::scoring_functions, roaming::lib::*, types},
-        telemetry::{TelemetryEvent, TelemetrySender},
-        util::pseudo_energy::EwmaSignalData,
-    },
-    fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::channel::mpsc,
-};
+use crate::client::connection_selection::scoring_functions;
+use crate::client::roaming::lib::*;
+use crate::client::types;
+use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use crate::util::pseudo_energy::EwmaSignalData;
+use futures::channel::mpsc;
+use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 /// If there isn't a change in reasons to roam or significant change in RSSI, wait a while between
 /// scans. If there isn't a change, it is unlikely that there would be a reason to roam now.
@@ -41,7 +39,7 @@ pub struct RoamMonitor {
     roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
     /// Channel to send roam requests to a state machine.
     roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-    connection_data: ConnectionData,
+    connection_data: RoamingConnectionData,
     telemetry_sender: TelemetrySender,
 }
 
@@ -49,7 +47,7 @@ impl RoamMonitor {
     pub fn new(
         roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
         roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-        connection_data: ConnectionData,
+        connection_data: RoamingConnectionData,
         telemetry_sender: TelemetrySender,
     ) -> Self {
         Self { roam_search_sender, roam_sender, connection_data, telemetry_sender }
@@ -79,7 +77,7 @@ impl RoamMonitorApi for RoamMonitor {
         if !roam_reasons.is_empty() {
             let now = fasync::Time::now();
             if now
-                < self.connection_data.roam_decision_data.time_prev_roam_scan
+                < self.connection_data.previous_roam_scan_data.time_prev_roam_scan
                     + MIN_TIME_BETWEEN_ROAM_SCANS
             {
                 return Ok(bss_score);
@@ -87,14 +85,14 @@ impl RoamMonitorApi for RoamMonitor {
             // If there isn't a new reason to roam and the previous scan
             // happened recently, do not scan again.
             let is_scan_old = now
-                > self.connection_data.roam_decision_data.time_prev_roam_scan
+                > self.connection_data.previous_roam_scan_data.time_prev_roam_scan
                     + TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE;
             let has_new_reason = roam_reasons.iter().any(|r| {
-                !self.connection_data.roam_decision_data.roam_reasons_prev_scan.contains(r)
+                !self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan.contains(r)
             });
             let rssi = self.connection_data.signal_data.ewma_rssi.get();
             let is_rssi_different =
-                (self.connection_data.roam_decision_data.rssi_prev_roam_scan - rssi).abs()
+                (self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan - rssi).abs()
                     > MIN_RSSI_CHANGE_TO_ROAM_SCAN;
             if is_scan_old || has_new_reason || is_rssi_different {
                 // Initiate roam scan.
@@ -103,9 +101,10 @@ impl RoamMonitorApi for RoamMonitor {
                 let _ = self.roam_search_sender.unbounded_send(req);
 
                 // Updated fields for tracking roam scan decisions
-                self.connection_data.roam_decision_data.time_prev_roam_scan = fasync::Time::now();
-                self.connection_data.roam_decision_data.roam_reasons_prev_scan = roam_reasons;
-                self.connection_data.roam_decision_data.rssi_prev_roam_scan = rssi;
+                self.connection_data.previous_roam_scan_data.time_prev_roam_scan =
+                    fasync::Time::now();
+                self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan = roam_reasons;
+                self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
             }
         }
         // return score for metrics purposes
@@ -144,16 +143,13 @@ fn check_signal_thresholds(
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*,
-        crate::{
-            telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS,
-            util::{pseudo_energy::RssiVelocity, testing::generate_connect_selection},
-        },
-        fidl_fuchsia_wlan_internal as fidl_internal,
-        test_util::{assert_gt, assert_lt},
-        wlan_common::{assert_variant, channel},
-    };
+    use super::*;
+    use crate::telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS;
+    use crate::util::pseudo_energy::RssiVelocity;
+    use crate::util::testing::generate_connect_selection;
+    use fidl_fuchsia_wlan_internal as fidl_internal;
+    use test_util::{assert_gt, assert_lt};
+    use wlan_common::{assert_variant, channel};
 
     #[fuchsia::test]
     fn test_check_signal_thresholds_2g() {
@@ -243,14 +239,15 @@ mod test {
 
         let init_rssi = -75;
         let init_snr = 15;
-        let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
+        let previous_roam_scan_data = PreviousRoamScanData::new(init_rssi);
         let mut signal_data =
             EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let connection_data = ConnectionData {
+        let rssi_velocity = RssiVelocity::new(init_rssi);
+        let connection_data = RoamingConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
-            rssi_velocity: RssiVelocity::new(0.0),
-            roam_decision_data: roam_data,
+            rssi_velocity,
+            previous_roam_scan_data,
         };
 
         let mut roam_monitor = RoamMonitor::new(
@@ -293,14 +290,14 @@ mod test {
 
         let init_rssi = -40;
         let init_snr = 50;
-        let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
+        let roam_data = PreviousRoamScanData::new(init_rssi as f64);
         let signal_data = EwmaSignalData::new(init_rssi, init_snr, 1);
 
-        let connection_data = ConnectionData {
+        let connection_data = RoamingConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
             rssi_velocity: RssiVelocity::new(-40),
-            roam_decision_data: roam_data,
+            previous_roam_scan_data: roam_data,
         };
         let mut roam_monitor = RoamMonitor::new(
             test_values.roam_search_sender.clone(),
@@ -350,14 +347,15 @@ mod test {
 
         let init_rssi = -80;
         let init_snr = 10;
-        let roam_data = RoamDecisionData::new(init_rssi as f64, fasync::Time::now());
+        let previous_roam_scan_data = PreviousRoamScanData::new(init_rssi);
         let signal_data =
             EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let connection_data = ConnectionData {
+        let rssi_velocity = RssiVelocity::new(init_rssi);
+        let connection_data = RoamingConnectionData {
             currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
             signal_data,
-            rssi_velocity: RssiVelocity::new(0.0),
-            roam_decision_data: roam_data,
+            rssi_velocity,
+            previous_roam_scan_data,
         };
         let mut roam_monitor = RoamMonitor::new(
             test_values.roam_search_sender.clone(),

@@ -5,10 +5,9 @@
 use crate::test_topology;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Logs, Severity};
-use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
-use fidl_fuchsia_diagnostics as fdiagnostics;
 use futures::StreamExt;
+use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
 
 // This test verifies that Archivist knows about logging from this component.
 #[fuchsia::test]

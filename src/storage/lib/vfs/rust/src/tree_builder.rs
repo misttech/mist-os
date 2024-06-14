@@ -8,14 +8,18 @@
 //! expects the tree structure to be defined at compile time, while this helper allows the tree
 //! structure to be dynamic.
 
-use crate::directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::Simple};
+use crate::directory::entry::DirectoryEntry;
+use crate::directory::helper::DirectlyMutable;
+use crate::directory::immutable::Simple;
 
-use {
-    fidl_fuchsia_io as fio,
-    itertools::Itertools,
-    std::{collections::HashMap, fmt, marker::PhantomData, slice::Iter, sync::Arc},
-    thiserror::Error,
-};
+use fidl_fuchsia_io as fio;
+use itertools::Itertools;
+use std::collections::HashMap;
+use std::fmt;
+use std::marker::PhantomData;
+use std::slice::Iter;
+use std::sync::Arc;
+use thiserror::Error;
 
 /// Represents a paths provided to [`TreeBuilder::add_entry()`].  See [`TreeBuilder`] for details.
 // I think it would be a bit more straightforward to have two different types that implement a
@@ -373,9 +377,11 @@ mod tests {
         open_get_vmo_file_proxy_assert_ok,
     };
 
-    use crate::{directory::test_utils::run_server_client, file};
+    use crate::directory::test_utils::run_server_client;
+    use crate::file;
 
-    use {fidl_fuchsia_io as fio, vfs_macros::pseudo_directory};
+    use fidl_fuchsia_io as fio;
+    use vfs_macros::pseudo_directory;
 
     #[test]
     fn vfs_with_custom_inodes() {

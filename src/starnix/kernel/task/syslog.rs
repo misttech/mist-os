@@ -2,29 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{CurrentTask, EventHandler, WaitCallback, WaitCanceler, WaitQueue, Waiter},
-    vfs::OutputBuffer,
-};
+use crate::task::{CurrentTask, EventHandler, WaitCallback, WaitCanceler, WaitQueue, Waiter};
+use crate::vfs::OutputBuffer;
 use diagnostics_data::{Data, Logs, Severity};
-use fidl_fuchsia_diagnostics as fdiagnostics;
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
 use starnix_sync::Mutex;
-use starnix_uapi::{
-    auth::{CAP_SYSLOG, CAP_SYS_ADMIN},
-    errors::{errno, error, Errno, EAGAIN},
-    vfs::FdEvents,
-};
-use std::{
-    cmp,
-    collections::VecDeque,
-    io::{self, Write},
-    sync::{mpsc, Arc},
-    time::Duration,
-};
+use starnix_uapi::auth::{CAP_SYSLOG, CAP_SYS_ADMIN};
+use starnix_uapi::errors::{errno, error, Errno, EAGAIN};
+use starnix_uapi::vfs::FdEvents;
+use std::cmp;
+use std::collections::VecDeque;
+use std::io::{self, Write};
+use std::sync::{mpsc, Arc};
+use std::time::Duration;
+use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_zircon as zx};
 
 const BUFFER_SIZE: i32 = 1_049_000;
 

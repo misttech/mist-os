@@ -2,21 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    futures::ready,
-    std::{
-        cell::UnsafeCell,
-        future::Future,
-        marker::PhantomData,
-        mem::ManuallyDrop,
-        pin::Pin,
-        sync::atomic::{
-            AtomicUsize,
-            Ordering::{Acquire, Relaxed, Release},
-        },
-        task::{Context, Poll},
-    },
-};
+use futures::ready;
+use std::cell::UnsafeCell;
+use std::future::Future;
+use std::marker::PhantomData;
+use std::mem::ManuallyDrop;
+use std::pin::Pin;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
+use std::task::{Context, Poll};
 
 /// A lock-free thread-safe future.
 // The debugger knows the layout so that async backtraces work, so if this changes the debugger

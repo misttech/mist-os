@@ -4,14 +4,11 @@
 
 mod controller;
 
-use {
-    crate::search::controller::{
-        components::ComponentSearchController, package_list::PackageListController,
-        packages::PackageSearchController,
-    },
-    scrutiny::prelude::*,
-    std::sync::Arc,
-};
+use crate::search::controller::components::ComponentSearchController;
+use crate::search::controller::package_list::PackageListController;
+use crate::search::controller::packages::PackageSearchController;
+use scrutiny::prelude::*;
+use std::sync::Arc;
 
 plugin!(
     SearchPlugin,
@@ -28,23 +25,23 @@ plugin!(
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{
-            core::collection::{
-                testing::fake_component_src_pkg, Component, Components, Package, Packages,
-            },
-            search::controller::{
-                components::{ComponentSearchController, ComponentSearchRequest},
-                packages::{PackageSearchController, PackageSearchRequest},
-            },
-        },
-        fuchsia_merkle::{Hash, HASH_SIZE},
-        fuchsia_url::{AbsolutePackageUrl, PackageName},
-        scrutiny::model::{controller::DataController, model::DataModel},
-        scrutiny_testing::{fake::fake_data_model, TEST_REPO_URL},
-        serde_json::json,
-        std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc},
+    use crate::core::collection::testing::fake_component_src_pkg;
+    use crate::core::collection::{Component, Components, Package, Packages};
+    use crate::search::controller::components::{
+        ComponentSearchController, ComponentSearchRequest,
     };
+    use crate::search::controller::packages::{PackageSearchController, PackageSearchRequest};
+    use fuchsia_merkle::{Hash, HASH_SIZE};
+    use fuchsia_url::{AbsolutePackageUrl, PackageName};
+    use scrutiny::model::controller::DataController;
+    use scrutiny::model::model::DataModel;
+    use scrutiny_testing::fake::fake_data_model;
+    use scrutiny_testing::TEST_REPO_URL;
+    use serde_json::json;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::str::FromStr;
+    use std::sync::Arc;
 
     fn data_model() -> Arc<DataModel> {
         fake_data_model()

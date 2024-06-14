@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    component_events::{events::*, matcher::*},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_tests as fctests,
-    fuchsia_component::client,
-    futures::stream::{FusedStream, StreamExt},
-};
+use component_events::events::*;
+use component_events::matcher::*;
+use fuchsia_component::client;
+use futures::stream::{FusedStream, StreamExt};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_tests as fctests};
 
 const CHILD_MONIKER: &str = "./looper";
 const NUM_CONNECTIONS: u64 = 3;

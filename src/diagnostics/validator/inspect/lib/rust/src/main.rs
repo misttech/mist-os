@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints::create_request_stream;
+use fidl_diagnostics_validate::*;
+use fidl_fuchsia_inspect::TreeMarker;
+use fuchsia_async as fasync;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::hierarchy::*;
 /// Rust Puppet, receiving commands to drive the Rust Inspect library.
 ///
 /// This code doesn't check for illegal commands such as deleting a node
@@ -9,21 +16,12 @@
 /// within the Validator program by running the command sequence against the
 /// local ("data::Data") implementation before sending them to the puppets.
 use fuchsia_inspect::Property as UsablePropertyTrait;
-use {
-    anyhow::{format_err, Context as _, Error},
-    fidl::endpoints::create_request_stream,
-    fidl_diagnostics_validate::*,
-    fidl_fuchsia_inspect::TreeMarker,
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::hierarchy::*,
-    fuchsia_inspect::*,
-    fuchsia_zircon::HandleBased,
-    futures::prelude::*,
-    inspect_runtime::{service, TreeServerSendPreference},
-    std::collections::HashMap,
-    tracing::{error, info, warn},
-};
+use fuchsia_inspect::*;
+use fuchsia_zircon::HandleBased;
+use futures::prelude::*;
+use inspect_runtime::{service, TreeServerSendPreference};
+use std::collections::HashMap;
+use tracing::{error, info, warn};
 
 #[derive(Debug)]
 enum Property {

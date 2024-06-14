@@ -7,6 +7,7 @@ use bitflags::bitflags;
 use linux_uapi as uapi;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
+pub const EPOLLWAKEUP: u32 = 1 << 29;
 pub const EPOLLONESHOT: u32 = 1 << 30;
 pub const EPOLLET: u32 = 1 << 31;
 
@@ -28,6 +29,7 @@ bitflags::bitflags! {
         const POLLRDHUP = uapi::POLLRDHUP;
         const EPOLLET = EPOLLET;
         const EPOLLONESHOT = EPOLLONESHOT;
+        const EPOLLWAKEUP = EPOLLWAKEUP;
     }
 }
 
@@ -66,6 +68,12 @@ impl EpollEvent {
 
     pub fn events(&self) -> FdEvents {
         FdEvents::from_bits_retain(self.0.events)
+    }
+
+    pub fn ignore(&mut self, events_to_ignore: FdEvents) {
+        let mut previous_events = self.events();
+        previous_events.remove(events_to_ignore);
+        self.0.events = previous_events.bits();
     }
 
     pub fn data(&self) -> u64 {

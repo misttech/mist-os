@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        mode_management::{Defect, EventHistory, IfaceFailure, PhyFailure},
-        telemetry,
-    },
-    futures::channel::mpsc,
-    tracing::warn,
-};
+use crate::mode_management::{Defect, EventHistory, IfaceFailure, PhyFailure};
+use crate::telemetry;
+use futures::channel::mpsc;
+use tracing::warn;
 
 // As a general note, recovery is intended to be a method of last resort.  It should be used in
 // circumstances where it is thought that WLAN firmware or the interface with the WLAN peripheral
@@ -532,13 +528,11 @@ fn thresholded_canceled_scan_recovery_profile(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async::{TestExecutor, Time},
-        fuchsia_zircon::DurationNum,
-        rand::Rng,
-        test_case::test_case,
-    };
+    use super::*;
+    use fuchsia_async::{TestExecutor, Time};
+    use fuchsia_zircon::DurationNum;
+    use rand::Rng;
+    use test_case::test_case;
 
     #[fuchsia::test]
     fn test_recovery_action_equality() {

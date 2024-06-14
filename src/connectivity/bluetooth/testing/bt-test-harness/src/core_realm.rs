@@ -2,23 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::emulator::EMULATOR_ROOT_DRIVER_URL;
+use anyhow::{format_err, Error};
+use fidl_fuchsia_bluetooth_snoop::SnoopMarker;
+use fidl_fuchsia_device::NameProviderMarker;
+use fidl_fuchsia_logger::LogSinkMarker;
+use fidl_fuchsia_stash::SecureStoreMarker;
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, ScopedInstance,
+};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use futures::FutureExt;
+use realmbuilder_mock_helpers::stateless_mock_responder;
 use {
-    crate::emulator::EMULATOR_ROOT_DRIVER_URL,
-    anyhow::{format_err, Error},
-    fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_bredr as fbredr,
-    fidl_fuchsia_bluetooth_gatt as fbgatt, fidl_fuchsia_bluetooth_le as fble,
-    fidl_fuchsia_bluetooth_snoop::SnoopMarker,
-    fidl_fuchsia_bluetooth_sys as fbsys,
-    fidl_fuchsia_device::NameProviderMarker,
+    fidl_fuchsia_bluetooth_bredr as fbredr, fidl_fuchsia_bluetooth_gatt as fbgatt,
+    fidl_fuchsia_bluetooth_le as fble, fidl_fuchsia_bluetooth_sys as fbsys,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger::LogSinkMarker,
-    fidl_fuchsia_stash::SecureStoreMarker,
-    fuchsia_component_test::{
-        Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, ScopedInstance,
-    },
-    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    futures::FutureExt,
-    realmbuilder_mock_helpers::stateless_mock_responder,
 };
 
 pub const SHARED_STATE_INDEX: &str = "BT-CORE-REALM";
@@ -94,9 +93,10 @@ impl CoreRealm {
                 constants::mock_snoop::MONIKER,
                 |handles| {
                     stateless_mock_responder::<SnoopMarker, _>(handles, |req| {
-                        let (_, _, responder) =
+                        // just drop the request, should be sufficient
+                        let _ =
                             req.into_start().ok_or(format_err!("got unexpected SnoopRequest"))?;
-                        Ok(responder.send(&fbt::Status { error: None })?)
+                        Ok(())
                     })
                     .boxed()
                 },

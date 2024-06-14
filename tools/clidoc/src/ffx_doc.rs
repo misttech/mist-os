@@ -5,12 +5,10 @@
 use crate::{md_path, HEADER};
 use anyhow::{bail, Context, Result};
 use ffx_command::{CliArgsInfo, ErrorCodeInfo, FlagInfo, SubCommandInfo};
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    path::PathBuf,
-    process::Command,
-};
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::PathBuf;
+use std::process::Command;
 use tracing::debug;
 
 pub(crate) fn write_formatted_output_for_ffx(

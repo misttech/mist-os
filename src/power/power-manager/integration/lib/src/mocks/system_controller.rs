@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io::DirectoryMarker,
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::LocalComponentHandles,
-    futures::{channel::mpsc, lock::Mutex, StreamExt, TryStreamExt},
-    std::sync::Arc,
-    tracing::*,
-};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io::DirectoryMarker;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::LocalComponentHandles;
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::{StreamExt, TryStreamExt};
+use std::sync::Arc;
+use tracing::*;
+use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 /// Mocks the fuchsia.sys2.SystemController service to be used in integration tests.
 pub struct MockSystemControllerService {
@@ -95,7 +95,8 @@ impl MockSystemControllerService {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_component::client::connect_to_protocol_at_dir_svc};
+    use super::*;
+    use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 
     #[fuchsia::test]
     async fn test_shutdown() {

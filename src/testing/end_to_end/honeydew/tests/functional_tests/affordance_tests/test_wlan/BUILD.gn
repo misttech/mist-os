@@ -29,29 +29,42 @@ if (is_host) {
     test_data_deps =
         [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
   }
+}
 
-  # Group containing all of the WLAN affordance functional test cases.
-  group("tests") {
-    testonly = true
-    public_deps = [
-      ":wlan_policy_test_sl4f($host_toolchain)",
-      ":wlan_test_sl4f($host_toolchain)",
-    ]
-  }
+# Package groups for WLAN.
+group("wlan_packages") {
+  testonly = true
+  public_deps = [ "../../../../:sl4f_packages" ]
+}
 
-  # Test groups for WLAN.
-  group("core_vim3_stable_sl4f_tests") {
-    testonly = true
-    public_deps = []
-  }
+group("test_wlan_policy_sl4f") {
+  testonly = true
+  public_deps = [
+    ":wlan_policy_test_sl4f($host_toolchain)",
+    "../../../../:sl4f_packages",
+  ]
+}
 
-  group("core_vim3_unstable_sl4f_tests") {
-    testonly = true
-    public_deps = [
-      ":wlan_policy_test_sl4f($host_toolchain)",
-      ":wlan_test_sl4f($host_toolchain)",
-    ]
-  }
+group("test_wlan_sl4f") {
+  testonly = true
+  public_deps = [
+    ":wlan_test_sl4f($host_toolchain)",
+    "../../../../:sl4f_packages",
+  ]
+}
+
+# Test groups for WLAN.
+group("core_vim3_stable_sl4f_tests") {
+  testonly = true
+  public_deps = []
+}
+
+group("core_vim3_unstable_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    ":test_wlan_policy_sl4f",
+    ":test_wlan_sl4f",
+  ]
 }
 
 group("core_vim3_staging_sl4f_tests") {
@@ -62,8 +75,11 @@ group("core_vim3_staging_sl4f_tests") {
   ]
 }
 
-# Package groups for WLAN.
-group("wlan_packages") {
+# Group containing all of the WLAN affordance functional test cases and its dependencies.
+group("tests") {
   testonly = true
-  public_deps = [ "../../../../:sl4f_packages" ]
+  public_deps = [
+    ":test_wlan_policy_sl4f",
+    ":test_wlan_sl4f",
+  ]
 }

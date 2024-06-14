@@ -16,6 +16,7 @@ fidl("fuchsia.memory.attribution") {
     "//examples/components/runner/colocated/*",
     "//src/developer/memory/*",
     "//src/performance/memory/*",
+    "//src/starnix/kernel/*",
     "//src/starnix/runner/*",
     "//src/starnix/tests/memory_attribution/*",
     "//src/sys/component_manager/*",

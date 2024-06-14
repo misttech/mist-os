@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    futures::prelude::*,
-    test_runners_lib::elf,
-    test_runners_lib::{elf::SuiteServer, errors::*},
-    thiserror::Error,
-    tracing::{info, warn},
-};
+use fuchsia_component::server::ServiceFs;
+use futures::prelude::*;
+use test_runners_lib::elf;
+use test_runners_lib::elf::SuiteServer;
+use test_runners_lib::errors::*;
+use thiserror::Error;
+use tracing::{info, warn};
+use {fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync};
 
 pub fn add_runner_service<F, U, S>(
     get_test_server: F,

@@ -4,15 +4,12 @@
 
 use anyhow::{anyhow, Result};
 use argh::{ArgsInfo, FromArgs};
-use async_fs as afs;
 use async_trait::async_trait;
 use crossterm::tty::IsTty;
 use errors::ffx_bail;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::Proxy;
 use fidl_codec::library as lib;
-use fidl_fuchsia_developer_remotecontrol as rc;
-use fuchsia_async as fasync;
 use futures::channel::oneshot::channel as oneshot;
 use futures::future::{select, Either, FutureExt};
 use futures::io::AllowStdIo;
@@ -24,6 +21,7 @@ use std::io::{self, stdin, BufRead as _, BufReader};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use vfs::directory::helper::DirectlyMutable;
+use {async_fs as afs, fidl_fuchsia_developer_remotecontrol as rc, fuchsia_async as fasync};
 
 mod analytics;
 mod cf_fs;
@@ -82,32 +80,29 @@ pub async fn exec_playground(
     let Ok(fuchsia_dir) = std::env::var("FUCHSIA_DIR") else {
         ffx_bail!("FUCHSIA_DIR environment variable is not set")
     };
-    let mut fuchsia_dir = PathBuf::from(fuchsia_dir);
-    fuchsia_dir.push(".fx-build-dir");
+    let fuchsia_dir = fuchsia_dir.trim();
+    let build_dir_file: PathBuf = [fuchsia_dir, ".fx-build-dir"].iter().collect();
 
-    let root = match std::fs::read_to_string(&fuchsia_dir) {
+    let root = match std::fs::read_to_string(&build_dir_file) {
         Ok(root) => root,
-        Err(e) => ffx_bail!("Could not read {}: {e}", fuchsia_dir.display()),
+        Err(e) => ffx_bail!("Could not read {}: {e}", build_dir_file.display()),
     };
+    let root = root.trim();
 
-    let root = PathBuf::from(root.trim());
-    let mut path = root.clone();
-    path.push("all_fidl_json.txt");
+    let all_fidl_json: PathBuf = [fuchsia_dir, root, "all_fidl_json.txt"].iter().collect();
 
-    let file = match File::open(&path) {
+    let file = match File::open(&all_fidl_json) {
         Ok(file) => file,
-        Err(e) => ffx_bail!("Could not open {}: {e}", path.display()),
+        Err(e) => ffx_bail!("Could not open {}: {e}", all_fidl_json.display()),
     };
 
     for line in BufReader::new(file).lines() {
         let line = match line {
             Ok(line) => line,
-            Err(e) => ffx_bail!("Error reading {}, {e}", path.display()),
+            Err(e) => ffx_bail!("Error reading {}, {e}", all_fidl_json.display()),
         };
         let line = line.trim();
-        let path_piece = PathBuf::from(line);
-        let mut path = root.clone();
-        path.push(path_piece);
+        let path: PathBuf = [fuchsia_dir, root, line].iter().collect();
         let json_file = match std::fs::read_to_string(&path) {
             Ok(json_file) => json_file,
             Err(e) => {

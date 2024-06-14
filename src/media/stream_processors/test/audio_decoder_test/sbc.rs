@@ -5,7 +5,8 @@
 use anyhow::{format_err, Result};
 use bitfield::bitfield;
 use fidl_fuchsia_media::*;
-use std::{fs, io, path::Path};
+use std::path::Path;
+use std::{fs, io};
 use stream_processor_test::*;
 
 /// Represents an SBC elementary stream.

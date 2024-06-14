@@ -6,17 +6,17 @@ mod command;
 mod deprovision;
 mod provision;
 
-use crate::{
-    command::handle_command_request, deprovision::handle_deprovision_request,
-    provision::handle_provision_request,
-};
+use crate::command::handle_command_request;
+use crate::deprovision::handle_deprovision_request;
+use crate::provision::handle_provision_request;
 use anyhow::Error;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_tpm::{
     CommandRequestStream, DeprovisionRequestStream, ProvisionRequestStream, TpmDeviceMarker,
     TpmDeviceProxy,
 };
-use futures::{lock::Mutex, prelude::*};
+use futures::lock::Mutex;
+use futures::prelude::*;
 use std::sync::Arc;
 use tracing;
 

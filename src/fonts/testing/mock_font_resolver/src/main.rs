@@ -2,22 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg::{FontResolverRequest, FontResolverRequestStream},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_url::AbsolutePackageUrl,
-    fuchsia_zircon::Status,
-    futures::{StreamExt, TryStreamExt},
-    tracing::*,
-    vfs::{
-        directory::entry_container::Directory, execution_scope::ExecutionScope,
-        file::vmo::read_only, pseudo_directory,
-    },
-};
+use anyhow::Error;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_pkg::{FontResolverRequest, FontResolverRequestStream};
+use fuchsia_component::server::ServiceFs;
+use fuchsia_url::AbsolutePackageUrl;
+use fuchsia_zircon::Status;
+use futures::{StreamExt, TryStreamExt};
+use tracing::*;
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::read_only;
+use vfs::pseudo_directory;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[fuchsia::main(logging_tags = ["mock_font_resolver"])]
 async fn main() -> Result<(), Error> {

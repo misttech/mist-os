@@ -2,32 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    collections::{HashMap, HashSet},
-    num::NonZeroU64,
-    pin::Pin,
-};
+use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU64;
 
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
-use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
-use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_name as fnet_name;
-use fuchsia_zircon as zx;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
+    fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_name as fnet_name, fuchsia_zircon as zx,
+};
 
 use anyhow::Context as _;
-use async_utils::{
-    hanging_get::client::HangingGetStream,
-    stream::{StreamMap, Tagged},
-};
+use async_utils::hanging_get::client::HangingGetStream;
+use async_utils::stream::{StreamMap, Tagged};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
-use futures::{
-    future::TryFutureExt as _,
-    stream::{BoxStream, Stream, TryStreamExt as _},
-};
+use futures::future::TryFutureExt as _;
+use futures::stream::{Stream, TryStreamExt as _};
+use tracing::warn;
 
-use crate::errors;
-use crate::{dns, DnsServerWatchers};
+use crate::{dns, errors, DnsServerWatchers};
 
 // TODO(https://fxbug.dev/329099228): Switch to using DUID-LLT and persisting it to disk.
 pub(super) fn duid(mac: fnet_ext::MacAddress) -> fnet_dhcpv6::Duid {
@@ -321,19 +313,26 @@ pub(super) async fn stop_client(
     let source = DnsServersUpdateSource::Dhcpv6 { interface_id: interface_id.get() };
 
     // Dropping all fuchsia.net.dhcpv6/Client proxies will stop the DHCPv6 client.
-    let _: Pin<Box<BoxStream<'_, _>>> = watchers.remove(&source).unwrap_or_else(|| {
-        unreachable!(
-            "DNS server watchers must contain key {:?}; interface_id={}",
+    if let None = watchers.remove(&source) {
+        // It's surprising that the DNS Watcher for the interface doesn't exist
+        // when the DHCP client is trying to be stopped, but this can happen
+        // when multiple futures try to stop the client at the same time.
+        warn!(
+            "DNS Watcher for key not present; multiple futures stopped DHCPv6 \
+            client for key {:?}; interface_id={}",
             source, interface_id
-        )
-    });
-    let _: Pin<Box<InterfaceIdTaggedPrefixesStream>> =
-        prefixes_streams.remove(&interface_id).unwrap_or_else(|| {
-            unreachable!(
-                "DHCPv6 prefixes streams must hold stream for interface_id={}",
-                interface_id
-            )
-        });
+        );
+    }
+    if let None = prefixes_streams.remove(&interface_id) {
+        // It's surprising that the Prefix Stream for the interface doesn't exist
+        // when the DHCP client is trying to be stopped, but this can happen
+        // when multiple futures try to stop the client at the same time.
+        warn!(
+            "Prefix Stream for key not present; multiple futures stopped DHCPv6 \
+            client for key {:?}; interface_id={}",
+            source, interface_id
+        );
+    }
 
     dns::update_servers(lookup_admin, dns_servers, source, vec![]).await
 }
@@ -363,17 +362,14 @@ impl PrefixProviderHandler {
 
 #[cfg(test)]
 mod tests {
-    use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-    use fuchsia_zircon as zx;
+    use {fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_zircon as zx};
 
     use const_unwrap::const_unwrap_option;
     use net_declare::{fidl_socket_addr_v6, net_subnet_v6};
     use test_case::test_case;
 
-    use crate::{
-        interface::{generate_identifier, InterfaceNamingIdentifier, ProvisioningAction},
-        DeviceClass, HostInterfaceState, InterfaceConfigState, InterfaceState,
-    };
+    use crate::interface::{generate_identifier, InterfaceNamingIdentifier, ProvisioningAction};
+    use crate::{DeviceClass, HostInterfaceState, InterfaceConfigState, InterfaceState};
 
     use super::*;
 

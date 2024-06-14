@@ -104,9 +104,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [list of labels] The packages installed on the bootfs partition of the
 #     generated ZBI as meta.fars and content-id'd blobs.
 #
-#   system_image_deps (optional)
-#     [list of labels] The objects installed in the system image.
-#
 #   additional_boot_args (default: [])
 #     [list of strings] List of arguments to add to /boot/config/additional_boot_args.
 #     These arguments come after synthesized arguments to configure blobfs.
@@ -296,7 +293,6 @@ template("assembled_system") {
                              "include_config_data",
                              "bootfs_package_labels",
                              "bootfs_labels",
-                             "system_image_deps",
                              "cmdline_deps",
                              "cmdline",
                              "fshost_config",
@@ -662,7 +658,6 @@ template("assembled_system") {
                                  "kernel_image_name",
                                  "bootfs_package_labels",
                                  "bootfs_labels",
-                                 "system_image_deps",
                                  "cmdline_deps",
                                  "cmdline",
                                ])

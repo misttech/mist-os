@@ -5,12 +5,11 @@
 use crate::helpers::*;
 use anyhow::{anyhow, Context as _, Error};
 use fidl::endpoints::{create_proxy, Proxy};
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_data as fdata;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_test as ftest;
-use fuchsia_zircon as zx;
 use std::collections::HashMap;
+use {
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    fidl_fuchsia_test as ftest, fuchsia_zircon as zx,
+};
 
 struct LtpTestDefinition {
     name: String,

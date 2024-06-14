@@ -2,37 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        cache::{
-            BasePackageIndex, BlobFetcher, CacheError::*, MerkleForError, MerkleForError::*,
-            ToResolveError, ToResolveStatus as _,
-        },
-        eager_package_manager::EagerPackageManager,
-        repository_manager::RepositoryManager,
-        repository_manager::{GetPackageError, GetPackageError::*, GetPackageHashError},
-        rewrite_manager::RewriteManager,
-    },
-    anyhow::{anyhow, Context as _, Error},
-    async_lock::RwLock as AsyncRwLock,
-    async_trait::async_trait,
-    cobalt_sw_delivery_registry as metrics,
-    fidl::endpoints::ServerEnd,
-    fidl_contrib::protocol_connector::ProtocolSender,
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::{self as fpkg, PackageResolverRequest, PackageResolverRequestStream},
-    fidl_fuchsia_pkg_ext::{self as pkg, BlobId},
-    fuchsia_cobalt_builders::MetricEventExt as _,
-    fuchsia_pkg::PackageDirectory,
-    fuchsia_trace as ftrace,
-    fuchsia_url::{AbsolutePackageUrl, ParseError},
-    fuchsia_zircon::Status,
-    futures::{future::Future, stream::TryStreamExt as _},
-    std::{sync::Arc, time::Instant},
-    system_image::CachePackages,
-    tracing::{error, info, warn},
+use crate::cache::CacheError::*;
+use crate::cache::MerkleForError::*;
+use crate::cache::{
+    BasePackageIndex, BlobFetcher, MerkleForError, ToResolveError, ToResolveStatus as _,
 };
+use crate::eager_package_manager::EagerPackageManager;
+use crate::repository_manager::GetPackageError::*;
+use crate::repository_manager::{GetPackageError, GetPackageHashError, RepositoryManager};
+use crate::rewrite_manager::RewriteManager;
+use anyhow::{anyhow, Context as _, Error};
+use async_lock::RwLock as AsyncRwLock;
+use async_trait::async_trait;
+use fidl::endpoints::ServerEnd;
+use fidl_contrib::protocol_connector::ProtocolSender;
+use fidl_fuchsia_metrics::MetricEvent;
+use fidl_fuchsia_pkg::{self as fpkg, PackageResolverRequest, PackageResolverRequestStream};
+use fidl_fuchsia_pkg_ext::{self as pkg, BlobId};
+use fuchsia_cobalt_builders::MetricEventExt as _;
+use fuchsia_pkg::PackageDirectory;
+use fuchsia_url::{AbsolutePackageUrl, ParseError};
+use fuchsia_zircon::Status;
+use futures::future::Future;
+use futures::stream::TryStreamExt as _;
+use std::sync::Arc;
+use std::time::Instant;
+use system_image::CachePackages;
+use tracing::{error, info, warn};
+use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_trace as ftrace};
 
 mod inspect;
 pub use inspect::ResolverService as ResolverServiceInspectState;
@@ -861,7 +858,8 @@ fn resolve_result_to_resolve_status_code(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_url::PinnedAbsolutePackageUrl};
+    use super::*;
+    use fuchsia_url::PinnedAbsolutePackageUrl;
 
     #[test]
     fn test_hash_from_cache_packages_manifest() {

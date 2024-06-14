@@ -8,15 +8,11 @@ use super::ScopeRef;
 use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
 use futures::FutureExt;
-use std::{
-    fmt,
-    future::Future,
-    mem,
-    sync::{atomic::Ordering, Arc},
-    thread,
-    time::Duration,
-    usize,
-};
+use std::future::Future;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use std::time::Duration;
+use std::{fmt, mem, thread, usize};
 
 /// A multi-threaded port-based executor for Fuchsia OS. Requires that tasks scheduled on it
 /// implement `Send` so they can be load balanced between worker threads.
@@ -183,13 +179,11 @@ impl Drop for SendExecutor {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::SendExecutor,
-        crate::{Task, Timer},
-        fuchsia_zircon::DurationNum,
-        futures::channel::oneshot,
-        std::sync::{Arc, Condvar, Mutex},
-    };
+    use super::SendExecutor;
+    use crate::{Task, Timer};
+    use fuchsia_zircon::DurationNum;
+    use futures::channel::oneshot;
+    use std::sync::{Arc, Condvar, Mutex};
 
     #[test]
     fn test_stalled_triggers_wake_up() {

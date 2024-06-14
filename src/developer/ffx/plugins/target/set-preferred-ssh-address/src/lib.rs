@@ -6,8 +6,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ffx_target_set_preferred_ssh_address_args::SetPreferredSshAddressCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_ffx as ffx;
-use fidl_fuchsia_net as fnet;
+use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_net as fnet};
 
 #[derive(FfxTool)]
 pub struct SetPreferredSshAddressTool {

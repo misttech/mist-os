@@ -2,26 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::model::{
-        actions::{
-            Action, ActionKey, ActionsManager, DiscoverAction, ShutdownAction, ShutdownType,
-        },
-        component::instance::InstanceState,
-        component::ComponentInstance,
-    },
-    ::routing::{
-        bedrock::structured_dict::ComponentInput, component_instance::ExtendedInstanceInterface,
-    },
-    async_trait::async_trait,
-    errors::{ActionError, DestroyActionError},
-    futures::{future::join_all, Future},
-    hooks::EventPayload,
-    std::{
-        pin::{pin, Pin},
-        sync::Arc,
-    },
+use crate::model::actions::{
+    Action, ActionKey, ActionsManager, DiscoverAction, ShutdownAction, ShutdownType,
 };
+use crate::model::component::instance::InstanceState;
+use crate::model::component::ComponentInstance;
+use ::routing::bedrock::structured_dict::ComponentInput;
+use ::routing::component_instance::ExtendedInstanceInterface;
+use async_trait::async_trait;
+use errors::{ActionError, DestroyActionError};
+use futures::future::join_all;
+use futures::Future;
+use hooks::EventPayload;
+use std::pin::{pin, Pin};
+use std::sync::Arc;
 
 /// Destroy this component instance, including all instances nested in its component.
 pub struct DestroyAction {}
@@ -152,27 +146,22 @@ fn ok_or_first_error(results: Vec<Result<(), ActionError>>) -> Result<(), Action
 
 #[cfg(test)]
 pub mod tests {
-    use {
-        super::*,
-        crate::model::{
-            actions::test_utils::{
-                is_child_deleted, is_destroyed, MockAction as TestUtilsMockAction,
-            },
-            component::StartReason,
-            testing::{
-                test_helpers::{
-                    component_decl_with_test_runner, execution_is_shut_down, get_incarnation_id,
-                    has_child, ActionsTest,
-                },
-                test_hook::Lifecycle,
-            },
-        },
-        async_utils::PollExt,
-        cm_rust_testing::*,
-        fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::{channel::mpsc, StreamExt},
-        moniker::{ChildName, Moniker},
+    use super::*;
+    use crate::model::actions::test_utils::{
+        is_child_deleted, is_destroyed, MockAction as TestUtilsMockAction,
     };
+    use crate::model::component::StartReason;
+    use crate::model::testing::test_helpers::{
+        component_decl_with_test_runner, execution_is_shut_down, get_incarnation_id, has_child,
+        ActionsTest,
+    };
+    use crate::model::testing::test_hook::Lifecycle;
+    use async_utils::PollExt;
+    use cm_rust_testing::*;
+    use futures::channel::mpsc;
+    use futures::StreamExt;
+    use moniker::{ChildName, Moniker};
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fuchsia::test]
     async fn destroy_one_component() {

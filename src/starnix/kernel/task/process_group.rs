@@ -2,22 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mutable_state::{ordered_state_accessor, state_implementation},
-    signals::{send_standard_signal, SignalInfo},
-    task::{Session, ThreadGroup},
-};
+use crate::mutable_state::{ordered_state_accessor, state_implementation};
+use crate::signals::SignalInfo;
+use crate::task::{Session, ThreadGroup};
 use macro_rules_attribute::apply;
 use starnix_sync::{LockBefore, Locked, OrderedRwLock, ProcessGroupState};
-use starnix_uapi::{
-    ownership::TempRef,
-    pid_t,
-    signals::{Signal, UncheckedSignal, SIGCONT, SIGHUP},
-};
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Weak},
-};
+use starnix_uapi::pid_t;
+use starnix_uapi::signals::{Signal, SIGCONT, SIGHUP};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Weak};
 
 #[derive(Debug)]
 pub struct ProcessGroupMutableState {
@@ -157,15 +150,8 @@ impl ProcessGroup {
 
     fn send_signals_to_thread_groups(signals: &[Signal], thread_groups: Vec<Arc<ThreadGroup>>) {
         for signal in signals.iter() {
-            let unchecked_signal: UncheckedSignal = (*signal).into();
-            let tasks = thread_groups
-                .iter()
-                .flat_map(|tg| {
-                    tg.read().get_signal_target(unchecked_signal).map(TempRef::into_static)
-                })
-                .collect::<Vec<_>>();
-            for task in tasks {
-                send_standard_signal(&task, SignalInfo::default(*signal));
+            for thread_group in &thread_groups {
+                thread_group.write().send_signal(SignalInfo::default(*signal));
             }
         }
     }

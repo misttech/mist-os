@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root};
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
 use {
-    anyhow::Error,
     fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::{
-        client::{connect_to_protocol, connect_to_protocol_at_dir_root},
-        server::ServiceFs,
-    },
-    futures::{StreamExt, TryStreamExt},
 };
 
 async fn run_trigger_service(mut stream: ftest::TriggerRequestStream) {

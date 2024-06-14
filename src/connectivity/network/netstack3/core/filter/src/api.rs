@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::info;
 use net_types::ip::{Ipv4, Ipv6};
 use netstack3_base::{ContextPair, Inspector};
-use tracing::info;
 
 use crate::{
     FilterBindingsTypes, FilterContext, FilterIpContext, Routines, ValidRoutines, ValidationError,

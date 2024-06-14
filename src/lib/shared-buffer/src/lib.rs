@@ -915,8 +915,7 @@ unsafe impl<'a> Sync for SharedBufferSliceMut<'a> {}
 
 #[cfg(test)]
 mod tests {
-    use core::mem;
-    use core::ptr;
+    use core::{mem, ptr};
 
     use super::{overlap, SharedBuffer};
 

@@ -1,33 +1,30 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::event::{self, Handler};
+use crate::netdevice_helper;
+use crate::wlancfg_helper::{start_ap_and_wait_for_confirmation, NetworkConfigBuilder};
+use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
+use fuchsia_async::{DurationExt, Time, TimeoutExt, Timer};
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at};
+use fuchsia_zircon::prelude::*;
+use fuchsia_zircon::{self as zx};
+use futures::channel::oneshot;
+use futures::{FutureExt, StreamExt};
+use ieee80211::{MacAddr, MacAddrBytes};
+use realm_client::{extend_namespace, InstalledNamespace};
+use std::fmt::Display;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use test_realm_helpers::tracing::Tracing;
+use tracing::{debug, info, warn};
+use wlan_common::test_utils::ExpectWithin;
+use wlantap_client::Wlantap;
 use {
-    crate::{
-        event::{self, Handler},
-        netdevice_helper,
-        wlancfg_helper::{start_ap_and_wait_for_confirmation, NetworkConfigBuilder},
-    },
-    fidl::endpoints::Proxy,
-    fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_driver_test as fidl_driver_test, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap as wlantap, fidl_test_wlan_realm as fidl_realm,
-    fuchsia_async::{DurationExt, Time, TimeoutExt, Timer},
-    fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at},
-    fuchsia_zircon::{self as zx, prelude::*},
-    futures::{channel::oneshot, FutureExt, StreamExt},
-    ieee80211::{MacAddr, MacAddrBytes},
-    realm_client::{extend_namespace, InstalledNamespace},
-    std::{
-        fmt::Display,
-        future::Future,
-        pin::Pin,
-        sync::Arc,
-        task::{Context, Poll},
-    },
-    test_realm_helpers::tracing::Tracing,
-    tracing::{debug, info, warn},
-    wlan_common::test_utils::ExpectWithin,
-    wlantap_client::Wlantap,
 };
 
 // Struct that allows a test suite to interact with the test realm.

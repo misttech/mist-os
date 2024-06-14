@@ -8,6 +8,7 @@ source_set("ldso") {
   deps = [
     ":dlstart",
     "//zircon/system/ulib/ldmsg",
+    "//zircon/system/ulib/processargs",
     "//zircon/third_party/ulib/musl:musl_internal",
   ]
   sources = [
@@ -54,7 +55,7 @@ source_set("ldso") {
 
 source_set("dlstart") {
   visibility = [ ":*" ]
-  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [ "dlstart.c" ]
   configs += [ "//build/config/sanitizers:no_sanitizers" ]
+  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
 }

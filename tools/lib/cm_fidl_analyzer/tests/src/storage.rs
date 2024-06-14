@@ -3,21 +3,23 @@
 // found in the LICENSE file.
 
 mod tests {
+    use crate::routing::RoutingTestBuilderForAnalyzer;
+    use cm_fidl_analyzer::route::VerifyRouteResult;
+    use cm_rust::{CapabilityDecl, CapabilityTypeName, OfferSource, StorageDirectorySource};
+    use cm_rust_testing::*;
+    use component_id_index::InstanceId;
+    use moniker::Moniker;
+    use routing::mapper::RouteSegment;
+    use routing::RegistrationDecl;
+    use routing_test_helpers::component_id_index::make_index_file;
+    use routing_test_helpers::storage::CommonStorageTest;
+    use routing_test_helpers::{
+        CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
+    };
+    use std::collections::HashSet;
     use {
-        crate::routing::RoutingTestBuilderForAnalyzer,
-        cm_fidl_analyzer::route::VerifyRouteResult,
-        cm_rust::{CapabilityDecl, CapabilityTypeName, OfferSource, StorageDirectorySource},
-        cm_rust_testing::*,
-        component_id_index::InstanceId,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
         fuchsia_zircon_status as zx_status,
-        moniker::Moniker,
-        routing::{mapper::RouteSegment, RegistrationDecl},
-        routing_test_helpers::{
-            component_id_index::make_index_file, storage::CommonStorageTest, CheckUse,
-            ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
-        },
-        std::collections::HashSet,
     };
 
     #[fuchsia::test]

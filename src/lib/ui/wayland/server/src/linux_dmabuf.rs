@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::buffer::Buffer;
+use crate::client::Client;
+use crate::object::{NewObjectExt, ObjectRef, RequestReceiver};
+use anyhow::Error;
+use fidl_fuchsia_math::Size;
+use fuchsia_zircon::{EventPair, Handle, HandleBased};
+use std::rc::Rc;
+use zwp_linux_dmabuf_v1_server_protocol::{
+    ZwpLinuxBufferParamsV1, ZwpLinuxBufferParamsV1Request, ZwpLinuxDmabufV1, ZwpLinuxDmabufV1Event,
+    ZwpLinuxDmabufV1Request,
+};
 use {
-    crate::buffer::Buffer,
-    crate::client::Client,
-    crate::object::{NewObjectExt, ObjectRef, RequestReceiver},
-    anyhow::Error,
-    fidl_fuchsia_math::Size,
     fidl_fuchsia_ui_composition as composition, fuchsia_wayland_core as wl, fuchsia_zircon as zx,
-    fuchsia_zircon::{EventPair, Handle, HandleBased},
-    std::rc::Rc,
-    zwp_linux_dmabuf_v1_server_protocol::{
-        ZwpLinuxBufferParamsV1, ZwpLinuxBufferParamsV1Request, ZwpLinuxDmabufV1,
-        ZwpLinuxDmabufV1Event, ZwpLinuxDmabufV1Request,
-    },
 };
 
 const DRM_FORMAT_ARGB8888: u32 = 0x34325241;

@@ -7,7 +7,8 @@ use async_trait::async_trait;
 use futures::channel::oneshot;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{fmt::Debug, str::FromStr};
+use std::fmt::Debug;
+use std::str::FromStr;
 use thiserror::Error;
 
 use crate::server::constants::{COMMAND_DELIMITER, COMMAND_SIZE};

@@ -32,14 +32,10 @@
 
 use core::hash::Hasher;
 use fuchsia_zircon as zx;
-use std::{
-    hash::Hash,
-    ops::Deref,
-    sync::{
-        atomic::{fence, AtomicUsize, Ordering},
-        Arc, Weak,
-    },
-};
+use std::hash::Hash;
+use std::ops::Deref;
+use std::sync::atomic::{fence, AtomicUsize, Ordering};
+use std::sync::{Arc, Weak};
 
 /// Macro to build a specific Releasable and OwnedRef.
 #[macro_export]
@@ -729,8 +725,7 @@ macro_rules! async_release_after {
     }};
 }
 
-pub use release_after;
-pub use release_on_error;
+pub use {release_after, release_on_error};
 
 #[cfg(test)]
 mod test {

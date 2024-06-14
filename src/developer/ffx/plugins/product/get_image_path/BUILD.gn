@@ -32,5 +32,6 @@ ffx_plugin("ffx_product_get_image_path") {
     "//src/lib/assembly/partitions_config",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
   ]
 }

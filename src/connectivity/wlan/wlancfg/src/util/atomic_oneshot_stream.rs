@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_sync::RwLock,
-    futures::{
-        stream::{iter, FusedStream},
-        StreamExt,
-    },
-    std::{fmt::Debug, pin::Pin, sync::Arc},
-};
+use fuchsia_sync::RwLock;
+use futures::stream::{iter, FusedStream};
+use futures::StreamExt;
+use std::fmt::Debug;
+use std::pin::Pin;
+use std::sync::Arc;
 
 #[derive(Debug, PartialEq)]
 enum StreamStatus {
@@ -91,13 +89,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        futures::{channel::mpsc, future, select, stream::FuturesUnordered, task::Poll, FutureExt},
-        std::pin::pin,
-        wlan_common::assert_variant,
-    };
+    use super::*;
+    use fuchsia_async as fasync;
+    use futures::channel::mpsc;
+    use futures::stream::FuturesUnordered;
+    use futures::task::Poll;
+    use futures::{future, select, FutureExt};
+    use std::pin::pin;
+    use wlan_common::assert_variant;
 
     #[fuchsia::test]
     fn test_atomic_stream() {

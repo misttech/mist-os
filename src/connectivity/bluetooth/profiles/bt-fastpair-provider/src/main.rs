@@ -5,7 +5,8 @@
 use anyhow::Error;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
-use futures::{channel::mpsc, future};
+use futures::channel::mpsc;
+use futures::future;
 use std::pin::pin;
 use tracing::{debug, info, warn};
 

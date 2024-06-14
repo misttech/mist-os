@@ -8,17 +8,17 @@ use crate::deps::{self, DatagramInfo, Instant as _, Socket as _};
 use crate::parse::{OptionCodeMap, OptionRequested};
 use anyhow::Context as _;
 use dhcp_protocol::{AtLeast, AtMostBytes, CLIENT_PORT, SERVER_PORT};
-use futures::{channel::mpsc, select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
-use net_types::{ethernet::Mac, SpecifiedAddr, Witness as _};
+use futures::channel::mpsc;
+use futures::{select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
+use net_types::ethernet::Mac;
+use net_types::{SpecifiedAddr, Witness as _};
 use rand::Rng as _;
 
-use std::{
-    fmt::{Debug, Display},
-    net::Ipv4Addr,
-    num::{NonZeroU32, NonZeroU64},
-    pin::pin,
-    time::Duration,
-};
+use std::fmt::{Debug, Display};
+use std::net::Ipv4Addr;
+use std::num::{NonZeroU32, NonZeroU64};
+use std::pin::pin;
+use std::time::Duration;
 
 /// Unexpected, non-recoverable errors encountered by the DHCP client.
 #[derive(thiserror::Error, Debug)]
@@ -1805,7 +1805,8 @@ mod test {
     use fuchsia_async as fasync;
     use futures::{join, Future};
     use itertools::Itertools as _;
-    use net_declare::{net::prefix_length_v4, net_mac, std_ip_v4};
+    use net_declare::net::prefix_length_v4;
+    use net_declare::{net_mac, std_ip_v4};
     use net_types::ip::{Ipv4, PrefixLength};
     use std::cell::RefCell;
     use std::rc::Rc;

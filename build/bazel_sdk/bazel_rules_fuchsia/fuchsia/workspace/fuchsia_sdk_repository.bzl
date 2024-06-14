@@ -4,8 +4,12 @@
 
 """Defines a WORKSPACE rule for loading a version of the Fuchsia IDK."""
 
-load("//fuchsia/workspace:utils.bzl", "workspace_path")
-load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "generate_sdk_constants", "resolve_repository_labels", "sdk_id_from_manifests", "serialize")
+load("//fuchsia/workspace:utils.bzl", "symlink_or_copy", "workspace_path")
+load(
+    "//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl",
+    "generate_sdk_repository",
+    "resolve_repository_labels",
+)
 
 # Environment variable used to set a local Fuchsia Platform tree build output
 # directory. If this variable is set, it should point to
@@ -61,58 +65,67 @@ def _instantiate_local_idk(ctx, manifests):
         fail("Cannot find IDK in: %s\n" % local_idk)
     manifests.append({"root": "%s/." % local_idk, "manifest": "meta/manifest.json"})
 
-def _merge_rules_fuchsia(ctx):
-    rules_fuchsia_root = ctx.path(Label("//:BUILD.bazel")).dirname
-    ctx.symlink(rules_fuchsia_root.get_child("fuchsia"), "fuchsia")
+def _get_starlark_runtime_for(ctx, copy_content_strategy):
+    """Return a runtime value usable with generate_sdk_build_rules.bzl functions.
 
-    # LINT.IfChange
-    # Link the common directory so that we can later use it as its own repo.
-    ctx.symlink(rules_fuchsia_root.get_child("common"), "common")
-    # LINT.ThenChange(rules_fuchsia_deps.bzl)
+    See the technical note at the start of said script describing what the result
+    should look like.
 
-    rules_fuchsia_build = ctx.read(rules_fuchsia_root.get_child("BUILD.bazel")).split("\n")
-    start, end = [
-        i
-        for i, s in enumerate(rules_fuchsia_build)
-        if "__BEGIN_FUCHSIA_SDK_INCLUDE__" in s or "__END_FUCHSIA_SDK_INCLUDE__" in s
-    ]
-    rules_fuchsia_build_fragment = "\n".join(rules_fuchsia_build[start:end + 1])
-    ctx.template(
-        "BUILD.bazel",
-        "BUILD.bazel",
-        substitutions = {
-            "{{__FUCHSIA_SDK_INCLUDE__}}": rules_fuchsia_build_fragment,
-        },
-        executable = False,
-    )
+    Args:
+       ctx: The current repository_ctx value.
+       copy_content_strategy: Argument to symlink_or_copy()
+    Returns:
+       A new struct that can be used as the first argument to most
+       functions provided by generate_sdk_build_rules.bzl.
+    """
 
-def _export_all_files(ctx):
-    result = ctx.execute(["find", "-L", ".", "-type", "f", "-name", "BUILD.bazel"])
-    if result.return_code:
-        fail("Failed to enumerate all subpackages in @fuchsia_sdk")
+    def _workspace_path(path):
+        return ctx.path(workspace_path(ctx, path))
 
-    # LINT.IfChange
-    EXPOSED_DEP = "_EXPORT_SUBPACKAGE_FILEGROUP"
-    # LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/workspace/sdk_templates/generate_sdk_build_rules.bzl)
+    def _label_to_path(label):
+        return ctx.path(Label(label))
 
-    # Get a list of all BUILD.bazel files.
-    all_build_files = result.stdout.strip().split("\n")
+    def _file_copier(files_to_copy):
+        symlink_or_copy(ctx, copy_content_strategy, files_to_copy)
 
-    # Filter only the ones that expose `:_EXPORT_SUBPACKAGE_FILEGROUP`.
-    # Transform "./<pkg>/BUILD.bazel" to "//<pkg>:_EXPORT_SUBPACKAGE_FILEGROUP`.
-    exported_targets = [
-        "//%s:%s" % ("/".join(build_file.split("/")[1:-1]), EXPOSED_DEP)
-        for build_file in all_build_files
-        if EXPOSED_DEP in ctx.read(build_file)
-    ]
+    def _json_decode(json_str):
+        return json.decode(json_str)
 
-    ctx.template(
-        "BUILD.bazel",
-        "BUILD.bazel",
-        substitutions = {
-            "{{ALL_FILES}}": serialize(exported_targets),
-        },
-        executable = False,
+    def _value_is_dict(v):
+        return type(v) == "dict"
+
+    def _value_is_list(v):
+        return type(v) == "list"
+
+    def _value_is_struct(v):
+        return type(v) == "struct"
+
+    def _find_repository_files_by_name(file_name):
+        ret = ctx.execute(["find", "-L", ".", "-type", "f", "-name", file_name])
+        if ret.return_code:
+            return []
+        return ret.stdout.strip().split("\n")
+
+    def _run_buildifier(buildifier_flags):
+        ret = ctx.execute(
+            [str(ctx.path(ctx.attr.buildifier))] + buildifier_flags,
+            quiet = False,
+        )
+        return ret.return_code == 0
+
+    return struct(
+        ctx = ctx,
+        make_struct = struct,
+        fail = fail,
+        value_is_dict = _value_is_dict,
+        value_is_list = _value_is_list,
+        value_is_struct = _value_is_struct,
+        workspace_path = _workspace_path,
+        label_to_path = _label_to_path,
+        file_copier = _file_copier,
+        json_decode = _json_decode,
+        find_repository_files_by_name = _find_repository_files_by_name,
+        run_buildifier = _run_buildifier if ctx.attr.buildifier else None,
     )
 
 def _fuchsia_sdk_repository_impl(ctx):
@@ -121,11 +134,8 @@ def _fuchsia_sdk_repository_impl(ctx):
         _instantiate_local_env(ctx)
         return
 
+    # Compute the set of input IDK manifests to use for this repository.
     manifests = []
-
-    # Resolve labels early to avoid repository rule restarts.
-    repo_build_template = ctx.path(Label("//fuchsia/workspace/sdk_templates:repository.BUILD.template"))
-    resolve_repository_labels(ctx)
 
     if _LOCAL_FUCHSIA_IDK_DIRECTORY in ctx.os.environ:
         copy_content_strategy = "symlink"
@@ -136,62 +146,12 @@ def _fuchsia_sdk_repository_impl(ctx):
     else:
         fail("The fuchsia sdk no longer supports downloading content via the cipd tool. Please use local_paths or provide a local fuchsia build.")
 
-    # Extract the target CPU names supported by our SDK manifests, then
-    # write it to generated_constants.bzl file.
-    constants = generate_sdk_constants(ctx, manifests)
+    runtime = _get_starlark_runtime_for(ctx, copy_content_strategy)
 
-    ctx.file("WORKSPACE.bazel", content = "", executable = False)
-    ctx.report_progress("Generating Bazel rules for the SDK")
-    ctx.template(
-        "BUILD.bazel",
-        repo_build_template,
-        substitutions = {
-            "{{HOST_CPU}}": constants.host_cpus[0],
-            "{{SDK_ID}}": sdk_id_from_manifests(ctx, manifests),
-        },
-        executable = False,
-    )
+    # Resolve labels early to avoid repository rule restarts.
+    resolve_repository_labels(runtime)
 
-    # TODO(https://fxbug.dev/42068729): Allow generate_sdk_build_rules to provide
-    # substitutions directly to the call to ctx.template above.
-    generate_sdk_build_rules(ctx, manifests, copy_content_strategy, constants)
-
-    _merge_rules_fuchsia(ctx)
-
-    # Should only be called after all BUILD.bazel files have been added.
-    _export_all_files(ctx)
-
-    # Run buildifier on all generated files, if the host tool is provided.
-    if ctx.attr.buildifier:
-        # First call with -lint=fix to automatically correct most issues.
-        ret = ctx.execute(
-            [
-                str(ctx.path(ctx.attr.buildifier)),
-                "-mode=fix",
-                "-lint=fix",
-                "-r",
-                ".",
-            ],
-            quiet = False,
-        )
-        if ret.return_code != 0:
-            fail("Error reformating Bazel SDK files!")
-
-        # Second call with -lint=warn to verify that there aren't any remaining
-        # issues that couldn't be fixed previously. This happens for warnings like
-        # module-docstring, or bzl-visibility which require manual fixes.
-        ret = ctx.execute(
-            [
-                str(ctx.path(ctx.attr.buildifier)),
-                "-mode=fix",
-                "-lint=warn",
-                "-r",
-                ".",
-            ],
-            quiet = False,
-        )
-        if ret.return_code != 0:
-            fail("Bazel formatting errors persist in Bazel SDK files!")
+    generate_sdk_repository(runtime, manifests)
 
 fuchsia_sdk_repository = repository_rule(
     doc = """

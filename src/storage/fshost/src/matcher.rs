@@ -2,27 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        device::{
-            constants::{
-                BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL,
-                FTL_PARTITION_LABEL, FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH,
-                FVM_PARTITION_LABEL, GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH,
-                NAND_BROKER_DRIVER_PATH, SUPER_PARTITION_LABEL,
-            },
-            Device,
-        },
-        environment::Environment,
-    },
-    anyhow::{bail, Context, Error},
-    async_trait::async_trait,
-    fs_management::format::DiskFormat,
-    std::{
-        collections::BTreeMap,
-        sync::atomic::{AtomicBool, Ordering},
-    },
+use crate::device::constants::{
+    BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FTL_PARTITION_LABEL,
+    FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
+    LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH, SUPER_PARTITION_LABEL,
 };
+use crate::device::Device;
+use crate::environment::Environment;
+use anyhow::{bail, Context, Error};
+use async_trait::async_trait;
+use fs_management::format::DiskFormat;
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[async_trait]
 pub trait Matcher: Send {
@@ -289,22 +280,6 @@ impl Matcher for FvmMatcher {
                 return false;
             }
         }
-        match device.partition_label().await {
-            Ok(label) => {
-                // There are a few different labels used depending on the device. If we don't see
-                // any of them, this isn't the right partition.
-                if !(label == FVM_PARTITION_LABEL
-                    || label == FUCHSIA_FVM_PARTITION_LABEL
-                    || label == FTL_PARTITION_LABEL)
-                {
-                    return false;
-                }
-            }
-            // If there is an error getting the partition label, it might be because this device
-            // doesn't support labels (like if it's directly on a raw disk in an emulator).
-            // Continue with content sniffing.
-            Err(_) => (),
-        }
         device.content_format().await.ok() == Some(DiskFormat::Fvm)
     }
 
@@ -407,24 +382,20 @@ impl Matcher for PartitionMapMatcher {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Device, DiskFormat, Environment, Matchers},
-        crate::{
-            config::default_config,
-            device::constants::{
-                BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL,
-                FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
-                LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
-            },
-            environment::Filesystem,
-        },
-        anyhow::{anyhow, Error},
-        async_trait::async_trait,
-        fidl_fuchsia_device::ControllerProxy,
-        fidl_fuchsia_hardware_block::{BlockInfo, BlockProxy, Flag},
-        fidl_fuchsia_hardware_block_volume::VolumeProxy,
-        std::sync::Mutex,
+    use super::{Device, DiskFormat, Environment, Matchers};
+    use crate::config::default_config;
+    use crate::device::constants::{
+        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL,
+        FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
+        LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
     };
+    use crate::environment::Filesystem;
+    use anyhow::{anyhow, Error};
+    use async_trait::async_trait;
+    use fidl_fuchsia_device::ControllerProxy;
+    use fidl_fuchsia_hardware_block::{BlockInfo, BlockProxy, Flag};
+    use fidl_fuchsia_hardware_block_volume::VolumeProxy;
+    use std::sync::Mutex;
 
     #[derive(Clone)]
     struct MockDevice {
@@ -942,86 +913,6 @@ mod tests {
                     .expect_mount_blobfs_on()
                     .expect_format_data()
                     .expect_bind_data()
-            )
-            .await
-            .expect("match_device failed"));
-    }
-
-    #[fuchsia::test]
-    async fn test_multiple_fvm_partitions_second_fails() {
-        let mut matchers = Matchers::new(&default_config(), None);
-
-        // An fvm device with the wrong label should fail.
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label("wrong_label"),
-                &mut MockEnv::new()
-            )
-            .await
-            .expect("match_device failed"));
-
-        // An fvm device with the right label should succeed.
-        assert!(matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label(FVM_PARTITION_LABEL),
-                &mut MockEnv::new()
-                    .expect_bind_and_enumerate_fvm()
-                    .expect_mount_data_on()
-                    .expect_mount_blobfs_on()
-            )
-            .await
-            .expect("match_device failed"));
-
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label(FVM_PARTITION_LABEL),
-                &mut MockEnv::new()
-            )
-            .await
-            .expect("match_device failed"));
-    }
-
-    #[fuchsia::test]
-    async fn test_multiple_fvm_partitions_second_fails_alternate_label() {
-        let mut matchers = Matchers::new(&default_config(), None);
-
-        // An fvm device with the wrong label should fail.
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label("wrong_label"),
-                &mut MockEnv::new()
-            )
-            .await
-            .expect("match_device failed"));
-
-        // An fvm device with the right label should succeed.
-        assert!(matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label(FUCHSIA_FVM_PARTITION_LABEL),
-                &mut MockEnv::new()
-                    .expect_bind_and_enumerate_fvm()
-                    .expect_mount_data_on()
-                    .expect_mount_blobfs_on()
-            )
-            .await
-            .expect("match_device failed"));
-
-        assert!(!matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_content_format(DiskFormat::Fvm)
-                    .set_partition_label(FUCHSIA_FVM_PARTITION_LABEL),
-                &mut MockEnv::new()
             )
             .await
             .expect("match_device failed"));

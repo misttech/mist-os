@@ -87,7 +87,6 @@ template("_cuckoo_product_bundle") {
           ":$stub_test_target",
         ]
     cmdline_deps = []
-    system_image_deps = board_system_image_deps
     core_realm_definition = "//build/testing:cuckoo-core-realm"
     board_config_label = board_configuration_label
     allow_eng_platform_bundle_use = true
@@ -115,10 +114,7 @@ template("_cuckoo_product_bundle") {
   foreach(input_group, cuckoo_kernel_zbi_test_params.input_groups) {
     input_group_label = "//bundles/assembly_input_groups:${input_group}"
     assembly_input.base_packages += [ "${input_group_label}.base_packages" ]
-    assembly_input.bootfs_labels += [ "${input_group_label}.bootfs_labels" ]
     assembly_input.cmdline_deps += [ "${input_group_label}.cmdline_deps" ]
-    assembly_input.system_image_deps +=
-        [ "${input_group_label}.system_image_deps" ]
   }
 
   assembled_system(assembled_system_target) {
@@ -142,8 +138,8 @@ template("_cuckoo_product_bundle") {
     name = main_target
     system_a = "${target_out_dir}/${assembled_system_namespace}/images.json"
     partitions = get_label_info(_partition_config_label, "target_out_dir") +
-                 "/" + get_label_info(_partition_config_label, "name") + ".json"
-    partitions_contents = partitions_config_contents
+                 "/" + get_label_info(_partition_config_label, "name") +
+                 "/partitions_config.json"
 
     deps = [
       ":$assembled_system_target",

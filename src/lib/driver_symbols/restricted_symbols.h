@@ -114,6 +114,7 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/msd_arm_rebind_dfv2.cm",
     "#meta/msd_arm_test.cm",
     "#meta/msd_arm_test_dfv2.cm",
+    "#meta/msd_kola.cm",
     "#meta/libmsd_intel.cm",
     "#meta/libmsd_intel_test.cm",
     "#meta/libmsd_vsi.cm",

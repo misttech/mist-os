@@ -6,20 +6,19 @@
 //! the target, hence the need for a transfer VMO.  This also uses a static zeroed VMO to transfer
 //! pages that should be zeroed.
 
-use crate::{task::CurrentTask, vfs::FsStr};
+use crate::task::CurrentTask;
+use crate::vfs::FsStr;
 use fidl::AsHandleRef;
-use fuchsia_zircon::{
-    sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_READ},
-    {self as zx},
-};
+use fuchsia_zircon::sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_READ};
+use fuchsia_zircon::{self as zx};
 use starnix_logging::{log_debug, log_error, log_warn};
 use starnix_sync::Mutex;
-use starnix_uapi::{errno, error, errors::Errno};
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    ops::Range,
-    sync::Arc,
-};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::{errno, error};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::ops::Range;
+use std::sync::Arc;
 
 // N.B. At time of writing, no particular science has gone into picking these numbers; tweaking
 // these numbers might or might not give us better performance.
@@ -434,7 +433,8 @@ mod tests {
     use super::{Pager, PagerExtent};
     use crate::testing::*;
     use fuchsia_zircon as zx;
-    use std::{sync::Arc, time::Duration};
+    use std::sync::Arc;
+    use std::time::Duration;
 
     #[::fuchsia::test]
     async fn test_pager() {

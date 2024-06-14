@@ -10,26 +10,26 @@ mod render_cpu;
 mod render_vk;
 mod touch;
 
+use crate::render::Renderer;
+use crate::render_cpu::CpuRenderer;
+use crate::render_vk::VulkanRenderer;
+use argh::FromArgs;
+use async_utils::hanging_get::client::HangingGetStream;
+use fidl::endpoints::create_proxy;
+use flatland_frame_scheduling_lib::*;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::{self as component};
+use fuchsia_framebuffer::FrameUsage;
+use fuchsia_scenic::ViewRefPair;
+use futures::channel::mpsc::{unbounded, UnboundedSender};
+use futures::prelude::*;
+use internal_message::*;
+use std::ops::DerefMut;
+use tracing::{error, info, warn};
 use {
-    crate::{render::Renderer, render_cpu::CpuRenderer, render_vk::VulkanRenderer},
-    argh::FromArgs,
-    async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::create_proxy,
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as fapp, fidl_fuchsia_ui_composition as fland,
-    fidl_fuchsia_ui_pointer as fptr, fidl_fuchsia_ui_views as fviews,
-    flatland_frame_scheduling_lib::*,
-    fuchsia_async as fasync,
-    fuchsia_component::{self as component, client::connect_to_protocol},
-    fuchsia_framebuffer::FrameUsage,
-    fuchsia_scenic::ViewRefPair,
+    fidl_fuchsia_ui_pointer as fptr, fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync,
     fuchsia_trace as trace, fuchsia_zircon as zx,
-    futures::{
-        channel::mpsc::{unbounded, UnboundedSender},
-        prelude::*,
-    },
-    internal_message::*,
-    std::ops::DerefMut,
-    tracing::{error, info, warn},
 };
 
 const IMAGE_COUNT: usize = 3;

@@ -18,7 +18,6 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
-# LINT.IfChange
 _PRODUCT_CONFIG_BASE_JSON = {
     "platform": {
         "build_type": BUILD_TYPES.ENG,
@@ -44,7 +43,6 @@ fuchsia_product_configuration(
     name = "product_config",
     product_config_json = _PRODUCT_CONFIG_BASE_JSON,
 )
-# LINT.ThenChange(//products/minimal/BUILD.gn)
 
 fuchsia_product(
     name = "image.x64",

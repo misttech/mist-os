@@ -8,10 +8,12 @@
 //! a trait, so we don't have to expose all of the internal core types to
 //! bindings for it to perform the inspection.
 
-use alloc::{format, string::String};
+use alloc::format;
+use alloc::string::String;
 use core::fmt::{Debug, Display};
 
-use net_types::{ip::IpAddress, AddrAndPortFormatter, ZonedAddr};
+use net_types::ip::IpAddress;
+use net_types::{AddrAndPortFormatter, ZonedAddr};
 
 use crate::counters::Counter;
 

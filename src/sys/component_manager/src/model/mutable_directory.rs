@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    errors::VfsError,
-    std::sync::Arc,
-    vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::simple as pfs},
-};
+use errors::VfsError;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::immutable::simple as pfs;
 
 type Directory = Arc<pfs::Simple>;
 
@@ -35,7 +35,9 @@ impl MutableDirectory for Directory {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, vfs::file::vmo::read_only};
+    use super::*;
+    use assert_matches::assert_matches;
+    use vfs::file::vmo::read_only;
 
     #[fuchsia::test]
     fn addable_with_result_add_ok() {

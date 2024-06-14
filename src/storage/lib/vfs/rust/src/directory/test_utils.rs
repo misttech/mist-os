@@ -10,7 +10,9 @@
 
 #[doc(hidden)]
 pub mod reexport {
-    pub use {fidl, fidl_fuchsia_io as fio, fuchsia_async::Channel, fuchsia_zircon_status::Status};
+    pub use fuchsia_async::Channel;
+    pub use fuchsia_zircon_status::Status;
+    pub use {fidl, fidl_fuchsia_io as fio};
 
     #[cfg(not(target_os = "fuchsia"))]
     pub use fuchsia_async::emulated_handle::MessageBuf;
@@ -18,17 +20,15 @@ pub mod reexport {
     pub use fuchsia_zircon::MessageBuf;
 }
 
-use crate::{
-    directory::entry::DirectoryEntry,
-    test_utils::run::{self, AsyncServerClientTestParams},
-};
+use crate::directory::entry::DirectoryEntry;
+use crate::test_utils::run::{self, AsyncServerClientTestParams};
 
-use {
-    byteorder::{LittleEndian, WriteBytesExt},
-    fidl_fuchsia_io as fio,
-    futures::Future,
-    std::{convert::TryInto as _, io::Write, sync::Arc},
-};
+use byteorder::{LittleEndian, WriteBytesExt};
+use fidl_fuchsia_io as fio;
+use futures::Future;
+use std::convert::TryInto as _;
+use std::io::Write;
+use std::sync::Arc;
 
 pub use run::{run_client, test_client};
 

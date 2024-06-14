@@ -8,13 +8,15 @@ use anyhow::{anyhow, bail, Result};
 use argh::{ArgsInfo, FromArgs};
 use blocking::Unblock;
 use fho::SimpleWriter;
-use fidl_fuchsia_developer_remotecontrol as rc;
-use fidl_fuchsia_starnix_container as fstarcontainer;
-use fuchsia_async as fasync;
-use futures::{future::FutureExt, join};
+use futures::future::FutureExt;
+use futures::join;
 use nix::unistd::dup;
 use std::os::unix::io::FromRawFd;
 use termion::raw::IntoRawMode;
+use {
+    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_starnix_container as fstarcontainer,
+    fuchsia_async as fasync,
+};
 
 use crate::common::*;
 

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Error, assert_matches::assert_matches, fuchsia_zircon as zx, rust_icu_ucal as ucal};
+use anyhow::Error;
+use assert_matches::assert_matches;
+use {fuchsia_zircon as zx, rust_icu_ucal as ucal};
 // [START imports]
 use icu_data::Loader;
 // [END imports]

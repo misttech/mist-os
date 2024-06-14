@@ -7,13 +7,13 @@
 
 #![cfg(test)]
 
-use {
-    crate::{
-        generated::translate, highlevel, lowlevel, lowlevel::write_to::WriteTo,
-        parser::command_parser, serde::internal::SerDeOne,
-    },
-    std::{collections::HashMap, io::Cursor},
-};
+use crate::generated::translate;
+use crate::lowlevel::write_to::WriteTo;
+use crate::parser::command_parser;
+use crate::serde::internal::SerDeOne;
+use crate::{highlevel, lowlevel};
+use std::collections::HashMap;
+use std::io::Cursor;
 
 fn cr_terminate(str: &str) -> String {
     format!("{}\r", str)

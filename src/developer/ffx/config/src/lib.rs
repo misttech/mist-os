@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::api::{
-    validate_type,
-    value::{ConfigValue, ValueStrategy},
-    ConfigError,
-};
+use crate::api::value::{ConfigValue, ValueStrategy};
+use crate::api::{validate_type, ConfigError};
 use analytics::{is_opted_in, set_opt_in_status};
 use anyhow::{anyhow, Context, Result};
-use std::{io::Write, path::PathBuf, sync::Mutex};
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::Mutex;
 
 pub mod api;
 pub mod environment;
@@ -41,8 +40,7 @@ lazy_static::lazy_static! {
 
 #[doc(hidden)]
 pub mod macro_deps {
-    pub use anyhow;
-    pub use serde_json;
+    pub use {anyhow, serde_json};
 }
 
 /// The levels of configuration possible
@@ -243,7 +241,8 @@ mod test {
     // creates a token stream referencing `ffx_config` on the inside.
     use crate::{self as ffx_config};
     use serde_json::{json, Value};
-    use std::{collections::HashSet, fs};
+    use std::collections::HashSet;
+    use std::fs;
 
     #[test]
     fn test_config_levels_make_sense_from_first() {

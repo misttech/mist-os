@@ -2,26 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, num::NonZeroU64};
+use std::cell::RefCell;
+use std::num::NonZeroU64;
 
 use anyhow::Context as _;
 use fidl::endpoints::{self, Proxy as _};
-use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_dhcp::{
     self as fdhcp, ClientExitReason, ClientRequestStream, ClientWatchConfigurationResponse,
     ConfigurationToRequest, NewClientParams,
 };
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{channel::mpsc, select, FutureExt as _, TryStreamExt as _};
-use net_types::{
-    ip::{Ipv4, Ipv4Addr, PrefixLength},
-    SpecifiedAddr, Witness as _,
-};
+use futures::channel::mpsc;
+use futures::{select, FutureExt as _, TryStreamExt as _};
+use net_types::ip::{Ipv4, Ipv4Addr, PrefixLength};
+use net_types::{SpecifiedAddr, Witness as _};
 use rand::SeedableRng as _;
 use std::pin::pin;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum Error {

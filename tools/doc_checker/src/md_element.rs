@@ -7,7 +7,10 @@
 
 use crate::{parser, DocLine};
 pub use pulldown_cmark::{CowStr, LinkType, Options, Parser, Tag};
-use std::{collections::HashMap, fmt::Debug, ops::Range, path::PathBuf};
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::ops::Range;
+use std::path::PathBuf;
 
 /// Element is a high level construct which collects the low level Tag objects into
 /// a single element. This removes the need for checks to deal with stateful processing of the event stream.

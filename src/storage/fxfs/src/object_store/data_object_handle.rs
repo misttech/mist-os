@@ -2,50 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        errors::FxfsError,
-        log::*,
-        lsm_tree::types::{ItemRef, LayerIterator},
-        object_handle::{
-            ObjectHandle, ObjectProperties, ReadObjectHandle, WriteBytes, WriteObjectHandle,
-        },
-        object_store::{
-            extent_record::{ExtentKey, ExtentMode, ExtentValue},
-            object_manager::ObjectManager,
-            object_record::{
-                AttributeKey, FsverityMetadata, ObjectAttributes, ObjectItem, ObjectKey,
-                ObjectKeyData, ObjectKind, ObjectValue, Timestamp,
-            },
-            store_object_handle::{MaybeChecksums, NeedsTrim},
-            transaction::{
-                self, lock_keys, AssocObj, AssociatedObject, LockKey, Mutation,
-                ObjectStoreMutation, Options, Transaction,
-            },
-            HandleOptions, HandleOwner, ObjectStore, RootDigest, StoreObjectHandle, TrimMode,
-            TrimResult, DEFAULT_DATA_ATTRIBUTE_ID, FSVERITY_MERKLE_ATTRIBUTE_ID,
-            TRANSACTION_MUTATION_THRESHOLD,
-        },
-        range::RangeExt,
-        round::{round_down, round_up},
-    },
-    anyhow::{anyhow, bail, ensure, Context, Error},
-    async_trait::async_trait,
-    fidl_fuchsia_io as fio,
-    fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder},
-    futures::{stream::FuturesUnordered, TryStreamExt},
-    fxfs_trace::trace,
-    mundane::hash::{Digest, Hasher, Sha256, Sha512},
-    std::{
-        cmp::min,
-        ops::{Bound, DerefMut, Range},
-        sync::{
-            atomic::{self, AtomicU64, Ordering},
-            Arc, Mutex,
-        },
-    },
-    storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef},
+use crate::errors::FxfsError;
+use crate::log::*;
+use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::object_handle::{
+    ObjectHandle, ObjectProperties, ReadObjectHandle, WriteBytes, WriteObjectHandle,
 };
+use crate::object_store::extent_record::{ExtentKey, ExtentMode, ExtentValue};
+use crate::object_store::object_manager::ObjectManager;
+use crate::object_store::object_record::{
+    AttributeKey, FsverityMetadata, ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData,
+    ObjectKind, ObjectValue, Timestamp,
+};
+use crate::object_store::store_object_handle::{MaybeChecksums, NeedsTrim};
+use crate::object_store::transaction::{
+    self, lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation, Options,
+    Transaction,
+};
+use crate::object_store::{
+    HandleOptions, HandleOwner, ObjectStore, RootDigest, StoreObjectHandle, TrimMode, TrimResult,
+    DEFAULT_DATA_ATTRIBUTE_ID, FSVERITY_MERKLE_ATTRIBUTE_ID, TRANSACTION_MUTATION_THRESHOLD,
+};
+use crate::range::RangeExt;
+use crate::round::{round_down, round_up};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use async_trait::async_trait;
+use fidl_fuchsia_io as fio;
+use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder};
+use futures::stream::FuturesUnordered;
+use futures::TryStreamExt;
+use fxfs_trace::trace;
+use mundane::hash::{Digest, Hasher, Sha256, Sha512};
+use std::cmp::min;
+use std::ops::{Bound, DerefMut, Range};
+use std::sync::atomic::{self, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
 
 /// How much data each transaction will cover when writing an attribute across batches. Pulled from
 /// `FLUSH_BATCH_SIZE` in paged_object_handle.rs.
@@ -1709,43 +1701,38 @@ impl<'a, S: HandleOwner> WriteBytes for DirectWriter<'a, S> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{
-            errors::FxfsError,
-            filesystem::{
-                FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem, SyncOptions,
-            },
-            fsck::{fsck, fsck_volume_with_options, fsck_with_options, FsckOptions},
-            object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle},
-            object_store::{
-                data_object_handle::WRITE_ATTR_BATCH_SIZE,
-                directory::replace_child,
-                object_record::{ObjectKey, ObjectValue, Timestamp},
-                transaction::{lock_keys, Mutation, Options},
-                volume::root_volume,
-                DataObjectHandle, Directory, HandleOptions, LockKey, ObjectStore, PosixAttributes,
-                FSVERITY_MERKLE_ATTRIBUTE_ID, TRANSACTION_MUTATION_THRESHOLD,
-            },
-            round::{round_down, round_up},
-        },
-        assert_matches::assert_matches,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        futures::{
-            channel::oneshot::channel,
-            stream::{FuturesUnordered, StreamExt},
-            FutureExt,
-        },
-        fxfs_crypto::Crypt,
-        fxfs_insecure_crypto::InsecureCrypt,
-        mundane::hash::{Digest, Hasher, Sha256},
-        rand::Rng,
-        std::{
-            ops::Range,
-            sync::{Arc, Mutex},
-            time::Duration,
-        },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+    use crate::errors::FxfsError;
+    use crate::filesystem::{
+        FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem, SyncOptions,
     };
+    use crate::fsck::{fsck, fsck_volume_with_options, fsck_with_options, FsckOptions};
+    use crate::object_handle::{
+        ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle,
+    };
+    use crate::object_store::data_object_handle::WRITE_ATTR_BATCH_SIZE;
+    use crate::object_store::directory::replace_child;
+    use crate::object_store::object_record::{ObjectKey, ObjectValue, Timestamp};
+    use crate::object_store::transaction::{lock_keys, Mutation, Options};
+    use crate::object_store::volume::root_volume;
+    use crate::object_store::{
+        DataObjectHandle, Directory, HandleOptions, LockKey, ObjectStore, PosixAttributes,
+        FSVERITY_MERKLE_ATTRIBUTE_ID, TRANSACTION_MUTATION_THRESHOLD,
+    };
+    use crate::round::{round_down, round_up};
+    use assert_matches::assert_matches;
+    use futures::channel::oneshot::channel;
+    use futures::stream::{FuturesUnordered, StreamExt};
+    use futures::FutureExt;
+    use fxfs_crypto::Crypt;
+    use fxfs_insecure_crypto::InsecureCrypt;
+    use mundane::hash::{Digest, Hasher, Sha256};
+    use rand::Rng;
+    use std::ops::Range;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use storage_device::fake_device::FakeDevice;
+    use storage_device::DeviceHolder;
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
 

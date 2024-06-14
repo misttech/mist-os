@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::typeface::TypefaceAndLangScore,
-    fidl_fuchsia_fonts::{
-        self as fonts, Slant, Style2, TypefaceQuery, Width, WEIGHT_MEDIUM, WEIGHT_NORMAL,
-    },
-    lazy_static::lazy_static,
+use super::typeface::TypefaceAndLangScore;
+use fidl_fuchsia_fonts::{
+    self as fonts, Slant, Style2, TypefaceQuery, Width, WEIGHT_MEDIUM, WEIGHT_NORMAL,
 };
+use lazy_static::lazy_static;
 
 lazy_static! {
     /// The default style (or its individual properties) are is applied to fill any style properties
@@ -178,13 +176,12 @@ pub fn select_best_match<'a, 'b>(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::super::{test_util::*, Typeface},
-        super::*,
-        fidl_fuchsia_fonts::{
-            GenericFontFamily, TypefaceRequestFlags, WEIGHT_BOLD, WEIGHT_EXTRA_BOLD,
-            WEIGHT_EXTRA_LIGHT, WEIGHT_LIGHT, WEIGHT_SEMI_BOLD, WEIGHT_THIN,
-        },
+    use super::super::test_util::*;
+    use super::super::Typeface;
+    use super::*;
+    use fidl_fuchsia_fonts::{
+        GenericFontFamily, TypefaceRequestFlags, WEIGHT_BOLD, WEIGHT_EXTRA_BOLD,
+        WEIGHT_EXTRA_LIGHT, WEIGHT_LIGHT, WEIGHT_SEMI_BOLD, WEIGHT_THIN,
     };
 
     /// Substitute for `TypefaceAndLangScore` that owns its typeface. Convert to a

@@ -2,27 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use addr::TargetAddr;
+use anyhow::Context;
 use argh::{ArgsInfo, FromArgs};
 use async_net::{Ipv4Addr, TcpListener, TcpStream};
-use fho::Connector;
-use fidl_fuchsia_developer_remotecontrol as rc;
-use fidl_fuchsia_starnix_container as fstarcontainer;
-use fuchsia_async as fasync;
+use emulator_instance::EMU_INSTANCE_ROOT_DIR;
+use ffx_config::EnvironmentContext;
+use ffx_emulator_config::ShowDetail;
+use ffx_emulator_engines::EngineBuilder;
+use fho::{return_bug, Connector, FfxContext, Result};
+use fidl_fuchsia_developer_ffx::TargetInfo;
 use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
 use futures::FutureExt;
-use signal_hook::{consts::signal::SIGINT, iterator::Signals};
+use signal_hook::consts::signal::SIGINT;
+use signal_hook::iterator::Signals;
 use std::io::ErrorKind;
-use std::net::{SocketAddrV4, TcpListener as SyncTcpListener};
+use std::net::{SocketAddr, SocketAddrV4, TcpListener as SyncTcpListener};
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::info;
+use {
+    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_starnix_container as fstarcontainer,
+    fuchsia_async as fasync,
+};
 
 use crate::common::*;
 
-const ADB_DEFAULT_PORT: u32 = 5555;
+const ADB_DEFAULT_PORT: u16 = 5555;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
@@ -42,18 +51,111 @@ pub struct StarnixAdbCommand {
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 enum AdbSubcommand {
+    Connect(AdbConnectArgs),
     Proxy(AdbProxyArgs),
 }
 
 impl StarnixAdbCommand {
-    pub async fn run(&self, rcs_connector: &Connector<rc::RemoteControlProxy>) -> Result<()> {
+    pub async fn run(
+        &self,
+        context: &EnvironmentContext,
+        rcs_connector: &Connector<rc::RemoteControlProxy>,
+        target_info: fho::Result<TargetInfo>,
+    ) -> Result<()> {
         match &self.subcommand {
+            AdbSubcommand::Connect(args) => {
+                args.run_connect(context, &self.adb, &target_info?).await
+            }
             AdbSubcommand::Proxy(args) => args.run_proxy(&self.adb, rcs_connector).await,
         }
     }
 }
 
-async fn serve_adb_connection(mut stream: TcpStream, bridge_socket: fidl::Socket) -> Result<()> {
+/// directly connect the local adb server to an adbd instance running on the target.
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "connect")]
+struct AdbConnectArgs {}
+
+impl AdbConnectArgs {
+    async fn run_connect(
+        &self,
+        context: &EnvironmentContext,
+        adb: &str,
+        target_info: &TargetInfo,
+    ) -> Result<()> {
+        let Some(address) = target_info.ssh_address.as_ref() else {
+            return_bug!("Target does not appear to have an ssh address.");
+        };
+
+        let ssh_address: TargetAddr = address.into();
+        let ssh_address: SocketAddr = ssh_address.into();
+
+        let adb_port = if ssh_address.port() == 22 || ssh_address.port() == 8022 {
+            // This only covers `--net tap` emulators, physical devices with CDC ethernet, and
+            // funnel. funnel also forwards adb to local 5555, so it's fine to use the default.
+            ADB_DEFAULT_PORT
+        } else {
+            // If the device doesn't have a standard SSH port, it's likely an emulator
+            // instance with user networking. Look up the instance and get its host port mapping
+            // to find the port we need.
+            let nodename = target_info.nodename.as_ref().bug_context("getting target name")?;
+            get_emu_host_adb_port(context, &nodename)
+                .await
+                .bug_context("Finding host adb port for user networking emulator")?
+        };
+
+        let mut adb_address = ssh_address.clone();
+        adb_address.set_port(adb_port);
+
+        let mut adb_cmd = Command::new(adb);
+        adb_cmd.arg("connect").arg(adb_address.to_string());
+        info!("running `{adb_cmd:?}`");
+
+        let connect_res = adb_cmd.output().bug_context("running adb connect")?;
+        if !connect_res.status.success() {
+            let stdout = String::from_utf8_lossy(&connect_res.stdout);
+            let stderr = String::from_utf8_lossy(&connect_res.stderr);
+            return_bug!("Couldn't run adb connect. stdout={stdout} stderr={stderr}");
+        }
+
+        eprintln!("adb is connected! You may need to run `export ANDROID_SERIAL={adb_address}`.");
+        Ok(())
+    }
+}
+
+async fn get_emu_host_adb_port(context: &EnvironmentContext, name: &str) -> Result<u16> {
+    let instance_dir: PathBuf =
+        context.get(EMU_INSTANCE_ROOT_DIR).bug_context("getting emulator instance dir")?;
+    let emu_instances = emulator_instance::EmulatorInstances::new(instance_dir);
+    let builder = EngineBuilder::new(emu_instances);
+    let mut instance_name = Some(name.to_string());
+    let engine = builder
+        .get_engine_by_name(&mut instance_name)
+        .with_bug_context(|| format!("getting emulator engine for target {name}"))?
+        .bug_context("have configured emulator but no engine was returned")?;
+    let mut details = engine.show(vec![ShowDetail::Net {
+        mac_address: Default::default(),
+        mode: Default::default(),
+        ports: Default::default(),
+        upscript: Default::default(),
+    }]);
+    if details.len() != 1 {
+        return_bug!("expected emulator details of length 1, got {details:?}");
+    }
+    match details.remove(0) {
+        ShowDetail::Net { ports, .. } => {
+            let ports = ports.bug_context("getting host port mappings")?;
+            let adb_mapping = ports.get("adb").bug_context("getting adb port mapping")?;
+            adb_mapping.host.bug_context("getting adb host port")
+        }
+        unexpected => return_bug!("asked for networking details, got {unexpected:?}"),
+    }
+}
+
+async fn serve_adb_connection(
+    mut stream: TcpStream,
+    bridge_socket: fidl::Socket,
+) -> anyhow::Result<()> {
     let mut bridge = fidl::AsyncSocket::from_socket(bridge_socket);
     let (breader, mut bwriter) = (&mut bridge).split();
     let (sreader, mut swriter) = (&mut stream).split();
@@ -168,13 +270,13 @@ impl AdbProxyArgs {
                 controller_proxy = reconnect().await?;
             }
 
-            let stream = stream?;
+            let stream = stream.map_err(|e| fho::Error::Unexpected(e.into()))?;
             let (sbridge, cbridge) = fidl::Socket::create_stream();
 
             controller_proxy
                 .0
                 .vsock_connect(fstarcontainer::ControllerVsockConnectRequest {
-                    port: Some(ADB_DEFAULT_PORT),
+                    port: Some(ADB_DEFAULT_PORT as u32),
                     bridge_socket: Some(sbridge),
                     ..Default::default()
                 })

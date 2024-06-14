@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::client::EstablishRsnaFailureReason,
-    fidl_fuchsia_wlan_mlme::{EapolResultCode, SaeFrame},
-    wlan_rsn::{auth, rsna::UpdateSink, Error, NegotiatedProtection},
-};
+use crate::client::EstablishRsnaFailureReason;
+use fidl_fuchsia_wlan_mlme::{EapolResultCode, SaeFrame};
+use wlan_rsn::rsna::UpdateSink;
+use wlan_rsn::{auth, Error, NegotiatedProtection};
 
 #[derive(Debug)]
 pub struct Rsna {

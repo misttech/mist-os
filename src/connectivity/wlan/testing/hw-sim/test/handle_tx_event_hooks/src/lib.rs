@@ -2,28 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::format_err,
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
-    fidl_test_wlan_realm::WlanConfig,
-    fuchsia_zircon::prelude::*,
-    futures::{channel::oneshot, join},
-    ieee80211::{Bssid, Ssid},
-    std::pin::pin,
-    wlan_common::{
-        bss::Protection,
-        channel::{Cbw, Channel},
-        ie::rsn::cipher::CIPHER_CCMP_128,
-    },
-    wlan_hw_sim::{
-        event::{
-            action::{self, AuthenticationControl, AuthenticationTap},
-            branch, Handler,
-        },
-        *,
-    },
-    wlan_rsn::rsna::UpdateSink,
-};
+use anyhow::format_err;
+use fidl_test_wlan_realm::WlanConfig;
+use fuchsia_zircon::prelude::*;
+use futures::channel::oneshot;
+use futures::join;
+use ieee80211::{Bssid, Ssid};
+use std::pin::pin;
+use wlan_common::bss::Protection;
+use wlan_common::channel::{Cbw, Channel};
+use wlan_common::ie::rsn::cipher::CIPHER_CCMP_128;
+use wlan_hw_sim::event::action::{self, AuthenticationControl, AuthenticationTap};
+use wlan_hw_sim::event::{branch, Handler};
+use wlan_hw_sim::*;
+use wlan_rsn::rsna::UpdateSink;
+use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap};
 
 fn scan_and_connect<'h>(
     phy: &'h fidl_tap::WlantapPhyProxy,
@@ -52,7 +45,8 @@ fn scan_and_connect<'h>(
             }),
             action::authenticate_with_control_state(),
             event::matched(move |control: &mut AuthenticationControl, _| {
-                use wlan_rsn::rsna::{SecAssocStatus::EssSaEstablished, SecAssocUpdate::Status};
+                use wlan_rsn::rsna::SecAssocStatus::EssSaEstablished;
+                use wlan_rsn::rsna::SecAssocUpdate::Status;
 
                 // Clear the update sink to prevent copying spurious updates into the trace.
                 // Retaining updates is not required for the WPA2 EAPOL exchange, because
@@ -145,13 +139,9 @@ async fn handle_tx_event_hooks() {
     // The `scan_and_connect` event handler accumulates updates from the authentication update
     // sink into `trace`. If association succeeds, then the last six updates must be in the order
     // asserted here.
-    use wlan_rsn::{
-        key::exchange::Key::{Gtk, Ptk},
-        rsna::{
-            SecAssocStatus::{EssSaEstablished, PmkSaEstablished},
-            SecAssocUpdate::{Key, Status, TxEapolKeyFrame},
-        },
-    };
+    use wlan_rsn::key::exchange::Key::{Gtk, Ptk};
+    use wlan_rsn::rsna::SecAssocStatus::{EssSaEstablished, PmkSaEstablished};
+    use wlan_rsn::rsna::SecAssocUpdate::{Key, Status, TxEapolKeyFrame};
     let n = trace.len();
     assert!(
         n >= 6,

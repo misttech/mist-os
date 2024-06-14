@@ -29,6 +29,11 @@ zx::result<> profiler::ComponentWatcher::Watch() {
   return zx::ok();
 }
 
+zx::result<> profiler::ComponentWatcher::Reset() {
+  stream_client_ = fidl::Client<fuchsia_component::EventStream>();
+  return zx::ok();
+}
+
 zx::result<> profiler::ComponentWatcher::WatchForMoniker(std::string moniker,
                                                          ComponentEventHandler handler) {
   // The events api strips leading "./"s from monikers
@@ -41,6 +46,15 @@ zx::result<> profiler::ComponentWatcher::WatchForMoniker(std::string moniker,
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
   moniker_watchers_[std::move(normalized)] = std::move(handler);
+  return zx::ok();
+}
+
+zx::result<> profiler::ComponentWatcher::WatchForUrl(std::string url,
+                                                     ComponentEventHandler handler) {
+  if (url_watchers_.find(url) != url_watchers_.end()) {
+    return zx::error(ZX_ERR_ALREADY_EXISTS);
+  }
+  url_watchers_[std::move(url)] = std::move(handler);
   return zx::ok();
 }
 
@@ -75,6 +89,12 @@ void profiler::ComponentWatcher::HandleEvent(
           if (moniker_handler != moniker_watchers_.end()) {
             moniker_handler->second(moniker, component_url);
             moniker_watchers_.erase(moniker_handler);
+          }
+          if (auto url_handler = url_watchers_.find(component_url);
+              url_handler != url_watchers_.end()) {
+            FX_LOGS(INFO) << "Got debug started for " << moniker << " (" << component_url << ")";
+            url_handler->second(moniker, component_url);
+            url_watchers_.erase(url_handler);
           }
           break;
         }

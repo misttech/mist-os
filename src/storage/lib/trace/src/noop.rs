@@ -8,7 +8,9 @@
 //! built with tracing enabled and with tracing disabled which will ensure that these functions
 //! can't diverge from the real ones.
 
-use std::{ffi::CStr, future::Future, marker::PhantomData};
+use std::ffi::CStr;
+use std::future::Future;
+use std::marker::PhantomData;
 
 pub struct TraceCategoryContext(());
 

@@ -2,25 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::writer::{error::Error, heap::Heap, Inspector, StringReference},
-    derivative::Derivative,
-    fuchsia_sync::{Mutex, MutexGuard},
-    futures::future::BoxFuture,
-    inspect_format::{
-        constants, utils, BlockAccessorExt, BlockAccessorMutExt, BlockContainer, BlockIndex,
-        BlockType, Container, Error as FormatError,
-        {ArrayFormat, Block, LinkNodeDisposition, PropertyFormat},
-    },
-    std::{
-        collections::HashMap,
-        sync::{
-            atomic::{AtomicU64, Ordering},
-            Arc,
-        },
-    },
-    tracing::error,
+use crate::writer::error::Error;
+use crate::writer::heap::Heap;
+use crate::writer::{Inspector, StringReference};
+use derivative::Derivative;
+use fuchsia_sync::{Mutex, MutexGuard};
+use futures::future::BoxFuture;
+use inspect_format::{
+    constants, utils, ArrayFormat, Block, BlockAccessorExt, BlockAccessorMutExt, BlockContainer,
+    BlockIndex, BlockType, Container, Error as FormatError, LinkNodeDisposition, PropertyFormat,
 };
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use tracing::error;
 
 /// Callback used to fill inspector lazy nodes.
 pub type LazyNodeContextFnArc =
@@ -1178,13 +1173,9 @@ impl InnerState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        reader::{
-            snapshot::{ScannedBlock, Snapshot},
-            PartialNodeHierarchy,
-        },
-        writer::testing_utils::get_state,
-    };
+    use crate::reader::snapshot::{ScannedBlock, Snapshot};
+    use crate::reader::PartialNodeHierarchy;
+    use crate::writer::testing_utils::get_state;
     use diagnostics_assertions::assert_data_tree;
     use futures::prelude::*;
 

@@ -332,7 +332,8 @@ mod tests {
             name: "fuchsia".into(),
             compression: ZbiCompression::ZStd,
             postprocessing_script: Some(PostProcessingScript {
-                path: Utf8PathBuf::from("fake"),
+                path: Some(Utf8PathBuf::from("fake")),
+                board_script_path: None,
                 args: vec!["arg1".into(), "arg2".into()],
             }),
         };

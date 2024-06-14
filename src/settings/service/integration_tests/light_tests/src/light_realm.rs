@@ -7,13 +7,11 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_hardware_light::{
     Capability, Info as HardwareInfo, LightError, LightRequest, LightRequestStream, Rgb,
 };
-use fidl_fuchsia_io as fio;
 use fidl_fuchsia_settings::{LightMarker, LightProxy, LightValue};
 use fidl_fuchsia_ui_policy::{
     DeviceListenerRegistryMarker, DeviceListenerRegistryRequest,
     DeviceListenerRegistryRequestStream, MediaButtonsListenerProxy,
 };
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability as ComponentCapability, ChildOptions, LocalComponentHandles, RealmBuilder,
@@ -24,10 +22,9 @@ use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use vfs::{
-    directory::{spawn_directory_with_options, DirectoryOptions},
-    pseudo_directory, service,
-};
+use vfs::directory::{spawn_directory_with_options, DirectoryOptions};
+use vfs::{pseudo_directory, service};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[derive(Clone, Debug)]
 pub struct HardwareLight {

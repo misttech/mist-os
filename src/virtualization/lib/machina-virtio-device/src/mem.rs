@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fuchsia_zircon::{self as zx},
-    virtio_device::{
-        mem::{DeviceRange, DriverMem, DriverRange},
-        queue::QueueMemory,
-        ring,
-    },
-};
+use fuchsia_zircon::{self as zx};
+use virtio_device::mem::{DeviceRange, DriverMem, DriverRange};
+use virtio_device::queue::QueueMemory;
+use virtio_device::ring;
 
 /// Provide access to guest memory.
 ///

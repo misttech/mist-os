@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    render::generic::{forma::Forma, PathBuilder},
-    Point,
-};
+use crate::render::generic::forma::Forma;
+use crate::render::generic::PathBuilder;
+use crate::Point;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FormaPath {

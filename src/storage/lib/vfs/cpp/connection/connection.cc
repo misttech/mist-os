@@ -50,11 +50,11 @@ Connection::~Connection() {
 
 void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
                            fidl::ServerEnd<fio::Node> server_end) {
-  auto clone_result = [=]() -> zx::result<std::tuple<fbl::RefPtr<Vnode>, VnodeConnectionOptions>> {
+  zx_status_t status = [&]() -> zx_status_t {
     zx::result clone_options = VnodeConnectionOptions::FromCloneFlags(flags, protocol);
     if (clone_options.is_error()) {
       FS_PRETTY_TRACE_DEBUG("[NodeClone] invalid clone flags: ", flags);
-      return clone_options.take_error();
+      return clone_options.error_value();
     }
     FS_PRETTY_TRACE_DEBUG("[NodeClone] our rights: ", rights(), ", options: ", *clone_options);
 
@@ -64,34 +64,31 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
       clone_options->rights = rights_;
     } else if (clone_options->rights - rights_) {
       // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
-      return zx::error(ZX_ERR_ACCESS_DENIED);
+      return ZX_ERR_ACCESS_DENIED;
     }
 
     if (zx::result validated = vnode()->ValidateOptions(*clone_options); validated.is_error()) {
-      return validated.take_error();
+      return validated.error_value();
     }
     fbl::RefPtr vn = vnode();
     // We only need to open the Vnode for non-node reference connection.
     if (protocol != VnodeProtocol::kNode) {
       if (zx_status_t open_status = OpenVnode(&vn); open_status != ZX_OK) {
-        return zx::error(open_status);
+        return open_status;
       }
     }
-
-    return zx::ok(std::make_tuple(std::move(vn), *clone_options));
+    // On failure, |Vfs::Serve()| will close the channel with an epitaph.
+    vfs_->Serve(vn, server_end.TakeChannel(), *clone_options);
+    return ZX_OK;
   }();
 
-  if (clone_result.is_ok()) {
-    auto [vnode, options] = *std::move(clone_result);
-    vfs_->Serve(vnode, server_end.TakeChannel(), options);
-  } else {
-    FS_PRETTY_TRACE_DEBUG("[NodeClone] error: ", clone_result.status_string());
-    if (flags & fio::OpenFlags::kDescribe) {
+  if (status != ZX_OK) {
+    FS_PRETTY_TRACE_DEBUG("[NodeClone] error: ", zx_status_get_string(status));
+    if (flags & fio::wire::OpenFlags::kDescribe) {
       // Ignore errors since there is nothing we can do if this fails.
-      [[maybe_unused]] auto result =
-          fidl::WireSendEvent(server_end)
-              ->OnOpen(clone_result.error_value(), fio::wire::NodeInfoDeprecated());
+      [[maybe_unused]] auto result = fidl::WireSendEvent(server_end)->OnOpen(status, {});
     }
+    server_end.Close(status);
   }
 }
 

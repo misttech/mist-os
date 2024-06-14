@@ -151,7 +151,6 @@ if (is_fuchsia) {
       "//:developer_cache_packages",
       "//:legacy_cache_packages",
     ]
-    system_image_deps = [ "//build/input:system_image" ]
     universe_packages = [ "//:developer_universe_packages" ]
     bootfs_labels = [ "//build/input:bootfs" ]
     bootfs_package_labels = product_bootfs_packages
@@ -243,7 +242,7 @@ if (is_fuchsia) {
     }
     _partitions_config_file =
         get_label_info(_partitions_config, "target_out_dir") + "/" +
-        get_label_info(_partitions_config, "name") + ".json"
+        get_label_info(_partitions_config, "name") + "/partitions_config.json"
 
     update_epoch = update_platform_epoch + update_product_epoch
     update_package("update") {
@@ -346,7 +345,6 @@ if (is_fuchsia) {
       }
 
       # List the contents of each input so that the outputs can be calculated.
-      partitions_contents = partitions_config_contents
       system_a_contents = _assembly_contents
       system_r_contents = _recovery_contents
 

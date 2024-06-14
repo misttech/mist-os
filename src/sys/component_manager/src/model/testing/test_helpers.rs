@@ -2,39 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder};
+use crate::framework::realm::RealmCapabilityHost;
+use crate::model::component::instance::InstanceState;
+use crate::model::component::{ComponentInstance, StartReason, WeakComponentInstance};
+use crate::model::events::registry::EventSubscription;
+use crate::model::events::source::EventSource;
+use crate::model::events::stream::EventStream;
+use crate::model::model::Model;
+use crate::model::testing::mocks::{ControlMessage, MockResolver, MockRunner};
+use crate::model::testing::test_hook::TestHook;
+use camino::Utf8PathBuf;
+use cm_config::RuntimeConfig;
+use cm_rust::{
+    Availability, CapabilityDecl, ChildDecl, ComponentDecl, ConfigValuesData, EventStreamDecl,
+    NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,
+};
+use cm_types::{Name, Url};
+use fidl::endpoints;
+use fuchsia_zircon::{self as zx, Koid};
+use futures::channel::mpsc::Receiver;
+use futures::lock::Mutex;
+use futures::{StreamExt, TryStreamExt};
+use hooks::HooksRegistration;
+use moniker::{ChildName, Moniker};
+use std::collections::HashSet;
+use std::sync::Arc;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::service;
 use {
-    crate::{
-        builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
-        framework::realm::RealmCapabilityHost,
-        model::{
-            component::instance::InstanceState,
-            component::{ComponentInstance, StartReason, WeakComponentInstance},
-            events::{registry::EventSubscription, source::EventSource, stream::EventStream},
-            model::Model,
-            testing::{
-                mocks::{ControlMessage, MockResolver, MockRunner},
-                test_hook::TestHook,
-            },
-        },
-    },
-    camino::Utf8PathBuf,
-    cm_config::RuntimeConfig,
-    cm_rust::{
-        Availability, CapabilityDecl, ChildDecl, ComponentDecl, ConfigValuesData, EventStreamDecl,
-        NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,
-    },
-    cm_types::Name,
-    cm_types::Url,
-    fidl::endpoints,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, Koid},
-    futures::{channel::mpsc::Receiver, lock::Mutex, StreamExt, TryStreamExt},
-    hooks::HooksRegistration,
-    moniker::{ChildName, Moniker},
-    std::collections::HashSet,
-    std::sync::Arc,
-    vfs::{directory::entry::DirectoryEntry, service},
 };
 
 pub const TEST_RUNNER_NAME: &str = cm_rust_testing::TEST_RUNNER_NAME;

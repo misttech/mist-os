@@ -201,7 +201,10 @@ mod tests {
     use crate::TestExecutor;
     use fuchsia_zircon::{self as zx};
     use futures::task::{waker, ArcWake};
-    use std::{future::poll_fn, mem, pin::pin, sync::Arc};
+    use std::future::poll_fn;
+    use std::mem;
+    use std::pin::pin;
+    use std::sync::Arc;
 
     #[test]
     fn can_receive() {

@@ -171,9 +171,9 @@ $ fx test //src/testing/end_to_end/examples/my_test_dir:my_test_target --e2e \
     --output
 ```
 
-By default, test logs are stored under `${FUCHSIA_OUT_DIR}/test_out/`. Users may
-override this by supplying `$FUCHSIA_TEST_OUTDIR=<custom_path>` before their
-`fx test` invocation.
+By default, test logs are deleted after the test run. Users may
+override this by supplying `--artifact-output-directory <custom_path>` option
+with `fx test` invocation.
 
 You've just written and run your first Lacewing test!
 

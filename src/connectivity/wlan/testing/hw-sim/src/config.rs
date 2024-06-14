@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use ieee80211::{MacAddr, MacAddrBytes};
+use wlan_common::ie::*;
+use zerocopy::AsBytes;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_device,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_tap as wlantap,
-    ieee80211::{MacAddr, MacAddrBytes},
-    wlan_common::ie::*,
-    zerocopy::AsBytes,
 };
 
 pub(crate) fn create_wlantap_config(

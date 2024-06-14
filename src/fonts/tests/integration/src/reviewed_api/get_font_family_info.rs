@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::util::*,
-    crate::{FONTS_ALIASED_CM, FONTS_SMALL_CM},
-    futures::future::join_all,
-    itertools::Itertools,
-};
+use super::util::*;
+use crate::{FONTS_ALIASED_CM, FONTS_SMALL_CM};
+use futures::future::join_all;
+use itertools::Itertools;
 
 // Add new tests here so we don't overload component manager with requests (58150)
 #[fasync::run_singlethreaded(test)]

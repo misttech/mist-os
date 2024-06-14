@@ -8,25 +8,24 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_hardware_network as fhardware_network;
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext};
-use fidl_fuchsia_net_virtualization as fnet_virtualization;
 use futures::StreamExt as _;
 use net_declare::fidl_subnet;
-use netstack_testing_common::{
-    interfaces, ping,
-    realms::{
-        KnownServiceProvider, ManagementAgent, ManagerConfig, NetCfgVersion, Netstack,
-        TestSandboxExt as _,
-    },
+use netstack_testing_common::realms::{
+    KnownServiceProvider, ManagementAgent, ManagerConfig, NetCfgVersion, Netstack,
+    TestSandboxExt as _,
 };
+use netstack_testing_common::{interfaces, ping};
 use netstack_testing_macros::netstack_test;
 use packet::ParseBuffer as _;
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use test_case::test_case;
 use tracing::info;
+use {
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_virtualization as fnet_virtualization,
+};
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 enum Network {

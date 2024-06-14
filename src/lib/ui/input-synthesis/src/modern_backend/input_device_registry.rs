@@ -2,18 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{modern_backend::input_device::InputDevice, synthesizer},
-    anyhow::{Context as _, Error},
-    fidl::endpoints,
-    fidl_fuchsia_input::Key,
-    fidl_fuchsia_input_injection::InputDeviceRegistryProxy,
-    fidl_fuchsia_input_report::{
-        Axis, ConsumerControlButton, ConsumerControlDescriptor, ConsumerControlInputDescriptor,
-        ContactInputDescriptor, DeviceDescriptor, DeviceInformation, InputDeviceMarker,
-        KeyboardDescriptor, KeyboardInputDescriptor, MouseDescriptor, MouseInputDescriptor, Range,
-        TouchDescriptor, TouchInputDescriptor, TouchType, Unit, UnitType, TOUCH_MAX_CONTACTS,
-    },
+use crate::modern_backend::input_device::InputDevice;
+use crate::synthesizer;
+use anyhow::{Context as _, Error};
+use fidl::endpoints;
+use fidl_fuchsia_input::Key;
+use fidl_fuchsia_input_injection::InputDeviceRegistryProxy;
+use fidl_fuchsia_input_report::{
+    Axis, ConsumerControlButton, ConsumerControlDescriptor, ConsumerControlInputDescriptor,
+    ContactInputDescriptor, DeviceDescriptor, DeviceInformation, InputDeviceMarker,
+    KeyboardDescriptor, KeyboardInputDescriptor, MouseDescriptor, MouseInputDescriptor, Range,
+    TouchDescriptor, TouchInputDescriptor, TouchType, Unit, UnitType, TOUCH_MAX_CONTACTS,
 };
 
 // Use this to place required DeviceInfo into DeviceDescriptor.
@@ -194,14 +193,14 @@ impl InputDeviceRegistry {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{synthesizer::InputDeviceRegistry as _, *},
-        anyhow::format_err,
-        fidl_fuchsia_input_injection::{InputDeviceRegistryMarker, InputDeviceRegistryRequest},
-        fuchsia_async as fasync,
-        futures::{pin_mut, task::Poll, StreamExt},
-        test_case::test_case,
-    };
+    use super::synthesizer::InputDeviceRegistry as _;
+    use super::*;
+    use anyhow::format_err;
+    use fidl_fuchsia_input_injection::{InputDeviceRegistryMarker, InputDeviceRegistryRequest};
+    use fuchsia_async as fasync;
+    use futures::task::Poll;
+    use futures::{pin_mut, StreamExt};
+    use test_case::test_case;
 
     #[test_case(&super::InputDeviceRegistry::add_keyboard_device; "keyboard_device")]
     #[test_case(&super::InputDeviceRegistry::add_media_buttons_device; "media_button_device")]

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Context as _, fidl_fuchsia_io as fio, fuchsia_zircon as zx, futures::Future};
+use anyhow::Context as _;
+use futures::Future;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Creates `temp_filename` under the `dir_proxy`, overwrite it if already exists, call the callback
 /// with the opened file proxy, and then atomically rename it to `permanent_filename`.
@@ -46,7 +48,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fuchsia_async as fasync};
+    use super::*;
+    use fuchsia_async as fasync;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_do_with_atomic_file() {

@@ -4,8 +4,7 @@
 
 use crate::uapi;
 use bitflags::bitflags;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_starnix_binder as fbinder;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_starnix_binder as fbinder};
 
 // The inner mod is required because bitflags cannot pass the attribute through to the single
 // variant, and attributes cannot be applied to macro invocations.

@@ -48,6 +48,7 @@ if (is_host) {
 
     public_deps = [
       "//src/lib/analytics/cpp/core_dev_tools",
+      "//src/lib/fxl:cli",
       "//third_party/re2",
     ]
   }

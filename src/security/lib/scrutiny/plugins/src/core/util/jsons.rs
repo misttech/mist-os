@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    serde::{
-        de::{self, Deserializer, Visitor},
-        ser::Serializer,
-    },
-    std::fmt,
-    url::Url,
-};
+use serde::de::{self, Deserializer, Visitor};
+use serde::ser::Serializer;
+use std::fmt;
+use url::Url;
 
 pub fn serialize_url<S>(url: &Url, serializer: S) -> Result<S::Ok, S::Error>
 where

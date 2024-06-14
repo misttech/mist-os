@@ -2,23 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::format_err;
+use async_trait::async_trait;
+use cm_rust::ComponentDecl;
+use cm_types::{Name, Url};
+use errors::ModelError;
+use futures::channel::oneshot;
+use futures::lock::Mutex;
+use moniker::{ExtendedMoniker, Moniker};
+use sandbox::{Connector, Receiver, WeakComponentToken};
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::{Arc, Mutex as StdMutex, Weak};
+use tracing::warn;
 use {
-    anyhow::format_err,
-    async_trait::async_trait,
-    cm_rust::ComponentDecl,
-    cm_types::{Name, Url},
-    errors::ModelError,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::{channel::oneshot, lock::Mutex},
-    moniker::{ExtendedMoniker, Moniker},
-    sandbox::{Connector, Receiver, WeakComponentToken},
-    std::{
-        collections::HashMap,
-        fmt,
-        sync::{Arc, Mutex as StdMutex, Weak},
-    },
-    tracing::warn,
 };
 
 pub trait HasEventType {

@@ -7,17 +7,12 @@
 //! Crate to provide fidl logging and test setup helpers for conformance tests
 //! for fuchsia.io.
 
-use {
-    async_trait::async_trait,
-    fidl::{
-        endpoints::{create_proxy, ClientEnd, ProtocolMarker, Proxy},
-        prelude::*,
-    },
-    fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test,
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_zircon as zx,
-    futures::{StreamExt as _, TryStreamExt as _},
-};
+use async_trait::async_trait;
+use fidl::endpoints::{create_proxy, ClientEnd, ProtocolMarker, Proxy};
+use fidl::prelude::*;
+use fuchsia_async::{DurationExt, TimeoutExt};
+use futures::{StreamExt as _, TryStreamExt as _};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test, fuchsia_zircon as zx};
 
 /// Test harness helper struct.
 pub mod test_harness;

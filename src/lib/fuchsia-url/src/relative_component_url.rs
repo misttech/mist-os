@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{errors::ParseError, RelativePackageUrl, UrlParts};
+use crate::errors::ParseError;
+use crate::{RelativePackageUrl, UrlParts};
 
 /// A relative URL locating a Fuchsia component. Used with a subpackage context.
 /// Has the form "<name>#<resource>" where:
@@ -92,12 +93,10 @@ impl<'de> serde::Deserialize<'de> for RelativeComponentUrl {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::errors::{PackagePathSegmentError, ResourcePathError},
-        assert_matches::assert_matches,
-        std::convert::TryFrom as _,
-    };
+    use super::*;
+    use crate::errors::{PackagePathSegmentError, ResourcePathError};
+    use assert_matches::assert_matches;
+    use std::convert::TryFrom as _;
 
     #[test]
     fn parse_err() {

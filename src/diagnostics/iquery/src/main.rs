@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    fuchsia_async as fasync,
-    iquery::{command_line::CommandLine, commands::ArchiveAccessorProvider, commands::Command},
-};
+use anyhow::Error;
+use fuchsia_async as fasync;
+use iquery::command_line::CommandLine;
+use iquery::commands::{ArchiveAccessorProvider, Command};
 
 #[cfg(test)]
 #[macro_use]

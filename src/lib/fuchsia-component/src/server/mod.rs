@@ -4,41 +4,33 @@
 
 //! Tools for providing Fuchsia services.
 
-use {
-    crate::DEFAULT_SERVICE_INSTANCE,
-    anyhow::Error,
-    fidl::endpoints::{
-        DiscoverableProtocolMarker, Proxy as _, RequestStream, ServerEnd, ServiceMarker,
-        ServiceRequest,
-    },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{channel::mpsc, future::BoxFuture, FutureExt, Stream, StreamExt},
-    pin_project::pin_project,
-    std::{
-        marker::PhantomData,
-        pin::Pin,
-        sync::Arc,
-        task::{Context, Poll},
-    },
-    thiserror::Error,
-    tracing::warn,
-    vfs::{
-        directory::{
-            entry::DirectoryEntry,
-            entry_container::Directory,
-            helper::DirectlyMutable,
-            immutable::{connection::ImmutableConnection, simple::simple},
-            simple::Simple,
-        },
-        execution_scope::ExecutionScope,
-        file::vmo::VmoFile,
-        name::Name,
-        path::Path,
-        remote::remote_dir,
-        service::endpoint,
-    },
-    zx::Duration,
+use crate::DEFAULT_SERVICE_INSTANCE;
+use anyhow::Error;
+use fidl::endpoints::{
+    DiscoverableProtocolMarker, Proxy as _, RequestStream, ServerEnd, ServiceMarker, ServiceRequest,
 };
+use futures::channel::mpsc;
+use futures::future::BoxFuture;
+use futures::{FutureExt, Stream, StreamExt};
+use pin_project::pin_project;
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use thiserror::Error;
+use tracing::warn;
+use vfs::directory::entry::DirectoryEntry;
+use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable;
+use vfs::directory::immutable::Simple as PseudoDir;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo::VmoFile;
+use vfs::name::Name;
+use vfs::path::Path;
+use vfs::remote::remote_dir;
+use vfs::service::endpoint;
+use zx::Duration;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 mod service;
 pub use service::{
@@ -63,7 +55,7 @@ pub struct ServiceFs<ServiceObjTy: ServiceObjTrait> {
     scope: ExecutionScope,
 
     // The root directory.
-    dir: Arc<Simple<ImmutableConnection>>,
+    dir: Arc<PseudoDir>,
 
     // New connections are sent via an mpsc. The tuple is (index, channel) where index is the index
     // into the `services` member.
@@ -108,7 +100,7 @@ impl<'a, Output: 'a> ServiceFs<ServiceObj<'a, Output>> {
 /// Services and subdirectories can be added to it.
 pub struct ServiceFsDir<'a, ServiceObjTy: ServiceObjTrait> {
     fs: &'a mut ServiceFs<ServiceObjTy>,
-    dir: Arc<Simple<ImmutableConnection>>,
+    dir: Arc<PseudoDir>,
 }
 
 /// A `Service` implementation that proxies requests
@@ -558,8 +550,8 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
     }
 }
 
-fn new_simple_dir() -> Arc<Simple<ImmutableConnection>> {
-    let dir = simple();
+fn new_simple_dir() -> Arc<PseudoDir> {
+    let dir = PseudoDir::new();
     dir.clone().set_not_found_handler(Box::new(move |path| {
         warn!(
             "ServiceFs received request to `{}` but has not been configured to serve this path.",

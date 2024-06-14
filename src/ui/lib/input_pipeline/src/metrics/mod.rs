@@ -4,10 +4,9 @@
 
 use anyhow::{Context as _, Error};
 use cobalt_client::traits::AsEventCode;
-use fidl_fuchsia_metrics as metrics;
-use fuchsia_async as fasync;
 use metrics_registry::*;
 use tracing::warn;
+use {fidl_fuchsia_metrics as metrics, fuchsia_async as fasync};
 
 /// Connects to the MetricEventLoggerFactory service to create a
 /// MetricEventLoggerProxy for the caller.

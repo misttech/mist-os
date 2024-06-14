@@ -8,7 +8,8 @@ use core::convert::Infallible as Never;
 
 use net_types::ip::IpAddress;
 use net_types::MulticastAddress;
-use packet::records::{options::OptionParseErr, TooFewRecordsErr};
+use packet::records::options::OptionParseErr;
+use packet::records::TooFewRecordsErr;
 use thiserror::Error;
 
 use crate::icmp::IcmpIpExt;

@@ -2,22 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_helpers::maybe_stream::MaybeStream,
-    async_utils::channel::TrySend,
-    fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync,
-    fuchsia_bluetooth::profile::{psm_from_protocol, Psm},
-    fuchsia_bluetooth::types::{Channel, PeerId},
-    futures::channel::mpsc,
-    futures::{select, StreamExt},
-    profile_client::ProfileEvent,
-    std::convert::TryInto,
-    std::default::Default,
-    std::future::Future,
-    std::pin::Pin,
-    std::task::{Context, Poll},
-    tracing::{debug, error, info, warn},
-};
+use async_helpers::maybe_stream::MaybeStream;
+use async_utils::channel::TrySend;
+use fuchsia_bluetooth::profile::{psm_from_protocol, Psm};
+use fuchsia_bluetooth::types::{Channel, PeerId};
+use futures::channel::mpsc;
+use futures::{select, StreamExt};
+use profile_client::ProfileEvent;
+use std::convert::TryInto;
+use std::default::Default;
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tracing::{debug, error, info, warn};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync};
 
 use crate::peer_info::PeerInfo;
 

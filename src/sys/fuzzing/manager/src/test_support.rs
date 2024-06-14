@@ -2,27 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::manager::{FidlEndpoint, Manager};
+use anyhow::{Context as _, Error, Result};
+use fidl::endpoints::{
+    create_proxy, create_proxy_and_stream, create_request_stream, ClientEnd, ControlHandle,
+    ServerEnd,
+};
+use futures::channel::mpsc;
+use futures::future::join_all;
+use futures::{
+    join, pin_mut, select, try_join, AsyncReadExt, AsyncWriteExt, FutureExt, SinkExt, StreamExt,
+    TryStreamExt,
+};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use test_manager::*;
+use zx::HandleBased;
 use {
-    crate::manager::{FidlEndpoint, Manager},
-    anyhow::{Context as _, Error, Result},
-    fidl::endpoints::{
-        create_proxy, create_proxy_and_stream, create_request_stream, ClientEnd, ControlHandle,
-        ServerEnd,
-    },
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_fuzzer as fuzz,
     fidl_fuchsia_mem as fmem, fidl_fuchsia_test_manager as test_manager, fuchsia_async as fasync,
     fuchsia_zircon as zx,
-    futures::channel::mpsc,
-    futures::future::join_all,
-    futures::{
-        join, pin_mut, select, try_join, AsyncReadExt, AsyncWriteExt, FutureExt, SinkExt,
-        StreamExt, TryStreamExt,
-    },
-    std::cell::RefCell,
-    std::collections::HashMap,
-    std::rc::Rc,
-    test_manager::*,
-    zx::HandleBased,
 };
 
 ////////////////////////////////////////////////////////////////////////////////

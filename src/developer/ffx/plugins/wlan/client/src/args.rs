@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::{ArgsInfo, FromArgs},
-    ffx_core::ffx_command,
-    ffx_wlan_common::args::{CredentialType, SecurityType},
-    fidl_fuchsia_wlan_policy as wlan_policy,
-};
+use argh::{ArgsInfo, FromArgs};
+use ffx_core::ffx_command;
+use ffx_wlan_common::args::{CredentialType, SecurityType};
+use fidl_fuchsia_wlan_policy as wlan_policy;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

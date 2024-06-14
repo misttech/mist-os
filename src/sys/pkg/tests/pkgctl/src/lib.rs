@@ -4,42 +4,40 @@
 
 #![allow(clippy::let_unit_value)]
 #![cfg(test)]
+use anyhow::Error;
+use fidl::endpoints::{ControlHandle as _, ServerEnd};
+use fidl_fuchsia_pkg::{
+    self as fpkg, PackageCacheRequest, PackageCacheRequestStream, PackageResolverRequest,
+    PackageResolverRequestStream, RepositoryIteratorRequest, RepositoryManagerRequest,
+    RepositoryManagerRequestStream, ResolveError,
+};
+use fidl_fuchsia_pkg_ext::{
+    MirrorConfig, MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
+    RepositoryStorageType,
+};
+use fidl_fuchsia_pkg_rewrite::{
+    EditTransactionRequest, EngineRequest, EngineRequestStream, RuleIteratorMarker,
+    RuleIteratorRequest,
+};
+use fidl_fuchsia_pkg_rewrite_ext::Rule;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_hyper_test_support::handler::StaticResponse;
+use fuchsia_hyper_test_support::TestServer;
+use fuchsia_sync::Mutex;
+use fuchsia_url::RepositoryUrl;
+use fuchsia_zircon::Status;
+use futures::prelude::*;
+use http::Uri;
+use shell_process::ProcessOutput;
+use std::fs::{create_dir, File};
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tempfile::TempDir;
+use vfs::directory::entry_container::Directory;
 use {
-    anyhow::Error,
-    fidl::endpoints::{ControlHandle as _, ServerEnd},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg::{
-        self as fpkg, PackageCacheRequest, PackageCacheRequestStream, PackageResolverRequest,
-        PackageResolverRequestStream, RepositoryIteratorRequest, RepositoryManagerRequest,
-        RepositoryManagerRequestStream, ResolveError,
-    },
-    fidl_fuchsia_pkg_ext::{
-        MirrorConfig, MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder,
-        RepositoryKey, RepositoryStorageType,
-    },
-    fidl_fuchsia_pkg_rewrite::{
-        EditTransactionRequest, EngineRequest, EngineRequestStream, RuleIteratorMarker,
-        RuleIteratorRequest,
-    },
-    fidl_fuchsia_pkg_rewrite_ext::Rule,
-    fidl_fuchsia_space as fidl_space, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_hyper_test_support::{handler::StaticResponse, TestServer},
-    fuchsia_sync::Mutex,
-    fuchsia_url::RepositoryUrl,
+    fidl_fuchsia_io as fio, fidl_fuchsia_space as fidl_space, fuchsia_async as fasync,
     fuchsia_zircon as zx,
-    fuchsia_zircon::Status,
-    futures::prelude::*,
-    http::Uri,
-    shell_process::ProcessOutput,
-    std::{
-        fs::{create_dir, File},
-        io::Write,
-        path::PathBuf,
-        sync::Arc,
-    },
-    tempfile::TempDir,
-    vfs::directory::entry_container::Directory,
 };
 
 const BINARY_PATH: &str = "/pkg/bin/pkgctl";

@@ -15,23 +15,21 @@ use core::borrow::Borrow;
 use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 
-use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
+use log::debug;
+use net_types::ip::{GenericOverIp, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
 use packet::records::{AlignedRecordSequenceBuilder, Records, RecordsRaw};
 use packet::{
     BufferAlloc, BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
     GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
     ParsablePacket, ParseMetadata, ReusableBuffer, SerializeError, SerializeTarget, Serializer,
 };
-use tracing::debug;
-use zerocopy::{
-    byteorder::network_endian::U16, AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell,
-    Ref, Unaligned,
-};
+use zerocopy::byteorder::network_endian::U16;
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
 use crate::error::{IpParseError, IpParseErrorAction, IpParseResult, ParseError};
 use crate::icmp::Icmpv6ParameterProblemCode;
 use crate::ip::{
-    IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto, Nat64Error,
+    IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto, Nat64Error,
     Nat64TranslationResult,
 };
 use crate::ipv4::{Ipv4PacketBuilder, HDR_PREFIX_LEN};
@@ -282,6 +280,10 @@ pub struct Ipv6Packet<B> {
     extension_hdrs: Records<B, Ipv6ExtensionHeaderImpl>,
     body: B,
     proto: Ipv6Proto,
+}
+
+impl<B: ByteSlice, I: IpExt> GenericOverIp<I> for Ipv6Packet<B> {
+    type Type = <I as IpExt>::Packet<B>;
 }
 
 impl<B: ByteSlice> Ipv6Header for Ipv6Packet<B> {
@@ -1316,8 +1318,7 @@ pub(crate) fn reassemble_fragmented_packet<
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use packet::FragmentedBuffer;
-    use packet::{Buf, ParseBuffer};
+    use packet::{Buf, FragmentedBuffer, ParseBuffer};
 
     use crate::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
     use crate::testutil::*;

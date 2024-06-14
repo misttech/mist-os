@@ -217,3 +217,9 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             method=Sl4fMethods.SET_DISCOVERABLE,
             params={"discoverable": discoverable},
         )
+
+    def run_pairing_delegate(self) -> None:
+        """Function to run pairing delegate server calls.
+
+        Fuchsia Controller only implementation
+        """

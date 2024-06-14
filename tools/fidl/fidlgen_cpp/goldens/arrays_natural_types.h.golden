@@ -493,7 +493,7 @@ inline TableLargeArray& TableLargeArray::a(std::optional<::std::array<uint32_t, 
 namespace fidl {
 
 template <>
-struct IsFidlType<::test_arrays::StructSmallArray> : public std::true_type {};
+struct IsFidlType<::test_arrays::StructSmallArray> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_arrays::StructSmallArray> {
@@ -505,14 +505,14 @@ struct TypeTraits<::test_arrays::StructSmallArray> {
 };
 
 template <>
-struct IsStruct<::test_arrays::StructSmallArray> : public std::true_type {};
+struct IsStruct<::test_arrays::StructSmallArray> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::StructSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_arrays::StructSmallArray, 8> {};
 
 template <>
-struct IsFidlType<::test_arrays::StructLargeArray> : public std::true_type {};
+struct IsFidlType<::test_arrays::StructLargeArray> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_arrays::StructLargeArray> {
@@ -524,14 +524,14 @@ struct TypeTraits<::test_arrays::StructLargeArray> {
 };
 
 template <>
-struct IsStruct<::test_arrays::StructLargeArray> : public std::true_type {};
+struct IsStruct<::test_arrays::StructLargeArray> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::StructLargeArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_arrays::StructLargeArray, 400> {};
 
 template <>
-struct IsFidlType<::test_arrays::TableSmallArray> : public std::true_type {};
+struct IsFidlType<::test_arrays::TableSmallArray> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_arrays::TableSmallArray> {
@@ -543,13 +543,13 @@ struct TypeTraits<::test_arrays::TableSmallArray> {
 };
 
 template <>
-struct IsTable<::test_arrays::TableSmallArray> : public std::true_type {};
+struct IsTable<::test_arrays::TableSmallArray> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::TableSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableSmallArray> {};
 
 template <>
-struct IsFidlType<::test_arrays::TableLargeArray> : public std::true_type {};
+struct IsFidlType<::test_arrays::TableLargeArray> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_arrays::TableLargeArray> {
@@ -561,13 +561,13 @@ struct TypeTraits<::test_arrays::TableLargeArray> {
 };
 
 template <>
-struct IsTable<::test_arrays::TableLargeArray> : public std::true_type {};
+struct IsTable<::test_arrays::TableLargeArray> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::TableLargeArray, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableLargeArray> {};
 
 template <>
-struct IsFidlType<::test_arrays::UnionSmallArray> : public std::true_type {};
+struct IsFidlType<::test_arrays::UnionSmallArray> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_arrays::UnionSmallArray> {
@@ -579,14 +579,14 @@ struct TypeTraits<::test_arrays::UnionSmallArray> {
 };
 
 template <>
-struct IsUnion<::test_arrays::UnionSmallArray> : public std::true_type {};
+struct IsUnion<::test_arrays::UnionSmallArray> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::UnionSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_arrays::UnionSmallArray> {};
 
 template <>
-struct IsFidlType<::test_arrays::UnionLargeArray> : public std::true_type {};
+struct IsFidlType<::test_arrays::UnionLargeArray> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_arrays::UnionLargeArray> {
@@ -598,7 +598,7 @@ struct TypeTraits<::test_arrays::UnionLargeArray> {
 };
 
 template <>
-struct IsUnion<::test_arrays::UnionLargeArray> : public std::true_type {};
+struct IsUnion<::test_arrays::UnionLargeArray> : public std::true_type{};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::UnionLargeArray, ::fidl::internal::NaturalCodingConstraintEmpty> final

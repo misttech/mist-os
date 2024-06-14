@@ -258,6 +258,34 @@ TEST_F(LowEnergyConnectionServerTest, GetCodecLocalDelayCommandNotSupported) {
   RunGetCodecDelayRangeTest(std::move(params), ZX_ERR_INTERNAL);
 }
 
+// Calling AcceptCis with CIG/CIS values matching those we are already waiting for causes the
+// IsochronousStream handle to be closed with an INVALID_ARGS epitaph.
+TEST_F(LowEnergyConnectionServerTest, AcceptCisCalledTwiceSameArgs) {
+  fuchsia::bluetooth::le::ConnectionAcceptCisRequest params1, params2;
+  params1.set_cig_id(0x10);
+  params2.set_cig_id(0x10);
+  params1.set_cis_id(0x08);
+  params2.set_cis_id(0x08);
+
+  fidl::InterfaceHandle<fuchsia::bluetooth::le::IsochronousStream> stream1_handle, stream2_handle;
+  params2.set_connection_stream(stream2_handle.NewRequest());
+  params1.set_connection_stream(stream1_handle.NewRequest());
+  fuchsia::bluetooth::le::IsochronousStreamPtr client1 = stream1_handle.Bind();
+  fuchsia::bluetooth::le::IsochronousStreamPtr client2 = stream2_handle.Bind();
+
+  std::optional<zx_status_t> client1_epitaph, client2_epitaph;
+  client1.set_error_handler([&](zx_status_t epitaph) { client1_epitaph = epitaph; });
+  client2.set_error_handler([&](zx_status_t epitaph) { client2_epitaph = epitaph; });
+
+  client()->AcceptCis(std::move(params1));
+  client()->AcceptCis(std::move(params2));
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(client1_epitaph);
+  ASSERT_TRUE(client2_epitaph);
+  EXPECT_EQ(*client2_epitaph, ZX_ERR_INVALID_ARGS);
+}
+
 TEST_F(LowEnergyConnectionServerTest, ServerClosedOnConnectionClosed) {
   adapter()->le()->Disconnect(peer_id());
   RunLoopUntilIdle();

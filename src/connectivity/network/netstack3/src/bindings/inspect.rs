@@ -10,20 +10,48 @@
 use std::string::ToString as _;
 
 use fuchsia_inspect::Node;
-use net_types::{
-    ethernet::Mac,
-    ip::{Ipv4, Ipv6},
-    UnicastAddr, Witness as _,
-};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ipv4, Ipv6};
+use net_types::{UnicastAddr, Witness as _};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice, WeakDeviceId};
 use netstack3_fuchsia::{FuchsiaInspector, InspectorDeviceIdProvider};
 
-use crate::bindings::{
-    devices::{
-        DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,
-    },
-    BindingsCtx, Ctx, DeviceIdExt as _,
+use crate::bindings::devices::{
+    DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,
 };
+use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt as _};
+
+/// An opaque struct that encapsulates the process of starting the Inspect
+/// publisher task.
+///
+/// In tests where Inspect data should not be published, set `should_publish` to
+/// false.
+pub struct InspectPublisher<'a> {
+    inspector: &'a fuchsia_inspect::Inspector,
+    should_publish: bool,
+}
+
+impl<'a> InspectPublisher<'a> {
+    pub(crate) fn new() -> Self {
+        Self { inspector: fuchsia_inspect::component::inspector(), should_publish: true }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_for_test(inspector: &'a fuchsia_inspect::Inspector) -> Self {
+        Self { inspector, should_publish: false }
+    }
+
+    pub(crate) fn inspector(&self) -> &'a fuchsia_inspect::Inspector {
+        self.inspector
+    }
+
+    pub(crate) fn publish(self) -> Option<fuchsia_async::Task<()>> {
+        self.should_publish.then(|| {
+            inspect_runtime::publish(self.inspector, inspect_runtime::PublishOptions::default())
+                .expect("publish Inspect task")
+        })
+    }
+}
 
 impl InspectorDeviceIdProvider<DeviceId<BindingsCtx>> for BindingsCtx {
     fn device_id(id: &DeviceId<BindingsCtx>) -> u64 {

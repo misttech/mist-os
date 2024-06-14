@@ -16,7 +16,8 @@ use {
     std::{borrow::Borrow, io::Write},
 };
 
-use crate::{draw::MappedImage, fps::Counter};
+use crate::draw::MappedImage;
+use crate::fps::Counter;
 
 // ANSI X3.64 (ECMA-48) escape code for clearing the terminal screen.
 const CLEAR: &str = "\x1B[2K\r";

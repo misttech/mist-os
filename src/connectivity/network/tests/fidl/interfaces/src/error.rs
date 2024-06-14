@@ -6,7 +6,8 @@
 
 #![cfg(test)]
 
-use std::{collections::HashMap, num::NonZeroU64};
+use std::collections::HashMap;
+use std::num::NonZeroU64;
 
 use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;

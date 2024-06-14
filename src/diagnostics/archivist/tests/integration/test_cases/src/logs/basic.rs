@@ -2,17 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{logs::utils::Listener, test_topology};
+use crate::logs::utils::Listener;
+use crate::test_topology;
 use diagnostics_reader::{ArchiveReader, Logs};
-use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy};
-use fuchsia_async as fasync;
 use fuchsia_component::client;
-use fuchsia_syslog_listener as syslog_listener;
-use fuchsia_zircon as zx;
-use futures::{channel::mpsc, Stream, StreamExt};
+use futures::channel::mpsc;
+use futures::{Stream, StreamExt};
 use tracing::{info, warn};
+use {
+    fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync,
+    fuchsia_syslog_listener as syslog_listener, fuchsia_zircon as zx,
+};
 
 fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
     let options = LogFilterOptions {

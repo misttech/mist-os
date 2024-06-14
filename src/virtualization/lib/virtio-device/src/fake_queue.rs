@@ -18,19 +18,13 @@
 //! it can also be used for writing unittests for actual virtio device drivers without needing a
 //! guest environment.
 
-use {
-    crate::{
-        mem::{DeviceRange, DriverRange},
-        queue::{Queue, QueueMemory},
-        ring::{self, DescAccess, VRING_DESC_F_INDIRECT},
-        util::NotificationCounter,
-    },
-    fuchsia_sync::Mutex,
-    std::{
-        alloc::{self, GlobalAlloc},
-        collections::HashMap,
-    },
-};
+use crate::mem::{DeviceRange, DriverRange};
+use crate::queue::{Queue, QueueMemory};
+use crate::ring::{self, DescAccess, VRING_DESC_F_INDIRECT};
+use crate::util::NotificationCounter;
+use fuchsia_sync::Mutex;
+use std::alloc::{self, GlobalAlloc};
+use std::collections::HashMap;
 
 // Helper struct that just holds an allocation and returns it to the system allocator on drop.
 struct IdentityAlloc {

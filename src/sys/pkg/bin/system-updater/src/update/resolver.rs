@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
-    fuchsia_url::{AbsolutePackageUrl, PinnedAbsolutePackageUrl},
-    futures::prelude::*,
-    std::collections::HashMap,
-    update_package::{UpdateImagePackage, UpdatePackage},
-};
+use fuchsia_url::{AbsolutePackageUrl, PinnedAbsolutePackageUrl};
+use futures::prelude::*;
+use std::collections::HashMap;
+use update_package::{UpdateImagePackage, UpdatePackage};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 /// Error encountered while resolving a package.
 #[derive(Debug, thiserror::Error)]

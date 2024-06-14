@@ -15,9 +15,13 @@ use fuchsia_bluetooth::types::Uuid;
 use fuchsia_sync::RwLock;
 use futures::StreamExt;
 use num::Num;
-use std::{collections::HashMap, num::ParseIntError, str::FromStr, sync::Arc};
+use std::collections::HashMap;
+use std::num::ParseIntError;
+use std::str::FromStr;
+use std::sync::Arc;
 
-use self::{commands::Cmd, types::Service};
+use self::commands::Cmd;
+use self::types::Service;
 
 pub mod commands;
 pub mod repl;
@@ -780,7 +784,8 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_gatt2::{ClientMarker, ServiceHandle};
     use fuchsia_zircon::DurationNum;
-    use futures::{future::FutureExt, join, select};
+    use futures::future::FutureExt;
+    use futures::{join, select};
     use std::pin::pin;
 
     #[fuchsia::test]

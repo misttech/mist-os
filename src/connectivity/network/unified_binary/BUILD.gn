@@ -23,11 +23,11 @@ rustc_binary("network_unified_binary") {
   sources = [ "src/main.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
-  # This is a known massive target.
-  # "racing" mode will make this more resilient to remote timeouts
-  # at the expense of using local resources, while still allowing
-  # warm-up of the remote cache.
-  configs += [ "//build/config/rust:rbe_strategy_racing" ]
+  if (is_asan) {
+    # This is a known massive target.
+    # Remote build on a worker with more memory.
+    configs += [ "//build/config:big_rbe_machine" ]
+  }
 
   configs += [ ":config" ]
 }

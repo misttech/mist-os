@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use component_events::events::*;
+use component_events::matcher::*;
+use fuchsia_component::client;
 use {
-    component_events::events::*, component_events::matcher::*,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_component::client,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
 };
 
 #[fasync::run_singlethreaded(test)]

@@ -5,12 +5,11 @@
 use anyhow::{format_err, Error};
 use fidl::prelude::*;
 use fidl_fuchsia_hardware_audio::*;
-use fidl_fuchsia_media as media;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{future::MaybeDone, StreamExt};
+use futures::future::MaybeDone;
+use futures::StreamExt;
 use std::sync::Arc;
 use tracing::info;
+use {fidl_fuchsia_media as media, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::driver::{ensure_dai_format_is_supported, ensure_pcm_format_is_supported};
 use crate::DigitalAudioInterface;
@@ -204,7 +203,8 @@ async fn process_audio_requests(
 mod tests {
     use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, AudioDeviceEnumeratorRequest};
     use fixture::fixture;
-    use futures::{task::Context, Future};
+    use futures::task::Context;
+    use futures::Future;
     use std::pin::Pin;
 
     use super::*;

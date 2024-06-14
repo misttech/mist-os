@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::client::types, std::collections::HashSet};
+use crate::client::types;
+use std::collections::HashSet;
 
 // Returns zero or more selected networks. Multiple selected networks indicates no preference
 // between them.

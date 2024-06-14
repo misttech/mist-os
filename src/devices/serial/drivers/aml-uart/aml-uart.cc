@@ -506,10 +506,7 @@ void AmlUart::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_
   if (element_control_client_end_) {
     fbl::AutoLock lock(&timer_lock_);
 
-    if (lease_control_client_end_.is_valid()) {
-      // Cancel the timer and set it again if the last one hasn't expired.
-      lease_timer_.cancel();
-    } else {
+    if (!lease_control_client_end_.is_valid()) {
       // Take the wake lease and keep the lease control client.
       auto lease_control_result = AcquireLease();
       if (lease_control_result.is_error()) {
@@ -519,8 +516,12 @@ void AmlUart::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_
     }
 
     timeout_ = zx::deadline_after(zx::msec(kPowerLeaseTimeoutMs));
-    timer_waiter_.Begin(timer_dispatcher_->async_dispatcher());
+    // Must set the new timeout before the wait on dispatcher begins, otherwise if there was a
+    // previous timer that has been fired, the new wait on dispatcher will capture the asserted
+    // signal again. Also we don't need to worry about missing the timeout signal from the new timer
+    // set, because the timeout signal will persist after timer fires.
     lease_timer_.set(timeout_, zx::duration());
+    timer_waiter_.Begin(timer_dispatcher_->async_dispatcher());
   }
 
   auto uart_status = Status::Get().ReadFrom(&mmio_);
@@ -541,12 +542,20 @@ void AmlUart::HandleLeaseTimer(async_dispatcher_t* dispatcher, async::WaitBase* 
     // Do nothing if the handler is triggered by the destroy of the dispatcher.
     return;
   }
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Timer fired with an error: %s", zx_status_get_string(status));
+    return;
+  }
+
   if (zx::clock::get_monotonic() < timeout_) {
     // If the current time is earlier than timeout, it means that this handler is triggered after
     // |HandleIrq| holds the lock, and when this handler get the lock, the timer has been reset, so
     // don't drop the lease in this case.
+    zxlogf(INFO,
+           "Timer has been reset by a new interrupt, this handler is out-of-date, so do nothing.");
     return;
   }
+
   lease_control_client_end_.reset();
 }
 }  // namespace serial

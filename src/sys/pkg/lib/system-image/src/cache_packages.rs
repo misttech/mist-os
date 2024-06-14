@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::CachePackagesInitError,
-    fuchsia_hash::Hash,
-    fuchsia_inspect::{self as finspect, ArrayProperty as _},
-    fuchsia_url::{AbsolutePackageUrl, PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl},
-    futures::{future::BoxFuture, FutureExt as _},
-    serde::{Deserialize, Serialize},
-    std::sync::Arc,
-};
+use crate::CachePackagesInitError;
+use fuchsia_hash::Hash;
+use fuchsia_inspect::{self as finspect, ArrayProperty as _};
+use fuchsia_url::{AbsolutePackageUrl, PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl};
+use futures::future::BoxFuture;
+use futures::FutureExt as _;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct CachePackages {
@@ -125,7 +124,9 @@ fn parse_json(contents: &[u8]) -> Result<Vec<PinnedAbsolutePackageUrl>, CachePac
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches, diagnostics_assertions::assert_data_tree};
+    use super::*;
+    use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
 
     #[test]
     fn populate_from_valid_json() {

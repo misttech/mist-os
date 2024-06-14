@@ -9,7 +9,9 @@ use fidl_fuchsia_feedback::DataProviderProxy;
 use fuchsia_triage::{
     analyze, analyze_structured, ActionResultFormatter, ActionTagDirective, TriageOutput,
 };
-use std::{env, io::Write, path::PathBuf};
+use std::env;
+use std::io::Write;
+use std::path::PathBuf;
 use tempfile::tempdir;
 use triage_app_lib::file_io::{config_from_files, diagnostics_from_directory};
 
@@ -133,7 +135,9 @@ mod tests {
     use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_feedback::{DataProviderRequest, Snapshot};
     use lazy_static::lazy_static;
-    use std::{collections::HashMap, fs, path::Path};
+    use std::collections::HashMap;
+    use std::fs;
+    use std::path::Path;
 
     macro_rules! test_file {
         (config $filename:expr) => {

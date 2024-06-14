@@ -36,12 +36,6 @@ class PlaybackController : public camera::actor::ActorBase {
   using SensorInfo = fuchsia_sensors_types::SensorInfo;
   using SensorRateConfig = fuchsia_sensors_types::SensorRateConfig;
 
-  static constexpr auto kLowerTimestamp = [](const SensorEvent& l, const SensorEvent& r) {
-    return l.timestamp() > r.timestamp();
-  };
-  using EventPriorityQueue =
-      std::priority_queue<SensorEvent, std::vector<SensorEvent>, decltype(kLowerTimestamp)>;
-
  public:
   explicit PlaybackController(async_dispatcher_t* dispatcher);
 
@@ -81,11 +75,14 @@ class PlaybackController : public camera::actor::ActorBase {
     bool enabled = false;
     zx::duration sampling_period = zx::duration(kDefaultSamplingPeriodNs);
     zx::duration max_reporting_latency = zx::duration(kDefaultMaxReportingLatencyNs);
-    zx::time last_scheduled_event_time = zx::time::infinite_past();
+
+    // Output buffer used when max reporting latency is non-zero.
+    std::queue<SensorEvent> event_buffer;
 
     // For fixed value playback
     std::vector<SensorEvent> fixed_sensor_events;
     int next_fixed_event = 0;
+    std::optional<zx::time> last_scheduled_event_time;
   };
 
   // Tells any attached Driver protocol implementation to disconnect their client with the given
@@ -110,9 +107,11 @@ class PlaybackController : public camera::actor::ActorBase {
   // This should only be called from a promise scheduled to run on this actor's executor.
   SensorEvent GenerateNextFixedEventForSensor(SensorId sensor_id, zx::time timestamp);
 
-  fpromise::promise<void> ScheduleFixedEvent(SensorId sensor_id, bool first_event);
+  fpromise::promise<void> ScheduleFixedEvent(SensorId sensor_id);
 
-  fpromise::promise<void> SendEvent(const SensorEvent& event);
+  fpromise::promise<void> SendOrBufferEvent(const SensorEvent& event);
+
+  fpromise::promise<void> SendBufferedEvents(SensorId sensor_id);
 
   fpromise::promise<void> StopScheduledPlayback();
 

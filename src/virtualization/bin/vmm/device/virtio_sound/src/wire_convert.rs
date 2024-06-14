@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::wire::*, fuchsia_zircon as zx, num_traits::cast::cast, once_cell::sync::Lazy,
-    std::collections::HashMap,
-};
+use crate::wire::*;
+use fuchsia_zircon as zx;
+use num_traits::cast::cast;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 /// Stringify a request code VIRTIO_SND_R_*.
 pub fn request_code_to_string(code: u32) -> &'static str {
@@ -108,7 +109,8 @@ pub fn bytes_for_duration(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, pretty_assertions::assert_eq};
+    use super::*;
+    use pretty_assertions::assert_eq;
 
     #[fuchsia::test]
     fn test_wire_formats_supported_bitmask() {
@@ -172,8 +174,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_bytes_per_frame() {
-        use fidl_fuchsia_media::AudioSampleFormat as ASF;
-        use fidl_fuchsia_media::AudioStreamType;
+        use fidl_fuchsia_media::{AudioSampleFormat as ASF, AudioStreamType};
 
         assert_eq!(
             2,
@@ -211,8 +212,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_bytes_for_duration() {
-        use fidl_fuchsia_media::AudioSampleFormat as ASF;
-        use fidl_fuchsia_media::AudioStreamType;
+        use fidl_fuchsia_media::{AudioSampleFormat as ASF, AudioStreamType};
 
         assert_eq!(
             None,

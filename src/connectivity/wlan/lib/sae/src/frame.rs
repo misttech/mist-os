@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    super::{AuthFrameRx, AuthFrameTx},
-    anyhow::{anyhow, bail, Error},
-    fidl_fuchsia_wlan_ieee80211::StatusCode,
-    wlan_common::{appendable::Appendable, buffer_reader::BufferReader},
-};
+use super::{AuthFrameRx, AuthFrameTx};
+use anyhow::{anyhow, bail, Error};
+use fidl_fuchsia_wlan_ieee80211::StatusCode;
+use wlan_common::appendable::Appendable;
+use wlan_common::buffer_reader::BufferReader;
 
 /// IEEE Std 802.11-2016, 12.4.6
 /// An anticlogging token sent to a peer.
@@ -138,7 +137,8 @@ pub fn write_confirm(send_confirm: u16, confirm: &[u8]) -> AuthFrameTx {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, wlan_common::assert_variant};
+    use super::*;
+    use wlan_common::assert_variant;
 
     #[rustfmt::skip]
     const ECC_COMMIT_BODY: &[u8] = &[

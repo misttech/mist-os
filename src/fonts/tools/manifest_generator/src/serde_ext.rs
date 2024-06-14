@@ -4,14 +4,10 @@
 
 //! Useful utilities for Serde JSON deserialization.
 
-use {
-    serde::de::DeserializeOwned,
-    std::{
-        fs,
-        path::{Path, PathBuf},
-    },
-    thiserror::Error,
-};
+use serde::de::DeserializeOwned;
+use std::fs;
+use std::path::{Path, PathBuf};
+use thiserror::Error;
 
 /// Loads and deserializes a JSON-serialized value of type `T` from a file path.
 pub fn load_from_path<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T, LoadError> {

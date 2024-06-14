@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::{ArgsInfo, FromArgValue, FromArgs},
-    std::fmt,
-};
+use argh::{ArgsInfo, FromArgValue, FromArgs};
+use std::fmt;
 
 #[cfg(not(target_os = "fuchsia"))]
 use ffx_core::ffx_command;

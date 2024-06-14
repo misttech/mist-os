@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    cr50::command::{Deserializable, Header, Serializable, Subcommand, TpmRequest},
-    util::{DeserializeError, Deserializer, Serializer},
-};
+use crate::cr50::command::{Deserializable, Header, Serializable, Subcommand, TpmRequest};
+use crate::util::{DeserializeError, Deserializer, Serializer};
 use fidl_fuchsia_tpm_cr50::{
     CcdCapability, CcdCapabilitySetting, CcdCapabilityState, PhysicalPresenceState,
 };
 use num_derive::FromPrimitive;
-use std::{
-    ffi::{CString, NulError},
-    marker::PhantomData,
-};
+use std::ffi::{CString, NulError};
+use std::marker::PhantomData;
 
 #[repr(u8)]
 #[derive(FromPrimitive, Debug, Copy, Clone, PartialEq, Eq)]

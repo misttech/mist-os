@@ -6,35 +6,29 @@
 
 use anyhow::Error;
 use argh::FromArgs;
+use carnelian::app::{Config, ViewCreationParameters};
+use carnelian::color::Color;
+use carnelian::drawing::{load_font, measure_text_width, DisplayRotation, FontFace};
+use carnelian::input::{self};
+use carnelian::scene::facets::{
+    FacetId, SetColorMessage, SetSizeMessage, TextFacetOptions, TextHorizontalAlignment,
+    TextVerticalAlignment,
+};
+use carnelian::scene::layout::{
+    Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize, Stack,
+    StackOptions,
+};
+use carnelian::scene::scene::{Scene, SceneBuilder};
 use carnelian::{
-    app::{Config, ViewCreationParameters},
-    color::Color,
-    derive_handle_message,
-    drawing::{load_font, measure_text_width, DisplayRotation, FontFace},
-    input::{self},
-    make_app_assistant, make_message,
-    scene::{
-        facets::{
-            FacetId, SetColorMessage, SetSizeMessage, TextFacetOptions, TextHorizontalAlignment,
-            TextVerticalAlignment,
-        },
-        layout::{
-            Alignment, CrossAxisAlignment, Flex, FlexOptions, MainAxisAlignment, MainAxisSize,
-            Stack, StackOptions,
-        },
-        scene::{Scene, SceneBuilder},
-    },
-    App, AppAssistant, AppSender, MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext,
-    ViewAssistantPtr, ViewKey,
+    derive_handle_message, make_app_assistant, make_message, App, AppAssistant, AppSender,
+    MessageTarget, Point, Size, ViewAssistant, ViewAssistantContext, ViewAssistantPtr, ViewKey,
 };
 use euclid::size2;
 use fuchsia_zircon::Time;
-use std::{
-    f32::consts::PI,
-    path::PathBuf,
-    thread,
-    time::{Duration, Instant},
-};
+use std::f32::consts::PI;
+use std::path::PathBuf;
+use std::thread;
+use std::time::{Duration, Instant};
 
 /// Button Sample
 #[derive(Debug, FromArgs)]

@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::api::ConfigResult;
+use crate::nested::RecursiveMap;
 use crate::{
-    api::ConfigResult, nested::RecursiveMap, validate_type, ConfigError, ConfigLevel, ConfigValue,
-    Environment, EnvironmentContext, ValueStrategy,
+    validate_type, ConfigError, ConfigLevel, ConfigValue, Environment, EnvironmentContext,
+    ValueStrategy,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value;
-use std::{
-    default::Default,
-    path::{Path, PathBuf},
-};
+use std::default::Default;
+use std::path::{Path, PathBuf};
 use tracing::debug;
 
 #[derive(Debug, PartialEq, Copy, Clone)]

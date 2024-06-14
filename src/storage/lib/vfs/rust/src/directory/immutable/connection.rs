@@ -5,29 +5,24 @@
 //! Connection to a directory that can not be modified by the client, no matter what permissions
 //! the client has on the FIDL connection.
 
-use crate::{
-    directory::{
-        connection::{BaseConnection, ConnectionState, DerivedConnection},
-        entry_container,
-    },
-    execution_scope::ExecutionScope,
-    node::OpenNode,
-    ObjectRequestRef, ProtocolsExt,
-};
+use crate::directory::connection::{BaseConnection, ConnectionState};
+use crate::directory::entry_container::Directory;
+use crate::execution_scope::ExecutionScope;
+use crate::node::OpenNode;
+use crate::{ObjectRequestRef, ProtocolsExt};
 
-use {
-    fidl_fuchsia_io as fio,
-    fio::DirectoryRequest,
-    fuchsia_zircon_status::Status,
-    futures::TryStreamExt as _,
-    std::{future::Future, sync::Arc},
-};
+use fidl_fuchsia_io as fio;
+use fio::DirectoryRequest;
+use fuchsia_zircon_status::Status;
+use futures::TryStreamExt as _;
+use std::future::Future;
+use std::sync::Arc;
 
-pub struct ImmutableConnection {
-    base: BaseConnection<Self>,
+pub struct ImmutableConnection<DirectoryType: Directory> {
+    base: BaseConnection<DirectoryType>,
 }
 
-impl ImmutableConnection {
+impl<DirectoryType: Directory> ImmutableConnection<DirectoryType> {
     async fn handle_requests<RS>(mut self, mut requests: RS)
     where
         RS: futures::stream::TryStream<Ok = DirectoryRequest, Error = fidl::Error> + Unpin,
@@ -42,7 +37,7 @@ impl ImmutableConnection {
 
     pub fn create(
         scope: ExecutionScope,
-        directory: Arc<impl entry_container::Directory>,
+        directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
@@ -61,7 +56,7 @@ impl ImmutableConnection {
     /// Try not to use this function for other purposes.
     pub fn create_transform_stream<Transform, RS>(
         scope: ExecutionScope,
-        directory: Arc<impl entry_container::Directory>,
+        directory: Arc<DirectoryType>,
         protocols: impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
         transform: Transform,
@@ -71,10 +66,10 @@ impl ImmutableConnection {
         RS: futures::stream::TryStream<Ok = DirectoryRequest, Error = fidl::Error> + Unpin,
     {
         // Ensure we close the directory if we fail to create the connection.
-        let directory = OpenNode::new(directory as Arc<dyn entry_container::Directory>);
+        let directory = OpenNode::new(directory);
 
         let connection = ImmutableConnection {
-            base: BaseConnection::<Self>::new(scope, directory, protocols.to_directory_options()?),
+            base: BaseConnection::new(scope, directory, protocols.to_directory_options()?),
         };
 
         // If we fail to send the task to the executor, it is probably shut down or is in the
@@ -88,8 +83,4 @@ impl ImmutableConnection {
             }
         })
     }
-}
-
-impl DerivedConnection for ImmutableConnection {
-    type Directory = dyn entry_container::Directory;
 }

@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    argh::FromArgs,
-    byteorder::{LittleEndian, WriteBytesExt},
-    fidl_fuchsia_hardware_block::BlockMarker,
-    fuchsia_component::client::connect_channel_to_protocol_at_path,
-    remote_block_device::{Cache, RemoteBlockClientSync},
-    std::{
-        io::Write,
-        process::{Command, Output},
-    },
-};
+use argh::FromArgs;
+use byteorder::{LittleEndian, WriteBytesExt};
+use fidl_fuchsia_hardware_block::BlockMarker;
+use fuchsia_component::client::connect_channel_to_protocol_at_path;
+use remote_block_device::{Cache, RemoteBlockClientSync};
+use std::io::Write;
+use std::process::{Command, Output};
 
 /// Magic number we write to the disk before the log data. This allows the extractor to
 /// differentiate between failures of this harness and a successful run where no output was

@@ -4,28 +4,21 @@
 
 //! Test utilities for dealing with time.
 
-use alloc::{
-    collections::{BinaryHeap, HashMap},
-    format,
-    string::String,
-    vec::Vec,
-};
-use core::{
-    fmt::{self, Debug, Formatter},
-    hash::Hash,
-    ops,
-    time::Duration,
-};
+use alloc::collections::{BinaryHeap, HashMap};
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::fmt::{self, Debug, Formatter};
+use core::hash::Hash;
+use core::ops;
+use core::time::Duration;
 
 use assert_matches::assert_matches;
 
-use crate::{
-    context::CtxPair,
-    ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
-    time::{
-        Instant, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext,
-        TimerHandler,
-    },
+use crate::context::CtxPair;
+use crate::ref_counted_hash_map::{RefCountedHashSet, RemoveResult};
+use crate::time::{
+    Instant, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext, TimerHandler,
 };
 
 /// A fake implementation of `Instant` for use in testing.

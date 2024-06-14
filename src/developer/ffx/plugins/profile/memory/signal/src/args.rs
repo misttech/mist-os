@@ -4,11 +4,9 @@
 
 //! Argument-parsing specification for the `signal` subcommand.
 
-use {
-    argh::{ArgsInfo, FromArgs},
-    ffx_core::ffx_command,
-    fidl_fuchsia_memorypressure::Level,
-};
+use argh::{ArgsInfo, FromArgs};
+use ffx_core::ffx_command;
+use fidl_fuchsia_memorypressure::Level;
 
 /// Signals userspace clients with specified memory pressure
 /// level. Clients can use this command to test their response to
@@ -36,7 +34,8 @@ fn parse_memory_pressure_level(value: &str) -> Result<Level, String> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, assert_matches::assert_matches};
+    use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn can_parse_canonical_levels() {

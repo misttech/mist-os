@@ -4,44 +4,44 @@
 
 use crate::run_component_features;
 use anyhow::{anyhow, bail, Error};
-use fidl::{
-    endpoints::{ControlHandle, RequestStream, ServerEnd},
-    AsyncChannel,
-};
-use fidl_fuchsia_component as fcomponent;
+use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
+use fidl::AsyncChannel;
 use fidl_fuchsia_component_runner::{
     ComponentControllerMarker, ComponentControllerRequest, ComponentControllerRequestStream,
     ComponentStartInfo,
 };
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::{channel::oneshot, FutureExt, StreamExt};
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use futures::channel::oneshot;
+use futures::{FutureExt, StreamExt};
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use runner::{get_program_string, get_program_strvec, StartInfoProgramError};
-use starnix_core::{
-    execution::{
-        create_filesystem_from_spec, execute_task_with_prerun_result, parse_numbered_handles,
-    },
-    fs::fuchsia::RemoteFs,
-    signals,
-    task::{CurrentTask, ExitStatus, Task},
-    vfs::{FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount},
+use starnix_core::execution::{
+    create_filesystem_from_spec, execute_task_with_prerun_result, parse_numbered_handles,
 };
+use starnix_core::fs::fuchsia::RemoteFs;
+use starnix_core::signals;
+use starnix_core::task::{CurrentTask, ExitStatus, Task};
+use starnix_core::vfs::{FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount};
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex};
-use starnix_uapi::{
-    auth::{Capabilities, Credentials},
-    device_type::DeviceType,
-    errno,
-    errors::{Errno, EEXIST, ENOTDIR},
-    file_mode::mode,
-    mount_flags::MountFlags,
-    open_flags::OpenFlags,
-    ownership::WeakRef,
-    signals::{SIGINT, SIGKILL},
+use starnix_uapi::auth::{Capabilities, Credentials};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::errno;
+use starnix_uapi::errors::{Errno, EEXIST, ENOTDIR};
+use starnix_uapi::file_mode::mode;
+use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::signals::{SIGINT, SIGKILL};
+use std::ffi::CString;
+use std::ops::DerefMut;
+use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
+use std::sync::Arc;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
-use std::{ffi::CString, ops::DerefMut, os::unix::ffi::OsStrExt, path::Path, sync::Arc};
 
 /// Component controller epitaph value used as the base value to pass non-zero error
 /// codes to the calling component.

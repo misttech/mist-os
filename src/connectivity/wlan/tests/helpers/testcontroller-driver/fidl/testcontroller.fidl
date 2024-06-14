@@ -6,6 +6,8 @@ library test.wlan.testcontroller;
 using fuchsia.wlan.fullmac;
 using zx;
 
+alias FullmacId = uint32;
+
 closed protocol TestController {
 
     /// Create and bind Fullmac driver that forwards all incoming calls
@@ -14,7 +16,17 @@ closed protocol TestController {
     ///
     /// The user should expect to receive a call to
     /// WlanFullmacImplBridge::Start shortly after calling this.
+    ///
+    /// Returns an |id| that uniquely identifies the new instance of the Fullmac driver,
+    /// which can be used to delete the driver instance later.
     strict CreateFullmac(resource struct {
         bridge_client client_end:fuchsia.wlan.fullmac.WlanFullmacImplBridge;
+    }) -> (resource struct {
+        id FullmacId;
+    }) error zx.Status;
+
+    /// Deletes the Fullmac driver with the given |id|.
+    strict DeleteFullmac(resource struct {
+        id FullmacId;
     }) -> () error zx.Status;
 };

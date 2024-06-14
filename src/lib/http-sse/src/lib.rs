@@ -9,9 +9,7 @@ mod linealyzer;
 mod server;
 mod source;
 
-pub use {
-    client::{Client, ClientConnectError, ClientPollError},
-    event::Event,
-    server::{EventSender, SseResponseCreator},
-    source::EventSource,
-};
+pub use client::{Client, ClientConnectError, ClientPollError};
+pub use event::Event;
+pub use server::{EventSender, SseResponseCreator};
+pub use source::EventSource;

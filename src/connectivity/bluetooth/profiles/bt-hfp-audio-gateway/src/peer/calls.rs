@@ -2,34 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        error::{CallError, Error},
-        inspect::CallEntryInspect,
-        peer::procedure::{dtmf::DtmfCode, hold::CallHoldAction},
-    },
-    async_utils::{
-        hanging_get::client::HangingGetStream,
-        stream::{StreamItem, StreamMap, StreamWithEpitaph, Tagged, WithEpitaph, WithTag},
-    },
-    bt_hfp::call::{
-        indicators::{self, CallIndicators, CallIndicatorsUpdates},
-        list::{Idx as CallIdx, List as CallList},
-        Direction, Number,
-    },
-    fidl_fuchsia_bluetooth_hfp::{
-        CallAction as FidlCallAction, CallProxy, CallState, NextCall, PeerHandlerProxy, RedialLast,
-        TransferActive,
-    },
-    fuchsia_async as fasync, fuchsia_inspect as inspect,
-    fuchsia_inspect_derive::{AttachError, Inspect},
-    futures::stream::{FusedStream, Stream, StreamExt},
-    std::{
-        pin::Pin,
-        task::{Context, Poll},
-    },
-    tracing::{debug, info, warn},
+use crate::error::{CallError, Error};
+use crate::inspect::CallEntryInspect;
+use crate::peer::procedure::dtmf::DtmfCode;
+use crate::peer::procedure::hold::CallHoldAction;
+use async_utils::hanging_get::client::HangingGetStream;
+use async_utils::stream::{StreamItem, StreamMap, StreamWithEpitaph, Tagged, WithEpitaph, WithTag};
+use bt_hfp::call::indicators::{self, CallIndicators, CallIndicatorsUpdates};
+use bt_hfp::call::list::{Idx as CallIdx, List as CallList};
+use bt_hfp::call::{Direction, Number};
+use fidl_fuchsia_bluetooth_hfp::{
+    CallAction as FidlCallAction, CallProxy, CallState, NextCall, PeerHandlerProxy, RedialLast,
+    TransferActive,
 };
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use futures::stream::{FusedStream, Stream, StreamExt};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tracing::{debug, info, warn};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 mod pending;
 
@@ -494,7 +485,8 @@ impl Calls {
     ///
     /// Returns an error if the CallIdx associated with a specific action is invalid.
     pub fn hold(&mut self, action: CallHoldAction) -> Result<(), CallError> {
-        use {CallHoldAction::*, CallState::*};
+        use CallHoldAction::*;
+        use CallState::*;
         match action {
             ReleaseAllHeld => {
                 let waiting_calls: Vec<_> =
@@ -739,18 +731,16 @@ impl From<FidlCallAction> for CallAction {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        assert_matches::assert_matches,
-        async_utils::PollExt,
-        fidl::endpoints::ClientEnd,
-        fidl_fuchsia_bluetooth_hfp::{
-            CallDirection, CallMarker, CallRequest, CallRequestStream, CallWatchStateResponder,
-            PeerHandlerMarker, PeerHandlerRequest, PeerHandlerRequestStream,
-        },
-        fuchsia_async as fasync,
-        std::pin::pin,
+    use super::*;
+    use assert_matches::assert_matches;
+    use async_utils::PollExt;
+    use fidl::endpoints::ClientEnd;
+    use fidl_fuchsia_bluetooth_hfp::{
+        CallDirection, CallMarker, CallRequest, CallRequestStream, CallWatchStateResponder,
+        PeerHandlerMarker, PeerHandlerRequest, PeerHandlerRequestStream,
     };
+    use fuchsia_async as fasync;
+    use std::pin::pin;
 
     #[fuchsia::test]
     fn call_is_active() {

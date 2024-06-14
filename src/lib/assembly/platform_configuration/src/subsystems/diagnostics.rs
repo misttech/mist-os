@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{common::DomainConfigDirectoryBuilder, subsystems::prelude::*};
+use crate::common::DomainConfigDirectoryBuilder;
+use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::diagnostics_config::{

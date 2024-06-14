@@ -66,7 +66,7 @@ impl PartitionReader {
         let (block_count, block_size) = self.size(&name)?;
 
         let Some(block_proxy_provider) = self.block_proxy_provider else {
-            return Err(anyhow!("No block_proxy_provider"))
+            return Err(anyhow!("No block_proxy_provider"));
         };
 
         async fn reader(

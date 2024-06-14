@@ -5,7 +5,8 @@
 pub mod artifact;
 pub mod fake;
 
-use {fuchsia_url::RepositoryUrl, once_cell::sync::Lazy};
+use fuchsia_url::RepositoryUrl;
+use once_cell::sync::Lazy;
 
 pub static TEST_REPO_URL: Lazy<RepositoryUrl> =
     Lazy::new(|| RepositoryUrl::parse_host("test.fuchsia.com".to_string()).unwrap());

@@ -6,45 +6,41 @@
 #![allow(clippy::too_many_arguments)]
 #![recursion_limit = "1024"]
 
+use anyhow::{format_err, Context as _, Error};
+use diagnostics_log::PublishOptions;
+use fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherMarker;
+use fidl_fuchsia_wlan_device_service::DeviceMonitorMarker;
+use fuchsia_async::DurationExt;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::component;
+use fuchsia_inspect_contrib::auto_persist;
+use fuchsia_zircon::prelude::*;
+use futures::channel::{mpsc, oneshot};
+use futures::future::OptionFuture;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use futures::{select, TryFutureExt};
+use std::convert::Infallible;
+use std::pin::pin;
+use std::sync::Arc;
+use tracing::{error, info, warn};
+use wlancfg_lib::access_point::AccessPoint;
+use wlancfg_lib::client::connection_selection::*;
+use wlancfg_lib::client::roaming::local_roam_manager;
+use wlancfg_lib::client::{self, scan};
+use wlancfg_lib::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
+use wlancfg_lib::legacy::{self, IfaceRef};
+use wlancfg_lib::mode_management::iface_manager_api::IfaceManagerApi;
+use wlancfg_lib::mode_management::phy_manager::PhyManager;
+use wlancfg_lib::mode_management::{create_iface_manager, device_monitor, recovery};
+use wlancfg_lib::regulatory_manager::RegulatoryManager;
+use wlancfg_lib::telemetry::{
+    connect_to_metrics_logger_factory, create_metrics_logger, serve_telemetry, TelemetrySender,
+};
+use wlancfg_lib::util;
 use {
-    anyhow::{format_err, Context as _, Error},
-    diagnostics_log::PublishOptions,
-    fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherMarker,
-    fidl_fuchsia_wlan_device_service::DeviceMonitorMarker,
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync,
-    fuchsia_async::DurationExt,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::component,
-    fuchsia_inspect_contrib::auto_persist,
-    fuchsia_trace_provider as ftrace_provider,
-    fuchsia_zircon::prelude::*,
-    futures::{
-        channel::{mpsc, oneshot},
-        future::OptionFuture,
-        lock::Mutex,
-        prelude::*,
-        select, TryFutureExt,
-    },
-    std::pin::pin,
-    std::{convert::Infallible, sync::Arc},
-    tracing::{error, info, warn},
-    wlan_trace as wtrace,
-    wlancfg_lib::{
-        access_point::AccessPoint,
-        client::{self, connection_selection::*, roaming::local_roam_manager, scan},
-        config_management::{SavedNetworksManager, SavedNetworksManagerApi},
-        legacy::{self, IfaceRef},
-        mode_management::{
-            create_iface_manager, device_monitor, iface_manager_api::IfaceManagerApi,
-            phy_manager::PhyManager, recovery,
-        },
-        regulatory_manager::RegulatoryManager,
-        telemetry::{
-            connect_to_metrics_logger_factory, create_metrics_logger, serve_telemetry,
-            TelemetrySender,
-        },
-        util,
-    },
+    fuchsia_trace_provider as ftrace_provider, wlan_trace as wtrace,
 };
 
 const REGULATORY_LISTENER_TIMEOUT_SEC: i64 = 30;

@@ -220,10 +220,8 @@ pub mod raw {
 /// Types and utilities to produce and manipulate processed summaries
 /// suitable for user-facing consumption.
 pub mod processed {
-    use crate::bucket::compute_buckets;
-    use crate::bucket::Bucket;
-    use crate::digest::processed;
-    use crate::digest::raw;
+    use crate::bucket::{compute_buckets, Bucket};
+    use crate::digest::{processed, raw};
     use serde::Serialize;
 
     use std::collections::{HashMap, HashSet};

@@ -6,11 +6,9 @@ use anyhow::Result;
 use logging::LogFormat;
 use rand::Rng;
 
-use tracing_subscriber::{
-    filter::{self, LevelFilter},
-    prelude::*,
-    Layer,
-};
+use tracing_subscriber::filter::{self, LevelFilter};
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::Layer;
 
 lazy_static::lazy_static! {
     static ref LOGGING_ID: u64 = generate_id();

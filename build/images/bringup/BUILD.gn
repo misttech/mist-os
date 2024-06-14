@@ -47,12 +47,15 @@ if (has_board) {
 }
 _partitions_config_file =
     get_label_info(_partitions_config, "target_out_dir") + "/" +
-    get_label_info(_partitions_config, "name") + ".json"
+    get_label_info(_partitions_config, "name") + "/partitions_config.json"
 
 product_assembly_configuration("product_assembly_config") {
   platform = {
     feature_set_level = "bootstrap"
     build_type = "eng"
+    kernel = {
+      oom_behavior = "job_kill"
+    }
     storage = {
       filesystems = {
         image_name = "bringup"
@@ -138,7 +141,6 @@ product_bundle("product_bundle") {
   }
 
   # List the contents of each input so that the outputs can be calculated.
-  partitions_contents = partitions_config_contents
   system_a_contents = _assembly_contents
   system_r_contents = _recovery_contents
 }

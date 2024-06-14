@@ -2,49 +2,50 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::builtin_environment::BuiltinEnvironment;
+use crate::model::actions::{
+    ActionsManager, ShutdownAction, ShutdownType, StartAction, StopAction,
+};
+use crate::model::component::instance::InstanceState;
+use crate::model::component::{ComponentInstance, IncomingCapabilities, StartReason};
+use crate::model::events::registry::EventSubscription;
+use crate::model::model::Model;
+use crate::model::start::Start;
+use crate::model::testing::mocks::*;
+use crate::model::testing::out_dir::OutDir;
+use crate::model::testing::routing_test_helpers::RoutingTestBuilder;
+use crate::model::testing::test_helpers::*;
+use crate::model::testing::test_hook::{Lifecycle, TestHook};
+use ::routing::bedrock::structured_dict::ComponentInput;
+use ::routing::policy::PolicyError;
+use assert_matches::assert_matches;
+use async_trait::async_trait;
+use cm_config::AllowlistEntryBuilder;
+use cm_rust::{
+    Availability, ComponentDecl, RegistrationSource, RunnerRegistration, UseEventStreamDecl,
+    UseSource,
+};
+use cm_rust_testing::*;
+use cm_types::Name;
+use errors::{ActionError, ModelError, StartActionError};
+use fidl::endpoints::{create_endpoints, ProtocolMarker, ServerEnd};
+use futures::channel::mpsc;
+use futures::future::pending;
+use futures::join;
+use futures::lock::Mutex;
+use futures::prelude::*;
+use hooks::{Event, EventType, Hook, HooksRegistration};
+use moniker::{ChildName, Moniker};
+use std::collections::HashSet;
+use std::sync::{Arc, Weak};
+use vfs::directory::entry::OpenRequest;
+use vfs::execution_scope::ExecutionScope;
+use vfs::ToObjectRequest;
+use zx::AsHandleRef;
 use {
-    crate::{
-        builtin_environment::BuiltinEnvironment,
-        model::{
-            actions::{ActionsManager, ShutdownAction, ShutdownType, StartAction, StopAction},
-            component::instance::InstanceState,
-            component::{ComponentInstance, IncomingCapabilities, StartReason},
-            events::registry::EventSubscription,
-            model::Model,
-            start::Start,
-            testing::{
-                mocks::*,
-                out_dir::OutDir,
-                routing_test_helpers::RoutingTestBuilder,
-                test_helpers::*,
-                test_hook::{Lifecycle, TestHook},
-            },
-        },
-    },
-    ::routing::{bedrock::structured_dict::ComponentInput, policy::PolicyError},
-    assert_matches::assert_matches,
-    async_trait::async_trait,
-    cm_config::AllowlistEntryBuilder,
-    cm_rust::{
-        Availability, ComponentDecl, RegistrationSource, RunnerRegistration, UseEventStreamDecl,
-        UseSource,
-    },
-    cm_rust_testing::*,
-    cm_types::Name,
-    errors::{ActionError, ModelError, StartActionError},
-    fidl::endpoints::{create_endpoints, ProtocolMarker, ServerEnd},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fuchsia_async as fasync, fuchsia_sync as fsync, fuchsia_zircon as zx,
-    futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
-    hooks::{Event, EventType, Hook, HooksRegistration},
-    moniker::{ChildName, Moniker},
-    std::{
-        collections::HashSet,
-        sync::{Arc, Weak},
-    },
-    vfs::{directory::entry::OpenRequest, execution_scope::ExecutionScope, ToObjectRequest},
-    zx::AsHandleRef,
 };
 
 async fn new_model(

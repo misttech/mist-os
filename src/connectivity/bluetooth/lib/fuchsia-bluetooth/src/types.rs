@@ -5,7 +5,13 @@
 use fidl_fuchsia_bluetooth_sys as sys;
 use std::fmt;
 
-pub use {self::uuid::*, address::*, bonding_data::*, channel::*, host_info::*, id::*, peer::*};
+pub use self::uuid::*;
+pub use address::*;
+pub use bonding_data::*;
+pub use channel::*;
+pub use host_info::*;
+pub use id::*;
+pub use peer::*;
 
 mod address;
 /// Types related to bonding data. This module defines helper functions for unit tests that utilize

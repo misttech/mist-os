@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{bail, Context as _, Error, Result},
-    diagnostics_data::LogsData,
-    fidl::endpoints::{create_proxy, create_request_stream},
-    fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-    fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_zircon as zx,
-    futures::{join, AsyncReadExt, AsyncWriteExt, TryStreamExt},
-    serde_json::Deserializer,
-    std::cell::RefCell,
-    std::rc::Rc,
-};
+use anyhow::{bail, Context as _, Error, Result};
+use diagnostics_data::LogsData;
+use fidl::endpoints::{create_proxy, create_request_stream};
+use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+use fuchsia_component::client::connect_to_protocol;
+use futures::{join, AsyncReadExt, AsyncWriteExt, TryStreamExt};
+use serde_json::Deserializer;
+use std::cell::RefCell;
+use std::rc::Rc;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const FUZZER_URL: &str = "fuchsia-pkg://fuchsia.com/fuzz-test-runner-tests#meta/fuzzer.cm";
 const BUF_SIZE: u32 = 32768;

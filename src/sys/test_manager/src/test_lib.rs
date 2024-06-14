@@ -4,20 +4,19 @@
 
 //! This crate provides helper functions for testing architecture tests.
 
-use {
-    anyhow::{bail, Context as _, Error},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_test_manager::{
-        self as ftest_manager, SuiteControllerProxy, SuiteEvent as FidlSuiteEvent,
-        SuiteEventPayload as FidlSuiteEventPayload, SuiteEventPayloadUnknown,
-    },
-    fuchsia_async as fasync,
-    futures::{channel::mpsc, prelude::*},
-    linked_hash_map::LinkedHashMap,
-    std::{collections::HashMap, sync::Arc},
-    test_diagnostics::{collect_and_send_string_output, LogStream},
-    tracing::*,
+use anyhow::{bail, Context as _, Error};
+use fidl_fuchsia_test_manager::{
+    self as ftest_manager, SuiteControllerProxy, SuiteEvent as FidlSuiteEvent,
+    SuiteEventPayload as FidlSuiteEventPayload, SuiteEventPayloadUnknown,
 };
+use futures::channel::mpsc;
+use futures::prelude::*;
+use linked_hash_map::LinkedHashMap;
+use std::collections::HashMap;
+use std::sync::Arc;
+use test_diagnostics::{collect_and_send_string_output, LogStream};
+use tracing::*;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 pub fn default_run_option() -> ftest_manager::RunOptions {
     ftest_manager::RunOptions {

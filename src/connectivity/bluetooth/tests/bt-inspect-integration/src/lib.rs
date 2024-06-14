@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bt_test_harness::inspect::InspectHarness, diagnostics_reader::DiagnosticsHierarchy,
-    fuchsia_bluetooth::expectation::asynchronous::ExpectableExt,
-};
+use bt_test_harness::inspect::InspectHarness;
+use diagnostics_reader::DiagnosticsHierarchy;
+use fuchsia_bluetooth::expectation::asynchronous::ExpectableExt;
 
 const GAP_CHILD_NODE: &str = "system";
 

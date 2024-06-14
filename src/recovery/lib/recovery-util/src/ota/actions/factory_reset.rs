@@ -48,10 +48,12 @@ mod test {
     use crate::ota::controller::MockSendEvent;
     use anyhow::Error;
     use fidl_fuchsia_recovery::FactoryResetRequest;
-    use fuchsia_async::TimeoutExt;
-    use fuchsia_async::{self as fasync};
+    use fuchsia_async::{
+        TimeoutExt, {self as fasync},
+    };
     use fuchsia_zircon::Duration;
-    use futures::{channel::mpsc, StreamExt, TryStreamExt};
+    use futures::channel::mpsc;
+    use futures::{StreamExt, TryStreamExt};
     use mockall::predicate::{self, eq};
 
     const RESET_CALLED: i32 = 123456;

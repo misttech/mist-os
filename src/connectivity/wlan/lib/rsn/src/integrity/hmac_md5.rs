@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{integrity::Algorithm, Error},
-    hmac::Mac as _,
-};
+use crate::integrity::Algorithm;
+use crate::Error;
+use hmac::Mac as _;
 
 pub struct HmacMd5;
 

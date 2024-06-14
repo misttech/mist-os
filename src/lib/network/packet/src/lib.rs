@@ -399,10 +399,9 @@ pub use crate::fragmented::*;
 pub use crate::serialize::*;
 pub use crate::util::*;
 
-use std::cmp;
 use std::convert::Infallible as Never;
-use std::mem;
 use std::ops::{Bound, Range, RangeBounds};
+use std::{cmp, mem};
 
 use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, NoCell, Ref, Unaligned};
 

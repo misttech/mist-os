@@ -3,33 +3,31 @@
 // found in the LICENSE file.
 
 pub mod admin_protocol;
-use {
-    crate::{
-        capability::CapabilitySource,
-        model::{
-            component::{ComponentInstance, StartReason, WeakComponentInstance},
-            routing::{Route, RouteSource},
-            start::Start,
-            storage::admin_protocol::StorageAdmin,
-        },
-        sandbox_util::LaunchTaskOnReceive,
-    },
-    ::routing::{
-        capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
-        error::RoutingError, RouteRequest,
-    },
-    cm_types::RelativePath,
-    component_id_index::InstanceId,
-    derivative::Derivative,
-    errors::{ModelError, StorageError},
-    fidl::endpoints::{create_proxy, ServerEnd},
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    futures::FutureExt,
-    moniker::Moniker,
-    sandbox::Dict,
-    std::{path::PathBuf, sync::Arc},
-    vfs::{directory::entry::OpenRequest, ToObjectRequest},
+use crate::capability::CapabilitySource;
+use crate::model::component::{
+    ComponentInstance, StartReason, WeakComponentInstance, WeakExtendedInstance,
 };
+use crate::model::routing::{Route, RouteSource};
+use crate::model::start::Start;
+use crate::model::storage::admin_protocol::StorageAdmin;
+use crate::sandbox_util::LaunchTaskOnReceive;
+use ::routing::capability_source::ComponentCapability;
+use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::error::RoutingError;
+use ::routing::RouteRequest;
+use cm_types::RelativePath;
+use component_id_index::InstanceId;
+use derivative::Derivative;
+use errors::{ModelError, StorageError};
+use fidl::endpoints::{create_proxy, ServerEnd};
+use futures::FutureExt;
+use moniker::Moniker;
+use sandbox::Dict;
+use std::path::PathBuf;
+use std::sync::Arc;
+use vfs::directory::entry::OpenRequest;
+use vfs::ToObjectRequest;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
 
 // TODO: The `use` declaration for storage implicitly carries these rights. While this is
 // correct, it would be more consistent to get the rights from `CapabilityState`.
@@ -404,6 +402,7 @@ pub fn build_storage_admin_dictionary(
             .insert(
                 storage_decl.name.clone(),
                 LaunchTaskOnReceive::new(
+                    WeakExtendedInstance::Component(weak_component.clone()),
                     component.nonblocking_task_group().as_weak(),
                     "storage admin protocol",
                     Some((component.context.policy().clone(), capability_source)),
@@ -427,17 +426,14 @@ pub fn build_storage_admin_dictionary(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use {
-        crate::model::testing::{
-            routing_test_helpers::{RoutingTest, RoutingTestBuilder},
-            test_helpers::{self, component_decl_with_test_runner},
-        },
-        assert_matches::assert_matches,
-        cm_rust::*,
-        cm_rust_testing::*,
-        fidl_fuchsia_io as fio,
-        rand::{distributions::Alphanumeric, Rng},
-    };
+    use crate::model::testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder};
+    use crate::model::testing::test_helpers::{self, component_decl_with_test_runner};
+    use assert_matches::assert_matches;
+    use cm_rust::*;
+    use cm_rust_testing::*;
+    use fidl_fuchsia_io as fio;
+    use rand::distributions::Alphanumeric;
+    use rand::Rng;
 
     #[fuchsia::test]
     async fn open_isolated_storage_test() {

@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{args_info::CliArgsInfo, Error, FfxCommandLine, MetricsSession, Result};
+use crate::args_info::CliArgsInfo;
+use crate::{Error, FfxCommandLine, MetricsSession, Result};
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
-use std::{collections::HashSet, fmt::Write, path::PathBuf, process::ExitStatus};
+use std::collections::HashSet;
+use std::fmt::Write;
+use std::path::PathBuf;
+use std::process::ExitStatus;
 
 /// Where the command was discovered
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, PartialEq, Eq, Hash)]

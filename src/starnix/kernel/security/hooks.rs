@@ -3,17 +3,16 @@
 // found in the LICENSE file.
 
 use super::{selinux_hooks, ResolvedElfState, ThreadGroupState};
-use crate::{
-    task::{CurrentTask, Kernel, Task, ThreadGroup},
-    vfs::{FsNode, FsNodeHandle, FsStr, ValueOrSize},
-};
+use crate::task::{CurrentTask, Kernel, Task, ThreadGroup};
+use crate::vfs::{FsNode, FsNodeHandle, FsStr, ValueOrSize};
 
-use {
-    selinux::{security_server::SecurityServer, InitialSid, SecurityId},
-    selinux_common::ProcessPermission,
-    starnix_uapi::{error, errors::Errno, signals::Signal},
-    std::sync::Arc,
-};
+use selinux::security_server::SecurityServer;
+use selinux::{InitialSid, SecurityId};
+use selinux_common::ProcessPermission;
+use starnix_uapi::error;
+use starnix_uapi::errors::Errno;
+use starnix_uapi::signals::Signal;
+use std::sync::Arc;
 
 /// Maximum supported size for the `"security.selinux"` value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
@@ -237,6 +236,24 @@ pub fn check_signal_access(
     })
 }
 
+/// Checks if sending a signal is allowed.
+pub fn check_signal_access_tg(
+    source: &CurrentTask,
+    target: &Arc<ThreadGroup>,
+    signal: Signal,
+) -> Result<(), Errno> {
+    check_if_selinux(source, |security_server| {
+        let source_sid = get_current_sid(&source.thread_group);
+        let target_sid = get_current_sid(target);
+        selinux_hooks::check_signal_access(
+            &security_server.as_permission_check(),
+            source_sid,
+            target_sid,
+            signal,
+        )
+    })
+}
+
 /// Checks if tracing the current task is allowed, and update the thread group SELinux state to
 /// store the tracer SID.
 pub fn check_ptrace_traceme_access_and_update_state(
@@ -413,17 +430,18 @@ pub fn get_fs_node_security_id(current_task: &CurrentTask, fs_node: &FsNode) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        testing::{
-            create_kernel_and_task, create_kernel_and_task_with_selinux,
-            create_kernel_task_and_unlocked, create_kernel_task_and_unlocked_with_selinux,
-            create_task, AutoReleasableTask,
-        },
-        vfs::{NamespaceNode, XattrOp},
+    use crate::testing::{
+        create_kernel_and_task, create_kernel_and_task_with_selinux,
+        create_kernel_task_and_unlocked, create_kernel_task_and_unlocked_with_selinux, create_task,
+        AutoReleasableTask,
     };
+    use crate::vfs::{NamespaceNode, XattrOp};
     use selinux::security_server::Mode;
     use starnix_sync::{Locked, Unlocked};
-    use starnix_uapi::{device_type::DeviceType, error, file_mode::FileMode, signals::SIGTERM};
+    use starnix_uapi::device_type::DeviceType;
+    use starnix_uapi::error;
+    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::signals::SIGTERM;
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
     const DIFFERENT_VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_different_valid_t:s0";

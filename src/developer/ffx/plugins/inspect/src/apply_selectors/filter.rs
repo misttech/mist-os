@@ -9,10 +9,8 @@ use diagnostics_hierarchy::{hierarchy, HierarchyMatcher};
 use difference::Difference::{Add, Rem, Same};
 use fidl_fuchsia_diagnostics::Selector;
 use selectors::VerboseError;
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 pub fn filter_json_schema_by_selectors(
     mut schema: InspectData,

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bt_rfcomm::{frame::Frame, RfcommError, Role, DLCI, MAX_RFCOMM_FRAME_SIZE};
+use bt_rfcomm::frame::Frame;
+use bt_rfcomm::{RfcommError, Role, DLCI, MAX_RFCOMM_FRAME_SIZE};
 use fuchsia_bluetooth::types::Channel;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::Inspect;

@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::{create_endpoints, create_proxy};
+use futures::StreamExt;
+use lazy_static::lazy_static;
+use wlan_common::test_utils::fake_stas::FakeProtectionCfg;
+use wlan_common::{assert_variant, bss, fake_fidl_bss_description};
 use {
-    fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_sme as fidl_sme,
     fidl_test_wlan_testcontroller as fidl_testcontroller,
-    futures::StreamExt,
-    lazy_static::lazy_static,
-    wlan_common::{
-        assert_variant, bss, fake_fidl_bss_description, test_utils::fake_stas::FakeProtectionCfg,
-    },
 };
 
 pub mod config;
@@ -53,13 +52,14 @@ pub async fn create_fullmac_driver(
     testcontroller_proxy: &fidl_testcontroller::TestControllerProxy,
     config: &config::FullmacDriverConfig,
 ) -> (
+    fidl_testcontroller::FullmacId,
     fidl_fullmac::WlanFullmacImplBridgeRequestStream,
     fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
     fidl_sme::GenericSmeProxy,
 ) {
     let (fullmac_bridge_client, fullmac_bridge_server) = create_endpoints();
 
-    testcontroller_proxy
+    let fullmac_id = testcontroller_proxy
         .create_fullmac(fullmac_bridge_client)
         .await
         .expect("FIDL error on create_fullmac")
@@ -69,6 +69,16 @@ pub async fn create_fullmac_driver(
         fullmac_bridge_server.into_stream().expect("Could not create stream");
 
     // Fullmac MLME queries driver before starting
+    let (fullmac_ifc_proxy, generic_sme_proxy) =
+        handle_fullmac_startup(&mut fullmac_bridge_stream, config).await;
+
+    (fullmac_id, fullmac_bridge_stream, fullmac_ifc_proxy, generic_sme_proxy)
+}
+
+pub async fn handle_fullmac_startup(
+    fullmac_bridge_stream: &mut fidl_fullmac::WlanFullmacImplBridgeRequestStream,
+    config: &config::FullmacDriverConfig,
+) -> (fidl_fullmac::WlanFullmacImplIfcBridgeProxy, fidl_sme::GenericSmeProxy) {
     assert_variant!(fullmac_bridge_stream.next().await,
         Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::QueryMacSublayerSupport { responder })) => {
             responder
@@ -144,5 +154,5 @@ pub async fn create_fullmac_driver(
         }
     );
 
-    (fullmac_bridge_stream, fullmac_ifc_proxy, generic_sme_proxy)
+    (fullmac_ifc_proxy, generic_sme_proxy)
 }

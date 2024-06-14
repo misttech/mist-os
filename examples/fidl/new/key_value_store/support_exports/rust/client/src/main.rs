@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    config::Config,
-    fuchsia_component::client::connect_to_protocol,
-    std::{thread, time},
-};
+use anyhow::{Context as _, Error};
+use config::Config;
+use fuchsia_component::client::connect_to_protocol;
+use std::{thread, time};
 
 // [START diff_1]
-use {
-    fidl::unpersist,
-    fidl_examples_keyvaluestore_supportexports::{Exportable, Item, StoreMarker},
-    fuchsia_zircon::Vmo,
-};
+use fidl::unpersist;
+use fidl_examples_keyvaluestore_supportexports::{Exportable, Item, StoreMarker};
+use fuchsia_zircon::Vmo;
 // [END diff_1]
 
 #[fuchsia::main]

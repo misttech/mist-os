@@ -5,8 +5,7 @@
 use crate::prelude::*;
 use anyhow::Error;
 use serde::Deserialize;
-use std::io;
-use std::path;
+use std::{io, path};
 
 /// Allows us to directly use [`tracing::Level`] in our config struct.
 mod serde_with_level {

@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, Error},
-    core::mem::size_of,
-    fidl_fuchsia_boot as fboot,
-    fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult, ZbiType::BootloaderFile},
-    fuchsia_zircon as zx,
-    futures::prelude::*,
-    std::{collections::HashMap, str::from_utf8, sync::Arc},
-};
+use anyhow::{anyhow, Error};
+use core::mem::size_of;
+use fuchsia_zbi::ZbiType::BootloaderFile;
+use fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult};
+use futures::prelude::*;
+use std::collections::HashMap;
+use std::str::from_utf8;
+use std::sync::Arc;
+use {fidl_fuchsia_boot as fboot, fuchsia_zircon as zx};
 
 pub struct Items {
     zbi_parser: ZbiParser,
@@ -141,15 +141,14 @@ impl Items {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        fuchsia_zbi::{
-            zbi_header_t, ZbiType, ZBI_CONTAINER_MAGIC, ZBI_FLAGS_VERSION, ZBI_ITEM_MAGIC,
-            ZBI_ITEM_NO_CRC32,
-        },
-        zerocopy::{byteorder::little_endian::U32, AsBytes},
+    use super::*;
+    use fuchsia_async as fasync;
+    use fuchsia_zbi::{
+        zbi_header_t, ZbiType, ZBI_CONTAINER_MAGIC, ZBI_FLAGS_VERSION, ZBI_ITEM_MAGIC,
+        ZBI_ITEM_NO_CRC32,
     };
+    use zerocopy::byteorder::little_endian::U32;
+    use zerocopy::AsBytes;
 
     const ZBI_HEADER_SIZE: usize = size_of::<zbi_header_t>();
 

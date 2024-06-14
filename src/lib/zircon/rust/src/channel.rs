@@ -4,9 +4,8 @@
 
 //! Type-safe bindings for Zircon channel objects.
 
-use crate::ok;
 use crate::{
-    size_to_u32_sat, usize_into_u32, AsHandleRef, Handle, HandleBased, HandleDisposition,
+    ok, size_to_u32_sat, usize_into_u32, AsHandleRef, Handle, HandleBased, HandleDisposition,
     HandleInfo, HandleOp, HandleRef, ObjectType, Peered, Rights, Status, Time,
 };
 use fuchsia_zircon_sys as sys;

@@ -2,15 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/cpp/library_headers.gni")
 
-zx_library("runtime") {
-  sdk = "source"
-  sdk_headers = [
+library_headers("headers") {
+  headers = [
     "runtime/thread.h",
     "runtime/tls.h",
   ]
+  public_deps = [ "//src/zircon/lib/zircon:headers" ]
+}
 
+static_library("runtime") {
+  public_deps = [ ":headers" ]
   sources = [ "thread.cc" ]
   deps = [
     "//sdk/lib/stdcompat",

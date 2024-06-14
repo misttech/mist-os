@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cell::RefCell, cmp::Ordering};
+use std::cell::RefCell;
+use std::cmp::Ordering;
 
 #[derive(Debug)]
 pub struct DynVec<T> {

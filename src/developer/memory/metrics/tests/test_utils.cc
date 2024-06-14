@@ -59,6 +59,7 @@ const GetInfoResponse* MockOS::GetGetInfoResponse(zx_handle_t handle, uint32_t t
       return &resp;
     }
   }
+  FX_LOGS(ERROR) << "This should not be reached: handle " << handle << " topic " << topic;
   EXPECT_TRUE(false) << "This should not be reached: handle " << handle << " topic " << topic;
   return nullptr;
 }
@@ -117,8 +118,9 @@ zx_status_t MockOS::GetKernelMemoryStatsCompression(
     zx_info_kmem_stats_compression_t& kmem_compression) {
   const GetInfoResponse* r =
       GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_COMPRESSION);
-  if (r == nullptr)
+  if (r == nullptr) {
     return ZX_ERR_INVALID_ARGS;
+  }
   memcpy(&kmem_compression, r->values, r->value_size);
   return r->ret;
 }
@@ -147,7 +149,7 @@ void TestUtils::CreateCapture(Capture* capture, const CaptureTemplate& t, Captur
 std::vector<ProcessSummary> TestUtils::GetProcessSummaries(const Summary& summary) {
   std::vector<ProcessSummary> summaries = summary.process_summaries();
   sort(summaries.begin(), summaries.end(),
-       [](ProcessSummary a, ProcessSummary b) { return a.koid() < b.koid(); });
+       [](const ProcessSummary& a, const ProcessSummary& b) { return a.koid() < b.koid(); });
   return summaries;
 }
 

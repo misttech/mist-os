@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    diagnostics_assertions::tree_assertion,
-    diagnostics_reader::{ArchiveReader, Inspect},
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_power_topology_test as fpt,
-    fuchsia_component_test::{
-        Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
-    },
-    tracing::*,
+use anyhow::Result;
+use diagnostics_assertions::{tree_assertion, AnyProperty};
+use diagnostics_reader::{ArchiveReader, Inspect};
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_power_topology_test as fpt;
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
 };
+use fuchsia_zircon as zx;
+use tracing::*;
+
+const MACRO_LOOP_EXIT: bool = false; // useful in development; prevent hangs from inspect mismatch
 
 macro_rules! block_until_inspect_matches {
     ($moniker:expr, $($tree:tt)+) => {{
@@ -39,6 +40,9 @@ macro_rules! block_until_inspect_matches {
                 Err(error) => {
                     if i == 10 {
                         tracing::warn!(?error, "Still awaiting inspect match after 10 tries");
+                    }
+                    if MACRO_LOOP_EXIT && i == 50 {
+                        return Err(error.into())
                     }
                 }
             }
@@ -192,6 +196,8 @@ async fn test_system_activity_control() -> Result<()> {
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
             },
+            suspend_events: {
+            },
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -220,10 +226,18 @@ async fn test_system_activity_control() -> Result<()> {
             },
             suspend_stats: {
                 success_count: 0u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
+                fail_count: 1u64,
+                last_failed_error: zx::sys::ZX_ERR_NOT_SUPPORTED as i64,
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    suspend_failed: AnyProperty,
+                },
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",

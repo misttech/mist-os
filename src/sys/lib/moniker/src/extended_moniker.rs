@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{error::MonikerError, moniker::Moniker},
-    core::cmp::Ord,
-    std::fmt,
-};
+use crate::error::MonikerError;
+use crate::moniker::Moniker;
+use core::cmp::Ord;
+use std::fmt;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

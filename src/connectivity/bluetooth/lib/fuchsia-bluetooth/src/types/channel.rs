@@ -3,17 +3,14 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::{ClientEnd, Proxy};
-use fidl_fuchsia_bluetooth_bredr as bredr;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::io;
 use futures::stream::{FusedStream, Stream};
-use futures::{Future, TryFutureExt};
+use futures::{io, Future, TryFutureExt};
 use std::fmt;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::error::Error;
 
