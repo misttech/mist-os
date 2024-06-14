@@ -14,5 +14,7 @@ resource("minimum_utc_stamp") {
   sources = [ build_info_files.minimum_utc_stamp ]
   outputs = [ "config/build_info/minimum_utc_stamp" ]
   deps = [ "//build/info:latest-commit-date-and-hash" ]
-  visibility = [ ":*" ]
+  if (!is_mistos) {
+    visibility = [ ":*" ]
+  }
 }
