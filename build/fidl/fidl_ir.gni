@@ -42,9 +42,8 @@ import("//build/fidl/fidlc.gni")
 #   visibility
 #
 template("fidl_ir") {
-  assert(
-      current_toolchain == fidl_toolchain,
-      "This template can only be used in the FIDL toolchain $fidl_toolchain.")
+  assert(is_fidl_toolchain,
+         "This template can only be used in a FIDL toolchain.")
 
   assert(defined(invoker.fidl_target_name), "fidl_target_name is required")
   assert(defined(invoker.fidl_library_name), "fidl_library_name is required")

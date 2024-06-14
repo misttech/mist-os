@@ -174,7 +174,7 @@ template("intl_strings") {
     output_conversion = "json"
   }
 
-  if (current_toolchain == fidl_toolchain) {
+  if (is_fidl_toolchain) {
     # Generates a FIDL file with all the strings constants defined.
     # It is only ran in the FIDL toolchain because we want to run this
     # conversion only once.

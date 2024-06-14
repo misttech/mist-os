@@ -4,7 +4,7 @@
 
 import("//build/fidl/fidl.gni")
 
-assert(is_host || current_toolchain == fidl_toolchain,
+assert(is_host || is_fidl_toolchain,
        "fuchsia.developer.ffx is only to be used for host tool communication")
 
 fidl("fuchsia.developer.ffx") {
