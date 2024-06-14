@@ -33,6 +33,7 @@ rustc_binary("bin") {
   ]
 
   sources = [
+    "src/builtin/log.rs",
     "src/builtin/mod.rs",
     "src/builtin/svc_controller.rs",
     "src/main.rs",

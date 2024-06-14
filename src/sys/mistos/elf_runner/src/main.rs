@@ -3,7 +3,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::builtin::log::{ReadOnlyLog, WriteOnlyLog};
 use crate::builtin::svc_controller::SvcController;
+
 use elf_runner::process_launcher::ProcessLauncher;
 use fidl::HandleBased;
 use fidl_fuchsia_io as fio;
@@ -100,6 +102,67 @@ fn main() {
         svc_stash.wait_for_epitaph().await;
 
         let mut service_fs = ServiceFs::new();
+
+        // Set up the ReadOnlyLog service.
+        let debuglog_resource = system_resource_handle
+            .as_ref()
+            .map(|handle| {
+                match handle.create_child(
+                    zx::ResourceKind::SYSTEM,
+                    None,
+                    zx::sys::ZX_RSRC_SYSTEM_DEBUGLOG_BASE,
+                    1,
+                    b"debuglog",
+                ) {
+                    Ok(resource) => Some(resource),
+                    Err(_) => None,
+                }
+            })
+            .flatten();
+
+        if let Some(debuglog_resource) = debuglog_resource {
+            let read_only_log = ReadOnlyLog::new(debuglog_resource);
+
+            service_fs.add_fidl_service(move |stream| {
+                let read_only_log = read_only_log.clone();
+                fasync::Task::spawn(async move {
+                    read_only_log.serve(stream).await.expect("Failed to serve read only log.");
+                })
+                .detach();
+            });
+        }
+
+        // Set up WriteOnlyLog service.
+        let debuglog_resource = system_resource_handle
+            .as_ref()
+            .map(|handle| {
+                match handle.create_child(
+                    zx::ResourceKind::SYSTEM,
+                    None,
+                    zx::sys::ZX_RSRC_SYSTEM_DEBUGLOG_BASE,
+                    1,
+                    b"debuglog",
+                ) {
+                    Ok(resource) => Some(resource),
+                    Err(_) => None,
+                }
+            })
+            .flatten();
+
+        if let Some(debuglog_resource) = debuglog_resource {
+            let write_only_log = WriteOnlyLog::new(
+                zx::DebugLog::create(&debuglog_resource, zx::DebugLogOpts::empty()).unwrap(),
+            );
+
+            service_fs.add_fidl_service(move |stream| {
+                let write_only_log = write_only_log.clone();
+                fasync::Task::spawn(async move {
+                    write_only_log.serve(stream).await.expect("Failed to serve write only log.");
+                })
+                .detach();
+            });
+        }
+
         service_fs.add_fidl_service(move |stream| {
             fasync::Task::spawn(async move {
                 let result = ProcessLauncher::serve(stream).await;
