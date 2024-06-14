@@ -706,12 +706,16 @@ def _generate_cc_source_library_build_rules(
     copts = _CC_LIBRARY_COPTS_OVERRIDES.get(target_name, [])
     alwayslink = target_name in _ALWAYSLINK_LIBS
 
-    srcs = meta["sources"]
+    # Note: srcs = meta["sources"] does not copy the contents so we need to make
+    # sure we do a copy here otherwise the target will get added to the
+    # files_to_copy list resulting in a broken symlink.
+    srcs = [s for s in meta["sources"]]
     verify_cc_head_api_level_name = (
         _get_target_name(meta["name"]) + "_verify_cc_head_api_level"
     )
     if meta["stable"] == False:
         srcs.append(":" + verify_cc_head_api_level_name)
+
     _merge_template(
         ctx,
         build_file,
