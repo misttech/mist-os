@@ -564,8 +564,7 @@ mod tests {
             dst_ip: MulticastAddr<Ipv6Addr>,
             message: NeighborSolicitation,
         ) -> Result<(), ()> {
-            self.send_frame(bindings_ctx, DadMessageMeta { dst_ip, message }, EmptyBuf)
-                .map_err(|EmptyBuf| ())
+            Ok(self.send_frame(bindings_ctx, DadMessageMeta { dst_ip, message }, EmptyBuf).unwrap())
         }
     }
 

@@ -554,7 +554,9 @@ mod tests {
         assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
         FakeWeakDeviceId,
     };
-    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _};
+    use netstack3_base::{
+        CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _, SendFrameError,
+    };
     use netstack3_filter::ProofOfEgressCheck;
     use packet::serialize::Buf;
     use packet::ParsablePacket as _;
@@ -654,7 +656,7 @@ mod tests {
                 Option<SpecifiedAddr<<Ipv4 as Ip>::Addr>>,
             >,
             _body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,
@@ -668,7 +670,7 @@ mod tests {
             device: &Self::DeviceId,
             destination: IpPacketDestination<Ipv4, &Self::DeviceId>,
             body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer + netstack3_filter::IpPacket<Ipv4>,
             S::Buffer: BufferMut,
@@ -692,7 +694,7 @@ mod tests {
             destination: IpPacketDestination<Ipv4, &Self::DeviceId>,
             body: S,
             ProofOfEgressCheck { .. }: ProofOfEgressCheck,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,

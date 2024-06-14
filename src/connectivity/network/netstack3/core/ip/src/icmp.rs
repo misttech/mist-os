@@ -21,7 +21,7 @@ use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
-    InstantBindingsTypes, InstantContext, RngContext, TokenBucket,
+    InstantBindingsTypes, InstantContext, RngContext, SendFrameError, TokenBucket,
 };
 use netstack3_filter::{self as filter, TransportPacketSerializer};
 use packet::{
@@ -1083,7 +1083,7 @@ pub fn send_ndp_packet<BC, CC, S, M>(
     body: S,
     code: M::Code,
     message: M,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     CC: IpLayerHandler<Ipv6, BC>,
     S: Serializer,
@@ -3433,7 +3433,7 @@ mod tests {
             _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _meta: SendIpPacketMeta<Ipv6, &Self::DeviceId, Option<SpecifiedAddr<Ipv6Addr>>>,
             _body: S,
-        ) -> Result<(), S> {
+        ) -> Result<(), SendFrameError<S>> {
             unimplemented!()
         }
 
@@ -3443,7 +3443,7 @@ mod tests {
             _device: &Self::DeviceId,
             _destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             _body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,

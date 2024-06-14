@@ -5,6 +5,7 @@
 //! Common error types for the netstack.
 
 use net_types::ip::{GenericOverIp, Ip};
+use packet::Nested;
 use thiserror::Error;
 
 /// Error when something is not supported.
@@ -99,3 +100,52 @@ pub enum SocketError {
 #[derive(Error, Debug, PartialEq)]
 #[error("Address resolution failed")]
 pub struct AddressResolutionFailed;
+
+/// An error and a serializer.
+///
+/// This error type encodes the common pattern of returning an error and the
+/// original serializer that caused the error. For brevity, users are encouraged
+/// to alias this to local types.
+///
+/// It provides a `From` implementation from `(E, S)` for convenience and
+/// impedance matching with the [`packet`] crate.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ErrorAndSerializer<E, S> {
+    /// The error observed.
+    pub error: E,
+    /// The serializer accompanying the error.
+    pub serializer: S,
+}
+
+impl<E, S> ErrorAndSerializer<E, S> {
+    /// Changes the serializer type.
+    pub fn map_serializer<N, F: FnOnce(S) -> N>(self, f: F) -> ErrorAndSerializer<E, N> {
+        let Self { error, serializer } = self;
+        ErrorAndSerializer { error, serializer: f(serializer) }
+    }
+
+    /// Changes the error type.
+    pub fn map_err<N, F: FnOnce(E) -> N>(self, f: F) -> ErrorAndSerializer<N, S> {
+        let Self { error, serializer } = self;
+        ErrorAndSerializer { error: f(error), serializer }
+    }
+
+    /// Changes the error type using [`Into::into`].
+    pub fn err_into<N: From<E>>(self) -> ErrorAndSerializer<N, S> {
+        self.map_err(Into::into)
+    }
+
+    /// Consumes this pair and returns only the error, dropping the serializer.
+    pub fn into_err(self) -> E {
+        self.error
+    }
+}
+
+impl<E, I, O> ErrorAndSerializer<E, Nested<I, O>> {
+    /// A convenience function for dealing with [`Nested`] serializers.
+    ///
+    /// Equivalent to using [`ErrorAndSerializer::map_serializer`].
+    pub fn into_inner(self) -> ErrorAndSerializer<E, I> {
+        self.map_serializer(|s| s.into_inner())
+    }
+}

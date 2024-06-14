@@ -72,8 +72,8 @@ pub mod socket {
         DeviceSocketBindingsContext, DeviceSocketContext, DeviceSocketContextTypes, DeviceSocketId,
         DeviceSocketMetadata, DeviceSocketTypes, DeviceSockets, EthernetFrame,
         EthernetHeaderParams, Frame, HeldDeviceSockets, HeldSockets, IpFrame, ParseSentFrameError,
-        PrimaryDeviceSocketId, Protocol, ReceivedFrame, SendFrameError, SentFrame, SocketId,
-        SocketInfo, SocketState, SocketStateAccessor, Target, TargetDevice,
+        PrimaryDeviceSocketId, Protocol, ReceivedFrame, SentFrame, SocketId, SocketInfo,
+        SocketState, SocketStateAccessor, Target, TargetDevice,
     };
 }
 

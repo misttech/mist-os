@@ -19,14 +19,14 @@ use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
     trace_duration, CoreTimerContext, Device, DeviceIdContext, FrameDestination, HandleableTimer,
     LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta,
-    ResourceCounterContext, RngContext, SendableFrameMeta, TimerContext, TimerHandler,
-    TracingContext, WeakDeviceIdentifier,
+    ResourceCounterContext, RngContext, SendFrameError, SendFrameErrorReason, SendableFrameMeta,
+    TimerContext, TimerHandler, TracingContext, WeakDeviceIdentifier,
 };
 use netstack3_ip::nud::{
     LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
 };
 use netstack3_ip::{IpPacketDestination, IpTypesIpExt, WrapBroadcastMarker};
-use packet::{Buf, BufferMut, Nested, Serializer};
+use packet::{Buf, BufferMut, Serializer};
 use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
@@ -47,6 +47,7 @@ use crate::internal::socket::{
     ReceivedFrame,
 };
 use crate::internal::state::{DeviceStateSpec, IpLinkDeviceState};
+use crate::DeviceSendFrameError;
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
@@ -103,7 +104,7 @@ pub fn send_as_ethernet_frame_to_dst<S, BC, CC>(
     dst_mac: Mac,
     body: S,
     ether_type: EtherType,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     S: Serializer,
     S::Buffer: BufferMut,
@@ -126,8 +127,7 @@ where
         ether_type,
         MIN_BODY_LEN,
     ));
-    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame)
-        .map_err(|frame| frame.into_inner())
+    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame).map_err(|err| err.into_inner())
 }
 
 fn send_ethernet_frame<S, BC, CC>(
@@ -135,7 +135,7 @@ fn send_ethernet_frame<S, BC, CC>(
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     frame: S,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     S: Serializer,
     S::Buffer: BufferMut,
@@ -156,18 +156,18 @@ where
             core_ctx.increment(device_id, |counters| &counters.send_frame);
             Ok(())
         }
-        Err(TransmitQueueFrameError::NoQueue(e)) => {
+        Err(TransmitQueueFrameError::NoQueue(DeviceSendFrameError::DeviceNotReady(()))) => {
             core_ctx.increment(device_id, |counters| &counters.send_dropped_no_queue);
-            error!("device {device_id:?} not ready to send frame: {e:?}");
+            error!("device {device_id:?} not ready to send frame");
             Ok(())
         }
-        Err(TransmitQueueFrameError::QueueFull(s)) => {
+        Err(TransmitQueueFrameError::QueueFull(serializer)) => {
             core_ctx.increment(device_id, |counters| &counters.send_queue_full);
-            Err(s)
+            Err(SendFrameError { serializer, error: SendFrameErrorReason::QueueFull })
         }
-        Err(TransmitQueueFrameError::SerializeError(s)) => {
+        Err(TransmitQueueFrameError::SerializeError(err)) => {
             core_ctx.increment(device_id, |counters| &counters.send_serialize_error);
-            Err(s)
+            Err(err.err_into())
         }
     }
 }
@@ -405,7 +405,7 @@ pub fn send_ip_frame<BC, CC, I, S>(
     device_id: &CC::DeviceId,
     destination: IpPacketDestination<I, &DeviceId<BC>>,
     body: S,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     BC: EthernetIpLinkDeviceBindingsContext + LinkResolutionContext<EthernetLinkDevice>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
@@ -457,7 +457,7 @@ where
             unreachable!("Loopback packets must be delivered through the loopback device")
         }
     }
-    .map_err(Nested::into_inner)
+    .map_err(|e| e.into_inner())
 }
 
 /// Metadata for received ethernet frames.
@@ -728,7 +728,12 @@ impl<
             + UseArpFrameMetadataBlanket,
     > SendableFrameMeta<CC, BC> for ArpFrameMetadata<EthernetLinkDevice, CC::DeviceId>
 {
-    fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, body: S) -> Result<(), S>
+    fn send_meta<S>(
+        self,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        body: S,
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
@@ -760,7 +765,12 @@ impl<
 where
     CC: DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<BC>>,
 {
-    fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, body: S) -> Result<(), S>
+    fn send_meta<S>(
+        self,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        body: S,
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
@@ -1106,7 +1116,7 @@ mod tests {
             _device_id: &Self::DeviceId,
             _neighbor: SpecifiedAddr<Ipv6Addr>,
             _body: S,
-        ) -> Result<(), S> {
+        ) -> Result<(), SendFrameError<S>> {
             unimplemented!()
         }
     }
@@ -1206,7 +1216,7 @@ mod tests {
             bindings_ctx: &mut FakeBindingsCtx,
             link_addr: Mac,
             body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,

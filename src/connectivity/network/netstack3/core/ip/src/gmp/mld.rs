@@ -420,7 +420,9 @@ mod tests {
         assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
         FakeWeakDeviceId,
     };
-    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext};
+    use netstack3_base::{
+        CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext, SendFrameError,
+    };
     use netstack3_filter::ProofOfEgressCheck;
     use packet::{BufferMut, ParseBuffer};
     use packet_formats::icmp::mld::MulticastListenerQuery;
@@ -529,7 +531,7 @@ mod tests {
                 Option<SpecifiedAddr<<Ipv6 as Ip>::Addr>>,
             >,
             _body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,
@@ -543,7 +545,7 @@ mod tests {
             device: &Self::DeviceId,
             destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer + netstack3_filter::IpPacket<Ipv6>,
             S::Buffer: BufferMut,
@@ -567,7 +569,7 @@ mod tests {
             destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             body: S,
             ProofOfEgressCheck { .. }: ProofOfEgressCheck,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,

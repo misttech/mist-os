@@ -14,7 +14,8 @@ use net_types::{MulticastAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
-    InstantContext, StrongDeviceIdentifier, TracingContext, WeakDeviceIdentifier as _,
+    InstantContext, SendFrameError, StrongDeviceIdentifier, TracingContext,
+    WeakDeviceIdentifier as _,
 };
 use netstack3_filter::{
     self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties, RawIpBody,
@@ -362,7 +363,7 @@ where
         meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
         body: S,
         packet_metadata: IpLayerPacketMetadata<I, BC>,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;

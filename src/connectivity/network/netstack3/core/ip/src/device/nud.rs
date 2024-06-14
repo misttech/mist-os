@@ -7,6 +7,7 @@
 use alloc::collections::hash_map::{self, Entry, HashMap};
 use alloc::collections::{BinaryHeap, VecDeque};
 use alloc::vec::Vec;
+use core::convert::Infallible as Never;
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::marker::PhantomData;
@@ -20,12 +21,13 @@ use net_types::SpecifiedAddr;
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     AddressResolutionFailed, AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
-    DeviceIdentifier, EventContext, HandleableTimer, Instant, InstantBindingsTypes, LinkAddress,
-    LinkDevice, LinkUnicastAddress, LocalTimerHeap, StrongDeviceIdentifier, TimerBindingsTypes,
-    TimerContext, WeakDeviceIdentifier,
+    DeviceIdentifier, ErrorAndSerializer, EventContext, HandleableTimer, Instant,
+    InstantBindingsTypes, LinkAddress, LinkDevice, LinkUnicastAddress, LocalTimerHeap,
+    SendFrameError, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet::{
-    Buf, BufferMut, GrowBuffer as _, ParsablePacket as _, ParseBufferMut as _, Serializer,
+    Buf, BufferMut, GrowBuffer as _, ParsablePacket as _, ParseBufferMut as _, SerializeError,
+    Serializer,
 };
 use packet_formats::ip::IpPacket as _;
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header as _, Ipv4Packet};
@@ -476,7 +478,10 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         )
     }
 
-    fn queue_packet<B, S>(&mut self, body: S) -> Result<(), S>
+    fn queue_packet<B, S>(
+        &mut self,
+        body: S,
+    ) -> Result<(), ErrorAndSerializer<SerializeError<Never>, S>>
     where
         B: BufferMut,
         S: Serializer<Buffer = B>,
@@ -492,7 +497,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         if pending_frames.len() < MAX_PENDING_FRAMES {
             pending_frames.push_back(
                 body.serialize_vec_outer()
-                    .map_err(|(_err, s)| s)?
+                    .map_err(|(error, serializer)| ErrorAndSerializer { error, serializer })?
                     .map_a(|b| Buf::new(b.as_ref().to_vec(), ..))
                     .into_inner(),
             );
@@ -528,8 +533,8 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
             // doesn't mean that updating the neighbor entry should fail.
             core_ctx
                 .send_ip_packet_to_neighbor_link_addr(bindings_ctx, link_address, body)
-                .unwrap_or_else(|_: Buf<Vec<u8>>| {
-                    error!("failed to send pending IP packet to neighbor {link_address:?}")
+                .unwrap_or_else(|err| {
+                    error!("failed to send pending IP packet to neighbor {link_address:?} {err:?}")
                 })
         }
         for notifier in notifiers.drain(..) {
@@ -1140,7 +1145,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
         device_id: &CC::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         body: S,
-    ) -> Result<bool, S>
+    ) -> Result<bool, SendFrameError<S>>
     where
         I: Ip,
         BC: NudBindingsContext<I, D, CC::DeviceId>,
@@ -1150,9 +1155,7 @@ impl<D: LinkDevice, BT: NudBindingsTypes<D>> DynamicNeighborState<D, BT> {
     {
         match self {
             DynamicNeighborState::Incomplete(incomplete) => {
-                incomplete.queue_packet(body)?;
-
-                Ok(false)
+                incomplete.queue_packet(body).map(|()| false).map_err(|e| e.err_into())
             }
             // Send the IP packet while holding the NUD lock to prevent a potential
             // ordering violation.
@@ -1984,7 +1987,7 @@ pub trait NudSenderContext<I: Ip, D: LinkDevice, BC>:
         bindings_ctx: &mut BC,
         neighbor_link_addr: D::Address,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut;
@@ -2062,7 +2065,7 @@ pub trait NudHandler<I: Ip, D: LinkDevice, BC: LinkResolutionContext<D>>:
         device_id: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut;
@@ -2440,19 +2443,20 @@ impl<
         device_id: &Self::DeviceId,
         lookup_addr: SpecifiedAddr<I::Addr>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let do_multicast_solicit =
-            self.with_nud_state_mut_and_sender_ctx(device_id, |state, core_ctx| {
+        let do_multicast_solicit = self.with_nud_state_mut_and_sender_ctx(
+            device_id,
+            |state, core_ctx| -> Result<_, SendFrameError<S>> {
                 let (entry, timer_heap) = state.entry_and_timer_heap(lookup_addr);
                 match entry {
                     Entry::Vacant(e) => {
                         let mut incomplete =
                             Incomplete::new(core_ctx, bindings_ctx, timer_heap, lookup_addr);
-                        incomplete.queue_packet(body)?;
+                        incomplete.queue_packet(body).map_err(|e| e.err_into())?;
                         insert_new_entry(
                             bindings_ctx,
                             device_id,
@@ -2494,7 +2498,8 @@ impl<
                         }
                     }
                 }
-            })?;
+            },
+        )?;
 
         if do_multicast_solicit {
             self.send_neighbor_solicitation(
@@ -2921,7 +2926,7 @@ mod tests {
             bindings_ctx: &mut FakeBindingsCtxImpl<I>,
             dst_link_address: FakeLinkAddress,
             body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,

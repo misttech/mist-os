@@ -30,8 +30,8 @@ use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
     AnyDevice, DeferredResourceRemovalContext, DeviceIdContext, EventContext, ExistsError,
     HandleableTimer, Inspectable, Instant, InstantBindingsTypes, InstantContext, NotFoundError,
-    RemoveResourceResultWithContext, RngContext, StrongDeviceIdentifier, TimerContext,
-    TimerHandler, WeakDeviceIdentifier,
+    RemoveResourceResultWithContext, RngContext, SendFrameError, StrongDeviceIdentifier,
+    TimerContext, TimerHandler, WeakDeviceIdentifier,
 };
 use netstack3_filter::{IpPacket, ProofOfEgressCheck};
 use packet::{BufferMut, Serializer};
@@ -1144,7 +1144,7 @@ pub trait IpDeviceSendContext<I: IpTypesIpExt, BC>: DeviceIdContext<AnyDevice> {
         destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
         egress_proof: ProofOfEgressCheck,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut;

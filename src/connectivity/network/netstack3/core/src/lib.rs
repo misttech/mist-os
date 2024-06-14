@@ -69,11 +69,11 @@ pub mod device {
 
 /// Device socket API.
 pub mod device_socket {
-    pub use netstack3_base::FrameDestination;
+    pub use netstack3_base::{FrameDestination, SendFrameErrorReason};
     pub use netstack3_device::socket::{
         DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-        EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SendFrameError, SentFrame,
-        SocketId, SocketInfo, TargetDevice,
+        EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SentFrame, SocketId,
+        SocketInfo, TargetDevice,
     };
 }
 

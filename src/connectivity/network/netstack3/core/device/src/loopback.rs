@@ -16,8 +16,9 @@ use net_types::ip::{Ipv4, Ipv6, Mtu};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
-    FrameDestination, RecvFrameContext, RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta,
-    StrongDeviceIdentifier, TimerContext, WeakDeviceIdentifier,
+    FrameDestination, RecvFrameContext, RecvIpFrameMeta, ResourceCounterContext, SendFrameError,
+    SendFrameErrorReason, SendableFrameMeta, StrongDeviceIdentifier, TimerContext,
+    WeakDeviceIdentifier,
 };
 use netstack3_ip::{IpPacketDestination, IpTypesIpExt};
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
@@ -41,6 +42,7 @@ use crate::internal::socket::{
     ReceivedFrame,
 };
 use crate::internal::state::{DeviceStateSpec, IpLinkDeviceState};
+use crate::DeviceSendFrameError;
 
 /// The MAC address corresponding to the loopback interface.
 const LOOPBACK_MAC: Mac = Mac::UNSPECIFIED;
@@ -296,7 +298,12 @@ where
         + DeviceIdContext<AnyDevice>,
     BC: DeviceLayerTypes,
 {
-    fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, body: S) -> Result<(), S>
+    fn send_meta<S>(
+        self,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        body: S,
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
@@ -325,7 +332,7 @@ pub fn send_ip_frame<CC, BC, I, S>(
     device_id: &<CC as DeviceIdContext<LoopbackDevice>>::DeviceId,
     destination: IpPacketDestination<I, &<CC as DeviceIdContext<AnyDevice>>::DeviceId>,
     packet: S,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     CC: TransmitQueueHandler<
             LoopbackDevice,
@@ -365,7 +372,7 @@ fn send_as_ethernet_frame_to_dst<CC, BC, S>(
     protocol: EtherType,
     dst_mac: Mac,
     meta: LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     CC: TransmitQueueHandler<
             LoopbackDevice,
@@ -391,7 +398,8 @@ where
         MIN_BODY_LEN,
     ));
 
-    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame, meta).map_err(|s| s.into_inner())
+    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame, meta)
+        .map_err(|err| err.into_inner())
 }
 
 fn send_ethernet_frame<CC, BC, S>(
@@ -400,7 +408,7 @@ fn send_ethernet_frame<CC, BC, S>(
     device_id: &<CC as DeviceIdContext<LoopbackDevice>>::DeviceId,
     frame: S,
     meta: LoopbackTxQueueMeta<<CC as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     CC: TransmitQueueHandler<
             LoopbackDevice,
@@ -424,17 +432,17 @@ where
             core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_frame);
             Ok(())
         }
-        Err(TransmitQueueFrameError::NoQueue(_)) => {
+        Err(TransmitQueueFrameError::NoQueue(DeviceSendFrameError::DeviceNotReady(_))) => {
             unreachable!("loopback never fails to send a frame")
         }
-        Err(TransmitQueueFrameError::QueueFull(s)) => {
+        Err(TransmitQueueFrameError::QueueFull(serializer)) => {
             core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_queue_full);
-            Err(s)
+            Err(SendFrameError { serializer, error: SendFrameErrorReason::QueueFull })
         }
-        Err(TransmitQueueFrameError::SerializeError(s)) => {
+        Err(TransmitQueueFrameError::SerializeError(err)) => {
             core_ctx
                 .increment(device_id, |counters: &DeviceCounters| &counters.send_serialize_error);
-            Err(s)
+            Err(err.err_into())
         }
     }
 }

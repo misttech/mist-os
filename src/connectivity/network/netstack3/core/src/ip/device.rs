@@ -13,6 +13,7 @@ use core::sync::atomic::AtomicU16;
 
 use lock_order::lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor};
 use lock_order::relation::LockBefore;
+use log::debug;
 use net_types::ip::{
     AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
 };
@@ -20,7 +21,7 @@ use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr,
 use netstack3_base::sync::WeakRc;
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
-    NotFoundError, RemoveResourceResultWithContext,
+    NotFoundError, RemoveResourceResultWithContext, SendFrameError,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
@@ -788,7 +789,9 @@ impl<
             IcmpUnusedCode,
             message,
         )
-        .map_err(|EmptyBuf| ())
+        .map_err(|SendFrameError { serializer: EmptyBuf, error }| {
+            debug!("error sending DAD packet: {error:?}")
+        })
     }
 }
 
@@ -834,7 +837,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
         device_id: &Self::DeviceId,
         message: RouterSolicitation,
         body: F,
-    ) -> Result<(), S> {
+    ) -> Result<(), SendFrameError<S>> {
         let Self { config: _, core_ctx } = self;
         let dst_ip = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.into_specified();
         let src_ip = device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(

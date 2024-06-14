@@ -23,8 +23,8 @@ use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier as _,
     EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector, InstantContext,
-    NestedIntoCoreTimerCtx, NotFoundError, RngContext, StrongDeviceIdentifier, TimerContext,
-    TimerHandler, TracingContext,
+    NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameError, SendFrameErrorReason,
+    StrongDeviceIdentifier, TimerContext, TimerHandler, TracingContext,
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
@@ -1060,7 +1060,7 @@ impl<
         >,
         body: S,
         packet_metadata: IpLayerPacketMetadata<I, BC>,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
@@ -1792,7 +1792,7 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
     destination: IpPacketDestination<I, &CC::DeviceId>,
     mut body: S,
     mut packet_metadata: IpLayerPacketMetadata<I, BC>,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
@@ -2188,12 +2188,16 @@ pub fn receive_ipv4_packet<
                     packet_metadata,
                 ) {
                     Ok(()) => (),
-                    Err(p) => {
-                        let _: ForwardedPacket<_, B> = p;
-                        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.mtu_exceeded);
-                        // TODO(https://fxbug.dev/42167236): Encode the MTU error
-                        // more obviously in the type system.
-                        debug!("failed to forward IPv4 packet: MTU exceeded");
+                    Err(SendFrameError { serializer: _, error }) => {
+                        match error {
+                            SendFrameErrorReason::SizeConstraintsViolation => {
+                                core_ctx.increment(|counters: &IpCounters<Ipv4>| {
+                                    &counters.mtu_exceeded
+                                });
+                            }
+                            SendFrameErrorReason::QueueFull | SendFrameErrorReason::Alloc => (),
+                        }
+                        debug!("failed to forward IPv4 packet: {error:?}");
                     }
                 }
             } else {
@@ -2544,7 +2548,7 @@ pub fn receive_ipv6_packet<
                 let (src, dst, proto, meta) = packet.into_metadata();
                 let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
 
-                if let Err(packet) = send_ip_frame(
+                match send_ip_frame(
                     core_ctx,
                     bindings_ctx,
                     &dst_device,
@@ -2552,36 +2556,44 @@ pub fn receive_ipv6_packet<
                     packet,
                     packet_metadata,
                 ) {
-                    // TODO(https://fxbug.dev/42167236): Encode the MTU error more
-                    // obviously in the type system.
-                    core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
-                    debug!("failed to forward IPv6 packet: MTU exceeded");
-                    if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                        trace!("receive_ipv6_packet: Sending ICMPv6 Packet Too Big");
-                        // TODO(joshlf): Increment the TTL since we just
-                        // decremented it. The fact that we don't do this is
-                        // technically a violation of the ICMP spec (we're not
-                        // encapsulating the original packet that caused the
-                        // issue, but a slightly modified version of it), but
-                        // it's not that big of a deal because it won't affect
-                        // the sender's ability to figure out the minimum path
-                        // MTU. This may break other logic, though, so we should
-                        // still fix it eventually.
-                        let mtu = core_ctx.get_mtu(&device);
-                        IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
-                            core_ctx,
-                            bindings_ctx,
-                            device,
-                            frame_dst,
-                            *src_ip,
-                            dst_ip,
-                            packet.into_buffer(),
-                            Icmpv6ErrorKind::PacketTooBig {
-                                proto,
-                                header_len: meta.header_len(),
-                                mtu,
-                            },
-                        );
+                    Ok(()) => (),
+                    Err(SendFrameError {
+                        serializer,
+                        error: SendFrameErrorReason::SizeConstraintsViolation,
+                    }) => {
+                        debug!("failed to forward IPv6 packet: MTU exceeded");
+                        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
+
+                        if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
+                            trace!("receive_ipv6_packet: Sending ICMPv6 Packet Too Big");
+                            // TODO(joshlf): Increment the TTL since we just
+                            // decremented it. The fact that we don't do this is
+                            // technically a violation of the ICMP spec (we're not
+                            // encapsulating the original packet that caused the
+                            // issue, but a slightly modified version of it), but
+                            // it's not that big of a deal because it won't affect
+                            // the sender's ability to figure out the minimum path
+                            // MTU. This may break other logic, though, so we should
+                            // still fix it eventually.
+                            let mtu = core_ctx.get_mtu(&device);
+                            IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
+                                core_ctx,
+                                bindings_ctx,
+                                device,
+                                frame_dst,
+                                *src_ip,
+                                dst_ip,
+                                serializer.into_buffer(),
+                                Icmpv6ErrorKind::PacketTooBig {
+                                    proto,
+                                    header_len: meta.header_len(),
+                                    mtu,
+                                },
+                            );
+                        }
+                    }
+                    Err(SendFrameError { serializer: _, error }) => {
+                        debug!("failed to forward IPv6 packet: {error:?}");
                     }
                 }
             } else {
@@ -2976,7 +2988,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &Self::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
@@ -2993,7 +3005,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         device: &Self::DeviceId,
         destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut;
@@ -3010,7 +3022,7 @@ impl<
         bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &CC::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
@@ -3024,7 +3036,7 @@ impl<
         device: &Self::DeviceId,
         destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
@@ -3056,7 +3068,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
     >,
     body: S,
     packet_metadata: IpLayerPacketMetadata<I, BC>,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
@@ -3096,7 +3108,7 @@ where
     if let Some(mtu) = mtu {
         let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu as usize));
         send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
-            .map_err(|ser| ser.into_inner().into_inner())
+            .map_err(|ser| ser.map_serializer(|s| s.into_inner()).into_inner())
     } else {
         send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
             .map_err(|ser| ser.into_inner())
@@ -3155,7 +3167,7 @@ pub(crate) mod testutil {
             core_ctx: &mut FakeCoreCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>,
             bindings_ctx: &mut BC,
             frame: SS,
-        ) -> Result<(), SS>
+        ) -> Result<(), SendFrameError<SS>>
         where
             SS: Serializer,
             SS::Buffer: BufferMut,
