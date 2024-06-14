@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
-import("//build/testing/boot_tests/kernel_zbi_test.gni")
+import("//build/testing/boot_tests/mistos_unittest_zbi.gni")
 
 rustc_library("mistos-logger") {
   edition = "2021"
@@ -21,7 +21,8 @@ rustc_library("mistos-logger") {
   ]
 
   test_deps = [
-    "//src/lib/fuchsia-runtime",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+    "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:rand",
   ]
@@ -32,12 +33,10 @@ rustc_library("mistos-logger") {
   ]
 }
 
-kernel_zbi_test("mistos-logger-tests") {
-  args = [
-    "userboot.test.root=/",
-    "userboot.test.next=bin/mistos_logger_lib_test+-Z+unstable-options+--force-run-in-process",
-  ]
-  deps = [ ":mistos-logger_test" ]
+mistos_unittest_zbi("mistos-logger-tests") {
+  executable_path = "bin/mistos_logger_lib_test"
+  test_target_label = ":mistos-logger_test"
+  prefix = ""
 }
 
 group("tests") {

@@ -121,45 +121,21 @@ impl Visit for StringVisitor {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Context,
-        fuchsia_runtime::{take_startup_handle, HandleType},
-        fuchsia_zircon::{self as zx, HandleBased},
-        rand::Rng,
-        std::panic,
-        tracing::{error, info, warn},
-    };
+    use super::*;
+    use anyhow::Context;
+    use fidl_fuchsia_boot as fboot;
+    use fuchsia_component::client::connect_channel_to_protocol;
+    use fuchsia_zircon::HandleBased;
+    use rand::Rng;
+    use std::panic;
+    use tracing::{error, info, warn};
 
     fn get_readonlylog() -> zx::DebugLog {
-        let system_resource_handle =
-            take_startup_handle(HandleType::SystemResource.into()).map(zx::Resource::from);
-
-        let debuglog_resource = system_resource_handle
-            .as_ref()
-            .map(|handle| {
-                match handle.create_child(
-                    zx::ResourceKind::SYSTEM,
-                    None,
-                    zx::sys::ZX_RSRC_SYSTEM_DEBUGLOG_BASE,
-                    1,
-                    b"debuglog",
-                ) {
-                    Ok(resource) => Some(resource),
-                    Err(_) => None,
-                }
-            })
-            .flatten()
-            .unwrap();
-
-        let debuglog = zx::DebugLog::create(&debuglog_resource, zx::DebugLogOpts::READABLE)
-            .context("Failed to create readonly debuglog object")
-            .unwrap();
-
-        let readonly = debuglog
-            .replace_handle(zx::Rights::BASIC | zx::Rights::READ | zx::Rights::SIGNAL)
-            .unwrap();
-        readonly
+        let (client_end, server_end) = zx::Channel::create();
+        connect_channel_to_protocol::<fboot::ReadOnlyLogMarker>(server_end).unwrap();
+        let service = fboot::ReadOnlyLogSynchronousProxy::new(client_end);
+        let log = service.get(zx::Time::INFINITE).expect("couldn't get read only log");
+        log
     }
 
     // expect_message_in_debuglog will read the last 10000 messages in zircon's debuglog, looking
