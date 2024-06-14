@@ -34,7 +34,4 @@ source_set("metrics") {
     "//zircon/system/ulib/task-utils",
     "//zircon/system/ulib/trace",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }

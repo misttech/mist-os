@@ -17,8 +17,18 @@
 #include "third_party/rapidjson/include/rapidjson/ostreamwrapper.h"
 #include "third_party/rapidjson/include/rapidjson/rapidjson.h"
 #include "third_party/rapidjson/include/rapidjson/writer.h"
-
 namespace {
+
+// TODO(https://fxbug.dev/42136089): replace with std::saturate_cast when available.
+rapidjson::SizeType safecast(size_t v) {
+  static_assert(std::numeric_limits<rapidjson::SizeType>::min() <=
+                std::numeric_limits<size_t>::min());
+  static_assert(std::numeric_limits<rapidjson::SizeType>::max() <=
+                std::numeric_limits<size_t>::max());
+  return static_cast<rapidjson::SizeType>(
+      std::clamp<size_t>(v, std::numeric_limits<rapidjson::SizeType>::min(),
+                         std::numeric_limits<rapidjson::SizeType>::max()));
+}
 
 rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
   TRACE_DURATION("memory_metrics", "Printer::DocumentFromCapture");
@@ -99,12 +109,12 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
   TRACE_DURATION_BEGIN("memory_metrics", "Printer::DocumentFromCapture::Processes");
   std::unordered_set<NameCount, NameCountHash> name_count;
   rapidjson::Value processes(rapidjson::kArrayType);
-  processes.Reserve(capture.koid_to_process().size(), a);
+  processes.Reserve(safecast(capture.koid_to_process().size()), a);
   rapidjson::Value process_header(rapidjson::kArrayType);
   processes.PushBack(process_header.PushBack("koid", a).PushBack("name", a).PushBack("vmos", a), a);
   for (const auto& [_, p] : capture.koid_to_process()) {
     rapidjson::Value vmos(rapidjson::kArrayType);
-    vmos.Reserve(p.vmos.size(), a);
+    vmos.Reserve(safecast(p.vmos.size()), a);
     for (const auto& v : p.vmos) {
       vmos.PushBack(v, a);
       auto [it, inserted] = name_count.emplace(capture.koid_to_vmo().find(v)->second.name);
@@ -182,7 +192,7 @@ const char* FormatSize(uint64_t bytes, char* buf) {
     bytes /= 1024;
     ui++;
   }
-  unsigned int round_up = ((r % 102) >= 51);
+  uint16_t round_up = ((r % 102) >= 51);
   r = (r / 102) + round_up;
   if (r == 10) {
     bytes++;
