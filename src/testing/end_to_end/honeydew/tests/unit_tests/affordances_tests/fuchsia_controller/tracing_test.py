@@ -4,12 +4,11 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.fuchsia_controller.tracing.py."""
 
-import asyncio
+import logging
 import os
 import tempfile
 import unittest
 from collections.abc import Callable
-import logging
 from typing import Any
 from unittest import mock
 
@@ -405,7 +404,7 @@ class TracingFCTests(unittest.TestCase):
             mock_tracingcontroller_terminate.assert_called()
             mock_tracingcontroller_response.assert_called()
 
-            with self.assertLogs("Tracing", level="WARNING") as cm:
+            with self.assertLogs("Tracing", level="WARNING"):
                 logging.getLogger("Tracing").warning(
                     "10 records were dropped for 4566!"
                 )
