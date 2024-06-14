@@ -106,6 +106,32 @@
     },
 
     ////////
+    // Rust
+    //
+
+    // This works around an OOM issue with the vscode extension-host's
+    // implementation of file-watching.
+    // see:  https://github.com/rust-lang/rust-analyzer/issues/12572
+    // see:  https://github.com/microsoft/vscode/issues/153154
+    "rust-analyzer.files.watcher": "server",
+    "rust-analyzer.server.path": "${workspaceFolder}/prebuilt/third_party/rust-analyzer/rust-analyzer",
+
+    // Use clippy.
+    "rust-analyzer.check.overrideCommand": [
+      "${workspaceFolder}/scripts/fx",
+      "clippy",
+      "--raw",
+      "-f",
+      "$saved_file"
+    ],
+
+    // Remap the diagnostics results from RA to handle the change in working dir
+    // from the workspace root to the root_build_dir in GN/Ninja.
+    "rust-analyzer.diagnostics.remapPrefix": {
+      "../../": "${workspaceFolder}",
+    },
+
+    ////////
     // C/C++
 
     // Formats C/C++ include guards to match Fuchsia style.
