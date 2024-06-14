@@ -4,4 +4,15 @@
   <imports>
     <localimport file="prebuilts"/>
   </imports>
+  <projects>
+    <project name="mist-os"
+             gitsubmodules="true"
+             path="."
+             remote="https://github.com/misttech/mist-os.git"/>
+  </projects>
+  <hooks>
+    <hook name="create-build-info-files"
+          project="mist-os"
+          action="build/info/create_jiri_hook_files.sh"/>
+  </hooks>
 </manifest>
