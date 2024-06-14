@@ -263,16 +263,6 @@ board_input_bundle("main_bundle") {
 
     # Base drivers
     {
-      package_target = "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3"
-      package_set = "base"
-      driver_components = [ "meta/brcmfmac.cm" ]
-    },
-    {
-      package_target = "//src/connectivity/bluetooth/hci/vendor/broadcom"
-      package_set = "base"
-      driver_components = [ "meta/bt-hci-broadcom.cm" ]
-    },
-    {
       package_target = "//src/graphics/drivers/msd-arm-mali:msd-arm-mali"
       package_set = "base"
       driver_components = [ "meta/msd_arm.cm" ]
@@ -296,6 +286,18 @@ board_input_bundle("main_bundle") {
 }
 
 board_input_bundle("broadcom_drivers") {
+  drivers = [
+    {
+      package_target = "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3"
+      package_set = "base"
+      driver_components = [ "meta/brcmfmac.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/bluetooth/hci/vendor/broadcom"
+      package_set = "base"
+      driver_components = [ "meta/bt-hci-broadcom.cm" ]
+    },
+  ]
 }
 
 board_input_bundle("devicetree_board_driver") {
