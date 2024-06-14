@@ -10,7 +10,8 @@ import("//build/rust/rustc_test.gni")
 rustc_test("ta_lifecycle_test") {
   edition = "2021"
 
-  sources = [ "src/lib.rs" ]
+  source_root = "src/ta_lifecycle.rs"
+  sources = [ source_root ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   deps = [
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_rust",
@@ -43,7 +44,40 @@ fuchsia_test("ta-lifecycle") {
   component = ":ta-lifecycle-test-root"
 }
 
+rustc_test("tee_internal_api_entry_points_test") {
+  edition = "2021"
+
+  source_root = "src/entry_points.rs"
+  sources = [ source_root ]
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  deps = [
+    "//sdk/fidl/fuchsia.tee:fuchsia.tee_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+  ]
+}
+
+fuchsia_test_component("tee-internal-api-entry-points-test-root") {
+  manifest = "meta/tee-internal-api-entry-points-root.cml"
+}
+
+fuchsia_test_component("tee-internal-api-entry-points-component") {
+  component_name = "tee-internal-api-entry-points-test"
+  manifest = "meta/tee-internal-api-entry-points-test.cml"
+  deps = [ ":tee_internal_api_entry_points_test" ]
+}
+
+fuchsia_test_package("tee-internal-api-entry-points-test") {
+  subpackages = [ "//src/tee/ta/entry_points:tee-internal-api-entry-points" ]
+  test_components = [ ":tee-internal-api-entry-points-test-root" ]
+  deps = [ ":tee-internal-api-entry-points-component" ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":ta-lifecycle" ]
+  deps = [
+    ":ta-lifecycle",
+    ":tee-internal-api-entry-points-test",
+  ]
 }

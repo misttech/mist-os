@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components/fuchsia_unittest_package.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 
@@ -28,18 +29,13 @@ ifs_shared_library("lib") {
   abi = "libtee_internal.ifs"
 }
 
-rustc_library("tee_internal_impl") {
+rustc_library("tee_internal") {
   edition = "2021"
 
   sources = [
     "src/binding.rs",
-    "src/binding_stubs.rs",
     "src/lib.rs",
-    "src/tee_impl.rs",
   ]
-
-  # TODO: Write tests.
-  # with_unit_tests = true
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }

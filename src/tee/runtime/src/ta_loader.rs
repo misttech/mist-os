@@ -6,7 +6,7 @@
 
 use anyhow::Error;
 
-use tee_internal_impl::binding::{TEE_Param, TEE_Result};
+use tee_internal::binding::{TEE_Param, TEE_Result};
 
 pub type SessionContext = *mut ::std::os::raw::c_void;
 
