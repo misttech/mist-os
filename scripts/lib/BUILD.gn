@@ -3,5 +3,6 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = []
+  testonly = true
+  deps = [ "termout:tests" ]
 }
