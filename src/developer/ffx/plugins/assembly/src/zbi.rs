@@ -156,7 +156,7 @@ pub fn vendor_sign_zbi(
     };
 
     // The resultant file path
-    let signed_path = outdir.as_ref().join(format!("{}.zbi.signed", zbi_config.name));
+    let signed_path = outdir.as_ref().join(format!("{}.zbi", zbi_config.name));
 
     // If the script config defines extra arguments, add them:
     let mut args = Vec::new();
@@ -321,7 +321,7 @@ mod tests {
     fn vendor_sign() {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
-        let expected_output = dir.join("fuchsia.zbi.signed");
+        let expected_output = dir.join("fuchsia.zbi");
 
         // Create a fake zbi.
         let zbi_path = dir.join("fuchsia.zbi");
