@@ -8,7 +8,7 @@ If you need to call some C or C++ APIs from Rust, you can use [`bindgen`] which 
 
 Our `bindgen` prebuilt currently links dynamically to clang, which means you need `libclang.so` available in your library search path.
 
-On Debian-based systems this can usually be achieved with `sudo apt install llvm-dev libclang-dev clang`. On macOS systems with homebrew this can usually be achieved with `brew install llvm`.
+On Debian-based systems this can usually be achieved with `sudo apt install llvm-dev libclang-dev clang`.
 
 ## Generating Rust code
 

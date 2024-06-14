@@ -9,7 +9,7 @@ C++ like UBSan.
 
 Note: it is [not currently possible][miri-monorail] to run tests under miri
 using Fuchsia's build system or infrastructure. This document describes a manual
-workflow which only supports host-side (Linux/MacOS) targets and is not
+workflow which only supports host-side (Linux) targets and is not
 continuously tested. Fixes and updates are welcome!
 
 ## Prerequisites

@@ -42,6 +42,6 @@ product.
 
 ## What you'll need
 
-*   A development machine running Linux or macOS
+*   A development machine running Linux
 *   A configured build environment with the
     [Fuchsia source code](/docs/get-started/get_fuchsia_source.md)
