@@ -8,6 +8,7 @@
 
 #include <sdk/lib/syslog/cpp/macros.h>
 
+#include "src/lib/fostr/fidl/fuchsia.math/amendments.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/global_image_data.h"
@@ -21,6 +22,17 @@ constexpr char kIndentation[] = " | ";
 inline void IndentLine(size_t current_indentation_level, std::ostream& output) {
   for (size_t i = 0; i < current_indentation_level; i++) {
     output << kIndentation;
+  }
+}
+
+std::ostream& operator<<(std::ostream& str, const fuchsia::ui::composition::HitTestInteraction& h) {
+  switch (h) {
+    case fuchsia::ui::composition::HitTestInteraction::DEFAULT:
+      return str << "default";
+    case fuchsia::ui::composition::HitTestInteraction::SEMANTICALLY_INVISIBLE:
+      return str << "semantically_invisible";
+    default:
+      return str << "unknown";
   }
 }
 
@@ -146,6 +158,25 @@ void DumpImages(const flatland::GlobalTopologyData& topology_data,
   }
 }
 
+void DumpHitRegions(const flatland::UberStruct::InstanceMap& snapshot, std::ostream& output) {
+  output << "\nHit Regions:\n";
+  for (const auto& [instance_id, uber_struct] : snapshot) {
+    for (const auto& [transform_handle, hit_regions] : uber_struct->local_hit_regions_map) {
+      if (hit_regions.empty())
+        continue;
+      output << "        transform: " << transform_handle << "\n";
+      for (const auto& hit_region : hit_regions) {
+        if (!hit_region.is_finite()) {
+          output << "        infinite";
+        } else {
+          output << "        region: " << hit_region.region();
+        }
+        output << " interaction: " << hit_region.interaction() << "\n";
+      }
+    }
+  }
+}
+
 }  // namespace
 
 namespace flatland {
@@ -161,6 +192,8 @@ void DumpScene(const UberStruct::InstanceMap& snapshot,
   DumpAllInstances(snapshot, output);
   output << '\n';
   DumpImages(topology_data, images, image_indices, image_rectangles, output);
+  output << '\n';
+  DumpHitRegions(snapshot, output);
   output << "\n============ END SCENE DUMP ======================";
 }
 

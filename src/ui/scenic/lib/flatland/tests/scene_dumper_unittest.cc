@@ -42,6 +42,12 @@ constexpr char kInstanceDumpLineIdentifierToken[] = "Instance";
 // Images are dumped on the same line containing this token.
 constexpr char kImageDumpLineIdentifierToken[] = "image:";
 
+// Hit regions are dumped on the lines after this token.
+constexpr char kHitRegionsDumpLineIdentifierToken[] = "Hit Regions";
+
+// Hit regions are dumped on the same line containing this token.
+constexpr char kHitRegionDumpLineIdentifierToken[] = "transform:";
+
 constexpr flatland::TransformHandle::InstanceId kLinkInstanceId = 0;
 
 // Creates a link in |links| to the the graph rooted at |instance_id:transform_id|. If transform_id
@@ -207,6 +213,46 @@ void ExpectInstanceDump(flatland::TransformHandle::InstanceId instance_id, const
   }
 }
 
+// Checks that the total number of hit regions dumped.
+void ExpectHitRegionDumpCount(const std::vector<std::string>& line_dump, int expected_count) {
+  size_t hit_region_line = 0;
+  for (size_t i = 0; i < line_dump.size(); ++i) {
+    if (line_dump[i].find(kHitRegionsDumpLineIdentifierToken) != std::string::npos) {
+      hit_region_line = i;
+      break;
+    }
+  }
+  int count = 0;
+  for (size_t i = hit_region_line + 1; i < line_dump.size(); ++i) {
+    if (line_dump[i].find(kHitRegionDumpLineIdentifierToken) != std::string::npos) {
+      count++;
+    }
+  }
+  EXPECT_EQ(count, expected_count);
+}
+
+void ExpectHitRegionDump(const std::vector<std::string>& line_dump,
+                         const flatland::TransformHandle& transform,
+                         const fuchsia::math::RectF& hit_region) {
+  size_t hit_region_line = 0;
+  for (size_t i = 0; i < line_dump.size(); ++i) {
+    if (line_dump[i].find(kHitRegionsDumpLineIdentifierToken) != std::string::npos) {
+      hit_region_line = i;
+      break;
+    }
+  }
+
+  std::ostringstream transform_line;
+  transform_line << "transform: (" << transform.GetInstanceId() << ":" << transform.GetTransformId()
+                 << ")";
+  EXPECT_NE(line_dump[hit_region_line + 1].find(transform_line.str()), std::string::npos);
+
+  std::ostringstream region_line;
+  region_line << "region: {x=" << hit_region.x << ", y=" << hit_region.y
+              << ", width=" << hit_region.width << ", height=" << hit_region.height << "}";
+  EXPECT_NE(line_dump[hit_region_line + 2].find(region_line.str()), std::string::npos);
+}
+
 // Find the line number containing an image dump (and also |kImageDumpLineIdentifierToken|). Returns
 // the line number of the following line (after the found image). This can then be specified as
 // |beginning_at| to find subsequent images.
@@ -280,6 +326,11 @@ TEST(SceneDumperTest, TopologyTree) {
   MakeLink(links, 4);  // 0:4 - 4:0
   MakeLink(links, 5);  // 0:5 - 5:0
 
+  const TransformHandle hit_region_transform(2, 0);
+  const fuchsia::math::RectF hit_region({.x = 1.f, .y = 2.f, .width = 3.f, .height = 4.f});
+  uber_structs.begin()->second->local_hit_regions_map[hit_region_transform].emplace_back(
+      hit_region);
+
   GlobalImageVector images;
   GlobalIndexVector image_indices;
   GlobalRectangleVector image_rectangles;
@@ -307,6 +358,9 @@ TEST(SceneDumperTest, TopologyTree) {
   ExpectInstanceDump(3, "", lines);
   ExpectInstanceDump(4, "", lines);
   ExpectInstanceDump(5, "", lines);
+
+  ExpectHitRegionDumpCount(lines, 1);
+  ExpectHitRegionDump(lines, hit_region_transform, hit_region);
 }
 
 TEST(SceneDumperTest, TopologyTreeDeep) {
