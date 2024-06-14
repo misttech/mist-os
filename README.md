@@ -14,16 +14,22 @@ It's based on Zircon Kernel from Fuchsia/LK project.
 _NOTE_: As derived from Fuchsia some scripts/tools are still necessary (plan to remove in the future).
 
 ```
-# Clone the REPO
-git clone https://github.com/misttech/mist-os.git
-
 # Jiri Bootstrap:
 curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s mist-os
 
 # Update binary/packages dependencies using jiri
 cd mist-os
 export PATH=$PWD/.jiri_root/bin:$PATH
+
+# Clone the REPO
+jiri import -name=integration flower https://github.com/misttech/integration
 jiri update
+
+# Avoid jiri to update the project(git). It will be usefull for updating packages and deps (submodules).
+jiri project-config --no-update=true --no-rebase=true
+
+# Check out the main branch
+git checkout main
 
 # Build the kernel
 make it
