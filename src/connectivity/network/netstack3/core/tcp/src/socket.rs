@@ -4346,6 +4346,8 @@ fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsConte
     bindings_ctx: &mut BC,
     id: TcpSocketId<I, CC::WeakDeviceId, BC>,
 ) {
+    let weak = id.downgrade();
+
     core_ctx.with_all_sockets_mut(move |all_sockets| {
         let TcpSocketId(rc) = &id;
         let debug_refs = StrongRc::debug_references(rc);
@@ -4393,7 +4395,6 @@ fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsConte
             return;
         };
 
-        let weak = PrimaryRc::downgrade(&primary);
         let remove_result =
             BC::unwrap_or_notify_with_new_reference_notifier(primary, |state| state);
         match remove_result {
