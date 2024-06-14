@@ -28,11 +28,12 @@ args: ## Set up build dir and arguments file
 	$(NOECHO)echo "target_os = \"mistos\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "host_test_labels = []" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "is_debug = true" >> $(OUTPUT)/args.gn
-	$(NOECHO)echo "kernel_extra_defines = [\"DISABLE_KASLR\"]" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "kernel_extra_defines = [ \"DISABLE_KASLR\" ]" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "compress_debuginfo = \"none\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "optimize = \"debug\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "zircon_optimize = \"debug\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "rust_incremental = \"incremental\"" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "host_labels = [ \"//build/rust:cargo_toml_gen\" ]" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "rbe_mode = \"off\"" >> $(OUTPUT)/args.gn
 .PHONY: args
 
