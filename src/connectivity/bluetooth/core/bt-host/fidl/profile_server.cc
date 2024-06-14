@@ -370,6 +370,25 @@ void ProfileServer::AudioOffloadExt::StartAudioOffload(
   channel_->StartA2dpOffload(*config, std::move(callback));
 }
 
+void ProfileServer::AudioOffloadController::Stop(AudioOffloadController::StopCallback callback) {
+  if (!channel_.is_alive()) {
+    bt_log(ERROR, "fidl", "Audio offload controller server was destroyed");
+    return;
+  }
+
+  channel_->StopA2dpOffload([stop_callback = std::move(callback), this](
+                                fit::result<bt::Error<pw::bluetooth::emboss::StatusCode>> result) {
+    if (result.is_error()) {
+      bt_log(ERROR, "fidl",
+             "Stop a2dp offload failed with error %s. Closing with ZX_ERR_UNAVAILABLE",
+             bt::HostErrorToString(result.error_value().host_error()).c_str());
+      Close(/*epitaph_value=*/ZX_ERR_UNAVAILABLE);
+      return;
+    }
+    stop_callback(fidlbredr::AudioOffloadController_Stop_Result::WithResponse({}));
+  });
+}
+
 std::unique_ptr<bt::l2cap::A2dpOffloadManager::Configuration>
 ProfileServer::AudioOffloadExt::AudioOffloadConfigFromFidl(
     fidlbredr::AudioOffloadConfiguration& audio_offload_configuration) {
