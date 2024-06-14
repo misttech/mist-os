@@ -33,15 +33,14 @@ template("fuchsia_ta_package") {
 
   shared_library(library_target) {
     output_name = "${ta_name}"
-    forward_variables_from(invoker,
-                           [
-                             "sources",
-                             "deps",
-                           ])
+    forward_variables_from(invoker, "*", [ "configs" ])
     if (!defined(deps)) {
       deps = []
     }
     deps += [ "//src/tee/tee_internal_api" ]
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
   }
 
   # This adds a file to the package containing the name of the TA at a
