@@ -12,6 +12,9 @@ lock_level!(DiagnosticsCoreDumpList);
 
 lock_level!(MmDumpable);
 
+lock_level!(BeforeFsNodeAppend);
+lock_level!(FsNodeAppend);
+
 // Artificial lock level that is used when releasing a Task
 lock_level!(TaskRelease);
 lock_level!(ProcessGroupState);
@@ -28,7 +31,6 @@ lock_level!(ResourceAccessorAddFile);
 
 // Lock level for DeviceOps.open. Must be before FileOpsCore because of get_or_create_loop_device
 lock_level!(DeviceOpen);
-lock_level!(FsNodeAllocate);
 
 // This file defines a hierarchy of locks, that is, the order in which
 // the locks must be acquired. Unlocked is a highest level and represents
@@ -43,9 +45,10 @@ impl_lock_after!(Unlocked => TaskRelease);
 impl_lock_after!(TaskRelease => ResourceAccessorAddFile);
 impl_lock_after!(ResourceAccessorAddFile => FileOpsToHandle);
 impl_lock_after!(FileOpsToHandle => DeviceOpen);
-impl_lock_after!(DeviceOpen => FsNodeAllocate);
-impl_lock_after!(FsNodeAllocate => FileOpsCore);
+impl_lock_after!(DeviceOpen => BeforeFsNodeAppend);
+impl_lock_after!(BeforeFsNodeAppend => FsNodeAppend);
+impl_lock_after!(FsNodeAppend => FileOpsCore);
 impl_lock_after!(FileOpsCore => WriteOps);
-impl_lock_after!(WriteOps =>  ProcessGroupState);
+impl_lock_after!(WriteOps => ProcessGroupState);
 impl_lock_after!(WriteOps => BpfHelperOps);
 impl_lock_after!(BpfHelperOps => BpfMapEntries);

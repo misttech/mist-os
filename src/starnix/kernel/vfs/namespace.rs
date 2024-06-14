@@ -32,7 +32,9 @@ use fidl_fuchsia_io as fio;
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, WriteOps};
+use starnix_sync::{
+    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, WriteOps,
+};
 use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -1576,7 +1578,7 @@ impl NamespaceNode {
         length: u64,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         self.entry.node.truncate(locked, current_task, &self.mount, length)
     }

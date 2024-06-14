@@ -371,6 +371,15 @@ impl<L> Locked<'_, L> {
     {
         Locked::<'a, M>(PhantomData::default())
     }
+
+    #[inline(always)]
+    pub fn cast_locked_by_value<'a, M>(_locked: Locked<'a, L>) -> Locked<'a, M>
+    where
+        M: 'a,
+        L: LockEqualOrBefore<M>,
+    {
+        Locked::<'a, M>(PhantomData::default())
+    }
 }
 
 #[cfg(test)]

@@ -3,19 +3,21 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
+use crate::vfs::rw_queue::RwQueueReadGuard;
 use crate::vfs::{
-    default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable, fs_args, CacheMode,
-    DirEntry, DirEntryHandle, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, InputBuffer, MountInfo, OutputBuffer, RenameFlags,
-    SeekTarget, SymlinkTarget, UnlinkKind, ValueOrSize, VecInputBuffer, VecOutputBuffer, XattrOp,
+    default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable, fs_args,
+    AlreadyLockedAppendLockStrategy, AppendLockGuard, CacheMode, DirEntry, DirEntryHandle,
+    DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString, InputBuffer, MountInfo, OutputBuffer, RenameFlags, SeekTarget,
+    SymlinkTarget, UnlinkKind, ValueOrSize, VecInputBuffer, VecOutputBuffer, XattrOp,
 };
 use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, FsNodeAllocate, LockBefore, LockEqualOrBefore, Locked, RwLock,
-    RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
+    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore,
+    Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -710,28 +712,48 @@ impl FsNodeOps for Arc<OverlayNode> {
         Ok(RwLockWriteGuard::downgrade(lock))
     }
 
+    fn append_lock_read<'a>(
+        &'a self,
+        locked: &'a mut Locked<'a, BeforeFsNodeAppend>,
+        _node: &'a FsNode,
+        current_task: &CurrentTask,
+    ) -> Result<(RwQueueReadGuard<'a, FsNodeAppend>, Locked<'a, FsNodeAppend>), Errno> {
+        let upper_node = self.ensure_upper(locked, current_task)?.entry.node.as_ref();
+        upper_node.ops().append_lock_read(locked, upper_node, current_task)
+    }
+
     fn truncate(
         &self,
         locked: &mut Locked<'_, FileOpsCore>,
+        guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
         let upper = self.ensure_upper(locked, current_task)?;
-        upper.entry().node.truncate(locked, current_task, upper.mount(), length)
+
+        upper.entry().node.truncate_with_strategy(
+            locked,
+            AlreadyLockedAppendLockStrategy::new(guard),
+            current_task,
+            upper.mount(),
+            length,
+        )
     }
 
     fn allocate(
         &self,
-        locked: &mut Locked<'_, FsNodeAllocate>,
+        locked: &mut Locked<'_, FileOpsCore>,
+        guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         current_task: &CurrentTask,
         mode: FallocMode,
         offset: u64,
         length: u64,
     ) -> Result<(), Errno> {
-        self.ensure_upper(locked, current_task)?.entry().node.fallocate(
+        self.ensure_upper(locked, current_task)?.entry().node.fallocate_with_strategy(
             locked,
+            AlreadyLockedAppendLockStrategy::new(guard),
             current_task,
             mode,
             offset,

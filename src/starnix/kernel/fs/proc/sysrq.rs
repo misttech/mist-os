@@ -6,8 +6,8 @@
 
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
-    FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, InputBuffer, OutputBuffer,
-    SeekTarget,
+    AppendLockGuard, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, InputBuffer,
+    OutputBuffer, SeekTarget,
 };
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -91,6 +91,7 @@ impl FsNodeOps for SysRqNode {
     fn truncate(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
+        _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _length: u64,

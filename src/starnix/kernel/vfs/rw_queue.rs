@@ -5,8 +5,9 @@
 use crate::task::CurrentTask;
 use starnix_uapi::errors::Errno;
 
+use core::marker::PhantomData;
 use fuchsia_zircon as zx;
-use starnix_sync::{InterruptibleEvent, Mutex};
+use starnix_sync::{InterruptibleEvent, LockBefore, Locked, Mutex};
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -15,21 +16,27 @@ use lock_api as _;
 #[cfg(any(test, debug_assertions))]
 use lock_api::RawRwLock;
 
-#[derive(Debug, Default)]
-pub struct RwQueue {
+#[derive(Debug)]
+pub struct RwQueue<L> {
     inner: Mutex<RwQueueInner>,
+    _phantom: PhantomData<L>,
 
     // Used to inform our deadlock detector about the waiters in the queue.
     #[cfg(any(test, debug_assertions))]
     tracer: tracer::MutexTracer,
 }
 
-impl RwQueue {
-    pub fn read(&self, current_task: &CurrentTask) -> Result<RwQueueReadGuard<'_>, Errno> {
+impl<L> RwQueue<L> {
+    // Acquires a read lock without checking lock ordering.
+    // TODO(https://fxbug.dev/333540469): This should be a part of the implementation
+    // of an OrderedRwLock. However, this requires that OrderedRwLock accepts the
+    // `read()` method that uses a context (in this case, `CurrentTask`).
+    fn read_internal(&self, current_task: &CurrentTask) -> Result<(), Errno> {
         #[cfg(any(test, debug_assertions))]
         self.tracer.lock_shared();
 
         let mut inner = self.inner.lock();
+
         if !inner.try_read() {
             let event = InterruptibleEvent::new();
             let guard = event.begin_wait();
@@ -43,15 +50,37 @@ impl RwQueue {
                 e
             })?;
         }
-
-        Ok(RwQueueReadGuard { queue: self })
+        Ok(())
     }
 
-    pub fn write(&self, current_task: &CurrentTask) -> Result<RwQueueWriteGuard<'_>, Errno> {
+    pub fn read_and<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'_, P>,
+        current_task: &CurrentTask,
+    ) -> Result<(RwQueueReadGuard<'_, L>, Locked<'_, L>), Errno>
+    where
+        P: LockBefore<L>,
+    {
+        self.read_internal(current_task)?;
+
+        let new_locked = locked.cast_locked::<L>();
+
+        Ok((RwQueueReadGuard { queue: self }, new_locked))
+    }
+
+    pub fn write_and<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'_, P>,
+        current_task: &CurrentTask,
+    ) -> Result<(RwQueueWriteGuard<'_, L>, Locked<'_, L>), Errno>
+    where
+        P: LockBefore<L>,
+    {
         #[cfg(any(test, debug_assertions))]
         self.tracer.lock_exclusive();
 
         let mut inner = self.inner.lock();
+
         if !inner.try_write() {
             let event = InterruptibleEvent::new();
             let guard = event.begin_wait();
@@ -66,18 +95,48 @@ impl RwQueue {
             })?;
         }
 
-        Ok(RwQueueWriteGuard { queue: self })
+        let new_locked = locked.cast_locked::<L>();
+        Ok((RwQueueWriteGuard { queue: self }, new_locked))
+    }
+
+    pub fn read<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'_, P>,
+        current_task: &CurrentTask,
+    ) -> Result<RwQueueReadGuard<'_, L>, Errno>
+    where
+        P: LockBefore<L>,
+    {
+        self.read_and(locked, current_task).map(|(g, _)| g)
+    }
+
+    pub fn write<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'_, P>,
+        current_task: &CurrentTask,
+    ) -> Result<RwQueueWriteGuard<'_, L>, Errno>
+    where
+        P: LockBefore<L>,
+    {
+        self.write_and(locked, current_task).map(|(g, _)| g)
     }
 
     /// Used to establish lock ordering.
     #[cfg(any(test, debug_assertions))]
-    pub fn read_for_lock_ordering(&self) -> RwQueueReadGuard<'_> {
+    pub fn read_for_lock_ordering<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'_, P>,
+    ) -> (RwQueueReadGuard<'_, L>, Locked<'_, L>)
+    where
+        P: LockBefore<L>,
+    {
         #[cfg(any(test, debug_assertions))]
         self.tracer.lock_shared();
 
         assert!(self.inner.lock().try_read(), "Cannot fail to acquire a read for lock ordering.");
+        let new_locked = locked.cast_locked::<L>();
 
-        RwQueueReadGuard { queue: self }
+        (RwQueueReadGuard { queue: self }, new_locked)
     }
 
     fn unlock_read(&self) {
@@ -95,6 +154,17 @@ impl RwQueue {
         #[cfg(any(test, debug_assertions))]
         unsafe {
             self.tracer.unlock_exclusive();
+        }
+    }
+}
+
+impl<L> Default for RwQueue<L> {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+            #[cfg(any(test, debug_assertions))]
+            tracer: Default::default(),
+            _phantom: Default::default(),
         }
     }
 }
@@ -222,21 +292,21 @@ impl RwQueueInner {
     }
 }
 
-pub struct RwQueueReadGuard<'a> {
-    queue: &'a RwQueue,
+pub struct RwQueueReadGuard<'a, L> {
+    queue: &'a RwQueue<L>,
 }
 
-impl<'a> Drop for RwQueueReadGuard<'a> {
+impl<'a, L> Drop for RwQueueReadGuard<'a, L> {
     fn drop(&mut self) {
         self.queue.unlock_read();
     }
 }
 
-pub struct RwQueueWriteGuard<'a> {
-    queue: &'a RwQueue,
+pub struct RwQueueWriteGuard<'a, L> {
+    queue: &'a RwQueue<L>,
 }
 
-impl<'a> Drop for RwQueueWriteGuard<'a> {
+impl<'a, L> Drop for RwQueueWriteGuard<'a, L> {
     fn drop(&mut self) {
         self.queue.unlock_write();
     }
@@ -279,6 +349,7 @@ mod test {
     use super::*;
     use crate::task::Kernel;
     use crate::testing::*;
+    use starnix_sync::{impl_lock_after, lock_level, Unlocked};
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -313,16 +384,20 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_write_and_read() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        lock_level!(TestLevel);
+        impl_lock_after!(Unlocked => TestLevel);
 
-        let queue = RwQueue::default();
-        let read_guard1 = queue.read(&current_task).expect("shouldn't be interrupted");
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+
+        let queue = RwQueue::<TestLevel>::default();
+        let read_guard1 = queue.read(&mut locked, &current_task).expect("shouldn't be interrupted");
         std::mem::drop(read_guard1);
 
-        let write_guard = queue.write(&current_task).expect("shouldn't be interrupted");
+        let write_guard =
+            queue.write(&mut locked, &current_task).expect("shouldn't be interrupted");
         std::mem::drop(write_guard);
 
-        let read_guard2 = queue.read(&current_task).expect("shouldn't be interrupted");
+        let read_guard2 = queue.read(&mut locked, &current_task).expect("shouldn't be interrupted");
         std::mem::drop(read_guard2);
     }
 
@@ -330,33 +405,42 @@ mod test {
     async fn test_read_in_parallel() {
         let (kernel, _current_task) = create_kernel_and_task();
 
+        lock_level!(TestLevel);
+        impl_lock_after!(Unlocked => TestLevel);
         struct Info {
             barrier: Barrier,
-            queue: RwQueue,
+            queue: RwQueue<TestLevel>,
         }
 
-        let info = Arc::new(Info { barrier: Barrier::new(2), queue: RwQueue::default() });
+        let info =
+            Arc::new(Info { barrier: Barrier::new(2), queue: RwQueue::<TestLevel>::default() });
 
         let info1 = Arc::clone(&info);
-        let thread1 = kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
-            let guard = info1.queue.read(&current_task).expect("shouldn't be interrupted");
-            info1.barrier.wait();
-            std::mem::drop(guard);
-        });
+        let thread1 =
+            kernel.kthreads.spawner().spawn_and_get_result(move |locked, current_task| {
+                let guard =
+                    info1.queue.read(locked, &current_task).expect("shouldn't be interrupted");
+                info1.barrier.wait();
+                std::mem::drop(guard);
+            });
 
         let info2 = Arc::clone(&info);
-        let thread2 = kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
-            let guard = info2.queue.read(&current_task).expect("shouldn't be interrupted");
-            info2.barrier.wait();
-            std::mem::drop(guard);
-        });
+        let thread2 =
+            kernel.kthreads.spawner().spawn_and_get_result(move |locked, current_task| {
+                let guard =
+                    info2.queue.read(locked, &current_task).expect("shouldn't be interrupted");
+                info2.barrier.wait();
+                std::mem::drop(guard);
+            });
 
         thread1.await.expect("failed to join thread");
         thread2.await.expect("failed to join thread");
     }
 
+    lock_level!(A);
+    impl_lock_after!(Unlocked => A);
     struct State {
-        queue: RwQueue,
+        queue: RwQueue<A>,
         gate: Barrier,
         writer_count: AtomicUsize,
         reader_count: AtomicUsize,
@@ -377,10 +461,11 @@ mod test {
             kernel: Arc<Kernel>,
             count: usize,
         ) -> Pin<Box<dyn Future<Output = Result<(), Errno>>>> {
-            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
+            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |locked, current_task| {
                 state.gate.wait();
                 for _ in 0..count {
-                    let guard = state.queue.write(current_task).expect("shouldn't be interrupted");
+                    let guard =
+                        state.queue.write(locked, current_task).expect("shouldn't be interrupted");
                     let writer_count = state.writer_count.fetch_add(1, Ordering::Acquire) + 1;
                     let reader_count = state.reader_count.load(Ordering::Acquire);
                     state.writer_count.fetch_sub(1, Ordering::Release);
@@ -399,10 +484,11 @@ mod test {
             kernel: Arc<Kernel>,
             count: usize,
         ) -> Pin<Box<dyn Future<Output = Result<(), Errno>>>> {
-            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
+            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |locked, current_task| {
                 state.gate.wait();
                 for _ in 0..count {
-                    let guard = state.queue.read(current_task).expect("shouldn't be interrupted");
+                    let guard =
+                        state.queue.read(locked, current_task).expect("shouldn't be interrupted");
                     let reader_count = state.reader_count.fetch_add(1, Ordering::Acquire) + 1;
                     let writer_count = state.writer_count.load(Ordering::Acquire);
                     state.reader_count.fetch_sub(1, Ordering::Release);

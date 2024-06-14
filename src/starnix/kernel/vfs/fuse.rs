@@ -11,10 +11,10 @@ use crate::vfs::buffers::{
 };
 use crate::vfs::{
     default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
-    fs_args, fs_node_impl_dir_readonly, CacheConfig, CacheMode, CheckAccessReason, DirEntry,
-    DirEntryOps, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource,
-    FallocMode, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    fs_args, fs_node_impl_dir_readonly, AppendLockGuard, CacheConfig, CacheMode, CheckAccessReason,
+    DirEntry, DirEntryOps, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FallocMode, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
     PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget,
     ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
 };
@@ -23,8 +23,8 @@ use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
-    AtomicTime, DeviceOpen, FileOpsCore, FsNodeAllocate, Locked, Mutex, MutexGuard, RwLock,
-    RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
+    AtomicTime, DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
+    RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::auth::FsCred;
@@ -1276,6 +1276,7 @@ impl FsNodeOps for Arc<FuseNode> {
     fn truncate(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
+        _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
         length: u64,
@@ -1311,7 +1312,8 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn allocate(
         &self,
-        _locked: &mut Locked<'_, FsNodeAllocate>,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _mode: FallocMode,

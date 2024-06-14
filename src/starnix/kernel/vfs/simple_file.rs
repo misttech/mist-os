@@ -5,8 +5,8 @@
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_seekable, fs_node_impl_not_dir, CheckAccessReason, FileObject, FileOps, FsNode,
-    FsNodeInfo, FsNodeOps,
+    fileops_impl_seekable, fs_node_impl_not_dir, AppendLockGuard, CheckAccessReason, FileObject,
+    FileOps, FsNode, FsNodeInfo, FsNodeOps,
 };
 
 use starnix_sync::{FileOpsCore, Locked, RwLock, WriteOps};
@@ -84,6 +84,7 @@ where
     fn truncate(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
+        _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _length: u64,

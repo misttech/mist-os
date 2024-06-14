@@ -11,9 +11,9 @@ use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::socket::{Socket, SocketFile, ZxioBackedSocket};
 use crate::vfs::{
     default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
-    fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink, Anon, CacheConfig,
-    CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject, FileOps,
-    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink, Anon, AppendLockGuard,
+    CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
     FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
     DEFAULT_BYTES_PER_BLOCK,
 };
@@ -23,8 +23,8 @@ use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
 use starnix_sync::{
-    FileOpsCore, FileOpsToHandle, FsNodeAllocate, Locked, Mutex, RwLock, RwLockReadGuard,
-    RwLockWriteGuard, Unlocked, WriteOps,
+    FileOpsCore, FileOpsToHandle, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::auth::FsCred;
@@ -726,6 +726,7 @@ impl FsNodeOps for RemoteNode {
     fn truncate(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
+        _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         length: u64,
@@ -735,7 +736,8 @@ impl FsNodeOps for RemoteNode {
 
     fn allocate(
         &self,
-        locked: &mut Locked<'_, FsNodeAllocate>,
+        locked: &mut Locked<'_, FileOpsCore>,
+        guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
         mode: FallocMode,
@@ -747,8 +749,7 @@ impl FsNodeOps for RemoteNode {
                 let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
                 let info = node.fetch_and_refresh_info(current_task)?;
                 if (info.size as u64) < allocate_size {
-                    let mut locked = locked.cast_locked::<FileOpsCore>();
-                    self.truncate(&mut locked, node, current_task, allocate_size)?;
+                    self.truncate(locked, guard, node, current_task, allocate_size)?;
                 }
                 Ok(())
             }

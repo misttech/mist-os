@@ -103,7 +103,6 @@ impl<T, L> OrderedMutex<T, L> {
         locked.lock(self)
     }
 
-    #[cfg(test)]
     pub fn lock_and<'a, P>(
         &'a self,
         locked: &'a mut Locked<'_, P>,
