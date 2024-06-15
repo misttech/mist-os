@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Context as _, Error};
-use fuchsia_async as fasync;
-use fuchsia_zircon::{Channel, MessageBuf};
+use anyhow::{format_err, Error};
+use fidl_fuchsia_hardware_bluetooth::{
+    HciTransportEvent, HciTransportEventStream, HciTransportProxy, ReceivedPacket, SentPacket,
+};
 use futures::executor::block_on;
-use futures::Stream;
+use futures::{ready, Stream, StreamExt};
 use std::convert::TryFrom as _;
 use std::fmt;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::Poll;
 
 use crate::types::{
     decode_opcode, parse_inquiry_result, EventPacketType, InquiryResult, StatusCode,
@@ -23,26 +24,27 @@ const DEFAULT_DEVICE: &str = "/dev/class/bt-hci/000";
 /// A CommandChannel provides a `Stream` associated with the control channel for a single HCI device.
 /// This stream can be polled for `EventPacket`s coming off the channel.
 pub struct CommandChannel {
-    pub chan: fuchsia_async::Channel,
+    pub proxy: HciTransportProxy,
+    event_stream: HciTransportEventStream,
+    is_terminated: bool,
 }
 
 impl CommandChannel {
     /// Create a new CommandChannel from a device path. This opens a new command channel, returning
     /// an error if the device doesn't exist or the channel cannot be created.
     pub fn new(device_path: &str) -> Result<CommandChannel, Error> {
-        let channel = open_command_channel(device_path)?;
-        CommandChannel::from_channel(channel)
+        let proxy = open_hci_transport(device_path)?;
+        CommandChannel::from_proxy(proxy)
     }
 
-    /// Take a channel and wrap it in a `CommandChannel`.
-    fn from_channel(chan: Channel) -> Result<CommandChannel, Error> {
-        let chan = fasync::Channel::from_channel(chan);
-
-        Ok(CommandChannel { chan })
+    /// Take a HciTransportProxy and wrap it in a `CommandChannel`.
+    fn from_proxy(proxy: HciTransportProxy) -> Result<CommandChannel, Error> {
+        let event_stream = proxy.take_event_stream();
+        Ok(CommandChannel { proxy, event_stream, is_terminated: false })
     }
 
-    pub fn send_command_packet(&self, buf: &[u8]) -> Result<(), Error> {
-        self.chan.write(buf, &mut vec![])?;
+    pub async fn send_command_packet(&self, buf: Vec<u8>) -> Result<(), Error> {
+        self.proxy.send_(&SentPacket::Command(buf)).await?;
         Ok(())
     }
 }
@@ -51,17 +53,32 @@ impl Unpin for CommandChannel {}
 impl Stream for CommandChannel {
     type Item = EventPacket;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut buf = MessageBuf::new();
-        match self.chan.recv_from(cx, &mut buf) {
-            Poll::Ready(_t) => {
-                if buf.bytes().is_empty() {
-                    Poll::Ready(None)
-                } else {
-                    Poll::Ready(Some(EventPacket::new(buf.bytes())))
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut core::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        if self.is_terminated {
+            return Poll::Ready(None);
+        }
+        loop {
+            let result = ready!(self.event_stream.poll_next_unpin(cx));
+            let Some(Ok(packet)) = result else {
+                self.is_terminated = true;
+                return Poll::Ready(None);
+            };
+            match packet {
+                HciTransportEvent::OnReceive { payload } => {
+                    if self.proxy.ack_receive().is_err() {
+                        self.is_terminated = true;
+                        return Poll::Ready(None);
+                    }
+                    let ReceivedPacket::Event(event) = payload else {
+                        continue;
+                    };
+                    return Poll::Ready(Some(EventPacket::new(event)));
                 }
+                _ => continue,
             }
-            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -82,10 +99,9 @@ const HCI_INQUIRY_RESULT_MIN: usize = 3;
 const HCI_INQUIRY_COMPLETE_MIN: usize = 3;
 
 impl EventPacket {
-    pub fn new(payload: &[u8]) -> EventPacket {
+    pub fn new(payload: Vec<u8>) -> EventPacket {
         assert!(!payload.is_empty(), "HCI Packet is empty");
 
-        let payload = payload.to_vec();
         match EventPacketType::try_from(payload[0]) {
             Ok(EventPacketType::CommandComplete) => {
                 if payload.len() < HCI_COMMAND_COMPLETE_MIN {
@@ -171,19 +187,14 @@ impl fmt::Display for EventPacket {
     }
 }
 
-fn open_command_channel(device_path: &str) -> Result<Channel, Error> {
+fn open_hci_transport(device_path: &str) -> Result<HciTransportProxy, Error> {
     let interface = fuchsia_component::client::connect_to_protocol_at_path::<
-        fidl_fuchsia_hardware_bluetooth::HciMarker,
+        fidl_fuchsia_hardware_bluetooth::VendorMarker,
     >(device_path)?;
-    let (ours, theirs) = Channel::create();
-    let res = block_on(interface.open_command_channel(theirs))
-        .context("open command channel request")?
-        .map_err(|e| format_err!("Failed with error: {}", e));
-
-    match res {
-        Ok(()) => Ok(ours),
-        Err(e) => Err(format_err!("Failed to open command channel with error {}", e)),
-    }
+    let proxy = block_on(interface.open_hci_transport())?
+        .map_err(|_| format_err!("open_hci_transport failed"))?
+        .into_proxy()?;
+    Ok(proxy)
 }
 
 pub fn open_default_device() -> Result<CommandChannel, Error> {
@@ -193,33 +204,58 @@ pub fn open_default_device() -> Result<CommandChannel, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bt_fidl_mocks::hci::HciTransportMock;
+    use bt_fidl_mocks::timeout_duration;
+    use fidl_fuchsia_hardware_bluetooth::{HciTransportMarker, ReceivedPacket};
     use fuchsia_async as fasync;
+    use futures::future::join;
     use futures::StreamExt;
 
     #[test]
-    fn test_from_channel() {
-        let _exec = fasync::TestExecutor::new();
-        let (channel, _) = Channel::create();
-        let _command_channel = CommandChannel::from_channel(channel).unwrap();
+    fn test_command_channel_stream_lifecycle() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>().unwrap();
+        let (stream, control_handle) = server.into_stream_and_control_handle().unwrap();
+        let mut command_channel = CommandChannel::from_proxy(proxy).unwrap();
+
+        let event = vec![0x0e, 0x04, 0x01, 0x03, 0x0c, 0x00];
+        control_handle.send_on_receive(&ReceivedPacket::Event(event.clone())).unwrap();
+
+        let event = exec.run_until_stalled(&mut command_channel.next());
+        assert!(event.is_ready());
+
+        drop(stream);
+        drop(control_handle);
+        let event = exec.run_until_stalled(&mut command_channel.next());
+        let Poll::Ready(None) = event else {
+            panic!("Expected None");
+        };
     }
 
     #[test]
     fn test_command_channel() {
         let mut exec = fasync::TestExecutor::new();
-        let (remote, local) = Channel::create();
-        let mut command_channel = CommandChannel::from_channel(local).unwrap();
+        let (proxy, server) = fidl::endpoints::create_proxy::<HciTransportMarker>().unwrap();
+        let (stream, control_handle) = server.into_stream_and_control_handle().unwrap();
+        let mut command_channel = CommandChannel::from_proxy(proxy).unwrap();
+        let mut mock = HciTransportMock::from_stream(stream, timeout_duration());
 
-        let _ = command_channel.send_command_packet(&[0x03, 0x0c, 0x00]).expect("unable to send");
+        let command = vec![0x03, 0x0c, 0x00];
+        let send_fut = command_channel.send_command_packet(command.clone());
+        let expect_fut = mock.expect_send(SentPacket::Command(command.clone()));
+        let send_poll = exec.run_until_stalled(&mut Box::pin(join(send_fut, expect_fut)));
+        let Poll::Ready((send_result, expect_result)) = send_poll else {
+            panic!("send future stuck pending");
+        };
+        let _ = send_result.expect("send failed");
+        let _ = expect_result.expect("expect failed");
 
-        let mut buf = MessageBuf::new();
-        let _ = remote.read(&mut buf).expect("unable to read");
-        assert_eq!(buf.bytes(), &[0x03, 0x0c, 0x00]);
+        let event = vec![0x0e, 0x04, 0x01, 0x03, 0x0c, 0x00];
+        control_handle.send_on_receive(&ReceivedPacket::Event(event.clone())).unwrap();
 
-        remote.write(&[0x0e, 0x04, 0x01, 0x03, 0x0c, 0x00], &mut vec![]).unwrap();
-
-        let packet = exec.run_until_stalled(&mut command_channel.next());
-        assert!(packet.is_ready());
-        match packet {
+        let event = exec.run_until_stalled(&mut command_channel.next());
+        assert!(event.is_ready());
+        match event {
             Poll::Ready(packet) => {
                 let pkt = packet.expect("no packet");
                 assert_eq!(
@@ -243,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_event_packet_decode_cmd_complete() {
-        let pkt = EventPacket::new(&[
+        let pkt = EventPacket::new(vec![
             0x0e, 0x04, // HCI_Command_Complete
             0x01, //
             0x03, 0x0c, // opcode (little endian)
@@ -260,7 +296,7 @@ mod tests {
 
     #[test]
     fn test_event_packet_decode_inquiry() {
-        let pkt = EventPacket::new(&[
+        let pkt = EventPacket::new(vec![
             0x02, 0x0f, // HCI_Inquiry_Result
             0x01, // results count
             0x7c, 0x48, 0xc6, 0x8b, 0x42, 0x74, // br_addr
@@ -284,7 +320,7 @@ mod tests {
 
     #[test]
     fn test_event_packet_decode_inquiry_complete() {
-        let pkt = EventPacket::new(&[
+        let pkt = EventPacket::new(vec![
             0x01, 0x0f, // HCI_Inquiry_Complete
             0x00,
         ]);
@@ -298,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_event_packet_decode_unhandled() {
-        let pkt = EventPacket::new(&[0x0e]);
+        let pkt = EventPacket::new(vec![0x0e]);
         let e = pkt.decode();
         assert_eq!(format!("{}", e), "Unknown Event: 0x0e Payload: 0e".to_string());
     }
