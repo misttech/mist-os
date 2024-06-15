@@ -79,8 +79,9 @@ class Device final : public DdkDeviceType,
 
   [[nodiscard]] zx_status_t GetContiguousGuardParameters(
       const std::optional<sysmem_config::Config>& config, uint64_t* guard_bytes_out,
-      bool* unused_pages_guarded, zx::duration* unused_page_check_cycle_period,
-      bool* internal_guard_pages_out, bool* crash_on_fail_out);
+      bool* unused_pages_guarded, int64_t* unused_guard_pattern_period_bytes,
+      zx::duration* unused_page_check_cycle_period, bool* internal_guard_pages_out,
+      bool* crash_on_fail_out);
 
   [[nodiscard]] static zx_status_t Bind(std::unique_ptr<Device> device);
   // currently public only for tests

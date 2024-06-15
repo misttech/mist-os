@@ -281,6 +281,7 @@ Device::~Device() {
 zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_config::Config>& config,
                                                  uint64_t* guard_bytes_out,
                                                  bool* unused_pages_guarded,
+                                                 int64_t* unused_guard_pattern_period_bytes,
                                                  zx::duration* unused_page_check_cycle_period,
                                                  bool* internal_guard_pages_out,
                                                  bool* crash_on_fail_out) {
@@ -293,12 +294,16 @@ zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_conf
     *unused_pages_guarded = true;
     *internal_guard_pages_out = false;
     *crash_on_fail_out = false;
+    *unused_guard_pattern_period_bytes = -1;
     return ZX_OK;
   }
 
   *crash_on_fail_out = config->contiguous_guard_pages_fatal();
   *internal_guard_pages_out = config->contiguous_guard_pages_internal();
   *unused_pages_guarded = config->contiguous_guard_pages_unused();
+  // if this value is <= 0 it'll be ignored and the default of 1/128 will stay in effect
+  *unused_guard_pattern_period_bytes =
+      config->contiguous_guard_pages_unused_fraction_denominator() * zx_system_get_page_size();
 
   int64_t unused_page_check_cycle_seconds_override =
       config->contiguous_guard_pages_unused_cycle_seconds_override();
@@ -627,13 +632,15 @@ zx_status_t Device::Bind() {
     }
     uint64_t guard_region_size;
     bool unused_pages_guarded;
+    int64_t unused_guard_pattern_period_bytes;
     zx::duration unused_page_check_cycle_period;
     bool internal_guard_regions;
     bool crash_on_guard;
-    if (GetContiguousGuardParameters(config, &guard_region_size, &unused_pages_guarded,
-                                     &unused_page_check_cycle_period, &internal_guard_regions,
-                                     &crash_on_guard) == ZX_OK) {
+    if (GetContiguousGuardParameters(
+            config, &guard_region_size, &unused_pages_guarded, &unused_guard_pattern_period_bytes,
+            &unused_page_check_cycle_period, &internal_guard_regions, &crash_on_guard) == ZX_OK) {
       pooled_allocator->InitGuardRegion(guard_region_size, unused_pages_guarded,
+                                        unused_guard_pattern_period_bytes,
                                         unused_page_check_cycle_period, internal_guard_regions,
                                         crash_on_guard, loop_.dispatcher());
     }

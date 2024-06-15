@@ -46,8 +46,22 @@
         // If true, sysmem will create guard regions around every allocation.
         contiguous_guard_pages_internal: { type: "bool" },
 
-        // If false, sysmem will _not_ treat currently-unused pages as guard pages.
+        // If true, sysmem will treat a fraction of currently-unused pages as
+        // guard pages and attempt to loan the rest back to zircon. If false,
+        // sysmem will attempt to loan all currently-unused pages back to
+        // zircon.
         contiguous_guard_pages_unused: { type: "bool" },
+
+        // When contiguous_guard_pages_unused is true and this value is > 0,
+        // 1/contiguous_guard_pages_unused_fraction_denominator currently-unused pages are not
+        // loaned back to zircon, and instead become guard pages.
+        //
+        // Else if contiguous_guard_pages_unused is true but this value is <= 0, the fraction kept
+        // as guard pages is 1/128.
+        //
+        // Else if contiguous_guard_pages_unused is false, this value is ignored and all
+        // currently-unused pages are loaned back to zircon.
+        contiguous_guard_pages_unused_fraction_denominator: { type: "int32" },
 
         // If value is less than 0 then it is ignored.
         contiguous_guard_page_count_override: { type: "int64" },

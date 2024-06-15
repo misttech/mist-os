@@ -33,6 +33,9 @@ declare_args() {
   driver_sysmem_contiguous_guard_pages_fatal = false
   driver_sysmem_contiguous_guard_pages_internal = false
   driver_sysmem_contiguous_guard_pages_unused = true
+
+  # <= 0 means this defaults to 128
+  driver_sysmem_contiguous_guard_pages_unused_fraction_denominator = -1
   driver_sysmem_contiguous_guard_pages_unused_cycle_seconds_override = -1
   driver_sysmem_contiguous_guard_page_count_override = -1
   driver_sysmem_protected_ranges_disable_dynamic = false
@@ -156,6 +159,8 @@ fuchsia_structured_config_values("config_values") {
     contiguous_guard_pages_internal =
         driver_sysmem_contiguous_guard_pages_internal
     contiguous_guard_pages_unused = driver_sysmem_contiguous_guard_pages_unused
+    contiguous_guard_pages_unused_fraction_denominator =
+        driver_sysmem_contiguous_guard_pages_unused_fraction_denominator
     contiguous_guard_pages_unused_cycle_seconds_override =
         driver_sysmem_contiguous_guard_pages_unused_cycle_seconds_override
     contiguous_guard_page_count_override =
