@@ -26,6 +26,8 @@ if (is_host) {
       "//third_party/rust_crates:rayon",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:tracing",
+      "//third_party/rust_crates:tracing-subscriber",
     ]
     data_deps = [ "debugdump:host($host_toolchain)" ]
     inputs = [

@@ -21,7 +21,9 @@ use fuchsia_pkg::PackageManifest;
 use handlebars::{Handlebars, Helper, HelperResult, Output, RenderContext, RenderError};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
+use rayon::ThreadPoolBuilder;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, span, Level};
 
 #[derive(FromArgs)]
 /// collect and generate stats on Fuchsia packages
@@ -48,6 +50,18 @@ struct ProcessArgs {
     /// the path to save the output json file
     #[argh(option)]
     out: Option<PathBuf>,
+
+    /// if set, process manifests one at a time, for debugging.
+    #[argh(switch)]
+    debug_no_parallel: bool,
+
+    /// process only this many manifests.
+    #[argh(option)]
+    debug_manifest_limit: Option<usize>,
+
+    /// process only manifests containing this substring.
+    #[argh(option)]
+    debug_manifest_filter: Option<String>,
 }
 
 #[derive(FromArgs)]
@@ -64,6 +78,7 @@ struct HtmlArgs {
 }
 
 fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
     let args: Args = argh::from_env();
 
     match args.cmd {
@@ -303,6 +318,23 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         duration
     );
 
+    let mut debug_mode = false;
+    if let Some(search) = args.debug_manifest_filter {
+        debug_mode = true;
+        manifests =
+            manifests.into_iter().filter(|v| v.to_string_lossy().contains(&search)).collect();
+    }
+    if let Some(limit) = args.debug_manifest_limit {
+        debug_mode = true;
+        manifests = manifests.into_iter().take(limit).collect();
+    }
+    if args.debug_no_parallel {
+        ThreadPoolBuilder::new().num_threads(1).build_global().expect("make thread pool");
+    }
+    if debug_mode {
+        println!("Filtered down to {} manifests", manifests.len());
+    }
+
     let get_content_file_path = |relative_path: &str, source_file_path: &Path| {
         let filepath = path.join(relative_path);
         if filepath.exists() {
@@ -332,7 +364,15 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     let names = Mutex::new(HashMap::new());
     let content_hash_to_path = Mutex::new(HashMap::new());
     let start = Instant::now();
+
     manifests.par_iter().for_each(|manifest_path| {
+        let span = span!(
+            Level::DEBUG,
+            "processing manifest",
+            path = manifest_path.to_string_lossy().to_string()
+        );
+        let _enter = span.enter();
+        debug!("Starting");
         manifest_count.fetch_add(1, Ordering::Relaxed);
         macro_rules! do_on_error {
             ($val:expr, $step:expr, $error_counter:expr, $do:expr) => {
@@ -340,6 +380,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                     Ok(v) => v,
                     Err(e) => {
                         $error_counter.fetch_add(1, Ordering::Relaxed);
+                        debug!(status = "Failed", step = $step);
                         eprintln!(
                             "[{}] Failed {}: {:?}",
                             manifest_path.to_string_lossy(),
@@ -355,6 +396,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                     Ok(v) => v,
                     Err(e) => {
                         $error_counter.fetch_add(1, Ordering::Relaxed);
+                        debug!(status = "Failed", step = $step);
                         eprintln!(
                             "[{}] Failed {} for {}: {:?}",
                             manifest_path.to_string_lossy(),
@@ -387,7 +429,11 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                 }
             };
 
+        debug!("Loaded");
+
         let mut contents = PackageContents::default();
+
+        debug!("Have {} blobs", manifest.blobs().len());
 
         for blob in manifest.blobs() {
             if blob.path == "meta/" {
@@ -408,14 +454,23 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                 );
 
                 let mut manifest_paths = vec![];
+                debug!("Loaded manifest, have {} entries", reader.list().len());
                 for entry in reader.list() {
                     let path = String::from_utf8_lossy(entry.path());
                     if path.ends_with(".cm") {
+                        debug!("Found a component manifest, {}", path);
                         manifest_paths.push(entry.path().to_owned());
                     }
                 }
 
                 for manifest_path in manifest_paths {
+                    let span = span!(
+                        Level::DEBUG,
+                        "processing component",
+                        path = String::from_utf8_lossy(&manifest_path).to_string()
+                    );
+                    let _entry = span.enter();
+                    debug!("Starting");
                     let data = do_on_error!(
                         reader.read_file(&manifest_path),
                         "reading component manifest",
@@ -450,10 +505,14 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                                             .used_from_child
                                             .insert((Capability::Protocol(name), c.name));
                                     }
-                                    _ => break,
+                                    e => {
+                                        debug!("Unknown use from ref: {:?}", e);
+                                        break;
+                                    }
                                 }
                             }
-                            _ => {
+                            e => {
+                                debug!("Unknown use entry: {:?}", e)
                                 // Skip all else for now
                             }
                         }
@@ -476,10 +535,14 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                                             .exposed_from_child
                                             .insert((Capability::Protocol(name), c.name));
                                     }
-                                    _ => break,
+                                    e => {
+                                        debug!("Unknown expose from ref : {:?}", e);
+                                        break;
+                                    }
                                 }
                             }
-                            _ => {
+                            e => {
+                                debug!("Unknown exposes entry: {:?}", e)
                                 // Skip all else for now
                             }
                         }
@@ -523,9 +586,13 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     }
 
     content_hash_to_path.lock().unwrap().par_iter().for_each(|(hash, path)| {
+        let span = span!(Level::DEBUG, "processing blob", hash=hash, path=path);
+        let _entry = span.enter();
         if path.is_empty() {
+            debug!("Skipping, no path");
             return;
         }
+
         let path = PathBuf::from(path);
         let alt_path = path
             .parent()
@@ -540,8 +607,11 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             path
         };
 
+        debug!("Found canonical path at {}", path.to_string_lossy().to_string());
+
         let f = File::open(&path);
         if f.is_err() {
+            debug!("Path found");
             eprintln!("Failed to open {}, skipping: {:?}", path.to_string_lossy(), f.unwrap_err());
             return;
         }
@@ -551,6 +621,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         if f.read_exact(&mut header_buf).is_ok() && header_buf == [0x7fu8, 0x45u8, 0x4cu8, 0x46u8] {
             // process
             elf_count.fetch_add(1, Ordering::Relaxed);
+            debug!("Looks like ELF, dumping headers");
 
             let mut elf_contents = ElfContents::new(path.to_string_lossy().to_string());
             let proc = std::process::Command::new(&debugdump_path)
@@ -562,9 +633,11 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             let files = match output {
                 Ok(output) => {
                     if output.status != "OK".to_string() {
+                        debug!("Dumping failed, {}", output.error);
                         eprintln!("Debug info error: {}", output.error);
                         vec![]
                     } else {
+                        debug!("Dumping succeeded, found {} files", output.files.len());
                         output.files
                     }
                 }
@@ -578,6 +651,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             }
             file_infos.lock().unwrap().insert(hash.clone(), FileInfo::Elf(elf_contents));
         } else {
+            debug!("Looks like some other kind of file");
             file_infos.lock().unwrap().insert(
                 hash.clone(),
                 FileInfo::Other(OtherContents { source_path: path.to_string_lossy().to_string() }),
