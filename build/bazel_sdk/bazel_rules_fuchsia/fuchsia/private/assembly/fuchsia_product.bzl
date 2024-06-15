@@ -308,6 +308,7 @@ def fuchsia_product(
         package_mode = None,
         platform_artifacts = None,
         legacy_bundle = None,
+        package_validation = None,
         **kwargs):
     fuchsia_product_assembly(
         name = name + "_product_assembly",
@@ -316,6 +317,7 @@ def fuchsia_product(
         platform_artifacts = platform_artifacts,
         legacy_bundle = legacy_bundle,
         package_mode = package_mode,
+        package_validation = package_validation,
     )
 
     _fuchsia_product_create_system(
