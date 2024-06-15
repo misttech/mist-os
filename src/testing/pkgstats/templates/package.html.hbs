@@ -11,6 +11,42 @@ found in the LICENSE file. }}
         {{#each this.[1].components}}
         <tr>
             <td>{{@key}}</td>
+            {{#if (or this.exposed_from_self this.offered_from_self)}}
+            <td>
+                Offered and exposed protocols
+                <ul>
+                    {{#each this.exposed_from_self}}
+                    <li>
+                        {{ capability_str this }} (exposed)
+                        {{{ capability_target_list this @root.[2] }}}
+                    </li>
+                    {{/each}}
+                    {{#each this.offered_from_self}}
+                    <li>
+                        {{ capability_str this }} (offered)
+                        {{{ capability_target_list this @root.[2] }}}
+                    </li>
+                    {{/each}}
+                </ul>
+            </td>
+            {{/if}}
+            {{#if (or this.used_from_parent this.used_from_child)}}
+            <td>
+                Used protocols
+                <ul>
+                    {{#each this.used_from_parent}}
+                    <li>
+                        {{ capability_str this }} (from parent)
+                    </li>
+                    {{/each}}
+                    {{#each this.used_from_child}}
+                    <li>
+                        {{ capability_str this.0 }} (from child)
+                    </li>
+                    {{/each}}
+                </ul>
+            </td>
+            {{/if}}
         </tr>
         {{/each}}
     </table>
