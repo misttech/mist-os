@@ -39,7 +39,7 @@ pub fn validate_product(
                                 PackageValidationError::UnsupportedAbiRevision (_) => true,
                                 _ => false};
                              if print_warning {
-                                println!("WARNING: The package named '{}', with manifest at {} failed validation:\n{}", manifest.name(), package_manifest_path, e);
+                                eprintln!("WARNING: The package named '{}', with manifest at {} failed validation:\n{}", manifest.name(), package_manifest_path, e);
                                 None
                              } else {
                                 // return the error
