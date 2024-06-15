@@ -21,4 +21,16 @@
 #define ZX_SYS_syscall_test2 10
 #define ZX_SYS_COUNT 11
 
+#ifndef __ASSEMBLER__
+
+// Indexed by syscall number.
+inline constexpr const char* kSyscallNames[] = {
+    "zx_channel_read",      "zx_channel_write",  "zx_clock_get_monotonic_via_kernel",
+    "zx_handle_close_many", "zx_ktrace_control", "zx_nanosleep",
+    "zx_process_exit",      "zx_syscall_next",   "zx_syscall_test0",
+    "zx_syscall_test1",     "zx_syscall_test2",
+};
+
+#endif  // #ifndef __ASSEMBLER__
+
 #endif  // LIB_SYSCALLS_ZX_SYSCALL_NUMBERS_H_
