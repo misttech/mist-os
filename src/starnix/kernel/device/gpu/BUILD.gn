@@ -17,9 +17,15 @@ rustc_library("gpu") {
   ]
 
   deps = [
+    ":gfxstream_stubs",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/kernel:starnix_sync",
     "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:rutabaga_gfx",
   ]
+}
+
+source_set("gfxstream_stubs") {
+  sources = [ "gfxstream_stubs.cc" ]
 }

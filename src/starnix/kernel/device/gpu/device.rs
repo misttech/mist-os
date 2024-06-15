@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use rutabaga_gfx::*;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::DeviceDirectory;
@@ -36,6 +37,9 @@ where
 
     let gpu_type: DeviceType =
         registry.register_dyn_chrdev(create_gpu_device).expect("gpu device register failed.");
+
+    let _ = RutabagaBuilder::new(RutabagaComponentType::Gfxstream, 0)
+        .build(RutabagaFenceHandler::new(move |_| {}), std::option::Option::None);
 
     registry.add_device(
         locked,
