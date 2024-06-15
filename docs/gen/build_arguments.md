@@ -2732,7 +2732,7 @@ From //build/config/profile/config.gni:15
 
 **Current value (from the default):** `-1`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:37
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:40
 
 ### driver_sysmem_contiguous_guard_pages_fatal
 
@@ -2756,7 +2756,15 @@ From //src/devices/sysmem/drivers/sysmem/BUILD.gn:35
 
 **Current value (from the default):** `-1`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:36
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:39
+
+### driver_sysmem_contiguous_guard_pages_unused_fraction_denominator
+
+<= 0 means this defaults to 128
+
+**Current value (from the default):** `-1`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:38
 
 ### driver_sysmem_contiguous_memory_size_override
 
@@ -2774,7 +2782,7 @@ From //src/devices/sysmem/drivers/sysmem/BUILD.gn:31
 
 **Current value (from the default):** `false`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:38
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:41
 
 ### dwarf_version
 
