@@ -295,6 +295,47 @@ zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
   return ZX_OK;
 }
 
+zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
+  canary_.Assert();
+
+  ContentSizeManager::Operation op;
+  Guard<Mutex> guard{content_size_mgr_->lock()};
+
+  uint64_t vmo_size = vmo_->size();
+  uint64_t old_stream_size = GetContentSize();
+
+  if (stream_size == old_stream_size) {
+    return ZX_OK;
+  }
+
+  // can't resize the stream beyond the VMO size
+  if (stream_size > vmo_size) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  content_size_mgr_->BeginSetContentSizeLocked(stream_size, &op, &guard);
+
+  // Zero the range from min(stream size, old stream size) to the end of the VMO.
+  uint64_t zero_start = ktl::min(stream_size, old_stream_size);
+  uint64_t zero_len = vmo_size - zero_start;
+  // Dropping the lock here is fine, as an `Operation` only needs to be locked when initializing,
+  // committing, or cancelling.
+  zx_status_t status;
+  guard.CallUnlocked([&] { status = vmo_->ZeroRange(zero_start, zero_len); });
+
+  op.AssertParentLockHeld();
+
+  // Undo this operation of ZeroRange fails.
+  if (status != ZX_OK) {
+    op.AssertParentLockHeld();
+    op.CancelLocked();
+    return status;
+  }
+
+  op.CommitLocked();
+  return ZX_OK;
+}
+
 uint64_t VmObjectDispatcher::GetContentSize() const {
   canary_.Assert();
 

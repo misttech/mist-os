@@ -198,11 +198,13 @@
     "zx_vmo_create_contiguous",
     "zx_vmo_create_physical",
     "zx_vmo_get_size",
+    "zx_vmo_get_stream_size",
     "zx_vmo_op_range",
     "zx_vmo_read",
     "zx_vmo_replace_as_executable",
     "zx_vmo_set_cache_policy",
     "zx_vmo_set_size",
+    "zx_vmo_set_stream_size",
     "zx_vmo_transfer_data",
     "zx_vmo_write"
 ]

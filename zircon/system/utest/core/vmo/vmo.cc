@@ -899,6 +899,184 @@ TEST(VmoTestCase, ContentSize) {
   EXPECT_EQ(target_size, content_size);
 }
 
+TEST(VmoTestCase, StreamSize) {
+  zx::vmo vmo;
+  const size_t create_len = zx_system_get_page_size() * 4 + 42;
+
+  // VMO with stream size of 4 pages & 42 bytes.
+  EXPECT_OK(zx::vmo::create(create_len, ZX_VMO_RESIZABLE, &vmo));
+
+  // Stream size should be create_len & VMO size should be rounded up be a multiple of page size.
+  uint64_t stream_size = 0;
+  uint64_t vmo_size = 0;
+
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, create_len);
+  EXPECT_OK(vmo.get_size(&vmo_size));
+  EXPECT_EQ(vmo_size, zx_system_get_page_size() * 5);
+
+  // Reducing stream size doesn't affect the VMO size.
+  EXPECT_OK(vmo.set_stream_size(zx_system_get_page_size() - 1));
+
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, zx_system_get_page_size() - 1);
+  EXPECT_OK(vmo.get_size(&vmo_size));
+  EXPECT_EQ(vmo_size, zx_system_get_page_size() * 5);
+
+  // Can resize stream up to the limit of the VMO size.
+  EXPECT_OK(vmo.set_stream_size(zx_system_get_page_size() * 5));
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, zx_system_get_page_size() * 5);
+
+  // Out of range error if stream is resized to be larger than the VMO.
+  EXPECT_EQ(vmo.set_stream_size(zx_system_get_page_size() * 5 + 1), ZX_ERR_OUT_OF_RANGE);
+
+  // zx_vmo_set_size should trim the stream size to ensure it is never larger than the VMO size.
+  EXPECT_OK(vmo.set_size(zx_system_get_page_size() * 2));
+
+  // VMO size should be rounded up a page & stream size
+  EXPECT_OK(vmo.get_size(&vmo_size));
+  EXPECT_EQ(vmo_size, zx_system_get_page_size() * 2);
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, zx_system_get_page_size() * 2);
+
+  // TODO(341218975@): add test that zx_vmo_set_size will not modify stream size, unless to
+  // maintain invariant that stream size does not exceed VMO size.
+
+  // zx_vmo_set_size should trim the stream size to ensure it is never larger than the VMO size.
+  EXPECT_OK(vmo.set_size(zx_system_get_page_size() * 10));
+
+  // VMO size should be rounded up a page & stream size
+  EXPECT_OK(vmo.get_size(&vmo_size));
+  EXPECT_EQ(vmo_size, zx_system_get_page_size() * 10);
+  EXPECT_OK(vmo.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, zx_system_get_page_size() * 10);
+
+  // Can change stream size on non-resizable VMO (up to the VMO size).
+  zx::vmo vmo_unbounded;
+  EXPECT_OK(zx::vmo::create(create_len, ZX_VMO_UNBOUNDED, &vmo_unbounded));
+
+  EXPECT_OK(vmo_unbounded.set_stream_size(create_len * 2 + 1));
+  EXPECT_OK(vmo_unbounded.get_stream_size(&stream_size));
+  EXPECT_EQ(stream_size, create_len * 2 + 1);
+}
+
+// Tests that if the stream size is increased, the range in between the old stream size & the new
+// stream size is zeroed.
+TEST(VmoTestCase, ZeroRangeOnSetStreamSize) {
+  const size_t four_pages = zx_system_get_page_size() * 4;
+
+  uint8_t data_buff[four_pages];
+  memset(data_buff, 9, sizeof(data_buff));
+
+  // 2 Page stream, unbounded VMO.
+  const size_t create_len = zx_system_get_page_size() * 2;
+  zx::vmo vmo;
+  EXPECT_OK(zx::vmo::create(create_len, ZX_VMO_UNBOUNDED, &vmo));
+
+  // Write data to 4 pages of VMO.
+  EXPECT_OK(vmo.write(data_buff, 0, sizeof(data_buff)));
+
+  // Increase stream length.
+  EXPECT_OK(vmo.set_stream_size(four_pages));
+
+  // Range between the old stream size & the new stream size should have been zeroed.
+  const size_t zero_len = four_pages - create_len;
+  uint8_t zero_buff[zero_len];
+  memset(zero_buff, 0, sizeof(zero_buff));
+  uint8_t vmo_buff[zero_len];
+  EXPECT_OK(vmo.read(vmo_buff, create_len, zero_len));
+  EXPECT_BYTES_EQ(vmo_buff, zero_buff, sizeof(vmo_buff));
+
+  // Write data to all pages of VMO.
+  EXPECT_OK(vmo.write(data_buff, 0, sizeof(data_buff)));
+
+  // Decrease stream length back to create_len.
+  vmo.set_stream_size(create_len);
+
+  // Range in between the new (smaller) stream len & old (larger) stream len should have been
+  // zeroed.
+  EXPECT_OK(vmo.read(vmo_buff, create_len, zero_len));
+  EXPECT_BYTES_EQ(vmo_buff, zero_buff, sizeof(vmo_buff));
+
+  // Nn page-aligned range.
+
+  // 2 pages - 42 bytes stream size.
+  const size_t create_len_non_aligned = zx_system_get_page_size() * 2 - 42;
+
+  zx::vmo vmo2;
+  EXPECT_OK(zx::vmo::create(create_len_non_aligned, ZX_VMO_UNBOUNDED, &vmo2));
+
+  // Write data to 4 pages.
+  EXPECT_OK(vmo2.write(data_buff, 0, sizeof(data_buff)));
+
+  // Increase stream len to 4 pages
+  EXPECT_OK(vmo2.set_stream_size(four_pages));
+
+  // Range from old create len to the end of the VMO should be zeroed.
+  const size_t zero_len2 = four_pages - create_len_non_aligned;
+  uint8_t zero_buff2[zero_len2];
+  memset(zero_buff2, 0, sizeof(zero_buff2));
+
+  uint8_t vmo2_buff[zero_len2];
+  EXPECT_OK(vmo2.read(vmo2_buff, create_len_non_aligned, zero_len2));
+  EXPECT_BYTES_EQ(vmo2_buff, zero_buff2, sizeof(vmo2_buff));
+
+  // Range from start of VMO to old create len should retain data.
+  uint8_t vmo2_buff2[create_len_non_aligned];
+  uint8_t vmo2_databuff[create_len_non_aligned];
+  memset(vmo2_databuff, 9, sizeof(vmo2_databuff));
+  EXPECT_OK(vmo2.read(vmo2_buff2, 0, create_len_non_aligned));
+  EXPECT_BYTES_EQ(vmo2_buff2, vmo2_databuff, sizeof(vmo2_buff2));
+}
+
+// Tests that calling set_stream_size won't discard pinned pages.
+TEST(VmoTestCase, SetStreamSizePinnedPages) {
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  zx::iommu iommu;
+  zx::bti bti;
+  zx_iommu_desc_dummy_t desc;
+  auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
+
+  EXPECT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::UncachedContiguous");
+
+  // 4 page VMO (& stream).
+  zx::vmo vmo;
+  const size_t create_len = zx_system_get_page_size() * 4;
+  const size_t reduced_len = zx_system_get_page_size() * 2;
+  EXPECT_OK(zx::vmo::create(create_len, ZX_VMO_RESIZABLE, &vmo));
+
+  // Pin the the entire VMO.
+  zx_paddr_t addrs[4];
+  zx::pmt pmt;
+  EXPECT_OK(bti.pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, vmo, 0, create_len, addrs, 4, &pmt));
+
+  // Reduce stream size to 2 pages (shouldn't discard pinned pages).
+  ASSERT_OK(vmo.set_stream_size(reduced_len));
+
+  // Unpin.
+  pmt.unpin();
+
+  // Re-pin entire VMO (which includes pages past the steam size).
+  EXPECT_OK(bti.pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, vmo, 0, create_len, addrs, 4, &pmt));
+
+  // Increase stream size back to 4 pages (should not discard pinned pages).
+  ASSERT_OK(vmo.set_stream_size(create_len));
+
+  pmt.unpin();
+}
+
 void RightsTestMapHelper(zx_handle_t vmo, size_t len, uint32_t flags, bool expect_success,
                          zx_status_t fail_err_code) {
   uintptr_t ptr;
@@ -2387,7 +2565,7 @@ TEST(VmoTestCase, VmoUnbounded) {
 
   // Stream size should be set to size argument.
   uint64_t content_size = 0;
-  EXPECT_OK(vmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size, sizeof(content_size)));
+  EXPECT_OK(vmo.get_stream_size(&content_size));
   EXPECT_EQ(content_size, 42);
 
   uint64_t size = 0;
@@ -2450,7 +2628,7 @@ TEST(VmoTestCase, VmoUnbounded) {
   ASSERT_OK(pager.create_vmo(ZX_VMO_UNBOUNDED, port, 0, 43, &pvmo));
 
   // Stream size should be set to size argument.
-  EXPECT_OK(pvmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size, sizeof(content_size)));
+  EXPECT_OK(pvmo.get_stream_size(&content_size));
   EXPECT_EQ(content_size, 43);
 
   // Unbounded VMO does not get the RESIZE right, or be able to be resized.
