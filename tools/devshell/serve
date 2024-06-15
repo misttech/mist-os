@@ -5,10 +5,10 @@
 
 #### CATEGORY=Software delivery
 ### start the update server and attach to a running fuchsia device
-## usage: fx serve [-v] [-l host[:port]] [-c version] [--no-auto-config] [--name NAME]
+## usage: fx serve [-v] [-l host[:port]] [-c version] [--no-device] [--name NAME]
 ##
 ##   -l port            port that "fx serve" will listen on
-##   --no-auto-config   do not configure this host as a package server on the device
+##   --no-device        Do not register the repository with a specific device.
 ##   --name NAME        Name the generated update source config NAME.
 ##   --[no-]persist     enable or disable persistence of repository metadata. Disabled
 ##                      by default.
@@ -39,7 +39,6 @@ set -- "${FX_ARGV[@]}"
 
 port=""
 verbose=false
-auto_config=true
 clean_first=false
 source_name=""
 persist="--no-persist"
@@ -58,8 +57,8 @@ while (($#)); do
     --persist)
       persist="--persist"
       ;;
-    --no-auto-config)
-      auto_config=false
+    --no-device)
+      no_device="--no-device"
       ;;
     -v|--verbose)
       verbose=true
@@ -255,12 +254,8 @@ if is_feature_enabled "foreground_repo_server"; then
 fi
 
 if [[ "$(ffx-repository-server-enabled)" == "true" ]]; then
-  if is_feature_enabled "foreground_repo_server"; then
-    fx-error "Both ffx foreground and background serving are enabled. This is mutually incompatible."
-  else
-    fx-error "Starting an ffx background server from \"fx serve\" is no longer supported,"
-    fx-error "preceding the upcoming removal of background serving at the end of 2024Q2."
-  fi
+  fx-error "Starting an ffx background server from \"fx serve\" is no longer supported,"
+  fx-error "preceding the upcoming removal of background serving at the end of 2024Q2."
   sunset_resolutions
 fi
 
@@ -271,12 +266,10 @@ if [[ "${err}" -ne 0 ]]; then
   exit 1
 fi
 
-if [[ "${auto_config}" == false ]]; then
-  log "Flag '--no-auto-config' used, automatic device configuration disabled."
-  log "Use 'fx -d DEVICE add-update-source --port ${port}' to reconfigure devices as needed, since it is not persistent accross reboots."
-  log "Serving packages on port ${port}..."
-  log "Repository is being served in the background by ffx"
-  exit 0
+if [[ "${no_device}" == "--no-device" ]]; then
+  fx-info "Please note that '--no-device' disables automatic device configuration."
+  fx-info "Use 'fx -d DEVICE add-update-source --port ${port}' to reconfigure devices"
+  fx-info "as needed, since it is not persisted accross reboots."
 fi
 
 if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; then
@@ -394,6 +387,7 @@ while true; do
       # Start repository server in foreground, wait until it
       # voluntarily exits
       fx-command-run ffx ${ffx_flags[@]} repository serve \
+        ${no_device} \
         --address [::]:${port} \
         --repository "${source_name}" \
         --repo-path "${repo_dir}" \
