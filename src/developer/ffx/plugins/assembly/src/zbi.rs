@@ -121,6 +121,7 @@ pub fn construct_zbi(
     zbi_builder.set_compression(match zbi_config.compression {
         ZbiCompression::ZStd => "zstd",
         ZbiCompression::ZStdMax => "zstd.max",
+        ZbiCompression::None => "none",
     });
 
     // Create an output manifest that describes the contents of the built ZBI.

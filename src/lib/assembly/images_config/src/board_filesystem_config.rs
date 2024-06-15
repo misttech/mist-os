@@ -67,6 +67,10 @@ pub enum ZbiCompression {
     /// zstd.max compression.
     #[serde(rename = "zstd.max")]
     ZStdMax,
+
+    /// no compression.
+    #[serde(rename = "none")]
+    None,
 }
 
 /// A script to process the ZBI after it is constructed.

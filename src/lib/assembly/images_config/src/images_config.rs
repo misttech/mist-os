@@ -86,6 +86,7 @@ impl fmt::Display for ZbiCompression {
             match self {
                 ZbiCompression::ZStd => "zstd",
                 ZbiCompression::ZStdMax => "zstd.max",
+                ZbiCompression::None => "none",
             }
         )
     }
@@ -93,6 +94,7 @@ impl fmt::Display for ZbiCompression {
 
 fn zbi_compression_from_str(s: &str) -> Result<ZbiCompression> {
     match s {
+        "none" => Ok(ZbiCompression::None),
         "zstd" => Ok(ZbiCompression::ZStd),
         "zstd.max" => Ok(ZbiCompression::ZStdMax),
         invalid => Err(anyhow!("invalid zbi compression: {}", invalid)),
@@ -865,6 +867,7 @@ mod tests {
     fn zbi_compression_try_from() {
         assert_eq!(ZbiCompression::ZStd, "zstd".try_into().unwrap());
         assert_eq!(ZbiCompression::ZStdMax, "zstd.max".try_into().unwrap());
+        assert_eq!(ZbiCompression::None, "none".try_into().unwrap());
         let compression: Result<ZbiCompression> = "else".try_into();
         assert!(compression.is_err());
     }
@@ -873,6 +876,7 @@ mod tests {
     fn zbi_compression_from_string() {
         assert_eq!(ZbiCompression::ZStd, ZbiCompression::from_str("zstd").unwrap());
         assert_eq!(ZbiCompression::ZStdMax, ZbiCompression::from_str("zstd.max").unwrap());
+        assert_eq!(ZbiCompression::None, ZbiCompression::from_str("none").unwrap());
         let compression: Result<ZbiCompression> = ZbiCompression::from_str("else");
         assert!(compression.is_err());
     }
@@ -881,6 +885,7 @@ mod tests {
     fn zbi_compressoin_to_string() {
         assert_eq!("zstd".to_string(), ZbiCompression::ZStd.to_string());
         assert_eq!("zstd.max".to_string(), ZbiCompression::ZStdMax.to_string());
+        assert_eq!("none".to_string(), ZbiCompression::None.to_string());
     }
 
     #[test]
