@@ -22,9 +22,6 @@ use uuid::Uuid;
 use crate::credentials::*;
 use crate::topology::*;
 
-/// If true, use non-random IDs for ease of debugging.
-const ID_DEBUG_MODE: bool = false;
-
 /// Max value for inspect event history.
 const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 512;
 
@@ -192,6 +189,9 @@ impl Broker {
         if prev_level.is_none() || prev_level.unwrap() < level {
             // The level was increased, look for activated assertive or pending
             // opportunistic claims that are newly satisfied by the new current level:
+            tracing::debug!(
+                "update_current_level({element_id}): level increased from {prev_level:?} to {level:?}"
+            );
             let claims_for_required_element: Vec<Claim> = self
                 .catalog
                 .assertive_claims
@@ -268,22 +268,25 @@ impl Broker {
             // become contingent or dropped and see if any of these claims no
             // longer have any dependents and thus can be deactivated or
             // dropped.
-            let assertive_claims_to_deactivate = self
+            tracing::debug!(
+                "update_current_level({element_id}): level decreased from {prev_level:?} to {level:?}"
+            );
+            let assertive_claims_marked_to_deactivate = self
                 .catalog
                 .assertive_claims
                 .activated
                 .marked_to_deactivate_for_element(element_id);
-            let assertive_claims_to_drop =
-                self.find_claims_with_no_dependents(&assertive_claims_to_deactivate);
-            let opportunistic_claims_to_deactivate = self
+            let assertive_claims_with_no_dependents =
+                self.find_claims_with_no_dependents(&assertive_claims_marked_to_deactivate);
+            let opportunistic_claims_marked_to_deactivate = self
                 .catalog
                 .opportunistic_claims
                 .activated
                 .marked_to_deactivate_for_element(element_id);
-            let opportunistic_claims_to_drop =
-                self.find_claims_with_no_dependents(&opportunistic_claims_to_deactivate);
-            self.drop_or_deactivate_assertive_claims(&assertive_claims_to_drop);
-            self.drop_or_deactivate_opportunistic_claims(&opportunistic_claims_to_drop);
+            let opportunistic_claims_with_no_dependents =
+                self.find_claims_with_no_dependents(&opportunistic_claims_marked_to_deactivate);
+            self.drop_or_deactivate_assertive_claims(&assertive_claims_with_no_dependents);
+            self.drop_or_deactivate_opportunistic_claims(&opportunistic_claims_with_no_dependents);
         }
     }
 
@@ -401,21 +404,24 @@ impl Broker {
                 "check if assertive claim {assertive_claim} would satisfy opportunistic claims"
             );
             let assertive_claim_requires = &assertive_claim.requires().clone();
-            let opportunistic_claims_for_req_element = self
+            let opportunistic_pending_claims_for_req_element = self
                 .catalog
                 .opportunistic_claims
                 .pending
                 .for_required_element(&assertive_claim_requires.element_id);
-            tracing::debug!(
-                "opportunistic_claims_for_req_element[{}]",
-                opportunistic_claims_for_req_element.iter().join(", ")
-            );
-            let opportunistic_claims_possibly_affected = opportunistic_claims_for_req_element
-                .iter()
-                // Only consider claims for leases other than assertive_claim's
-                .filter(|c| c.lease_id != lease.id)
-                // Only consider opportunistic claims that would be satisfied by assertive_claim
-                .filter(|c| assertive_claim_requires.level.satisfies(c.requires().level));
+            let opportunistic_activated_claims_for_req_element = self
+                .catalog
+                .opportunistic_claims
+                .activated
+                .for_required_element(&assertive_claim_requires.element_id);
+            let opportunistic_claims_possibly_affected =
+                opportunistic_pending_claims_for_req_element
+                    .iter()
+                    .chain(opportunistic_activated_claims_for_req_element.iter())
+                    // Only consider claims for leases other than active_claim's
+                    .filter(|c| c.lease_id != lease.id)
+                    // Only consider opportunistic claims that would be satisfied by assertive_claim
+                    .filter(|c| assertive_claim_requires.level.satisfies(c.requires().level));
             for opportunistic_claim in opportunistic_claims_possibly_affected {
                 tracing::debug!(
                     "assertive claim {assertive_claim} may have changed status of lease {}",
@@ -435,6 +441,7 @@ impl Broker {
 
     /// Runs when a lease becomes no longer contingent.
     fn on_lease_transition_to_noncontingent(&mut self, lease_id: &LeaseID) {
+        tracing::debug!("on_lease_transition_to_noncontingent({lease_id})");
         // Reset any assertive or opportunistic claims that were previously marked to
         // deactivate. Since they weren't already deactivated, they must
         // already be currently satisfied.
@@ -577,7 +584,7 @@ impl Broker {
             // Mark all activated claims of this lease to be deactivated once
             // they are no longer in use.
             tracing::debug!(
-                "drop(lease:{lease_id}): marking activated assertive claims to deactivate"
+                "update_lease_status({lease_id}): marking activated assertive claims to deactivate"
             );
             let assertive_claims_to_deactivate =
                 self.catalog.assertive_claims.activated.mark_to_deactivate(&lease_id);
@@ -585,7 +592,7 @@ impl Broker {
                 &assertive_claims_to_deactivate,
             ));
             tracing::debug!(
-                "drop(lease:{lease_id}): marking activated opportunistic claims to deactivate"
+                "update_lease_status({lease_id}): marking activated opportunistic claims to deactivate"
             );
             let opportunistic_claims_to_deactivate =
                 self.catalog.opportunistic_claims.activated.mark_to_deactivate(&lease_id);
@@ -1335,9 +1342,10 @@ impl ClaimLookup {
     }
 
     fn remove_from_claims_to_deactivate(&mut self, id: &ClaimID) {
-        let Some(claim) = self.claims.remove(id) else {
+        let Some(claim) = self.claims.get(id) else {
             return;
         };
+        tracing::debug!("remove_from_claims_to_deactivate: {claim}");
         if let Some(claim_ids) =
             self.claims_to_deactivate_by_element_id.get_mut(&claim.dependent().element_id)
         {
@@ -1540,12 +1548,31 @@ mod tests {
 
     #[track_caller]
     fn assert_lease_cleaned_up(catalog: &Catalog, lease_id: &LeaseID) {
-        assert!(!catalog.leases.contains_key(lease_id));
-        assert!(catalog.lease_status.get(lease_id).is_none());
-        assert!(catalog.assertive_claims.activated.for_lease(lease_id).is_empty());
-        assert!(catalog.assertive_claims.pending.for_lease(lease_id).is_empty());
-        assert!(catalog.opportunistic_claims.activated.for_lease(lease_id).is_empty());
-        assert!(catalog.opportunistic_claims.pending.for_lease(lease_id).is_empty());
+        assert!(!catalog.leases.contains_key(lease_id), "{lease_id} still in catalog.leases");
+        assert!(
+            catalog.lease_status.get(lease_id).is_none(),
+            "{lease_id} still in catalog.lease_status"
+        );
+        assert_eq!(
+            catalog.assertive_claims.activated.for_lease(lease_id),
+            vec![],
+            "assertive_claims.activated not empty"
+        );
+        assert_eq!(
+            catalog.assertive_claims.pending.for_lease(lease_id),
+            vec![],
+            "assertive_claims.pending not empty"
+        );
+        assert_eq!(
+            catalog.opportunistic_claims.activated.for_lease(lease_id),
+            vec![],
+            "opportunistic_claims.activated not empty"
+        );
+        assert_eq!(
+            catalog.opportunistic_claims.pending.for_lease(lease_id),
+            vec![],
+            "opportunistic_claims.pending not empty"
+        );
     }
 
     #[fuchsia::test]
@@ -6100,6 +6127,231 @@ mod tests {
 
         // All leases should be cleaned up.
         assert_lease_cleaned_up(&broker.catalog, &lease_a_id);
+    }
+
+    #[fuchsia::test]
+    fn test_lease_noncontingent_to_contingent() {
+        // Tests that when a supportive lease is dropped, a lease that
+        // was noncontingent is correctly identified and made contingent.
+        // Found in https://fxbug.dev/342205990 as an interaction between
+        // Storage's Hardware (HW) and Wake-on-request (WOR) elements, and
+        // System Activity Governor's Wake Handling (WH) and Execution State
+        // elements.
+        // HW has a passive dep on Execution State: Wake Handling (1)
+        // WOR has an active dep on Wake Handling: Active, which has an active dep on ES: WH
+        // A persistent lease is held on HW that should be activated whenever ES is at WH or higher.
+        // HW -> ES(WH)
+        // WOR => WH(A)
+        // WH(A) => ES(WH)
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+        let token_sag_es_active = DependencyToken::create();
+        let token_sag_es_passive = DependencyToken::create();
+        let sag_es = broker
+            .add_element(
+                "SAG Execution State",
+                OFF.level,
+                vec![0, 1, 2],
+                vec![],
+                vec![token_sag_es_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_sag_es_passive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let token_sag_wh_active = DependencyToken::create();
+        let sag_wh = broker
+            .add_element(
+                "SAG Wake Handling",
+                OFF.level,
+                vec![0, 1],
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: ON.level,
+                    requires_token: token_sag_es_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: ON.level,
+                }],
+                vec![token_sag_wh_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![],
+            )
+            .expect("add_element failed");
+        let storage_hw = broker
+            .add_element(
+                "Storage Hardware",
+                OFF.level,
+                vec![0, 1],
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Passive,
+                    dependent_level: ON.level,
+                    requires_token: token_sag_es_passive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: ON.level,
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let storage_wor = broker
+            .add_element(
+                "Storage Wake on Request",
+                OFF.level,
+                vec![0, 1],
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: ON.level,
+                    requires_token: token_sag_wh_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: ON.level,
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let mut required_levels = RequiredLevelMatcher::new();
+
+        // Initial required level for all elements should be OFF.
+        // Set all current levels to OFF.
+        required_levels.update(&sag_es, OFF);
+        required_levels.update(&sag_wh, OFF);
+        required_levels.update(&storage_hw, OFF);
+        required_levels.update(&storage_wor, OFF);
+        required_levels.assert_matches(&broker);
+        broker.update_current_level(&sag_es, OFF);
+        broker.update_current_level(&sag_wh, OFF);
+        broker.update_current_level(&storage_hw, OFF);
+        broker.update_current_level(&storage_wor, OFF);
+
+        // Create Persistent Lease for HW.
+        let lease_hw = broker.acquire_lease(&storage_hw, ON).expect("acquire failed");
+        let lease_hw_id = lease_hw.id.clone();
+        // Required levels should not have changed.
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        // Lease is contingent on the opportunistic dependency on ES(WH).
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Create Lease for WOR.
+        let lease_wor1 = broker.acquire_lease(&storage_wor, ON).expect("acquire failed");
+        let lease_wor1_id = lease_wor1.id.clone();
+        required_levels.update(&sag_es, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        // Lease is no longer contingent because the opportunistic dependency
+        // on ES(WH) is supported by WH's assertive dependency.
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), false);
+        assert_eq!(broker.get_lease_status(&lease_wor1.id), Some(LeaseStatus::Pending));
+
+        // Update Execution State to ON
+        // Persistent Lease for HW should become satisfied.
+        broker.update_current_level(&sag_es, ON);
+        required_levels.update(&sag_wh, ON);
+        required_levels.update(&storage_hw, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), false);
+        assert_eq!(broker.get_lease_status(&lease_wor1.id), Some(LeaseStatus::Pending));
+
+        // Update SAG: Wake Handling to ON
+        // Lease WOR should become satisfied.
+        broker.update_current_level(&sag_wh, ON);
+        required_levels.update(&storage_wor, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_wor1.id), Some(LeaseStatus::Satisfied));
+
+        // Drop Lease on WOR.
+        broker.drop_lease(&lease_wor1.id).expect("drop_lease failed");
+        required_levels.update(&storage_wor, OFF);
+        required_levels.update(&sag_wh, OFF);
+        // TODO(b/346331940): Storage HW should have RL OFF here
+        // required_levels.update(&storage_hw, OFF);
+        required_levels.assert_matches(&broker);
+        // TODO(b/346331940): Lease on HW should become Pending and Contingent here
+        // assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        // assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Power down Storage WOR.
+        broker.update_current_level(&storage_wor, OFF);
+        required_levels.assert_matches(&broker);
+
+        broker.update_current_level(&sag_wh, OFF);
+        // TODO(b/346331940): Storage HW should have become OFF above.
+        required_levels.update(&storage_hw, OFF);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Create new Lease for WOR.
+        // Persistent lease for Storage should immediately become satisfied
+        // since Execution State was already on.
+        let lease_wor2 = broker.acquire_lease(&storage_wor, ON).expect("acquire failed");
+        let lease_wor2_id = lease_wor2.id.clone();
+        required_levels.update(&sag_es, ON);
+        required_levels.update(&sag_wh, ON);
+        required_levels.update(&storage_hw, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), false);
+        assert_eq!(broker.get_lease_status(&lease_wor2.id), Some(LeaseStatus::Pending));
+
+        // Power up SAG: Wake Handling.
+        broker.update_current_level(&sag_wh, ON);
+        required_levels.update(&storage_wor, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), false);
+        assert_eq!(broker.get_lease_status(&lease_wor2.id), Some(LeaseStatus::Satisfied));
+
+        // Drop second Lease on WOR.
+        broker.drop_lease(&lease_wor2.id).expect("drop_lease failed");
+        required_levels.update(&storage_wor, OFF);
+        required_levels.update(&sag_wh, OFF);
+        // TODO(b/346331940): Storage HW should have RL OFF here
+        // required_levels.update(&storage_hw, OFF);
+        required_levels.assert_matches(&broker);
+        // TODO(b/346331940): Lease on HW should become Pending and Contingent here
+        // assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        // assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Power down Storage WOR.
+        broker.update_current_level(&storage_wor, OFF);
+        required_levels.assert_matches(&broker);
+
+        broker.update_current_level(&sag_wh, OFF);
+        // TODO(b/346331940): Storage HW should have become OFF above.
+        required_levels.update(&storage_hw, OFF);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Drop lease on Storage HW
+        broker.drop_lease(&lease_hw.id).expect("drop_lease failed");
+        // TODO(b/346331940): SAG ES's RL should have become OFF above.
+        required_levels.update(&sag_es, OFF);
+        required_levels.assert_matches(&broker);
+
+        // Power down Execution State.
+        broker.update_current_level(&sag_es, OFF);
+        required_levels.assert_matches(&broker);
+
+        // Leases should be cleaned up.
+        assert_lease_cleaned_up(&broker.catalog, &lease_hw_id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_wor1_id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_wor2_id);
     }
 
     #[fuchsia::test]

@@ -52,7 +52,7 @@ impl std::cmp::Ord for IndexedPowerLevel {
 }
 
 /// If true, use non-random IDs for ease of debugging.
-const ID_DEBUG_MODE: bool = false;
+pub const ID_DEBUG_MODE: bool = false;
 
 // This may be a token later, but using a String for now for simplicity.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
