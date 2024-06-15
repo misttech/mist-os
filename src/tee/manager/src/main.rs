@@ -12,6 +12,7 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
 use serde::Deserialize;
+use tee_internal::binding::TEE_ERROR_TARGET_DEAD;
 
 #[derive(Deserialize, Debug, Clone)]
 #[allow(dead_code)]
@@ -87,9 +88,17 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
     while let Some(request) = request.stream.next().await {
         match request {
             Ok(ftee::ApplicationRequest::OpenSession2 { parameter_set, responder }) => {
-                if let Ok((code, result)) = ta.open_session2(parameter_set).await {
-                    let _ = responder.send(code, overwrite_return_origin(result));
-                }
+                let _ = match ta.open_session2(parameter_set).await {
+                    Ok((code, result)) => responder.send(code, overwrite_return_origin(result)),
+                    Err(_) => responder.send(
+                        0,
+                        ftee::OpResult {
+                            return_code: Some(TEE_ERROR_TARGET_DEAD as u64),
+                            return_origin: Some(ftee::ReturnOrigin::TrustedOs),
+                            ..Default::default()
+                        },
+                    ),
+                };
             }
             Ok(ftee::ApplicationRequest::InvokeCommand {
                 session_id,
@@ -97,14 +106,19 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
                 parameter_set,
                 responder,
             }) => {
-                if let Ok(result) = ta.invoke_command(session_id, command_id, parameter_set).await {
-                    let _ = responder.send(overwrite_return_origin(result));
-                }
+                let _ = match ta.invoke_command(session_id, command_id, parameter_set).await {
+                    Ok(result) => responder.send(overwrite_return_origin(result)),
+                    Err(_) => responder.send(ftee::OpResult {
+                        return_code: Some(TEE_ERROR_TARGET_DEAD as u64),
+                        return_origin: Some(ftee::ReturnOrigin::TrustedOs),
+                        ..Default::default()
+                    }),
+                };
             }
             Ok(ftee::ApplicationRequest::CloseSession { session_id, responder }) => {
-                if let Ok(()) = ta.close_session(session_id).await {
-                    let _ = responder.send();
-                }
+                // This always succeeds - even if the TA isn't there we report success.
+                let _ = ta.close_session(session_id).await;
+                let _ = responder.send();
             }
             Err(_) => break,
         }
