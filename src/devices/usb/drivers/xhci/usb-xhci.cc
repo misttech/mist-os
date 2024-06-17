@@ -532,8 +532,8 @@ void UsbXhci::DdkSuspend(ddk::SuspendTxn txn) {
     txn.Reply(ZX_ERR_BAD_STATE, 0);
     return;
   }
-  // TODO(https://fxbug.dev/42118825): do different things based on the requested_state and suspend reason.
-  // for now we shutdown the driver in preparation for mexec
+  // TODO(https://fxbug.dev/42118825): do different things based on the requested_state and suspend
+  // reason. for now we shutdown the driver in preparation for mexec
   USBCMD::Get(cap_length_).ReadFrom(&mmio_.value()).set_ENABLE(0).WriteTo(&mmio_.value());
   while (!USBSTS::Get(cap_length_).ReadFrom(&mmio_.value()).HCHalted()) {
   }
@@ -807,8 +807,8 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
             }
             auto completion = static_cast<CommandCompletionEvent*>(result.value());
             if (completion->CompletionCode() == CommandCompletionEvent::BandwidthError) {
-              // TODO(https://fxbug.dev/42068887): We could handle this by implementing bandwidth negotiation
-              // (see Section 4.16.1). For now just return an error to the client.
+              // TODO(https://fxbug.dev/42068887): We could handle this by implementing bandwidth
+              // negotiation (see Section 4.16.1). For now just return an error to the client.
               return fpromise::error(ZX_ERR_NO_RESOURCES);
             }
             if (completion->CompletionCode() != CommandCompletionEvent::Success) {
@@ -1606,7 +1606,7 @@ zx_status_t UsbXhci::HciFinalize() {
       .set_ENABLE(1)
       .set_INTE(1)
       .set_HSEE(1)
-      .set_EWE(1)
+      .set_EWE(0)
       .WriteTo(&mmio_.value());
   while (USBSTS::Get(cap_length_).ReadFrom(&mmio_.value()).HCHalted()) {
     zx::nanosleep(zx::deadline_after(zx::msec(1)));

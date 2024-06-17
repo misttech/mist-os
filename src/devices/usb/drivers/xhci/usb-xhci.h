@@ -203,14 +203,6 @@ class UsbXhci : public UsbXhciType,
 
   void SetDeviceInformation(uint8_t slot, uint8_t port, const std::optional<HubInfo>& hub);
 
-  // MfIndex wrapper handler. The previous driver used this to increment
-  // the mfindex wrap value. This caused race conditions that resulted
-  // in incorrect values for the mfindex wrap value.
-  // This function is left empty as a placeholder
-  // for future use of the MFIndex wrap event. It is unclear at the moment
-  // what, if anything this callback should be used for.
-  void MfIndexWrapped() {}
-
   uint8_t GetPortCount() { return static_cast<uint8_t>(params_.MaxPorts()); }
 
   // Resets a port. Not to be confused with ResetDevice.

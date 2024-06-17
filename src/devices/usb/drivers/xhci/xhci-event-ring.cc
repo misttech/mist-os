@@ -615,13 +615,6 @@ zx_status_t EventRing::HandleIRQ() {
         case Control::TransferEvent:
           HandleTransferInterrupt();
           break;
-        case Control::MFIndexWrapEvent: {
-          if (!mf_index_wrap_event_) {
-            mf_index_wrap_event_ = events_.CreateUint("MFIndexWrapEvent", 0);
-          }
-          mf_index_wrap_event_->Add(1);
-          hci_->MfIndexWrapped();
-        } break;
         case Control::HostControllerEvent:
           if (!host_controller_event_) {
             host_controller_event_ = events_.CreateUint("HostControllerEvent", 0);
@@ -844,8 +837,8 @@ void EventRing::HandleTransferInterrupt() {
   std::unique_ptr<TRBContext> context;
   zx_status_t status = ring.CompleteTRB(trb, &context);
 
-  // TODO(https://fxbug.dev/42059338): Once we reliably keep track of TRBs, this error handling should be
-  // removed and replaced by: ZX_ASSERT(status == ZX_OK).
+  // TODO(https://fxbug.dev/42059338): Once we reliably keep track of TRBs, this error handling
+  // should be removed and replaced by: ZX_ASSERT(status == ZX_OK).
   if (status != ZX_OK) {
     zxlogf(ERROR, "Lost a TRB! Completion code is %u", transfer_event->CompletionCode());
 
