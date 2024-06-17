@@ -224,15 +224,41 @@ type BufferMemoryConstraints = table {
     /// If the CPU domain is selected, participants must ensure the CPU can read
     /// or write data to the buffer without cache operations outside of the
     /// participant.
+    ///
+    /// In other words, if a producer participant DMAs data directly to RAM on a
+    /// non-cache-coherent architecture such as arm, the producer must ensure
+    /// the CPU cache is clean wrt. the buffer before the DMA write, and
+    /// invalidate the CPU cache after the DMA write and before indicating that
+    /// the buffer is ready to any other participant. If a consumer participant
+    /// DMAs data directly from RAM on a non-cache-coherent architecture such as
+    /// arm, the consumer must flush the CPU cache wrt the buffer before the DMA
+    /// read.
+    ///
+    /// CPU-only participants that don't do any DMA can just write and read the
+    /// buffers (when they should) without needing to do any CPU cache ops.
     5: cpu_domain_supported bool;
+
     /// When true, the participant is ok with sysmem selecting the RAM domain.
     ///
     /// If the RAM domain is selected, producer data must be available in RAM
     /// (with CPU cache state such that the RAM data won't get corrupted by a
     /// dirty CPU cache line writing incorrect data to RAM), and a consumer
     /// reading using the CPU must invalidate CPU cache before reading (the
-    /// producer doesn't guarantee zero stale "clean" cache lines)
+    /// producer doesn't guarantee zero stale "clean" cache lines).
+    ///
+    /// In other words, if a producer participant uses the CPU to write data on
+    /// a non-cache-coherent architecture such as arm, the producer must flush
+    /// the data to RAM before indicating to another participant that the buffer
+    /// is ready. If a consumer participant uses the CPU to read data on a
+    /// non-cache-coherent architecture such as arm, the participant must
+    /// invalidate (typically flush+invalidate with knowledge that no cache
+    /// lines are dirty) the CPU cache before reading the buffer.
+    ///
+    /// RAM-only participants that don't do any CPU accesses to a buffer can
+    /// just do DMA to/from the buffers (when they should) without needing to
+    /// do any CPU cache ops.
     6: ram_domain_supported bool;
+
     /// When true, the participant is ok with sysmem selecting the INACCESSIBLE
     /// domain.
     ///
@@ -242,11 +268,18 @@ type BufferMemoryConstraints = table {
     ///
     /// If the INACCESSIBLE domain is selected, participants must only operate
     /// on the data using DMAs performed by HW, or platform-specific DMA-like
-    /// requests to a secure environment.
+    /// requests to a secure environment (which will do the needed CPU cache ops
+    /// similar to how a RAM domain participant would operate).
     ///
     /// Secure heaps only support INACCESSIBLE domain, and will fail allocation
     /// if any participant with `BufferUsage` other than `NONE_USAGE` does not
     /// set inaccessible_domain_supported to true.
+    ///
+    /// When the INACCESSIBLE domain is selected, participants (outside of
+    /// secure/DRM environments) should not attempt to map buffers, and should
+    /// not attempt to perform any CPU cache ops. In this respect, this domain
+    /// is similar to RAM domain with all participants only doing DMA and no
+    /// participant(s) doing CPU accesses.
     7: inaccessible_domain_supported bool;
 
     /// Which heaps are acceptable to the participant. Participants that don't
