@@ -725,7 +725,7 @@ rustflags = ["--cfg=rustc_1_26"]
 [gn.package.rand_pcg."0.1.1"]
 rustflags = ["--cfg=rust_1_26"]
 
-[gn.package.rayon-core."1.7.0"]
+[gn.package.rayon-core."1.7.1"]
 # Has build script but no config needed.
 
 [gn.package.ref-cast."1.0.9"]
