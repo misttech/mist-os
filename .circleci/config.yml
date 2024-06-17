@@ -29,7 +29,7 @@ jobs:
           key: *jiri-cache
           paths:
             - .cipd
-            - prebuild
+            - prebuilt
       - run: make test && make ci
 
 workflows:

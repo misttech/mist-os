@@ -142,7 +142,7 @@ if (current_os == "linux") {
   }
 }
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   static_library("static-pie") {
     sources = [ "fuchsia-static-pie.cc" ]
     deps = [

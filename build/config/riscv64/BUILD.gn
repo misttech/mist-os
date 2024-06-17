@@ -46,7 +46,7 @@ config("lto-workarounds") {
 
   rust_linkarg = "-Clink-args="
 
-  if (!is_fuchsia) {
+  if (!(is_fuchsia || is_mistos)) {
     # On non-Fuchsia platforms, rustc calls clang, which calls lld.
     rust_linkarg += "-Wl,"
   }

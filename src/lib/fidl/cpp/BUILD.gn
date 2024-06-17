@@ -51,7 +51,7 @@ config("cpp_base.headers") {
 # The IPC library that adds messaging APIs on top of domain objects.
 #
 # It is Fuchsia-only.
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   sdk_source_set("cpp") {
     category = "partner"
     stable = true

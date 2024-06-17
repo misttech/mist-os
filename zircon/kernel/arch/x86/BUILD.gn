@@ -237,10 +237,6 @@ source_set("syscall") {
     "//zircon/kernel/lib/code-patching:headers",
     "//zircon/kernel/lib/syscalls",
   ]
-
-  if (is_mistos) {
-    deps += [ "//zircon/kernel/lib/mistos/syscalls" ]
-  }
 }
 
 source_set("tests") {

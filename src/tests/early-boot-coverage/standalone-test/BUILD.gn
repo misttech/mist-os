@@ -8,7 +8,7 @@ import("//build/toolchain/variant_tags.gni")
 import(
     "//src/tests/early-boot-coverage/host-test/coverage_verification_test.gni")
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   config("coverage") {
     cflags = [
       "-fprofile-instr-generate",

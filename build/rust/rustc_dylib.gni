@@ -162,7 +162,7 @@ template("rustc_dylib") {
 
       # TODO(https://fxbug.dev/42069148): Remove "--undefined-version" logic when
       # issue resolved upstream.
-      if (is_fuchsia) {
+      if (is_fuchsia || is_mistos) {
         rustflags = [ "-Clink-arg=--undefined-version" ]
       } else if (is_linux) {
         rustflags = [ "-Clink-arg=-Wl,--undefined-version" ]

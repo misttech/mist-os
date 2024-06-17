@@ -58,8 +58,6 @@ class VmAddressRegionDispatcher final
                                                 : VmAddressRegionOpChildren::Yes;
   }
 
-  uint base_arch_mmu_flags() { return base_arch_mmu_flags_; }
-
  private:
   explicit VmAddressRegionDispatcher(fbl::RefPtr<VmAddressRegion> vmar, uint base_arch_mmu_flags);
 

@@ -36,7 +36,7 @@ template("fidl_tables") {
 
     deps = [ coding_tables_target ]
     public_deps = [ "//sdk/lib/fidl_base" ]
-    if (is_fuchsia) {
+    if (is_fuchsia || is_mistos) {
       public_deps += [ "//zircon/public/sysroot:headers" ]
     } else {
       public_deps += [ "//src/zircon/lib/zircon:zircon-headers" ]

@@ -4,7 +4,7 @@
 
 import("//build/zircon/zx_library.gni")
 
-assert(is_fuchsia)
+assert(is_fuchsia || is_mistos)
 
 zx_library("async-default") {
   sdk = "shared"

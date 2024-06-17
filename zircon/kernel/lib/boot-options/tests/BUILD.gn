@@ -56,7 +56,7 @@ if (is_kernel) {
     ]
   }
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     fuchsia_fuzzer_package("boot-options-fuzzers") {
       cpp_fuzzer_components = [ ":boot-options-basic-fuzzer-component" ]
     }

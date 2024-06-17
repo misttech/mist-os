@@ -479,7 +479,7 @@ template("zircon_toolchain") {
   if (use_breakpad) {
     dump_syms = breakpad_dump_syms
     dump_syms += " -r "
-    if (invoker.os == "fuchsia") {
+    if (invoker.os == "fuchsia" || invoker.os == "mistos") {
       dump_syms += " -n \"<_>\" -o Fuchsia"
     } else {
       # Use what's probably installation name, not the ".debug" name.
@@ -489,7 +489,7 @@ template("zircon_toolchain") {
   }
 
   # TODO(https://fxbug.dev/42136235): enable for other targets and binary formats.
-  use_gsym = output_gsym && is_elf && invoker.os == "fuchsia"
+  use_gsym = output_gsym && is_elf && (invoker.os == "fuchsia" || invoker.os == "mistos")
   if (use_gsym) {
     gsymutil = rebase_path("$clang_tool_dir/llvm-gsymutil", root_build_dir)
   }

@@ -24,10 +24,30 @@ info: ## Print build info
 
 args: ## Set up build dir and arguments file
 	$(NOECHO)mkdir -p $(OUTPUT)
-	$(NOECHO)echo "target_os=\"mistos\"" > $(OUTPUT)/args.gn
-	$(NOECHO)echo "host_test_labels=[]" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "# Basic args:" > $(OUTPUT)/args.gn
+	$(NOECHO)echo "target_os = \"mistos\"" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "host_test_labels = []" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "rust_incremental = \"incremental\"" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "host_labels = [ \"//build/rust:cargo_toml_gen\" ]" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "rbe_mode = \"off\"" >> $(OUTPUT)/args.gn
 .PHONY: args
+
+debug: args ## Set debug arguments
+	$(NOECHO)echo "is_debug = true" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "compress_debuginfo = \"none\"" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "optimize = \"debug\"" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "zircon_optimize = \"debug\"" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "kernel_extra_defines = [ \"DISABLE_KASLR\" ]" >> $(OUTPUT)/args.gn
+.PHONY: debug
+
+kasan: args ## Compile with Kernel Address Sanitazier enabled
+	$(NOECHO)echo "select_variant = [ \"kasan\" ]" >> $(OUTPUT)/args.gn
+.PHONY: kasan
+
+host_test: args ## Enable some host tests
+	$(NOECHO)echo "host_test_labels += [ \"//zircon/system/ulib/zxtest/test:zxtest\" ]" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "host_test_labels += [ \"//zircon/system/ulib/fbl/test:fbl\" ]" >> $(OUTPUT)/args.gn
+.PHONY: zxtest
 
 gen: ## Generate ninja
 	$(NOECHO)echo "Running:$(GN) gen $(OUTPUT)"
@@ -52,29 +72,19 @@ rain: ## Run qemu with precompiled images (do not rebuild)
 	-z $(OUTPUT)/kernel_x64/kernel.zbi -c "kernel.shell=true" -- -no-reboot
 .PHONY: rain
 
-kasan: args ## Compile with Kernel Address Sanitazier enabled
-	$(NOECHO)echo "select_variant = [ \"kasan\" ]" >> $(OUTPUT)/args.gn
-.PHONY: kasan
-
-zxtest: args ## Enable zxtest
-	$(NOECHO)echo "host_test_labels += [ \"//zircon/system/ulib/zxtest/test:zxtest\" ]" >> $(OUTPUT)/args.gn
-	$(NOECHO)echo "host_test_labels += [ \"//zircon/system/ulib/fbl/test:fbl\" ]" >> $(OUTPUT)/args.gn
-	$(NOECHO)echo "register_zxtest=true" >> $(OUTPUT)/args.gn
-.PHONY: zxtest
-
-test: zxtest gen info ## Run test kernel-zxtest.zbi
-	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-unittests-zxtest
+test: host_test gen info ## Run test kernel-unittests-boot-test.zbi
+	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-unittests-boot-test
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-t $(OUTPUT)/multiboot.bin \
-	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-zxtest.zbi -s1 \
+	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-boot-test.zbi \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: test
 
-ci: zxtest kasan info gen ## Run test kernel-zxtest.zbi with kasan
-	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-unittests-zxtest
+ci: debug kasan info gen ## Run test kernel-zxtest.zbi with kasan
+	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-t $(OUTPUT)/multiboot.bin \
-	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-zxtest.zbi -s1 \
+	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-boot-test.zbi \
 	-c "kernel.bypass-debuglog=true" \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: ci

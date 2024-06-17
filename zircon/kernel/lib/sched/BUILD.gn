@@ -49,7 +49,7 @@ test("sched-unittests") {
   ]
 }
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   cpp_fuzzer("run-queue-fuzzer") {
     sources = [ "run-queue-fuzzer.cc" ]
     deps = [ ":sched" ]

@@ -1,0 +1,426 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_macro.gni")
+import("//build/rust/rustc_test.gni")
+import("//build/testing/boot_tests/kernel_zbi_test.gni")
+import("//build/testing/boot_tests/mistos_unittest_zbi.gni")
+import("//build/testing/bootfs_test.gni")
+import("//build/zbi/kernel_cmdline.gni")
+import("//build/zbi/zbi.gni")
+import("//build/zbi/zbi_input.gni")
+import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/lib/gzip/gzip.gni")
+import("//tools/protobuf/rust_proto_library.gni")
+import("args.gni")
+
+group("kernel") {
+  deps = [ ":starnix_kernel_zbi" ]
+}
+
+group("tests") {
+  testonly = true
+
+  deps = [
+    ":starnix-tests",
+    ":starnix_kernel_bin-tests",
+    ":starnix_kernel_runner-tests",
+    ":starnix_lifecycle-tests",
+    ":starnix_logging-tests",
+    ":starnix_sync-tests",
+  ]
+}
+
+rustc_binary("starnix_kernel_bin") {
+  name = "starnix_kernel"
+  edition = "2021"
+  with_unit_tests = true
+
+  # TODO(https://fxbug.dev/42059075): Re-enable starnix in these environments.
+  exclude_toolchain_tags = [
+    "asan",
+    "hwasan",
+  ]
+
+  source_root = "main.rs"
+  deps = [
+    ":starnix_logging",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/mistos-bootfs",
+    "//src/lib/mistos-logger",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:tracing-mutex",
+  ]
+
+  non_rust_deps = [ ":restricted_trampoline" ]
+
+  sources = [ "main.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
+  disable_rustdoc = false
+}
+
+rustc_library("starnix_core") {
+  name = "starnix_core"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "lib.rs"
+
+  # TODO(https://fxbug.dev/42059075): Re-enable starnix in these environments.
+  exclude_toolchain_tags = [
+    "asan",
+    "hwasan",
+  ]
+
+  sources = [ "lib.rs" ]
+
+  deps = []
+
+  if (current_cpu == "arm64") {
+    deps += [ ":vdso-helpers-arm" ]
+  }
+
+  test_deps = []
+
+  features = []
+  if (starnix_syscall_stats) {
+    features += [ "syscall_stats" ]
+  }
+  if (starnix_unified_aspace) {
+    features += [ "unified_aspace" ]
+  }
+  if (starnix_enable_alternate_anon_allocs) {
+    features += [ "alternate_anon_allocs" ]
+  }
+  inputs = [
+    "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
+  ]
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+}
+
+rustc_library("starnix_kernel_runner") {
+  name = "starnix_kernel_runner"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "runner/lib.rs"
+
+  # TODO(https://fxbug.dev/42059075): Re-enable starnix in these environments.
+  exclude_toolchain_tags = [
+    "asan",
+    "hwasan",
+  ]
+
+  sources = [ "runner/lib.rs" ]
+
+  deps = []
+
+  test_deps = []
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+}
+
+rustc_library("starnix_lifecycle") {
+  name = "starnix_lifecycle"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "lifecycle/lib.rs"
+
+  sources = [
+    "lifecycle/atomic_counter.rs",
+    "lifecycle/delayed_releaser.rs",
+    "lifecycle/drop_notifier.rs",
+    "lifecycle/lib.rs",
+  ]
+
+  deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:paste",
+  ]
+
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:futures",
+  ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+}
+
+rustc_library("starnix_logging") {
+  name = "starnix_logging"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "logging/lib.rs"
+
+  sources = [
+    "logging/core_dump_list.rs",
+    "logging/lib.rs",
+    "logging/logging.rs",
+    "logging/not_found.rs",
+    "logging/stubs.rs",
+    "logging/trace.rs",
+  ]
+
+  deps = [
+    ":starnix_sync",
+    "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/trace/rust:trace",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:bstr",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  test_deps = [ "//third_party/rust_crates:pretty_assertions" ]
+
+  features = []
+  if (starnix_disable_logging) {
+    features += [ "disable_logging" ]
+  }
+  if (starnix_enable_tracing) {
+    features += [ "tracing" ]
+  }
+  if (starnix_enable_tracing_firehose) {
+    features += [ "tracing_firehose" ]
+  }
+  if (starnix_enable_trace_and_debug_logs_in_release) {
+    features += [ "trace_and_debug_logs_in_release" ]
+  }
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+}
+
+rustc_library("starnix_sync") {
+  name = "starnix_sync"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "sync/lib.rs"
+
+  deps = [
+    "//src/lib/fuchsia-sync",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:lock_api",
+    "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:static_assertions",
+    "//third_party/rust_crates:tracing-mutex",
+  ]
+
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:test-case",
+  ]
+
+  sources = [
+    "sync/atomic_time.rs",
+    "sync/interruptible_event.rs",
+    "sync/lib.rs",
+    "sync/lock_ordering.rs",
+    "sync/lock_relations.rs",
+    "sync/lock_sequence.rs",
+    "sync/lock_traits.rs",
+    "sync/locks.rs",
+    "sync/port_event.rs",
+  ]
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+}
+
+rust_proto_library("perfetto_consumer_proto") {
+  sources = [
+    "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
+    "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
+  ]
+  packages = [ "perfetto.protos" ]
+  include_dirs = [ "//third_party/perfetto" ]
+}
+
+static_library("restricted_trampoline") {
+  sources = [ "execution/trampoline_${current_cpu}.S" ]
+}
+
+resource("starnix-test-files") {
+  sources = [
+    "data/testfile.txt",
+    "data/testfile2.txt",
+  ]
+  outputs = [ "data/{{source_file_part}}" ]
+}
+
+# vDSO
+
+config("vdso_config") {
+  cflags = [ "-fPIC" ]
+  ldflags = [
+    "-shared",
+
+    # Make sure libc is not linked into the vDSO. Header-only use is OK.
+    "-nostdlib",
+  ]
+
+  # Force LTO so that functions are inlined when appropriate even across
+  # different compilation units.
+  if (!is_debug) {
+    # Add thinlto config if lto variants are not used.
+    if (!is_lto_variant) {
+      configs = [ "//build/config/lto:thinlto" ]
+    }
+  }
+
+  # Use a custom linker script to ensure only one PT_LOAD header.
+  vdso_linker_script = "vdso/vdso.ld"
+  vdso_version_script = "vdso/vdso-${current_cpu}.map"
+  ldflags += [
+    "-Wl,--hash-style=both",
+    "-Wl,-T," + rebase_path(vdso_linker_script, root_build_dir),
+    "-Wl,--version-script," + rebase_path(vdso_version_script, root_build_dir),
+  ]
+}
+
+source_set("vdso-calculate-utc") {
+  sources = [ "vdso/vdso-calculate-utc.cc" ]
+  deps = [
+    "//zircon/system/public",
+    "//zircon/system/ulib/affine",
+  ]
+  configs += [ ":vdso_config" ]
+}
+
+if (current_cpu == "arm64") {
+  static_library("vdso-helpers-arm") {
+    sources = [ "vdso/get_raw_ticks_arm.cc" ]
+    deps = [ "//zircon/system/public" ]
+  }
+}
+
+loadable_module("vdso") {
+  sources = [
+    "vdso/vdso-${current_cpu}.cc",
+    "vdso/vdso-common.cc",
+  ]
+  deps = [
+    ":vdso-calculate-utc",
+    "//zircon/system/public",
+    "//zircon/system/ulib/affine",
+  ]
+
+  if (current_cpu == "arm64") {
+    deps += [ ":vdso-helpers-arm" ]
+  }
+
+  output_name = "libvdso"
+  configs += [ ":vdso_config" ]
+  if (is_linux) {
+    # By default, Linux host libraries statically link libc++. Since this library specifies nostdlib
+    # this option is unused and generates a warning.
+    configs -= [ "//build/config/linux:implicit-host-libs" ]
+  }
+
+  exclude_toolchain_tags = [ "instrumented" ]
+}
+
+resource("vdso-data") {
+  sources = [ "$root_out_dir/libvdso.so" ]
+  outputs = [ "data/libvdso.so" ]
+  deps = [ ":vdso" ]
+}
+
+# Components
+
+# ZBIs
+
+kernel_cmdline("starnix-zbi-cmdline") {
+  args = [
+    "userboot.next.root=/",
+    "userboot.next=bin/starnix_kernel",
+  ]
+}
+
+zbi("starnix_kernel_zbi") {
+  deps = [ "//zircon/kernel" ]
+
+  # Order matters here!
+  # NOSORT
+  deps += [
+    #":kernel_config",
+    #"//src/starnix/containers:default_init",
+    ":starnix-zbi-cmdline",
+    ":starnix_kernel_bin",
+  ]
+
+  output_name = "starnix_kernel"
+  output_dir = root_out_dir
+  output_extension = "zbi"
+  output_path =
+      rebase_path("$output_dir/$target_name.$output_extension", root_build_dir)
+
+  metadata = {
+    # For the //:images build_api_module().
+    images = [
+      {
+        label = get_label_info(":$target_name", "label_with_toolchain")
+        name = "$target_name"
+        tags = [ "incomplete" ]
+        type = "zbi"
+        path = output_path
+        cpu = current_cpu
+      },
+    ]
+  }
+}
+
+mistos_unittest_zbi("starnix-tests") {
+  executable_path = "bin/starnix_core_lib_test"
+  test_target_label = ":starnix_core_test"
+  deps = [
+    #":starnix-test-files",
+    "//src/starnix/examples/hello_starnix:bin",
+  ]
+  prefix = ""
+}
+
+mistos_unittest_zbi("starnix_kernel_bin-tests") {
+  executable_path = "bin/starnix_kernel_bin_test"
+  test_target_label = ":starnix_kernel_bin_test"
+  prefix = ""
+}
+
+mistos_unittest_zbi("starnix_kernel_runner-tests") {
+  executable_path = "bin/starnix_kernel_runner_lib_test"
+  test_target_label = ":starnix_kernel_runner_test"
+  prefix = ""
+}
+
+mistos_unittest_zbi("starnix_lifecycle-tests") {
+  executable_path = "bin/starnix_lifecycle_lib_test"
+  test_target_label = ":starnix_lifecycle_test"
+  prefix = ""
+}
+
+mistos_unittest_zbi("starnix_logging-tests") {
+  executable_path = "bin/starnix_logging_lib_test"
+  test_target_label = ":starnix_logging_test"
+  prefix = ""
+}
+
+mistos_unittest_zbi("starnix_sync-tests") {
+  executable_path = "bin/starnix_sync_lib_test"
+  test_target_label = ":starnix_sync_test"
+  prefix = ""
+}

@@ -91,7 +91,7 @@ static_library("zstd") {
 
   configs += [ ":internal.config" ]
 
-  if (!is_fuchsia) {
+  if (!(is_fuchsia || is_mistos)) {
     libs = [ "pthread" ]
   }
 

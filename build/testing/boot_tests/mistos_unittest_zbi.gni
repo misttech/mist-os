@@ -1,0 +1,62 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/test.gni")
+import("//build/testing/boot_tests/zbi_test.gni")
+import("//build/zbi/kernel_cmdline.gni")
+
+template("mistos_unittest_zbi") {
+  userboot_prefix = "zbi-test"
+  if (defined(invoker.prefix)) {
+    userboot_prefix = invoker.prefix
+  }
+
+  main_target = target_name
+  executable_path = invoker.executable_path
+  test_target_label = invoker.test_target_label
+  zbi_input_target = "$target_name.zbi_input"
+  cmdline_target = "$target_name.cmdline"
+
+  zbi_input(zbi_input_target) {
+    testonly = true
+    prefix = userboot_prefix
+    deps = [ "$test_target_label" ]
+    deps += [
+      "//build/info/bootfs:minimum_utc_stamp",
+      "//src/sys/mistos/elf_runner:bin",
+    ]
+  }
+
+  kernel_cmdline(cmdline_target) {
+    testonly = true
+    forward_variables_from(invoker, [ "visibility" ])
+    if (defined(visibility)) {
+      visibility += [ ":$main_target" ]
+    }
+
+    args = [
+      "userboot.root=$userboot_prefix",
+      "userboot.next=bin/mistos_elf_runner+${executable_path}",
+    ]
+  }
+
+  group(main_target) {
+    testonly = true
+    deps = [ ":${main_target}-zbi" ]
+  }
+
+  extra_deps = []
+  if (defined(invoker.deps)) {
+    extra_deps = invoker.deps
+  }
+
+  zbi_test("${main_target}-zbi") {
+    assert(current_cpu != "")
+    deps = [ "//zircon/kernel" ]
+    deps += [ ":$cmdline_target" ]
+    deps += [ ":$zbi_input_target" ]
+    deps += extra_deps
+  }
+}

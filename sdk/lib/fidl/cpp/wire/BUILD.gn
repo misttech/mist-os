@@ -50,7 +50,7 @@ sdk_source_set("wire") {
     "include/lib/fidl/cpp/wire/wire_encoder.h",
     "include/lib/fidl/cpp/wire/wire_types.h",
   ]
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     public += [
       "include/lib/fidl/cpp/wire/async_binding.h",
       "include/lib/fidl/cpp/wire/async_transaction.h",
@@ -82,7 +82,7 @@ sdk_source_set("wire") {
       "include/lib/fidl/cpp/wire/wire_messaging_declarations.h",
     ]
   }
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     public += [ "include/lib/fidl/cpp/wire/internal/transport_channel.h" ]
   } else {
     public += [ "include/lib/fidl/cpp/wire/internal/transport_channel_host.h" ]
@@ -91,7 +91,7 @@ sdk_source_set("wire") {
 
   sdk_headers_for_internal_use =
       [ "include/lib/fidl/cpp/wire/internal/transport.h" ]
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sdk_headers_for_internal_use += [
       "include/lib/fidl/cpp/wire/internal/arrow.h",
       "include/lib/fidl/cpp/wire/internal/client_continuation.h",
@@ -103,7 +103,7 @@ sdk_source_set("wire") {
       "include/lib/fidl/cpp/wire/internal/synchronization_checker.h",
     ]
   }
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sdk_headers_for_internal_use +=
         [ "include/lib/fidl/cpp/wire/internal/transport_channel.h" ]
   } else {
@@ -128,7 +128,7 @@ sdk_source_set("wire") {
     "wire_messaging.cc",
     "wire_types.cc",
   ]
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources += [
       "async_binding.cc",
       "async_transaction.cc",
@@ -140,7 +140,7 @@ sdk_source_set("wire") {
       "unknown_interactions.cc",
     ]
   }
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources += [ "transport_channel.cc" ]
   } else {
     sources += [ "transport_channel_host.cc" ]
@@ -165,7 +165,7 @@ sdk_source_set("wire") {
     "//sdk/lib/fidl_base",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     public_deps += [
       # <lib/fidl/cpp/wire/async_binding.h> has #include <lib/async/dispatcher.h>
       "//zircon/system/ulib/async",

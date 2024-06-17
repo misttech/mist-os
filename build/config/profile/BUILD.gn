@@ -55,7 +55,7 @@ foreach(file, profile_source_files_list_files) {
 # explicit deps and take care of those linking details for itself.
 _has_compiler_abi = toolchain_variant.tags + [ "no-compiler-abi" ] -
                     [ "no-compiler-abi" ] == toolchain_variant.tags
-_fuchsia_prebuilt_runtime = _has_compiler_abi && is_fuchsia && !is_kernel
+_fuchsia_prebuilt_runtime = _has_compiler_abi && (is_fuchsia || is_mistos) && !is_kernel
 
 variant("coverage") {
   common_flags = _coverage_common_flags
@@ -83,7 +83,7 @@ variant("coverage") {
   }
 
   # Enable coverage from system headers in Fuchsia.
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     cflags += [
       "-mllvm",
       "-system-headers-coverage",
@@ -139,7 +139,7 @@ variant("coverage-cts") {
   }
 
   # Enable coverage from system headers in Fuchsia.
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     cflags += [
       "-mllvm",
       "-system-headers-coverage",
@@ -198,7 +198,7 @@ variant("profile") {
     rustflags += [ "-Clink-arg=$dynamic_linker_flags" ]
   }
 
-  if (is_fuchsia || is_kernel) {
+  if ((is_fuchsia || is_mistos) || is_kernel) {
     # TODO(https://fxbug.dev/42053322): Value profiling isn't supported by the runtime.
     cflags = [
       "-mllvm",

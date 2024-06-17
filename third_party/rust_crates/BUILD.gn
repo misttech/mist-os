@@ -65,19 +65,19 @@ group("async-channel") {
   public_deps = [ ":async-channel-v1_8_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("async-executor") {
     public_deps = [ ":async-executor-v1_5_0" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("async-fs") {
     public_deps = [ ":async-fs-v1_6_0" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("async-io") {
     public_deps = [ ":async-io-v1_12_0" ]
   }
@@ -87,7 +87,7 @@ group("async-lock") {
   public_deps = [ ":async-lock-v2_6_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("async-net") {
     public_deps = [ ":async-net-v1_7_0" ]
   }
@@ -153,7 +153,7 @@ group("camino") {
   public_deps = [ ":camino-v1_1_1" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("cargo_metadata") {
     public_deps = [ ":cargo_metadata-v0_14_1" ]
   }
@@ -195,7 +195,7 @@ group("crossbeam-utils") {
   public_deps = [ ":crossbeam-utils-v0_8_14" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("crossterm") {
     public_deps = [ ":crossterm-v0_19_0" ]
   }
@@ -245,7 +245,7 @@ group("dyn-clone") {
   public_deps = [ ":dyn-clone-v1_0_5" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("easy-parallel") {
     public_deps = [ ":easy-parallel-v3_1_0" ]
   }
@@ -263,7 +263,7 @@ group("elliptic-curve") {
   public_deps = [ ":elliptic-curve-v0_12_3" ]
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("euclid") {
     public_deps = [ ":euclid-v0_22_1" ]
   }
@@ -293,13 +293,13 @@ group("fragile") {
   public_deps = [ ":fragile-v1_0_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("fs_extra") {
     public_deps = [ ":fs_extra-v1_2_0" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("fuse3") {
     public_deps = [ ":fuse3-v0_6_1" ]
   }
@@ -329,7 +329,7 @@ group("futures-util") {
   public_deps = [ ":futures-util-v0_3_19" ]
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("getopts") {
     public_deps = [ ":getopts-v0_2_18" ]
   }
@@ -371,7 +371,7 @@ group("hmac") {
   public_deps = [ ":hmac-v0_12_1" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("home") {
     public_deps = [ ":home-v0_5_9" ]
   }
@@ -393,13 +393,13 @@ group("hyper") {
   public_deps = [ ":hyper-v0_14_19" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("hyper-rustls") {
     public_deps = [ ":hyper-rustls-v0_22_1" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("hyper-rustls") {
     public_deps = [ ":hyper-rustls-v0_22_1" ]
   }
@@ -409,7 +409,7 @@ group("indexmap") {
   public_deps = [ ":indexmap-v1_9_2" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("indoc") {
     public_deps = [ ":indoc-v1_0_3($host_toolchain)" ]
   }
@@ -447,7 +447,7 @@ group("linked-hash-map") {
   public_deps = [ ":linked-hash-map-v0_5_3" ]
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("lipsum") {
     public_deps = [ ":lipsum-v0_6_0" ]
   }
@@ -461,7 +461,7 @@ group("log") {
   public_deps = [ ":log-v0_4_20" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("loom") {
     public_deps = [ ":loom-v0_7_1" ]
     testonly = true
@@ -504,7 +504,7 @@ group("miniz_oxide") {
   public_deps = [ ":miniz_oxide-v0_3_6" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("mio") {
     public_deps = [ ":mio-v0_8_9" ]
   }
@@ -550,7 +550,7 @@ group("nom_locate") {
   public_deps = [ ":nom_locate-v2_1_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("notify") {
     public_deps = [ ":notify-v5_2_0" ]
   }
@@ -580,7 +580,7 @@ group("once_cell") {
   public_deps = [ ":once_cell-v1_17_1" ]
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("openat") {
     public_deps = [ ":openat-v0_1_17" ]
   }
@@ -594,7 +594,7 @@ group("p256") {
   public_deps = [ ":p256-v0_11_1" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("parking_lot") {
     public_deps = [ ":parking_lot-v0_9_0" ]
   }
@@ -624,7 +624,7 @@ group("pest_derive") {
   public_deps = [ ":pest_derive-v2_7_8($host_toolchain)" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("petgraph") {
     public_deps = [ ":petgraph-v0_6_2" ]
   }
@@ -646,7 +646,7 @@ group("png") {
   public_deps = [ ":png-v0_14_0" ]
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("pretty") {
     public_deps = [ ":pretty-v0_5_2" ]
   }
@@ -660,7 +660,7 @@ group("prettytable-rs") {
   public_deps = [ ":prettytable-rs-v0_8_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("proc-macro2") {
     public_deps = [ ":proc-macro2-v1_0_79" ]
   }
@@ -686,13 +686,13 @@ group("prost-types") {
   public_deps = [ ":prost-types-v0_11_1" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("pulldown-cmark") {
     public_deps = [ ":pulldown-cmark-v0_6_0" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("quote") {
     public_deps = [ ":quote-v1_0_35" ]
   }
@@ -728,61 +728,61 @@ group("ring") {
 
 import("//build/icu/icu_rust_crates.gni")
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_common") {
     public_deps = [ ":rust_icu_common-v5_0_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_sys") {
     public_deps = [ ":rust_icu_sys-v5_0_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_ucal") {
     public_deps = [ ":rust_icu_ucal-v5_0_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_uchar") {
     public_deps = [ ":rust_icu_uchar-v5_0_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_udat") {
     public_deps = [ ":rust_icu_udat-v5_0_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_udata") {
     public_deps = [ ":rust_icu_udata-v5_0_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_uenum") {
     public_deps = [ ":rust_icu_uenum-v5_0_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_uloc") {
     public_deps = [ ":rust_icu_uloc-v5_0_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_unorm2") {
     public_deps = [ ":rust_icu_unorm2-v5_0_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   icu_group("rust_icu_ustring") {
     public_deps = [ ":rust_icu_ustring-v5_0_0" ]
   }
@@ -792,7 +792,7 @@ group("rustc-hash") {
   public_deps = [ ":rustc-hash-v1_0_1" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("rustfix") {
     public_deps = [ ":rustfix-v0_6_1" ]
   }
@@ -802,7 +802,7 @@ group("rustls") {
   public_deps = [ ":rustls-v0_19_1" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("rustls-native-certs") {
     public_deps = [ ":rustls-native-certs-v0_5_0" ]
   }
@@ -852,13 +852,13 @@ group("serde_repr") {
   public_deps = [ ":serde_repr-v0_1_7($host_toolchain)" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("serde_yaml") {
     public_deps = [ ":serde_yaml-v0_9_14" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("serial_test") {
     public_deps = [ ":serial_test-v0_5_1" ]
   }
@@ -874,13 +874,13 @@ group("sha2") {
   public_deps = [ ":sha2-v0_10_6" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("shared_child") {
     public_deps = [ ":shared_child-v1_0_0" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("signal-hook") {
     public_deps = [ ":signal-hook-v0_3_17" ]
   }
@@ -890,7 +890,7 @@ group("signature") {
   public_deps = [ ":signature-v1_6_4" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("simplelog") {
     public_deps = [ ":simplelog-v0_10_2" ]
   }
@@ -928,31 +928,31 @@ group("structopt") {
   public_deps = [ ":structopt-v0_2_14" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("strum") {
     public_deps = [ ":strum-v0_25_0" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("strum_macros") {
     public_deps = [ ":strum_macros-v0_25_3($host_toolchain)" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("syn") {
     public_deps = [ ":syn-v2_0_55" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("synstructure") {
     public_deps = [ ":synstructure-v0_12_1" ]
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("tar") {
     public_deps = [ ":tar-v0_4_25" ]
   }
@@ -962,7 +962,7 @@ group("tempfile") {
   public_deps = [ ":tempfile-v3_2_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("term_grid") {
     public_deps = [ ":term_grid-v0_2_0" ]
   }
@@ -972,7 +972,7 @@ group("termion") {
   public_deps = [ ":termion-v1_5_3" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("termios") {
     public_deps = [ ":termios-v0_3_2" ]
   }
@@ -996,7 +996,7 @@ group("thiserror") {
 
 import("//third_party/rust_crates/private_visibility.gni")
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("tinyjson") {
     public_deps = [ ":tinyjson-v2_5_0" ]
 
@@ -1004,13 +1004,13 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("tokio") {
     public_deps = [ ":tokio-v1_32_1" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("tokio") {
     public_deps = [ ":tokio-v1_32_1" ]
   }
@@ -1020,7 +1020,7 @@ group("tokio-rustls") {
   public_deps = [ ":tokio-rustls-v0_22_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("tokio-stream") {
     public_deps = [ ":tokio-stream-v0_1_14" ]
   }
@@ -1054,19 +1054,19 @@ group("tracing-subscriber") {
   public_deps = [ ":tracing-subscriber-v0_3_18" ]
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("trust-dns-proto") {
     public_deps = [ ":trust-dns-proto-v0_22_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("trust-dns-resolver") {
     public_deps = [ ":trust-dns-resolver-v0_22_0" ]
   }
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("ttf-parser") {
     public_deps = [ ":ttf-parser-v0_10_1" ]
   }
@@ -1092,7 +1092,7 @@ group("unicase") {
   public_deps = [ ":unicase-v2_7_0" ]
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("unicode-normalization") {
     public_deps = [ ":unicode-normalization-v0_1_19" ]
   }
@@ -1130,7 +1130,7 @@ group("valico") {
   public_deps = [ ":valico-v2_4_2" ]
 }
 
-if (current_os == "fuchsia") {
+if (current_os == "fuchsia" || current_os == "mistos") {
   group("vk-sys") {
     public_deps = [ ":vk-sys-v0_7_0" ]
   }
@@ -1164,7 +1164,7 @@ group("zerocopy") {
   public_deps = [ ":zerocopy-v0_8_0-alpha_5" ]
 }
 
-if (!(current_os == "fuchsia")) {
+if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("zip") {
     public_deps = [ ":zip-v0_5_5" ]
   }
@@ -6111,7 +6111,7 @@ rust_library("generator-v0_7_5") {
     deps += [ ":windows-v0_48_0" ]
   }
   deps += [ "//build/validate:non_production_tag" ]
-  if (!(current_os == "fuchsia")) {
+  if (!(current_os == "fuchsia" || current_os == "mistos")) {
     deps += [ "//third_party/rust_crates/compat/generator:asm" ]
   }
 
@@ -10791,7 +10791,7 @@ rust_library("polling-v2_4_0") {
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":log-v0_4_20" ]
-  if (true || current_os == "fuchsia" || false) {
+  if (true || (current_os == "fuchsia" || current_os == "mistos") || false) {
     deps += [ ":libc-v0_2_149" ]
   }
   if (false) {
@@ -12050,7 +12050,7 @@ rust_library("rand_os-v0_1_2") {
   if (false) {
     deps += [ ":cloudabi-v0_0_3" ]
   }
-  if (current_os == "fuchsia") {
+  if (current_os == "fuchsia" || current_os == "mistos") {
     deps += [ ":fuchsia-cprng-v0_1_1" ]
   }
   if (true) {
@@ -12709,7 +12709,7 @@ rust_library("ring-v0_16_20") {
   }
   if (false || current_cpu == "x64" ||
       ((current_cpu == "arm64" || false) &&
-       (false || current_os == "fuchsia" || current_os == "linux"))) {
+       (false || (current_os == "fuchsia" || current_os == "mistos") || current_os == "linux"))) {
     deps += [ ":spin-v0_5_2" ]
   }
   if (false || current_os == "linux") {
@@ -13341,7 +13341,7 @@ rust_library("rustyline-v2_1_0") {
   deps += [ ":log-v0_4_20" ]
   deps += [ ":unicode-segmentation-v1_10_1" ]
   deps += [ ":unicode-width-v0_1_10" ]
-  if (true && !(current_os == "fuchsia")) {
+  if (true && !(current_os == "fuchsia" || current_os == "mistos")) {
     deps += [ ":nix-v0_26_2" ]
   }
   if (true) {
@@ -16038,7 +16038,7 @@ rust_library("tokio-v1_32_1") {
   if (false) {
     deps += [ ":backtrace-v0_3_61" ]
   }
-  if (!(current_os == "fuchsia")) {
+  if (!(current_os == "fuchsia" || current_os == "mistos")) {
     deps += [ ":bytes-v1_0_1" ]
     deps += [ ":libc-v0_2_149" ]
     deps += [ ":memchr-v2_7_1" ]
@@ -16059,7 +16059,7 @@ rust_library("tokio-v1_32_1") {
     "--cfg=feature=\"sync\"",
     "--cfg=feature=\"time\"",
   ]
-  if (!(current_os == "fuchsia")) {
+  if (!(current_os == "fuchsia" || current_os == "mistos")) {
     rustflags += [
       "--cfg=feature=\"bytes\"",
       "--cfg=feature=\"fs\"",
@@ -16257,7 +16257,7 @@ rust_library("tracing-v0_1_40") {
   deps += [ ":tracing-core-v0_1_32" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
   deps += [ ":tracing-attributes-v0_1_27($host_toolchain)" ]
-  if (!(current_os == "fuchsia")) {
+  if (!(current_os == "fuchsia" || current_os == "mistos")) {
     deps += [ ":log-v0_4_20" ]
   }
 
@@ -16273,7 +16273,7 @@ rust_library("tracing-v0_1_40") {
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"tracing-attributes\"",
   ]
-  if (!(current_os == "fuchsia")) {
+  if (!(current_os == "fuchsia" || current_os == "mistos")) {
     rustflags += [ "--cfg=feature=\"log\"" ]
   }
 

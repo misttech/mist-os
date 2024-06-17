@@ -1,0 +1,43 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("bin") {
+  testonly = true
+  name = "mistos_elf_runner"
+  with_unit_tests = true
+  edition = "2021"
+
+  configs += [ "//build/config/rust:bootfs" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_rust",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
+    "//src/lib/mistos-bootfs",
+    "//src/lib/mistos-logger",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/sys/lib/elf_runner",
+    "//src/sys/lib/library_loader",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  sources = [
+    "src/builtin/log.rs",
+    "src/builtin/log_sink.rs",
+    "src/builtin/mod.rs",
+    "src/builtin/svc_controller.rs",
+    "src/main.rs",
+  ]
+}

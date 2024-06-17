@@ -1,4 +1,3 @@
-# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -134,26 +133,8 @@ if (toolchain_environment == "kernel") {
       "//zircon/system/ulib/pretty",
     ]
     if (!kernel_no_userabi) {
-      if (is_mistos) {
-        deps += [ "//zircon/system/ulib/zxtest/test:tests-mistos" ]
-        if (register_zxtest) {
-          deps += [
-            "//zircon/kernel/lib/mistos/elfldltl/test:tests-mistos",
-            "//zircon/kernel/lib/mistos/linux_uapi/tests",
-            "//zircon/kernel/lib/mistos/starnix/kernel/tests",
-            "//zircon/kernel/lib/mistos/starnix_uapi/tests",
-            "//zircon/kernel/lib/mistos/userloader/tests",
-            "//zircon/kernel/lib/mistos/util/tests",
-            "//zircon/kernel/lib/mistos/zbi_parser/tests",
-            "//zircon/kernel/lib/mistos/zbitl/tests",
-            "//zircon/kernel/lib/mistos/zx/tests:tests",
-            "//zircon/system/ulib/fbl/test:tests-mistos",
-          ]
-        }
-      } else {
-        sources += [ "userboot_tests.cc" ]
-        deps += [ "//zircon/kernel/lib/userabi" ]
-      }
+      sources += [ "userboot_tests.cc" ]
+      deps += [ "//zircon/kernel/lib/userabi" ]
     }
     public_deps = [ "//zircon/system/ulib/zx:headers" ]
   }

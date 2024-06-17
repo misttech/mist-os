@@ -6,7 +6,7 @@ import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 
 test("utc-procargs") {
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
     if (configs + fdio_config - fdio_config != configs) {
       configs -= fdio_config

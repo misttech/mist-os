@@ -13,6 +13,13 @@ declare_args() {
   #
   # These will be added to the build using the host toolchain.
   host_test_labels = []
+
+  # If you add labels to this variable, these will be included in the 'host'
+  # artifact set, which represents an additional set of host-only software that
+  # is produced by the build.
+  #
+  # These will be added to the build using the host toolchain.
+  host_labels = []
 }
 
 if (host_os == "mac") {
@@ -88,6 +95,36 @@ build_api_module("tests") {
   ]
 }
 
+###
+### Top-level targets.
+###
+group("default") {
+  testonly = true
+  deps = [
+    "//:host",
+    "//bundles/boot_tests",
+
+    # Produce Fuchsia libs zbi tests
+    "//src/lib/fuchsia:tests",
+
+    # Produce mist-os libs zbi tests
+    "//src/lib/mistos-bootfs:tests",
+    "//src/lib/mistos-logger:tests",
+    "//src/starnix_lite:tests",
+
+    # Examples
+    "//src/lib/zircon/rust/examples/zx_toy:zx_toy_zbi",
+
+    # Host tools tests
+    "//zircon/tools:tests",
+  ]
+}
+
+# Generate ZBIs used to run on target
+group("zbi") {
+  deps = [ "//src/starnix_lite" ]
+}
+
 # Host-only tests.  These cannot have any dependency on an assembled platform
 # image, or the compiled OS itself, not even for their host_test_data().
 validated_test_types_group("host_tests") {
@@ -104,20 +141,31 @@ validated_test_types_group("host_tests") {
 }
 
 ###
-### Top-level targets.
-###
-group("default") {
-  testonly = true
-  deps = [
-    "//:tests",
-    "//bundles/boot_tests",
-    "//examples/nolibc",
-    "//zircon/kernel/lib/mistos/starnix/examples/hello_starnix",
-    "//zircon/kernel/lib/mistos/userloader/example:tests",
+# GN-Argument configured groups for host binaries and tools
+#
 
-    #
-    "//zircon/tools:tests",
+group("host") {
+  # TODO(https://fxbug.dev/42160904) investigate removing testonly here
+  testonly = true
+  public_deps = [
+    # Tools & tests added by the developer
+    ":developer_host_tools",
   ]
+}
+
+# WARNING: Known to infrastructure
+#
+# This group creates a single ninja build target that can create all targets
+# specified by `host_labels` with `fx build :developer_host_tools`
+group("developer_host_tools") {
+  testonly = true
+  public_deps = []
+
+  foreach(label, host_labels) {
+    # Strip any toolchain that is provided, and replace with the host toolchain.
+    full_label = get_label_info(label, "label_no_toolchain")
+    public_deps += [ "$full_label($host_toolchain)" ]
+  }
 }
 
 # A GN pool matching the special Ninja 'console' pool. Any action() that

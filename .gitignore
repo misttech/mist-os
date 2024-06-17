@@ -42,6 +42,7 @@
 *.pyc
 *.code-workspace
 !fuchsia.code-workspace
+!mist-os.code-workspace
 *.sublime-project
 *.sublime-workspace
 *.swp

@@ -324,10 +324,6 @@ if (is_kernel) {
       defines += [ "KERNEL_NO_USERABI" ]
     }
 
-    if (is_mistos) {
-      defines += [ "_KERNEL_MISTOS" ]
-    }
-
     cflags = [ "-fpie" ]
   }
 
@@ -901,14 +897,6 @@ if (!is_efi_toolchain) {
       "phys:boot_tests",
       "//zircon/kernel/lib/userabi/userboot/tests:boot_tests",
     ]
-
-    if (is_mistos) {
-      deps -= [ "//zircon/kernel/lib/userabi/userboot/tests:boot_tests" ]
-      if (register_zxtest) {
-        deps += [ ":kernel-unittests-zxtest" ]
-      }
-    }
-
     if (all_cpu_kernel_boot_tests) {
       foreach(cpu, standard_fuchsia_cpus) {
         deps += [ ":boot_tests.$cpu" ]
@@ -930,24 +918,6 @@ if (!is_efi_toolchain) {
       "graceful-shutdown",
     ]
   }
-
-  if (is_mistos && register_zxtest) {
-    kernel_shell_script_test("kernel-unittests-zxtest") {
-      environments = kernel_test_environments
-      script = [
-        "zx_run_all_test",
-        "boot-test-success",
-        "graceful-shutdown",
-      ]
-
-      # Keep kernel as first item in ZBI
-      deps = [ ":kernel(:kernel_$current_cpu)" ]
-      # Additional itens used for testing
-      deps += [
-        "//zircon/kernel/lib/mistos/starnix/examples/hello_starnix:zbi_input",
-      ]
-    }
-  }
 }
 
 foreach(cpu, standard_fuchsia_cpus) {
@@ -957,8 +927,5 @@ foreach(cpu, standard_fuchsia_cpus) {
       ":kernel-unittests-boot-test(:kernel_$cpu)",
       "phys/test:$cpu",
     ]
-    if (is_mistos && register_zxtest) {
-      deps += [ ":kernel-unittests-zxtest(:kernel_$cpu)" ]
-    }
   }
 }

@@ -40,7 +40,7 @@ static_library("cpp") {
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     public += [
       "fuchsia_vfs.h",
       "lazy_dir.h",
