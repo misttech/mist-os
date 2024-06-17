@@ -16,7 +16,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/archive"
 	buildcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/publish"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/seal"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/serve"
 )
 
@@ -28,7 +27,6 @@ IMPORTANT: Please note that pm is being sunset and will be removed.
 
 Package Commands:
     build    - perform update and seal in order
-    seal     - seal package metadata into a meta.far
     archive  - construct a single .far representation of the package
 
 Repository Commands:
@@ -100,7 +98,8 @@ func doMain() int {
 		err = publish.Run(cfg, flag.Args()[1:])
 
 	case "seal":
-		err = seal.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "please use 'ffx package far create' instead")
+		err = nil
 
 	case "sign":
 		fmt.Fprintf(os.Stderr, "sign is deprecated without replacement")
