@@ -20,6 +20,20 @@
 constexpr char kGpioDevClassDir[] = GPIO_DEV_CLASS_PATH;
 constexpr char kGpioDevClassNsDir[] = "/ns" GPIO_DEV_CLASS_PATH;
 
+constexpr std::optional<fuchsia_hardware_gpio::wire::GpioFlags> ParseInputFlag(
+    std::string_view arg) {
+  if (arg == "down") {
+    return fuchsia_hardware_gpio::wire::GpioFlags::kPullDown;
+  }
+  if (arg == "up") {
+    return fuchsia_hardware_gpio::wire::GpioFlags::kPullUp;
+  }
+  if (arg == "none") {
+    return fuchsia_hardware_gpio::wire::GpioFlags::kNoPull;
+  }
+  return {};
+}
+
 constexpr std::optional<uint32_t> ParseInterruptFlags(std::string_view arg) {
   if (arg == "default") {
     return ZX_INTERRUPT_MODE_DEFAULT;
@@ -67,7 +81,6 @@ int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
   *out_value = 0;
   *ds_ua = 0;
   *interrupt_flags = 0;
-  unsigned long flag = 0;
   switch (func_arg[0]) {
     case 'n':
       *func = GetName;
@@ -84,7 +97,7 @@ int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
       *write_value = static_cast<uint8_t>(std::stoul(argv[3]));
       break;
     case 'i':
-    case 'q':
+    case 'q': {
       if (argc < 4) {
         return -1;
       }
@@ -103,13 +116,15 @@ int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
 
       *func = ConfigIn;
 
-      flag = std::stoul(argv[3]);
-      if (flag > 3) {
-        fprintf(stderr, "Invalid flag\n\n");
+      std::optional<fuchsia_hardware_gpio::wire::GpioFlags> parsed_in_flag =
+          ParseInputFlag(argv[3]);
+      if (!parsed_in_flag) {
+        fprintf(stderr, "Invalid flag \"%s\"\n\n", argv[3]);
         return -1;
       }
-      *in_flag = static_cast<fuchsia_hardware_gpio::wire::GpioFlags>(flag);
+      *in_flag = *parsed_in_flag;
       break;
+    }
     case 'o':
       *func = ConfigOut;
 

@@ -244,7 +244,7 @@ TEST_F(GpioUtilTest, WriteTest) {
 
 TEST_F(GpioUtilTest, ConfigInTest) {
   int argc = 4;
-  const char* argv[] = {"gpioutil", "i", "some_path", "2"};
+  const char* argv[] = {"gpioutil", "i", "some_path", "none"};
 
   GpioFunc func;
   uint8_t write_value, out_value;

@@ -76,8 +76,7 @@ Configure a GPIO as IN.
 
 `<name>` should be one of the values returned from [`list`](#list).
 
-`<value>` is the resistor pull. Accepted values are `0`
-(GPIO\_PULL\_DOWN), `1` (GPIO\_PULL\_UP), or `2` (GPIO\_NO\_PULL).
+`<value>` is the resistor pull. Accepted values are `down`, `up`, or `none`.
 
 This command doesn't return a value.
 
@@ -170,7 +169,7 @@ $ gpioutil write GPIO_HW_ID_3 0
 ### Configure a GPIO as IN with a pull-down resistor
 
 ```none {:.devsite-disable-click-to-copy}
-$ gpioutil in GPIO_HW_ID_3 0
+$ gpioutil in GPIO_HW_ID_3 down
 ```
 
 ### Configure a GPIO as OUT with an initial value of HIGH
