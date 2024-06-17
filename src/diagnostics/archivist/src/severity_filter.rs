@@ -10,7 +10,13 @@ use tracing::{Metadata, Subscriber};
 use tracing_subscriber::Layer;
 
 pub struct KlogSeverityFilter {
-    pub min_severity: Arc<RwLock<Severity>>,
+    min_severity: Arc<RwLock<Severity>>,
+}
+
+impl KlogSeverityFilter {
+    pub fn set_severity(&self, severity: Severity) {
+        *self.min_severity.write() = severity;
+    }
 }
 
 impl Default for KlogSeverityFilter {

@@ -287,10 +287,10 @@ impl LogsRepositoryState {
                 .min_by_key(|selector| selector.interest.min_severity.unwrap_or(Severity::Info));
             if let Some(selector) = lowest_selector {
                 if clear_interest {
-                    *publisher.min_severity.write() = Severity::Info;
+                    publisher.set_severity(Severity::Info);
                 } else {
-                    *publisher.min_severity.write() =
-                        selector.interest.min_severity.unwrap_or(Severity::Info);
+                    publisher
+                        .set_severity(selector.interest.min_severity.unwrap_or(Severity::Info));
                 }
             }
         });
