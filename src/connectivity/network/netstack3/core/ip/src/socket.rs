@@ -10,7 +10,7 @@ use core::num::{NonZeroU32, NonZeroU8};
 
 use log::error;
 use net_types::ip::{Ip, IpVersionMarker, Ipv6Addr, Ipv6SourceAddr, Mtu};
-use net_types::{MulticastAddress, SpecifiedAddr};
+use net_types::{MulticastAddress, ScopeableAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
@@ -827,7 +827,7 @@ pub(crate) mod ipv6_source_address_selection {
         a: &SasCandidate<D>,
         b: &SasCandidate<D>,
     ) -> Ordering {
-        // TODO(https://fxbug.dev/42123500): Implement rules 2, 4, 5.5, 6, and 7.
+        // TODO(https://fxbug.dev/42123500): Implement rules 4, 5.5, 6, and 7.
 
         let a_addr = a.addr_sub.addr().into_specified();
         let b_addr = b.addr_sub.addr().into_specified();
@@ -845,6 +845,7 @@ pub(crate) mod ipv6_source_address_selection {
         debug_assert!(b.flags.assigned);
 
         rule_1(remote_ip, a_addr, b_addr)
+            .then_with(|| rule_2(remote_ip, a_addr, b_addr))
             .then_with(|| rule_3(a.flags.deprecated, b.flags.deprecated))
             .then_with(|| rule_5(outbound_device, &a.device, &b.device))
             .then_with(|| rule_8(remote_ip, a.addr_sub, b.addr_sub))
@@ -873,6 +874,36 @@ pub(crate) mod ipv6_source_address_selection {
             // and in the second case, the rule doesn't apply. In either case,
             // we move onto the next rule.
             if a == remote_ip {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            }
+        } else {
+            Ordering::Equal
+        }
+    }
+
+    fn rule_2(
+        remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
+        a: SpecifiedAddr<Ipv6Addr>,
+        b: SpecifiedAddr<Ipv6Addr>,
+    ) -> Ordering {
+        // Scope ordering is defined by the Multicast Scope ID, see
+        // https://datatracker.ietf.org/doc/html/rfc6724#section-3.1 .
+        let remote_scope = match remote_ip {
+            Some(remote_ip) => remote_ip.scope().multicast_scope_id(),
+            None => return Ordering::Equal,
+        };
+        let a_scope = a.scope().multicast_scope_id();
+        let b_scope = b.scope().multicast_scope_id();
+        if a_scope < b_scope {
+            if a_scope < remote_scope {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        } else if a_scope > b_scope {
+            if b_scope < remote_scope {
                 Ordering::Greater
             } else {
                 Ordering::Less
@@ -956,6 +987,8 @@ pub(crate) mod ipv6_source_address_selection {
             let remote = SpecifiedAddr::new(net_ip_v6!("2001:0db8:1::")).unwrap();
             let local0 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:2::")).unwrap();
             let local1 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:3::")).unwrap();
+            let link_local_remote = SpecifiedAddr::new(net_ip_v6!("fe80::1:2:42")).unwrap();
+            let link_local = SpecifiedAddr::new(net_ip_v6!("fe80::1:2:4")).unwrap();
             let dev0 = &0;
             let dev1 = &1;
             let dev2 = &2;
@@ -965,6 +998,15 @@ pub(crate) mod ipv6_source_address_selection {
             assert_eq!(rule_1(Some(remote), local0, remote), Ordering::Less);
             assert_eq!(rule_1(Some(remote), local0, local1), Ordering::Equal);
             assert_eq!(rule_1(None, local0, local1), Ordering::Equal);
+
+            // Rule 2: Prefer appropriate scope
+            assert_eq!(rule_2(Some(remote), local0, local1), Ordering::Equal);
+            assert_eq!(rule_2(Some(remote), local1, local0), Ordering::Equal);
+            assert_eq!(rule_2(Some(remote), local0, link_local), Ordering::Greater);
+            assert_eq!(rule_2(Some(remote), link_local, local0), Ordering::Less);
+            assert_eq!(rule_2(Some(link_local_remote), local0, link_local), Ordering::Less);
+            assert_eq!(rule_2(Some(link_local_remote), link_local, local0), Ordering::Greater);
+            assert_eq!(rule_1(None, local0, link_local), Ordering::Equal);
 
             // Rule 3: Avoid deprecated states
             assert_eq!(rule_3(false, true), Ordering::Greater);
