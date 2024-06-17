@@ -132,6 +132,10 @@ void AmlSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
   completer.ReplySuccess(resp);
 }
 
+zx_status_t AmlSuspend::SystemSuspendEnter(zx_time_t resume_deadline) {
+  return zx_system_suspend_enter(cpu_resource_.get(), resume_deadline);
+}
+
 void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& completer) {
   fidl::Arena arena;
 
@@ -149,8 +153,7 @@ void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& com
 
   inspect_events_.CreateEntry(
       [](inspect::Node& n) { n.RecordInt("suspended", zx_clock_get_monotonic()); });
-  zx_status_t result =
-      zx_system_suspend_enter(cpu_resource_.get(), zx::deadline_after(kDebugSuspendDuration).get());
+  zx_status_t result = SystemSuspendEnter(zx::deadline_after(kDebugSuspendDuration).get());
 
   if (result != ZX_OK) {
     FDF_LOG(ERROR, "zx_system_suspend_enter failed: %s", zx_status_get_string(result));
