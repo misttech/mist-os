@@ -38,10 +38,14 @@ class DeviceServer : public fidl::Server<fuchsia_hardware_suspend::Suspender>,
   void Serve(async_dispatcher_t* dispatcher, fidl::ServerEnd<test_suspendcontrol::Device> server);
 
  private:
+  void SendGetSuspendStatesResponses();
+
   fidl::ServerBindingGroup<test_suspendcontrol::Device> device_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_suspend::Suspender> suspender_bindings_;
 
-  std::vector<fuchsia_hardware_suspend::SuspendState> suspend_states_;
+  std::optional<std::vector<fuchsia_hardware_suspend::SuspendState>> suspend_states_;
+  std::vector<GetSuspendStatesCompleter::Async> get_suspend_states_completers_;
+
   std::optional<uint64_t> last_state_index_;
   std::optional<SuspendCompleter::Async> suspend_completer_;
   std::optional<AwaitSuspendCompleter::Async> await_suspend_completer_;

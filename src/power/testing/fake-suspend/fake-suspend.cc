@@ -7,10 +7,13 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include "src/power/testing/fake-suspend/device_server.h"
 
 int main() {
+  FX_LOGS(INFO) << "Starting fake suspend...";
+
   async::Loop loop{&kAsyncLoopConfigAttachToCurrentThread};
   component::OutgoingDirectory outgoing(loop.dispatcher());
 

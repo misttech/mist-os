@@ -17,11 +17,19 @@ using test_suspendcontrol::DeviceResumeRequest;
 // fuchsia.hardware.suspend/Suspender.*
 
 void DeviceServer::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
-  completer.Reply(zx::ok(SuspenderGetSuspendStatesResponse().suspend_states(suspend_states_)));
+  get_suspend_states_completers_.push_back(completer.ToAsync());
+  if (suspend_states_.has_value()) {
+    SendGetSuspendStatesResponses();
+  }
 }
 
 void DeviceServer::Suspend(SuspendRequest& request, SuspendCompleter::Sync& completer) {
-  if (request.state_index() >= suspend_states_.size()) {
+  if (!suspend_states_.has_value()) {
+    completer.Reply(zx::error(ZX_ERR_BAD_STATE));
+    return;
+  }
+
+  if (request.state_index() >= suspend_states_->size()) {
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
@@ -40,7 +48,8 @@ void DeviceServer::Suspend(SuspendRequest& request, SuspendCompleter::Sync& comp
 
 void DeviceServer::SetSuspendStates(SetSuspendStatesRequest& request,
                                     SetSuspendStatesCompleter::Sync& completer) {
-  suspend_states_ = request.suspend_states().value();
+  suspend_states_ = std::move(request.suspend_states().value());
+  SendGetSuspendStatesResponses();
   completer.Reply(zx::ok());
 }
 
@@ -82,6 +91,23 @@ void DeviceServer::Serve(async_dispatcher_t* dispatcher,
 void DeviceServer::Serve(async_dispatcher_t* dispatcher,
                          fidl::ServerEnd<test_suspendcontrol::Device> server) {
   device_bindings_.AddBinding(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure);
+}
+
+// private methods
+
+void DeviceServer::SendGetSuspendStatesResponses() {
+  ZX_ASSERT(suspend_states_.has_value());
+
+  const std::vector<fuchsia_hardware_suspend::SuspendState>& states = suspend_states_.value();
+  // NB: |std::vector|'s move constructor guarantees that |get_suspend_states_completers_|
+  // be empty, but |std::vector|'s move assignment only guarantees that will be in a
+  // valid but undefined state.
+  std::vector<GetSuspendStatesCompleter::Async> completers(
+      std::move(get_suspend_states_completers_));
+
+  for (auto& completer : completers) {
+    completer.Reply(zx::ok(SuspenderGetSuspendStatesResponse().suspend_states(states)));
+  }
 }
 
 }  // namespace fake_suspend
