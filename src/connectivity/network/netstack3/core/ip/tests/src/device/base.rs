@@ -14,7 +14,7 @@ use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
 use net_types::{LinkLocalAddr, SpecifiedAddr, UnicastAddr, Witness};
 use test_case::test_case;
 
-use netstack3_base::testutil::{assert_empty, FakeInstant, TestIpExt as _};
+use netstack3_base::testutil::{assert_empty, FakeInstant, TestIpExt};
 use netstack3_base::InstantContext as _;
 use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
@@ -26,11 +26,11 @@ use netstack3_core::testutil::{
 use netstack3_core::{IpExt, StackStateBuilder, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{
-    AddressRemovedReason, DadTimerId, IpAddressId as _, IpAddressState, IpDeviceConfiguration,
-    IpDeviceConfigurationUpdate, IpDeviceEvent, IpDeviceFlags, IpDeviceStateContext,
-    Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
-    Ipv6DeviceTimerId, Lifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfiguration,
-    UpdateIpConfigurationError,
+    AddIpAddrSubnetError, AddressRemovedReason, DadTimerId, IpAddressId as _, IpAddressState,
+    IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent, IpDeviceFlags,
+    IpDeviceStateContext, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime, RsTimerId, SetIpAddressPropertiesError,
+    SlaacConfiguration, UpdateIpConfigurationError,
 };
 use netstack3_ip::gmp::MldTimerId;
 use netstack3_ip::nud::{self, LinkResolutionResult};
@@ -940,4 +940,26 @@ fn configure_link_local_address_generation(enable_stable_addresses: bool) {
         ),
         expected_addrs,
     );
+}
+
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
+fn disallow_loopback_addrs_on_non_loopback_interface<I: IpExt + TestIpExt>() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+    let device_id = ctx
+        .core_api()
+        .device::<EthernetLinkDevice>()
+        .add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: I::TEST_ADDRS.local_mac,
+                max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            },
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+    let result = ctx.core_api().device_ip::<I>().add_ip_addr_subnet(
+        &device_id,
+        AddrSubnet::new(I::LOOPBACK_ADDRESS.get(), I::LOOPBACK_SUBNET.prefix()).unwrap(),
+    );
+    assert_eq!(result, Err(AddIpAddrSubnetError::InvalidAddr));
 }
