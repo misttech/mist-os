@@ -12,10 +12,10 @@
 // unconditional dependency for rustdoc generation.
 use tracing_mutex as _;
 
-use ::mistos_logger::klog;
-use fuchsia_runtime as fruntime;
-use fuchsia_zircon as zx;
+use mistos_bootfs::bootfs::BootfsSvc;
+use mistos_logger::klog;
 use starnix_logging::log_info;
+use {fuchsia_runtime as fruntime, fuchsia_zircon as zx};
 
 extern "C" {
     fn dl_set_loader_service(
@@ -45,4 +45,15 @@ fn main() {
     klog::KernelLogger::init();
 
     log_info!("Starnix Lite is starting up...");
+
+    let system_resource_handle =
+        fruntime::take_startup_handle(fruntime::HandleType::SystemResource.into())
+            .map(zx::Resource::from);
+    let bootfs_svc = BootfsSvc::new().expect("Failed to create Rust bootfs");
+
+    let service = bootfs_svc
+        .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
+        .expect("Failed to ingest bootfs");
+
+    let _ = service.create_and_bind_vfs();
 }

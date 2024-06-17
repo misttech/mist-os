@@ -21,11 +21,19 @@ executable("bin") {
 
   disable_syslog_backend = true
 
-  configs += [
-    "//build/config/fuchsia:no_cpp_standard_library",
-    "//build/config/fuchsia:static-pie-config",
-    ":config",
-  ]
+  if (is_mistos) {
+    configs += [
+      "//build/config/mistos:no_cpp_standard_library",
+      "//build/config/mistos:static-pie-config",
+      ":config",
+    ]
+  } else {
+    configs += [
+      "//build/config/fuchsia:no_cpp_standard_library",
+      "//build/config/fuchsia:static-pie-config",
+      ":config",
+    ]
+  }
 }
 
 fuchsia_package_with_single_component("hello_starnix") {

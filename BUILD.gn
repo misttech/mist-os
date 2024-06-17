@@ -104,16 +104,25 @@ group("default") {
     "//:host",
     "//bundles/boot_tests",
 
-    #
+    # Produce Fuchsia libs zbi tests
     "//src/lib/fuchsia:tests",
 
-    #
+    # Produce mist-os libs zbi tests
     "//src/lib/mistos-bootfs:tests",
     "//src/lib/mistos-logger:tests",
+    "//src/starnix_lite:tests",
 
-    #
+    # Examples
+    "//src/lib/zircon/rust/examples/zx_toy:zx_toy_zbi",
+
+    # Host tools tests
     "//zircon/tools:tests",
   ]
+}
+
+# Generate ZBIs used to run on target
+group("zbi") {
+  deps = [ "//src/starnix_lite" ]
 }
 
 # Host-only tests.  These cannot have any dependency on an assembled platform
