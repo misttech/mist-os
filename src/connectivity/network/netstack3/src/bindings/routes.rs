@@ -19,7 +19,9 @@
 use std::collections::{HashMap, HashSet};
 
 use assert_matches::assert_matches;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use fidl_fuchsia_net_routes_ext::rules::RuleSetPriority;
 use futures::channel::{mpsc, oneshot};
 use futures::{
     stream, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
@@ -35,7 +37,9 @@ use crate::bindings::util::{EntryAndTableId, TryIntoFidlWithContext};
 use crate::bindings::{BindingsCtx, Ctx, IpExt};
 
 pub(crate) mod admin;
+pub(crate) mod rules_admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
+use rules_admin::{NewRuleSet, RuleOp, RuleTable, RuleWorkItem, SetPriorityConflict};
 
 pub(crate) mod state;
 mod witness;
@@ -391,7 +395,9 @@ pub(crate) struct State<I: Ip> {
     last_table_id: TableId<I>,
     new_table_receiver: mpsc::UnboundedReceiver<NewTable<I>>,
     route_work_receivers: RouteWorkReceivers<I::Addr>,
+    new_rule_set_receiver: mpsc::UnboundedReceiver<NewRuleSet<I>>,
     tables: HashMap<TableId<I>, Table<I::Addr>>,
+    rules: RuleTable<I>,
     update_dispatcher: crate::bindings::routes::state::RouteUpdateDispatcher<I>,
 }
 
@@ -400,13 +406,15 @@ pub(crate) struct State<I: Ip> {
 pub(crate) struct Changes<A: IpAddress> {
     new_table_sink: mpsc::UnboundedSender<NewTable<A::Version>>,
     main_table_route_work_sink: mpsc::UnboundedSender<RouteWorkItem<A>>,
+    new_rule_set_sink: mpsc::UnboundedSender<NewRuleSet<A::Version>>,
 }
 
 impl<A: IpAddress> Changes<A> {
     fn close_senders(&self) {
-        let Self { new_table_sink, main_table_route_work_sink } = self;
+        let Self { new_table_sink, main_table_route_work_sink, new_rule_set_sink } = self;
         new_table_sink.close_channel();
         main_table_route_work_sink.close_channel();
+        new_rule_set_sink.close_channel();
     }
 }
 
@@ -419,10 +427,13 @@ where
         let State {
             new_table_receiver,
             route_work_receivers,
+            new_rule_set_receiver,
             tables,
+            rules,
             update_dispatcher,
             last_table_id,
         } = self;
+        let mut rule_set_work_receivers = stream::FuturesUnordered::new();
         loop {
             futures::select_biased!(
                 route_work_item = route_work_receivers.next() => {
@@ -464,6 +475,39 @@ where
                         route_work_receivers
                     )
                 },
+                new_rule_set = new_rule_set_receiver.next() => {
+                    let Some(NewRuleSet {
+                        priority,
+                        rule_set_work_receiver,
+                        responder
+                    }) = new_rule_set else {
+                        continue;
+                    };
+                    let result = rules.new_rule_set(priority);
+                    rule_set_work_receivers.push(
+                        rule_set_work_receiver.into_future());
+                    responder.send(result).expect("failed to send result");
+                }
+                rule_set_work_item = rule_set_work_receivers.next() => {
+                    let Some((Some(RuleWorkItem {
+                        op,
+                        responder
+                    }), mut rest)) = rule_set_work_item else {
+                        continue;
+                    };
+                    let is_removal = matches!(op, RuleOp::RemoveSet { .. });
+                    let result = Self::handle_rule_op(rules, op);
+                    if is_removal {
+                        // We must close the channel so that the rule set
+                        // can no longer send RuleOps. Note that we make
+                        // sure no more operations will be sent once
+                        // `RemoveSet` is sent.
+                        rest.close();
+                    } else {
+                        rule_set_work_receivers.push(rest.into_future());
+                    }
+                    responder.send(result).expect("the receiver is dropped");
+                }
                 complete => break,
             )
         }
@@ -529,6 +573,21 @@ where
                 };
                 responder.send(result).expect("the receiver should still be alive");
             }
+        }
+    }
+
+    fn handle_rule_op(
+        table: &mut RuleTable<I>,
+        op: RuleOp<I>,
+    ) -> Result<(), fnet_routes_admin::RuleSetError> {
+        match op {
+            RuleOp::RemoveSet { priority } => {
+                return Ok(table.remove_rule_set(priority));
+            }
+            RuleOp::Add { priority, index, selector, action } => {
+                table.add_rule(priority, index, selector, action)
+            }
+            RuleOp::Remove { priority, index } => table.remove_rule(priority, index),
         }
     }
 }
@@ -861,15 +920,18 @@ pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
         let (main_table_route_work_sink, main_table_route_work_receiver) = mpsc::unbounded();
         let route_work_receivers =
             RouteWorkReceivers::new(main_table_route_work_receiver.into_future());
+        let (new_rule_set_sink, new_rule_set_receiver) = mpsc::unbounded();
 
         let state = State {
             new_table_receiver,
             tables,
+            rules: Default::default(),
             update_dispatcher: Default::default(),
             route_work_receivers,
+            new_rule_set_receiver,
             last_table_id: main_table_id,
         };
-        (Changes { new_table_sink, main_table_route_work_sink }, state)
+        (Changes { new_table_sink, main_table_route_work_sink, new_rule_set_sink }, state)
     }
     let (v4, v4_state) = create::<Ipv4>();
     let (v6, v6_state) = create::<Ipv6>();
@@ -930,6 +992,19 @@ impl ChangeSink {
                 } => (table_id, route_work_sink)
             )
         })
+    }
+
+    async fn new_rule_set<I: Ip>(
+        &self,
+        priority: RuleSetPriority,
+        rule_set_work_receiver: mpsc::UnboundedReceiver<RuleWorkItem<I>>,
+    ) -> Result<(), SetPriorityConflict> {
+        let sender = &self.changes::<I>().new_rule_set_sink;
+        let (responder, receiver) = oneshot::channel();
+        sender
+            .unbounded_send(NewRuleSet { priority, rule_set_work_receiver, responder })
+            .expect("change runner shut down before the services are shut down");
+        receiver.await.expect("responder should not be dropped")
     }
 
     pub(crate) fn main_table_route_work_sink<I: Ip>(

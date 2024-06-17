@@ -65,6 +65,8 @@ pub fn main() {
         .add_fidl_service(Service::RoutesAdminV6)
         .add_fidl_service(Service::RouteTableProviderV4)
         .add_fidl_service(Service::RouteTableProviderV6)
+        .add_fidl_service(Service::RuleTableV4)
+        .add_fidl_service(Service::RuleTableV6)
         .add_fidl_service(Service::RootRoutesV4)
         .add_fidl_service(Service::RootRoutesV6)
         .add_fidl_service(Service::Interfaces)

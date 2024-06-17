@@ -116,6 +116,12 @@ closed protocol BaseRuleSet {
     strict RemoveRule(struct {
         index fuchsia.net.routes.RuleIndex;
     }) -> () error RuleSetError;
+
+    /// Removes all rules in the rule set and the underlying channel will be
+    /// closed after the rules are removed.
+    ///
+    /// This method provides a way for synchronous closure.
+    strict Close();
 };
 
 /// Possible errors for operating the rule set.
@@ -132,4 +138,6 @@ type RuleSetError = flexible enum : uint32 {
     RULE_ALREADY_EXISTS = 4;
     /// Tried to remove a rule at an index that does not have an existing rule.
     RULE_DOES_NOT_EXIST = 5;
+    /// The selector is misconfigured because the base part is missing.
+    BASE_SELECTOR_MISSING = 6;
 };

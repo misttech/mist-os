@@ -35,6 +35,7 @@ rustc_library("fidl_fuchsia_net_routes_ext") {
   sources = [
     "src/admin.rs",
     "src/lib.rs",
+    "src/rules.rs",
     "src/testutil.rs",
   ]
 

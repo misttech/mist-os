@@ -111,6 +111,7 @@ common_sources = [
   "src/bindings/root_fidl_worker.rs",
   "src/bindings/routes.rs",
   "src/bindings/routes/admin.rs",
+  "src/bindings/routes/rules_admin.rs",
   "src/bindings/routes/state.rs",
   "src/bindings/routes/witness.rs",
   "src/bindings/socket.rs",

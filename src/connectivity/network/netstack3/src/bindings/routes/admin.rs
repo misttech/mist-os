@@ -30,11 +30,11 @@ use {
 
 use crate::bindings::devices::StaticCommonInfo;
 use crate::bindings::routes::witness::TableId;
-use crate::bindings::routes::{self};
+use crate::bindings::routes::{self, RouteWorkItem, WeakDeviceId};
 use crate::bindings::util::{TaskWaitGroupSpawner, TryFromFidlWithContext};
 use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt};
 
-use super::{RouteWorkItem, WeakDeviceId};
+pub(crate) use crate::bindings::routes::rules_admin::serve_rule_table;
 
 pub(crate) async fn serve_route_set<
     I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,

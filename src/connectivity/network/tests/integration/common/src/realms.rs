@@ -80,8 +80,6 @@ impl NetstackVersion {
                 fnet_routes::StateV6Marker::PROTOCOL_NAME,
                 fnet_routes_admin::RouteTableV4Marker::PROTOCOL_NAME,
                 fnet_routes_admin::RouteTableV6Marker::PROTOCOL_NAME,
-                fnet_routes_admin::RouteTableProviderV4Marker::PROTOCOL_NAME,
-                fnet_routes_admin::RouteTableProviderV6Marker::PROTOCOL_NAME,
                 fnet_stack::StackMarker::PROTOCOL_NAME,
                 fposix_socket_packet::ProviderMarker::PROTOCOL_NAME,
                 fposix_socket_raw::ProviderMarker::PROTOCOL_NAME,
@@ -102,6 +100,10 @@ impl NetstackVersion {
             NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => &common_services_and!(
                 fnet_filter::ControlMarker::PROTOCOL_NAME,
                 fnet_filter::StateMarker::PROTOCOL_NAME,
+                fnet_routes_admin::RouteTableProviderV4Marker::PROTOCOL_NAME,
+                fnet_routes_admin::RouteTableProviderV6Marker::PROTOCOL_NAME,
+                fnet_routes_admin::RuleTableV4Marker::PROTOCOL_NAME,
+                fnet_routes_admin::RuleTableV6Marker::PROTOCOL_NAME,
             ),
         }
     }
