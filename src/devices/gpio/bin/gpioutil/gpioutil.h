@@ -18,6 +18,7 @@ enum GpioFunc {
   GetDriveStrength,
   GetName,
   List,
+  Interrupt,
   Invalid
 };
 
@@ -29,7 +30,8 @@ zx::result<> GetStatus(const T& result);
 
 // Parse the command line arguments in |argv|
 int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
-              fuchsia_hardware_gpio::wire::GpioFlags* in_flag, uint8_t* out_value, uint64_t* ds_ua);
+              fuchsia_hardware_gpio::wire::GpioFlags* in_flag, uint8_t* out_value, uint64_t* ds_ua,
+              uint32_t* interrupt_flags);
 
 zx::result<> ListGpios();
 
@@ -38,6 +40,6 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByNa
 
 int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFunc func,
                uint8_t write_value, fuchsia_hardware_gpio::wire::GpioFlags in_flag,
-               uint8_t out_value, uint64_t ds_ua);
+               uint8_t out_value, uint64_t ds_ua, uint32_t interrupt_flags);
 
 #endif  // SRC_DEVICES_GPIO_BIN_GPIOUTIL_GPIOUTIL_H_

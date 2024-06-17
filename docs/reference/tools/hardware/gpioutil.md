@@ -118,6 +118,21 @@ GPIO. `<value>` should be in microamps.
 
 Aliases: `d`
 
+### interrupt
+
+```none
+gpioutil interrupt <name> [<value>]
+```
+
+Get the GPIO interrupt and wait for it to be triggered once.
+
+`<name>` should be one of the values returned from [`list`](#list).
+
+`<value>` is the interrupt mode to use. Accepted values are `default`,
+`edge-high`, `edge-low`, `edge-both`, `level-low`, or `level-high`.
+
+Aliases: `q`
+
 ### help
 
 ```none
@@ -176,6 +191,13 @@ Drive Strength: 500 ua
 ```none {:.devsite-disable-click-to-copy}
 $ gpioutil drive GPIO_HW_ID_3 500
 Set drive strength to 500
+```
+
+### Wait for a falling edge on a GPIO
+
+```none {:.devsite-disable-click-to-copy}
+$ gpioutil interrupt GPIO_HW_ID_3 edge-low
+Received interrupt at time 12345
 ```
 
 ## Notes

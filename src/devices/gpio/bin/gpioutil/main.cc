@@ -45,6 +45,9 @@ static void usage() {
       "                    state and its value should be `0` (LOW) or `1` (HIGH).\n"
       "  drive | d         Set the drive strength of <name>. <value> should be the\n"
       "                    drive strength value in microamps.\n"
+      "  interrupt | q     Get the interrupt corresponding to <name> with flags <value>. Wait for\n"
+      "                    it to trigger once, then exit. <value> should be `default`, \n"
+      "                    `edge-high`, `edge-low`, `edge-both`, `level-low`, or `level-high`.\n"
       "  help | h          Print this help text.\n\n"
       "Examples:\n"
       "  List GPIO pins:\n"
@@ -66,7 +69,10 @@ static void usage() {
       "  Drive Strength: 500 ua\n\n"
       "  Set the drive strength of a GPIO pin to 500 microamps:\n"
       "  $ gpioutil drive GPIO_HW_ID_3 500\n"
-      "  Set drive strength to 500\n\n");
+      "  Set drive strength to 500\n\n"
+      "  Wait for a falling edge on a GPIO:\n"
+      "  $ gpioutil interrupt GPIO_HW_ID_3 edge-low\n"
+      "  Received interrupt at time 12345\n\n");
 }
 // LINT.ThenChange(//docs/reference/tools/hardware/gpioutil.md)
 
@@ -75,7 +81,8 @@ int main(int argc, char** argv) {
   uint8_t write_value, out_value;
   uint64_t ds_ua;
   fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  if (ParseArgs(argc, argv, &func, &write_value, &in_flag, &out_value, &ds_ua)) {
+  uint32_t interrupt_flags;
+  if (ParseArgs(argc, argv, &func, &write_value, &in_flag, &out_value, &ds_ua, &interrupt_flags)) {
     fprintf(stderr, "Unable to parse arguments!\n\n");
     usage();
     return -1;
@@ -103,7 +110,8 @@ int main(int argc, char** argv) {
     }
 
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(client_end.value()));
-    ret = ClientCall(std::move(client), func, write_value, in_flag, out_value, ds_ua);
+    ret = ClientCall(std::move(client), func, write_value, in_flag, out_value, ds_ua,
+                     interrupt_flags);
   } else {
     // Access by GPIO name
     auto client = FindGpioClientByName(argv[kArgDevice]);
@@ -114,7 +122,8 @@ int main(int argc, char** argv) {
       return -1;
     }
 
-    ret = ClientCall(std::move(*client), func, write_value, in_flag, out_value, ds_ua);
+    ret = ClientCall(std::move(*client), func, write_value, in_flag, out_value, ds_ua,
+                     interrupt_flags);
   }
 
   if (ret == -1) {

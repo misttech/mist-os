@@ -9,23 +9,50 @@
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <stdio.h>
+#include <zircon/types.h>
 
 #include <filesystem>
+#include <optional>
+#include <string_view>
 
 // Directory path to the GPIO class
 #define GPIO_DEV_CLASS_PATH "/dev/class/gpio/"
 constexpr char kGpioDevClassDir[] = GPIO_DEV_CLASS_PATH;
 constexpr char kGpioDevClassNsDir[] = "/ns" GPIO_DEV_CLASS_PATH;
 
+constexpr std::optional<uint32_t> ParseInterruptFlags(std::string_view arg) {
+  if (arg == "default") {
+    return ZX_INTERRUPT_MODE_DEFAULT;
+  }
+  if (arg == "edge-low") {
+    return ZX_INTERRUPT_MODE_EDGE_LOW;
+  }
+  if (arg == "edge-high") {
+    return ZX_INTERRUPT_MODE_EDGE_HIGH;
+  }
+  if (arg == "edge-both") {
+    return ZX_INTERRUPT_MODE_EDGE_BOTH;
+  }
+  if (arg == "level-low") {
+    return ZX_INTERRUPT_MODE_LEVEL_LOW;
+  }
+  if (arg == "level-high") {
+    return ZX_INTERRUPT_MODE_LEVEL_HIGH;
+  }
+  return {};
+}
+
 int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
-              fuchsia_hardware_gpio::wire::GpioFlags* in_flag, uint8_t* out_value,
-              uint64_t* ds_ua) {
+              fuchsia_hardware_gpio::wire::GpioFlags* in_flag, uint8_t* out_value, uint64_t* ds_ua,
+              uint32_t* interrupt_flags) {
   if (argc < 2) {
     return -1;
   }
 
+  std::string_view func_arg = argv[1];
+
   /* Following functions allow no args */
-  switch (argv[1][0]) {
+  switch (func_arg[0]) {
     case 'l':
       *func = List;
       return 0;
@@ -39,8 +66,9 @@ int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
   *in_flag = fuchsia_hardware_gpio::wire::GpioFlags::kNoPull;
   *out_value = 0;
   *ds_ua = 0;
+  *interrupt_flags = 0;
   unsigned long flag = 0;
-  switch (argv[1][0]) {
+  switch (func_arg[0]) {
     case 'n':
       *func = GetName;
       break;
@@ -56,11 +84,25 @@ int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
       *write_value = static_cast<uint8_t>(std::stoul(argv[3]));
       break;
     case 'i':
-      *func = ConfigIn;
-
+    case 'q':
       if (argc < 4) {
         return -1;
       }
+
+      if (func_arg[0] == 'q' || func_arg == "interrupt") {
+        *func = Interrupt;
+        std::optional<uint32_t> parsed_interrupt_flags = ParseInterruptFlags(argv[3]);
+        if (!parsed_interrupt_flags) {
+          fprintf(stderr, "Invalid interrupt flag \"%s\"\n\n", argv[3]);
+          return -1;
+        }
+
+        *interrupt_flags = *parsed_interrupt_flags;
+        break;
+      }
+
+      *func = ConfigIn;
+
       flag = std::stoul(argv[3]);
       if (flag > 3) {
         fprintf(stderr, "Invalid flag\n\n");
@@ -186,7 +228,7 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByNa
 
 int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFunc func,
                uint8_t write_value, fuchsia_hardware_gpio::wire::GpioFlags in_flag,
-               uint8_t out_value, uint64_t ds_ua) {
+               uint8_t out_value, uint64_t ds_ua, uint32_t interrupt_flags) {
   switch (func) {
     case GetName: {
       auto result_pin = client->GetPin();
@@ -294,6 +336,40 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
         return -2;
       }
       printf("Drive Strength: %lu ua\n", result->value()->result_ua);
+      break;
+    }
+    case Interrupt: {
+      auto result = client->GetInterrupt(interrupt_flags);
+      if (!result.ok()) {
+        fprintf(stderr, "Call to get GPIO interrupt failed: %s\n",
+                result.FormatDescription().c_str());
+        return -2;
+      }
+      if (result->is_error()) {
+        fprintf(stderr, "Could not get GPIO interrupt: %s\n",
+                zx_status_get_string(result->error_value()));
+        return -2;
+      }
+
+      zx::time timestamp{};
+      if (zx_status_t status = result->value()->irq.wait(&timestamp); status != ZX_OK) {
+        fprintf(stderr, "Interrupt wait failed: %s\n", zx_status_get_string(status));
+        return -2;
+      }
+
+      printf("Received interrupt at time %ld\n", timestamp.get());
+
+      auto release = client->ReleaseInterrupt();
+      if (!release.ok()) {
+        fprintf(stderr, "Call to release GPIO interrupt failed: %s\n",
+                release.FormatDescription().c_str());
+        return -2;
+      }
+      if (release->is_error()) {
+        fprintf(stderr, "Could not release GPIO interrupt: %s\n",
+                zx_status_get_string(release->error_value()));
+        return -2;
+      }
       break;
     }
     default:
