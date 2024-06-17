@@ -87,9 +87,12 @@ template("fidl_library") {
 
   stable = defined(invoker.stable) && invoker.stable
 
+  # TODO(https://fxbug.dev/346884696): Replace with a solution that does not
+  # rely on fragile allow-listing of names. See the related TODOs below.
   in_fuchsia_namespace =
       invoker.library_name ==
-      "fuchsia." + string_replace(invoker.library_name, "fuchsia.", "", 1)
+      "fuchsia." + string_replace(invoker.library_name, "fuchsia.", "", 1) ||
+      invoker.library_name == "zx"
 
   # Additional dependencies to add when this target is published in an SDK.
   sdk_atom_deps = []
