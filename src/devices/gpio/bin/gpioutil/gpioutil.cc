@@ -113,7 +113,8 @@ zx::result<> ListGpios() {
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(client_end.value()));
     const fidl::WireResult result_pin = client->GetPin();
     if (!result_pin.ok()) {
-      fprintf(stderr, "Could not get pin from %s: %s\n", gpio_path, result_pin.status_string());
+      fprintf(stderr, "Could not get pin from %s: %s\n", gpio_path,
+              result_pin.FormatDescription().c_str());
       return zx::error(result_pin.status());
     }
     const fit::result response_pin = result_pin.value();
@@ -124,7 +125,8 @@ zx::result<> ListGpios() {
     }
     const fidl::WireResult result_name = client->GetName();
     if (!result_name.ok()) {
-      fprintf(stderr, "Could not get name from %s: %s\n", gpio_path, result_name.status_string());
+      fprintf(stderr, "Could not get name from %s: %s\n", gpio_path,
+              result_name.FormatDescription().c_str());
       return zx::error(result_name.status());
     }
     const fit::result response_name = result_name.value();
@@ -163,7 +165,8 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByNa
 
     const fidl::WireResult result_name = client->GetName();
     if (!result_name.ok()) {
-      fprintf(stderr, "Could not get name from %s: %s\n", gpio_path, result_name.status_string());
+      fprintf(stderr, "Could not get name from %s: %s\n", gpio_path,
+              result_name.FormatDescription().c_str());
       return zx::error(result_name.status());
     }
     const fit::result response_name = result_name.value();
@@ -188,12 +191,21 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
     case GetName: {
       auto result_pin = client->GetPin();
       if (!result_pin.ok()) {
-        fprintf(stderr, "Could not get Pin\n");
+        fprintf(stderr, "Call to get Pin failed: %s\n", result_pin.FormatDescription().c_str());
+        return -2;
+      }
+      if (result_pin->is_error()) {
+        fprintf(stderr, "Failed to get Pin: %s\n", zx_status_get_string(result_pin->error_value()));
         return -2;
       }
       auto result_name = client->GetName();
       if (!result_name.ok()) {
-        fprintf(stderr, "Could not get Name\n");
+        fprintf(stderr, "Call to get Name failed: %s\n", result_name.FormatDescription().c_str());
+        return -2;
+      }
+      if (result_name->is_error()) {
+        fprintf(stderr, "Failed to get Name: %s\n",
+                zx_status_get_string(result_name->error_value()));
         return -2;
       }
       auto pin = result_pin->value()->pin;
@@ -203,8 +215,12 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
     }
     case Read: {
       auto result = client->Read();
-      if ((result.status() != ZX_OK) || result->is_error()) {
-        fprintf(stderr, "Could not read GPIO\n");
+      if (!result.ok()) {
+        fprintf(stderr, "Call to read GPIO failed: %s\n", result.FormatDescription().c_str());
+        return -2;
+      }
+      if (result->is_error()) {
+        fprintf(stderr, "Could not read GPIO: %s\n", zx_status_get_string(result->error_value()));
         return -2;
       }
       printf("GPIO Value: %u\n", result->value()->value);
@@ -212,32 +228,54 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
     }
     case Write: {
       auto result = client->Write(write_value);
-      if ((result.status() != ZX_OK) || result->is_error()) {
-        fprintf(stderr, "Could not write to GPIO\n");
+      if (!result.ok()) {
+        fprintf(stderr, "Call to write GPIO failed: %s\n", result.FormatDescription().c_str());
+        return -2;
+      }
+      if (result->is_error()) {
+        fprintf(stderr, "Could not write GPIO: %s\n", zx_status_get_string(result->error_value()));
         return -2;
       }
       break;
     }
     case ConfigIn: {
       auto result = client->ConfigIn(in_flag);
-      if ((result.status() != ZX_OK) || result->is_error()) {
-        fprintf(stderr, "Could not configure GPIO as input\n");
+      if (!result.ok()) {
+        fprintf(stderr, "Call to configure GPIO as input failed: %s\n",
+                result.FormatDescription().c_str());
+        return -2;
+      }
+      if (result->is_error()) {
+        fprintf(stderr, "Could not configure GPIO as input: %s\n",
+                zx_status_get_string(result->error_value()));
         return -2;
       }
       break;
     }
     case ConfigOut: {
       auto result = client->ConfigOut(out_value);
-      if ((result.status() != ZX_OK) || result->is_error()) {
-        fprintf(stderr, "Could not configure GPIO as output\n");
+      if (!result.ok()) {
+        fprintf(stderr, "Call to configure GPIO as output failed: %s\n",
+                result.FormatDescription().c_str());
+        return -2;
+      }
+      if (result->is_error()) {
+        fprintf(stderr, "Could not configure GPIO as output: %s\n",
+                zx_status_get_string(result->error_value()));
         return -2;
       }
       break;
     }
     case SetDriveStrength: {
       auto result = client->SetDriveStrength(ds_ua);
-      if ((result.status() != ZX_OK) || result->is_error()) {
-        fprintf(stderr, "Could not set GPIO drive strength\n");
+      if (!result.ok()) {
+        fprintf(stderr, "Call to set GPIO drive strength failed: %s\n",
+                result.FormatDescription().c_str());
+        return -2;
+      }
+      if (result->is_error()) {
+        fprintf(stderr, "Could not set GPIO drive strength: %s\n",
+                zx_status_get_string(result->error_value()));
         return -2;
       }
       printf("Set drive strength to %lu\n", result->value()->actual_ds_ua);
@@ -245,8 +283,14 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
     }
     case GetDriveStrength: {
       auto result = client->GetDriveStrength();
-      if ((result.status() != ZX_OK) || result->is_error()) {
-        fprintf(stderr, "Could not get drive strength\n");
+      if (!result.ok()) {
+        fprintf(stderr, "Call to get GPIO drive strength failed: %s\n",
+                result.FormatDescription().c_str());
+        return -2;
+      }
+      if (result->is_error()) {
+        fprintf(stderr, "Could not get GPIO drive strength: %s\n",
+                zx_status_get_string(result->error_value()));
         return -2;
       }
       printf("Drive Strength: %lu ua\n", result->value()->result_ua);
