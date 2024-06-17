@@ -247,6 +247,27 @@ impl SuspendResumeManager {
         }
     }
 
+    fn update_stats(&self, stats: fsuspend::SuspendStats) {
+        let stats_guard = &mut self.lock().suspend_stats;
+
+        // Only update the stats if the new stats moves forward.
+        let success_count = stats.success_count.unwrap_or_default();
+        if stats_guard.success_count > success_count {
+            return;
+        }
+        let fail_count = stats.fail_count.unwrap_or_default();
+        if stats_guard.fail_count > fail_count {
+            return;
+        }
+
+        stats_guard.success_count = stats.success_count.unwrap_or_default();
+        stats_guard.fail_count = stats.fail_count.unwrap_or_default();
+        stats_guard.last_time_in_sleep =
+            zx::Duration::from_millis(stats.last_time_in_suspend.unwrap_or_default());
+        stats_guard.last_time_in_suspend_operations =
+            zx::Duration::from_millis(stats.last_time_in_suspend_operations.unwrap_or_default());
+    }
+
     fn init_stats_watcher(self: &SuspendResumeManagerHandle, system_task: &CurrentTask) {
         let self_ref = self.clone();
         system_task.kernel().kthreads.spawn_future(async move {
@@ -254,19 +275,9 @@ impl SuspendResumeManager {
             let stats_proxy = connect_to_protocol::<fsuspend::StatsMarker>()
                 .expect("connection to fuchsia.power.suspend.Stats");
             let mut stats_stream = HangingGetStream::new(stats_proxy, fsuspend::StatsProxy::watch);
-            while let Some(stream) = stats_stream.next().await {
-                match stream {
-                    Ok(stats) => {
-                        let stats_guard = &mut self_ref.lock().suspend_stats;
-                        stats_guard.success_count = stats.success_count.unwrap_or_default();
-                        stats_guard.fail_count = stats.fail_count.unwrap_or_default();
-                        stats_guard.last_time_in_sleep = zx::Duration::from_millis(
-                            stats.last_time_in_suspend.unwrap_or_default(),
-                        );
-                        stats_guard.last_time_in_suspend_operations = zx::Duration::from_millis(
-                            stats.last_time_in_suspend_operations.unwrap_or_default(),
-                        );
-                    }
+            while let Some(stats) = stats_stream.next().await {
+                match stats {
+                    Ok(stats) => self_ref.update_stats(stats),
                     Err(e) => {
                         log_error!("stats watcher got an error: {}", e);
                         break;
@@ -357,7 +368,18 @@ impl SuspendResumeManager {
 
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
         self.update_power_level(state.into())?;
-        self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)
+        self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)?;
+
+        // Synchronously update the stats after performing suspend so that a later
+        // query of stats is guaranteed to reflect the current suspend operation.
+        let stats_proxy = connect_to_protocol_sync::<fsuspend::StatsMarker>()
+            .expect("connection to fuchsia.power.suspend.Stats");
+        match stats_proxy.watch(zx::Time::INFINITE) {
+            Ok(stats) => self.update_stats(stats),
+            Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
+        }
+
+        Ok(())
     }
 }
 
