@@ -18,6 +18,14 @@ fuchsia_component("fake_data_provider") {
   ]
 }
 
+fuchsia_component("fake_crash_introspect") {
+  testonly = true
+
+  manifest = "meta/fake_crash_introspect.cml"
+
+  deps = [ ":fake_crash_introspect_exe" ]
+}
+
 executable("fake_data_provider_exe") {
   sources = [
     "data_provider.cc",
@@ -34,6 +42,25 @@ executable("fake_data_provider_exe") {
     "//src/developer/forensics/utils:archive",
     "//src/lib/fsl",
     "//src/lib/fxl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+}
+
+executable("fake_crash_introspect_exe") {
+  sources = [
+    "crash_introspect.cc",
+    "crash_introspect.h",
+    "crash_introspect_main.cc",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/cpp/wire",
+    "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
