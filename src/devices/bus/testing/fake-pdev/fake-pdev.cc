@@ -155,6 +155,16 @@ void FakePDevFidl::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& c
   completer.ReplySuccess(value);
 }
 
+void FakePDevFidl::GetMetadata(GetMetadataRequestView request,
+                               GetMetadataCompleter::Sync& completer) {
+  auto metadata = metadata_.find(request->type);
+  if (metadata == metadata_.end()) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
+  }
+  completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
+}
+
 void FakePDevFidl::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {}

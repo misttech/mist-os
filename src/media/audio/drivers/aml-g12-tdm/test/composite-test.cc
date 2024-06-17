@@ -135,6 +135,10 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
+  void GetMetadata(GetMetadataRequest& request, GetMetadataCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {}

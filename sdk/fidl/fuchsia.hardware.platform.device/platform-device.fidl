@@ -145,6 +145,15 @@ open protocol Device {
 
     /// Return information about the board the device is attached to.
     flexible GetBoardInfo() -> (BoardInfo) error zx.Status;
+
+    /// Returns the metadata associated with the device and |type|.
+    /// Returns ZX_ERR_NOT_FOUND if the metadata does not exist.
+    @available(added=HEAD)
+    flexible GetMetadata(struct {
+        type uint32;
+    }) -> (struct {
+        metadata vector<uint8>:MAX;
+    }) error zx.Status;
 };
 
 service Service {
