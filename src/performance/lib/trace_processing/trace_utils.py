@@ -5,7 +5,17 @@
 
 import math
 import statistics
-from typing import Any, Iterable, Iterator, List, Optional, Set, Tuple, TypeVar
+from typing import (
+    Any,
+    Generator,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+)
 
 from trace_processing import trace_model, trace_metrics, trace_time
 
@@ -33,12 +43,15 @@ def percentile(values: Iterable[int | float], percentile: int) -> float:
     )
 
 
+T = TypeVar("T", bound=trace_model.Event)
+
+
 def filter_events(
     events: Iterable[trace_model.Event],
+    type: type[T],
     category: Optional[str] = None,
     name: Optional[str] = None,
-    type: type = object,
-) -> Iterator[trace_model.Event]:
+) -> Generator[T, None, None]:
     """Filter |events| based on category, name, or type.
 
     Args:
@@ -52,13 +65,11 @@ def filter_events(
       the caller must create a local copy in order to loop over the filtered events more than once.
     """
 
-    def event_matches(event: trace_model.Event) -> bool:
-        type_matches = isinstance(event, type)
+    for event in events:
         category_matches: bool = category is None or event.category == category
         name_matches: bool = name is None or event.name == name
-        return type_matches and category_matches and name_matches
-
-    return filter(event_matches, events)
+        if isinstance(event, type) and category_matches and name_matches:
+            yield event
 
 
 U = TypeVar("U", bound=trace_model.SchedulingRecord)
@@ -234,8 +245,8 @@ def get_nearest_following_event(
 def adjust_to_common_process_start(
     model: trace_model.Model,
     name: str,
+    type: type[T],
     category: Optional[str] = None,
-    type: type = object,
 ) -> trace_model.Model:
     """Adjust model to a consistent start time tracking the latest first event recorded from a
     list of processes. The list of processes are selected through matching event flow.

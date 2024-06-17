@@ -75,7 +75,9 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
 
             events = list(
                 trace_utils.filter_events(
-                    model.all_events(), category="benchmark"
+                    model.all_events(),
+                    category="benchmark",
+                    type=trace_model.Event,
                 )
             )
             for event_name in [
@@ -92,7 +94,9 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
 
             events = list(
                 trace_utils.filter_events(
-                    model.all_events(), category="kernel:syscall"
+                    model.all_events(),
+                    category="kernel:syscall",
+                    type=trace_model.Event,
                 )
             )
             for event_name in ["syscall_test_0", "syscall_test_8"]:

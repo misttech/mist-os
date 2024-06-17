@@ -76,6 +76,7 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
             all_events,
             category=_EVENT_CATEGORY,
             name=_PRESENT_EVENT_NAME.format(self._debug_name),
+            type=trace_model.Event,
         )
 
         present_latencies: list[float] = []

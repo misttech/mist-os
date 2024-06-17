@@ -92,13 +92,17 @@ class TraceUtilsTest(unittest.TestCase):
             ),
         ]
 
-        filtered: List[trace_model.Event] = list(
-            trace_utils.filter_events(events, category="cat_a", name="name_a")
+        filtered = list(
+            trace_utils.filter_events(
+                events, category="cat_a", name="name_a", type=trace_model.Event
+            )
         )
         self.assertEqual(filtered, [events[0]])
 
-        filtered2: List[trace_model.Event] = list(
-            trace_utils.filter_events(events, category="cat_c", name="name_c")
+        filtered2 = list(
+            trace_utils.filter_events(
+                events, category="cat_c", name="name_c", type=trace_model.Event
+            )
         )
         self.assertEqual(filtered2, [])
 
