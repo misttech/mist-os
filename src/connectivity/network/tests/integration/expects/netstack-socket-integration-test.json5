@@ -31,11 +31,6 @@
                 // Reenable once Netstack2 uses the bound device when
                 // connecting.
                 "tcp_connect_bound_to_device_ns2",
-
-                // TODO(https://fxbug.dev/42084713): Make this test pass
-                // by delivering looped-back packets to a socket bound to
-                // a non-loopback device.
-                "ping_self_ns3::v6_link_local",
             ],
         },
     ],

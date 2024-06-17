@@ -1809,7 +1809,7 @@ fn do_route_lookup<I: IpExt>(
                 None,
                 Device::First.ip_address(),
                 Ok(ResolvedRoute {src_addr: Device::Second.ip_address(), device: Device::Loopback,
-                    local_delivery_device: Some(Device::Second),
+                    local_delivery_device: Some(Device::First),
                     next_hop: NextHop::RemoteAsNeighbor });
                 "local delivery cross device")]
 fn lookup_route<I: TestIpExt + IpExt>(

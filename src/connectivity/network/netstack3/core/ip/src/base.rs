@@ -831,12 +831,27 @@ fn is_local_assigned_address<
 >(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
-    local_ip: SpecifiedAddr<I::Addr>,
+    addr: SpecifiedAddr<I::Addr>,
 ) -> bool {
-    match core_ctx.address_status_for_device(local_ip, device) {
+    match core_ctx.address_status_for_device(addr, device) {
         AddressStatus::Present(status) => is_unicast_assigned::<I>(&status),
         AddressStatus::Unassigned => false,
     }
+}
+
+fn get_device_with_assigned_address<A, BC, CC>(
+    core_ctx: &mut CC,
+    addr: SpecifiedAddr<A>,
+) -> Option<CC::DeviceId>
+where
+    A: IpAddress,
+    A::Version: IpLayerIpExt,
+    BC: IpLayerBindingsContext<A::Version, CC::DeviceId>,
+    CC: IpDeviceStateContext<A::Version, BC> + IpDeviceContext<A::Version, BC>,
+{
+    core_ctx.with_address_statuses(addr, |mut it| {
+        it.find_map(|(device, status)| is_unicast_assigned::<A::Version>(&status).then_some(device))
+    })
 }
 
 // Returns the local IP address to use for sending packets from the
@@ -880,7 +895,7 @@ pub enum ResolveRouteError {
 /// If a `device` is specified, the resolved route is limited to those that
 /// egress over the device.
 ///
-/// If `local_ip` is specified the resolved route is limited to those that egress
+/// If `src_ip` is specified the resolved route is limited to those that egress
 /// over a device with the address assigned.
 pub fn resolve_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
@@ -889,11 +904,11 @@ pub fn resolve_route_to_destination<
 >(
     core_ctx: &mut CC,
     device: Option<&CC::DeviceId>,
-    local_ip: Option<IpDeviceAddr<I::Addr>>,
-    addr: Option<RoutableIpAddr<I::Addr>>,
+    src_ip: Option<IpDeviceAddr<I::Addr>>,
+    dst_ip: Option<RoutableIpAddr<I::Addr>>,
 ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
     enum LocalDelivery<A, D> {
-        WeakLoopback { addr: A, device: D },
+        WeakLoopback { dst_ip: A, device: D },
         StrongForDevice(D),
     }
 
@@ -910,9 +925,9 @@ pub fn resolve_route_to_destination<
     // TODO(https://fxbug.dev/42175703): Encode the delivery of locally-
     // destined packets to loopback in the route table.
     let local_delivery_instructions: Option<LocalDelivery<RoutableIpAddr<I::Addr>, CC::DeviceId>> =
-        addr.and_then(|addr| {
+        dst_ip.and_then(|dst_ip| {
             match device {
-                Some(device) => match core_ctx.address_status_for_device(addr.into(), device) {
+                Some(device) => match core_ctx.address_status_for_device(dst_ip.into(), device) {
                     AddressStatus::Present(status) => {
                         // If the destination is an address assigned to the
                         // requested egress interface, route locally via the strong
@@ -935,21 +950,15 @@ pub fn resolve_route_to_destination<
                     // about allowing cross-device local delivery even when
                     // SO_BINDTODEVICE or link-local addresses are involved, and this
                     // behavior may need to be emulated.
-                    core_ctx
-                        .with_address_statuses(addr.into(), |mut it| {
-                            it.find_map(|(device, status)| {
-                                is_unicast_assigned::<I>(&status).then_some(device)
-                            })
-                        })
-                        .map(|device| {
-                            if local_ip.is_some_and(|local_ip| local_ip.as_ref().must_have_zone())
-                                || addr.as_ref().must_have_zone()
-                            {
-                                LocalDelivery::StrongForDevice(device)
-                            } else {
-                                LocalDelivery::WeakLoopback { addr, device }
-                            }
-                        })
+                    get_device_with_assigned_address(core_ctx, dst_ip.into()).map(|device| {
+                        if src_ip.is_some_and(|ip| ip.as_ref().must_have_zone())
+                            || dst_ip.as_ref().must_have_zone()
+                        {
+                            LocalDelivery::StrongForDevice(device)
+                        } else {
+                            LocalDelivery::WeakLoopback { dst_ip, device }
+                        }
+                    })
                 }
             }
         });
@@ -961,24 +970,24 @@ pub fn resolve_route_to_destination<
                 Some(loopback) => loopback,
             };
 
-            let (local_ip, dest_device) = match local_delivery {
-                LocalDelivery::WeakLoopback { addr, device } => match local_ip {
-                    Some(local_ip) => core_ctx
-                        .with_address_statuses(local_ip.into(), |mut it| {
-                            it.find_map(|(device, status)| {
-                                is_unicast_assigned::<I>(&status).then_some(device)
-                            })
-                        })
-                        .map(|device| (local_ip, device))
-                        .ok_or(ResolveRouteError::NoSrcAddr)?,
-                    None => (addr, device),
-                },
+            let (src_addr, dest_device) = match local_delivery {
+                LocalDelivery::WeakLoopback { dst_ip, device } => {
+                    let src_ip = match src_ip {
+                        Some(src_ip) => {
+                            let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
+                                .ok_or(ResolveRouteError::NoSrcAddr)?;
+                            src_ip
+                        }
+                        None => dst_ip,
+                    };
+                    (src_ip, device)
+                }
                 LocalDelivery::StrongForDevice(device) => {
-                    (get_local_addr(core_ctx, local_ip, &device, addr)?, device)
+                    (get_local_addr(core_ctx, src_ip, &device, dst_ip)?, device)
                 }
             };
             Ok(ResolvedRoute {
-                src_addr: local_ip,
+                src_addr,
                 local_delivery_device: Some(dest_device),
                 device: loopback,
                 next_hop: NextHop::RemoteAsNeighbor,
@@ -990,31 +999,39 @@ pub fn resolve_route_to_destination<
                     let mut matching_with_addr = table.lookup_filter_map(
                         core_ctx,
                         device,
-                        addr.map_or(I::UNSPECIFIED_ADDRESS, |a| a.addr()),
-                        |core_ctx, d| Some(get_local_addr(core_ctx, local_ip, d, addr)),
+                        dst_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.addr()),
+                        |core_ctx, d| Some(get_local_addr(core_ctx, src_ip, d, dst_ip)),
                     );
 
                     let first_error = match matching_with_addr.next() {
-                        Some((Destination { device, next_hop }, Ok(addr))) => {
-                            return Ok((Destination { device: device.clone(), next_hop }, addr))
+                        Some((Destination { device, next_hop }, Ok(local_addr))) => {
+                            return Ok((
+                                Destination { device: device.clone(), next_hop },
+                                local_addr,
+                            ))
                         }
                         Some((_, Err(e))) => e,
                         None => return Err(ResolveRouteError::Unreachable),
                     };
 
                     matching_with_addr
-                        .filter_map(|(d, r)| {
+                        .filter_map(|(destination, local_addr)| {
                             // Select successful routes. We ignore later errors
                             // since we've already saved the first one.
-                            r.ok_checked::<ResolveRouteError>().map(|a| (d, a))
+                            local_addr
+                                .ok_checked::<ResolveRouteError>()
+                                .map(|local_addr| (destination, local_addr))
                         })
                         .next()
-                        .map_or(Err(first_error), |(Destination { device, next_hop }, addr)| {
-                            Ok((Destination { device: device.clone(), next_hop }, addr))
-                        })
+                        .map_or(
+                            Err(first_error),
+                            |(Destination { device, next_hop }, local_addr)| {
+                                Ok((Destination { device: device.clone(), next_hop }, local_addr))
+                            },
+                        )
                 })
-                .map(|(Destination { device, next_hop }, local_ip)| ResolvedRoute {
-                    src_addr: local_ip,
+                .map(|(Destination { device, next_hop }, local_addr)| ResolvedRoute {
+                    src_addr: local_addr,
                     device,
                     local_delivery_device: None,
                     next_hop,

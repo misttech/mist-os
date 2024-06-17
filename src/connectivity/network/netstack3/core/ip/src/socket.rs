@@ -592,7 +592,7 @@ where
         src_addr: local_ip,
         device: mut egress_device,
         mut next_hop,
-        local_delivery_device: _,
+        mut local_delivery_device,
     } = resolve(core_ctx, bindings_ctx, socket_device, *local_ip, *remote_ip)?;
 
     let previous_dst = remote_ip.addr();
@@ -627,7 +627,7 @@ where
             src_addr: new_local_ip,
             device: new_device,
             next_hop: new_next_hop,
-            local_delivery_device: _,
+            local_delivery_device: new_local_delivery_device,
         } = resolve(core_ctx, bindings_ctx, socket_device, local_ip, remote_ip).inspect_err(
             |_| {
                 packet_metadata.acknowledge_drop();
@@ -636,6 +636,7 @@ where
         local_ip = new_local_ip;
         egress_device = new_device;
         next_hop = new_next_hop;
+        local_delivery_device = new_local_delivery_device;
     }
 
     let loopback_packet = (options.multicast_loop()
@@ -645,12 +646,16 @@ where
     .transpose()?
     .map(|buf| RawIpBody::new(*proto, local_ip.addr(), remote_ip.addr(), buf));
 
+    let destination = match &local_delivery_device {
+        Some(d) => IpPacketDestination::Loopback(d),
+        None => IpPacketDestination::from_next_hop(next_hop, remote_ip.into()),
+    };
     let ttl = options.hop_limit(&remote_ip.into());
     let meta = SendIpPacketMeta {
         device: &egress_device,
         src_ip: local_ip.into(),
         dst_ip: remote_ip.into(),
-        destination: IpPacketDestination::from_next_hop(next_hop, remote_ip.into()),
+        destination,
         ttl,
         proto: *proto,
         mtu,

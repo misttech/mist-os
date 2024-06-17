@@ -42,16 +42,8 @@ fn loopback_bind_to_device<I: IpExt + TestIpExt>(bind_to_device: bool) {
     .unwrap();
 
     assert!(ctx.test_api().handle_queued_rx_packets());
-
-    // TODO(https://fxbug.dev/42084713): They should both be non-empty. The
-    // socket map should allow a looped back packet to be delivered despite
-    // it being bound to a device other than loopback.
-    if bind_to_device {
-        assert_matches!(&ctx.bindings_ctx.take_udp_received(&socket)[..], []);
-    } else {
-        assert_matches!(
-            &ctx.bindings_ctx.take_udp_received(&socket)[..],
-            [packet] => assert_eq!(packet, HELLO)
-        );
-    }
+    assert_matches!(
+        &ctx.bindings_ctx.take_udp_received(&socket)[..],
+        [packet] => assert_eq!(packet, HELLO)
+    );
 }
