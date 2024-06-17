@@ -235,13 +235,19 @@ pub(crate) mod testutil {
     /// A fake [`FrameContext`].
     pub struct FakeFrameCtx<Meta> {
         frames: Vec<(Meta, Vec<u8>)>,
-        should_error_for_frame: Option<Box<dyn FnMut(&Meta) -> bool + Send>>,
+        should_error_for_frame:
+            Option<Box<dyn FnMut(&Meta) -> Option<SendFrameErrorReason> + Send>>,
     }
 
     impl<Meta> FakeFrameCtx<Meta> {
         /// Closure which can decide to cause an error to be thrown when
         /// handling a frame, based on the metadata.
-        pub fn set_should_error_for_frame<F: Fn(&Meta) -> bool + Send + 'static>(&mut self, f: F) {
+        pub fn set_should_error_for_frame<
+            F: Fn(&Meta) -> Option<SendFrameErrorReason> + Send + 'static,
+        >(
+            &mut self,
+            f: F,
+        ) {
             self.should_error_for_frame = Some(Box::new(f));
         }
     }
@@ -280,13 +286,8 @@ pub(crate) mod testutil {
             S: Serializer,
             S::Buffer: BufferMut,
         {
-            if let Some(should_error_for_frame) = core_ctx.should_error_for_frame.as_mut() {
-                if should_error_for_frame(&self) {
-                    return Err(SendFrameError {
-                        serializer: frame,
-                        error: SendFrameErrorReason::QueueFull,
-                    });
-                }
+            if let Some(error) = core_ctx.should_error_for_frame.as_mut().and_then(|f| f(&self)) {
+                return Err(SendFrameError { serializer: frame, error });
             }
 
             let buffer = frame

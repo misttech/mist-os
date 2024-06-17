@@ -22,8 +22,8 @@ use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier as _,
-    EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector, InstantContext,
-    NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameError, SendFrameErrorReason,
+    ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector,
+    InstantContext, NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
     StrongDeviceIdentifier, TimerContext, TimerHandler, TracingContext,
 };
 use netstack3_filter::{
@@ -64,6 +64,9 @@ use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocket
 use crate::internal::types::{
     self, Destination, IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
 };
+
+#[cfg(test)]
+mod tests;
 
 /// Default IPv4 TTL.
 pub const DEFAULT_TTL: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
@@ -150,6 +153,25 @@ impl<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, 
         conn: ConntrackConnection<I, BT>,
     ) -> Option<ConntrackConnection<I, BT>> {
         self.conntrack_connection.replace(conn)
+    }
+}
+
+/// Send errors observed at or above the IP layer that carry a serializer.
+pub type IpSendFrameError<S> = ErrorAndSerializer<IpSendFrameErrorReason, S>;
+
+/// Send error cause for [`IpSendFrameError`].
+#[derive(Debug, PartialEq)]
+pub enum IpSendFrameErrorReason {
+    /// Error comes from the device layer.
+    Device(SendFrameErrorReason),
+    /// The frame's source or destination address is in the loopback subnet, but
+    /// the target device is not the loopback device.
+    IllegalLoopbackAddress,
+}
+
+impl From<SendFrameErrorReason> for IpSendFrameErrorReason {
+    fn from(value: SendFrameErrorReason) -> Self {
+        Self::Device(value)
     }
 }
 
@@ -1077,7 +1099,7 @@ impl<
         >,
         body: S,
         packet_metadata: IpLayerPacketMetadata<I, BC>,
-    ) -> Result<(), SendFrameError<S>>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
@@ -1146,6 +1168,7 @@ impl<
 pub(crate) trait IpLayerEgressContext<I, BC>:
     IpDeviceSendContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
     + FilterHandlerProvider<I, BC>
+    + CounterContext<IpCounters<I>>
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
@@ -1157,7 +1180,8 @@ where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
     CC: IpDeviceSendContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
-        + FilterHandlerProvider<I, BC>,
+        + FilterHandlerProvider<I, BC>
+        + CounterContext<IpCounters<I>>,
 {
 }
 
@@ -1356,6 +1380,9 @@ pub struct IpCounters<I: IpLayerIpExt> {
     pub unspecified_source: Counter,
     /// Count of incoming IP packets dropped.
     pub dropped: Counter,
+    /// Number of frames rejected because they'd cause illegal loopback
+    /// addresses on the wire.
+    pub tx_illegal_loopback_address: Counter,
     /// Version specific rx counters.
     pub version_rx: I::RxCounters,
 }
@@ -1809,7 +1836,7 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
     destination: IpPacketDestination<I, &CC::DeviceId>,
     mut body: S,
     mut packet_metadata: IpLayerPacketMetadata<I, BC>,
-) -> Result<(), SendFrameError<S>>
+) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
@@ -1830,9 +1857,23 @@ where
         }
         filter::Verdict::Accept => {}
     }
-
     packet_metadata.acknowledge_drop();
-    core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof)
+
+    // The filtering layer may have changed our address. Perform a last moment
+    // check to protect against sending loopback addresses on the wire for
+    // non-loopback devices, which is an RFC violation.
+    if !device.is_loopback()
+        && (I::LOOPBACK_SUBNET.contains(&body.src_addr())
+            || I::LOOPBACK_SUBNET.contains(&body.dst_addr()))
+    {
+        core_ctx.increment(|c: &IpCounters<I>| &c.tx_illegal_loopback_address);
+        return Err(IpSendFrameError {
+            serializer: body,
+            error: IpSendFrameErrorReason::IllegalLoopbackAddress,
+        });
+    }
+
+    core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof).map_err(|e| e.err_into())
 }
 
 /// Drop a packet and undo the effects of parsing it.
@@ -2205,14 +2246,18 @@ pub fn receive_ipv4_packet<
                     packet_metadata,
                 ) {
                     Ok(()) => (),
-                    Err(SendFrameError { serializer: _, error }) => {
+                    Err(IpSendFrameError { serializer: _, error }) => {
                         match error {
-                            SendFrameErrorReason::SizeConstraintsViolation => {
+                            IpSendFrameErrorReason::Device(
+                                SendFrameErrorReason::SizeConstraintsViolation,
+                            ) => {
                                 core_ctx.increment(|counters: &IpCounters<Ipv4>| {
                                     &counters.mtu_exceeded
                                 });
                             }
-                            SendFrameErrorReason::QueueFull | SendFrameErrorReason::Alloc => (),
+                            IpSendFrameErrorReason::Device(SendFrameErrorReason::QueueFull)
+                            | IpSendFrameErrorReason::Device(SendFrameErrorReason::Alloc)
+                            | IpSendFrameErrorReason::IllegalLoopbackAddress => (),
                         }
                         debug!("failed to forward IPv4 packet: {error:?}");
                     }
@@ -2574,9 +2619,12 @@ pub fn receive_ipv6_packet<
                     packet_metadata,
                 ) {
                     Ok(()) => (),
-                    Err(SendFrameError {
+                    Err(IpSendFrameError {
                         serializer,
-                        error: SendFrameErrorReason::SizeConstraintsViolation,
+                        error:
+                            IpSendFrameErrorReason::Device(
+                                SendFrameErrorReason::SizeConstraintsViolation,
+                            ),
                     }) => {
                         debug!("failed to forward IPv6 packet: MTU exceeded");
                         core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
@@ -2609,7 +2657,7 @@ pub fn receive_ipv6_packet<
                             );
                         }
                     }
-                    Err(SendFrameError { serializer: _, error }) => {
+                    Err(IpSendFrameError { serializer: _, error }) => {
                         debug!("failed to forward IPv6 packet: {error:?}");
                     }
                 }
@@ -3005,7 +3053,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &Self::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
-    ) -> Result<(), SendFrameError<S>>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
@@ -3022,7 +3070,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         device: &Self::DeviceId,
         destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-    ) -> Result<(), SendFrameError<S>>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut;
@@ -3039,7 +3087,7 @@ impl<
         bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &CC::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
-    ) -> Result<(), SendFrameError<S>>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
@@ -3053,7 +3101,7 @@ impl<
         device: &Self::DeviceId,
         destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-    ) -> Result<(), SendFrameError<S>>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
@@ -3085,7 +3133,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
     >,
     body: S,
     packet_metadata: IpLayerPacketMetadata<I, BC>,
-) -> Result<(), SendFrameError<S>>
+) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
@@ -3097,10 +3145,6 @@ where
     let next_packet_id = gen_ip_packet_id(core_ctx);
     let ttl = ttl.unwrap_or_else(|| core_ctx.get_hop_limit(device)).get();
     let src_ip = src_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.get());
-    assert!(
-        (!I::LOOPBACK_SUBNET.contains(&src_ip) && !I::LOOPBACK_SUBNET.contains(&dst_ip))
-            || device.is_loopback()
-    );
     let mut builder = I::PacketBuilder::new(src_ip, dst_ip.get(), ttl, proto);
 
     #[derive(GenericOverIp)]
@@ -3150,7 +3194,7 @@ pub(crate) mod testutil {
     use super::*;
 
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId};
-    use netstack3_base::{SendFrameContext, SendableFrameMeta};
+    use netstack3_base::{SendFrameContext, SendFrameError, SendableFrameMeta};
 
     /// A [`SendIpPacketMeta`] for dual stack contextx.
     #[derive(Debug, GenericOverIp)]

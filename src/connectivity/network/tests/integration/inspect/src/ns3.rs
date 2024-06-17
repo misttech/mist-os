@@ -728,7 +728,10 @@ async fn inspect_counters(name: &str) {
                 },
             },
             "IPv4": {
-                PacketTx: 1u64,
+                PacketTx: {
+                    Sent: 1u64,
+                    IllegalLoopbackAddress: 0u64,
+                },
                 "PacketRx": {
                     Received: 1u64,
                     Dispatched: 1u64,
@@ -755,7 +758,10 @@ async fn inspect_counters(name: &str) {
                 },
             },
             "IPv6": {
-                PacketTx: 0u64,
+                PacketTx: {
+                    Sent: 0u64,
+                    IllegalLoopbackAddress: 0u64,
+                },
                 "PacketRx": {
                     Received: 0u64,
                     Dispatched: 0u64,

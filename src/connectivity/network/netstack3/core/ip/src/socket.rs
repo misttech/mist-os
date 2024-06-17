@@ -14,7 +14,7 @@ use net_types::{MulticastAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
-    InstantContext, SendFrameError, StrongDeviceIdentifier, TracingContext,
+    InstantContext, SendFrameErrorReason, StrongDeviceIdentifier, TracingContext,
     WeakDeviceIdentifier as _,
 };
 use netstack3_filter::{
@@ -26,7 +26,8 @@ use thiserror::Error;
 
 use crate::internal::base::{
     FilterHandlerProvider, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata,
-    IpPacketDestination, ResolveRouteError, SendIpPacketMeta,
+    IpPacketDestination, IpSendFrameError, IpSendFrameErrorReason, ResolveRouteError,
+    SendIpPacketMeta,
 };
 use crate::internal::device::state::IpDeviceStateIpExt;
 use crate::internal::device::IpDeviceAddr;
@@ -178,6 +179,10 @@ pub enum IpSockSendError {
     /// The socket is currently unroutable.
     #[error("the socket is currently unroutable: {}", _0)]
     Unroutable(#[from] ResolveRouteError),
+    /// The socket operation would've resulted in illegal loopback addresses on
+    /// a non-loopback device.
+    #[error("illegal loopback address")]
+    IllegalLoopbackAddress,
 }
 
 impl From<SerializeError<Infallible>> for IpSockSendError {
@@ -185,6 +190,30 @@ impl From<SerializeError<Infallible>> for IpSockSendError {
         match err {
             SerializeError::Alloc(err) => match err {},
             SerializeError::SizeLimitExceeded => IpSockSendError::Mtu,
+        }
+    }
+}
+
+impl IpSockSendError {
+    /// Constructs a `Result` from an [`IpSendFrameErrorReason`] with
+    /// application-visible [`IpSockSendError`]s in the `Err` variant.
+    ///
+    /// Errors that are not bubbled up to applications are dropped.
+    fn from_ip_send_frame(e: IpSendFrameErrorReason) -> Result<(), Self> {
+        match e {
+            IpSendFrameErrorReason::Device(d) => Self::from_send_frame(d),
+            IpSendFrameErrorReason::IllegalLoopbackAddress => Err(Self::IllegalLoopbackAddress),
+        }
+    }
+
+    /// Constructs a `Result` from a [`SendFrameErrorReason`] with
+    /// application-visible [`IpSockSendError`]s in the `Err` variant.
+    ///
+    /// Errors that are not bubbled up to applications are dropped.
+    fn from_send_frame(e: SendFrameErrorReason) -> Result<(), Self> {
+        match e {
+            SendFrameErrorReason::Alloc | SendFrameErrorReason::QueueFull => Ok(()),
+            SendFrameErrorReason::SizeConstraintsViolation => Err(Self::Mtu),
         }
     }
 }
@@ -363,7 +392,7 @@ where
         meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
         body: S,
         packet_metadata: IpLayerPacketMetadata<I, BC>,
-    ) -> Result<(), SendFrameError<S>>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
@@ -660,8 +689,9 @@ where
         proto: *proto,
         mtu,
     };
-    IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata)
-        .map_err(|_s| IpSockSendError::Mtu)?;
+    IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata).or_else(
+        |IpSendFrameError { serializer: _, error }| IpSockSendError::from_ip_send_frame(error),
+    )?;
 
     match (loopback_packet, core_ctx.get_loopback_device()) {
         (Some(loopback_packet), Some(loopback_device)) => {
@@ -685,7 +715,9 @@ where
                 loopback_packet,
                 packet_metadata,
             )
-            .unwrap_or_else(|_s| error!("Failed to send multicast loopback packet"));
+            .unwrap_or_else(|IpSendFrameError { serializer: _, error }| {
+                error!("failed to send multicast loopback packet: {error:?}")
+            });
         }
         (Some(_loopback_packet), None) => {
             error!("can't send multicast loopback packet without the loopback device")
@@ -1056,7 +1088,7 @@ pub(crate) mod testutil {
     use net_types::ip::{GenericOverIp, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Subnet};
     use net_types::{MulticastAddr, Witness as _};
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId};
-    use netstack3_base::SendFrameContext;
+    use netstack3_base::{SendFrameContext, SendFrameError};
     use netstack3_filter::Tuple;
 
     use super::*;
@@ -1161,7 +1193,9 @@ pub(crate) mod testutil {
         {
             let meta =
                 self.state.fake_ip_socket_ctx_mut().resolve_send_meta(socket, mtu, options)?;
-            self.send_frame(bindings_ctx, meta, body).map_err(|_s| IpSockSendError::Mtu)
+            self.send_frame(bindings_ctx, meta, body).or_else(
+                |SendFrameError { serializer: _, error }| IpSockSendError::from_send_frame(error),
+            )
         }
     }
 

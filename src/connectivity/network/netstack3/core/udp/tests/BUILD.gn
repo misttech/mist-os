@@ -8,6 +8,7 @@ import("//build/rust/rustc_test.gni")
 rustc_test("netstack3_udp_integration_test") {
   edition = "2021"
   sources = [
+    "src/bindtodevice.rs",
     "src/lib.rs",
     "src/loopback.rs",
   ]
@@ -21,6 +22,7 @@ rustc_test("netstack3_udp_integration_test") {
     "//src/lib/const-unwrap",
     "//src/lib/network/packet",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:either",
     "//third_party/rust_crates:test-case",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

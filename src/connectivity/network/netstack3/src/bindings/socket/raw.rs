@@ -906,6 +906,9 @@ impl IntoErrno for RawIpSocketSendToError {
                 // MTU errors result in `Emsgsize` for sendto, but `Einval` for
                 // send.
                 IpSockCreateAndSendError::Send(IpSockSendError::Mtu) => fposix::Errno::Emsgsize,
+                IpSockCreateAndSendError::Send(IpSockSendError::IllegalLoopbackAddress) => {
+                    fposix::Errno::Einval
+                }
                 IpSockCreateAndSendError::Send(IpSockSendError::Unroutable(inner)) => {
                     inner.into_errno()
                 }

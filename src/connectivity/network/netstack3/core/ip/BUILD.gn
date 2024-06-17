@@ -13,6 +13,7 @@ rustc_library_with_features("netstack3-ip") {
   sources = [
     "src/api.rs",
     "src/base.rs",
+    "src/base/tests.rs",
     "src/device.rs",
     "src/device/api.rs",
     "src/device/config.rs",

@@ -21,7 +21,7 @@ use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
-    InstantBindingsTypes, InstantContext, RngContext, SendFrameError, TokenBucket,
+    InstantBindingsTypes, InstantContext, RngContext, TokenBucket,
 };
 use netstack3_filter::{self as filter, TransportPacketSerializer};
 use packet::{
@@ -47,8 +47,8 @@ use zerocopy::ByteSlice;
 
 use crate::internal::base::{
     self, AddressStatus, IpDeviceStateContext, IpExt, IpLayerHandler, IpPacketDestination,
-    IpTransportContext, Ipv6PresentAddressStatus, SendIpPacketMeta, TransparentLocalDelivery,
-    TransportReceiveError, IPV6_DEFAULT_SUBNET,
+    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, SendIpPacketMeta,
+    TransparentLocalDelivery, TransportReceiveError, IPV6_DEFAULT_SUBNET,
 };
 use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
@@ -1083,7 +1083,7 @@ pub fn send_ndp_packet<BC, CC, S, M>(
     body: S,
     code: M::Code,
     message: M,
-) -> Result<(), SendFrameError<S>>
+) -> Result<(), IpSendFrameError<S>>
 where
     CC: IpLayerHandler<Ipv6, BC>,
     S: Serializer,
@@ -3433,7 +3433,7 @@ mod tests {
             _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _meta: SendIpPacketMeta<Ipv6, &Self::DeviceId, Option<SpecifiedAddr<Ipv6Addr>>>,
             _body: S,
-        ) -> Result<(), SendFrameError<S>> {
+        ) -> Result<(), IpSendFrameError<S>> {
             unimplemented!()
         }
 
@@ -3443,7 +3443,7 @@ mod tests {
             _device: &Self::DeviceId,
             _destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             _body: S,
-        ) -> Result<(), SendFrameError<S>>
+        ) -> Result<(), IpSendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,

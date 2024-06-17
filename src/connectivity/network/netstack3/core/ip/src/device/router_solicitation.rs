@@ -12,13 +12,15 @@ use core::time::Duration;
 use net_types::ip::Ipv6Addr;
 use net_types::UnicastAddr;
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, RngContext, SendFrameError,
-    TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, RngContext, TimerBindingsTypes,
+    TimerContext, TimerHandler, WeakDeviceIdentifier,
 };
 use packet::{EitherSerializer, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;
 use packet_formats::icmp::ndp::{OptionSequenceBuilder, RouterSolicitation};
 use rand::Rng as _;
+
+use crate::internal::base::IpSendFrameError;
 
 /// Amount of time to wait after sending `MAX_RTR_SOLICITATIONS` Router
 /// Solicitation messages before determining that there are no routers on the
@@ -120,7 +122,7 @@ pub trait RsContext<BC: RsBindingsTypes>: DeviceIdContext<AnyDevice> {
         device_id: &Self::DeviceId,
         message: RouterSolicitation,
         body: F,
-    ) -> Result<(), SendFrameError<S>>;
+    ) -> Result<(), IpSendFrameError<S>>;
 }
 
 /// The bindings types for router solicitation.
@@ -297,9 +299,10 @@ mod tests {
             &FakeDeviceId: &FakeDeviceId,
             message: RouterSolicitation,
             body: F,
-        ) -> Result<(), SendFrameError<S>> {
+        ) -> Result<(), IpSendFrameError<S>> {
             let FakeRsContext { source_address, .. } = &self.state;
             self.send_frame(bindings_ctx, RsMessageMeta { message }, body(*source_address))
+                .map_err(|e| e.err_into())
         }
     }
 
