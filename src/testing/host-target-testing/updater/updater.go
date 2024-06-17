@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
@@ -220,11 +221,23 @@ func updateCheckNow(
 			"--monitor",
 		}
 
-		err = c.Run(ctx, cmd, os.Stdout, os.Stderr)
+		var stdout bytes.Buffer
+		err = c.Run(ctx, cmd, &stdout, os.Stderr)
 		if err == nil && checkForUnkownFirmware {
 			// FIXME(https://fxbug.dev/42077484): We wouldn't have to ignore disconnects
 			// if we could trigger an update without it automatically rebooting.
 			err = checkSyslogForUnknownFirmware(ctx, c)
+		}
+
+		scanner := bufio.NewScanner(&stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.Contains(line, "InstallationDeferredByPolicy") {
+				logger.Warningf(ctx, "InstallationDeferredByPolicy state detected, forcing reboot")
+				if err := c.Reboot(ctx); err != nil {
+					return fmt.Errorf("failed to reboot the device after InstallationDeferredByPolicy state: %w", err)
+				}
+			}
 		}
 
 		if err != nil {
