@@ -1097,7 +1097,7 @@ def _install():
         print(
             "Warning: Unsupported architecture, KASLR support will be experimental"
         )
-    gdb.events.stop.connect(_KASLR_stop_event)
+    #gdb.events.stop.connect(_KASLR_stop_event)
 
 
 _install()
