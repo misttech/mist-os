@@ -11,31 +11,52 @@ namespace fake_suspend {
 
 using fuchsia_hardware_suspend::SuspenderGetSuspendStatesResponse;
 using fuchsia_hardware_suspend::SuspenderSuspendResponse;
+using test_suspendcontrol::DeviceAwaitSuspendResponse;
+using test_suspendcontrol::DeviceResumeRequest;
 
-DeviceServer::DeviceServer(
-    std::shared_ptr<std::vector<fuchsia_hardware_suspend::SuspendState>> suspend_states)
-    : suspend_states_(std::move(suspend_states)) {}
+// fuchsia.hardware.suspend/Suspender.*
 
 void DeviceServer::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
-  completer.Reply(zx::ok(SuspenderGetSuspendStatesResponse().suspend_states(*suspend_states_)));
+  completer.Reply(zx::ok(SuspenderGetSuspendStatesResponse().suspend_states(suspend_states_)));
 }
 
 void DeviceServer::Suspend(SuspendRequest& request, SuspendCompleter::Sync& completer) {
-  if (request.state_index() >= suspend_states_->size()) {
+  if (request.state_index() >= suspend_states_.size()) {
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
 
   last_state_index_ = request.state_index();
   suspend_completer_ = completer.ToAsync();
-  if (auto suspend_observer = suspend_observer_.lock()) {
-    suspend_observer->OnSuspend(request.state_index());
+
+  if (await_suspend_completer_) {
+    await_suspend_completer_->Reply(
+        zx::ok(DeviceAwaitSuspendResponse().state_index(last_state_index_)));
+    await_suspend_completer_.reset();
   }
 }
 
-zx::result<> DeviceServer::Resume(const DeviceResumeRequest& request) {
-  if (!suspend_completer_) {
-    return zx::ok();
+// test.suspendcontrol/Device.*
+
+void DeviceServer::SetSuspendStates(SetSuspendStatesRequest& request,
+                                    SetSuspendStatesCompleter::Sync& completer) {
+  suspend_states_ = request.suspend_states().value();
+  completer.Reply(zx::ok());
+}
+
+void DeviceServer::AwaitSuspend(AwaitSuspendCompleter::Sync& completer) {
+  if (suspend_completer_.has_value()) {
+    completer.Reply(zx::ok(DeviceAwaitSuspendResponse().state_index(last_state_index_)));
+    return;
+  }
+
+  await_suspend_completer_ = completer.ToAsync();
+}
+
+void DeviceServer::Resume(ResumeRequest& request, ResumeCompleter::Sync& completer) {
+  if (!suspend_completer_.has_value()) {
+    completer.Reply(zx::error(ZX_ERR_BAD_STATE));
+    return;
   }
 
   if (request.Which() == DeviceResumeRequest::Tag::kResult) {
@@ -46,13 +67,21 @@ zx::result<> DeviceServer::Resume(const DeviceResumeRequest& request) {
   } else {
     suspend_completer_->Reply(zx::error(request.error().value()));
   }
+
   suspend_completer_.reset();
-  return zx::ok();
+  completer.Reply(zx::ok());
 }
+
+// Server methods
 
 void DeviceServer::Serve(async_dispatcher_t* dispatcher,
                          fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> server) {
-  bindings_.AddBinding(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure);
+  suspender_bindings_.AddBinding(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure);
+}
+
+void DeviceServer::Serve(async_dispatcher_t* dispatcher,
+                         fidl::ServerEnd<test_suspendcontrol::Device> server) {
+  device_bindings_.AddBinding(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure);
 }
 
 }  // namespace fake_suspend
