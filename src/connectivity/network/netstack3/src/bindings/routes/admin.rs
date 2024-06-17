@@ -111,12 +111,8 @@ pub(crate) async fn serve_route_table_provider_v4(
                     Ok((table_id, route_work_sink)) => {
                         UserRouteTable::new(ctx.clone(), name, table_id, route_work_sink)
                     }
-                    Err(routes::TableError::TableIdOverflows) => {
+                    Err(routes::TableIdOverflowsError) => {
                         control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
-                        break;
-                    }
-                    Err(routes::TableError::ShuttingDown) => {
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_STATE);
                         break;
                     }
                 };
@@ -150,12 +146,8 @@ pub(crate) async fn serve_route_table_provider_v6(
                     Ok((table_id, route_work_sink)) => {
                         UserRouteTable::new(ctx.clone(), name, table_id, route_work_sink)
                     }
-                    Err(routes::TableError::TableIdOverflows) => {
+                    Err(routes::TableIdOverflowsError) => {
                         control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
-                        break;
-                    }
-                    Err(routes::TableError::ShuttingDown) => {
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_STATE);
                         break;
                     }
                 };

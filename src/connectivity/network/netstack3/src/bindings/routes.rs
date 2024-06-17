@@ -114,14 +114,9 @@ pub(crate) enum ChangeError {
     SetRemoved,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 
-enum TableError {
-    #[error("table ID overflows")]
-    TableIdOverflows,
-    #[error("table worker is shutting down")]
-    ShuttingDown,
-}
+struct TableIdOverflowsError;
 
 #[derive(Debug)]
 pub(crate) struct RouteWorkItem<A: IpAddress> {
@@ -134,9 +129,9 @@ enum TableOpOutcome<I: Ip> {
     Added { table_id: TableId<I>, route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>> },
 }
 
-struct TableWorkItem<I: Ip> {
+struct NewTable<I: Ip> {
     op: TableOp<I>,
-    responder: oneshot::Sender<Result<TableOpOutcome<I>, TableError>>,
+    responder: oneshot::Sender<Result<TableOpOutcome<I>, TableIdOverflowsError>>,
 }
 
 /// The routing table from the perspective of bindings.
@@ -394,7 +389,7 @@ type RouteWorkReceivers<A> =
 
 pub(crate) struct State<I: Ip> {
     last_table_id: TableId<I>,
-    table_work_receiver: mpsc::UnboundedReceiver<TableWorkItem<I>>,
+    new_table_receiver: mpsc::UnboundedReceiver<NewTable<I>>,
     route_work_receivers: RouteWorkReceivers<I::Addr>,
     tables: HashMap<TableId<I>, Table<I::Addr>>,
     update_dispatcher: crate::bindings::routes::state::RouteUpdateDispatcher<I>,
@@ -403,8 +398,16 @@ pub(crate) struct State<I: Ip> {
 #[derive(derivative::Derivative)]
 #[derivative(Clone(bound = ""))]
 pub(crate) struct Changes<A: IpAddress> {
-    table_work_sink: mpsc::UnboundedSender<TableWorkItem<A::Version>>,
+    new_table_sink: mpsc::UnboundedSender<NewTable<A::Version>>,
     main_table_route_work_sink: mpsc::UnboundedSender<RouteWorkItem<A>>,
+}
+
+impl<A: IpAddress> Changes<A> {
+    fn close_senders(&self) {
+        let Self { new_table_sink, main_table_route_work_sink } = self;
+        new_table_sink.close_channel();
+        main_table_route_work_sink.close_channel();
+    }
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
@@ -414,7 +417,7 @@ where
 {
     pub(crate) async fn run_changes(&mut self, mut ctx: Ctx) {
         let State {
-            table_work_receiver,
+            new_table_receiver,
             route_work_receivers,
             tables,
             update_dispatcher,
@@ -450,14 +453,14 @@ where
                         route_work_receivers.push(rest.into_future());
                     }
                 },
-                table_work_item = table_work_receiver.next() => {
-                    let Some(table_work_item) = table_work_item else {
+                new_table = new_table_receiver.next() => {
+                    let Some(new_table) = new_table else {
                         continue;
                     };
                     Self::handle_table_op(
                         last_table_id,
                         tables,
-                        table_work_item,
+                        new_table,
                         route_work_receivers
                     )
                 },
@@ -499,7 +502,7 @@ where
     fn handle_table_op(
         last_table_id: &mut TableId<I>,
         tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
-        TableWorkItem { op, responder }: TableWorkItem<I>,
+        NewTable { op, responder }: NewTable<I>,
         route_work_receivers: &mut RouteWorkReceivers<I::Addr>,
     ) {
         match op {
@@ -508,7 +511,7 @@ where
                     match last_table_id.next() {
                         // Never reuse table IDs, so the table IDs can only be
                         // increasing.
-                        None => Err(TableError::TableIdOverflows),
+                        None => Err(TableIdOverflowsError),
                         Some(table_id) => {
                             assert_matches!(
                                 tables.insert(
@@ -846,7 +849,7 @@ impl ChangeRunner {
 
 pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
     fn create<I: FidlRouteAdminIpExt>() -> (Changes<I::Addr>, State<I>) {
-        let (table_work_sink, table_work_receiver) = mpsc::unbounded();
+        let (new_table_sink, new_table_receiver) = mpsc::unbounded();
         let mut tables = HashMap::new();
         let main_table_id = main_table_id::<I>();
 
@@ -860,13 +863,13 @@ pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
             RouteWorkReceivers::new(main_table_route_work_receiver.into_future());
 
         let state = State {
-            table_work_receiver,
+            new_table_receiver,
             tables,
             update_dispatcher: Default::default(),
             route_work_receivers,
             last_table_id: main_table_id,
         };
-        (Changes { table_work_sink, main_table_route_work_sink }, state)
+        (Changes { new_table_sink, main_table_route_work_sink }, state)
     }
     let (v4, v4_state) = create::<Ipv4>();
     let (v6, v6_state) = create::<Ipv6>();
@@ -878,10 +881,8 @@ impl ChangeSink {
     /// [`ChangeRunner::run`] to exit.
     pub(crate) fn close_senders(&self) {
         let Self { v4, v6 } = self;
-        v4.table_work_sink.close_channel();
-        v4.main_table_route_work_sink.close_channel();
-        v6.table_work_sink.close_channel();
-        v6.main_table_route_work_sink.close_channel();
+        v4.close_senders();
+        v6.close_senders();
     }
 
     pub(crate) fn fire_main_table_route_change_and_forget<A: IpAddress>(&self, change: Change<A>) {
@@ -912,27 +913,15 @@ impl ChangeSink {
         }
     }
 
-    #[must_use = "the returned future must be polled to avoid panics from the ChangeRunner"]
-    fn send_table_op<I: Ip>(
-        &self,
-        op: TableOp<I>,
-    ) -> impl Future<Output = Result<TableOpOutcome<I>, TableError>> {
-        let sender = self.table_work_sink::<I>();
-        let (responder, receiver) = oneshot::channel();
-        let item = TableWorkItem { op, responder };
-        match sender.unbounded_send(item) {
-            Ok(()) => receiver.map(|r| r.expect("responder should not be dropped")).left_future(),
-            Err(e) => {
-                warn!("failed to send an table op to ChangeRunner: {e:?}");
-                futures::future::ready(Err(TableError::ShuttingDown)).right_future()
-            }
-        }
-    }
-
     async fn add_table<I: Ip>(
         &self,
-    ) -> Result<(TableId<I>, mpsc::UnboundedSender<RouteWorkItem<I::Addr>>), TableError> {
-        self.send_table_op(TableOp::AddTable(IpVersionMarker::new())).await.map(|outcome| {
+    ) -> Result<(TableId<I>, mpsc::UnboundedSender<RouteWorkItem<I::Addr>>), TableIdOverflowsError>
+    {
+        let sender = &self.changes::<I>().new_table_sink;
+        let (responder, receiver) = oneshot::channel();
+        let item = NewTable { op: TableOp::AddTable(IpVersionMarker::new()), responder };
+        sender.unbounded_send(item).expect("change runner shut down before services are shut down");
+        receiver.map(|r| r.expect("responder should not be dropped")).await.map(|outcome| {
             assert_matches!(
                 outcome,
                 TableOpOutcome::Added{
@@ -943,35 +932,24 @@ impl ChangeSink {
         })
     }
 
-    fn table_work_sink<I: Ip>(&self) -> &mpsc::UnboundedSender<TableWorkItem<I>> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct ChangeSender<'a, I: Ip> {
-            sender: &'a mpsc::UnboundedSender<TableWorkItem<I>>,
-        }
-
-        let ChangeSender { sender } = I::map_ip_out(
-            self,
-            |ChangeSink { v4, v6: _ }| ChangeSender { sender: &v4.table_work_sink },
-            |ChangeSink { v4: _, v6 }| ChangeSender { sender: &v6.table_work_sink },
-        );
-        sender
-    }
-
     pub(crate) fn main_table_route_work_sink<I: Ip>(
         &self,
     ) -> &mpsc::UnboundedSender<RouteWorkItem<I::Addr>> {
+        &self.changes::<I>().main_table_route_work_sink
+    }
+
+    fn changes<I: Ip>(&self) -> &Changes<I::Addr> {
         #[derive(GenericOverIp)]
-        #[generic_over_ip(A, IpAddress)]
-        struct ChangeSender<'a, A: IpAddress> {
-            sender: &'a mpsc::UnboundedSender<RouteWorkItem<A>>,
+        #[generic_over_ip(I, Ip)]
+        struct ChangesOutput<'a, I: Ip> {
+            changes: &'a Changes<I::Addr>,
         }
 
-        let ChangeSender { sender } = I::map_ip_out(
+        let ChangesOutput { changes } = I::map_ip_out(
             self,
-            |ChangeSink { v4, v6: _ }| ChangeSender { sender: &v4.main_table_route_work_sink },
-            |ChangeSink { v4: _, v6 }| ChangeSender { sender: &v6.main_table_route_work_sink },
+            |ChangeSink { v4, v6: _ }| ChangesOutput { changes: &v4 },
+            |ChangeSink { v4: _, v6 }| ChangesOutput { changes: &v6 },
         );
-        sender
+        changes
     }
 }
