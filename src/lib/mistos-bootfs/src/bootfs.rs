@@ -2,24 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl::AsHandleRef as _,
-    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
-    fuchsia_bootfs::{BootfsParser, BootfsParserError},
-    fuchsia_component::client,
-    fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
-    fuchsia_zircon::{self as zx, HandleBased, Resource},
-    std::sync::Arc,
-    thiserror::Error,
-    tracing::info,
-    vfs::{
-        directory::immutable::connection::ImmutableConnection,
-        execution_scope::ExecutionScope,
-        file::vmo,
-        tree_builder::{self, TreeBuilder},
-        ToObjectRequest,
-    },
-};
+use fidl::AsHandleRef as _;
+use fuchsia_bootfs::{BootfsParser, BootfsParserError};
+use fuchsia_component::client;
+use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx, HandleBased, Resource};
+use std::sync::Arc;
+use thiserror::Error;
+use tracing::info;
+use vfs::directory::immutable::connection::ImmutableConnection;
+use vfs::execution_scope::ExecutionScope;
+use vfs::file::vmo;
+use vfs::tree_builder::{self, TreeBuilder};
+use vfs::ToObjectRequest;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync};
 
 // Used to create executable VMOs.
 const BOOTFS_VMEX_NAME: &str = "bootfs_vmex";
@@ -356,27 +352,25 @@ impl BootfsSvc {
 
 #[cfg(test)]
 mod tests {
-    use {
-        anyhow::{Context, Error},
-        fidl_fuchsia_io as fio,
-        fuchsia_fs::{directory, file, node, OpenFlags},
-        futures::StreamExt,
-        libc::S_IRUSR,
-    };
+    use anyhow::{Context, Error};
+    use fidl_fuchsia_io as fio;
+    use fuchsia_fs::{directory, file, node, OpenFlags};
+    use futures::StreamExt;
+    use libc::{S_IRUSR, S_IXUSR};
 
     // Since this is a system test, we're actually going to verify real system critical files. That
     // means that these tests take a dependency on these files existing in the system, which may
     // not forever be true. If any of the files listed here are removed, it's fine to update the set
     // of checked files.
     const SAMPLE_UTF8_READONLY_FILE: &str = "/boot/config/build_info/minimum_utc_stamp";
-    //const SAMPLE_REQUIRED_DIRECTORY: &str = "/boot/lib";
-    //const KERNEL_VDSO_DIRECTORY: &str = "/boot/kernel/vdso";
+    const SAMPLE_REQUIRED_DIRECTORY: &str = "/boot/lib";
+    const KERNEL_VDSO_DIRECTORY: &str = "/boot/kernel/vdso";
     //const BOOTFS_READONLY_FILES: &[&str] = &["/boot/config/component_manager"];
     //const BOOTFS_DATA_DIRECTORY: &str = "/boot/data";
     const BOOTFS_EXECUTABLE_LIB_FILES: &[&str] = &["ld.so.1"];
     const BOOTFS_EXECUTABLE_NON_LIB_FILES: &[&str] = &["/boot/bin/mistos_elf_runner"];
 
-    #[fuchsia::test(logging = false)]
+    #[fuchsia::test]
     async fn basic_filenode_test() -> Result<(), Error> {
         // Open the known good file as a node, and check its attributes.
         let node = node::open_in_namespace(SAMPLE_UTF8_READONLY_FILE, OpenFlags::RIGHT_READABLE)
@@ -411,7 +405,68 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia::test(logging = false)]
+    #[fuchsia::test]
+    async fn basic_directory_test() -> Result<(), Error> {
+        // Open the known good file as a node, and check its attributes.
+        let node = node::open_in_namespace(
+            SAMPLE_REQUIRED_DIRECTORY,
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .context("failed to open as a readable and executable node")?;
+
+        // This node should be an immutable directory, the inode should not be unknown,
+        // and creation and modification times should be 0 since system UTC isn't
+        // available or reliable in early boot.
+        assert_ne!(node.get_attr().await?.1.id, fio::INO_UNKNOWN);
+        assert_eq!(node.get_attr().await?.1.creation_time, 0);
+        assert_eq!(node.get_attr().await?.1.modification_time, 0);
+
+        // TODO(https://fxbug.dev/42173193): The C++ bootfs VFS uses the wrong POSIX bits (needs S_IXUSR).
+        let cpp_bootfs = fio::MODE_TYPE_DIRECTORY | S_IRUSR;
+        let rust_bootfs = fio::MODE_TYPE_DIRECTORY | S_IRUSR | S_IXUSR;
+        let actual_value = node.get_attr().await?.1.mode;
+        assert!(actual_value == cpp_bootfs || actual_value == rust_bootfs);
+
+        node::close(node).await?;
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn check_kernel_vmos() -> Result<(), Error> {
+        let directory = directory::open_in_namespace(
+            KERNEL_VDSO_DIRECTORY,
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .context("failed to open kernel vdso directory")?;
+        let vdsos = fuchsia_fs::directory::readdir(&directory)
+            .await
+            .context("failed to read kernel vdso directory")?;
+
+        // We should have added at least the default VDSO.
+        assert_ne!(vdsos.len(), 0);
+        directory::close(directory).await?;
+
+        // All VDSOs should have execution rights.
+        for vdso in vdsos {
+            let name = format!("{}/{}", KERNEL_VDSO_DIRECTORY, vdso.name);
+            let file = file::open_in_namespace(
+                &name,
+                OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
+            )
+            .context("failed to open file")?;
+            let data = file::read_num_bytes(&file, 1).await.context(format!(
+                "failed to read a single byte from a vdso opened as read-execute: {}",
+                name
+            ))?;
+            assert_ne!(data.len(), 0);
+            file::close(file).await?;
+        }
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
     async fn check_executable_files() -> Result<(), Error> {
         // Sanitizers nest lib files within '/boot/lib/asan' or '/boot/lib/asan-ubsan' etc., so
         // we need to just search recursively for these files instead.
