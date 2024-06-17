@@ -8,7 +8,7 @@ use crate::fs::sysfs::DeviceDirectory;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString};
-use starnix_logging::log_info;
+use starnix_logging::{log_error, log_info};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, WriteOps};
 use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
 use starnix_uapi::error;
@@ -16,6 +16,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
+use zerocopy::IntoBytes;
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -63,6 +64,7 @@ impl TouchPowerPolicyDevice {
                 }
                 prev_standby = standby;
             }
+            log_error!("touch_standby relay was terminated unexpectedly.");
         });
     }
 
@@ -91,16 +93,13 @@ pub struct TouchPowerPolicyFile {
     // When true, Input Pipeline suspends processing of all touch events.
     touch_standby: Mutex<bool>,
     // Sender used to send changes to `touch_standby` to the device relay
-    _touch_standby_sender: Sender<bool>,
+    touch_standby_sender: Sender<bool>,
 }
 
 #[allow(dead_code)]
 impl TouchPowerPolicyFile {
     pub fn new(touch_standby_sender: Sender<bool>) -> Arc<Self> {
-        Arc::new(TouchPowerPolicyFile {
-            touch_standby: Mutex::new(false),
-            _touch_standby_sender: touch_standby_sender,
-        })
+        Arc::new(TouchPowerPolicyFile { touch_standby: Mutex::new(false), touch_standby_sender })
     }
 }
 
@@ -113,10 +112,11 @@ impl FileOps for TouchPowerPolicyFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
-        _data: &mut dyn OutputBuffer,
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        error!(EOPNOTSUPP)
+        let touch_standby = self.touch_standby.lock().to_owned();
+        data.write_all(touch_standby.as_bytes())
     }
 
     fn write(
@@ -124,10 +124,22 @@ impl FileOps for TouchPowerPolicyFile {
         _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        offset: usize,
-        _data: &mut dyn InputBuffer,
+        _offset: usize,
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        error!(EOPNOTSUPP)
+        let content = data.read_all()?;
+        let standby = match &*content {
+            b"0" | b"0\n" => false,
+            b"1" | b"1\n" => true,
+            _ => {
+                log_error!("Invalid touch_standby value - must be 0 or 1");
+                return error!(EINVAL);
+            }
+        };
+        *self.touch_standby.lock() = standby;
+        if let Err(e) = self.touch_standby_sender.send(standby) {
+            log_error!("unable to send recent touch_standby state to device relay: {:?}", e);
+        }
+        Ok(content.len())
     }
 }

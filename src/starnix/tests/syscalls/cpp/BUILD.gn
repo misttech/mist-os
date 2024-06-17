@@ -54,6 +54,7 @@ syscall_tests = [
   "time_test",
   "timerfd_test",
   "tmpfs_test",
+  "touch_standby_test",
   "trivial_test",
   "tun_test",
   "udev_test",
