@@ -55,8 +55,8 @@ inline zx_ticks_t timer_get_boot_ticks_offset() {
   return internal::boot_ticks_offset.load(ktl::memory_order_relaxed);
 }
 
-// API to set/clear a hardware timer that is responsible for calling timer_tick() when it fires
-zx_status_t platform_set_oneshot_timer(zx_time_t deadline);
+// API to set/clear a hardware timer that is responsible for calling timer_tick() when it fires.
+zx_status_t platform_set_oneshot_timer(zx_ticks_t deadline);
 void platform_stop_timer();
 
 // Shutdown the calling CPU's platform timer.

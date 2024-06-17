@@ -46,23 +46,19 @@ void riscv64_timer_exception() {
 
 zx_ticks_t riscv_sbi_current_ticks() { return riscv64_csr_read(RISCV64_CSR_TIME); }
 
-zx_status_t riscv_sbi_set_oneshot_timer(zx_time_t deadline) {
+zx_status_t riscv_sbi_set_oneshot_timer(zx_ticks_t deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   deadline = ktl::max<zx_time_t>(deadline, 0);
 
-  // Convert interval to ticks.
-  const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
-  const uint64_t ticks = time_to_ticks.Scale(deadline) + 1;
-
-  LTRACEF("cpu %u: deadline %#" PRIx64 "\n", arch_curr_cpu_num(), ticks);
+  LTRACEF("cpu %u: deadline %#" PRIx64 "\n", arch_curr_cpu_num(), deadline);
 
   // If sstc feature is present, directly set the compare register instead of
   // making a call to SBI.
   if (gRiscvFeatures[arch::RiscvFeature::kSstc]) {
-    riscv64_csr_write(RISCV64_CSR_STIMECMP, ticks);
+    riscv64_csr_write(RISCV64_CSR_STIMECMP, deadline);
   } else {
-    sbi_set_timer(ticks);
+    sbi_set_timer(deadline);
   }
 
   // Enable the timer interrupt.

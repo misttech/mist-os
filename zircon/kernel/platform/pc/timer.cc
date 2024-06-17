@@ -106,7 +106,6 @@ static_assert(ktl::size(clock_name) == CLOCK_COUNT, "");
 static struct fp_32_64 us_per_pit;
 static volatile uint64_t pit_ticks;
 static uint16_t pit_divisor;
-static uint32_t ns_per_pit_rounded_up;
 
 // Whether or not we have an Invariant TSC (controls whether we use the PIT or
 // not after initialization).  The Invariant TSC is rate-invariant under P-, C-,
@@ -116,6 +115,10 @@ static bool invariant_tsc;
 // the TSC).  Constant TSC predates the Invariant TSC.  The Constant TSC is
 // rate-invariant under P-state transitions.
 static bool constant_tsc;
+
+// The ratio between the chosen reference timer's ticks and the APIC's ticks.
+// This is set after clock selection is complete in pc_init_timer.
+static affine::Ratio reference_timer_ticks_to_apic_ticks;
 
 static enum clock_source wall_clock = CLOCK_UNSELECTED;
 static enum clock_source calibration_clock;
@@ -129,13 +132,10 @@ static uint8_t apic_divisor = 0;
 // TSC timer calibration values
 static uint64_t tsc_ticks_per_ms;
 static struct fp_32_64 ns_per_tsc;
-static struct fp_32_64 tsc_per_ns;
-static uint32_t ns_per_tsc_rounded_up;
 static affine::Ratio rdtsc_ticks_to_clock_monotonic;
 
 // HPET calibration values
 static struct fp_32_64 ns_per_hpet;
-static uint32_t ns_per_hpet_rounded_up;
 affine::Ratio hpet_ticks_to_clock_monotonic;  // Non-static so that hpet_init has access
 
 // An affine transformation from times sampled from the EarlyTicks timeline to
@@ -282,30 +282,6 @@ zx_time_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts) {
   }
 }
 
-// Round up t to a clock tick, so that when the APIC timer fires, the wall time
-// will have elapsed.
-static zx_time_t discrete_time_roundup(zx_time_t t) {
-  zx_duration_t value;
-  switch (wall_clock) {
-    case CLOCK_TSC: {
-      value = ns_per_tsc_rounded_up;
-      break;
-    }
-    case CLOCK_HPET: {
-      value = ns_per_hpet_rounded_up;
-      break;
-    }
-    case CLOCK_PIT: {
-      value = ns_per_pit_rounded_up;
-      break;
-    }
-    default:
-      panic("Invalid wall clock source\n");
-  }
-
-  return zx_time_add_duration(t, value);
-}
-
 // The PIT timer will keep track of wall time if we aren't using the TSC
 static void pit_timer_tick(void* arg) { pit_ticks = pit_ticks + 1; }
 
@@ -343,9 +319,6 @@ static void set_pit_frequency(uint32_t frequency) {
    * point representation of the configured timer delta.
    */
   fp_32_64_div_32_32(&us_per_pit, 1000 * 1000 * 3 * count, INTERNAL_FREQ_3X);
-
-  // Add 1us to the PIT tick rate to deal with rounding
-  ns_per_pit_rounded_up = (u32_mul_u64_fp32_64(1, us_per_pit) + 1) * 1000;
 
   // dprintf(DEBUG, "set_pit_frequency: pit_divisor=%04x\n", pit_divisor);
 
@@ -584,9 +557,6 @@ static void calibrate_tsc(bool has_pv_clock) {
 
   ASSERT(tsc_ticks_per_ms <= UINT32_MAX);
   fp_32_64_div_32_32(&ns_per_tsc, 1000 * 1000, static_cast<uint32_t>(tsc_ticks_per_ms));
-  fp_32_64_div_32_32(&tsc_per_ns, static_cast<uint32_t>(tsc_ticks_per_ms), 1000 * 1000);
-  // Add 1ns to conservatively deal with rounding
-  ns_per_tsc_rounded_up = u32_mul_u64_fp32_64(1, ns_per_tsc) + 1;
 
   LTRACEF("ns_per_tsc: %08x.%08x%08x\n", ns_per_tsc.l0, ns_per_tsc.l32, ns_per_tsc.l64);
 }
@@ -595,6 +565,9 @@ static uint64_t hpet_ticks_per_ms(void) { return _hpet_ticks_per_ms; }
 
 static void pc_init_timer(uint level) {
   const struct x86_model_info* cpu_model = x86_get_model();
+  // Declares the desired PIT frequency to be 1000, which gives us ~1ms granularity.
+  // This may not be used if we chose to use a different platform reference timer.
+  constexpr uint32_t desired_pit_frequency = 1000;
 
   constant_tsc = false;
   if (x86_vendor == X86_VENDOR_INTEL) {
@@ -625,8 +598,6 @@ static void pc_init_timer(uint level) {
     ASSERT(hpet_ms_rate <= UINT32_MAX);
     printf("HPET frequency: %" PRIu64 " ticks/ms\n", hpet_ms_rate);
     fp_32_64_div_32_32(&ns_per_hpet, 1000 * 1000, static_cast<uint32_t>(hpet_ms_rate));
-    // Add 1ns to conservatively deal with rounding
-    ns_per_hpet_rounded_up = u32_mul_u64_fp32_64(1, ns_per_hpet) + 1;
   } else {
     calibration_clock = CLOCK_PIT;
   }
@@ -721,7 +692,7 @@ static void pc_init_timer(uint level) {
       // transformation from ticks to clock monotonic.
       timer_set_ticks_to_time_ratio({1'000'000, 1});
 
-      set_pit_frequency(1000);  // ~1ms granularity
+      set_pit_frequency(desired_pit_frequency);
 
       uint32_t irq = apic_io_isa_to_global(ISA_IRQ_PIT);
       zx_status_t status = register_permanent_int_handler(irq, &pit_timer_tick, NULL);
@@ -749,42 +720,68 @@ static void pc_init_timer(uint level) {
     }
   }
 
+  // Now that we've decided on which wall_clock to use as our timer reference, set up the ratio
+  // that converts from reference timer ticks to APIC ticks.
+  switch (wall_clock) {
+    case CLOCK_UNSELECTED:
+      panic("Wall clock was unselected by the time pc_init_timer completed\n");
+      break;
+    case CLOCK_TSC:
+      ASSERT(tsc_ticks_per_ms <= UINT32_MAX);
+      reference_timer_ticks_to_apic_ticks = {apic_ticks_per_ms,
+                                             static_cast<uint32_t>(tsc_ticks_per_ms)};
+      break;
+    case CLOCK_HPET: {
+      const uint64_t hpet_ticks_ms = hpet_ticks_per_ms();
+      ASSERT(hpet_ticks_ms <= UINT32_MAX);
+      reference_timer_ticks_to_apic_ticks = {apic_ticks_per_ms,
+                                             static_cast<uint32_t>(hpet_ticks_ms)};
+      break;
+    }
+    case CLOCK_PIT: {
+      // Here's how we computed the ms_per_pit ratio:
+      //
+      // count = INTERNAL_FREQ_3X/desired_pit_frequency
+      // ms/pit = (3000 * count) / INTERNAL_FREQ_3X
+      //        = (3000 * (INTERNAL_FREQ_3X/desired_pit_frequency))/ INTERNAL_FREQ_3X
+      //        = (3000 * INTERNAL_FREQ_3X) / (desired_pit_frequency * INTERNAL_FREQ_3X)
+      //        = 3000/desired_pit_frequency
+      const affine::Ratio ms_per_pit = {3000, desired_pit_frequency};
+      const affine::Ratio apic_per_ms = {apic_ticks_per_ms, 1};
+      reference_timer_ticks_to_apic_ticks = affine::Ratio::Product(apic_per_ms, ms_per_pit);
+      break;
+    }
+    default:
+      PANIC_UNIMPLEMENTED;
+  }
+
   printf("timer features: constant_tsc %d invariant_tsc %d tsc_deadline %d\n", constant_tsc,
          invariant_tsc, use_tsc_deadline);
   printf("Using %s as wallclock\n", clock_name[wall_clock]);
 }
 LK_INIT_HOOK(timer, &pc_init_timer, LK_INIT_LEVEL_VM + 3)
 
-zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
-  DEBUG_ASSERT(arch_ints_disabled());
+// Converts the given duration's units from the platform's selected tick source to APIC ticks.
+uint64_t apic_ticks_from_platform_ticks(zx_duration_t interval) {
+  DEBUG_ASSERT(wall_clock != CLOCK_UNSELECTED);
+  DEBUG_ASSERT(wall_clock != CLOCK_COUNT);
+  return reference_timer_ticks_to_apic_ticks.Scale<affine::Ratio::Round::Up>(interval);
+}
 
-  if (deadline < 0) {
-    deadline = 0;
-  }
-  deadline = discrete_time_roundup(deadline);
-  DEBUG_ASSERT(deadline > 0);
+zx_status_t platform_set_oneshot_timer(zx_ticks_t deadline) {
+  DEBUG_ASSERT(arch_ints_disabled());
+  // We use 1 tick as the minimum deadline here because we want a deadline that immediately fires
+  // the timer, but we can't use 0 because setting a TSC deadline to zero disables the APIC timer.
+  deadline = ktl::max<zx_ticks_t>(deadline, 1);
 
   if (use_tsc_deadline) {
-    // Check if the deadline would overflow the TSC.
-    const uint64_t tsc_ticks_per_ns = tsc_ticks_per_ms / ZX_MSEC(1);
-    if (UINT64_MAX / deadline < tsc_ticks_per_ns) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    // We rounded up to the tick after above.
-    //
-    // As the ticks offset is only updated early during boot when we're running on a single core
-    // with interrupts disabled, we don't need to worry about thread synchronization so
-    // memory_order_relaxed is sufficient.
-    const uint64_t tsc_deadline =
-        u64_mul_u64_fp32_64(deadline, tsc_per_ns) - timer_get_mono_ticks_offset();
-    LTRACEF("Scheduling oneshot timer: %" PRIu64 " deadline\n", tsc_deadline);
-    apic_timer_set_tsc_deadline(tsc_deadline, false /* unmasked */);
+    LTRACEF("Scheduling oneshot timer: %" PRIi64 " deadline\n", deadline);
+    apic_timer_set_tsc_deadline(deadline, false /* unmasked */);
     kcounter_add(platform_timer_set_counter, 1);
     return ZX_OK;
   }
 
-  const zx_time_t now = current_time();
+  const zx_ticks_t now = platform_current_raw_ticks();
   if (now >= deadline) {
     // Deadline has already passed. We still need to schedule a timer so that
     // the interrupt fires.
@@ -792,13 +789,13 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
     kcounter_add(platform_timer_set_counter, 1);
     return apic_timer_set_oneshot(1, 1, false /* unmasked */);
   }
-  const zx_duration_t interval = zx_time_sub_time(deadline, now);
+
+  const zx_duration_t interval = zx_ticks_sub_ticks(deadline, now);
   DEBUG_ASSERT(interval > 0);
 
-  uint64_t apic_ticks_needed = u64_mul_u64_fp32_64(interval, apic_ticks_per_ns);
-  if (apic_ticks_needed == 0) {
-    apic_ticks_needed = 1;
-  }
+  // Convert the interval, which is in platform reference timer ticks, to APIC timer ticks.
+  const uint64_t apic_ticks_needed = apic_ticks_from_platform_ticks(interval);
+  DEBUG_ASSERT(apic_ticks_needed > 0);
 
   // Find the shift needed for this timeout, since count is 32-bit.
   const auto highest_set_bit = static_cast<uint32_t>(log2_ulong_floor(apic_ticks_needed));

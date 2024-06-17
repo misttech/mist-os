@@ -16,7 +16,7 @@ namespace {
 
 constexpr pdev_timer_ops default_ops = {
     .current_ticks = []() -> zx_ticks_t { return 0; },
-    .set_oneshot_timer = [](zx_time_t deadline) -> zx_status_t { PANIC_UNIMPLEMENTED; },
+    .set_oneshot_timer = [](zx_ticks_t deadline) -> zx_status_t { PANIC_UNIMPLEMENTED; },
     .stop = []() -> zx_status_t { PANIC_UNIMPLEMENTED; },
     .shutdown = []() -> zx_status_t { PANIC_UNIMPLEMENTED; },
 };
@@ -27,7 +27,7 @@ const pdev_timer_ops* timer_ops = &default_ops;
 
 zx_ticks_t timer_current_ticks() { return timer_ops->current_ticks(); }
 
-zx_status_t timer_set_oneshot_timer(zx_time_t deadline) {
+zx_status_t timer_set_oneshot_timer(zx_ticks_t deadline) {
   return timer_ops->set_oneshot_timer(deadline);
 }
 
