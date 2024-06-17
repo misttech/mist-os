@@ -34,7 +34,7 @@ executable("memory_monitor_unittests") {
     "//src/developer/memory/monitor:lib",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/storage/memfs:cpp",
+    "//zircon/system/ulib/fbl",
   ]
 }
 
