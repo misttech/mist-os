@@ -4,26 +4,26 @@
 // found in the LICENSE file.
 
 use crate::builtin::log::{ReadOnlyLog, WriteOnlyLog};
+use crate::builtin::log_sink::LogSink;
 use crate::builtin::svc_controller::SvcController;
 
 use elf_runner::process_launcher::ProcessLauncher;
 use fidl::HandleBased;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_ldsvc as fldsvc;
-use fuchsia_async as fasync;
 use fuchsia_component::server::*;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
-use fuchsia_zircon as zx;
 use futures::channel::oneshot;
 use futures::prelude::*;
 use mistos_bootfs::bootfs::BootfsSvc;
 use mistos_logger::klog;
-use std::env;
 use std::io::{self, Write};
-use std::process::{self, Command};
+use std::process::{self, Command, ExitCode};
 use std::sync::Arc;
-use std::thread;
+use std::{env, thread};
 use tracing::{info, warn};
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+};
 
 mod builtin;
 
@@ -173,6 +173,16 @@ fn main() {
             .detach();
         });
 
+        service_fs.add_fidl_service(move |stream| {
+            fasync::Task::spawn(async move {
+                let result = LogSink::serve(stream).await;
+                if let Err(error) = result {
+                    warn!(%error, "ProcessLauncher.serve failed");
+                }
+            })
+            .detach();
+        });
+
         // Bind to the channel
         service_fs
             .serve_connection(svc_stash.svc_endpoint().lock().take().expect("No svc channel found"))
@@ -194,14 +204,23 @@ fn main() {
         });
 
         // TODO (Herrera) Check if the file exists in BootFS
-        let output = Command::new("/boot/".to_owned() + &args[1])
-            .args(&args[2..])
-            .output()
-            .expect("failed to execute process");
+        let mut command = Command::new("/boot/".to_owned() + &args[1]);
 
-        io::stdout().write_all(&output.stdout).unwrap();
-        info!("output status {}", output.status);
-        process::exit(output.status.code().unwrap());
+        // Add args
+        command.args(&args[2..]);
+
+        let output = match command.output() {
+            Ok(out) => out,
+            Err(e) => {
+                let err = format!("Failed to spawn {} as child: {:?}", args[0], e);
+                return ("failed".to_owned(), err.into_bytes(), ExitCode::FAILURE);
+            }
+        };
+        let std::process::Output { stdout, stderr, status } = output;
+
+        io::stdout().write_all(&stdout).unwrap();
+        io::stdout().write_all(&stderr).unwrap();
+        process::exit(status.code().unwrap());
     });
 
     executor.run(run_root_fut);

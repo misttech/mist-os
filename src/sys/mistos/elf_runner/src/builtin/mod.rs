@@ -3,4 +3,5 @@
 // found in the LICENSE file.
 
 pub mod log;
+pub mod log_sink;
 pub mod svc_controller;
