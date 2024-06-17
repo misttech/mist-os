@@ -105,6 +105,13 @@ group("default") {
     "//bundles/boot_tests",
 
     #
+    "//src/lib/fuchsia:tests",
+
+    #
+    "//src/lib/mistos-bootfs:tests",
+    "//src/lib/mistos-logger:tests",
+
+    #
     "//zircon/tools:tests",
   ]
 }
