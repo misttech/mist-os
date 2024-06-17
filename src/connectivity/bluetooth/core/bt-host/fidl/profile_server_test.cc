@@ -69,33 +69,37 @@ fidlbredr::ServiceDefinition MakeFIDLServiceDefinition() {
       fidl_helpers::UuidToFidl(bt::sdp::profile::kAudioSink));
 
   fidlbredr::ProtocolDescriptor l2cap_proto;
-  l2cap_proto.protocol = fidlbredr::ProtocolIdentifier::L2CAP;
+  l2cap_proto.set_protocol(fidlbredr::ProtocolIdentifier::L2CAP);
   fidlbredr::DataElement l2cap_data_el;
   l2cap_data_el.set_uint16(fidlbredr::PSM_AVDTP);
-  l2cap_proto.params.emplace_back(std::move(l2cap_data_el));
+  std::vector<fidlbredr::DataElement> l2cap_params;
+  l2cap_params.emplace_back(std::move(l2cap_data_el));
+  l2cap_proto.set_params(std::move(l2cap_params));
 
   def.mutable_protocol_descriptor_list()->emplace_back(std::move(l2cap_proto));
 
   fidlbredr::ProtocolDescriptor avdtp_proto;
-  avdtp_proto.protocol = fidlbredr::ProtocolIdentifier::AVDTP;
+  avdtp_proto.set_protocol(fidlbredr::ProtocolIdentifier::AVDTP);
   fidlbredr::DataElement avdtp_data_el;
   avdtp_data_el.set_uint16(0x0103);  // Version 1.3
-  avdtp_proto.params.emplace_back(std::move(avdtp_data_el));
+  std::vector<fidlbredr::DataElement> avdtp_params;
+  avdtp_params.emplace_back(std::move(avdtp_data_el));
+  avdtp_proto.set_params(std::move(avdtp_params));
 
   def.mutable_protocol_descriptor_list()->emplace_back(std::move(avdtp_proto));
 
   fidlbredr::ProfileDescriptor prof_desc;
-  prof_desc.profile_id = fidlbredr::ServiceClassProfileIdentifier::ADVANCED_AUDIO_DISTRIBUTION;
-  prof_desc.major_version = 1;
-  prof_desc.minor_version = 3;
-  def.mutable_profile_descriptors()->emplace_back(prof_desc);
+  prof_desc.set_profile_id(fidlbredr::ServiceClassProfileIdentifier::ADVANCED_AUDIO_DISTRIBUTION);
+  prof_desc.set_major_version(1);
+  prof_desc.set_minor_version(3);
+  def.mutable_profile_descriptors()->emplace_back(std::move(prof_desc));
 
   // Additional attributes are also OK.
   fidlbredr::Attribute addl_attr;
-  addl_attr.id = 0x000A;  // Documentation URL ID
+  addl_attr.set_id(0x000A);  // Documentation URL ID
   fidlbredr::DataElement doc_url_el;
   doc_url_el.set_url("fuchsia.dev");
-  addl_attr.element = std::move(doc_url_el);
+  addl_attr.set_element(std::move(doc_url_el));
   def.mutable_additional_attributes()->emplace_back(std::move(addl_attr));
 
   return def;
@@ -2683,8 +2687,8 @@ TEST_F(ProfileServerTestFakeAdapter, ServiceFoundRelayedToFidlClient) {
   EXPECT_EQ(search_results.service_found_count(), 1u);
   EXPECT_EQ(search_results.peer_id().value().value, peer_id.value());
   EXPECT_EQ(search_results.attributes().value().size(), 1u);
-  EXPECT_EQ(search_results.attributes().value()[0].id, attr_id);
-  EXPECT_EQ(search_results.attributes().value()[0].element.url(),
+  EXPECT_EQ(search_results.attributes().value()[0].id(), attr_id);
+  EXPECT_EQ(search_results.attributes().value()[0].element().url(),
             std::string("https://foobar.dev"));
 }
 

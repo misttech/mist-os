@@ -189,11 +189,13 @@ fidlbredr::ProtocolDescriptorPtr DataElementToProtocolDescriptor(const bt::sdp::
     bt_log(DEBUG, "fidl", "first DataElement in sequence is not type kUUID (in: %s)", bt_str(*in));
     return nullptr;
   }
-  desc->protocol = static_cast<fidlbredr::ProtocolIdentifier>(*protocol_uuid->As16Bit());
+  desc->set_protocol(static_cast<fidlbredr::ProtocolIdentifier>(*protocol_uuid->As16Bit()));
   const bt::sdp::DataElement* it;
+  std::vector<fidlbredr::DataElement> params;
   for (size_t idx = 1; (it = in->At(idx)); ++idx) {
-    desc->params.push_back(std::move(*DataElementToFidl(it)));
+    params.push_back(std::move(*DataElementToFidl(it)));
   }
+  desc->set_params(std::move(params));
 
   return desc;
 }
@@ -889,8 +891,8 @@ void ProfileServer::OnServiceFound(
 
   for (const auto& it : attributes) {
     auto attr = std::make_unique<fidlbredr::Attribute>();
-    attr->id = it.first;
-    attr->element = std::move(*DataElementToFidl(&it.second));
+    attr->set_id(it.first);
+    attr->set_element(std::move(*DataElementToFidl(&it.second)));
     fidl_attrs.emplace_back(std::move(*attr));
   }
 

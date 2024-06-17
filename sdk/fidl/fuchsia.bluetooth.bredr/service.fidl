@@ -16,7 +16,7 @@ const MAX_STRING_LENGTH uint16 = 1024;
 
 /// A DataElement is one element in a SDP record. SDP attributes and other parameters are
 /// expresssed in DataElements.
-type DataElement = strict union {
+type DataElement = flexible union {
     1: int8 int8;
     2: int16 int16;
     3: int32 int32;
@@ -37,7 +37,7 @@ type DataElement = strict union {
 /// We intentionally omit deprecated profile identifiers.
 /// From Bluetooth Assigned Numbers:
 /// https://www.bluetooth.com/specifications/assigned-numbers/service-discovery
-type ProtocolIdentifier = strict enum : uint16 {
+type ProtocolIdentifier = flexible enum : uint16 {
     SDP = 1;
     RFCOMM = 3;
     ATT = 7;
@@ -83,9 +83,11 @@ const PSM_DYNAMIC uint16 = 0xffff;
 /// Usually used to describe a protocol endpoint in a ProtocolDescriptorList.
 /// Use `PSM_DYNAMIC` in the L2CAP protocol-specific `params` to specify a PSM that is dynamically
 /// assigned.
-type ProtocolDescriptor = struct {
-    protocol ProtocolIdentifier;
-    params vector<DataElement>:MAX_SEQUENCE_LENGTH;
+type ProtocolDescriptor = table {
+    /// Required.
+    1: protocol ProtocolIdentifier;
+    /// Required.
+    2: params vector<DataElement>:MAX_SEQUENCE_LENGTH;
 };
 
 /// A ProtocolDescriptorList is a list of protocols in a "stack" from lowest to highest,
@@ -97,7 +99,7 @@ alias ProtocolDescriptorList = vector<ProtocolDescriptor>:MAX_SEQUENCE_LENGTH;
 /// or reserved for use by Fuchsia Bluetooth.
 /// These numbers are sourced from the Bluetooth Assigned Numbers for SDP.
 /// https://www.bluetooth.com/specifications/assigned-numbers/service-discovery
-type ServiceClassProfileIdentifier = strict enum : uint16 {
+type ServiceClassProfileIdentifier = flexible enum : uint16 {
     // ServiceDiscoveryService and BrowseGroupDescriptorService claimed by Fuchsia
     /// Serial Port Profile (SPP)
     SERIAL_PORT = 0x1101;
@@ -174,10 +176,13 @@ type ServiceClassProfileIdentifier = strict enum : uint16 {
 
 /// A description of a profile that this service conforms to.
 /// See Bluetooth Specification v5.2 Vol 3, Part B, Section 5.1.11
-type ProfileDescriptor = struct {
-    profile_id ServiceClassProfileIdentifier;
-    major_version uint8;
-    minor_version uint8;
+type ProfileDescriptor = table {
+    /// Required.
+    1: profile_id ServiceClassProfileIdentifier;
+    /// Required.
+    2: major_version uint8;
+    /// Required.
+    3: minor_version uint8;
 };
 
 /// Maximum number of languages that are supported by SDP at the moment.
@@ -205,9 +210,11 @@ type Information = table {
 };
 
 /// A generic attribute, used for protocol information;
-type Attribute = struct {
-    id uint16;
-    element DataElement;
+type Attribute = table {
+    /// Required.
+    1: id uint16;
+    /// Required.
+    2: element DataElement;
 };
 
 /// Universal attribute IDs.

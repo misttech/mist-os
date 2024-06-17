@@ -66,22 +66,26 @@ fn avrcp_controller_service_definition() -> bredr::ServiceDefinition {
         service_class_uuids: Some(vec![Uuid::new16(0x110E).into(), Uuid::new16(0x110F).into()]),
         protocol_descriptor_list: Some(vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![bredr::DataElement::Uint16(bredr::PSM_AVCTP as u16)],
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![bredr::DataElement::Uint16(bredr::PSM_AVCTP as u16)]),
+                ..Default::default()
             },
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Avctp,
-                params: vec![bredr::DataElement::Uint16(0x0103)], // Indicate v1.3
+                protocol: Some(bredr::ProtocolIdentifier::Avctp),
+                params: Some(vec![bredr::DataElement::Uint16(0x0103)]), // Indicate v1.3
+                ..Default::default()
             },
         ]),
         profile_descriptors: Some(vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::AvRemoteControl,
-            major_version: 1,
-            minor_version: 6,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::AvRemoteControl),
+            major_version: Some(1),
+            minor_version: Some(6),
+            ..Default::default()
         }]),
         additional_attributes: Some(vec![bredr::Attribute {
-            id: SDP_SUPPORTED_FEATURES, // SDP Attribute "SUPPORTED FEATURES"
-            element: bredr::DataElement::Uint16(0x0003), // CATEGORY 1 and 2.
+            id: Some(SDP_SUPPORTED_FEATURES), // SDP Attribute "SUPPORTED FEATURES"
+            element: Some(bredr::DataElement::Uint16(0x0003)), // CATEGORY 1 and 2.
+            ..Default::default()
         }]),
         ..Default::default()
     }

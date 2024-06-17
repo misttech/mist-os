@@ -7,6 +7,7 @@ use bt_obex::client::ObexClient;
 use bt_obex::header::{Header, HeaderSet};
 use bt_obex::profile::{connect_to_obex_service, parse_obex_search_result};
 use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_bluetooth::profile::{Attribute, ProtocolDescriptor};
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::StreamExt;
@@ -42,8 +43,15 @@ async fn handle_profile_events(
     while let Some(event) = profile_client.next().await {
         match event.map_err(|e| format_err!("{e:?}"))? {
             ProfileEvent::SearchResult { id, protocol, attributes, .. } => {
-                let protocol = protocol.unwrap_or(Vec::new()).iter().map(Into::into).collect();
-                let attributes = attributes.iter().map(Into::into).collect();
+                let protocol = protocol
+                    .unwrap_or(Vec::new())
+                    .iter()
+                    .map(|p| ProtocolDescriptor::try_from(p))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let attributes = attributes
+                    .iter()
+                    .map(|a| Attribute::try_from(a))
+                    .collect::<Result<Vec<_>, _>>()?;
                 info!(%id, "Found search result: {protocol:?}");
                 let Some(connect_parameters) = parse_obex_search_result(&protocol, &attributes)
                 else {

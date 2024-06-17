@@ -58,7 +58,8 @@ impl MasConfig {
         if service_ids
             .iter()
             .find(|id| {
-                id.number == bredr::ServiceClassProfileIdentifier::MessageAccessServer as u16
+                id.number
+                    == bredr::ServiceClassProfileIdentifier::MessageAccessServer.into_primitive()
             })
             .is_none()
         {
@@ -71,15 +72,23 @@ impl MasConfig {
         if profile_desc
             .iter()
             .find(|desc| {
-                desc.profile_id == bredr::ServiceClassProfileIdentifier::MessageAccessProfile
+                desc.profile_id == Some(bredr::ServiceClassProfileIdentifier::MessageAccessProfile)
             })
             .is_none()
         {
             return Err(MapError::DoesNotExist(ServiceRecordItem::MapProfileDescriptor));
         }
 
-        let protocol = protocol.iter().map(Into::into).collect();
-        let attributes = attributes.iter().map(Into::into).collect();
+        let protocol = protocol
+            .iter()
+            .map(|p| ProtocolDescriptor::try_from(p))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| MapError::InvalidParameters)?;
+        let attributes = attributes
+            .iter()
+            .map(|a| Attribute::try_from(a))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| MapError::InvalidParameters)?;
 
         // Ensure either L2CAP or RFCOMM connection is supported.
         let connection = parse_obex_search_result(&protocol, &attributes)
@@ -170,7 +179,7 @@ fn default_map_supported_features() -> MapSupportedFeatures {
 fn build_mns_service_definition() -> ServiceDefinition {
     ServiceDefinition {
         service_class_uuids: vec![Uuid::new16(
-            bredr::ServiceClassProfileIdentifier::MessageNotificationServer as u16,
+            bredr::ServiceClassProfileIdentifier::MessageNotificationServer.into_primitive(),
         )
         .into()],
         protocol_descriptor_list: vec![
@@ -192,9 +201,10 @@ fn build_mns_service_definition() -> ServiceDefinition {
             provider: None,
         }],
         profile_descriptors: vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::MessageAccessProfile,
-            major_version: PROFILE_MAJOR_VERSION,
-            minor_version: PROFILE_MINOR_VERSION,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::MessageAccessProfile),
+            major_version: Some(PROFILE_MAJOR_VERSION),
+            minor_version: Some(PROFILE_MINOR_VERSION),
+            ..Default::default()
         }],
         additional_attributes: vec![
             // Request a dynamic PSM to be assigned by the profile service.
@@ -249,10 +259,15 @@ mod tests {
     fn test_protocols() -> Vec<bredr::ProtocolDescriptor> {
         vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Rfcomm,
-                params: vec![bredr::DataElement::Uint8(8)],
+                protocol: Some(bredr::ProtocolIdentifier::Rfcomm),
+                params: Some(vec![bredr::DataElement::Uint8(8)]),
+                ..Default::default()
             },
-            bredr::ProtocolDescriptor { protocol: bredr::ProtocolIdentifier::Obex, params: vec![] },
+            bredr::ProtocolDescriptor {
+                protocol: Some(bredr::ProtocolIdentifier::Obex),
+                params: Some(vec![]),
+                ..Default::default()
+            },
         ]
     }
 
@@ -261,42 +276,53 @@ mod tests {
     fn test_attributes() -> Vec<bredr::Attribute> {
         vec![
             bredr::Attribute {
-                id: bredr::ATTR_SERVICE_CLASS_ID_LIST,
-                element: bredr::DataElement::Sequence(vec![Some(Box::new(
+                id: Some(bredr::ATTR_SERVICE_CLASS_ID_LIST),
+                element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                     bredr::DataElement::Uuid(
                         Uuid::new16(
-                            bredr::ServiceClassProfileIdentifier::MessageAccessServer as u16,
+                            bredr::ServiceClassProfileIdentifier::MessageAccessServer
+                                .into_primitive(),
                         )
                         .into(),
                     ),
-                ))]),
+                ))])),
+                ..Default::default()
             },
             bredr::Attribute {
-                id: bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-                element: bredr::DataElement::Sequence(vec![Some(Box::new(
+                id: Some(bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST),
+                element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                     bredr::DataElement::Sequence(vec![
                         Some(Box::new(bredr::DataElement::Uuid(
                             Uuid::new16(
-                                bredr::ServiceClassProfileIdentifier::MessageAccessProfile as u16,
+                                bredr::ServiceClassProfileIdentifier::MessageAccessProfile
+                                    .into_primitive(),
                             )
                             .into(),
                         ))),
                         Some(Box::new(bredr::DataElement::Uint16(0x0104))),
                     ]),
-                ))]),
+                ))])),
+                ..Default::default()
             },
             bredr::Attribute {
-                id: ATTR_SERVICE_NAME,
-                element: bredr::DataElement::Str(vec![0x68, 0x69]),
-            },
-            bredr::Attribute { id: ATTR_MAS_INSTANCE_ID, element: bredr::DataElement::Uint8(1) },
-            bredr::Attribute {
-                id: ATTR_SUPPORTED_MESSAGE_TYPES,
-                element: bredr::DataElement::Uint8(0x05), // email and sms cdma.
+                id: Some(ATTR_SERVICE_NAME),
+                element: Some(bredr::DataElement::Str(vec![0x68, 0x69])),
+                ..Default::default()
             },
             bredr::Attribute {
-                id: ATTR_MAP_SUPPORTED_FEATURES,
-                element: bredr::DataElement::Uint32(0x00080007),
+                id: Some(ATTR_MAS_INSTANCE_ID),
+                element: Some(bredr::DataElement::Uint8(1)),
+                ..Default::default()
+            },
+            bredr::Attribute {
+                id: Some(ATTR_SUPPORTED_MESSAGE_TYPES),
+                element: Some(bredr::DataElement::Uint8(0x05)), // email and sms cdma.
+                ..Default::default()
+            },
+            bredr::Attribute {
+                id: Some(ATTR_MAP_SUPPORTED_FEATURES),
+                element: Some(bredr::DataElement::Uint32(0x00080007)),
+                ..Default::default()
             },
         ]
     }
@@ -333,23 +359,25 @@ mod tests {
 
         // Add L2CAP protocol.
         protocols.push(bredr::ProtocolDescriptor {
-            protocol: bredr::ProtocolIdentifier::L2Cap,
-            params: vec![],
+            protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+            params: Some(vec![]),
+            ..Default::default()
         });
 
         let mut attributes = test_attributes();
 
         // Set service name attribute to an invalid value to test fall back name.
         for a in attributes.iter_mut() {
-            if a.id == ATTR_SERVICE_NAME {
-                a.element = bredr::DataElement::Uint8(0x00);
+            if a.id == Some(ATTR_SERVICE_NAME) {
+                a.element = Some(bredr::DataElement::Uint8(0x00));
             }
         }
 
         // Add GOEP L2CAP Psm attribute to test GOEP interoperability.
         attributes.push(bredr::Attribute {
-            id: GOEP_L2CAP_PSM_ATTRIBUTE,
-            element: bredr::DataElement::Uint16(0x1007),
+            id: Some(GOEP_L2CAP_PSM_ATTRIBUTE),
+            element: Some(bredr::DataElement::Uint16(0x1007)),
+            ..Default::default()
         });
 
         let config = MasConfig::from_search_result(protocols, attributes).expect("should succeed");
@@ -369,8 +397,8 @@ mod tests {
 
         // Set RFU bits in supported message types attribute.
         for a in attributes.iter_mut() {
-            if a.id == ATTR_SUPPORTED_MESSAGE_TYPES {
-                a.element = bredr::DataElement::Uint8(0b10000101); // email and sms cdma and bit 7.
+            if a.id == Some(ATTR_SUPPORTED_MESSAGE_TYPES) {
+                a.element = Some(bredr::DataElement::Uint8(0b10000101)); // email and sms cdma and bit 7.
             }
         }
 
@@ -387,51 +415,59 @@ mod tests {
         // Missing obex.
         let _ = MasConfig::from_search_result(
             vec![bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Rfcomm,
-                params: vec![bredr::DataElement::Uint8(8)],
+                protocol: Some(bredr::ProtocolIdentifier::Rfcomm),
+                params: Some(vec![bredr::DataElement::Uint8(8)]),
+                ..Default::default()
             }],
             vec![
                 bredr::Attribute {
-                    id: bredr::ATTR_SERVICE_CLASS_ID_LIST,
-                    element: bredr::DataElement::Sequence(vec![Some(Box::new(
+                    id: Some(bredr::ATTR_SERVICE_CLASS_ID_LIST),
+                    element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                         bredr::DataElement::Uuid(
                             Uuid::new16(
-                                bredr::ServiceClassProfileIdentifier::MessageAccessServer as u16,
+                                bredr::ServiceClassProfileIdentifier::MessageAccessServer
+                                    .into_primitive(),
                             )
                             .into(),
                         ),
-                    ))]),
+                    ))])),
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-                    element: bredr::DataElement::Sequence(vec![Some(Box::new(
+                    id: Some(bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST),
+                    element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                         bredr::DataElement::Sequence(vec![
                             Some(Box::new(bredr::DataElement::Uuid(
                                 Uuid::new16(
                                     bredr::ServiceClassProfileIdentifier::MessageAccessProfile
-                                        as u16,
+                                        .into_primitive(),
                                 )
                                 .into(),
                             ))),
                             Some(Box::new(bredr::DataElement::Uint16(0x0104))),
                         ]),
-                    ))]),
+                    ))])),
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: ATTR_SERVICE_NAME,
-                    element: bredr::DataElement::Str(vec![0x68, 0x69]),
+                    id: Some(ATTR_SERVICE_NAME),
+                    element: Some(bredr::DataElement::Str(vec![0x68, 0x69])),
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: ATTR_MAS_INSTANCE_ID,
-                    element: bredr::DataElement::Uint8(1),
+                    id: Some(ATTR_MAS_INSTANCE_ID),
+                    element: Some(bredr::DataElement::Uint8(1)),
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: ATTR_SUPPORTED_MESSAGE_TYPES,
-                    element: bredr::DataElement::Uint8(0x05), // email and sms cdma.
+                    id: Some(ATTR_SUPPORTED_MESSAGE_TYPES),
+                    element: Some(bredr::DataElement::Uint8(0x05)), // email and sms cdma.
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: ATTR_MAP_SUPPORTED_FEATURES,
-                    element: bredr::DataElement::Uint32(0x00080007),
+                    id: Some(ATTR_MAP_SUPPORTED_FEATURES),
+                    element: Some(bredr::DataElement::Uint32(0x00080007)),
+                    ..Default::default()
                 },
             ],
         )
@@ -441,60 +477,70 @@ mod tests {
         let _ = MasConfig::from_search_result(
             vec![
                 bredr::ProtocolDescriptor {
-                    protocol: bredr::ProtocolIdentifier::L2Cap,
-                    params: vec![],
+                    protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                    params: Some(vec![]),
+                    ..Default::default()
                 },
                 bredr::ProtocolDescriptor {
-                    protocol: bredr::ProtocolIdentifier::Rfcomm,
-                    params: vec![bredr::DataElement::Uint8(8)],
+                    protocol: Some(bredr::ProtocolIdentifier::Rfcomm),
+                    params: Some(vec![bredr::DataElement::Uint8(8)]),
+                    ..Default::default()
                 },
                 bredr::ProtocolDescriptor {
-                    protocol: bredr::ProtocolIdentifier::Obex,
-                    params: vec![],
+                    protocol: Some(bredr::ProtocolIdentifier::Obex),
+                    params: Some(vec![]),
+                    ..Default::default()
                 },
             ],
             vec![
                 bredr::Attribute {
-                    id: bredr::ATTR_SERVICE_CLASS_ID_LIST,
-                    element: bredr::DataElement::Sequence(vec![Some(Box::new(
+                    id: Some(bredr::ATTR_SERVICE_CLASS_ID_LIST),
+                    element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                         bredr::DataElement::Uuid(
                             Uuid::new16(
-                                bredr::ServiceClassProfileIdentifier::MessageAccessServer as u16,
+                                bredr::ServiceClassProfileIdentifier::MessageAccessServer
+                                    .into_primitive(),
                             )
                             .into(),
                         ),
-                    ))]),
+                    ))])),
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-                    element: bredr::DataElement::Sequence(vec![Some(Box::new(
+                    id: Some(bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST),
+                    element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                         bredr::DataElement::Sequence(vec![
                             Some(Box::new(bredr::DataElement::Uuid(
                                 Uuid::new16(
                                     bredr::ServiceClassProfileIdentifier::MessageAccessProfile
-                                        as u16,
+                                        .into_primitive(),
                                 )
                                 .into(),
                             ))),
                             Some(Box::new(bredr::DataElement::Uint16(0x0104))),
                         ]),
-                    ))]),
+                    ))])),
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: GOEP_L2CAP_PSM_ATTRIBUTE,
-                    element: bredr::DataElement::Uint16(0x1007),
+                    id: Some(GOEP_L2CAP_PSM_ATTRIBUTE),
+                    element: Some(bredr::DataElement::Uint16(0x1007)),
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: ATTR_SERVICE_NAME,
-                    element: bredr::DataElement::Uint8(0x00),
+                    id: Some(ATTR_SERVICE_NAME),
+                    element: Some(bredr::DataElement::Uint8(0x00)),
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: ATTR_SUPPORTED_MESSAGE_TYPES,
-                    element: bredr::DataElement::Uint8(0x05), // email and sms cdma.
+                    id: Some(ATTR_SUPPORTED_MESSAGE_TYPES),
+                    element: Some(bredr::DataElement::Uint8(0x05)), // email and sms cdma.
+                    ..Default::default()
                 },
                 bredr::Attribute {
-                    id: ATTR_MAP_SUPPORTED_FEATURES,
-                    element: bredr::DataElement::Uint32(0x00080007),
+                    id: Some(ATTR_MAP_SUPPORTED_FEATURES),
+                    element: Some(bredr::DataElement::Uint32(0x00080007)),
+                    ..Default::default()
                 },
             ],
         )

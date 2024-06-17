@@ -80,27 +80,31 @@ fn hfp_hf_service_definition() -> bredr::ServiceDefinition {
 
     bredr::ServiceDefinition {
         service_class_uuids: Some(vec![
-            Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree as u16).into(),
-            Uuid::new16(bredr::ServiceClassProfileIdentifier::GenericAudio as u16).into(),
+            Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree.into_primitive()).into(),
+            Uuid::new16(bredr::ServiceClassProfileIdentifier::GenericAudio.into_primitive()).into(),
         ]),
         protocol_descriptor_list: Some(vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![],
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![]),
+                ..Default::default()
             },
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Rfcomm,
-                params: vec![],
+                protocol: Some(bredr::ProtocolIdentifier::Rfcomm),
+                params: Some(vec![]),
+                ..Default::default()
             },
         ]),
         profile_descriptors: Some(vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::Handsfree,
-            major_version: 1,
-            minor_version: 8,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::Handsfree),
+            major_version: Some(1),
+            minor_version: Some(8),
+            ..Default::default()
         }]),
         additional_attributes: Some(vec![bredr::Attribute {
-            id: ATTR_ID_HFP_SUPPORTED_FEATURES,
-            element: bredr::DataElement::Uint16(supported_features),
+            id: Some(ATTR_ID_HFP_SUPPORTED_FEATURES),
+            element: Some(bredr::DataElement::Uint16(supported_features)),
+            ..Default::default()
         }]),
         ..Default::default()
     }

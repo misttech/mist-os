@@ -6,7 +6,7 @@
 
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_bluetooth_bredr as bredr;
-use fuchsia_bluetooth::profile::psm_from_protocol;
+use fuchsia_bluetooth::profile::{psm_from_protocol, ProtocolDescriptor};
 use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::{FutureExt, StreamExt};
@@ -49,7 +49,9 @@ async fn main() -> Result<(), Error> {
                 };
                 match request {
                     ProfileEvent::PeerConnected { id, protocol, .. } => {
-                        let protocol = protocol.iter().map(Into::into).collect();
+                        let protocol = protocol.iter()
+                            .map(|p| ProtocolDescriptor::try_from(p))
+                            .collect::<Result<Vec<_>,_>>()?;
                         let psm = match psm_from_protocol(&protocol) {
                             None => {
                                 warn!(peer_id = %id, "Received peer connect request with no PSM");

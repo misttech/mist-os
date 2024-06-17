@@ -13,8 +13,9 @@ use crate::types::ServiceRecord;
 /// Builds the L2Cap Protocol Descriptor from the provided `psm`.
 pub fn build_l2cap_descriptor(psm: Psm) -> Vec<bredr::ProtocolDescriptor> {
     vec![bredr::ProtocolDescriptor {
-        protocol: bredr::ProtocolIdentifier::L2Cap,
-        params: vec![bredr::DataElement::Uint16(psm.into())],
+        protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+        params: Some(vec![bredr::DataElement::Uint16(psm.into())]),
+        ..Default::default()
     }]
 }
 
@@ -81,8 +82,9 @@ pub(crate) mod tests {
     fn minimal_service_definition() -> (bredr::ServiceDefinition, ServiceRecord) {
         let def = bredr::ServiceDefinition {
             service_class_uuids: Some(vec![
-                Uuid::new16(bredr::ServiceClassProfileIdentifier::Headset as u16).into(),
-                Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree as u16).into(),
+                Uuid::new16(bredr::ServiceClassProfileIdentifier::Headset.into_primitive()).into(),
+                Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree.into_primitive())
+                    .into(),
             ]),
             ..Default::default()
         };
@@ -102,18 +104,21 @@ pub(crate) mod tests {
     /// Uses the provided `psm` for the service.
     pub(crate) fn a2dp_service_definition(psm: Psm) -> (bredr::ServiceDefinition, ServiceRecord) {
         let prof_descs = vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         }];
         let protocol_descriptor_list = vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![bredr::DataElement::Uint16(psm.into())],
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![bredr::DataElement::Uint16(psm.into())]),
+                ..Default::default()
             },
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Avdtp,
-                params: vec![bredr::DataElement::Uint16(0x0103)], // Indicate v1.3
+                protocol: Some(bredr::ProtocolIdentifier::Avdtp),
+                params: Some(vec![bredr::DataElement::Uint16(0x0103)]), // Indicate v1.3
+                ..Default::default()
             },
         ];
         let def = bredr::ServiceDefinition {
@@ -125,7 +130,10 @@ pub(crate) mod tests {
         };
 
         let a2dp_ids = vec![bredr::ServiceClassProfileIdentifier::AudioSink].into_iter().collect();
-        let primary_protocol = protocol_descriptor_list.iter().map(Into::into).collect();
+        let primary_protocol = protocol_descriptor_list
+            .iter()
+            .map(|p| ProtocolDescriptor::try_from(p).unwrap())
+            .collect();
         let record =
             ServiceRecord::new(a2dp_ids, primary_protocol, HashSet::new(), prof_descs, vec![]);
 
@@ -138,9 +146,10 @@ pub(crate) mod tests {
     fn avrcp_service_definition() -> (bredr::ServiceDefinition, ServiceRecord) {
         use bredr::ServiceClassProfileIdentifier::{AvRemoteControl, AvRemoteControlController};
         let prof_descs = vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::AvRemoteControl,
-            major_version: 1,
-            minor_version: 6,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::AvRemoteControl),
+            major_version: Some(1),
+            minor_version: Some(6),
+            ..Default::default()
         }];
         let avrcp_attribute = Attribute {
             id: SDP_SUPPORTED_FEATURES, // SDP Attribute "SUPPORTED FEATURES"
@@ -156,35 +165,42 @@ pub(crate) mod tests {
         let additional_psms = vec![Psm::AVCTP_BROWSE].into_iter().collect();
         let protocol_descriptor_list = vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![bredr::DataElement::Uint16(bredr::PSM_AVCTP as u16)],
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![bredr::DataElement::Uint16(bredr::PSM_AVCTP as u16)]),
+                ..Default::default()
             },
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Avctp,
-                params: vec![bredr::DataElement::Uint16(0x0103)], // Indicate v1.3
+                protocol: Some(bredr::ProtocolIdentifier::Avctp),
+                params: Some(vec![bredr::DataElement::Uint16(0x0103)]), // Indicate v1.3
+                ..Default::default()
             },
         ];
         let def = bredr::ServiceDefinition {
             service_class_uuids: Some(vec![
-                Uuid::new16(AvRemoteControl as u16).into(),
-                Uuid::new16(AvRemoteControlController as u16).into(),
+                Uuid::new16(AvRemoteControl.into_primitive()).into(),
+                Uuid::new16(AvRemoteControlController.into_primitive()).into(),
             ]),
             protocol_descriptor_list: Some(protocol_descriptor_list.clone()),
             additional_protocol_descriptor_lists: Some(vec![vec![
                 bredr::ProtocolDescriptor {
-                    protocol: bredr::ProtocolIdentifier::L2Cap,
-                    params: vec![bredr::DataElement::Uint16(bredr::PSM_AVCTP_BROWSE as u16)],
+                    protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                    params: Some(vec![bredr::DataElement::Uint16(bredr::PSM_AVCTP_BROWSE as u16)]),
+                    ..Default::default()
                 },
                 bredr::ProtocolDescriptor {
-                    protocol: bredr::ProtocolIdentifier::Avctp,
-                    params: vec![bredr::DataElement::Uint16(0x0103)],
+                    protocol: Some(bredr::ProtocolIdentifier::Avctp),
+                    params: Some(vec![bredr::DataElement::Uint16(0x0103)]),
+                    ..Default::default()
                 },
             ]]),
             profile_descriptors: Some(prof_descs.clone()),
             additional_attributes: Some(vec![(&avrcp_attribute).into()]),
             ..Default::default()
         };
-        let primary_protocol = protocol_descriptor_list.iter().map(Into::into).collect();
+        let primary_protocol = protocol_descriptor_list
+            .iter()
+            .map(|p| ProtocolDescriptor::try_from(p).unwrap())
+            .collect();
         let record = ServiceRecord::new(
             avrcp_ids,
             primary_protocol,
@@ -225,23 +241,26 @@ pub(crate) mod tests {
         rfcomm_channel: ServerChannel,
     ) -> (bredr::ServiceDefinition, ServiceRecord) {
         let prof_descs = vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::SerialPort,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::SerialPort),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         }];
         let protocol_descriptor_list = vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![], // For RFCOMM services, the PSM is omitted.
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![]), // For RFCOMM services), the PSM is omitted.
+                ..Default::default()
             },
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Rfcomm,
-                params: vec![bredr::DataElement::Uint8(rfcomm_channel.into())],
+                protocol: Some(bredr::ProtocolIdentifier::Rfcomm),
+                params: Some(vec![bredr::DataElement::Uint8(rfcomm_channel.into())]),
+                ..Default::default()
             },
         ];
         let def = bredr::ServiceDefinition {
             service_class_uuids: Some(vec![Uuid::new16(
-                bredr::ServiceClassProfileIdentifier::SerialPort as u16,
+                bredr::ServiceClassProfileIdentifier::SerialPort.into_primitive(),
             )
             .into()]),
             protocol_descriptor_list: Some(protocol_descriptor_list.clone()),
@@ -249,7 +268,10 @@ pub(crate) mod tests {
             ..Default::default()
         };
         let spp_ids = vec![bredr::ServiceClassProfileIdentifier::SerialPort].into_iter().collect();
-        let primary_protocol = protocol_descriptor_list.iter().map(Into::into).collect();
+        let primary_protocol = protocol_descriptor_list
+            .iter()
+            .map(|p| ProtocolDescriptor::try_from(p).unwrap())
+            .collect();
         let record =
             ServiceRecord::new(spp_ids, primary_protocol, HashSet::new(), prof_descs, vec![]);
         (def, record)

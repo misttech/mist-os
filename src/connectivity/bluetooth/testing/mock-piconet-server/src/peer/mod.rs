@@ -317,7 +317,8 @@ mod tests {
             })) => {
                 let _ = responder.send();
                 assert_eq!(other_peer, peer_id.into());
-                protocol.map(|p| p.iter().map(Into::into).collect())
+                protocol
+                    .map(|p| p.iter().map(|p| ProtocolDescriptor::try_from(p).unwrap()).collect())
             }
             x => panic!("Expected ServiceFound request but got: {:?}", x),
         }

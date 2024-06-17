@@ -142,8 +142,9 @@ async fn advertise(
     let svc_defs = vec![ServiceDefinition {
         service_class_uuids: Some(vec![audio_sink_uuid.into()]),
         protocol_descriptor_list: Some(vec![ProtocolDescriptor {
-            protocol: ProtocolIdentifier::L2Cap,
-            params: vec![DataElement::Uint16(psm)],
+            protocol: Some(ProtocolIdentifier::L2Cap),
+            params: Some(vec![DataElement::Uint16(psm)]),
+            ..Default::default()
         }]),
         ..Default::default()
     }];

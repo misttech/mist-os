@@ -76,9 +76,10 @@ impl DaiAudioControl {
         Self { input, output, audio_core, active_connection: None }
     }
 
-    const HF_INPUT_UUID: Uuid = Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree as u16);
+    const HF_INPUT_UUID: Uuid =
+        Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree.into_primitive());
     const HF_OUTPUT_UUID: Uuid =
-        Uuid::new16(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway as u16);
+        Uuid::new16(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway.into_primitive());
 
     fn start_device(
         &mut self,

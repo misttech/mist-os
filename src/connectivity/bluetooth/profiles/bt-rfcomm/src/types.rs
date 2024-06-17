@@ -221,9 +221,10 @@ pub(crate) mod tests {
             service_class_uuids: vec![Uuid::new16(0x1101).into()], // SPP UUID
             protocol_descriptor_list: rfcomm_protocol_descriptor_list(channel),
             profile_descriptors: vec![ProfileDescriptor {
-                profile_id: ServiceClassProfileIdentifier::SerialPort,
-                major_version: 1,
-                minor_version: 2,
+                profile_id: Some(ServiceClassProfileIdentifier::SerialPort),
+                major_version: Some(1),
+                minor_version: Some(2),
+                ..Default::default()
             }],
             ..ServiceDefinition::default()
         }
@@ -244,9 +245,10 @@ pub(crate) mod tests {
                 },
             ],
             profile_descriptors: vec![ProfileDescriptor {
-                profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-                major_version: 1,
-                minor_version: 2,
+                profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+                major_version: Some(1),
+                minor_version: Some(2),
+                ..Default::default()
             }],
             ..ServiceDefinition::default()
         }

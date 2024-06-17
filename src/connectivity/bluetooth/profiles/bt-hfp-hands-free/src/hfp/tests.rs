@@ -42,8 +42,9 @@ type HfpRunFuture = Pin<Box<dyn Future<Output = Result<()>>>>;
 
 fn protocol_list() -> Vec<bredr::ProtocolDescriptor> {
     vec![bredr::ProtocolDescriptor {
-        protocol: bredr::ProtocolIdentifier::Rfcomm,
-        params: vec![/* Server Channel */ bredr::DataElement::Uint8(1)],
+        protocol: Some(bredr::ProtocolIdentifier::Rfcomm),
+        params: Some(vec![/* Server Channel */ bredr::DataElement::Uint8(1)]),
+        ..Default::default()
     }]
 }
 

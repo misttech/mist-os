@@ -270,7 +270,7 @@ impl Peer {
         &self,
     ) -> impl Future<Output = avdtp::Result<Vec<avdtp::StreamEndpoint>>> {
         let avdtp = self.avdtp();
-        let get_all = self.descriptor.lock().is_some_and(a2dp_version_check);
+        let get_all = self.descriptor.lock().clone().is_some_and(a2dp_version_check);
         let inner = self.inner.clone();
         let metrics = self.metrics.clone();
         let peer_id = self.id;
@@ -558,7 +558,10 @@ impl Future for ClosedPeer {
 
 /// Determines if Peer profile version is newer (>= 1.3) or older (< 1.3)
 fn a2dp_version_check(profile: ProfileDescriptor) -> bool {
-    (profile.major_version == 1 && profile.minor_version >= 3) || profile.major_version > 1
+    let (Some(major), Some(minor)) = (profile.major_version, profile.minor_version) else {
+        return false;
+    };
+    (major == 1 && minor >= 3) || major > 1
 }
 
 /// Peer handles the communication with the AVDTP layer, and provides responses as appropriate
@@ -1279,9 +1282,10 @@ mod tests {
         let (remote, _, cobalt_receiver, peer) = setup_test_peer(true, build_test_streams(), None);
 
         let p: ProfileDescriptor = ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         };
         let _ = peer.set_descriptor(p);
 
@@ -1407,9 +1411,10 @@ mod tests {
 
         let (remote, _, cobalt_receiver, peer) = setup_test_peer(true, build_test_streams(), None);
         let p: ProfileDescriptor = ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 1,
-            minor_version: 3,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(1),
+            minor_version: Some(3),
+            ..Default::default()
         };
         let _ = peer.set_descriptor(p);
 
@@ -2986,37 +2991,42 @@ mod tests {
     #[fuchsia::test]
     fn version_check() {
         let p1: ProfileDescriptor = ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 1,
-            minor_version: 3,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(1),
+            minor_version: Some(3),
+            ..Default::default()
         };
         assert_eq!(true, a2dp_version_check(p1));
 
         let p1: ProfileDescriptor = ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 2,
-            minor_version: 10,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(2),
+            minor_version: Some(10),
+            ..Default::default()
         };
         assert_eq!(true, a2dp_version_check(p1));
 
         let p1: ProfileDescriptor = ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 1,
-            minor_version: 0,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(1),
+            minor_version: Some(0),
+            ..Default::default()
         };
         assert_eq!(false, a2dp_version_check(p1));
 
         let p1: ProfileDescriptor = ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 0,
-            minor_version: 9,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: None,
+            minor_version: Some(9),
+            ..Default::default()
         };
         assert_eq!(false, a2dp_version_check(p1));
 
         let p1: ProfileDescriptor = ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 2,
-            minor_version: 2,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(2),
+            minor_version: Some(2),
+            ..Default::default()
         };
         assert_eq!(true, a2dp_version_check(p1));
     }

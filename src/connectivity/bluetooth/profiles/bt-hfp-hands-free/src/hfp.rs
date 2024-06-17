@@ -98,7 +98,7 @@ where
                     let profile_event_result = profile_event_result_option
                         .ok_or(format_err!("Profile client stream closed."))?;
                     let profile_event = profile_event_result?;
-                    self.handle_profile_event(profile_event);
+                    self.handle_profile_event(profile_event)?;
                 },
 
                 (peer_id, protocol) = self.search_result_timers.select_next_some() => {
@@ -130,7 +130,7 @@ where
         }
     }
 
-    fn handle_profile_event(&mut self, event: ProfileEvent) {
+    fn handle_profile_event(&mut self, event: ProfileEvent) -> Result<()> {
         let peer_id = event.peer_id();
 
         let peer = self
@@ -156,14 +156,19 @@ where
                     debug!("Setting timer for peer task search results for peer {}", peer_id);
 
                     // Convert FIDL ProtocolDescriptor to BT ProtocolDescriptor.
-                    let protocol =
-                        protocol.map(|p| p.iter().map(ProtocolDescriptor::from).collect());
+                    let protocol = protocol.map_or(Ok(None), |p| {
+                        p.iter()
+                            .map(|p| ProtocolDescriptor::try_from(p))
+                            .collect::<Result<Vec<_>, _>>()
+                            .map(|p| Some(p))
+                    })?;
 
                     let search_result_timer = Self::search_result_timer(peer_id, protocol);
                     self.search_result_timers.push(search_result_timer);
                 }
             }
         }
+        Ok(())
     }
 
     // We expect peers to connect to us.  If they don't connect to us but we get

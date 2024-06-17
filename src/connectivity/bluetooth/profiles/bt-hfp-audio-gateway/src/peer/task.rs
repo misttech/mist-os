@@ -326,12 +326,26 @@ impl PeerTask {
     async fn peer_request(&mut self, request: PeerRequest) -> Result<(), Error> {
         match request {
             PeerRequest::Profile(ProfileEvent::PeerConnected { protocol, channel, id: _ }) => {
-                let protocol = protocol.iter().map(ProtocolDescriptor::from).collect();
+                let protocol = protocol
+                    .iter()
+                    .map(|proto| ProtocolDescriptor::try_from(proto))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| Error::MissingParameter(e.to_string()))?;
                 self.on_connection_request(protocol, channel).await?;
             }
             PeerRequest::Profile(ProfileEvent::SearchResult { protocol, attributes, id: _ }) => {
-                let protocol = protocol.map(|p| p.iter().map(ProtocolDescriptor::from).collect());
-                let attributes = attributes.iter().map(Attribute::from).collect();
+                let protocol = protocol.map_or(Ok(None), |p| {
+                    p.iter()
+                        .map(|proto| ProtocolDescriptor::try_from(proto))
+                        .collect::<Result<Vec<_>, _>>()
+                        .map(|p| Some(p))
+                        .map_err(|e| Error::MissingParameter(e.to_string()))
+                })?;
+                let attributes = attributes
+                    .iter()
+                    .map(|attr| Attribute::try_from(attr))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| Error::MissingParameter(e.to_string()))?;
                 self.on_search_result(protocol, attributes).await;
             }
             PeerRequest::ManagerConnected { id } => self.on_manager_connected(id).await?,
@@ -1691,8 +1705,9 @@ mod tests {
         // No connection should be made for a non RFCOMM search result.
         // Send a valid search result with some random L2CAP protocol.
         let protocol = vec![bredr::ProtocolDescriptor {
-            protocol: bredr::ProtocolIdentifier::L2Cap,
-            params: vec![bredr::DataElement::Uint16(25)],
+            protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+            params: Some(vec![bredr::DataElement::Uint16(25)]),
+            ..Default::default()
         }];
         let event = ProfileEvent::SearchResult {
             id: PeerId(1),

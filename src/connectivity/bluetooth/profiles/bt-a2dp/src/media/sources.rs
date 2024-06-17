@@ -107,7 +107,7 @@ struct AudioOutStream {}
 
 const LOCAL_MONOTONIC_CLOCK_DOMAIN: u32 = 0;
 const AUDIO_SOURCE_UUID: Uuid =
-    Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource as u16);
+    Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
 
 impl AudioOutStream {
     pub fn new(

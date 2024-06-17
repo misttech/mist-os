@@ -267,9 +267,10 @@ impl InbandAudioControl {
     }
 
     const LOCAL_MONOTONIC_CLOCK_DOMAIN: u32 = 0;
-    const HF_INPUT_UUID: Uuid = Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree as u16);
+    const HF_INPUT_UUID: Uuid =
+        Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree.into_primitive());
     const HF_OUTPUT_UUID: Uuid =
-        Uuid::new16(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway as u16);
+        Uuid::new16(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway.into_primitive());
 
     // This is currently 2x an SCO frame which holds 7.5ms
     // This must be a multiple of 7.5ms for the CVSD encoder to not have any remainder bytes.

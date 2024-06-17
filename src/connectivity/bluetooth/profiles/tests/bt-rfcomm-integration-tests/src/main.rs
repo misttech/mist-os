@@ -6,7 +6,7 @@ use bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol
 use bt_rfcomm::ServerChannel;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_async::{DurationExt, TimeoutExt};
-use fuchsia_bluetooth::profile::{l2cap_connect_parameters, Psm};
+use fuchsia_bluetooth::profile::{l2cap_connect_parameters, ProtocolDescriptor, Psm};
 use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
 use fuchsia_component_test::{Capability, RealmInstance};
 use fuchsia_zircon::Duration;
@@ -45,23 +45,26 @@ type SppClient = ProfileClient;
 pub fn spp_service_definition() -> bredr::ServiceDefinition {
     bredr::ServiceDefinition {
         service_class_uuids: Some(vec![Uuid::new16(
-            bredr::ServiceClassProfileIdentifier::SerialPort as u16,
+            bredr::ServiceClassProfileIdentifier::SerialPort.into_primitive(),
         )
         .into()]),
         protocol_descriptor_list: Some(vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![], // Ignored for RFCOMM.
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![]), // Ignored for RFCOMM.
+                ..Default::default()
             },
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Rfcomm,
-                params: vec![], // This will be populated by the RFCOMM component.
+                protocol: Some(bredr::ProtocolIdentifier::Rfcomm),
+                params: Some(vec![]), // This will be populated by the RFCOMM component.
+                ..Default::default()
             },
         ]),
         profile_descriptors: Some(vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::SerialPort,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::SerialPort),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         }]),
         ..Default::default()
     }
@@ -127,7 +130,8 @@ async fn expect_peer_advertising(
     assert_eq!(expected_id, peer_id.into());
     tracing::info!("Discovered service with protocol: {:?}", protocol);
     responder.send().unwrap();
-    let protocol = protocol.unwrap().iter().map(Into::into).collect();
+    let protocol =
+        protocol.unwrap().iter().map(|p| ProtocolDescriptor::try_from(p).unwrap()).collect();
     server_channel_from_protocol(&protocol).expect("is rfcomm")
 }
 
@@ -279,8 +283,9 @@ fn a2dp_service_definition() -> bredr::ServiceDefinition {
     bredr::ServiceDefinition {
         service_class_uuids: Some(vec![Uuid::new16(0x110B).into()]), // Audio Sink UUID
         protocol_descriptor_list: Some(vec![bredr::ProtocolDescriptor {
-            protocol: bredr::ProtocolIdentifier::L2Cap,
-            params: vec![bredr::DataElement::Uint16(bredr::PSM_AVDTP)],
+            protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+            params: Some(vec![bredr::DataElement::Uint16(bredr::PSM_AVDTP)]),
+            ..Default::default()
         }]),
         ..Default::default()
     }
