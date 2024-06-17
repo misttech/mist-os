@@ -348,11 +348,6 @@ async fn get_backing_memory_per_package_source(source: PackageSource) {
     // calls with supported flags should succeed for files that are not meta-as-file.
     for size in [0, 1, 4095, 4096, 4097] {
         for path in [format!("file_{size}"), format!("meta/file_{size}")] {
-            // TODO(https://fxbug.dev/305272765): Remove once null blob edge-case behaviour has been fixed.
-            if path == "file_0" {
-                continue;
-            }
-
             let file = open_file(root_dir, &path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
 
             let _: zx::Vmo =

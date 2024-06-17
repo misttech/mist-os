@@ -141,15 +141,6 @@ impl Inner {
                 .map_err(zx::Status::from_raw)
             {
                 Ok(vmo) => Arc::new(vmo),
-                Err(zx::Status::BAD_STATE) => {
-                    // TODO(https://fxbug.dev/305272765): ZX_ERR_BAD_STATE is returned for the empty
-                    // blob, but Blobfs/Fxblob should be changed to handle this case
-                    // successfully.  Remove the error-swallowing when the behaviour is fixed.
-                    Arc::new(
-                        zx::Vmo::create_with_opts(zx::VmoOptions::empty(), 0)
-                            .map_err(|status| from_status_like_fdio!(status))?,
-                    )
-                }
                 Err(status) => return Err(from_status_like_fdio!(status)),
             };
             *self = Inner::Vmo(vmo);
