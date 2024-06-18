@@ -365,6 +365,10 @@ void DriverDevelopmentService::RemoveTestNode(RemoveTestNodeRequestView request,
   completer.ReplySuccess();
 }
 
+void DriverDevelopmentService::WaitForBootup(WaitForBootupCompleter::Sync& completer) {
+  driver_runner_.WaitForBootup([completer = completer.ToAsync()]() mutable { completer.Reply(); });
+}
+
 void DriverDevelopmentService::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_driver_development::Manager> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

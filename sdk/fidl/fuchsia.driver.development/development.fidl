@@ -113,11 +113,15 @@ open protocol Manager {
     flexible RemoveTestNode(struct {
         name string:NODE_MONIKER_MAX;
     }) -> () error zx.Status;
+
+    /// Waits for bootup to complete.
+    @available(added=21)
+    strict WaitForBootup() -> ();
 };
 
 /// Interface for watching when bootup is complete, in which there are no more bind and driver start
 /// activity.
-@available(added=20)
+@available(added=20, removed=21)
 @discoverable
 open protocol BootupWatcher {
     // Waits for bootup to complete.

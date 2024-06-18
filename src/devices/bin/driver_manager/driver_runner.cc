@@ -353,15 +353,16 @@ std::vector<fdd::wire::CompositeNodeInfo> DriverRunner::GetCompositeListInfo(
   return list;
 }
 
+void DriverRunner::WaitForBootup(fit::callback<void()> callback) {
+  bootup_tracker_->WaitForBootup(std::move(callback));
+}
+
 void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing) {
   zx::result result = runner_.Publish(outgoing);
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 
   result = outgoing.AddUnmanagedProtocol<fdf::CompositeNodeManager>(
       manager_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
-  ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
-
-  result = outgoing.AddUnmanagedProtocol<fdd::BootupWatcher>(bootup_tracker_->GetHandler());
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 }
 

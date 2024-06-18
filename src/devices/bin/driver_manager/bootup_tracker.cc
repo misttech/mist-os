@@ -19,11 +19,11 @@ zx::duration kLastUpdatedTimeoutDuration = zx::sec(10);
 
 void BootupTracker::Start() { UpdateTrackerAndResetTimer(); }
 
-void BootupTracker::WaitForBootup(WaitForBootupCompleter::Sync& completer) {
+void BootupTracker::WaitForBootup(fit::callback<void()> callback) {
   if (bootup_done_) {
-    completer.Reply();
+    callback();
   } else {
-    completers_.push_back(completer.ToAsync());
+    callbacks_.push_back(std::move(callback));
   }
 }
 
@@ -70,10 +70,10 @@ void BootupTracker::CheckBootupDone() {
     LOGF(INFO, "Bootup completed.");
   }
 
-  for (auto& completer : completers_) {
-    completer.Reply();
+  for (auto& callback : callbacks_) {
+    callback();
   }
-  completers_.clear();
+  callbacks_.clear();
   bootup_done_ = true;
 }
 
@@ -100,13 +100,6 @@ void BootupTracker::ResetBootupTimer() {
     bootup_timeout_task_.Cancel();
   }
   bootup_timeout_task_.PostDelayed(dispatcher_, kBootupTimeoutDuration);
-}
-
-void BootupTracker::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_driver_development::BootupWatcher> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
-  LOGF(ERROR, "Unknown method in BootupWatcher protocol, closing with ZX_ERR_NOT_SUPPORTED");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace driver_manager

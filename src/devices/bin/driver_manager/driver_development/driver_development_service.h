@@ -38,6 +38,7 @@ class DriverDevelopmentService : public fidl::WireServer<fuchsia_driver_developm
   void AddTestNode(AddTestNodeRequestView request, AddTestNodeCompleter::Sync& completer) override;
   void RemoveTestNode(RemoveTestNodeRequestView request,
                       RemoveTestNodeCompleter::Sync& completer) override;
+  void WaitForBootup(WaitForBootupCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_driver_development::Manager> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -46,6 +47,7 @@ class DriverDevelopmentService : public fidl::WireServer<fuchsia_driver_developm
   // A map of the test nodes that have been created.
   std::map<std::string, std::weak_ptr<driver_manager::Node>> test_nodes_;
   fidl::ServerBindingGroup<fuchsia_driver_development::Manager> bindings_;
+
   async_dispatcher_t* const dispatcher_;
 };
 

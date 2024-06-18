@@ -26,15 +26,6 @@ class BootupTrackerTest : public BindManagerTestBase {
     BindManagerTestBase::SetUp();
     tracker = std::make_unique<TestBootupTracker>(bind_manager(), dispatcher());
     tracker->Start();
-
-    auto [client_end, server_end] =
-        fidl::Endpoints<fuchsia_driver_development::BootupWatcher>::Create();
-
-    fidl::BindServer(
-        dispatcher(), std::move(server_end), tracker.get(),
-        [this](driver_manager::BootupTracker*, fidl::UnbindInfo,
-               fidl::ServerEnd<fuchsia_driver_development::BootupWatcher>) { tracker.reset(); });
-    client.Bind(std::move(client_end), dispatcher());
   }
 
   void TriggerBootupTimeout() {
@@ -43,16 +34,12 @@ class BootupTrackerTest : public BindManagerTestBase {
   }
 
   void WaitForBootup() {
-    client->WaitForBootup().Then(
-        [this](fidl::WireUnownedResult<fuchsia_driver_development::BootupWatcher::WaitForBootup>&
-                   result) { bootup_completed_ = true; });
+    tracker->WaitForBootup([this]() { bootup_completed_ = true; });
   }
 
   bool bootup_completed() const { return bootup_completed_; }
 
  protected:
-  fidl::WireClient<fuchsia_driver_development::BootupWatcher> client;
-
   std::unique_ptr<TestBootupTracker> tracker;
 
  private:

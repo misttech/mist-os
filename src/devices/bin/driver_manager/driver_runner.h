@@ -116,6 +116,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   std::vector<fuchsia_driver_development::wire::CompositeNodeInfo> GetCompositeListInfo(
       fidl::AnyArena& arena) const;
 
+  void WaitForBootup(fit::callback<void()> callback);
+
   fidl::WireClient<fuchsia_driver_index::DriverIndex>& driver_index() { return driver_index_; }
 
   std::shared_ptr<Node> root_node() const { return root_node_; }
