@@ -3,7 +3,12 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load(":providers.bzl", "FuchsiaComponentManifestShardCollectionInfo", "FuchsiaComponentManifestShardInfo")
+load(
+    ":providers.bzl",
+    "FuchsiaComponentManifestInfo",
+    "FuchsiaComponentManifestShardCollectionInfo",
+    "FuchsiaComponentManifestShardInfo",
+)
 
 def _fuchsia_component_manifest_shard_collection_impl(ctx):
     return FuchsiaComponentManifestShardCollectionInfo(
@@ -51,20 +56,22 @@ fuchsia_component_manifest_shard = rule(
 
 def _fuchsia_component_manifest_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
-    if not ctx.file.src and not ctx.attr.content:
+    if not (ctx.file.src or ctx.attr.content):
         fail("Either 'src' or 'content' needs to be specified.")
 
     if ctx.file.src and ctx.attr.content:
         fail("Only one of 'src' and 'content' can be specified.")
 
+    if ctx.attr.content and not ctx.attr.component_name:
+        fail("When 'content' is specified, 'component_name' must also be specified.")
+
+    component_name = ctx.attr.component_name or ctx.file.src.basename[:-4]
+    config_package_path = "meta/%s.cvf" % component_name
+
     if ctx.file.src:
         manifest_in = ctx.file.src
     else:
-        # create a manifest file from the given content
-        if not ctx.attr.component_name:
-            fail("Attribute 'component_name' has to be specified when using inline content.")
-
-        manifest_in = ctx.actions.declare_file("%s.cml" % ctx.attr.component_name)
+        manifest_in = ctx.actions.declare_file("%s.cml" % component_name)
         ctx.actions.write(
             output = manifest_in,
             content = ctx.attr.content,
@@ -107,12 +114,10 @@ def _fuchsia_component_manifest_impl(ctx):
     for w in include_path_dict.keys():
         include_path.extend(["--includepath", w])
 
-    # LINT.IfChange
     config_values_package_path_args = [
         "--config-package-path",
-        "meta/%s.cvf" % ctx.attr.component_name,
+        config_package_path,
     ]
-    # LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/fuchsia_structured_config.bzl)
 
     ctx.actions.run(
         executable = sdk.cmc,
@@ -133,6 +138,10 @@ def _fuchsia_component_manifest_impl(ctx):
 
     return [
         DefaultInfo(files = depset([manifest_out])),
+        FuchsiaComponentManifestInfo(
+            component_name = ctx.attr.component_name,
+            config_package_path = config_package_path,
+        ),
     ]
 
 _fuchsia_component_manifest = rule(

@@ -5,7 +5,13 @@
 # buildifier: disable=module-docstring
 load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
 load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols")
-load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageResourcesInfo", "FuchsiaUnitTestComponentInfo")
+load(
+    ":providers.bzl",
+    "FuchsiaComponentInfo",
+    "FuchsiaComponentManifestInfo",
+    "FuchsiaPackageResourcesInfo",
+    "FuchsiaUnitTestComponentInfo",
+)
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variant", "rule_variants")
 
 def _manifest_target(name, manifest_in, tags):
@@ -107,6 +113,15 @@ def _fuchsia_component_impl(ctx):
 
     resources = []
     for dep in ctx.attr.deps:
+        if FuchsiaComponentManifestInfo in dep:
+            left = ctx.attr.component_name
+            right = dep[FuchsiaComponentManifestInfo].component_name
+            if left and right and left != right:
+                msg = "\nError setting 'component_name' in '%s' target: " % str(ctx.label)
+                msg += "The 'fuchsia_component' target defines it as '%s', "
+                msg += "whereas the associated 'fuchsia_component_manifest' target "
+                msg += "defines it as '%s'. If both are set, they must match." % (left, right)
+                fail(msg)
         if FuchsiaPackageResourcesInfo in dep:
             resources += dep[FuchsiaPackageResourcesInfo].resources
         else:
@@ -156,7 +171,9 @@ number of dependencies which will be included in the final package.
             mandatory = True,
         ),
         "component_name": attr.string(
-            doc = "The name of the component, defaults to the target name",
+            doc = """The name of the component, defaults to the target name.
+            Note: This field will soon be deprecated. Please set the component name
+            in the associated fuchsia_component_manifest rule.""",
         ),
         "is_driver": attr.bool(
             doc = "True if this is a driver component",

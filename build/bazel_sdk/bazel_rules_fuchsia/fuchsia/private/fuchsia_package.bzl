@@ -24,6 +24,7 @@ load(
     "FuchsiaPackageInfo",
     "FuchsiaPackageResourcesInfo",
     "FuchsiaPackagedComponentInfo",
+    "FuchsiaStructuredConfigInfo",
 )
 load(":utils.bzl", "fuchsia_cpu_from_ctx", "label_name", "make_resource_struct", "rule_variants", "stub_executable")
 
@@ -318,6 +319,16 @@ def _build_fuchsia_package_impl(ctx):
 
     # Collect all the resources from the deps
     for dep in ctx.attr.test_components + ctx.attr.components + ctx.attr.resources:
+        if FuchsiaStructuredConfigInfo in dep:
+            sc_info = dep[FuchsiaStructuredConfigInfo]
+            package_resources.append(
+                # add the CVF file
+                make_resource_struct(
+                    src = sc_info.cvf_source,
+                    dest = sc_info.cvf_dest,
+                ),
+            )
+
         if FuchsiaComponentInfo in dep:
             component_info = dep[FuchsiaComponentInfo]
             component_manifest = component_info.manifest
