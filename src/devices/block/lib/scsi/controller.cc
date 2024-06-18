@@ -386,11 +386,13 @@ zx::result<uint32_t> Controller::ScanAndBindLogicalUnits(uint8_t target,
   for (uint16_t lun = 0; lun < max_lun; ++lun) {
     zx::result disk = Disk::Bind(this, target, lun, max_transfer_bytes, disk_options);
     if (disk.is_ok()) {
+      scsi::Disk* dev = disk.value().get();
+      block_devs_[target][lun] = std::move(disk.value());
       if (lu_callback) {
-        zx::result result = lu_callback(lun, disk->block_size_bytes(), disk->block_count());
+        zx::result result = lu_callback(lun, dev->block_size_bytes(), dev->block_count());
         if (result.is_error()) {
           FDF_LOGL(ERROR, driver_logger(), "SCSI: lu_callback for block device failed: %s",
-                   disk.status_string());
+                   result.status_string());
           return result.take_error();
         }
       }
