@@ -120,8 +120,8 @@ pub(crate) struct Config<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> Config<PS> {
-    pub fn handle_unknown(&self) -> &HandleUnknown {
-        &self.handle_unknown
+    pub fn handle_unknown(&self) -> HandleUnknown {
+        self.handle_unknown
     }
 }
 
@@ -156,7 +156,7 @@ impl<PS: ParseStrategy> Validate for Config<PS> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum HandleUnknown {
     Deny,
     Reject,

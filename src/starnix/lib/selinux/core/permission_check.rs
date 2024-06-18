@@ -38,9 +38,12 @@ pub trait PermissionCheck: AccessVectorComputer + Query + private::PermissionChe
             Some(permission) => permission.class(),
             None => return true,
         };
-        let permissions_access_vector = self.access_vector_from_permissions(permissions);
-        let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
-        permissions_access_vector & permitted_access_vector == permissions_access_vector
+        if let Some(permissions_access_vector) = self.access_vector_from_permissions(permissions) {
+            let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
+            permissions_access_vector & permitted_access_vector == permissions_access_vector
+        } else {
+            false
+        }
     }
 }
 
@@ -72,9 +75,12 @@ pub trait PermissionCheckMut:
             Some(permission) => permission.class(),
             None => return true,
         };
-        let permissions_access_vector = self.access_vector_from_permissions(permissions);
-        let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
-        permissions_access_vector & permitted_access_vector == permissions_access_vector
+        if let Some(permissions_access_vector) = self.access_vector_from_permissions(permissions) {
+            let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
+            permissions_access_vector & permitted_access_vector == permissions_access_vector
+        } else {
+            false
+        }
     }
 }
 
@@ -102,7 +108,7 @@ impl<'a> AccessVectorComputer for PermissionCheckImpl<'a> {
     fn access_vector_from_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
         &self,
         permissions: &[P],
-    ) -> AccessVector {
+    ) -> Option<AccessVector> {
         self.security_server.access_vector_from_permissions(permissions)
     }
 }
@@ -188,8 +194,8 @@ mod tests {
         >(
             &self,
             permissions: &[P],
-        ) -> AccessVector {
-            access_vector_from_permissions(permissions)
+        ) -> Option<AccessVector> {
+            Some(access_vector_from_permissions(permissions))
         }
     }
 
@@ -214,8 +220,8 @@ mod tests {
         >(
             &self,
             permissions: &[P],
-        ) -> AccessVector {
-            access_vector_from_permissions(permissions)
+        ) -> Option<AccessVector> {
+            Some(access_vector_from_permissions(permissions))
         }
     }
 

@@ -16,7 +16,7 @@ mod symbols;
 pub use security_context::{SecurityContext, SecurityContextError};
 
 use anyhow::Context as _;
-use error::{NewSecurityContextError, ParseError, QueryError};
+use error::{ParseError, QueryError};
 use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
@@ -154,7 +154,7 @@ impl<PS: ParseStrategy> Policy<PS> {
 
     /// The way "unknown" policy decisions should be handed according to the underlying binary
     /// policy.
-    pub fn handle_unknown(&self) -> &HandleUnknown {
+    pub fn handle_unknown(&self) -> HandleUnknown {
         self.0.parsed_policy().handle_unknown()
     }
 
@@ -195,7 +195,7 @@ impl<PS: ParseStrategy> Policy<PS> {
         source: &SecurityContext,
         target: &SecurityContext,
         class: &FileClass,
-    ) -> Result<SecurityContext, NewSecurityContextError> {
+    ) -> Result<SecurityContext, SecurityContextError> {
         self.0.new_file_security_context(source, target, class)
     }
 
@@ -212,7 +212,7 @@ impl<PS: ParseStrategy> Policy<PS> {
         source: &SecurityContext,
         target: &SecurityContext,
         class: &ObjectClass,
-    ) -> Result<SecurityContext, NewSecurityContextError> {
+    ) -> Result<SecurityContext, SecurityContextError> {
         self.0.new_security_context(
             source,
             target,
@@ -238,14 +238,18 @@ impl<PS: ParseStrategy> Policy<PS> {
         permission: sc::Permission,
     ) -> Result<bool, QueryError> {
         let object_class = permission.class();
-        let target_class = self.0.class(&object_class);
-        let permission = self.0.permission(&permission);
-        self.0.parsed_policy().class_permission_is_explicitly_allowed(
-            source_type,
-            target_type,
-            target_class,
-            permission,
-        )
+        if let (Some(target_class), Some(permission)) =
+            (self.0.class(&object_class), self.0.permission(&permission))
+        {
+            self.0.parsed_policy().class_permission_is_explicitly_allowed(
+                source_type,
+                target_type,
+                target_class,
+                permission,
+            )
+        } else {
+            Ok(false)
+        }
     }
 
     /// Returns whether the input types are explicitly granted the permission named
@@ -280,9 +284,16 @@ impl<PS: ParseStrategy> Policy<PS> {
         source_type: TypeId,
         target_type: TypeId,
         object_class: sc::ObjectClass,
-    ) -> Result<AccessVector, QueryError> {
-        let target_class = self.0.class(&object_class);
-        self.0.parsed_policy().compute_explicitly_allowed(source_type, target_type, target_class)
+    ) -> AccessVector {
+        if let Some(target_class) = self.0.class(&object_class) {
+            self.0.parsed_policy().compute_explicitly_allowed(
+                source_type,
+                target_type,
+                target_class,
+            )
+        } else {
+            AccessVector::NONE
+        }
     }
 
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
@@ -329,19 +340,24 @@ impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
     >(
         &self,
         permissions: &[P],
-    ) -> AccessVector {
+    ) -> Option<AccessVector> {
         let mut access_vector = AccessVector::NONE;
         for permission in permissions {
-            let permission_info = self.0.permission(&permission.clone().into());
-
-            // Compute bit flag associated with permission.
-            // Use `permission.id() - 1` below because ids start at `1` to refer to the
-            // "shift `1` by 0 bits".
-            //
-            // id=1 => bits:0...001, id=2 => bits:0...010, etc.
-            access_vector |= AccessVector(1 << (permission_info.id() - 1));
+            if let Some(permission_info) = self.0.permission(&permission.clone().into()) {
+                // Compute bit flag associated with permission.
+                // Use `permission.id() - 1` below because ids start at `1` to refer to the
+                // "shift `1` by 0 bits".
+                //
+                // id=1 => bits:0...001, id=2 => bits:0...010, etc.
+                access_vector |= AccessVector(1 << (permission_info.id() - 1));
+            } else {
+                // The permission is unknown so defer to the policy-define unknown handling behaviour.
+                if self.0.parsed_policy().handle_unknown() != HandleUnknown::Allow {
+                    return None;
+                }
+            }
         }
-        access_vector
+        Some(access_vector)
     }
 }
 
@@ -372,16 +388,18 @@ impl<PS: ParseStrategy> Unvalidated<PS> {
 /// An owner of policy information that can translate [`sc::Permission`] values into
 /// [`AccessVector`] values that are consistent with the owned policy.
 pub trait AccessVectorComputer {
-    /// Computes an [`AccessVector`] where the only bits set are those that correspond to
-    /// all `permissions`. This operation fails if `permissions` contain permissions that refer to
-    /// different object classes because an access vector specifies permission bits associated with
-    /// one specific object class.
+    /// Returns an [`AccessVector`] containing the supplied kernel `permissions`.
+    ///
+    /// The loaded policy's "handle unknown" configuration determines how `permissions`
+    /// entries not explicitly defined by the policy are handled. Allow-unknown will
+    /// result in unknown `permissions` being ignored, while deny-unknown will cause
+    /// `None` to be returned if one or more `permissions` are unknown.
     fn access_vector_from_permissions<
         P: sc::ClassPermission + Into<sc::Permission> + Clone + 'static,
     >(
         &self,
         permissions: &[P],
-    ) -> AccessVector;
+    ) -> Option<AccessVector>;
 }
 
 /// A data structure that can be parsed as a part of a binary policy.
