@@ -25,9 +25,31 @@
 namespace fdf_power {
 
 enum class Error : uint8_t {
+  /// The power configuration appears to be invalid. A non-exhaustive list of
+  /// possible reasons is it contained no elements, the element definition
+  /// appears malformed, or other reasons.
   INVALID_ARGS,
+  /// A general I/O error happened which we're not sure about. This should be
+  /// a rare occurrence and typically more specific errors should be returned.
   IO,
+  /// The configuration has a dependency, but we couldn't get access to the
+  /// tokens for it. Maybe a parent didn't offer something expected or SAG
+  /// didn't make something available.
   DEPENDENCY_NOT_FOUND,
+  /// No token services capability available, maybe it wasn't routed?
+  TOKEN_SERVICE_CAPABILITY_NOT_FOUND,
+  /// An unexpected error occurred listing service instances.
+  READ_INSTANCES,
+  /// We were able to access the token service capability, but no instances
+  /// were available. Did the parents offer any?
+  NO_TOKEN_SERVICE_INSTANCES,
+  /// Requesting a token from the provider protocol failed. Maybe the token
+  /// provider is not implemented correctly?
+  TOKEN_REQUEST,
+  /// Couldn't access the capability for System Activity Governor tokens.
+  ACTIVITY_GOVERNOR_UNAVAILABLE,
+  /// Request to System Activity Governor returned an error.
+  ACTIVITY_GOVERNOR_REQUEST,
 };
 
 class ParentElementHasher final {
