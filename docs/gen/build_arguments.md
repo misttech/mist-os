@@ -3163,7 +3163,7 @@ From //zircon/kernel/params.gni:116
 
 Enforce ABI compatibility checks for stable API levels.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //tools/fidl/abi-compat/BUILD.gn:14
 
