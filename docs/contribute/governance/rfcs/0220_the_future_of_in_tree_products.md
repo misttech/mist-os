@@ -286,7 +286,8 @@ will non-exhaustively include by virtue of being an `_eng` configuration:
 
 We do not intend to include the following:
 
-*   Paving support or zedboot
+*   Paving support through zedboot (though the paver _service_ needs to work
+    on a running Fuchsia image in order to enable OTAs)
 *   Graphical support
 *   Audio support
 *   Input support
