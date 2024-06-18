@@ -431,7 +431,9 @@ impl SuspendResumeManager {
         let prev = self.lock().suspend_waiter.replace(Arc::clone(&waiter));
         debug_assert!(prev.is_none(), "Should not have concurrent suspend attempts");
 
-        self.update_power_level(state.into())?;
+        self.update_power_level(state.into()).inspect_err(|_| {
+            self.lock().suspend_waiter.take();
+        })?;
 
         let suspend_result = waiter.wait();
 
