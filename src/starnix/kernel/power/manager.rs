@@ -393,13 +393,23 @@ impl SuspendResumeManager {
 ///
 /// This is useful for syscalls that need to keep the system awake for a period of time, such as
 /// `EPOLLWAKEUP` event in epoll.
-#[derive(Default)]
 pub struct WakeLease {
+    name: String,
     element: OnceCell<PowerElement>,
     lease: Mutex<Option<zx::Channel>>,
 }
 
 impl WakeLease {
+    pub fn new(name: &str) -> Self {
+        let random_string: String =
+            rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
+        Self {
+            name: format!("{}-{}", name, random_string),
+            element: Default::default(),
+            lease: Default::default(),
+        }
+    }
+
     fn element(&self) -> Result<&PowerElement, Errno> {
         self.element.get_or_try_init(|| {
             let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()
@@ -420,12 +430,10 @@ impl WakeLease {
             let power_levels: Vec<u8> =
                 (0..=fbroker::BinaryPowerLevel::On.into_primitive()).collect();
             let (lessor_proxy, lessor_server_end) = create_sync_proxy::<fbroker::LessorMarker>();
-            let random_string: String =
-                rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
             let element_proxy = topology
                 .add_element(
                     fbroker::ElementSchema {
-                        element_name: Some(format!("starnix-wake-lease-{random_string}")),
+                        element_name: Some(format!("starnix-wake-lock-{}", self.name)),
                         initial_current_level: Some(
                             fbroker::BinaryPowerLevel::Off.into_primitive(),
                         ),
