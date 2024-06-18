@@ -4,13 +4,15 @@
 
 use anyhow::format_err;
 use fidl_fuchsia_hardware_audio::{self as audio, DaiFormat, PcmFormat};
+use fidl_fuchsia_media as media;
 use fuchsia_audio_dai::{self as dai, DaiAudioDevice, DigitalAudioInterface};
-use fuchsia_bluetooth::types::{peer_audio_stream_id, Uuid};
+use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId};
 use media::AudioDeviceEnumeratorProxy;
 use tracing::{info, warn};
-use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_media as media};
 
-use super::*;
+use crate::audio::{AudioControl, AudioError, HF_INPUT_UUID, HF_OUTPUT_UUID};
+use crate::features::CodecId;
+use crate::sco_connector::ScoConnection;
 
 pub struct DaiAudioControl {
     output: DaiAudioDevice,
@@ -76,11 +78,6 @@ impl DaiAudioControl {
         Self { input, output, audio_core, active_connection: None }
     }
 
-    const HF_INPUT_UUID: Uuid =
-        Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree.into_primitive());
-    const HF_OUTPUT_UUID: Uuid =
-        Uuid::new16(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway.into_primitive());
-
     fn start_device(
         &mut self,
         peer_id: &PeerId,
@@ -89,9 +86,9 @@ impl DaiAudioControl {
         pcm_format: PcmFormat,
     ) -> Result<(), anyhow::Error> {
         let (uuid, dev) = if input {
-            (Self::HF_INPUT_UUID, &mut self.input)
+            (HF_INPUT_UUID, &mut self.input)
         } else {
-            (Self::HF_OUTPUT_UUID, &mut self.output)
+            (HF_OUTPUT_UUID, &mut self.output)
         };
 
         let dev_id = peer_audio_stream_id(*peer_id, uuid);

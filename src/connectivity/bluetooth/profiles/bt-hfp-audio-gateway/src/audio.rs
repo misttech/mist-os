@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_media as media;
-use fuchsia_bluetooth::types::PeerId;
+use fuchsia_bluetooth::types::{PeerId, Uuid};
 use std::collections::HashSet;
 use thiserror::Error;
+use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_media as media};
 
 use crate::features::CodecId;
 use crate::sco_connector::ScoConnection;
@@ -38,6 +38,16 @@ use dai::DaiAudioControl;
 mod inband;
 use inband::InbandAudioControl;
 
+mod codec;
+
+const DEVICE_NAME: &'static str = "Bluetooth HFP";
+
+// Used to build audio device IDs for peers
+const HF_INPUT_UUID: Uuid =
+    Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree.into_primitive());
+const HF_OUTPUT_UUID: Uuid =
+    Uuid::new16(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway.into_primitive());
+
 pub trait AudioControl: Send {
     /// Start the audio, adding the audio device to the audio core and routing audio.
     fn start(
@@ -52,28 +62,35 @@ pub trait AudioControl: Send {
     fn stop(&mut self) -> Result<(), AudioError>;
 }
 
-/// An AudioControl that either sends the audio directly to the controller (using the DAI)
-/// or encodes the audio locally and sends it in the SCO channel, depending on whether the
-/// codec is in the list of controller_supported codecs.
-pub struct CodecAudioControl {
-    controller_codecids: HashSet<CodecId>,
-    dai: DaiAudioControl,
+/// An AudioControl that either sends the audio directly to the controller (using an offload
+/// AudioControl) or encodes audio locally and sends it in the SCO channel, depending on
+/// whether the codec is in the list of offload-supported codecs.
+pub struct PartialOffloadAudioControl {
+    offload_codecids: HashSet<CodecId>,
+    /// Used to control when the audio can be sent offloaded
+    offload: Box<dyn AudioControl>,
+    /// Used to encode audio locally and send inband
     inband: InbandAudioControl,
     started: bool,
 }
 
-impl CodecAudioControl {
+impl PartialOffloadAudioControl {
     pub async fn setup(
         audio_proxy: media::AudioDeviceEnumeratorProxy,
-        controller_supported: HashSet<CodecId>,
+        offload_supported: HashSet<CodecId>,
     ) -> Result<Self, AudioError> {
         let dai = DaiAudioControl::discover(audio_proxy.clone()).await?;
         let inband = InbandAudioControl::create(audio_proxy)?;
-        Ok(Self { controller_codecids: controller_supported, dai, inband, started: false })
+        Ok(Self {
+            offload_codecids: offload_supported,
+            offload: Box::new(dai),
+            inband,
+            started: false,
+        })
     }
 }
 
-impl AudioControl for CodecAudioControl {
+impl AudioControl for PartialOffloadAudioControl {
     fn start(
         &mut self,
         id: PeerId,
@@ -83,8 +100,8 @@ impl AudioControl for CodecAudioControl {
         if self.started {
             return Err(AudioError::AlreadyStarted);
         }
-        let result = if self.controller_codecids.contains(&codec) {
-            self.dai.start(id, connection, codec)
+        let result = if self.offload_codecids.contains(&codec) {
+            self.offload.start(id, connection, codec)
         } else {
             self.inband.start(id, connection, codec)
         };
@@ -106,7 +123,7 @@ impl AudioControl for CodecAudioControl {
             }
             Err(e) => return Err(e),
         }
-        let res = self.dai.stop();
+        let res = self.offload.stop();
         if res.is_ok() {
             self.started = false;
         }

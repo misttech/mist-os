@@ -6,7 +6,7 @@ use anyhow::format_err;
 use fuchsia_audio_codec::{StreamProcessor, StreamProcessorOutputStream};
 use fuchsia_audio_device::stream_config::SoftStreamConfig;
 use fuchsia_audio_device::{AudioFrameSink, AudioFrameStream};
-use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
+use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId};
 use futures::task::Context;
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
 use media::AudioDeviceEnumeratorProxy;
@@ -17,7 +17,7 @@ use {
     fuchsia_zircon as zx,
 };
 
-use crate::audio::{AudioControl, AudioError};
+use crate::audio::{AudioControl, AudioError, HF_INPUT_UUID, HF_OUTPUT_UUID};
 use crate::sco_connector::ScoConnection;
 use crate::CodecId;
 
@@ -267,10 +267,6 @@ impl InbandAudioControl {
     }
 
     const LOCAL_MONOTONIC_CLOCK_DOMAIN: u32 = 0;
-    const HF_INPUT_UUID: Uuid =
-        Uuid::new16(bredr::ServiceClassProfileIdentifier::Handsfree.into_primitive());
-    const HF_OUTPUT_UUID: Uuid =
-        Uuid::new16(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway.into_primitive());
 
     // This is currently 2x an SCO frame which holds 7.5ms
     // This must be a multiple of 7.5ms for the CVSD encoder to not have any remainder bytes.
@@ -281,18 +277,18 @@ impl InbandAudioControl {
         peer_id: PeerId,
         codec_id: CodecId,
     ) -> Result<AudioFrameSink, AudioError> {
-        let audio_dev_id = peer_audio_stream_id(peer_id, Self::HF_INPUT_UUID);
+        let audio_dev_id = peer_audio_stream_id(peer_id, HF_INPUT_UUID);
         let (client, sink) = SoftStreamConfig::create_input(
             &audio_dev_id,
             "Fuchsia",
-            "Bluetooth HFP",
+            super::DEVICE_NAME,
             Self::LOCAL_MONOTONIC_CLOCK_DOMAIN,
             codec_id.try_into()?,
             Self::AUDIO_BUFFER_DURATION,
         )
         .map_err(|e| AudioError::audio_core(format_err!("Couldn't create input: {e:?}")))?;
 
-        self.audio_core.add_device_by_channel("Bluetooth HFP", true, client)?;
+        self.audio_core.add_device_by_channel(super::DEVICE_NAME, true, client)?;
         Ok(sink)
     }
 
@@ -301,18 +297,18 @@ impl InbandAudioControl {
         peer_id: PeerId,
         codec_id: CodecId,
     ) -> Result<AudioFrameStream, AudioError> {
-        let audio_dev_id = peer_audio_stream_id(peer_id, Self::HF_OUTPUT_UUID);
+        let audio_dev_id = peer_audio_stream_id(peer_id, HF_OUTPUT_UUID);
         let (client, stream) = SoftStreamConfig::create_output(
             &audio_dev_id,
             "Fuchsia",
-            "Bluetooth HFP",
+            super::DEVICE_NAME,
             Self::LOCAL_MONOTONIC_CLOCK_DOMAIN,
             codec_id.try_into()?,
             Self::AUDIO_BUFFER_DURATION,
             zx::Duration::from_millis(0),
         )
         .map_err(|e| AudioError::audio_core(format_err!("Couldn't create output: {e:?}")))?;
-        self.audio_core.add_device_by_channel("Bluetooth HFP", false, client)?;
+        self.audio_core.add_device_by_channel(super::DEVICE_NAME, false, client)?;
         Ok(stream)
     }
 }
