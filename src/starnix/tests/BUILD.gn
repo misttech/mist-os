@@ -18,6 +18,7 @@ group("tests") {
     "diagnostics:tests",
     "gvisor:tests",
     "memory_attribution:tests",
+    "power:tests",
     "reboot:tests",
     "scheduler:tests",
     "syscalls:tests",
