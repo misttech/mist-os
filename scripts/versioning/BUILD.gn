@@ -103,6 +103,8 @@ if (freeze_api_level) {
     _version_history_file = "//sdk/version_history.json"
 
     args = [
+      "--root-source-dir",
+      rebase_path("//", root_build_dir),
       "--stamp-file",
       rebase_path(_stamp_file, root_build_dir),
       "--sdk-version-history",

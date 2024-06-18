@@ -1,9 +1,1 @@
-# This is the current API level.
-# Only non-breaking changes are allowed. When this API level is frozen,
-# please delete this file.
-set noparent
-
-include /sdk/fidl/OWNERS
-
-# Add access for platform version roller
-global-integration-roller@fuchsia-infra.iam.gserviceaccount.com
+include /sdk/history/IN_DEVELOPMENT_API_LEVEL_OWNERS

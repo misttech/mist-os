@@ -18,7 +18,9 @@ TEST_VERSION_HISTORY_FILE_CONTENT = {
         "name": "Platform version map",
         "type": "version_history",
         "api_levels": {
-            "1": {"abi_revision": "0x1", "status": "in-development"}
+            "1": {"abi_revision": "0x41", "status": "supported"},
+            "2": {"abi_revision": "0x52", "status": "in-development"},
+            "3": {"abi_revision": "0x63", "status": "in-development"},
         },
     },
     "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json",
@@ -32,16 +34,22 @@ class TestFreezePlatformVersionMethods(unittest.TestCase):
                 "name": "Platform version map",
                 "type": "version_history",
                 "api_levels": {
-                    "1": {"abi_revision": "0x1", "status": "supported"}
+                    "1": {"abi_revision": "0x41", "status": "supported"},
+                    "2": {"abi_revision": "0x52", "status": "supported"},
+                    "3": {"abi_revision": "0x63", "status": "in-development"},
                 },
             },
             "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json",
         }
 
-        result = freeze_in_development_api_level.freeze_version_history(
+        (
+            level_frozen,
+            updated_history,
+        ) = freeze_in_development_api_level.freeze_version_history(
             TEST_VERSION_HISTORY_FILE_CONTENT
         )
-        self.assertEqual(result, expected_version_history)
+        self.assertEqual(level_frozen, "2")
+        self.assertEqual(updated_history, expected_version_history)
 
 
 if __name__ == "__main__":
