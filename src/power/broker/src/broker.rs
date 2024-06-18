@@ -568,14 +568,23 @@ impl Broker {
             // LeaseStatus was not changed.
             return None;
         };
-        // The lease_status changed, update the required level of the leased
-        // element.
+
+        // The lease_status changed, update the required level of the leased element.
         if let Some(lease) = self.catalog.leases.get(lease_id) {
-            self.update_required_levels(&vec![&lease.element_id.clone()]);
+            let elem_id = lease.element_id.clone();
+            let lease_id = lease.id.clone();
+            self.update_required_levels(&vec![&elem_id]);
+            if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(&elem_id) {
+                elem_inspect
+                    .borrow_mut()
+                    .meta()
+                    .set_and_track(format!("lease_status_{lease_id}"), format!("{status:?}"));
+            }
         } else {
             tracing::warn!("update_lease_status: lease {lease_id} not found");
         }
         tracing::debug!("update_lease_status({lease_id}) to {status:?}");
+
         // Lease has transitioned from satisfied to pending and contingent.
         if prev_status.as_ref() == Some(&LeaseStatus::Satisfied)
             && status == LeaseStatus::Pending
@@ -1157,10 +1166,11 @@ impl Catalog {
         // TODO: Add lease validation and control.
         let lease = Lease::new(&element_id, level);
         if let Ok(elem_inspect) = self.topology.inspect_for_element(element_id) {
-            elem_inspect
-                .borrow_mut()
-                .meta()
-                .set(format!("lease_{}", lease.id.clone()), format!("level_{}", level));
+            let elem_readable_name = self.topology.element_name(element_id);
+            elem_inspect.borrow_mut().meta().set_and_track(
+                format!("lease_{}", lease.id),
+                format!("level_{level}@{elem_readable_name}"), // for example, level_1@elem_name
+            );
         }
         self.leases.insert(lease.id.clone(), lease.clone());
         let element_level = ElementLevel { element_id: element_id.clone(), level: level.clone() };
@@ -1196,7 +1206,13 @@ impl Catalog {
         let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
         self.lease_status.remove(lease_id);
         if let Ok(elem_inspect) = self.topology.inspect_for_element(&lease.element_id) {
-            elem_inspect.borrow_mut().meta().remove(format!("lease_{}", lease.id.clone()).as_str());
+            elem_inspect
+                .borrow_mut()
+                .meta()
+                .remove_and_track(format!("lease_{}", lease.id).as_str());
+            elem_inspect.borrow_mut().meta().remove(format!("lease_status_{}", lease.id).as_str());
+            // lease_ drop events are useful as part of understanding lifecycle.
+            // lease_status_ drop events are redundant with lease_ drops, so we don't record them.
         }
         tracing::debug!("dropping lease({:?})", &lease);
         // Pending claims should be dropped immediately.
@@ -1897,38 +1913,38 @@ mod tests {
                                 relationships: {},
                             },
                         },
-                        "events": {
+                        events: {
                             "0": {
                                 "@time": AnyProperty,
-                                "vertex_id": broker.get_unsatisfiable_element_id().to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "1": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: latinum.to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "2": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": 7u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: 7u64,
                             },
                             "3": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": 5u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: 5u64,
                             },
                         },
         }}}});
@@ -1982,52 +1998,52 @@ mod tests {
                                 relationships: {},
                             },
                         },
-                        "events": {
+                        events: {
                             "0": {
                                 "@time": AnyProperty,
-                                "vertex_id": broker.get_unsatisfiable_element_id().to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "1": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: latinum.to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "2": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": 2u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: 2u64,
                             },
                             "3": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": 0u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: 0u64,
                             },
                             "4": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": 1u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: 1u64,
                             },
                             "5": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": 1u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: 1u64,
                             },
                         },
         }}}});
@@ -2231,38 +2247,38 @@ mod tests {
                                 relationships: {},
                             },
                         },
-                        "events": {
+                        events: {
                             "0": {
                                 "@time": AnyProperty,
-                                "vertex_id": broker.get_unsatisfiable_element_id().to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "1": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: unobtanium.to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "2": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": OFF.level as u64,
+                                vertex_id: unobtanium.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: OFF.level as u64,
                             },
                             "3": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": OFF.level as u64,
+                                vertex_id: unobtanium.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: OFF.level as u64,
                             },
                         },
                     },
@@ -2286,43 +2302,43 @@ mod tests {
                                 relationships: {}
                             },
                         },
-                        "events": {
+                        events: {
                             "0": {
                                 "@time": AnyProperty,
-                                "vertex_id": broker.get_unsatisfiable_element_id().to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "1": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: unobtanium.to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "2": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": OFF.level as u64,
+                                vertex_id: unobtanium.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: OFF.level as u64,
                             },
                             "3": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": OFF.level as u64,
+                                vertex_id: unobtanium.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: OFF.level as u64,
                             },
                             "4": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "remove_vertex",
+                                vertex_id: unobtanium.to_string(),
+                                event: "remove_vertex",
                             },
                         },
         }}}});
@@ -2525,7 +2541,7 @@ mod tests {
                                 },
                             },
                         },
-                        "events": contains {},
+                        events: contains {},
                     },
         }}});
 
@@ -2594,7 +2610,8 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}", lease.id.clone()) => "level_1",
+                                    format!("lease_{}", lease.id) => "level_1@C",
+                                    format!("lease_status_{}", lease.id) => "Satisfied",
                                 },
                                 relationships: {
                                     parent1.to_string() => {
@@ -2608,8 +2625,31 @@ mod tests {
                                 },
                             },
                         },
-                        "events": contains {},
-        }}}});
+                        events: contains {
+                            "14": {
+                                "@time": AnyProperty,
+                                event: "update_key",
+                                key: format!("lease_{}", lease.id),
+                                update: "level_1@C",
+                                vertex_id: child.to_string()
+                            },
+                            "17": {
+                                "@time": AnyProperty,
+                                event: "update_key",
+                                key: format!("lease_status_{}", lease.id),
+                                update: "Pending",
+                                vertex_id: child.to_string()
+                            },
+                            "21": {
+                                "@time": AnyProperty,
+                                event: "update_key",
+                                key: format!("lease_status_{}", lease.id),
+                                update: "Satisfied",
+                                vertex_id: child.to_string()
+                            }
+                        },
+                    },
+        }}});
 
         // Update Child's current level to ON.
         broker.update_current_level(&child, ON);
@@ -3237,7 +3277,8 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}", lease_b_id.clone()) => "level_1",
+                                    format!("lease_{}", lease_b_id) => "level_1@B",
+                                    format!("lease_status_{}", lease_b_id) => "Satisfied",
                                 },
                                 relationships: {
                                     element_a.to_string() => {
@@ -3252,7 +3293,8 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}", lease_c_id.clone()) => "level_1",
+                                    format!("lease_{}", lease_c_id) => "level_1@C",
+                                    format!("lease_status_{}", lease_c_id) => "Satisfied",
                                 },
                                 relationships: {
                                     element_a.to_string() => {

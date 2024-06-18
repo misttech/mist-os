@@ -9,6 +9,7 @@ use fuchsia_inspect_contrib::graph::{
     Digraph as IGraph, DigraphOpts as IGraphOpts, Edge as IGraphEdge, Metadata as IGraphMeta,
     Vertex as IGraphVertex,
 };
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -278,6 +279,12 @@ impl Topology {
     #[cfg(test)]
     pub fn element_exists(&self, element_id: &ElementID) -> bool {
         self.elements.contains_key(element_id)
+    }
+
+    pub fn element_name(&self, element_id: &ElementID) -> Cow<'_, str> {
+        Cow::from(
+            self.elements.get(element_id).and_then(|e| Some(e.name.as_str())).unwrap_or_default(),
+        )
     }
 
     pub fn remove_element(&mut self, element_id: &ElementID) {

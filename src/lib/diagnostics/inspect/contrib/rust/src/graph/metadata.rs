@@ -197,12 +197,24 @@ impl<I: VertexId> VertexGraphMetadata<I> {
         key: impl Into<Cow<'a, str>>,
         value: impl Into<MetadataValue<'b>>,
     ) {
-        self.inner.set(key, value);
+        self.inner.set(key, value, None);
+    }
+
+    pub fn set_and_track<'a, 'b>(
+        &mut self,
+        key: impl Into<Cow<'a, str>>,
+        value: impl Into<MetadataValue<'b>>,
+    ) {
+        self.inner.set(key, value, Some(true));
     }
 
     /// Remove the metadata field at `key`.
     pub fn remove(&mut self, key: &str) {
         self.inner.remove(key);
+    }
+
+    pub fn remove_and_track(&mut self, key: &str) {
+        self.inner.remove_and_track(key);
     }
 
     pub(crate) fn new<'a>(
@@ -241,7 +253,7 @@ impl EdgeGraphMetadata {
         key: impl Into<Cow<'a, str>>,
         value: impl Into<MetadataValue<'b>>,
     ) {
-        self.inner.set(key, value);
+        self.inner.set(key, value, None);
     }
 
     /// Remove the metadata field at `key`.
@@ -335,8 +347,21 @@ where
         (Self { id, node, map, events_tracker }, meta_event_node)
     }
 
-    fn set<'a, 'b>(&mut self, key: impl Into<Cow<'a, str>>, value: impl Into<MetadataValue<'b>>) {
+    fn set<'a, 'b>(
+        &mut self,
+        key: impl Into<Cow<'a, str>>,
+        value: impl Into<MetadataValue<'b>>,
+        maybe_track: Option<bool>,
+    ) {
         let key: Cow<'a, str> = key.into();
+        // Sometimes, dynamically-created properties need tracking.
+        if let Some(choice) = maybe_track {
+            if let Some((_, ref mut track_events)) = self.map.get_mut(key.as_ref()) {
+                if *track_events != choice {
+                    *track_events = choice;
+                }
+            }
+        }
         let value = value.into();
         match (self.map.get(key.as_ref()), value) {
             (
@@ -394,20 +419,32 @@ where
                 // TODO(https://fxbug.dev/338660036): implement later.
             }
             (Some((_, track_events)), value) => {
-                if *track_events {
+                let track_events = *track_events; // drops ownership
+                if track_events {
                     self.log_update_key(key.as_ref(), &value)
                 }
-                let track_events = *track_events;
                 Self::insert_to_map(&self.node, &mut self.map, &[key], value, track_events);
             }
             (None, value) => {
-                Self::insert_to_map(&self.node, &mut self.map, &[key], value, false);
+                let track_events = maybe_track.unwrap_or(false);
+                if track_events {
+                    self.log_update_key(key.as_ref(), &value)
+                }
+                Self::insert_to_map(&self.node, &mut self.map, &[key], value, track_events);
             }
         }
     }
 
     fn remove(&mut self, key: &str) {
         self.map.remove(key);
+    }
+
+    fn remove_and_track(&mut self, key: &str) {
+        if let Some(_) = self.map.remove(key) {
+            if let Some(events_tracker) = &self.events_tracker {
+                events_tracker.metadata_dropped(&self.id, key);
+            }
+        }
     }
 
     fn log_update_key(&self, key: &str, value: &MetadataValue<'_>) {
