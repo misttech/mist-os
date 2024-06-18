@@ -194,9 +194,9 @@ template("network_unified_binary_regular_and_gub_packages") {
   }
 
   # Mimic what fuchsia_package does to ensure we get the same package name.
-  _gup_package_name = target_name
+  _gub_package_name = target_name
   if (defined(invoker.package_name)) {
-    _gup_package_name = invoker.package_name
+    _gub_package_name = invoker.package_name
   }
 
   # Declare the gub fuchsia package, which uses the transformed gub deps and
@@ -208,7 +208,7 @@ template("network_unified_binary_regular_and_gub_packages") {
                              "deps",
                              "package_name",
                            ])
-    package_name = _gup_package_name
+    package_name = _gub_package_name
 
     # Coverage builders OOM when building GUB binaries (see
     # https://fxbug.dev/316891343). Setting the dependencies to an empty list
