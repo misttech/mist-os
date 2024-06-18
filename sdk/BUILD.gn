@@ -420,6 +420,7 @@ group("tests_no_e2e") {
   deps = [
     "//sdk/ctf/plasa:tests",
     "//sdk/lib:tests",
+    "//tools/fidl/abi-compat:check-compatibility",
   ]
 }
 
