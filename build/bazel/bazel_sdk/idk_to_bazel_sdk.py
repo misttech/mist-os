@@ -18,7 +18,11 @@ import typing as T
 _SCRIPT_DIR = Path(__file__).parent
 
 # See comment in BUILD.bazel to see why changing sys.path manually
-# is required here.
+# is required here. Bytecode generation is also disallowed to avoid
+# polluting the Bazel execroot with .pyc files that can end up in
+# the generated TreeArtifact, resulting in issues when dependent
+# actions try to read it.
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(_SCRIPT_DIR))
 from generate_sdk_build_rules import generate_sdk_repository
 
@@ -481,13 +485,14 @@ def main() -> int:
     ]
 
     if not args.bazel_rules_fuchsia:
-        # Assume __file__ is //fuchsia/workspace/sdk_export/<name>.py
+        # Assume __file__ is //build/bazel/bazel_sdk/<name>.py
         # This script can be launched through multiple symlinks from the Bazel execroot or
         # even a build sandbox. Resolve __file__ directly to get the real location
         # of the script in the Fuchsia source checkout, then walk up parent directories
         # to get the correct directory.
         args.bazel_rules_fuchsia = (
-            Path(__file__).resolve().parent.parent.parent.parent
+            Path(__file__).resolve().parent.parent.parent
+            / "bazel_sdk/bazel_rules_fuchsia"
         )
 
     workspace_root = args.bazel_rules_fuchsia
