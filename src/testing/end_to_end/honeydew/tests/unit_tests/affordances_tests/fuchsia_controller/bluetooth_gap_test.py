@@ -125,28 +125,28 @@ class BluetoothGapTest(unittest.TestCase):
     def test_reset_state(self) -> None:
         """Test for BluetoothGap.reset_state() method."""
         self.bluetooth_gap_obj._pairing_delegate_server = mock.MagicMock()
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
         self.bluetooth_gap_obj.reset_state()
         assert self.bluetooth_gap_obj._access_controller_proxy is None
         assert self.bluetooth_gap_obj._host_watcher_controller_proxy is None
         assert self.bluetooth_gap_obj._pairing_controller_proxy is None
         assert self.bluetooth_gap_obj._session_initialized is False
         assert self.bluetooth_gap_obj._pairing_delegate_server is None
-        self.bluetooth_gap_obj._loop.close.assert_called()
+        self.bluetooth_gap_obj.loop.close.assert_called()
 
     def test_accept_pairing(self) -> None:
         """Test for BluetoothGap.accept_pairing() method."""
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
         self.bluetooth_gap_obj.accept_pairing(
             BluetoothAcceptPairing.DEFAULT_INPUT_MODE,
             BluetoothAcceptPairing.DEFAULT_OUTPUT_MODE,
         )
-        self.bluetooth_gap_obj._loop.run_until_complete.assert_called()
+        self.bluetooth_gap_obj.loop.run_until_complete.assert_called()
 
     def test_async_accept_pairing(self) -> None:
         """Test for BluetoothGap._accept_pairing() async method."""
         self.bluetooth_gap_obj._pairing_controller_proxy = mock.MagicMock()
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
         asyncio.run(
             self.bluetooth_gap_obj._accept_pairing(
                 BluetoothAcceptPairing.DEFAULT_INPUT_MODE,
@@ -178,7 +178,7 @@ class BluetoothGapTest(unittest.TestCase):
     def test_connect_device(self, parameterized_dict: dict[str, Any]) -> None:
         """Test for BluetoothGap.connect_device() method."""
         self.bluetooth_gap_obj._access_controller_proxy = mock.MagicMock()
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
         dummy_identifier = "0"
         self.bluetooth_gap_obj.connect_device(
             identifier=dummy_identifier,
@@ -189,13 +189,13 @@ class BluetoothGapTest(unittest.TestCase):
             id=dummy_peer_id
         )
         self.assertEqual(
-            self.bluetooth_gap_obj._loop.run_until_complete.call_count, 2
+            self.bluetooth_gap_obj.loop.run_until_complete.call_count, 2
         )
 
     def test_forget_device(self) -> None:
         """Test for BluetoothGap.forget_device() method."""
         self.bluetooth_gap_obj._access_controller_proxy = mock.MagicMock()
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
         dummy_identifier = "0"
         self.bluetooth_gap_obj.forget_device(
             identifier=dummy_identifier,
@@ -204,12 +204,12 @@ class BluetoothGapTest(unittest.TestCase):
         self.bluetooth_gap_obj._access_controller_proxy.forget.assert_called_with(
             id=dummy_peer_id
         )
-        self.bluetooth_gap_obj._loop.run_until_complete.assert_called_once()
+        self.bluetooth_gap_obj.loop.run_until_complete.assert_called_once()
 
     def test_get_active_adapter_address(self) -> None:
         """Test for BluetoothGap.get_active_adapter_address() method."""
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
-        self.bluetooth_gap_obj._loop.run_until_complete = mock.MagicMock(
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop.run_until_complete = mock.MagicMock(
             return_value="1"
         )
         dummy_address = self.bluetooth_gap_obj.get_active_adapter_address()
@@ -238,8 +238,8 @@ class BluetoothGapTest(unittest.TestCase):
 
     def test_get_known_remote_devices(self) -> None:
         """Test for BluetoothGap.get_known_remote_devices() method."""
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
-        self.bluetooth_gap_obj._loop.run_until_complete = mock.MagicMock(
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop.run_until_complete = mock.MagicMock(
             return_value=_SAMPLE_KNOWN_DEVICES_OUTPUT
         )
         self.bluetooth_gap_obj._access_controller_proxy = mock.MagicMock()
@@ -248,8 +248,8 @@ class BluetoothGapTest(unittest.TestCase):
 
     def test_get_connected_devices(self) -> None:
         """Test for BluetoothGap.get_connected_devices() method."""
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
-        self.bluetooth_gap_obj._loop.run_until_complete = mock.MagicMock(
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop.run_until_complete = mock.MagicMock(
             return_value=_SAMPLE_KNOWN_DEVICES_OUTPUT
         )
         self.bluetooth_gap_obj._access_controller_proxy = mock.MagicMock()
@@ -276,7 +276,7 @@ class BluetoothGapTest(unittest.TestCase):
     def test_pair_device(self, parameterized_dict: dict[str, Any]) -> None:
         """Test for BluetoothGap.pair_device() method."""
         self.bluetooth_gap_obj._access_controller_proxy = mock.MagicMock()
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
         dummy_identifier = "0"
         self.bluetooth_gap_obj.pair_device(
             identifier=dummy_identifier,
@@ -290,7 +290,7 @@ class BluetoothGapTest(unittest.TestCase):
             id=dummy_peer_id, options=dummy_options
         )
         self.assertEqual(
-            self.bluetooth_gap_obj._loop.run_until_complete.call_count, 2
+            self.bluetooth_gap_obj.loop.run_until_complete.call_count, 2
         )
 
     @parameterized.expand(
@@ -333,7 +333,7 @@ class BluetoothGapTest(unittest.TestCase):
         if parameterized_dict.get("token"):
             self.bluetooth_gap_obj.discovery_token = mock.MagicMock()
         self.bluetooth_gap_obj._access_controller_proxy = mock.MagicMock()
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
         if parameterized_dict.get("token") and parameterized_dict.get(
             "discovery"
         ):
@@ -343,7 +343,7 @@ class BluetoothGapTest(unittest.TestCase):
             self.bluetooth_gap_obj.request_discovery(discovery=True)
             self.bluetooth_gap_obj._access_controller_proxy.start_discovery.assert_called_once()
             self.assertEqual(
-                self.bluetooth_gap_obj._loop.run_until_complete.call_count, 1
+                self.bluetooth_gap_obj.loop.run_until_complete.call_count, 1
             )
         else:
             self.bluetooth_gap_obj.request_discovery(discovery=False)
@@ -387,7 +387,7 @@ class BluetoothGapTest(unittest.TestCase):
         if parameterized_dict.get("token"):
             self.bluetooth_gap_obj.discoverable_token = mock.MagicMock()
         self.bluetooth_gap_obj._access_controller_proxy = mock.MagicMock()
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
         if not parameterized_dict.get("discoverable"):
             self.bluetooth_gap_obj.set_discoverable(discoverable=False)
             assert self.bluetooth_gap_obj.discoverable_token is None
@@ -399,7 +399,7 @@ class BluetoothGapTest(unittest.TestCase):
             self.bluetooth_gap_obj.set_discoverable(discoverable=True)
             self.bluetooth_gap_obj._access_controller_proxy.make_discoverable.assert_called_once()
             self.assertEqual(
-                self.bluetooth_gap_obj._loop.run_until_complete.call_count, 1
+                self.bluetooth_gap_obj.loop.run_until_complete.call_count, 1
             )
 
     @parameterized.expand(
@@ -427,10 +427,10 @@ class BluetoothGapTest(unittest.TestCase):
             with self.assertRaises(errors.BluetoothError):
                 self.bluetooth_gap_obj.run_pairing_delegate()
         self.bluetooth_gap_obj._pairing_delegate_server = mock.MagicMock()
-        self.bluetooth_gap_obj._loop = mock.MagicMock()
+        self.bluetooth_gap_obj.loop = mock.MagicMock()
         self.bluetooth_gap_obj.run_pairing_delegate()
         self.assertEqual(
-            self.bluetooth_gap_obj._loop.run_until_complete.call_count, 1
+            self.bluetooth_gap_obj.loop.run_until_complete.call_count, 1
         )
 
 
