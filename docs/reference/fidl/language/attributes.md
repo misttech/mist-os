@@ -44,8 +44,8 @@ Illustrates both aspects:
 ## `@available` {#available}
 
 **USAGE**: `@available(platform="`_string_`", added=`_version_`,
-deprecated=`_version_`, removed=`_version_`, removed=`_version_`,
-note="`_string_`", legacy=`_legacy_`)`
+deprecated=`_version_`, removed=`_version_`, replaced=`_version_`,
+renamed="`_string_`", note="`_string_`")`
 
 **MEANING**:
 All arguments are optional, but at least one must be provided.
@@ -54,15 +54,15 @@ All arguments are optional, but at least one must be provided.
   Must be a valid [library name element][identifiers]. If omitted, defaults to
   the first element of the library name.
 * `added`, `deprecated`, `removed`, `replaced`: Must be an integer from 1 to
-  2^63-1 or the special constant `HEAD`. Cannot be `LEGACY`.
+  2^31-1 (inclusive), or one of the special constants `NEXT` and `HEAD`.
     * `removed` and `replaced` are mutually exclusive.
     * Must respect `added <= deprecated < removed` or
       `added <= deprecated < replaced`.
+* `renamed`: Only allowed if `removed` or `replaced` is provided. Specifies the
+  new name of the element after it is removed or replaced.
 * `note`: Only allowed if `deprecated` is provided. Should contain a brief
   explanation indicating what to use instead, suitable to be included in
   compiler error messages.
-* `legacy`: Only allowed if `removed` is provided or inherited. False by
-  default. If true, the element is included in the `LEGACY` version.
 
 See [FIDL versioning](versioning.md) for more details.
 

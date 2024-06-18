@@ -21,10 +21,9 @@ The following sections explain how to manage this lifecycle as an API developer.
 ### Adding FIDL APIs {#adding}
 
 Always annotate new FIDL APIs with an
-[@available](/docs/reference/fidl/language/versioning.md)
-attribute. Unstable APIs should be added at the `HEAD`
-API level. Note that partners using the SDK cannot target
-the `HEAD` API level, by design.
+[`@available`](/docs/reference/fidl/language/versioning.md) attribute. Unstable
+APIs should be added at the `HEAD` API level. Note that partners using the SDK
+cannot target the `HEAD` API level, by design.
 
 For example:
 
@@ -113,60 +112,31 @@ added. For example:
 
 ### Removing FIDL APIs {#removing}
 
-Note that you should always [deprecate](#deprecating) an API
-before removing it, and you should [preserve the ABI](#preserving)
-when removing an API whenever possible.
+Note that you should always [deprecate](#deprecating) an API before removing it.
 
-The recommended way to remove an API is to use its @available attribute. This is
-the method we generally recommend. For example, if an API was added at level 10,
-it can be removed at level 12 like this:
+To remove an API that was added in a stable level, use the `@available`
+attribute's `removed` argument. For example, to remove a method at level 12:
 
 ```
-@available(added=10, removed=12)
-library fuchsia.examples.docs;
-```
-
-In this example, an end developer targeting levels 10 or 11 would see client
-bindings for the fuchsia.examples.docs library, but a developer targeting level
-12 or greater would not. If this API's source is removed before the platform
-drops support for API level 12, the API's static compatibility tests will fail
-and special approval from //sdk/history/OWNERS will be required to submit the
-change. When the Fuchsia platform drops support for API level 12 the API's source
-code can be deleted.
-
-Alternatively, you can delete the API's source code which is not recommended for
-most use cases. If the API was added at the in development API level or a
-previous API level which is currently supported,  this removes the API from
-Fuchsia's history which is generally not allowed. Static compatibility tests
-will fail in this case and you will need special approval from
-`//sdk/history/OWNERS` to submit the changes. If the API was added at any level
-greater than the in development API level - including the special `HEAD` API
-level  - then this method of removal is fine.
-
-### Preserving ABI when removing FIDL APIs {#preserving}
-
-It's possible to remove an API's client bindings from SDKs - preventing future
-end developers from targeting the API - while preserving the platform's
-implementation of the API (The ABI). This feature allows existing applications
-to run on newer versions of the platform. When an API has been removed from SDKs
-and the platform still supports its ABI, we say the platform has legacy
-[support](/docs/reference/fidl/language/versioning.md#legacy)
-for that API.
-
-To maintain legacy support for an API, set legacy=true when removing the API.
-For example:
-
-```fidl
-protocol LegacyExample {
-    @available(added=10, deprecated=11, removed=12, legacy=true)
-    LegacyMethod();
+protocol Example {
+    @available(added=10, removed=12)
+    Run() -> ();
 };
 ```
 
-All methods in the Fuchsia platform should retain legacy support when they are
-removed. Once the Fuchsia platform drops support for all API levels before the
-method's removal, it is safe to remove `legacy=true` and the method's
-implementation.
+In this example, an end developer targeting levels 10 or 11 would see client
+bindings for the `Run` method, but a developer targeting level 12 or greater
+would not. Developers working on the Fuchsia platform would see bindings for the
+`Run` method as long as 10 or 11 remain supported API levels, since the platform
+build targets the set of all supported API levels.
+
+Once the platform drops support for levels 10 and 11, you can delete the `Run`
+method from the FIDL file if you wish. If you delete it while levels 10 or 11
+are still supported, static compatibility tests will fail and special approval
+from //sdk/history/OWNERS will be required to submit the change.
+
+To remove an API that was added at an unstable level such as `NEXT` or `HEAD`,
+you can simply delete it from the FIDL file.
 
 ## Designing APIs that evolve gracefully {#evolve-gracefully}
 

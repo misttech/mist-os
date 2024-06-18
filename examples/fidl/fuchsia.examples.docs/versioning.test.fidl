@@ -15,10 +15,10 @@ const ANSWER uint64 = 42;
 
 // [START inheritance]
 @available(added=2, deprecated=3)
-protocol Versioned {
+open protocol Versioned {
     // Equivalent to `@available(added=2, deprecated=3, removed=4)`.
     @available(removed=4)
-    Removed(table {
+    flexible Removed(table {
         // Equivalent to `@available(added=3, deprecated=3, removed=4)`.
         @available(added=3)
         1: message string;
@@ -27,7 +27,7 @@ protocol Versioned {
 // [END inheritance]
 
 // [START deprecation]
-protocol Example {
+open protocol Example {
     /// (Description of the method.)
     ///
     /// # Deprecation
@@ -35,10 +35,10 @@ protocol Example {
     /// (Detailed explanation of why the method is deprecated, the timeline for
     /// removing it, and what should be used instead.)
     @available(deprecated=5, removed=6, note="use Replacement")
-    Deprecated();
+    flexible Deprecated();
 
     @available(added=5)
-    Replacement();
+    flexible Replacement();
 };
 // [END deprecation]
 
@@ -54,12 +54,40 @@ type Color = flexible enum { // Note: flexible instead of strict
 };
 // [END replaced]
 
-// [START legacy]
-protocol LegacyExample {
-    @available(deprecated=5, removed=6, note="...")
-    LegacyMethod();
+// [START renamed]
+type User = table {
+    @available(replaced=2, renamed="first_name")
+    1: name string;
+    @available(added=2)
+    1: first_name string;
 };
-// [END legacy]
+// [END renamed]
+
+// [START rename_declaration]
+@available(deprecated=2, removed=3, note="renamed to Information")
+type Info = table {};
+
+@available(added=2)
+type Information = table {};
+// [END rename_declaration]
+
+// [START discourage_use]
+open protocol Door {
+    @available(removed=5, renamed="DeprecatedOpen")
+    flexible Open() -> ();
+};
+// [END discourage_use]
+
+// [START reuse_name]
+open protocol Door2 {
+    @available(removed=5, renamed="DeprecatedOpen")
+    flexible Open() -> ();
+
+    @available(added=5)
+    @selector("NewOpen")
+    flexible Open() -> () error uint32;
+};
+// [END reuse_name]
 
 // [START references]
 const VALUE uint32 = 5;
