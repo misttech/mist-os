@@ -142,6 +142,7 @@ fuchsia_component("hello_starnix") {
 }
 
 fuchsia_package("zxdb_e2e_inferiors") {
+  testonly = true
   deps = [
     ":async_rust",
     ":bitfield",
