@@ -28,6 +28,7 @@
 #include <usb/request-cpp.h>
 #include <usb/usb.h>
 
+#include "src/devices/usb/drivers/dwc2/dwc2_config.h"
 #include "src/devices/usb/drivers/dwc2/usb_dwc_regs.h"
 #include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint-server.h"
 #include "src/devices/usb/lib/usb-phy/include/usb-phy/usb-phy.h"
@@ -45,7 +46,7 @@ class Dwc2 : public Dwc2Type,
       : Dwc2Type(parent), dispatcher_(dispatcher), outgoing_(dispatcher) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
-  zx_status_t Init();
+  zx_status_t Init(const dwc2_config::Config& config);
   int IrqThread();
 
   // Device protocol implementation.

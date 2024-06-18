@@ -16,6 +16,7 @@
 #include <lib/zx/time.h>
 #include <threads.h>
 #include <zircon/status.h>
+#include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 
@@ -952,8 +953,15 @@ void Dwc2::SetConnected(bool connected) {
 }
 
 zx_status_t Dwc2::Create(void* ctx, zx_device_t* parent) {
+  zx_handle_t structured_config_vmo;
+  zx_status_t status = device_get_config_vmo(parent, &structured_config_vmo);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get config vmo: %s", zx_status_get_string(status));
+    return status;
+  }
+
   auto dev = std::make_unique<Dwc2>(parent, fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  auto status = dev->Init();
+  status = dev->Init(dwc2_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo)));
   if (status != ZX_OK) {
     return status;
   }
@@ -963,7 +971,7 @@ zx_status_t Dwc2::Create(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-zx_status_t Dwc2::Init() {
+zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
   pdev_ = ddk::PDevFidl::FromFragment(parent());
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "Dwc2::Create: could not get platform device protocol");
@@ -995,7 +1003,8 @@ zx_status_t Dwc2::Init() {
     return status;
   }
 
-  status = pdev_.GetInterrupt(0, &irq_);
+  // If suspend is enabled, set interrupt to wakeable.
+  status = pdev_.GetInterrupt(0, config.enable_suspend() ? ZX_INTERRUPT_WAKE_VECTOR : 0, &irq_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Dwc2::Init GetInterrupt failed: %d", status);
     return status;
