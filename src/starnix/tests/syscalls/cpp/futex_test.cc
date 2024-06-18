@@ -372,4 +372,58 @@ TEST(FutexTest, WaitRestartableOnSignal) {
   EXPECT_TRUE(helper.WaitForChildren());
 }
 
+TEST(FutexTest, CanRequeueAllWaiters) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    auto futex_basic = [](std::atomic<uint32_t> *addr, uint32_t op, uint32_t val) {
+      return syscall(SYS_futex, addr, op, val, NULL, NULL, 0);
+    };
+
+    auto futex_requeue_all = [](std::atomic<uint32_t> *addr, std::atomic<uint32_t> *addr2) {
+      return syscall(SYS_futex, addr, FUTEX_REQUEUE, 0, INT_MAX, addr2, 0);
+    };
+
+    std::atomic<uint32_t> futex_word = 0;
+    std::atomic<uint32_t> requeue_futex_word = 0;
+    std::atomic<size_t> awakened = 0;
+
+    auto waiter_func = [&futex_word, &awakened, &futex_basic]() {
+      long res = SAFE_SYSCALL(futex_basic(&futex_word, FUTEX_WAIT, 0));
+      EXPECT_EQ(res, 0);
+      awakened++;
+    };
+
+    std::vector<std::thread> threads;
+
+    constexpr size_t kNumThreads = 10;
+    for (size_t i = 0; i < kNumThreads; i++) {
+      threads.push_back(std::thread(waiter_func));
+    }
+
+    EXPECT_EQ(awakened, 0u);
+
+    long requeued = 0;
+    while (requeued != kNumThreads) {
+      requeued += SAFE_SYSCALL(futex_requeue_all(&futex_word, &requeue_futex_word));
+      sched_yield();
+    }
+
+    EXPECT_EQ(awakened, 0u);
+
+    // We cannot wake anyone in the first futex.
+    futex_word = 1;
+    EXPECT_EQ(futex_basic(&futex_word, FUTEX_WAKE, INT_MAX), 0);
+
+    // We can wake kNumThreads in the second futex.
+    requeue_futex_word = 1;
+    while (awakened != kNumThreads) {
+      SAFE_SYSCALL(futex_basic(&requeue_futex_word, FUTEX_WAKE, INT_MAX));
+    }
+
+    for (auto &thread : threads) {
+      thread.join();
+    }
+  });
+}
+
 }  // anonymous namespace

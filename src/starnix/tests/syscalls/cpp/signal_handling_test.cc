@@ -926,6 +926,95 @@ TEST(SignalHandling, ExitSignalIsAProcessSignal) {
 
 void empty_signal_handler(int, siginfo_t *, void *) {}
 
+TEST(SignalHandling, SignalDeliveryWakesOnlyOneFutex) {
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([&]() {
+    struct sigaction sig_action = {};
+    sig_action.sa_sigaction = empty_signal_handler;
+    sig_action.sa_flags = SA_SIGINFO;
+    SAFE_SYSCALL(sigaction(SIGUSR1, &sig_action, nullptr));
+
+    auto block_sigusr1 = []() -> sigset_t {
+      sigset_t block_mask, old_mask;
+      sigemptyset(&block_mask);
+      sigaddset(&block_mask, SIGUSR1);
+      SAFE_SYSCALL(pthread_sigmask(SIG_BLOCK, &block_mask, &old_mask));
+      return old_mask;
+    };
+
+    auto futex_wait = [](std::atomic<uint32_t> *uaddr, uint32_t value) -> long {
+      return syscall(SYS_futex, uaddr, FUTEX_WAIT, value, 0, 0, nullptr);
+    };
+
+    auto futex_wake = [](std::atomic<uint32_t> *uaddr, uint32_t waiters) -> long {
+      return syscall(SYS_futex, uaddr, FUTEX_WAKE, waiters, 0, 0, nullptr);
+    };
+
+    auto futex_requeue_all = [](std::atomic<uint32_t> *uaddr,
+                                std::atomic<uint32_t> *new_addr) -> long {
+      return syscall(SYS_futex, uaddr, FUTEX_REQUEUE, 0, INT_MAX, new_addr, 0);
+    };
+
+    std::atomic<uint32_t> interrupt_count = 0;
+    std::atomic<uint32_t> awakened = 0;
+    std::atomic<uint32_t> futex_word = 0;
+    std::atomic<uint32_t> requeue_futex_word = 0;
+    std::atomic<uint32_t> thread_was_interrupted = 0;
+
+    auto thread_func = [&interrupt_count, &futex_word, &futex_wait, &thread_was_interrupted,
+                        &futex_wake, &awakened]() {
+      long res = futex_wait(&futex_word, 0);
+      if (res == -1 && errno == EINTR) {
+        interrupt_count += 1;
+        thread_was_interrupted = 1;
+        futex_wake(&thread_was_interrupted, 1);
+      }
+      awakened++;
+    };
+
+    std::vector<std::thread> threads;
+    constexpr size_t kNumThreads = 10;
+    for (size_t i = 0; i < kNumThreads; i++) {
+      threads.push_back(std::thread(thread_func));
+    }
+
+    block_sigusr1();
+
+    // In order to check whether the threads are waiting on the futex, we
+    // requeue them onto a new futex word. Once all the threads are requeued, we
+    // know that they are waiting there.
+    long requeued = 0;
+    while (requeued != kNumThreads) {
+      requeued += SAFE_SYSCALL(futex_requeue_all(&futex_word, &requeue_futex_word));
+      sched_yield();
+    }
+
+    // Deliver a signal, it should only be received by only one of the futexes.
+    SAFE_SYSCALL(kill(getpid(), SIGUSR1));
+
+    // Wait for the thread to be awaken.
+    while (thread_was_interrupted == 0) {
+      long res = futex_wait(&thread_was_interrupted, 0);
+      ASSERT_TRUE(res == 0 || (res == -1 && errno == EAGAIN));
+    }
+
+    long futex_awakened = 0;
+    requeue_futex_word = 1;
+    while (awakened != kNumThreads) {
+      futex_awakened += SAFE_SYSCALL(futex_wake(&requeue_futex_word, INT_MAX));
+      sched_yield();
+    }
+
+    for (auto &thread : threads) {
+      thread.join();
+    }
+
+    EXPECT_EQ(interrupt_count, 1U);
+    EXPECT_EQ(static_cast<size_t>(futex_awakened), kNumThreads - 1);
+  });
+}
+
 TEST(SignalHandling, FutexIsInterruptedBySignalHandler) {
   test_helper::ForkHelper helper;
 
