@@ -2647,7 +2647,7 @@ TEST(VmoTestCase, VmoUnbounded) {
   clone.reset();
 }
 
-// Helper function which will  map the passed VMO & cause a read to write permission fault on the
+// Helper function which will map the passed VMO & cause a read to write permission fault on the
 // first two pages. Passed VMO must be at least two pages in length.
 void ProtectToWriteTestHelper(zx::vmo *vmo, const size_t len) {
   ASSERT_GE(len, 2 * zx_system_get_page_size());
@@ -2661,12 +2661,12 @@ void ProtectToWriteTestHelper(zx::vmo *vmo, const size_t len) {
   *reinterpret_cast<uint64_t *>(vaddr) = 0xdead1eaf;
 
   // Protect to remove write permissions.
-  zx::vmar::root_self()->protect(ZX_VM_PERM_READ, vaddr, len);
+  ASSERT_OK(zx::vmar::root_self()->protect(ZX_VM_PERM_READ, vaddr, len));
 
   EXPECT_EQ(*reinterpret_cast<uint64_t *>(vaddr), 0xdead1eaf);
 
   // Add back write permissions
-  zx::vmar::root_self()->protect(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, vaddr, len);
+  ASSERT_OK(zx::vmar::root_self()->protect(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, vaddr, len));
 
   *reinterpret_cast<uint64_t *>(vaddr) = 0xc0ffee;
   *reinterpret_cast<uint64_t *>(vaddr + zx_system_get_page_size()) = 0xc0ffee;
@@ -2690,12 +2690,12 @@ TEST(VmoTestCase, ProtectToWrite) {
 
   phys = std::move(result.value());
 
-  ProtectToWriteTestHelper(&phys.vmo, len);
+  ASSERT_NO_FATAL_FAILURE(ProtectToWriteTestHelper(&phys.vmo, len));
 
   // Paged VMO.
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(len, 0, &vmo));
-  ProtectToWriteTestHelper(&vmo, len);
+  ASSERT_NO_FATAL_FAILURE(ProtectToWriteTestHelper(&vmo, len));
 }
 
 // Prefetch on an anonymous VMO only has an effect of decompressing pages, which we cannot trigger
