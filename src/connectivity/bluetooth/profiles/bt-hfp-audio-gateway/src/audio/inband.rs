@@ -285,14 +285,14 @@ impl InbandAudioControl {
         let (client, sink) = SoftStreamConfig::create_input(
             &audio_dev_id,
             "Fuchsia",
-            super::DEVICE_NAME,
+            "Bluetooth HFP",
             Self::LOCAL_MONOTONIC_CLOCK_DOMAIN,
             codec_id.try_into()?,
             Self::AUDIO_BUFFER_DURATION,
         )
         .map_err(|e| AudioError::audio_core(format_err!("Couldn't create input: {e:?}")))?;
 
-        self.audio_core.add_device_by_channel(super::DEVICE_NAME, true, client)?;
+        self.audio_core.add_device_by_channel("Bluetooth HFP", true, client)?;
         Ok(sink)
     }
 
@@ -305,14 +305,14 @@ impl InbandAudioControl {
         let (client, stream) = SoftStreamConfig::create_output(
             &audio_dev_id,
             "Fuchsia",
-            super::DEVICE_NAME,
+            "Bluetooth HFP",
             Self::LOCAL_MONOTONIC_CLOCK_DOMAIN,
             codec_id.try_into()?,
             Self::AUDIO_BUFFER_DURATION,
             zx::Duration::from_millis(0),
         )
         .map_err(|e| AudioError::audio_core(format_err!("Couldn't create output: {e:?}")))?;
-        self.audio_core.add_device_by_channel(super::DEVICE_NAME, false, client)?;
+        self.audio_core.add_device_by_channel("Bluetooth HFP", false, client)?;
         Ok(stream)
     }
 }

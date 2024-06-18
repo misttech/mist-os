@@ -14,7 +14,6 @@ rustc_binary("bin") {
 
   deps = [
     ":hfp_profile_config",
-    "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",
     "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.hfp:fuchsia.bluetooth.hfp_rust",
@@ -68,7 +67,6 @@ rustc_binary("bin") {
   sources = [
     "src/a2dp.rs",
     "src/audio.rs",
-    "src/audio/codec.rs",
     "src/audio/dai.rs",
     "src/audio/inband.rs",
     "src/config.rs",

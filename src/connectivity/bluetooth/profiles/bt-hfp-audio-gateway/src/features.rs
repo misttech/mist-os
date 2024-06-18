@@ -139,27 +139,6 @@ impl TryFrom<CodecId> for media::PcmFormat {
     }
 }
 
-impl TryFrom<CodecId> for fidl_fuchsia_hardware_audio::DaiSupportedFormats {
-    type Error = AudioError;
-
-    fn try_from(value: CodecId) -> Result<Self, Self::Error> {
-        let frames_per_second = match value {
-            CodecId::CVSD => 64000,
-            CodecId::MSBC => 16000,
-            _ => return Err(unsupported_codec_id(value)),
-        };
-        use fidl_fuchsia_hardware_audio::*;
-        Ok(DaiSupportedFormats {
-            number_of_channels: vec![1],
-            sample_formats: vec![fidl_fuchsia_hardware_audio::DaiSampleFormat::PcmSigned],
-            frame_formats: vec![DaiFrameFormat::FrameFormatStandard(DaiFrameFormatStandard::I2S)],
-            frame_rates: vec![frames_per_second],
-            bits_per_slot: vec![16],
-            bits_per_sample: vec![16],
-        })
-    }
-}
-
 impl TryFrom<CodecId> for media::DomainFormat {
     type Error = AudioError;
 
