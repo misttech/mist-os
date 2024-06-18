@@ -1645,7 +1645,7 @@ protocol Test {
   ASSERT_EQ(protocol->methods.size(), 1u);
   auto& method = protocol->methods[0];
   auto method_request = method.maybe_request.get();
-  EXPECT_EQ(method.has_request, true);
+  EXPECT_EQ(method.kind, Protocol::Method::Kind::kOneWay);
   ASSERT_NE(method_request, nullptr);
 
   auto id = static_cast<const IdentifierType*>(method_request->type);
@@ -1675,8 +1675,8 @@ protocol Test {
   ASSERT_NE(protocol, nullptr);
   ASSERT_EQ(protocol->methods.size(), 1u);
   auto& method = protocol->methods[0];
+  EXPECT_EQ(method.kind, Protocol::Method::Kind::kTwoWay);
   auto method_response = method.maybe_response.get();
-  EXPECT_EQ(method.has_response, true);
   ASSERT_NE(method_response, nullptr);
 
   auto id = static_cast<const IdentifierType*>(method_response->type);
@@ -1721,8 +1721,8 @@ protocol MessagePort {
   auto message_port = library.LookupProtocol("MessagePort");
   ASSERT_EQ(message_port->methods.size(), 1u);
   auto& post_message = message_port->methods[0];
+  EXPECT_EQ(post_message.kind, Protocol::Method::Kind::kTwoWay);
   auto post_message_request = post_message.maybe_request.get();
-  EXPECT_EQ(post_message.has_request, true);
 
   auto id = static_cast<const IdentifierType*>(post_message_request->type);
   auto as_struct = static_cast<const Struct*>(id->type_decl);
@@ -1763,8 +1763,8 @@ protocol MessagePort {
   auto message_port = library.LookupProtocol("MessagePort");
   ASSERT_EQ(message_port->methods.size(), 1u);
   auto& post_message = message_port->methods[0];
+  EXPECT_EQ(post_message.kind, Protocol::Method::Kind::kTwoWay);
   auto post_message_request = post_message.maybe_request.get();
-  EXPECT_EQ(post_message.has_request, true);
 
   auto id = static_cast<const IdentifierType*>(post_message_request->type);
   auto as_struct = static_cast<const Struct*>(id->type_decl);
@@ -1805,8 +1805,8 @@ protocol MessagePort {
   auto message_port = library.LookupProtocol("MessagePort");
   ASSERT_EQ(message_port->methods.size(), 1u);
   auto& post_message = message_port->methods[0];
+  EXPECT_EQ(post_message.kind, Protocol::Method::Kind::kTwoWay);
   auto post_message_request = post_message.maybe_request.get();
-  EXPECT_EQ(post_message.has_request, true);
 
   auto id = static_cast<const IdentifierType*>(post_message_request->type);
   auto as_struct = static_cast<const Struct*>(id->type_decl);
@@ -1847,8 +1847,8 @@ protocol MessagePort {
   auto message_port = library.LookupProtocol("MessagePort");
   ASSERT_EQ(message_port->methods.size(), 1u);
   auto& post_message = message_port->methods[0];
+  EXPECT_EQ(post_message.kind, Protocol::Method::Kind::kTwoWay);
   auto post_message_request = post_message.maybe_request.get();
-  EXPECT_EQ(post_message.has_request, true);
 
   auto id = static_cast<const IdentifierType*>(post_message_request->type);
   auto as_struct = static_cast<const Struct*>(id->type_decl);
@@ -2240,9 +2240,8 @@ protocol Child {
   auto child = child_library.LookupProtocol("Child");
   ASSERT_EQ(child->all_methods.size(), 1u);
   auto& sync_with_info = child->all_methods[0];
-  auto sync_request = sync_with_info.method->maybe_request.get();
-  EXPECT_EQ(sync_with_info.method->has_request, true);
-  EXPECT_EQ(sync_request, nullptr);
+  EXPECT_EQ(sync_with_info.method->kind, Protocol::Method::Kind::kTwoWay);
+  EXPECT_EQ(sync_with_info.method->maybe_request, nullptr);
 }
 
 TEST(TypeshapeTests, GoodUnionSize8Alignment4Sandwich) {

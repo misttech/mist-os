@@ -211,6 +211,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 8904504160365833729,
           "name": "SendHandles",
           "strict": true,

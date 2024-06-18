@@ -191,6 +191,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 8948968077914418681,
           "name": "OneWayBasic",
           "strict": true,
@@ -221,6 +222,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 2331618702752598159,
           "name": "TwoWayBasic",
           "strict": true,
@@ -265,6 +267,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 5016634351643393939,
           "name": "ErrorBasic",
           "strict": true,
@@ -322,6 +325,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 5892309624949902400,
           "name": "EventBasic",
           "strict": true,
@@ -352,6 +356,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 3153289648860022476,
           "name": "OneWayCompound",
           "strict": true,
@@ -382,6 +387,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 8787219719097524529,
           "name": "TwoWayCompound",
           "strict": true,
@@ -426,6 +432,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 2990809657626249085,
           "name": "ErrorCompound",
           "strict": true,
@@ -483,6 +490,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 7024581948727571669,
           "name": "EventCompound",
           "strict": true,
@@ -513,6 +521,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 7125516817014311449,
           "name": "OneWayArrayBasic",
           "strict": true,
@@ -543,6 +552,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 5309034178175279380,
           "name": "TwoWayArrayBasic",
           "strict": true,
@@ -587,6 +597,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 1084731895342694265,
           "name": "ErrorArrayBasic",
           "strict": true,
@@ -644,6 +655,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 5888282827283820590,
           "name": "EventArrayBasic",
           "strict": true,
@@ -674,6 +686,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 5064659223443251357,
           "name": "OneWayArrayCompound",
           "strict": true,
@@ -704,6 +717,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 849744466051983995,
           "name": "TwoWayArrayCompound",
           "strict": true,
@@ -748,6 +762,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 5919277476782807556,
           "name": "ErrorArrayCompound",
           "strict": true,
@@ -805,6 +820,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 2189769767733851157,
           "name": "EventArrayCompound",
           "strict": true,
@@ -835,6 +851,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 5733220720079947351,
           "name": "OneWayVectorBasic",
           "strict": true,
@@ -865,6 +882,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 8674156353091415668,
           "name": "TwoWayVectorBasic",
           "strict": true,
@@ -909,6 +927,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 875941614196965234,
           "name": "ErrorVectorBasic",
           "strict": true,
@@ -966,6 +985,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 4583890770109526006,
           "name": "EventVectorBasic",
           "strict": true,
@@ -996,6 +1016,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 1853985797298830992,
           "name": "OneWayVectorCompound",
           "strict": true,
@@ -1026,6 +1047,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 3968024057912959924,
           "name": "TwoWayVectorCompound",
           "strict": true,
@@ -1070,6 +1092,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 8506780203315865989,
           "name": "ErrorVectorCompound",
           "strict": true,
@@ -1127,6 +1150,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 6026375226599919603,
           "name": "EventVectorCompound",
           "strict": true,
@@ -1157,6 +1181,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 1530215841195476271,
           "name": "OneWayVectorOptional",
           "strict": true,
@@ -1187,6 +1212,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 1030024737742222323,
           "name": "TwoWayVectorOptional",
           "strict": true,
@@ -1231,6 +1257,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 6406191217027936606,
           "name": "ErrorVectorOptional",
           "strict": true,
@@ -1288,6 +1315,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 1684763340073130077,
           "name": "EventVectorOptional",
           "strict": true,
@@ -1318,6 +1346,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 5912603762133524183,
           "name": "OneWayArrayVectorNested",
           "strict": true,
@@ -1348,6 +1377,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 5351275678438791132,
           "name": "TwoWayArrayVectorNested",
           "strict": true,
@@ -1392,6 +1422,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 9085604921605802151,
           "name": "ErrorArrayVectorNested",
           "strict": true,
@@ -1449,6 +1480,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 1228201560727880574,
           "name": "EventArrayVectorNested",
           "strict": true,
@@ -1479,6 +1511,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 6553996787849601058,
           "name": "OneWayResource",
           "strict": true,
@@ -1509,6 +1542,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 1802709005492464987,
           "name": "TwoWayResource",
           "strict": true,
@@ -1553,6 +1587,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 6568609240497354166,
           "name": "ErrorResource",
           "strict": true,
@@ -1610,6 +1645,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 5745997765922613643,
           "name": "EventResource",
           "strict": true,

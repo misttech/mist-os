@@ -240,6 +240,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 6023439637367187273,
           "name": "Method",
           "strict": true,

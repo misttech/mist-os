@@ -35,6 +35,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 1107623248440401476,
           "name": "foo",
           "strict": true,

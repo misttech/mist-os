@@ -46,6 +46,7 @@
       ],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 3973163707930985819,
           "name": "First",
           "strict": true,
@@ -76,6 +77,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 2545123272820824165,
           "name": "Second",
           "strict": true,
@@ -120,6 +122,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 3973163707930985819,
           "name": "First",
           "strict": true,

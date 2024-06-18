@@ -63,6 +63,7 @@
       ],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 2602591870026304272,
           "name": "OneWayComposed",
           "strict": true,
@@ -93,6 +94,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 2542459230546612144,
           "name": "TwoWayComposed",
           "strict": true,
@@ -137,6 +139,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 7681984876526769495,
           "name": "TwoWayComposedWithError",
           "strict": true,
@@ -208,6 +211,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 1872339328378152762,
           "name": "OnComposed",
           "strict": true,
@@ -238,6 +242,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 7755175439334311701,
           "name": "OneWayLocal",
           "strict": true,
@@ -268,6 +273,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 8374292137648566031,
           "name": "TwoWayLocal",
           "strict": true,
@@ -312,6 +318,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 2898559119954589948,
           "name": "TwoWayLocalWithError",
           "strict": true,
@@ -383,6 +390,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 5135782819583756313,
           "name": "OnLocal",
           "strict": true,
@@ -413,6 +421,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 3344777159365288972,
           "name": "OneWayImport",
           "strict": true,
@@ -443,6 +452,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 2374708679656510579,
           "name": "TwoWayImport",
           "strict": true,
@@ -487,6 +497,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 4286143084949642173,
           "name": "TwoWayImportWithError",
           "strict": true,
@@ -558,6 +569,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 1996489653379631369,
           "name": "OnImport",
           "strict": true,
@@ -588,6 +600,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 811587311021806764,
           "name": "OneWayAnon",
           "strict": true,
@@ -618,6 +631,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 629880979996923737,
           "name": "TwoWayAnon",
           "strict": true,
@@ -662,6 +676,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 6368863385719175734,
           "name": "TwoWayAnonWithError",
           "strict": true,
@@ -733,6 +748,7 @@
           }
         },
         {
+          "kind": "event",
           "ordinal": 4815229650203439104,
           "name": "OnAnon",
           "strict": true,

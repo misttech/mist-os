@@ -101,6 +101,7 @@
       ],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 4619180266423108403,
           "name": "GetFoo",
           "strict": true,

@@ -104,7 +104,7 @@ type ExampleUnion = union {
   ASSERT_NE(example_child_protocol, nullptr);
   EXPECT_TRUE(example_child_protocol->attributes->Get("on_protocol"));
   EXPECT_TRUE(example_child_protocol->methods.front().attributes->Get("on_method"));
-  ASSERT_NE(example_child_protocol->methods.front().maybe_request.get(), nullptr);
+  ASSERT_NE(example_child_protocol->methods.front().maybe_request, nullptr);
 
   auto id = static_cast<const IdentifierType*>(
       example_child_protocol->methods.front().maybe_request->type);

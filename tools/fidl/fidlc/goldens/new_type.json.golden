@@ -146,6 +146,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 7893336915889044876,
           "name": "Add",
           "strict": true,

@@ -68,6 +68,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 7942965975761529343,
           "name": "Send",
           "strict": true,

@@ -79,6 +79,7 @@
       ],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 7540745593380780216,
           "name": "foo",
           "strict": true,
@@ -137,6 +138,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 7540745593380780216,
           "name": "foo",
           "strict": true,

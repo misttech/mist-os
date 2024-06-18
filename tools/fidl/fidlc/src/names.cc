@@ -229,6 +229,17 @@ std::string NameType(const Type* type) {
   return buf.str();
 }
 
+std::string NameMethodKind(Protocol::Method::Kind kind) {
+  switch (kind) {
+    case Protocol::Method::Kind::kOneWay:
+      return "oneway";
+    case Protocol::Method::Kind::kTwoWay:
+      return "twoway";
+    case Protocol::Method::Kind::kEvent:
+      return "event";
+  }
+}
+
 std::string FullyQualifiedName(const Name& name) {
   if (name.is_intrinsic())
     return name.full_name();

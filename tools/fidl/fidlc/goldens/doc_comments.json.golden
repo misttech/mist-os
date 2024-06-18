@@ -821,6 +821,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 5017051197196532121,
           "name": "Method",
           "strict": true,
@@ -870,6 +871,7 @@
           "has_error": false
         },
         {
+          "kind": "event",
           "ordinal": 28780186509098736,
           "name": "OnEvent",
           "strict": true,

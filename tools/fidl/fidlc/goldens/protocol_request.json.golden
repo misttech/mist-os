@@ -48,6 +48,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 881818649151440699,
           "name": "GetChild",
           "strict": true,
@@ -78,6 +79,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 1096855814967598201,
           "name": "GetChildRequest",
           "strict": true,
@@ -108,6 +110,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 4470101341872267920,
           "name": "TakeChild",
           "strict": true,
@@ -138,6 +141,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 2333981071306416007,
           "name": "TakeChildRequest",
           "strict": true,
