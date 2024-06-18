@@ -33,6 +33,8 @@ class CallbackRequest
     : public fbl::DoublyLinkedListable<std::unique_ptr<CallbackRequest>,
                                        fbl::NodeOptions::AllowRemoveFromContainer> {
  public:
+  virtual ~CallbackRequest() = default;
+
   enum class RequestType {
     kIrq,
     kWait,
