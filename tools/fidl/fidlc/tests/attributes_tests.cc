@@ -692,10 +692,10 @@ protocol ExampleProtocol {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(AttributesTests, BadDuplicateAttributePlacement) {
+TEST(AttributesTests, BadAttributeOnTopLevelLayout) {
   TestLibrary library;
   library.AddFile("bad/fi-0023.noformat.test.fidl");
-  library.ExpectFail(ErrRedundantAttributePlacement);
+  library.ExpectFail(ErrAttributeInsideTypeDeclaration);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -705,8 +705,6 @@ library fidl.test;
 
 @foo
 type Foo = struct {};
-
-type Bar = @bar struct {};
 
 protocol MyProtocol {
   MyMethod(@baz struct {
@@ -719,10 +717,6 @@ protocol MyProtocol {
   auto foo = library.LookupStruct("Foo");
   ASSERT_NE(foo, nullptr);
   EXPECT_TRUE(foo->attributes->Get("foo"));
-
-  auto bar = library.LookupStruct("Bar");
-  ASSERT_NE(bar, nullptr);
-  EXPECT_TRUE(bar->attributes->Get("bar"));
 
   auto req = library.LookupStruct("MyProtocolMyMethodRequest");
   ASSERT_NE(req, nullptr);

@@ -3,5 +3,4 @@
 // found in the LICENSE file.
 library test.bad.fi0023;
 
-@foo
-type Foo = @bar struct {};
+type Foo = @foo struct {};

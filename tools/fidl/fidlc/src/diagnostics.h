@@ -44,9 +44,8 @@ constexpr ErrorDef<20> ErrInvalidProtocolMember("invalid protocol member");
 constexpr RetiredDef<21> ErrExpectedProtocolMember;
 constexpr ErrorDef<22> ErrCannotAttachAttributeToIdentifier(
     "cannot attach attributes to identifiers");
-constexpr ErrorDef<23> ErrRedundantAttributePlacement(
-    "cannot specify attributes on the type declaration and the corresponding layout at the same "
-    "time; please merge them into one location instead");
+constexpr ErrorDef<23> ErrAttributeInsideTypeDeclaration(
+    "attributes are not allowed here; put the attribute before the `type` keyword instead");
 constexpr ErrorDef<24> ErrDocCommentOnParameters("cannot have doc comment on parameters");
 constexpr ErrorDef<25> ErrLibraryImportsMustBeGroupedAtTopOfFile(
     "library imports must be grouped at top-of-file");
@@ -470,7 +469,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0020 */ &ErrInvalidProtocolMember,
     /* fi-0021 */ &ErrExpectedProtocolMember,
     /* fi-0022 */ &ErrCannotAttachAttributeToIdentifier,
-    /* fi-0023 */ &ErrRedundantAttributePlacement,
+    /* fi-0023 */ &ErrAttributeInsideTypeDeclaration,
     /* fi-0024 */ &ErrDocCommentOnParameters,
     /* fi-0025 */ &ErrLibraryImportsMustBeGroupedAtTopOfFile,
     /* fi-0026 */ &WarnCommentWithinDocCommentBlock,

@@ -172,30 +172,15 @@ resource_definition Resource : uint32 {
   EXPECT_EQ(unfiltered_decls.size(), filtered_decls.size());
 }
 
-// TODO(https://fxbug.dev/42146818): Currently attributes `@HERE type Foo = struct {};` and
-// `type Foo = @HERE struct {};` are interchangeable. We just disallow using
-// both at once (ErrRedundantAttributePlacement). However, @available on the
-// anonymous layout is confusing so maybe we should rethink this design.
-TEST(VersioningAttributeTests, GoodAnonymousLayoutTopLevel) {
-  auto source = R"FIDL(
+TEST(VersioningAttributeTests, BadAnonymousLayoutTopLevel) {
+  TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
 
 type Foo = @available(added=2) struct {};
-)FIDL";
-
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "1");
-    ASSERT_COMPILED(library);
-    ASSERT_FALSE(library.HasStruct("Foo"));
-  }
-  {
-    TestLibrary library(source);
-    library.SelectVersion("example", "2");
-    ASSERT_COMPILED(library);
-    ASSERT_TRUE(library.HasStruct("Foo"));
-  }
+)FIDL");
+  library.ExpectFail(ErrAttributeInsideTypeDeclaration);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(VersioningAttributeTests, BadAnonymousLayoutInMember) {
