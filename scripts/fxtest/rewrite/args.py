@@ -448,11 +448,13 @@ def parse_args(
     )
     execution.add_argument(
         "--breakpoint",
-        nargs="*",
+        metavar="BREAKPOINT",  # This is to make the help text singular.
         dest="breakpoints",
+        action="append",
         help="""Run the test with zxdb attached and set the given breakpoint. For example,
-        --breakpoint=my_source_file.cc:37 will insert a breakpoint at line 37 of any file
-        named my_source_file.cc. Implies --no-status. Note: this flag is experimental""",
+        `--breakpoint my_source_file.cc:37` will insert a breakpoint at line 37 of any file
+        named my_source_file.cc. May be specified multiple times to add multiple breakpoints.
+        Implies --no-status. Note: this flag is experimental""",
         default=[],
     )
 
