@@ -316,19 +316,17 @@ pub fn sys_bpf(
             let object = get_bpf_object(current_task, bpf_fd)?;
 
             let mut info = match object {
-                BpfHandle::Map(map) => {
-                    bpf_map_info {
-                        type_: map.schema.map_type,
-                        id: 0, // not used by android as far as I can tell
-                        key_size: map.schema.key_size,
-                        value_size: map.schema.value_size,
-                        max_entries: map.schema.max_entries,
-                        map_flags: map.flags,
-                        ..Default::default()
-                    }
-                    .as_bytes()
-                    .to_owned()
+                BpfHandle::Map(map) => bpf_map_info {
+                    type_: map.schema.map_type,
+                    id: map.id,
+                    key_size: map.schema.key_size,
+                    value_size: map.schema.value_size,
+                    max_entries: map.schema.max_entries,
+                    map_flags: map.flags,
+                    ..Default::default()
                 }
+                .as_bytes()
+                .to_owned(),
                 BpfHandle::Program(_) => {
                     #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
                     bpf_prog_info {
