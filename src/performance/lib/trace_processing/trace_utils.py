@@ -265,8 +265,6 @@ def adjust_to_common_process_start(
       KeyError if no matched event is found.
     """
 
-    all_events: Iterator[trace_model.Event] = model.all_events()
-
     filtered = filter_events(
         model.all_events(), category=category, name=name, type=type
     )
