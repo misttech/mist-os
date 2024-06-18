@@ -50,6 +50,7 @@ impl ReadError {
 }
 
 /// An error encountered while reading a named file
+#[cfg(target_os = "fuchsia")]
 #[derive(Debug, Error)]
 #[error("error reading '{path}': {source}")]
 pub struct ReadNamedError {
@@ -59,6 +60,7 @@ pub struct ReadNamedError {
     source: ReadError,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl ReadNamedError {
     /// Returns the path associated with this error.
     pub fn path(&self) -> &str {
@@ -94,6 +96,7 @@ pub enum WriteError {
 }
 
 /// An error encountered while writing a named file
+#[cfg(target_os = "fuchsia")]
 #[derive(Debug, Error)]
 #[error("error writing '{path}': {source}")]
 pub struct WriteNamedError {
@@ -103,6 +106,7 @@ pub struct WriteNamedError {
     source: WriteError,
 }
 
+#[cfg(target_os = "fuchsia")]
 impl WriteNamedError {
     /// Returns the path associated with this error.
     pub fn path(&self) -> &str {
