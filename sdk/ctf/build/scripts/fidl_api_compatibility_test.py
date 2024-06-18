@@ -139,15 +139,7 @@ def main():
 
     dependencies = [args.current, args.golden]
 
-    if os.path.getsize(args.current) == 0 and not os.path.exists(args.golden):
-        # Skip testing if current is empty and golden is missing.
-        # Also, do not generate such files when updating goldens.
-
-        # Do not depend on files that do not and should not exist.
-        dependencies.remove(args.golden)
-
-        err = None
-    elif args.policy == Policy.update_golden:
+    if args.policy == Policy.update_golden:
         err = update_golden(args)
     elif not os.path.exists(args.golden):
         # In all remaining cases, the golden must exist.
