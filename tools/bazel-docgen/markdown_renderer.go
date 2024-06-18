@@ -32,6 +32,10 @@ func (r MarkdownRenderer) RenderRepositoryRuleInfo(rule *pb.RepositoryRuleInfo, 
 	return render(rule, out, NewRepositoryRuleTemplate)
 }
 
+func (r MarkdownRenderer) RenderReadme(toc *[]TOCEntry, out io.Writer) error {
+	return render(toc, out, NewREADMETemplate)
+}
+
 func render(v interface{}, out io.Writer, templateFunc func() (*template.Template, error)) error {
 	t, err := templateFunc()
 	if err == nil {

@@ -7,46 +7,22 @@ package bazel_docgen
 import (
 	"path/filepath"
 	"sort"
+	"strings"
 
 	pb "go.fuchsia.dev/fuchsia/tools/bazel-docgen/third_party/stardoc"
 	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v2"
 )
 
-type supportedDocType int
-
-const (
-	docTypeRule = iota
-	docTypeProvider
-	docTypeStarlarkFunction
-	docTypeRepositoryRule
-)
-
-type tocEntry struct {
-	Title    string     `yaml:",omitempty"`
-	Path     string     `yaml:",omitempty"`
-	Heading  string     `yaml:",omitempty"`
-	Sections []tocEntry `yaml:"section,omitempty"`
-	docType  supportedDocType
-}
-
-func newTocEntry(title string, filename string, docType supportedDocType, mkPathFn func(string) string) tocEntry {
-	return tocEntry{
-		Title:   title,
-		Path:    mkPathFn(filename),
-		docType: docType,
-	}
-}
-
-func checkDuplicateName(name string, entries map[string]tocEntry) bool {
+func checkDuplicateName(name string, entries map[string]TOCEntry) bool {
 	_, ok := entries[name]
 	return ok
 }
 
-func filterEntries(entries []tocEntry, docType supportedDocType) []tocEntry {
-	var filteredEntries []tocEntry
+func filterEntries(entries []TOCEntry, docType SupportedDocType) []TOCEntry {
+	var filteredEntries []TOCEntry
 	for _, entry := range entries {
-		if entry.docType == docType {
+		if entry.DocType == docType {
 			filteredEntries = append(filteredEntries, entry)
 		}
 	}
@@ -61,14 +37,22 @@ func filterEntries(entries []tocEntry, docType supportedDocType) []tocEntry {
 // macro. However, these end up as starlark functions in our docs which is not
 // what we want. This rule figures out if a starlark function is trying to be a
 // macro or an actual function.
-func docTypeForStarlarkFunction(f *pb.StarlarkFunctionInfo) supportedDocType {
+func docTypeForStarlarkFunction(f *pb.StarlarkFunctionInfo) SupportedDocType {
 	params := f.GetParameter()
 
 	if len(params) > 0 && params[0].GetName() == "name" {
-		return docTypeRule
+		return DocTypeRule
 	}
 
-	return docTypeStarlarkFunction
+	return DocTypeStarlarkFunction
+}
+
+type docStringer interface {
+	GetDocString() string
+}
+
+func shortDescription(v docStringer) string {
+	return strings.Split(v.GetDocString(), "\n")[0]
 }
 
 func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider FileProvider, basePath string) {
@@ -78,7 +62,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 		return filepath.Join("/", basePath, s)
 	}
 
-	entries := make(map[string]tocEntry)
+	entries := make(map[string]TOCEntry)
 
 	for _, moduleInfo := range roots {
 
@@ -91,7 +75,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			if err := renderer.RenderRuleInfo(rule, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}
-			entries[fileName] = newTocEntry(rule.RuleName, fileName, docTypeRule, mkPathFn)
+			entries[fileName] = NewTOCEntry(rule.RuleName, fileName, shortDescription(rule), DocTypeRule, mkPathFn)
 		}
 
 		// Render all of our providers
@@ -101,7 +85,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			if err := renderer.RenderProviderInfo(provider, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}
-			entries[fileName] = newTocEntry(provider.ProviderName, fileName, docTypeProvider, mkPathFn)
+			entries[fileName] = NewTOCEntry(provider.ProviderName, fileName, shortDescription(provider), DocTypeProvider, mkPathFn)
 		}
 
 		// Render all of our starlark functions
@@ -111,7 +95,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			if err := renderer.RenderStarlarkFunctionInfo(funcInfo, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}
-			entries[fileName] = newTocEntry(funcInfo.FunctionName, fileName, docTypeForStarlarkFunction(funcInfo), mkPathFn)
+			entries[fileName] = NewTOCEntry(funcInfo.FunctionName, fileName, shortDescription(funcInfo), docTypeForStarlarkFunction(funcInfo), mkPathFn)
 		}
 
 		// Render all of our rules
@@ -121,38 +105,37 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 			if err := renderer.RenderRepositoryRuleInfo(repoRule, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}
-			entries[fileName] = newTocEntry(repoRule.RuleName, fileName, docTypeRepositoryRule, mkPathFn)
+			entries[fileName] = NewTOCEntry(repoRule.RuleName, fileName, shortDescription(repoRule), DocTypeRepositoryRule, mkPathFn)
 		}
 	}
 
 	// Render our README.md
-	readmeWriter := fileProvider.NewFile("README.md")
-	readmeWriter.Write([]byte(""))
-
 	tocEntries := maps.Values(entries)
-	toc := []tocEntry{
+	renderer.RenderReadme(&tocEntries, fileProvider.NewFile("README.md"))
+
+	toc := []TOCEntry{
 		{
 			Title: "Overview",
 			Path:  mkPathFn("README.md"),
 		},
 		{
 			Title: "API",
-			Sections: []tocEntry{
+			Sections: []TOCEntry{
 				{
 					Title:    "Rules",
-					Sections: filterEntries(tocEntries, docTypeRule),
+					Sections: filterEntries(tocEntries, DocTypeRule),
 				},
 				{
 					Title:    "Providers",
-					Sections: filterEntries(tocEntries, docTypeProvider),
+					Sections: filterEntries(tocEntries, DocTypeProvider),
 				},
 				{
 					Title:    "Starlark Functions",
-					Sections: filterEntries(tocEntries, docTypeStarlarkFunction),
+					Sections: filterEntries(tocEntries, DocTypeStarlarkFunction),
 				},
 				{
 					Title:    "Repository Rules",
-					Sections: filterEntries(tocEntries, docTypeRepositoryRule),
+					Sections: filterEntries(tocEntries, DocTypeRepositoryRule),
 				},
 			},
 		},
