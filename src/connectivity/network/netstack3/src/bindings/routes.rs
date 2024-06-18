@@ -23,9 +23,7 @@ use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::rules::RuleSetPriority;
 use futures::channel::{mpsc, oneshot};
-use futures::{
-    stream, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
-};
+use futures::{stream, Future, FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
 use net_types::ip::{
     GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
@@ -448,8 +446,7 @@ where
                     if removing {
                         rest.close();
                     }
-                    Self::handle_route_change(&mut ctx, tables, update_dispatcher, route_work_item)
-                        .await;
+                    Self::handle_route_change(&mut ctx, tables, update_dispatcher, route_work_item);
                     if removing {
                         rest.filter_map(|RouteWorkItem {
                             change: _,
@@ -513,13 +510,13 @@ where
         }
     }
 
-    async fn handle_route_change(
+    fn handle_route_change(
         ctx: &mut Ctx,
         tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
         update_dispatcher: &mut crate::bindings::routes::state::RouteUpdateDispatcher<I>,
         RouteWorkItem { change, responder }: RouteWorkItem<I::Addr>,
     ) {
-        let result = handle_route_change::<I>(tables, ctx, change, update_dispatcher).await;
+        let result = handle_route_change::<I>(tables, ctx, change, update_dispatcher);
         if let Some(responder) = responder {
             match responder.send(result) {
                 Ok(()) => (),
@@ -602,10 +599,10 @@ fn to_entry<I: netstack3_core::IpExt>(
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-async fn handle_single_table_route_change<I>(
+fn handle_single_table_route_change<I>(
     table: &mut Table<I::Addr>,
     table_id: TableId<I>,
-    mut ctx: Ctx,
+    ctx: &mut Ctx,
     change: Change<I::Addr>,
     route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
 ) -> Result<ChangeOutcome, ChangeError>
@@ -626,7 +623,7 @@ where
                 TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
                 TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
                 TableModifyResult::TableChanged((addable_entry, _generation)) => {
-                    TableChange::Add(to_entry::<I>(&mut ctx, addable_entry))
+                    TableChange::Add(to_entry::<I>(ctx, addable_entry))
                 }
             }
         }
@@ -741,7 +738,6 @@ where
                 .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteAdded(
                     installed_route,
                 ))
-                .await
                 .expect("failed to notify route update dispatcher");
         }
         TableChange::Remove(removed) => {
@@ -752,8 +748,7 @@ where
                 entry: to_entry::<I>(&mut ctx_clone, entry),
                 table_id,
             });
-            notify_removed_routes::<I>(ctx.bindings_ctx(), route_update_dispatcher, removed, table)
-                .await;
+            notify_removed_routes::<I>(ctx.bindings_ctx(), route_update_dispatcher, removed, table);
         }
     };
 
@@ -761,7 +756,7 @@ where
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-async fn handle_route_change<I>(
+fn handle_route_change<I>(
     tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
     ctx: &mut Ctx,
     change: Change<I::Addr>,
@@ -780,7 +775,7 @@ where
         std::iter::once((table_id, table))
     }
 
-    let tables = match &change {
+    let mut tables = match &change {
         Change::RouteOp(_, SetMembership::User(weak_set)) | Change::RemoveSet(weak_set) => {
             itertools::Either::Left(one_table(
                 tables,
@@ -802,33 +797,22 @@ where
         Change::RemoveTable(table_id) => itertools::Either::Left(one_table(tables, *table_id)),
     };
 
-    stream::iter(tables)
-        .map(Ok)
-        .try_fold(ChangeOutcome::NoChange, {
-            move |change_so_far, (table_id, table)| {
-                handle_single_table_route_change(
-                    table,
-                    table_id,
-                    ctx.clone(),
-                    change.clone(),
-                    route_update_dispatcher,
-                )
-                .map_ok(move |current_change| {
-                    match (change_so_far, current_change) {
-                        (ChangeOutcome::NoChange, ChangeOutcome::NoChange) => {
-                            ChangeOutcome::NoChange
-                        }
-                        (ChangeOutcome::Changed, _) | (_, ChangeOutcome::Changed) => {
-                            ChangeOutcome::Changed
-                        }
-                    }
-                })
-            }
+    tables.try_fold(ChangeOutcome::NoChange, |change_so_far, (table_id, table)| {
+        let change_outcome = handle_single_table_route_change(
+            table,
+            table_id,
+            ctx,
+            change.clone(),
+            route_update_dispatcher,
+        )?;
+        Ok(match (change_so_far, change_outcome) {
+            (ChangeOutcome::NoChange, ChangeOutcome::NoChange) => ChangeOutcome::NoChange,
+            (ChangeOutcome::Changed, _) | (_, ChangeOutcome::Changed) => ChangeOutcome::Changed,
         })
-        .await
+    })
 }
 
-async fn notify_removed_routes<I: Ip>(
+fn notify_removed_routes<I: Ip>(
     bindings_ctx: &crate::bindings::BindingsCtx,
     dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
     removed_routes: impl IntoIterator<Item = EntryAndTableId<I>>,
@@ -870,7 +854,6 @@ async fn notify_removed_routes<I: Ip>(
             .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteRemoved(
                 installed_route,
             ))
-            .await
             .expect("failed to notify route update dispatcher");
     }
 }

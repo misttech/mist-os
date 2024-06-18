@@ -22,6 +22,7 @@ use netstack3_core::device::{DeviceId, EthernetDeviceId, EthernetLinkDevice};
 use netstack3_core::error::AddressResolutionFailed;
 use netstack3_core::neighbor::{LinkResolutionContext, LinkResolutionResult};
 use netstack3_core::routes::{NextHop, ResolvedRoute, WrapBroadcastMarker};
+use netstack3_core::sync::Mutex;
 use thiserror::Error;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
@@ -270,7 +271,7 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
         }
     };
     let mut watcher = {
-        let mut dispatcher = dispatcher.lock().await;
+        let mut dispatcher = dispatcher.lock();
         dispatcher.connect_new_client(client_interest)
     };
 
@@ -310,7 +311,7 @@ async fn serve_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
         }
     };
     {
-        let mut dispatcher = dispatcher.lock().await;
+        let mut dispatcher = dispatcher.lock();
         dispatcher.disconnect_client(watcher);
     }
 
@@ -375,7 +376,7 @@ pub(crate) enum RoutingTableUpdate<I: Ip> {
 // of the `fuchsia.net.routes/WatcherV{4,6}` protocols.
 #[derive(Default, Clone)]
 pub(crate) struct RouteUpdateDispatcher<I: Ip>(
-    std::sync::Arc<futures::lock::Mutex<RouteUpdateDispatcherInner<I>>>,
+    std::sync::Arc<Mutex<RouteUpdateDispatcherInner<I>>>,
 );
 
 // The inner representation of a `RouteUpdateDispatcher` holding state for the
@@ -449,12 +450,12 @@ impl<I: Ip> RouteUpdateDispatcherInner<I> {
 }
 
 impl<I: Ip> RouteUpdateDispatcher<I> {
-    pub(crate) async fn notify(
+    pub(crate) fn notify(
         &self,
         update: RoutingTableUpdate<I>,
     ) -> Result<(), RouteUpdateNotifyError<I>> {
         let Self(inner) = self;
-        inner.lock().await.notify(update)
+        inner.lock().notify(update)
     }
 }
 
