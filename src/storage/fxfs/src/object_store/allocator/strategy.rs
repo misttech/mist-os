@@ -176,6 +176,14 @@ impl BestFit {
         assert_eq!(Some(range.start), self.by_end.remove(&range.end));
     }
 
+    /// Returns the set of buckets that have overflow markers.
+    pub fn overflow_markers(&self) -> Vec<u64> {
+        self.ranges
+            .iter()
+            .filter_map(|(&size, size_bucket)| size_bucket.overflow.then_some(size))
+            .collect()
+    }
+
     // Overflow markers persist until removed.
     // Before we refresh data from disk, we need to remove these markers as there is no guarantee
     // that we will overflow the same bucket every time we refresh.
@@ -457,5 +465,44 @@ mod test {
         let mut bestfit = BestFit::default();
         assert_eq!(bestfit.force_free(0..100).unwrap(), true);
         assert_eq!(bestfit.allocate(100), Ok(0..100));
+    }
+
+    #[test]
+    fn test_overflow_changes() {
+        // Test for b/345105394 conditions.
+        // This doesn't exactly recreate the differences though because
+        let mut bestfit = BestFit::default();
+        let mut ofs: u64 = 0;
+        // Fill 256kb.
+        for i in 0..max_entries(256 << 10) as u64 {
+            assert!(bestfit.force_free(i * 2 * (256 << 10)..(i * 2 + 1) * (256 << 10)).unwrap());
+        }
+        ofs += (256 << 10) * max_entries(256 << 10) as u64 * 3;
+
+        // Overflow 768kb
+        for i in 0..max_entries(768 << 10) as u64 + 1 {
+            assert!(bestfit
+                .force_free(ofs + i * 2 * (768 << 10)..ofs + (i * 2 + 1) * (768 << 10))
+                .unwrap());
+        }
+        ofs += (768 << 10) * (max_entries(768 << 10) + 1) as u64 * 3;
+
+        // Overflow 512kb.
+        for i in 0..max_entries(512 << 10) as u64 + 1 {
+            assert!(bestfit
+                .force_free(ofs + i * 2 * (512 << 10)..ofs + (i * 2 + 1) * (512 << 10))
+                .unwrap());
+        }
+        // We want to put the next free adjacent to the tail of the last 512kb block, so
+        // we drop the "+1" and add 512kb.
+        ofs += (512 << 10) * max_entries(512 << 10) as u64 * 2 + (512 << 10);
+
+        assert_eq!(bestfit.overflow_markers(), vec![524288, 786432]);
+
+        // This is a 256kB free just after a 512kB free, so it will form a 768kb free.
+        assert!(bestfit.force_free(ofs..ofs + (256 << 10)).unwrap());
+        // In the actual bug, we would not add this until after the next flush, so
+        // force_free would not return true and the only change would be the overflow marker.
+        assert_eq!(bestfit.overflow_markers(), vec![262144, 524288, 786432]);
     }
 }
