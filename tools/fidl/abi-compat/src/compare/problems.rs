@@ -239,6 +239,7 @@ impl CompatibilityProblems {
             message: message.as_ref().to_owned(),
         });
     }
+
     pub fn type_error(&mut self, sender: &Path, receiver: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
             scope: CompatibilityScope::Type { sender: sender.clone(), receiver: receiver.clone() },

@@ -19,6 +19,14 @@ pub struct AttributeArgument {
     pub name: String,
     pub value: Constant,
 }
+
+impl AttributeArgument {
+    #[cfg(test)]
+    pub fn new(name: impl AsRef<str>, value: Constant) -> Self {
+        Self { name: name.as_ref().to_string(), value }
+    }
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct Attribute {
     pub name: String,
@@ -26,6 +34,10 @@ pub struct Attribute {
 }
 
 impl Attribute {
+    #[cfg(test)]
+    pub fn new(name: impl AsRef<str>, arguments: Vec<AttributeArgument>) -> Self {
+        Self { name: name.as_ref().to_string(), arguments }
+    }
     pub fn get_argument(&self, name: impl AsRef<str>) -> Option<Constant> {
         let name = name.as_ref();
         if let Some(arg) = self.arguments.iter().filter(|a| a.name == name).next() {
@@ -216,6 +228,8 @@ pub enum Declaration {
 
 #[derive(Deserialize, Debug)]
 pub struct IR {
+    #[cfg(test)]
+    pub maybe_attributes: Option<Vec<Attribute>>,
     pub available: HashMap<String, Vec<String>>,
     bits_declarations: Vec<BitsDeclaration>,
     enum_declarations: Vec<EnumDeclaration>,
@@ -277,6 +291,7 @@ impl IR {
     pub fn empty_for_tests() -> Rc<Self> {
         use maplit::hashmap;
         return Rc::new(Self {
+            maybe_attributes: None,
             available: hashmap! {},
             bits_declarations: vec![],
             enum_declarations: vec![],
@@ -319,7 +334,9 @@ open protocol Example {
 
 #[cfg(test)]
 mod testing {
-    use super::{Result, IR};
+    use crate::ir::get_attribute;
+
+    use super::{Attribute, AttributeArgument, Result, IR};
     use std::ffi::OsString;
     use std::path::Path;
     use std::process::Command;
@@ -397,6 +414,43 @@ mod testing {
         let status = Command::new(fidlc_path).args(args).status().expect("Failed to run fidlc");
         assert!(status.success());
 
-        IR::load(ir_path)
+        let mut ir = Rc::into_inner(IR::load(ir_path)?)
+            .expect("There shouldn't be multiple references yet.");
+
+        let library_added = super::get_attribute(&ir.maybe_attributes, "available")
+            .expect("top-level library should have @available")
+            .get_argument("added")
+            .expect("top-level library @available should have added=");
+        let added_argument = AttributeArgument::new("added", library_added);
+
+        // Make protocol declarations inherit the added version from the library @available,
+        // if they don't have one themselves.
+        // This matches the behavior of the platform-ir Python script.
+        for p in ir.protocol_declarations.iter_mut() {
+            if p.maybe_attributes.is_none() {
+                // If there are no attributes, just add @available(added=library_added)
+                p.maybe_attributes =
+                    Some(vec![Attribute::new("available", vec![added_argument.clone()])]);
+            } else if get_attribute(&p.maybe_attributes, "available").is_none() {
+                // if there are attributes but no @available, add one
+                p.maybe_attributes
+                    .as_mut()
+                    .unwrap()
+                    .push(Attribute::new("available", vec![added_argument.clone()]));
+            } else {
+                // find the @available and if it doesn't have added= add one
+                for attribute in p.maybe_attributes.as_mut().unwrap().iter_mut() {
+                    if attribute.name != "available" {
+                        continue;
+                    }
+                    if attribute.arguments.iter().filter(|a| a.name == "added").next().is_none() {
+                        // No added=
+                        attribute.arguments.push(added_argument.clone())
+                    }
+                }
+            }
+        }
+
+        Ok(Rc::new(ir))
     }
 }

@@ -60,6 +60,7 @@ if (is_host) {
     edition = "2021"
     deps = abi_compat_deps + [ "//third_party/rust_crates:tempfile" ]
     sources = abi_compat_sources + [
+                "src/compare/protocol_tests.rs",
                 "src/compare/test.rs",
                 "src/compare/types_tests.rs",
               ]

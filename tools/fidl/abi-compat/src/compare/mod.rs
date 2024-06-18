@@ -26,6 +26,8 @@ mod problems;
 pub use problems::*;
 
 #[cfg(test)]
+mod protocol_tests;
+#[cfg(test)]
 mod test;
 #[cfg(test)]
 mod types_tests;
@@ -258,22 +260,6 @@ pub struct Protocol {
 impl Protocol {
     fn compatible(external: &Self, platform: &Self) -> Result<CompatibilityProblems> {
         let mut problems = CompatibilityProblems::default();
-
-        // Check for protocol openness mismatch.
-        if external.openness != platform.openness {
-            // TODO: This is probably too strict.
-            // There should be a warning about a difference but an error if
-            // there are methods or event that can't be handled.
-            problems.platform(
-                &external.path,
-                &platform.path,
-                format!(
-                    "openness mismatch between external:{} and platform:{}",
-                    external.path.api_level(),
-                    platform.path.api_level()
-                ),
-            );
-        }
 
         // Look at discoverable to identify the pairs of client/server interactions
         let mut clients = Vec::new();
