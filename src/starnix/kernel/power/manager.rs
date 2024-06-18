@@ -6,7 +6,7 @@ use crate::power::{SuspendState, SuspendStats};
 use crate::task::CurrentTask;
 
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex as StdMutex};
 
 use anyhow::{anyhow, Context};
 use async_utils::hanging_get::client::HangingGetStream;
@@ -60,6 +60,37 @@ pub struct SuspendResumeManager {
 }
 static STARNIX_POWER_ON_LEVEL: fbroker::PowerLevel = 4;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum SuspendResult {
+    /// Indicates suspension was successful.
+    ///
+    /// Note that a successful suspension result may be returned _after_ resuming
+    /// from a suspend. Observers may not assume that this result will be observed
+    /// before the system actually suspends.
+    Success,
+    Failure,
+}
+
+#[derive(Default)]
+struct SuspendWaiter {
+    cond_var: Condvar,
+    result: StdMutex<Option<SuspendResult>>,
+}
+
+impl SuspendWaiter {
+    fn new() -> Arc<Self> {
+        Arc::new(SuspendWaiter::default())
+    }
+
+    fn wait(self: Arc<Self>) -> SuspendResult {
+        let guard = self.result.lock().unwrap();
+        self.cond_var
+            .wait_while(guard, |result| result.is_none())
+            .unwrap()
+            .expect("result is set before being notified")
+    }
+}
+
 /// Manager for suspend and resume.
 #[derive(Default)]
 pub struct SuspendResumeManagerInner {
@@ -67,6 +98,8 @@ pub struct SuspendResumeManagerInner {
     sync_on_suspend_enabled: bool,
     /// Lease control channel to hold the system power state as active.
     lease_control_channel: Option<zx::Channel>,
+
+    suspend_waiter: Option<Arc<SuspendWaiter>>,
 }
 
 pub type SuspendResumeManagerHandle = Arc<SuspendResumeManager>;
@@ -206,18 +239,34 @@ impl SuspendResumeManager {
                                 }
                                 Err(e) => log_error!("Failed to create a power-on lease: {}", e),
                             }
+
+                            // Wake up a potentially blocked suspend.
+                            //
+                            // NB: We can't send this event on the `OnSuspend` listener event
+                            // since that event is emitted before suspension is actually
+                            // attempted.
+                            self_ref.notify_suspension(SuspendResult::Success);
                         }
                         fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
-                            log_info!("Transiting to a low-power state");
+                            log_info!("Attempting to transition to a low-power state");
                         }
                         fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                            // TODO(b/337924793): Update Starnix to handle suspend failures.
+                            log_warn!("Failed to suspend");
+
+                            // We failed to suspend so bring us back to the power on level.
+                            match self_ref.update_power_level(STARNIX_POWER_ON_LEVEL) {
+                                Ok(()) => {}
+                                // What can we really do here?
+                                Err(e) => log_error!(
+                                    "Failed to create a power-on lease after suspend failure: {e}"
+                                ),
+                            }
+
+                            // Wake up a potentially blocked suspend.
+                            self_ref.notify_suspension(SuspendResult::Failure);
+
                             if let Err(e) = responder.send() {
-                                log_error!(
-                                    "OnSuspendFail server failed to send a respond to its
-                                    client: {}",
-                                    e
-                                );
+                                log_error!("Failed to send OnSuspendFail response: {e}");
                             }
                         }
                         fsystem::ActivityGovernorListenerRequest::_UnknownMethod {
@@ -366,9 +415,25 @@ impl SuspendResumeManager {
         Ok(())
     }
 
+    fn notify_suspension(&self, result: SuspendResult) {
+        let waiters = std::mem::take(&mut self.lock().suspend_waiter);
+        for waiter in waiters.into_iter() {
+            let mut guard = waiter.result.lock().unwrap();
+            let prev = guard.replace(result);
+            debug_assert_eq!(prev, None, "waiter should only be notified once");
+            // We should only have a single thread blocked per waiter.
+            waiter.cond_var.notify_one();
+        }
+    }
+
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
+        let waiter = SuspendWaiter::new();
+        let prev = self.lock().suspend_waiter.replace(Arc::clone(&waiter));
+        debug_assert!(prev.is_none(), "Should not have concurrent suspend attempts");
+
         self.update_power_level(state.into())?;
-        self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)?;
+
+        let suspend_result = waiter.wait();
 
         // Synchronously update the stats after performing suspend so that a later
         // query of stats is guaranteed to reflect the current suspend operation.
@@ -379,7 +444,10 @@ impl SuspendResumeManager {
             Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
         }
 
-        Ok(())
+        match suspend_result {
+            SuspendResult::Success => self.wait_for_power_level(STARNIX_POWER_ON_LEVEL),
+            SuspendResult::Failure => error!(EINVAL, format!("failed to suspend")),
+        }
     }
 }
 

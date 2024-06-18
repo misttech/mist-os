@@ -54,10 +54,37 @@ starnix_linux_test_component("success-test") {
   test_type = "starnix"
 }
 
+fuchsia_component("failure-fake-suspend-controller") {
+  manifest = "meta/failure-fake-suspend-controller.cml"
+  deps = [ ":fake-suspend-controller-bin" ]
+}
+
+test("failure-test-bin") {
+  # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
+  exclude_toolchain_tags = [ "asan" ]
+  sources = [ "failure-test.cc" ]
+  deps = [
+    ":test-helpers",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+starnix_linux_test_component("failure-test") {
+  test_label = ":failure-test-bin"
+  test_binary = "failure-test-bin"
+  test_type = "starnix"
+}
+
 fuchsia_test_package("package") {
   package_name = "starnix-sysfs-power-state-integration-test"
-  test_components = [ ":success-test" ]
-  deps = [ ":success-fake-suspend-controller" ]
+  test_components = [
+    ":success-test",
+    ":failure-test",
+  ]
+  deps = [
+    ":failure-fake-suspend-controller",
+    ":success-fake-suspend-controller",
+  ]
 
   subpackages = starnix_test_subpackages
   subpackages += [

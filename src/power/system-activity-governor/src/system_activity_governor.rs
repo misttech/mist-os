@@ -239,6 +239,7 @@ impl ExecutionStateManager {
                     Some(error) => {
                         tracing::warn!(?error, "Failed to suspend");
                         stats.fail_count = stats.fail_count.map(|c| c + 1);
+                        suspend_failed = true;
 
                         if let Ok(Err(error)) = error {
                             stats.last_failed_error = Some(error);
