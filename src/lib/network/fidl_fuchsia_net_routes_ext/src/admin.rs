@@ -42,7 +42,7 @@ pub enum RouteTableCreationError {
 /// Admin extension for the `fuchsia.net.routes.admin` FIDL API.
 pub trait FidlRouteAdminIpExt: Ip {
     /// The "route table" protocol to use for this IP version.
-    type RouteTableMarker: DiscoverableProtocolMarker;
+    type RouteTableMarker: DiscoverableProtocolMarker<RequestStream = Self::RouteTableRequestStream>;
     /// The "root set" protocol to use for this IP version.
     type GlobalRouteTableMarker: DiscoverableProtocolMarker;
     /// The "route set" protocol to use for this IP version.
@@ -73,6 +73,16 @@ pub trait FidlRouteAdminIpExt: Ip {
     >;
     /// The control handle for RouteTable protocols.
     type RouteTableControlHandle: fidl::endpoints::ControlHandle;
+
+    /// Turns a FIDL route set request into the extension type.
+    fn into_route_set_request(
+        request: fidl::endpoints::Request<Self::RouteSetMarker>,
+    ) -> RouteSetRequest<Self>;
+
+    /// Turns a FIDL route table request into the extension type.
+    fn into_route_table_request(
+        request: fidl::endpoints::Request<Self::RouteTableMarker>,
+    ) -> RouteTableRequest<Self>;
 }
 
 impl FidlRouteAdminIpExt for Ipv4 {
@@ -91,6 +101,18 @@ impl FidlRouteAdminIpExt for Ipv4 {
     type RouteTableGetAuthorizationResponder =
         fnet_routes_admin::RouteTableV4GetAuthorizationForRouteTableResponder;
     type RouteTableControlHandle = fnet_routes_admin::RouteTableV4ControlHandle;
+
+    fn into_route_set_request(
+        request: fidl::endpoints::Request<Self::RouteSetMarker>,
+    ) -> RouteSetRequest<Self> {
+        RouteSetRequest::from(request)
+    }
+
+    fn into_route_table_request(
+        request: fidl::endpoints::Request<Self::RouteTableMarker>,
+    ) -> RouteTableRequest<Self> {
+        RouteTableRequest::from(request)
+    }
 }
 
 impl FidlRouteAdminIpExt for Ipv6 {
@@ -109,6 +131,18 @@ impl FidlRouteAdminIpExt for Ipv6 {
     type RouteTableGetAuthorizationResponder =
         fnet_routes_admin::RouteTableV6GetAuthorizationForRouteTableResponder;
     type RouteTableControlHandle = fnet_routes_admin::RouteTableV6ControlHandle;
+
+    fn into_route_set_request(
+        request: fidl::endpoints::Request<Self::RouteSetMarker>,
+    ) -> RouteSetRequest<Self> {
+        RouteSetRequest::from(request)
+    }
+
+    fn into_route_table_request(
+        request: fidl::endpoints::Request<Self::RouteTableMarker>,
+    ) -> RouteTableRequest<Self> {
+        RouteTableRequest::from(request)
+    }
 }
 
 /// Abstracts over AddRoute and RemoveRoute RouteSet method responders.
