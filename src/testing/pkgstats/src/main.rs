@@ -179,11 +179,11 @@ fn do_html_command(args: HtmlArgs) -> Result<()> {
                 FileInfo::Elf(elf) => elf
                     .source_file_references
                     .iter()
-                    .map(|idx| input.files[idx].clone())
+                    .map(|idx| input.files[idx].source_path.clone())
                     .collect::<Vec<_>>(),
                 _ => vec![],
             };
-            files.sort_by(|a, b| a.source_path.cmp(&b.source_path));
+            files.sort();
 
             let with_files = (item.0, item.1, files);
             let body_content = hb.render("content", &with_files).context("rendering content")?;
