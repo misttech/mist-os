@@ -7,16 +7,16 @@
 namespace {
 
 TEST_F(DeviceEnumerationTest, QemuX64Test) {
-  static const char* kDevicePaths[] = {
-      "sys/platform/00:00:1b/sysmem",
+  const char* kNodeMonikers[] = {
+      "dev.sys.platform.00_00_1b.sysmem",
 
-      "sys/platform/pt/acpi", "sys/platform/pt/PCI0/bus/00:1f.2/00_1f_2/ahci",
+      "dev.sys.platform.pt.acpi", "dev.sys.platform.pt.PCI0.bus.00_1f.2.00_1f_2.ahci",
       // TODO(https://fxbug.dev/42075162): Re-enable with new names after QEMU roll
-      //"sys/platform/pt/acpi/_SB_/PCI0/ISA_/KBD_/pt/KBD_-composite-spec/i8042/i8042-keyboard",
-      //"sys/platform/pt/acpi/_SB_/PCI0/ISA_/KBD_/pt/KBD_-composite-spec/i8042/i8042-mouse",
+      //"sys.platform.pt.acpi._SB_.PCI0.ISA_.KBD_.pt.KBD_-composite-spec.i8042.i8042-keyboard",
+      //"sys.platform.pt.acpi._SB_.PCI0.ISA_.KBD_.pt.KBD_-composite-spec.i8042.i8042-mouse",
   };
 
-  ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+  VerifyNodes(kNodeMonikers);
 }
 
 }  // namespace

@@ -4,7 +4,6 @@
 
 #include "zircon/system/utest/device-enumeration/common.h"
 
-#include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
@@ -134,12 +133,51 @@ void DeviceEnumerationTest::TestRunner(const char** device_paths, size_t paths_n
   loop.Run();
 }
 
-// Static
-void DeviceEnumerationTest::PrintAllDevices() {
+void DeviceEnumerationTest::VerifyNodes(cpp20::span<const char*> node_monikers) {
+  std::vector<std::string> missing_nodes;
+  for (const char* moniker : node_monikers) {
+    if (node_info_.find(moniker) == node_info_.end()) {
+      missing_nodes.push_back(moniker);
+    }
+  }
+
+  if (!missing_nodes.empty()) {
+    fprintf(stderr, "Unable to find node(s):\n");
+    for (auto& moniker : missing_nodes) {
+      fprintf(stderr, "     %s:\n", moniker.c_str());
+    }
+  }
+
+  ASSERT_TRUE(missing_nodes.empty());
+}
+
+void DeviceEnumerationTest::VerifyOneOf(cpp20::span<const char*> node_monikers) {
+  std::vector<std::string> missing_nodes;
+  bool found_node = false;
+  for (const char* moniker : node_monikers) {
+    if (node_info_.find(moniker) != node_info_.end()) {
+      found_node = true;
+      break;
+    }
+  }
+
+  if (!found_node) {
+    fprintf(stderr, "Unable to find one of the node(s):\n");
+    for (const char* moniker : node_monikers) {
+      fprintf(stderr, "     %s:\n", moniker);
+    }
+  }
+  ASSERT_TRUE(found_node);
+}
+
+void DeviceEnumerationTest::RetrieveNodeInfo() {
   // This uses the development API for its convenience over directory traversal. It would be more
   // useful to log paths in devfs for the purposes of this test, but less convenient.
   zx::result driver_development = component::Connect<fuchsia_driver_development::Manager>();
   ASSERT_OK(driver_development.status_value());
+
+  const fidl::Status bootup_result = fidl::WireCall(driver_development.value())->WaitForBootup();
+  ASSERT_OK(bootup_result.status());
 
   {
     auto [client, server] = fidl::Endpoints<fuchsia_driver_development::NodeInfoIterator>::Create();
@@ -149,7 +187,7 @@ void DeviceEnumerationTest::PrintAllDevices() {
     ASSERT_OK(result.status());
 
     // NB: this uses iostream (rather than printf) because FIDL strings aren't null-terminated.
-    std::cout << "BEGIN printing all devices (paths in DFv1, monikers in DFv2):" << std::endl;
+    std::cout << "BEGIN printing all node monikers:" << std::endl;
     while (true) {
       const fidl::WireResult result = fidl::WireCall(client)->GetNext();
       ASSERT_OK(result.status());
@@ -160,8 +198,9 @@ void DeviceEnumerationTest::PrintAllDevices() {
       for (const fuchsia_driver_development::wire::NodeInfo& info : response.nodes) {
         ASSERT_TRUE(info.has_moniker());
         std::cout << info.moniker().get() << std::endl;
+        node_info_[std::string(info.moniker().get())] = fidl::ToNatural(info);
       }
     }
-    std::cout << "END printing all devices (paths in DFv1, monikers in DFv2)." << std::endl;
+    std::cout << "END printing all node monikers." << std::endl;
   }
 }
