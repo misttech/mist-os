@@ -1,6 +1,6 @@
 rule_info {
   rule_name: "example_rule"
-  doc_string: "The description of a basic rule"
+  doc_string: "The description of a basic rule\n\nSome other text on a new line."
   attribute {
     name: "name"
     doc_string: "A unique name for this target."

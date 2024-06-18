@@ -27,10 +27,10 @@ type tocEntry struct {
 	Path     string     `yaml:",omitempty"`
 	Heading  string     `yaml:",omitempty"`
 	Sections []tocEntry `yaml:"section,omitempty"`
-	docType  int
+	docType  supportedDocType
 }
 
-func newTocEntry(title string, filename string, docType int, mkPathFn func(string) string) tocEntry {
+func newTocEntry(title string, filename string, docType supportedDocType, mkPathFn func(string) string) tocEntry {
 	return tocEntry{
 		Title:   title,
 		Path:    mkPathFn(filename),
@@ -43,7 +43,7 @@ func checkDuplicateName(name string, entries map[string]tocEntry) bool {
 	return ok
 }
 
-func filterEntries(entries []tocEntry, docType int) []tocEntry {
+func filterEntries(entries []tocEntry, docType supportedDocType) []tocEntry {
 	var filteredEntries []tocEntry
 	for _, entry := range entries {
 		if entry.docType == docType {
@@ -55,6 +55,20 @@ func filterEntries(entries []tocEntry, docType int) []tocEntry {
 		return filteredEntries[i].Title < filteredEntries[j].Title
 	})
 	return filteredEntries
+}
+
+// There are several places in our bazel rules where we wrap a rule with a
+// macro. However, these end up as starlark functions in our docs which is not
+// what we want. This rule figures out if a starlark function is trying to be a
+// macro or an actual function.
+func docTypeForStarlarkFunction(f *pb.StarlarkFunctionInfo) supportedDocType {
+	params := f.GetParameter()
+
+	if len(params) > 0 && params[0].GetName() == "name" {
+		return docTypeRule
+	}
+
+	return docTypeStarlarkFunction
 }
 
 func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider FileProvider, basePath string) {
@@ -70,7 +84,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 
 		// Render all of our rules
 		for _, rule := range moduleInfo.GetRuleInfo() {
-			fileName := "rule_" + rule.RuleName + ".md"
+			fileName := rule.RuleName + ".md"
 			if checkDuplicateName(fileName, entries) {
 				continue
 			}
@@ -82,7 +96,7 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 
 		// Render all of our providers
 		for _, provider := range moduleInfo.GetProviderInfo() {
-			fileName := "provider_" + provider.ProviderName + ".md"
+			fileName := provider.ProviderName + ".md"
 			checkDuplicateName(fileName, entries)
 			if err := renderer.RenderProviderInfo(provider, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
@@ -92,17 +106,17 @@ func RenderModuleInfo(roots []pb.ModuleInfo, renderer Renderer, fileProvider Fil
 
 		// Render all of our starlark functions
 		for _, funcInfo := range moduleInfo.GetFuncInfo() {
-			fileName := "func_" + funcInfo.FunctionName + ".md"
+			fileName := funcInfo.FunctionName + ".md"
 			checkDuplicateName(fileName, entries)
 			if err := renderer.RenderStarlarkFunctionInfo(funcInfo, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
 			}
-			entries[fileName] = newTocEntry(funcInfo.FunctionName, fileName, docTypeStarlarkFunction, mkPathFn)
+			entries[fileName] = newTocEntry(funcInfo.FunctionName, fileName, docTypeForStarlarkFunction(funcInfo), mkPathFn)
 		}
 
 		// Render all of our rules
 		for _, repoRule := range moduleInfo.GetRepositoryRuleInfo() {
-			fileName := "repo_rule_" + repoRule.RuleName + ".md"
+			fileName := repoRule.RuleName + ".md"
 			checkDuplicateName(fileName, entries)
 			if err := renderer.RenderRepositoryRuleInfo(repoRule, fileProvider.NewFile(fileName)); err != nil {
 				panic(err)
