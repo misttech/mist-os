@@ -391,6 +391,7 @@ while true; do
         --address [::]:${port} \
         --repository "${source_name}" \
         --repo-path "${repo_dir}" \
+        --trusted-root "${repo_dir}/repository/9.root.json" \
         --alias "fuchsia.com" \
         --alias "chromium.org"
 
