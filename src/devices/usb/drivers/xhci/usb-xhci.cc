@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -1318,7 +1319,9 @@ zx_status_t UsbXhci::InitMmio() {
     return ZX_ERR_NO_MEMORY;
   }
   for (uint16_t i = 0; i < irq_count_; i++) {
-    status = pdev_.GetInterrupt(i, 0, &interrupter(i).GetIrq());
+    // Set interrupt to wakeable if suspend is enabled.
+    status = pdev_.GetInterrupt(i, config_.enable_suspend() ? ZX_INTERRUPT_WAKE_VECTOR : 0,
+                                &interrupter(i).GetIrq());
     if (status != ZX_OK) {
       zxlogf(ERROR, "UsbXhci: failed fetch interrupt (%s)", zx_status_get_string(status));
       return status;
@@ -1718,10 +1721,17 @@ void Inspect::Init(uint16_t hci_version_in, HCSPARAMS1& hcs1, HCCPARAMS1& hcc1) 
 
 // Static function; called by the DDK bind operation.
 zx_status_t UsbXhci::Create(void* ctx, zx_device_t* parent) {
+  zx_handle_t structured_config_vmo;
+  zx_status_t status = device_get_config_vmo(parent, &structured_config_vmo);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get config vmo: %s", zx_status_get_string(status));
+    return status;
+  }
+
   fbl::AllocChecker ac;
-  auto dev = std::unique_ptr<UsbXhci>(
-      new (&ac) UsbXhci(parent, dma_buffer::CreateBufferFactory(),
-                        fdf::Dispatcher::GetCurrent()->async_dispatcher()));
+  auto dev = std::unique_ptr<UsbXhci>(new (&ac) UsbXhci(
+      parent, xhci_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo)),
+      dma_buffer::CreateBufferFactory(), fdf::Dispatcher::GetCurrent()->async_dispatcher()));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1744,7 +1754,7 @@ zx_status_t UsbXhci::Create(void* ctx, zx_device_t* parent) {
     }
   }
 
-  zx_status_t status = dev->Init();
+  status = dev->Init();
   if (status != ZX_OK) {
     return status;
   }

@@ -449,7 +449,8 @@ class XhciMmioHarness : public XhciHarness {
                           std::move(outgoing_endpoints.client));
 
     auto dev =
-        std::make_unique<UsbXhci>(root_.get(), ddk_fake::CreateBufferFactory(), loop_.dispatcher());
+        std::make_unique<UsbXhci>(root_.get(), xhci_config::Config({.enable_suspend = false}),
+                                  ddk_fake::CreateBufferFactory(), loop_.dispatcher());
     dev->SetTestHarness(this);
     dev->DdkAdd("xhci");
     ASSERT_EQ(1, root_->child_count());

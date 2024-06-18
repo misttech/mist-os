@@ -54,7 +54,8 @@ class EventRingHarness : public zxtest::Test {
  public:
   EventRingHarness()
       : trb_context_allocator_(-1, true),
-        hci_(root_.get(), ddk_fake::CreateBufferFactory(), loop_.dispatcher()) {}
+        hci_(root_.get(), xhci_config::Config({.enable_suspend = false}),
+             ddk_fake::CreateBufferFactory(), loop_.dispatcher()) {}
   void SetUp() override {
     // Globals
     constexpr auto kRuntimeRegisterOffset = 6 * sizeof(uint32_t);
