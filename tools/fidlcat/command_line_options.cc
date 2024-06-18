@@ -322,12 +322,6 @@ cmdline::Status ProcessLogOptions(const CommandLineOptions* options) {
     settings.log_file = *options->log_file;
   }
   fuchsia_logging::LogSettingsBuilder builder;
-  if (settings.disable_interest_listener) {
-    builder.DisableInterestListener();
-  }
-  if (!settings.wait_for_initial_interest) {
-    builder.DisableWaitForInitialInterest();
-  }
   builder.WithMinLogSeverity(settings.min_log_level);
 #ifndef __Fuchsia__
   builder.WithLogFile(settings.log_file);
@@ -337,6 +331,12 @@ cmdline::Status ProcessLogOptions(const CommandLineOptions* options) {
   }
   if (settings.log_sink) {
     builder.WithLogSink(settings.log_sink);
+  }
+  if (settings.disable_interest_listener) {
+    builder.DisableInterestListener();
+  }
+  if (!settings.wait_for_initial_interest) {
+    builder.DisableWaitForInitialInterest();
   }
 #endif
   builder.BuildAndInitialize();
