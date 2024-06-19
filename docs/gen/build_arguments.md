@@ -133,7 +133,7 @@ From //src/graphics/display/drivers/amlogic-display/BUILD.gn:19
 
 **Current value (from the default):** `true`
 
-From //build/config/fuchsia/platform_version.gni:37
+From //build/config/fuchsia/platform_version.gni:39
 
 ### archivist_max_cached_logs_bytes
 
@@ -863,11 +863,13 @@ From //build/images/args.gni:35
 ### bump_api_level
 
 If true, build for N+1 api level, where N is
-platform_version.in_development_api_level.
+platform_version.deprecated_highest_numbered_api_level.
+TODO(https://fxbug.dev/326277078): Update this comment and potentially
+redefine these args when switching the in-development level to "NEXT".
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:25
+From //build/config/fuchsia/platform_version.gni:27
 
 ### cache_package_labels
 
@@ -3449,7 +3451,7 @@ From //src/fonts/build/font_args.gni:12
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:27
+From //build/config/fuchsia/platform_version.gni:29
 
 ### fuchsia_async_trace_level_logging
 
@@ -4038,7 +4040,7 @@ platform-version-roller when the API level is incremented.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:36
+From //build/config/fuchsia/platform_version.gni:38
 
 ### include_shell_commands_package
 
@@ -5368,7 +5370,7 @@ To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:50
+From //build/config/fuchsia/platform_version.gni:52
 
 ### override_idk_target_cpus
 
