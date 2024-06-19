@@ -370,6 +370,11 @@ template("assembled_system") {
       _generate_image_metadata = invoker.generate_image_metadata
     }
 
+    _generate_signed_zbi = defined(invoker.zbi_signing_script)
+    if (defined(invoker.generate_signed_zbi)) {
+      _generate_signed_zbi = invoker.generate_signed_zbi
+    }
+
     _generate_vbmeta = false
     if (defined(invoker.generate_vbmeta)) {
       _generate_vbmeta = invoker.generate_vbmeta
@@ -393,10 +398,6 @@ template("assembled_system") {
 
     forward_variables_from(invoker, [ "image_metadata_overrides" ])
     if (defined(image_metadata_overrides)) {
-      _generate_signed_zbi = defined(invoker.zbi_signing_script)
-      if (defined(invoker.generate_signed_zbi)) {
-        _generate_signed_zbi = invoker.generate_signed_zbi
-      }
       if (!_generate_signed_zbi) {
         assert(
             !defined(image_metadata_overrides.zbi_signed),
@@ -557,6 +558,7 @@ template("assembled_system") {
       bootfs_files = "${gendir}/bootfs_files.list"
       additional_boot_args = "${gendir}/additional_boot_args.txt"
       zbi = "${outdir}/${_image_name}.zbi"
+      zbi_signed = "${zbi}.signed"
       vbmeta = "${outdir}/${_image_name}.vbmeta"
 
       if (_generate_fvm || _generate_fvm_fastboot || _generate_fvm_nand) {
@@ -594,6 +596,12 @@ template("assembled_system") {
       assembly_manifest = "${outdir}/images.json"
       config_data_manifest = "${outdir}/config_data/package_manifest.json"
       image_command_log = "${gendir}/command_log.json"
+
+      # Determine which ZBI we are shipping.
+      zbi_final = zbi
+      if (_generate_signed_zbi) {
+        zbi_final = zbi_signed
+      }
 
       # The directory in which all the platform AIBs can be found
       platform_common_aibs_dir =
@@ -880,6 +888,10 @@ template("assembled_system") {
         files.assembly_manifest,
       ]
 
+      if (_generate_signed_zbi) {
+        outputs += [ files.zbi_signed ]
+      }
+
       if (_generate_vbmeta) {
         outputs += [ files.vbmeta ]
       }
@@ -1044,10 +1056,6 @@ template("assembled_system") {
           }
 
           # Optionally add the signed images.
-          _generate_signed_zbi = defined(invoker.zbi_signing_script)
-          if (defined(invoker.generate_signed_zbi)) {
-            _generate_signed_zbi = invoker.generate_signed_zbi
-          }
           if (_generate_signed_zbi) {
             images += [
               {
@@ -1058,11 +1066,12 @@ template("assembled_system") {
                 if (defined(invoker.output_dir)) {
                   label = get_label_info(":${labels.copy_zbi_signed}",
                                          "label_with_toolchain")
-                  path = rebase_path("${invoker.output_dir}/" +
-                                         get_path_info(files.zbi, "file"),
-                                     root_build_dir)
+                  path =
+                      rebase_path("${invoker.output_dir}/" +
+                                      get_path_info(files.zbi_signed, "file"),
+                                  root_build_dir)
                 } else {
-                  path = rebase_path(files.zbi, root_build_dir)
+                  path = rebase_path(files.zbi_signed, root_build_dir)
                 }
                 forward_variables_from(_image_overrides["zbi_signed"], "*")
               },
@@ -1149,10 +1158,6 @@ template("assembled_system") {
         deps = [ ":${labels.image_assembler}" ]
       }
 
-      _generate_signed_zbi = defined(invoker.zbi_signing_script)
-      if (defined(invoker.generate_signed_zbi)) {
-        _generate_signed_zbi = invoker.generate_signed_zbi
-      }
       if (_generate_signed_zbi) {
         copy(labels.copy_zbi_signed) {
           forward_variables_from(invoker,
@@ -1160,7 +1165,7 @@ template("assembled_system") {
                                    "testonly",
                                    "visibility",
                                  ])
-          sources = [ files.zbi ]
+          sources = [ files.zbi_signed ]
           outputs = [ "${invoker.output_dir}/${output_name}.zbi.signed" ]
           deps = [ ":${labels.image_assembler}" ]
         }

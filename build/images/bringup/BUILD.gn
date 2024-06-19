@@ -128,9 +128,13 @@ product_bundle("product_bundle") {
   _assembly_contents = [ files.qemu_kernel ]
   _recovery_contents = [ files.qemu_kernel ]
 
-  _assembly_contents += [ files.zbi ]
-  _recovery_contents += [ files.recovery_zbi ]
-
+  if (custom_signing_script != "" || use_vboot) {
+    _assembly_contents += [ files.zbi_signed ]
+    _recovery_contents += [ files.recovery_zbi_signed ]
+  } else {
+    _assembly_contents += [ files.zbi ]
+    _recovery_contents += [ files.recovery_zbi ]
+  }
   if (use_vbmeta) {
     _assembly_contents += [ files.vbmeta ]
     _recovery_contents += [ files.recovery_vbmeta ]

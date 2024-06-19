@@ -417,8 +417,8 @@ template("bazel_product_bundle") {
     deps = _size_targets
   }
 
-  _elf_sizes_bazel_action_target = "${target_name}_elf_sizes"
   if (defined(invoker.bazel_elf_sizes_target)) {
+    _elf_sizes_bazel_action_target = "${target_name}_elf_sizes"
     _elf_sizes_ninja_out_path =
         "${_elf_sizes_bazel_action_target}/elf_sizes.json"
     bazel_action(_elf_sizes_bazel_action_target) {
@@ -451,9 +451,6 @@ template("bazel_product_bundle") {
           },
         ]
       }
-    }
-  } else {
-    group(_elf_sizes_bazel_action_target) {
     }
   }
 
