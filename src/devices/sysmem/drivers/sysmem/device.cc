@@ -738,17 +738,19 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Device::SetupOutgoingServiceD
                 .sysmem = bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
                 .allocator_v1 =
                     [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
-                      zx_status_t status = CommonSysmemConnectV1(request.TakeChannel());
-                      if (status != ZX_OK) {
-                        LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
-                      }
+                      // The Allocator is channel-owned / self-owned.
+                      postTask([this, allocator_request = request.TakeChannel()]() mutable {
+                        // The Allocator is channel-owned / self-owned.
+                        Allocator::CreateChannelOwnedV1(std::move(allocator_request), this);
+                      });
                     },
                 .allocator_v2 =
                     [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
-                      zx_status_t status = CommonSysmemConnectV2(request.TakeChannel());
-                      if (status != ZX_OK) {
-                        LOG(INFO, "Direct connect to fuchsia_sysmem2::Allocator() failed");
-                      }
+                      // The Allocator is channel-owned / self-owned.
+                      postTask([this, allocator_request = request.TakeChannel()]() mutable {
+                        // The Allocator is channel-owned / self-owned.
+                        Allocator::CreateChannelOwnedV2(std::move(allocator_request), this);
+                      });
                     },
             }));
 
@@ -812,25 +814,7 @@ void Device::SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
   });
 }
 
-zx_status_t Device::CommonSysmemConnectV1(zx::channel allocator_request) {
-  // The Allocator is channel-owned / self-owned.
-  postTask([this, allocator_request = std::move(allocator_request)]() mutable {
-    // The Allocator is channel-owned / self-owned.
-    Allocator::CreateChannelOwnedV1(std::move(allocator_request), this);
-  });
-  return ZX_OK;
-}
-
-zx_status_t Device::CommonSysmemConnectV2(zx::channel allocator_request) {
-  // The Allocator is channel-owned / self-owned.
-  postTask([this, allocator_request = std::move(allocator_request)]() mutable {
-    // The Allocator is channel-owned / self-owned.
-    Allocator::CreateChannelOwnedV2(std::move(allocator_request), this);
-  });
-  return ZX_OK;
-}
-
-zx_status_t Device::CommonSysmemRegisterHeap(
+zx_status_t Device::RegisterHeapInternal(
     fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection) {
   class EventHandler : public fidl::WireAsyncEventHandler<fuchsia_hardware_sysmem::Heap> {
    public:
@@ -890,7 +874,7 @@ zx_status_t Device::CommonSysmemRegisterHeap(
   return ZX_OK;
 }
 
-zx_status_t Device::CommonSysmemRegisterSecureMem(
+zx_status_t Device::RegisterSecureMemInternal(
     fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection) {
   LOG(DEBUG, "sysmem RegisterSecureMem begin");
 
@@ -1097,7 +1081,7 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(
 
 // This call allows us to tell the difference between expected vs. unexpected close of the tee_
 // channel.
-zx_status_t Device::CommonSysmemUnregisterSecureMem() {
+zx_status_t Device::UnregisterSecureMemInternal() {
   // By this point, the aml-securemem driver's suspend(mexec) has already prepared for mexec.
   //
   // In this path, the server end of the channel hasn't closed yet, but will be closed shortly after
@@ -1296,8 +1280,7 @@ void Device::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::S
   }
   auto& v2_heap_type = v2_heap_type_result.value();
   auto heap = sysmem::MakeHeap(std::move(v2_heap_type), 0);
-  zx_status_t status =
-      CommonSysmemRegisterHeap(std::move(heap), std::move(request.heap_connection()));
+  zx_status_t status = RegisterHeapInternal(std::move(heap), std::move(request.heap_connection()));
   if (status != ZX_OK) {
     LOG(WARNING, "CommonSysmemRegisterHeap failed");
     completer.Close(status);
@@ -1307,7 +1290,7 @@ void Device::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::S
 
 void Device::RegisterSecureMem(RegisterSecureMemRequest& request,
                                RegisterSecureMemCompleter::Sync& completer) {
-  zx_status_t status = CommonSysmemRegisterSecureMem(std::move(request.secure_mem_connection()));
+  zx_status_t status = RegisterSecureMemInternal(std::move(request.secure_mem_connection()));
   if (status != ZX_OK) {
     completer.Close(status);
     return;
@@ -1315,7 +1298,7 @@ void Device::RegisterSecureMem(RegisterSecureMemRequest& request,
 }
 
 void Device::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) {
-  zx_status_t status = CommonSysmemUnregisterSecureMem();
+  zx_status_t status = UnregisterSecureMemInternal();
   if (status == ZX_OK) {
     completer.Reply(fit::ok());
   } else {

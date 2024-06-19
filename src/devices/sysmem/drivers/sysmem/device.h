@@ -91,16 +91,13 @@ class Device final : public DdkDeviceType,
   // The rest of the methods are only valid to call after Bind().
   //
 
-  // TODO(b/332630641): These "Common" methods are mostly left over common implementations from back
-  // when we also had a sysmem banjo protocol. However, a couple of these are called directly by
-  // tests. We can inline the ones not used from tests.
-  [[nodiscard]] zx_status_t CommonSysmemConnectV1(zx::channel allocator_request);
-  [[nodiscard]] zx_status_t CommonSysmemConnectV2(zx::channel allocator_request);
-  [[nodiscard]] zx_status_t CommonSysmemRegisterHeap(
+  [[nodiscard]] zx_status_t RegisterHeapInternal(
       fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection);
-  [[nodiscard]] zx_status_t CommonSysmemRegisterSecureMem(
+  // Also called directly by a test.
+  [[nodiscard]] zx_status_t RegisterSecureMemInternal(
       fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection);
-  [[nodiscard]] zx_status_t CommonSysmemUnregisterSecureMem();
+  // Also called directly by a test.
+  [[nodiscard]] zx_status_t UnregisterSecureMemInternal();
 
   // Ddk mixin implementations.
   void DdkUnbind(ddk::UnbindTxn txn);
