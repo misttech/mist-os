@@ -31,11 +31,8 @@ impl<S: crate::NonMetaStorage> MetaFile<S> {
         Arc::new(MetaFile { root_dir, location, vmo: OnceCell::new() })
     }
 
-    async fn vmo(&self) -> Result<&zx::Vmo, anyhow::Error> {
-        Ok(if let Some(vmo) = self.vmo.get() {
-            vmo
-        } else {
-            let far_vmo = self.root_dir.meta_far_vmo().await.context("getting far vmo")?;
+    fn vmo(&self) -> Result<&zx::Vmo, anyhow::Error> {
+        self.vmo.get_or_try_init(|| {
             // The FAR spec requires 4 KiB alignment of content chunks [1], so offset will
             // always be page-aligned, because pages are required [2] to be a power of 2 and at
             // least 4 KiB.
@@ -44,14 +41,14 @@ impl<S: crate::NonMetaStorage> MetaFile<S> {
             // TODO(https://fxbug.dev/42162525) Need to manually zero the end of the VMO if
             // zx_system_get_page_size() > 4K.
             assert_eq!(zx::system_get_page_size(), 4096);
-            let vmo = far_vmo
+            self.root_dir
+                .meta_far_vmo
                 .create_child(
                     zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::NO_WRITE,
                     self.location.offset,
                     self.location.length,
                 )
-                .context("creating MetaFile VMO")?;
-            self.vmo.get_or_init(|| vmo)
+                .context("creating MetaFile VMO")
         })
     }
 }
@@ -128,7 +125,7 @@ impl<S: crate::NonMetaStorage> vfs::file::File for MetaFile<S> {
             return Err(zx::Status::NOT_SUPPORTED);
         }
 
-        let vmo = self.vmo().await.map_err(|e: anyhow::Error| {
+        let vmo = self.vmo().map_err(|e: anyhow::Error| {
             error!("Failed to get MetaFile VMO during get_backing_memory: {:#}", e);
             zx::Status::INTERNAL
         })?;
@@ -191,25 +188,12 @@ impl<S: crate::NonMetaStorage> vfs::file::FileIo for MetaFile<S> {
         let offset_chunk = std::cmp::min(offset_chunk, self.location.length);
         let offset_far = offset_chunk + self.location.offset;
         let count = std::cmp::min(
-            crate::usize_to_u64_safe(buffer.len()),
-            self.location.length - offset_chunk,
+            buffer.len(),
+            crate::u64_to_usize_safe(self.location.length - offset_chunk),
         );
-        let bytes = self
-            .root_dir
-            .meta_far
-            .read_at(count, offset_far)
-            .await
-            .map_err(|e: fidl::Error| {
-                error!("meta.far read_at fidl error: {:#}", e);
-                zx::Status::INTERNAL
-            })?
-            .map_err(zx::Status::from_raw)
-            .map_err(|e: zx::Status| {
-                error!("meta.far read_at protocol error: {:#}", e);
-                e
-            })?;
-        let () = buffer[..bytes.len()].copy_from_slice(&bytes);
-        Ok(crate::usize_to_u64_safe(bytes.len()))
+        let buffer = &mut buffer[0..count];
+        self.root_dir.meta_far_vmo.read(buffer, offset_far)?;
+        Ok(crate::usize_to_u64_safe(count))
     }
 
     async fn write_at(&self, _offset: u64, _content: &[u8]) -> Result<u64, zx::Status> {
@@ -273,7 +257,7 @@ mod tests {
         let meta_file = get_meta_file(root_dir);
 
         // VMO is readable
-        let vmo = meta_file.vmo().await.unwrap();
+        let vmo = meta_file.vmo().unwrap();
         let mut buf = [0u8; 8];
         vmo.read(&mut buf, 0).unwrap();
         assert_eq!(buf, [0, 1, 2, 3, 0, 0, 0, 0]);
@@ -289,7 +273,7 @@ mod tests {
         assert!(meta_file.vmo.get().is_some());
 
         // Accessing the VMO through the cached path works
-        let vmo = meta_file.vmo().await.unwrap();
+        let vmo = meta_file.vmo().unwrap();
         let mut buf = [0u8; 8];
         vmo.read(&mut buf, 0).unwrap();
         assert_eq!(buf, [0, 1, 2, 3, 0, 0, 0, 0]);

@@ -7,6 +7,7 @@
 use fidl::endpoints::ServerEnd;
 use std::collections::HashSet;
 use std::convert::TryInto as _;
+use std::future::Future;
 use tracing::error;
 use vfs::common::send_on_open_with_error;
 use vfs::directory::entry::EntryInfo;
@@ -32,7 +33,7 @@ pub enum Error {
     MissingMetaFar,
 
     #[error("while opening the meta.far")]
-    OpenMetaFar(#[source] fuchsia_fs::node::OpenError),
+    OpenMetaFar(#[source] NonMetaStorageError),
 
     #[error("while instantiating a fuchsia archive reader")]
     ArchiveReader(#[source] fuchsia_archive::Error),
@@ -59,12 +60,11 @@ pub enum Error {
 
 impl From<&Error> for zx::Status {
     fn from(e: &Error) -> Self {
-        use fuchsia_fs::node::OpenError;
         use Error::*;
         match e {
             MissingMetaFar => zx::Status::NOT_FOUND,
-            OpenMetaFar(OpenError::OpenError(s)) => *s,
-            OpenMetaFar(_) | DropperAlreadySet => zx::Status::INTERNAL,
+            OpenMetaFar(e) => e.into(),
+            DropperAlreadySet => zx::Status::INTERNAL,
             ArchiveReader(fuchsia_archive::Error::Read(_)) => zx::Status::IO,
             ArchiveReader(_) | ReadMetaContents(_) | DeserializeMetaContents(_) => {
                 zx::Status::INVALID_ARGS
@@ -74,9 +74,45 @@ impl From<&Error> for zx::Status {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum NonMetaStorageError {
+    #[error("while reading blob")]
+    ReadBlob(#[source] fuchsia_fs::file::ReadError),
+
+    #[error("while opening blob")]
+    OpenBlob(#[source] fuchsia_fs::node::OpenError),
+
+    #[error("while making FIDL call")]
+    Fidl(#[source] fidl::Error),
+
+    #[error("while calling GetBackingMemory")]
+    GetVmo(#[source] zx::Status),
+}
+
+impl NonMetaStorageError {
+    pub fn is_not_found_error(&self) -> bool {
+        match self {
+            NonMetaStorageError::ReadBlob(e) => e.is_not_found_error(),
+            NonMetaStorageError::OpenBlob(e) => e.is_not_found_error(),
+            NonMetaStorageError::GetVmo(status) => *status == zx::Status::NOT_FOUND,
+            _ => false,
+        }
+    }
+}
+
+impl From<&NonMetaStorageError> for zx::Status {
+    fn from(e: &NonMetaStorageError) -> Self {
+        if e.is_not_found_error() {
+            zx::Status::NOT_FOUND
+        } else {
+            zx::Status::INTERNAL
+        }
+    }
+}
+
 /// The storage that provides the non-meta files (accessed by hash) of a package-directory (e.g.
 /// blobfs).
-pub trait NonMetaStorage: Send + Sync + 'static {
+pub trait NonMetaStorage: Send + Sync + Sized + 'static {
     /// Open a non-meta file by hash. `scope` may complete while there are still open connections.
     fn open(
         &self,
@@ -84,7 +120,7 @@ pub trait NonMetaStorage: Send + Sync + 'static {
         flags: fio::OpenFlags,
         scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
-    ) -> Result<(), fuchsia_fs::node::OpenError>;
+    ) -> Result<(), NonMetaStorageError>;
 
     fn open2(
         &self,
@@ -93,6 +129,18 @@ pub trait NonMetaStorage: Send + Sync + 'static {
         _scope: ExecutionScope,
         _object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status>;
+
+    /// Get a read-only VMO for the blob.
+    fn get_blob_vmo(
+        &self,
+        hash: &fuchsia_hash::Hash,
+    ) -> impl Future<Output = Result<zx::Vmo, NonMetaStorageError>> + Send;
+
+    /// Reads the contents of a blob.
+    fn read_blob(
+        &self,
+        hash: &fuchsia_hash::Hash,
+    ) -> impl Future<Output = Result<Vec<u8>, NonMetaStorageError>> + Send;
 }
 
 impl NonMetaStorage for blobfs::Client {
@@ -102,9 +150,10 @@ impl NonMetaStorage for blobfs::Client {
         flags: fio::OpenFlags,
         scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
-    ) -> Result<(), fuchsia_fs::node::OpenError> {
-        self.open_blob_for_read(blob, flags, scope, server_end)
-            .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
+    ) -> Result<(), NonMetaStorageError> {
+        self.open_blob_for_read(blob, flags, scope, server_end).map_err(|e| {
+            NonMetaStorageError::OpenBlob(fuchsia_fs::node::OpenError::SendOpenRequest(e))
+        })
     }
 
     fn open2(
@@ -116,6 +165,26 @@ impl NonMetaStorage for blobfs::Client {
     ) -> Result<(), zx::Status> {
         self.open2_blob_for_read(blob, protocols, scope, object_request)
     }
+
+    async fn get_blob_vmo(
+        &self,
+        hash: &fuchsia_hash::Hash,
+    ) -> Result<zx::Vmo, NonMetaStorageError> {
+        self.get_blob_vmo(hash).await.map_err(|e| match e {
+            blobfs::GetBlobVmoError::OpenBlob(e) => NonMetaStorageError::OpenBlob(e),
+            blobfs::GetBlobVmoError::GetVmo(e) => NonMetaStorageError::GetVmo(e),
+            blobfs::GetBlobVmoError::Fidl(e) => NonMetaStorageError::Fidl(e),
+        })
+    }
+
+    async fn read_blob(&self, hash: &fuchsia_hash::Hash) -> Result<Vec<u8>, NonMetaStorageError> {
+        let vmo = NonMetaStorage::get_blob_vmo(self, hash).await?;
+        let content_size = vmo.get_content_size().map_err(|e| {
+            NonMetaStorageError::ReadBlob(fuchsia_fs::file::ReadError::ReadError(e))
+        })?;
+        vmo.read_to_vec(0, content_size)
+            .map_err(|e| NonMetaStorageError::ReadBlob(fuchsia_fs::file::ReadError::ReadError(e)))
+    }
 }
 
 /// Assumes the directory is a flat container and the files are named after their hashes.
@@ -126,9 +195,10 @@ impl NonMetaStorage for fio::DirectoryProxy {
         flags: fio::OpenFlags,
         _scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
-    ) -> Result<(), fuchsia_fs::node::OpenError> {
-        self.open(flags, fio::ModeType::empty(), blob.to_string().as_str(), server_end)
-            .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
+    ) -> Result<(), NonMetaStorageError> {
+        self.open(flags, fio::ModeType::empty(), blob.to_string().as_str(), server_end).map_err(
+            |e| NonMetaStorageError::OpenBlob(fuchsia_fs::node::OpenError::SendOpenRequest(e)),
+        )
     }
 
     fn open2(
@@ -141,6 +211,30 @@ impl NonMetaStorage for fio::DirectoryProxy {
         // If the FIDL call passes, errors will be communicated via the `object_request` channel.
         self.open2(blob.to_string().as_str(), &protocols, object_request.take().into_channel())
             .map_err(|_fidl_error| zx::Status::PEER_CLOSED)
+    }
+
+    async fn get_blob_vmo(
+        &self,
+        hash: &fuchsia_hash::Hash,
+    ) -> Result<zx::Vmo, NonMetaStorageError> {
+        let proxy = fuchsia_fs::directory::open_file(
+            self,
+            &hash.to_string(),
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .map_err(NonMetaStorageError::OpenBlob)?;
+        proxy
+            .get_backing_memory(fio::VmoFlags::PRIVATE_CLONE | fio::VmoFlags::READ)
+            .await
+            .map_err(NonMetaStorageError::Fidl)?
+            .map_err(|e| NonMetaStorageError::GetVmo(zx::Status::from_raw(e)))
+    }
+
+    async fn read_blob(&self, hash: &fuchsia_hash::Hash) -> Result<Vec<u8>, NonMetaStorageError> {
+        fuchsia_fs::directory::read_file(self, &hash.to_string())
+            .await
+            .map_err(NonMetaStorageError::ReadBlob)
     }
 }
 
@@ -287,7 +381,9 @@ mod tests {
     use fuchsia_pkg_testing::PackageBuilder;
     use futures::StreamExt;
     use std::any::Any;
+    use std::sync::Arc;
     use vfs::directory::dirents_sink::{self, AppendResult, Sealed, Sink};
+    use vfs::directory::helper::DirectlyMutable;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn serve() {
@@ -526,5 +622,94 @@ mod tests {
         fn open(self: Box<Self>) -> Box<dyn Any> {
             self
         }
+    }
+
+    const BLOB_CONTENTS: &[u8] = b"blob-contents";
+
+    fn blob_contents_hash() -> Hash {
+        fuchsia_merkle::from_slice(BLOB_CONTENTS).root()
+    }
+
+    fn serve_directory(directory: Arc<vfs::directory::immutable::Simple>) -> fio::DirectoryProxy {
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        vfs::directory::entry_container::Directory::open(
+            directory,
+            vfs::execution_scope::ExecutionScope::new(),
+            fio::OpenFlags::RIGHT_READABLE,
+            vfs::path::Path::dot(),
+            fidl::endpoints::ServerEnd::new(server_end.into_channel()),
+        );
+        proxy
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn bootfs_get_vmo_blob() {
+        let directory = vfs::directory::immutable::simple();
+        directory.add_entry(blob_contents_hash(), vfs::file::read_only(BLOB_CONTENTS)).unwrap();
+        let proxy = serve_directory(directory);
+
+        let vmo = proxy.get_blob_vmo(&blob_contents_hash()).await.unwrap();
+        assert_eq!(vmo.read_to_vec(0, BLOB_CONTENTS.len() as u64).unwrap(), BLOB_CONTENTS);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn bootfs_read_blob() {
+        let directory = vfs::directory::immutable::simple();
+        directory.add_entry(blob_contents_hash(), vfs::file::read_only(BLOB_CONTENTS)).unwrap();
+        let proxy = serve_directory(directory);
+
+        assert_eq!(proxy.read_blob(&blob_contents_hash()).await.unwrap(), BLOB_CONTENTS);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn bootfs_get_vmo_blob_missing_blob() {
+        let directory = vfs::directory::immutable::simple();
+        let proxy = serve_directory(directory);
+
+        let result = proxy.get_blob_vmo(&blob_contents_hash()).await;
+        assert_matches!(result, Err(NonMetaStorageError::OpenBlob(e)) if e.is_not_found_error());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn bootfs_read_blob_missing_blob() {
+        let directory = vfs::directory::immutable::simple();
+        let proxy = serve_directory(directory);
+
+        let result = proxy.read_blob(&blob_contents_hash()).await;
+        assert_matches!(result, Err(NonMetaStorageError::ReadBlob(e)) if e.is_not_found_error());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn blobfs_get_vmo_blob() {
+        let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
+        blobfs_fake.add_blob(blob_contents_hash(), BLOB_CONTENTS);
+
+        let vmo =
+            NonMetaStorage::get_blob_vmo(&blobfs_client, &blob_contents_hash()).await.unwrap();
+        assert_eq!(vmo.read_to_vec(0, BLOB_CONTENTS.len() as u64).unwrap(), BLOB_CONTENTS);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn blobfs_read_blob() {
+        let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
+        blobfs_fake.add_blob(blob_contents_hash(), BLOB_CONTENTS);
+
+        assert_eq!(blobfs_client.read_blob(&blob_contents_hash()).await.unwrap(), BLOB_CONTENTS);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn blobfs_get_vmo_blob_missing_blob() {
+        let (_blobfs_fake, blobfs_client) = FakeBlobfs::new();
+
+        let result = NonMetaStorage::get_blob_vmo(&blobfs_client, &blob_contents_hash()).await;
+        assert_matches!(result, Err(NonMetaStorageError::OpenBlob(e)) if e.is_not_found_error());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn blobfs_read_blob_missing_blob() {
+        let (_blobfs_fake, blobfs_client) = FakeBlobfs::new();
+
+        let result = blobfs_client.read_blob(&blob_contents_hash()).await;
+        assert_matches!(result, Err(NonMetaStorageError::OpenBlob(e)) if e.is_not_found_error());
     }
 }

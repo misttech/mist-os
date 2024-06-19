@@ -7,7 +7,7 @@
 use fidl::endpoints::RequestStream as _;
 use fidl_fuchsia_io as fio;
 use fuchsia_hash::Hash;
-use fuchsia_zircon::{self as zx, AsHandleRef as _, Status};
+use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status};
 use futures::{Future, StreamExt as _, TryStreamExt as _};
 use std::cmp::min;
 use std::collections::HashSet;
@@ -402,6 +402,22 @@ impl Blob {
                 Some(Ok(fio::FileRequest::Close { responder })) => {
                     let _ = responder.send(Ok(()));
                     return;
+                }
+                Some(Ok(fio::FileRequest::GetBackingMemory { flags, responder })) => {
+                    assert!(flags.contains(fio::VmoFlags::READ));
+                    assert!(!flags.contains(fio::VmoFlags::WRITE));
+                    assert!(!flags.contains(fio::VmoFlags::EXECUTE));
+                    let vmo = zx::Vmo::create(data.len() as u64).unwrap();
+                    vmo.write(data, 0).unwrap();
+                    let vmo = vmo
+                        .replace_handle(
+                            zx::Rights::READ
+                                | zx::Rights::BASIC
+                                | zx::Rights::MAP
+                                | zx::Rights::GET_PROPERTY,
+                        )
+                        .unwrap();
+                    responder.send(Ok(vmo)).unwrap();
                 }
                 None => {
                     return;
