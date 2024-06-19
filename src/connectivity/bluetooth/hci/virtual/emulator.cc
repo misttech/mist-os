@@ -20,6 +20,7 @@ using bt::DeviceAddress;
 using bt::testing::FakeController;
 
 namespace bt_hci_virtual {
+
 namespace {
 
 const char* ChannelTypeToString(ChannelType chan_type) {
@@ -104,6 +105,8 @@ EmulatorDevice::EmulatorDevice()
       fake_device_(pw_dispatcher_),
       emulator_devfs_connector_(fit::bind_member<&EmulatorDevice::ConnectEmulator>(this)),
       vendor_devfs_connector_(fit::bind_member<&EmulatorDevice::ConnectVendor>(this)) {}
+
+EmulatorDevice::~EmulatorDevice() { fake_device_.Stop(); }
 
 zx_status_t EmulatorDevice::Initialize(std::string_view name, AddChildCallback callback,
                                        ShutdownCallback shutdown) {
@@ -264,9 +267,74 @@ void EmulatorDevice::OpenHci(OpenHciCompleter::Sync& completer) {
   completer.ReplySuccess(std::move(endpoints->client));
 }
 
+void EmulatorDevice::OpenHciTransport(OpenHciTransportCompleter::Sync& completer) {
+  // Sets FakeController to respond with event, ACL, and ISO packet types when it receives an
+  // incoming packet of the appropriate type
+  fake_device_.SetEventFunction(fit::bind_member<&EmulatorDevice::SendEventToHost>(this));
+  fake_device_.SetReceiveAclFunction(fit::bind_member<&EmulatorDevice::SendAclPacketToHost>(this));
+  fake_device_.SetReceiveIsoFunction(fit::bind_member<&EmulatorDevice::SendIsoPacketToHost>(this));
+
+  auto endpoints = fidl::CreateEndpoints<fhbt::HciTransport>();
+  if (endpoints.is_error()) {
+    FDF_LOG(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
+    completer.ReplyError(endpoints.error_value());
+    return;
+  }
+
+  hci_transport_bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                     std::move(endpoints->server), this,
+                                     fidl::kIgnoreBindingClosure);
+  completer.ReplySuccess(std::move(endpoints->client));
+}
+
 void EmulatorDevice::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Vendor> metadata,
                                            fidl::UnknownMethodCompleter::Sync& completer) {
   FDF_LOG(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::Send(SendRequest& request, SendCompleter::Sync& completer) {
+  switch (request.Which()) {
+    case fhbt::SentPacket::Tag::kCommand: {
+      std::vector<uint8_t> command_data = request.command().value();
+      pw::span<const std::byte> buffer = bt::BufferView(command_data).subspan();
+      fake_device_.SendCommand(buffer);
+      completer.Reply();
+      return;
+    }
+    case fhbt::SentPacket::Tag::kAcl: {
+      std::vector<uint8_t> acl_data = request.acl().value();
+      pw::span<const std::byte> buffer = bt::BufferView(acl_data).subspan();
+      fake_device_.SendAclData(buffer);
+      completer.Reply();
+      return;
+    }
+    case fhbt::SentPacket::Tag::kIso: {
+      std::vector<uint8_t> iso_data = request.iso().value();
+      pw::span<const std::byte> buffer = bt::BufferView(iso_data).subspan();
+      fake_device_.SendIsoData(buffer);
+      completer.Reply();
+      return;
+    }
+    default: {
+      FDF_LOG(ERROR, "Received unknown packet type %lu", static_cast<uint64_t>(request.Which()));
+      return;
+    }
+  }
+}
+
+void EmulatorDevice::ConfigureSco(
+    ConfigureScoRequest& request,
+    fidl::Server<fuchsia_hardware_bluetooth::HciTransport>::ConfigureScoCompleter::Sync&
+        completer) {
+  // This interface is not implemented.
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::handle_unknown_method(
+    ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
+    ::fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown method in HciTransport request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -296,8 +364,9 @@ void EmulatorDevice::OpenScoDataChannel(OpenScoDataChannelRequestView request,
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void EmulatorDevice::ConfigureSco(ConfigureScoRequestView request,
-                                  ConfigureScoCompleter::Sync& completer) {
+void EmulatorDevice::ConfigureSco(
+    ConfigureScoRequestView request,
+    fidl::WireServer<fuchsia_hardware_bluetooth::Hci>::ConfigureScoCompleter::Sync& completer) {
   // This interface is not implemented.
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
@@ -529,7 +598,7 @@ bool EmulatorDevice::StartCmdChannel(zx::channel chan) {
     return false;
   }
 
-  fake_device_.SetEventFunction(fit::bind_member<&EmulatorDevice::SendEvent>(this));
+  fake_device_.SetEventFunction(fit::bind_member<&EmulatorDevice::SendEventToHost>(this));
 
   cmd_channel_ = std::move(chan);
   cmd_channel_wait_.set_object(cmd_channel_.get());
@@ -549,7 +618,7 @@ bool EmulatorDevice::StartAclChannel(zx::channel chan) {
   }
 
   // Enable FakeController to send packets to bt-host.
-  fake_device_.SetReceiveAclFunction(fit::bind_member<&EmulatorDevice::SendAclPacket>(this));
+  fake_device_.SetReceiveAclFunction(fit::bind_member<&EmulatorDevice::SendAclPacketToHost>(this));
 
   // Enable bt-host to send packets to FakeController.
   acl_channel_ = std::move(chan);
@@ -570,7 +639,7 @@ bool EmulatorDevice::StartIsoChannel(zx::channel chan) {
   }
 
   // Enable FakeController to send packets to bt-host.
-  fake_device_.SetReceiveIsoFunction(fit::bind_member<&EmulatorDevice::SendIsoPacket>(this));
+  fake_device_.SetReceiveIsoFunction(fit::bind_member<&EmulatorDevice::SendIsoPacketToHost>(this));
 
   // Enable bt-host to send packets to FakeController.
   iso_channel_ = std::move(chan);
@@ -609,28 +678,91 @@ void EmulatorDevice::CloseIsoDataChannel() {
   fake_device_.Stop();
 }
 
-void EmulatorDevice::SendEvent(pw::span<const std::byte> buffer) {
-  zx_status_t status = cmd_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
-                                          /*handles=*/nullptr, /*num_handles=*/0);
-  if (status != ZX_OK) {
-    FDF_LOG(WARNING, "failed to write event");
+void EmulatorDevice::SendEventToHost(pw::span<const std::byte> buffer) {
+  // Using Hci protocol
+  if (cmd_channel_.is_valid()) {
+    zx_status_t status = cmd_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
+                                            /*handles=*/nullptr, /*num_handles=*/0);
+    if (status != ZX_OK) {
+      FDF_LOG(WARNING, "failed to write event");
+    }
+    return;
   }
+
+  if (hci_transport_bindings_.size() == 0) {
+    FDF_LOG(ERROR, "No HciTransport bindings");
+    return;
+  }
+  // Using HciTransport protocol (i.e. |cmd_channel_| is not set)
+  hci_transport_bindings_.ForEachBinding(
+      [buffer](const fidl::ServerBinding<fuchsia_hardware_bluetooth::HciTransport>& binding) {
+        // Send the event to bt-host
+        std::vector<uint8_t> data = bt::BufferView(buffer).ToVector();
+        fhbt::ReceivedPacket event = fhbt::ReceivedPacket::WithEvent(data);
+        fit::result<::fidl::OneWayError> status = fidl::SendEvent(binding)->OnReceive(event);
+        if (!status.is_ok()) {
+          FDF_LOG(ERROR, "Failed to send OnReceive event to bt-host: %s",
+                  status.error_value().status_string());
+        }
+      });
 }
 
-void EmulatorDevice::SendAclPacket(pw::span<const std::byte> buffer) {
-  zx_status_t status = acl_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
-                                          /*handles=*/nullptr, /*num_handles=*/0);
-  if (status != ZX_OK) {
-    FDF_LOG(WARNING, "failed to write ACL packet");
+void EmulatorDevice::SendAclPacketToHost(pw::span<const std::byte> buffer) {
+  // Using Hci protocol
+  if (acl_channel_.is_valid()) {
+    zx_status_t status = acl_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
+                                            /*handles=*/nullptr, /*num_handles=*/0);
+    if (status != ZX_OK) {
+      FDF_LOG(WARNING, "failed to write ACL packet");
+    }
+    return;
   }
+
+  if (hci_transport_bindings_.size() == 0) {
+    FDF_LOG(ERROR, "No HciTransport bindings");
+    return;
+  }
+  // Using HciTransport protocol (i.e. |acl_channel_| is not set)
+  hci_transport_bindings_.ForEachBinding(
+      [buffer](const fidl::ServerBinding<fuchsia_hardware_bluetooth::HciTransport>& binding) {
+        // Send the event to bt-host
+        std::vector<uint8_t> data = bt::BufferView(buffer).ToVector();
+        fhbt::ReceivedPacket event = fhbt::ReceivedPacket::WithAcl(data);
+        fit::result<::fidl::OneWayError> status = fidl::SendEvent(binding)->OnReceive(event);
+        if (!status.is_ok()) {
+          FDF_LOG(ERROR, "Failed to send OnReceive event to bt-host: %s",
+                  status.error_value().status_string());
+        }
+      });
 }
 
-void EmulatorDevice::SendIsoPacket(pw::span<const std::byte> buffer) {
-  zx_status_t status = iso_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
-                                          /*handles=*/nullptr, /*num_handles=*/0);
-  if (status != ZX_OK) {
-    FDF_LOG(WARNING, "failed to write ISO packet");
+void EmulatorDevice::SendIsoPacketToHost(pw::span<const std::byte> buffer) {
+  // Using Hci protocol
+  if (iso_channel_.is_valid()) {
+    zx_status_t status = iso_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
+                                            /*handles=*/nullptr, /*num_handles=*/0);
+    if (status != ZX_OK) {
+      FDF_LOG(WARNING, "failed to write ISO packet");
+    }
+    return;
   }
+
+  if (hci_transport_bindings_.size() == 0) {
+    FDF_LOG(ERROR, "No HciTransport bindings");
+    return;
+  }
+  // Using HciTransport protocol (i.e. |iso_channel_| is not set)
+  hci_transport_bindings_.ForEachBinding(
+      [buffer](const fidl::ServerBinding<fuchsia_hardware_bluetooth::HciTransport>& binding) {
+        // Send the event to bt-host
+        std::vector<uint8_t> data = bt::BufferView(buffer).ToVector();
+        fhbt::ReceivedPacket event = fhbt::ReceivedPacket::WithIso(data);
+        fit::result<::fidl::OneWayError> status = fidl::SendEvent(binding)->OnReceive(event);
+        if (!status.is_ok()) {
+          FDF_LOG(ERROR, "Failed to send OnReceive event to bt-host: %s",
+                  status.error_value().status_string());
+        }
+      });
 }
 
 void EmulatorDevice::HandleCommandPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
