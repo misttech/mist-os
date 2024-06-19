@@ -12,10 +12,12 @@ use futures::{Future, StreamExt};
 use std::boxed::Box;
 use tracing::error;
 use wlan_common::bss::BssDescription;
-use {fidl_fuchsia_metrics, fidl_fuchsia_wlan_sme as fidl_sme};
+use wlan_common::channel::Channel;
+use {fidl_fuchsia_metrics, fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx};
 
 mod processors;
 pub(crate) mod util;
+pub use crate::processors::connect_disconnect::{ApState, DisconnectInfo, Signal, TrackedBss};
 pub use util::sender::TelemetrySender;
 #[cfg(test)]
 mod testing;
@@ -25,7 +27,7 @@ pub enum TelemetryEvent {
     /// Report a connection result.
     ConnectResult { result: fidl_sme::ConnectResult, bss: Box<BssDescription> },
     /// Report a disconnection.
-    Disconnect,
+    Disconnect { info: Box<DisconnectInfo> },
 }
 
 pub fn serve_telemetry(
@@ -56,8 +58,8 @@ pub fn serve_telemetry(
                 ConnectResult { result, bss } => {
                     connect_disconnect.log_connect_attempt(result, &bss).await;
                 }
-                Disconnect => {
-                    connect_disconnect.log_disconnect().await;
+                Disconnect { info } => {
+                    connect_disconnect.log_disconnect(&info).await;
                 }
             }
         }
