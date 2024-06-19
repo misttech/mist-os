@@ -591,7 +591,7 @@ zx_status_t Tas58xx::SetMuteElement(signal_fidl::SettableElementState state) {
   return ZX_OK;
 }
 
-void Tas58xx::WatchElementState(uint64_t processing_element_id,
+void Tas58xx::WatchElementState(signal_fidl::ElementId processing_element_id,
                                 signal_fidl::SignalProcessing::WatchElementStateCallback callback) {
   switch (processing_element_id) {
     case kAglPeId:
@@ -758,7 +758,7 @@ void Tas58xx::WatchTopology(
   }
 }
 
-void Tas58xx::SetTopology(uint64_t topology_id,
+void Tas58xx::SetTopology(signal_fidl::TopologyId topology_id,
                           signal_fidl::SignalProcessing::SetTopologyCallback callback) {
   if (topology_id != kTopologyId) {
     callback(signal_fidl::SignalProcessing_SetTopology_Result::WithErr(ZX_ERR_INVALID_ARGS));
@@ -768,7 +768,7 @@ void Tas58xx::SetTopology(uint64_t topology_id,
       signal_fidl::SignalProcessing_SetTopology_Response()));
 }
 
-void Tas58xx::SetElementState(uint64_t processing_element_id,
+void Tas58xx::SetElementState(signal_fidl::ElementId processing_element_id,
                               signal_fidl::SettableElementState state,
                               signal_fidl::SignalProcessing::SetElementStateCallback callback) {
   zx_status_t status = ZX_OK;

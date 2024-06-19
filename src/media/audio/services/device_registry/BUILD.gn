@@ -70,6 +70,7 @@ executable("device_registry_bin") {
 
 executable("device_registry_unittests_bin") {
   testonly = true
+  output_name = "audio_services_device_registry_unittests"
 
   sources = [
     "audio_device_registry_unittest.cc",
@@ -95,6 +96,7 @@ executable("device_registry_unittests_bin") {
 
 executable("device_registry_warning_unittests_bin") {
   testonly = true
+  output_name = "audio_services_device_registry_warning_unittests"
 
   sources = [
     "audio_device_registry_warning_unittest.cc",

@@ -19,9 +19,9 @@ int VirtualAudioComposite::instance_count_ = 0;
 
 // static
 fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
-  constexpr uint64_t kDefaultRingBufferId = 123;
-  constexpr uint64_t kDefaultDaiId = 456;
-  constexpr uint64_t kDefaultTopologyId = 789;
+  constexpr fuchsia_hardware_audio::ElementId kDefaultRingBufferId = 123;
+  constexpr fuchsia_hardware_audio::ElementId kDefaultDaiId = 456;
+  constexpr fuchsia_hardware_audio::TopologyId kDefaultTopologyId = 789;
 
   fuchsia_virtualaudio::Configuration config;
   config.device_name("Virtual Audio Composite Device");
@@ -697,7 +697,7 @@ void VirtualAudioComposite::SetElementState(SetElementStateRequest& request,
   // TODO(https://fxbug.dev/42075676): Add support for more elements provided by the driver (ring
   // buffers, DAI interconnects and other processing elements), allowing their configuration and
   // observability via the virtual audio FIDL APIs.
-  uint64_t id = request.processing_element_id();
+  fuchsia_hardware_audio::ElementId id = request.processing_element_id();
   if (id != kRingBufferId && id != kDaiId) {
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;

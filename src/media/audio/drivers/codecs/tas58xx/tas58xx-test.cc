@@ -28,10 +28,10 @@ namespace audio {
 namespace audio_fidl = ::fuchsia::hardware::audio;
 namespace signal_fidl = ::fuchsia::hardware::audio::signalprocessing;
 
-static constexpr uint64_t kAglPeIndex = 0;
-static constexpr uint64_t kGainPeIndex = 1;
-static constexpr uint64_t kMutePeIndex = 2;
-static constexpr uint64_t kEqualizerPeIndex = 3;
+static constexpr size_t kAglPeIndex = 0;
+static constexpr size_t kGainPeIndex = 1;
+static constexpr size_t kMutePeIndex = 2;
+static constexpr size_t kEqualizerPeIndex = 3;
 
 struct Tas58xxCodec : public Tas58xx {
   explicit Tas58xxCodec(zx_device_t* parent, ddk::I2cChannel i2c,
@@ -51,11 +51,13 @@ struct Tas58xxCodec : public Tas58xx {
     return zx::success(std::move(channel_local));
   }
   inspect::Inspector& inspect() { return Tas58xx::inspect(); }
-  static uint64_t GetTopologyId() { return Tas58xx::GetTopologyId(); }
-  static uint64_t GetAglPeId() { return Tas58xx::GetAglPeId(); }
-  static uint64_t GetEqPeId() { return Tas58xx::GetEqPeId(); }
-  static uint64_t GetGainPeId() { return Tas58xx::GetGainPeId(); }
-  static uint64_t GetMutePeId() { return Tas58xx::GetMutePeId(); }
+  static fuchsia_hardware_audio::wire::TopologyId GetTopologyId() {
+    return Tas58xx::GetTopologyId();
+  }
+  static fuchsia_hardware_audio::wire::ElementId GetAglPeId() { return Tas58xx::GetAglPeId(); }
+  static fuchsia_hardware_audio::wire::ElementId GetEqPeId() { return Tas58xx::GetEqPeId(); }
+  static fuchsia_hardware_audio::wire::ElementId GetGainPeId() { return Tas58xx::GetGainPeId(); }
+  static fuchsia_hardware_audio::wire::ElementId GetMutePeId() { return Tas58xx::GetMutePeId(); }
   void PeriodicPollFaults() { Tas58xx::PeriodicPollFaults(); }
   zx_status_t SetBand(bool enabled, size_t index, uint32_t frequency, float Q, float gain_db) {
     return Tas58xx::SetBand(enabled, index, frequency, Q, gain_db);

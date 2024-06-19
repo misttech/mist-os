@@ -1,6 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/mock-i2c/mock-i2c.h>
 #include <lib/zx/clock.h>
@@ -13,8 +14,8 @@
 #include "src/media/audio/drivers/codecs/da7219/da7219-dfv1.h"
 
 namespace {
-static constexpr uint64_t kTopologyId = 1;
-static constexpr uint64_t kHeadphoneGainPeId = 1;
+static constexpr fuchsia_hardware_audio::wire::TopologyId kTopologyId = 1;
+static constexpr fuchsia_hardware_audio::wire::ElementId kHeadphoneGainPeId = 1;
 }  // namespace
 
 namespace audio::da7219 {

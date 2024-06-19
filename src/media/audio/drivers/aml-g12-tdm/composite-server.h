@@ -142,9 +142,11 @@ class AudioCompositeServer
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
 
  private:
-  static constexpr std::array<uint64_t, kNumberOfPipelines> kDaiIds = {1, 2, 3};
-  static constexpr std::array<uint64_t, kNumberOfTdmEngines> kRingBufferIds = {4, 5, 6, 7, 8, 9};
-  static constexpr uint64_t kTopologyId = 1;
+  static constexpr std::array<fuchsia_hardware_audio::ElementId, kNumberOfPipelines> kDaiIds = {
+      1, 2, 3};
+  static constexpr std::array<fuchsia_hardware_audio::ElementId, kNumberOfTdmEngines>
+      kRingBufferIds = {4, 5, 6, 7, 8, 9};
+  static constexpr fuchsia_hardware_audio::TopologyId kTopologyId = 1;
 
   struct ElementCompleter {
     // One-shot flag that indicates whether or not WatchElementState has been called
@@ -174,7 +176,7 @@ class AudioCompositeServer
 
   TopologyCompleter topology_completer_ = {};
 
-  std::unordered_map<uint64_t, ElementCompleter> element_completers_;
+  std::unordered_map<fuchsia_hardware_audio::ElementId, ElementCompleter> element_completers_;
   std::array<Engine, kNumberOfTdmEngines> engines_;
   std::array<fuchsia_hardware_audio::PcmSupportedFormats, kNumberOfTdmEngines>
       supported_ring_buffer_formats_;
