@@ -18,19 +18,6 @@
 
 namespace object_info_test {
 
-// Cannot obtain information about self, since the buffer lives within the same address space
-// being inspected.
-template <typename EntryType, typename HandleType>
-void CheckSelfInfoFails(zx_object_info_topic_t topic, uint32_t entry_count,
-                        const HandleType& self) {
-  EntryType entries[entry_count];
-  size_t actual;
-  size_t avail;
-
-  ASSERT_EQ(self.get_info(topic, entries, sizeof(EntryType) * entry_count, &actual, &avail),
-            ZX_ERR_ACCESS_DENIED);
-}
-
 template <typename EntryType, typename HandleType>
 void CheckSelfInfoSuceeds(zx_object_info_topic_t topic, uint32_t entry_count,
                           const HandleType& self) {

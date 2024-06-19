@@ -682,7 +682,7 @@ TEST_F(ProcessGetInfoTest, InfoProcessVmosSmokeTest) {
   }
 }
 
-TEST_F(ProcessGetInfoTest, InfoProcessVmosOnSelfFails) {
+TEST_F(ProcessGetInfoTest, InfoProcessVmosOnSelfSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
       (CheckSelfInfoSuceeds<zx_info_vmo_t>(ZX_INFO_PROCESS_VMOS, 1, process_provider())));
 }
