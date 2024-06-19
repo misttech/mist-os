@@ -12,7 +12,6 @@ use fuchsia_sync::RwLock;
 use moniker::ExtendedMoniker;
 use selectors::SelectorExt;
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -40,7 +39,11 @@ pub struct Pipeline {
     /// Whether the pipeline had an error when being created.
     has_error: bool,
 
-    mutable_state: RwLock<PipelineMutableState>,
+    /// Static selectors that the pipeline uses. Loaded from configuration.
+    static_selectors: Option<Vec<Selector>>,
+
+    /// A hierarchy matcher for any selector present in the static selectors.
+    moniker_to_static_matcher_map: RwLock<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>>,
 }
 
 impl Pipeline {
@@ -116,10 +119,8 @@ impl Pipeline {
             protocol_name: "test",
             has_error: false,
             stats: AccessorStats::new(Default::default()),
-            mutable_state: RwLock::new(PipelineMutableState {
-                moniker_to_static_matcher_map: HashMap::new(),
-                static_selectors,
-            }),
+            moniker_to_static_matcher_map: RwLock::new(HashMap::new()),
+            static_selectors,
         }
     }
 
@@ -150,10 +151,8 @@ impl Pipeline {
             stats,
             protocol_name: parameters.protocol_name,
             has_error,
-            mutable_state: RwLock::new(PipelineMutableState {
-                moniker_to_static_matcher_map: HashMap::new(),
-                static_selectors,
-            }),
+            moniker_to_static_matcher_map: RwLock::new(HashMap::new()),
+            static_selectors,
         }
     }
 
@@ -168,33 +167,12 @@ impl Pipeline {
     pub fn accessor_stats(&self) -> &AccessorStats {
         &self.stats
     }
-}
 
-pub struct PipelineMutableState {
-    /// Static selectors that the pipeline uses. Loaded from configuration.
-    static_selectors: Option<Vec<Selector>>,
-
-    /// A hierarchy matcher for any selector present in the static selectors.
-    moniker_to_static_matcher_map: HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>,
-}
-
-impl Deref for Pipeline {
-    type Target = RwLock<PipelineMutableState>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.mutable_state
-    }
-}
-
-impl PipelineMutableState {
-    pub fn remove(&mut self, moniker: &ExtendedMoniker) {
-        self.moniker_to_static_matcher_map.remove(moniker);
+    pub fn remove_component(&self, moniker: &ExtendedMoniker) {
+        self.moniker_to_static_matcher_map.write().remove(moniker);
     }
 
-    pub fn add_inspect_artifacts(&mut self, moniker: &ExtendedMoniker) -> Result<(), Error> {
-        // Update the pipeline wrapper to be aware of the new inspect source if there
-        // are are static selectors for the pipeline, and some of them are applicable to
-        // the inspect source's moniker. Otherwise, ignore.
+    pub fn add_component(&self, moniker: &ExtendedMoniker) -> Result<(), Error> {
         if let Some(selectors) = &self.static_selectors {
             let matched_selectors =
                 moniker.match_against_selectors(selectors).map_err(Error::MatchComponentMoniker)?;
@@ -204,6 +182,7 @@ impl PipelineMutableState {
                 populated_vec => {
                     let hierarchy_matcher = (populated_vec).try_into()?;
                     self.moniker_to_static_matcher_map
+                        .write()
                         .insert(moniker.clone(), Arc::new(hierarchy_matcher));
                 }
             }
@@ -219,7 +198,7 @@ impl PipelineMutableState {
             // as it'll be just cloning arcs, but we could be more efficient here.
             // Due to lock semantics we can't just return a reference at the moment as it leads to
             // an ABBA lock between inspect insertion into the repo and inspect reading.
-            return Some(self.moniker_to_static_matcher_map.clone());
+            return Some(self.moniker_to_static_matcher_map.read().clone());
         }
         None
     }
