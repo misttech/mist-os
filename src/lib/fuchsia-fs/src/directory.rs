@@ -19,6 +19,74 @@ use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 mod watcher;
 pub use watcher::{WatchEvent, WatchMessage, Watcher, WatcherCreateError, WatcherStreamError};
 
+#[cfg(target_os = "fuchsia")]
+pub use fuchsia::*;
+
+#[cfg(not(target_os = "fuchsia"))]
+pub use host::*;
+
+#[cfg(target_os = "fuchsia")]
+mod fuchsia {
+    use super::*;
+
+    /// Opens the given `path` from the current namespace as a [`DirectoryProxy`].
+    ///
+    /// The target is assumed to implement fuchsia.io.Directory but this isn't verified. To connect
+    /// to a filesystem node which doesn't implement fuchsia.io.Directory, use the functions in
+    /// [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
+    /// error. However, if incorrect flags are sent, or if the rest of the path sent to the
+    /// filesystem server doesn't exist, this will still return success. Instead, the returned
+    /// DirectoryProxy channel pair will be closed with an epitaph.
+    pub fn open_in_namespace(
+        path: &str,
+        flags: fio::OpenFlags,
+    ) -> Result<fio::DirectoryProxy, OpenError> {
+        let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
+        open_channel_in_namespace(path, flags, request)?;
+        Ok(node)
+    }
+
+    /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
+    /// over [`request`]. Once the channel is connected, any calls made prior are serviced.
+    ///
+    /// The target is assumed to implement fuchsia.io.Directory but this isn't verified. To connect
+    /// to a filesystem node which doesn't implement fuchsia.io.Directory, use the functions in
+    /// [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
+    /// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will
+    /// still return success. Instead, the [`request`] channel will be closed with an epitaph.
+    pub fn open_channel_in_namespace(
+        path: &str,
+        flags: fio::OpenFlags,
+        request: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
+    ) -> Result<(), OpenError> {
+        let flags = flags | fio::OpenFlags::DIRECTORY;
+        let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
+        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+    }
+
+    /// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.
+    pub async fn read_file(parent: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, ReadError> {
+        let flags = fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE;
+        let file = open_file_no_describe(parent, path, flags).map_err(ReadError::Open)?;
+        crate::file::read_file_with_on_open_event(file).await
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+mod host {
+    use super::*;
+
+    /// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.
+    pub async fn read_file(parent: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, ReadError> {
+        let file = open_file_no_describe(parent, path, fio::OpenFlags::RIGHT_READABLE)?;
+        crate::file::read(&file).await
+    }
+}
+
 /// Error returned by readdir_recursive.
 #[derive(Debug, Clone, Error)]
 pub enum RecursiveEnumerateError {
@@ -65,47 +133,6 @@ pub enum DecodeDirentError {
 
     #[error("name is not valid utf-8: {}", _0)]
     InvalidUtf8(Utf8Error),
-}
-
-/// Opens the given `path` from the current namespace as a [`DirectoryProxy`].
-///
-/// The target is assumed to implement fuchsia.io.Directory but this isn't verified. To connect to
-/// a filesystem node which doesn't implement fuchsia.io.Directory, use the functions in
-/// [`fuchsia_component::client`] instead.
-///
-/// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
-/// error. However, if incorrect flags are sent, or if the rest of the path sent to the filesystem
-/// server doesn't exist, this will still return success. Instead, the returned DirectoryProxy
-/// channel pair will be closed with an epitaph.
-#[cfg(target_os = "fuchsia")]
-pub fn open_in_namespace(
-    path: &str,
-    flags: fio::OpenFlags,
-) -> Result<fio::DirectoryProxy, OpenError> {
-    let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
-    open_channel_in_namespace(path, flags, request)?;
-    Ok(node)
-}
-
-/// Asynchronously opens the given [`path`] in the current namespace, serving the connection over
-/// [`request`]. Once the channel is connected, any calls made prior are serviced.
-///
-/// The target is assumed to implement fuchsia.io.Directory but this isn't verified. To connect to
-/// a filesystem node which doesn't implement fuchsia.io.Directory, use the functions in
-/// [`fuchsia_component::client`] instead.
-///
-/// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
-/// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will still
-/// return success. Instead, the [`request`] channel will be closed with an epitaph.
-#[cfg(target_os = "fuchsia")]
-pub fn open_channel_in_namespace(
-    path: &str,
-    flags: fio::OpenFlags,
-    request: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
-) -> Result<(), OpenError> {
-    let flags = flags | fio::OpenFlags::DIRECTORY;
-    let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-    namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
 }
 
 /// Opens the given `path` from the given `parent` directory as a [`DirectoryProxy`]. The target is
@@ -744,21 +771,6 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
         Ok(())
     };
     Box::pin(fut)
-}
-
-/// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.
-#[cfg(target_os = "fuchsia")]
-pub async fn read_file(parent: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, ReadError> {
-    let flags = fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE;
-    let file = open_file_no_describe(parent, path, flags).map_err(ReadError::Open)?;
-    crate::file::read_file_with_on_open_event(file).await
-}
-
-/// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.
-#[cfg(not(target_os = "fuchsia"))]
-pub async fn read_file(parent: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, ReadError> {
-    let file = open_file_no_describe(parent, path, fio::OpenFlags::RIGHT_READABLE)?;
-    crate::file::read(&file).await
 }
 
 /// Opens `path` from the `parent` directory as a file and reads the file contents as a utf-8
