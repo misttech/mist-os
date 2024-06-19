@@ -107,7 +107,6 @@ impl<'a> MissingBlobs<'a> {
         &mut self,
         root_dir_or_hash: RootDirOrHash<'_>,
     ) -> Result<(), ServeNeededBlobsError> {
-        let root_dir_storage;
         let root_dir = match root_dir_or_hash {
             RootDirOrHash::RootDir(root_dir) => {
                 if !self.visited_subpackages.insert(*root_dir.hash()) {
@@ -119,12 +118,11 @@ impl<'a> MissingBlobs<'a> {
                 if !self.visited_subpackages.insert(hash) {
                     return Ok(());
                 }
-                root_dir_storage = self
+                &self
                     .root_dir_factory
                     .create(hash)
                     .await
-                    .map_err(ServeNeededBlobsError::CreateSubpackageRootDir)?;
-                &root_dir_storage
+                    .map_err(ServeNeededBlobsError::CreateSubpackageRootDir)?
             }
         };
 
