@@ -278,8 +278,10 @@ template("fidl_library") {
 
     # The current level might be a supported level. Don't double count it.
     #
-    # TODO: https://fxbug.dev/305961460 - Replace with more definite logic.
-    current_level = platform_version.in_development_api_level
+    # TODO(https://fxbug.dev/326277078): Update when introducing "NEXT" as an
+    # API level. At that time, numbered API levels will always be "NEXT" and the
+    # policy will always be "no_changes".
+    current_level = platform_version.deprecated_highest_numbered_api_level
     policy_for_current_level = "ack_changes"
 
     # policy_for_current_level is unused when regenerating golden files.
@@ -288,8 +290,23 @@ template("fidl_library") {
     api_levels = [ "$current_level" ]
 
     # Set api level to the next level if generate golden files tag is set to true.
+    # There must not be a numbered in-development level when doing so.
+    # TODO(https://fxbug.dev/326277078): Remove or update this comment and logic
+    # when adding support for "NEXT" as an API level. At that time, numbered API
+    # levels can no longer be in-development and the "next API level" will
+    # always be "NEXT".
     if (defined(include_next_api_level) && include_next_api_level) {
-      next_level = 1 + platform_version.in_development_api_level
+      _max_frozen_api_level = 0
+      foreach(level, platform_version.frozen_api_levels) {
+        if (level > _max_frozen_api_level) {
+          _max_frozen_api_level = level
+        }
+      }
+      assert(platform_version.deprecated_highest_numbered_api_level ==
+                 _max_frozen_api_level,
+             "The previous API level must be frozen before adding a new one.")
+
+      next_level = 1 + platform_version.deprecated_highest_numbered_api_level
       api_levels += [ "$next_level" ]
     }
 

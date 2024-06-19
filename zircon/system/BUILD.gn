@@ -22,14 +22,14 @@ static_library("availability_test") {
     _override_target_api_level_plus_one = override_target_api_level + 1
 
     # TODO(https://fxbug.dev/305961460): Replace the RHS with another mechanism.
-    _highest_supported_api_level_plus_one =
-        platform_version.in_development_api_level + 1
+    _highest_numbered_api_level_plus_one =
+        platform_version.deprecated_highest_numbered_api_level + 1
 
     defines = [
       "BUILT_AT_NUMBERED_API_LEVEL=$override_target_api_level",
       "BUILT_AT_NUMBERED_API_LEVEL_MINUS_ONE=$_override_target_api_level_minus_one",
       "BUILT_AT_NUMBERED_API_LEVEL_PLUS_ONE=$_override_target_api_level_plus_one",
-      "FUCHSIA_INTERNAL_LEVEL_${_highest_supported_api_level_plus_one}_()=${_highest_supported_api_level_plus_one}",
+      "FUCHSIA_INTERNAL_LEVEL_${_highest_numbered_api_level_plus_one}_()=${_highest_numbered_api_level_plus_one}",
     ]
   }
 

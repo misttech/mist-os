@@ -11,8 +11,12 @@ import("//build/cpp/sdk_source_set.gni")
 import("//build/config/fuchsia/platform_version.gni")
 config("fuchsia_api_level_for_developer_tools") {
   visibility = [ ":*" ]
-  defines =
-      [ "NEXT_STABLE_API_LEVEL=${platform_version.in_development_api_level}" ]
+  defines = [
+    # TODO(https://fxbug.dev/308808613): Eliminate the need for this in order
+    # to unblock https://fxbug.dev/305961460.
+    # TODO(https://fxbug.dev/326277078): Add 1 when switching to NEXT.
+    "NEXT_STABLE_API_LEVEL=${platform_version.deprecated_highest_numbered_api_level}",
+  ]
 }
 
 sdk_source_set("ipc") {

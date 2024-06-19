@@ -53,7 +53,23 @@ if (bump_api_level) {
         "//docs/development/testing/ctf/fidl_api_compatibility_testing.md"
     _goldens_manifest = "$root_build_dir/compatibility_testing_goldens.json"
     _stamp_file = "$target_out_dir/$target_name.status"
-    _next_level = platform_version.in_development_api_level + 1
+
+    # There must be no in-development (unfrozen) API level when adding a new one.
+    # TODO(https://fxbug.dev/326277078): Replace the logic in this file when
+    # adding support for "NEXT" as an API level. At that time, numbered API levels
+    # can no longer be in-development and the "next API level" will always be
+    # "NEXT".
+    _max_frozen_api_level = 0
+    foreach(level, platform_version.frozen_api_levels) {
+      if (level > _max_frozen_api_level) {
+        _max_frozen_api_level = level
+      }
+    }
+    assert(platform_version.deprecated_highest_numbered_api_level ==
+               _max_frozen_api_level,
+           "The previous API level must be frozen before adding a new one.")
+
+    _next_level = platform_version.deprecated_highest_numbered_api_level + 1
 
     args = [
       "--stamp-file",
