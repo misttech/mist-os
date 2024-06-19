@@ -199,10 +199,10 @@ inline zx_info_maps_v1_t MapsInfoToVersion(const zx_info_maps_t& maps) {
 }
 
 template <typename T>
-class SubsetProcessMapsInfoWriter : public ProcessMapsInfoWriter {
+class SubsetVmarMapsInfoWriter : public VmarMapsInfoWriter {
  public:
-  SubsetProcessMapsInfoWriter(user_out_ptr<T> out) : out_(out) {}
-  ~SubsetProcessMapsInfoWriter() = default;
+  SubsetVmarMapsInfoWriter(user_out_ptr<T> out) : out_(out) {}
+  ~SubsetVmarMapsInfoWriter() = default;
   zx_status_t Write(const zx_info_maps_t& maps, size_t offset) override {
     T versioned_maps = MapsInfoToVersion<T>(maps);
     return out_.element_offset(offset + base_offset_).copy_to_user(versioned_maps);
@@ -530,12 +530,12 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       size_t avail = 0;
 
       if (topic == ZX_INFO_PROCESS_MAPS_V1) {
-        SubsetProcessMapsInfoWriter<zx_info_maps_v1_t> writer{
+        SubsetVmarMapsInfoWriter<zx_info_maps_v1_t> writer{
             _buffer.reinterpret<zx_info_maps_v1_t>()};
         count = buffer_size / sizeof(zx_info_maps_v1_t);
         status = process->GetAspaceMaps(writer, count, &count, &avail);
       } else {
-        SubsetProcessMapsInfoWriter<zx_info_maps_t> writer{_buffer.reinterpret<zx_info_maps_t>()};
+        SubsetVmarMapsInfoWriter<zx_info_maps_t> writer{_buffer.reinterpret<zx_info_maps_t>()};
         count = buffer_size / sizeof(zx_info_maps_t);
         status = process->GetAspaceMaps(writer, count, &count, &avail);
       }

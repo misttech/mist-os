@@ -719,7 +719,7 @@ TaskRuntimeStats ProcessDispatcher::GetTaskRuntimeStats() const {
   return accumulator;
 }
 
-zx_status_t ProcessDispatcher::GetAspaceMaps(ProcessMapsInfoWriter& maps, size_t max,
+zx_status_t ProcessDispatcher::GetAspaceMaps(VmarMapsInfoWriter& maps, size_t max,
                                              size_t* actual_out, size_t* available_out) const {
   *actual_out = 0;
   *available_out = 0;
