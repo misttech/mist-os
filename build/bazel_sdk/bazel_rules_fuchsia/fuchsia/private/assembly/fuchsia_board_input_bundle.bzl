@@ -12,6 +12,7 @@ load(
     ":providers.bzl",
     "FuchsiaBoardInputBundleInfo",
 )
+load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _fuchsia_board_input_bundle_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -106,6 +107,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
         outputs = [board_input_bundle_dir, ffx_isolate_dir],
         command = script,
         progress_message = "Creating board input bundle for %s" % ctx.label.name,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     deps = [board_input_bundle_dir] + creation_inputs

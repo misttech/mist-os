@@ -14,6 +14,7 @@ load(
     "FuchsiaProductConfigInfo",
     "FuchsiaProductImageInfo",
 )
+load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 PACKAGE_MODE = struct(
     DISK = "disk",
@@ -158,6 +159,7 @@ def _fuchsia_product_assembly_impl(ctx):
             "--base-package-manifest-list",
             base_package_list.path,
         ],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     deps = [out_dir, ffx_isolate_dir, cache_package_list, base_package_list, platform_aibs_file] + ffx_inputs
@@ -265,6 +267,7 @@ def _fuchsia_product_create_system_impl(ctx):
         command = shell_src,
         env = shell_env,
         progress_message = "Assembly Create-system for %s" % ctx.label.name,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
     return [
         DefaultInfo(files = depset(direct = [out_dir, ffx_isolate_dir] + ffx_inputs)),

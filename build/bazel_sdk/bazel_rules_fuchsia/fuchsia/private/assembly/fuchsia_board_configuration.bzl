@@ -11,7 +11,7 @@ load(
     "FuchsiaBoardConfigInfo",
     "FuchsiaBoardInputBundleInfo",
 )
-load(":util.bzl", "extract_labels", "replace_labels_with_files")
+load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS", "extract_labels", "replace_labels_with_files")
 
 def _copy_bash(ctx, src, dst):
     cmd = """\
@@ -33,10 +33,7 @@ rm -rf \"$2\" && cp -fR \"$1/\" \"$2\"
         mnemonic = mnemonic,
         progress_message = progress_message,
         use_default_shell_env = True,
-        execution_requirements = {
-            "no-remote": "1",
-            "no-cache": "1",
-        },
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
 def _fuchsia_board_configuration_impl(ctx):
