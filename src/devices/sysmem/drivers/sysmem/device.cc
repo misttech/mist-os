@@ -569,8 +569,8 @@ zx_status_t Device::Bind() {
     if (config->protected_memory_size_override() >= 0) {
       protected_memory_size = config->protected_memory_size_override();
     }
-    if (config->protected_memory_size_override() >= 0) {
-      contiguous_memory_size = config->protected_memory_size_override();
+    if (config->contiguous_memory_size_override() >= 0) {
+      contiguous_memory_size = config->contiguous_memory_size_override();
     }
     protected_ranges_disable_dynamic_ = config->protected_ranges_disable_dynamic();
   }
