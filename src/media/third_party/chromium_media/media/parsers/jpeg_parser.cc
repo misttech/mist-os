@@ -576,6 +576,25 @@ bool ParseJpegPicture(const uint8_t* buffer,
   DCHECK(eoi_end_ptr);
   result->data_size = eoi_begin_ptr - result->data;
   result->image_size = eoi_end_ptr - reinterpret_cast<const char*>(buffer);
+
+  int max_h_factor = safemath::strict_cast<int>(
+      result->frame_header.components[0].horizontal_sampling_factor);
+  int max_v_factor = safemath::strict_cast<int>(
+      result->frame_header.components[0].vertical_sampling_factor);
+  int mcu_cols = safemath::strict_cast<int>(result->frame_header.coded_width) /
+                 (max_h_factor * 8);
+  int mcu_rows = safemath::strict_cast<int>(result->frame_header.coded_height) /
+                 (max_v_factor * 8);
+  if (result->frame_header.coded_width == 0 ||
+      result->frame_header.coded_height == 0 || mcu_cols == 0 ||
+      mcu_rows == 0) {
+    DLOG(ERROR) << "zero size - coded_width: "
+                << result->frame_header.coded_width
+                << " coded_height: " << result->frame_header.coded_height
+                << " mcu_cols: " << mcu_cols << " mcu_rows: " << mcu_rows;
+    return false;
+  }
+
   return true;
 }
 

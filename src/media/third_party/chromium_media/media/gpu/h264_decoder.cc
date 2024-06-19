@@ -1047,8 +1047,7 @@ bool H264Decoder::SlidingWindowPictureMarking() {
 
   // 8.2.5.3. Ensure the DPB doesn't overflow by discarding the oldest picture.
   int num_ref_pics = dpb_.CountRefPics();
-  DCHECK_LE(num_ref_pics, std::max<int>(sps->max_num_ref_frames, 1));
-  if (num_ref_pics == std::max<int>(sps->max_num_ref_frames, 1)) {
+  while (num_ref_pics >= std::max<int>(sps->max_num_ref_frames, 1)) {
     // Max number of reference pics reached, need to remove one of the short
     // term ones. Find smallest frame_num_wrap short reference picture and mark
     // it as unused.
@@ -1060,6 +1059,8 @@ bool H264Decoder::SlidingWindowPictureMarking() {
     }
 
     to_unmark->ref = false;
+
+    --num_ref_pics;
   }
 
   return true;
