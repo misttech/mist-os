@@ -175,10 +175,14 @@ async fn main_connect_loop(
 
     // Outer connection loop, retries when disconnected.
     loop {
-        // Check for an exit request before (re-)connecting.
+        // Check if we want to exit before starting to (re-)connect.
         if let Ok(Some(())) = loop_stop_rx.try_next() {
             return Ok(());
         }
+        if retries >= NUM_RECONNECT_RETRIES {
+            ffx_bail!("Stopping reconnecting after {retries} subsequent failed attempts");
+        }
+
         let mut target_spec_from_rcs_proxy: Option<String> = None;
         let rcs_proxy = timeout(
             TIMEOUT,
@@ -202,7 +206,7 @@ async fn main_connect_loop(
             }
             Err(e) => {
                 retries += 1;
-                tracing::warn!("Attempt #{retries}: failed to connect to rcs, trying again: {e}");
+                tracing::warn!("Attempt #{retries}: failed to connect to rcs, retrying: {e}");
                 continue;
             }
         };
@@ -224,18 +228,13 @@ async fn main_connect_loop(
         // This catches an edge case where the environment is not populated consistently.
         if target_spec_from_rcs_proxy != target_spec_from_target_proxy {
             tracing::warn!(
-                "Obtained different targets from RCS and target proxies: '{:#?}', '{:#?}'",
+                "Attempt #{}: RCS and target proxies do not match: '{:?}', '{:?}', retrying.",
+                retries,
                 target_spec_from_rcs_proxy,
-                target_spec_from_target_proxy
+                target_spec_from_target_proxy,
             );
-            if retries >= NUM_RECONNECT_RETRIES {
-                tracing::error!("Stopping reconnecting after {retries} subsequent failed attempts");
-                return Ok(());
-            } else {
-                tracing::warn!("Retrying to reconnect ...");
-                retries += 1;
-                continue;
-            }
+            retries += 1;
+            continue;
         }
 
         let target_info: TargetInfo = timeout(Duration::from_secs(2), target_proxy.identity())
@@ -292,21 +291,12 @@ async fn main_connect_loop(
                 }
             }
             Err(e) => {
-                tracing::error!("Error connecting to target: {}", e);
-                if retries >= NUM_RECONNECT_RETRIES {
-                    tracing::error!(
-                        "Stopping reconnecting after {retries} subsequent failed attempts"
-                    );
-                    break;
-                } else {
-                    tracing::warn!("Retrying to connect ...");
-                    retries += 1;
-                    continue;
-                }
+                tracing::warn!("Cannot connect to target: {:?}, retrying.", e);
+                retries += 1;
+                continue;
             }
         };
     }
-    Ok(())
 }
 
 #[async_trait(?Send)]
@@ -418,7 +408,7 @@ $ ffx doctor --restart-daemon"#,
     let server_addr = server.local_addr().clone();
 
     let server_task = fasync::Task::local(server_fut);
-    let (server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
+    let (mut server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
     let (loop_stop_tx, loop_stop_rx) = futures::channel::mpsc::channel::<()>(1);
 
     // Register signal handler and monitor for server requests.
@@ -429,12 +419,13 @@ $ ffx doctor --restart-daemon"#,
     });
     start_signal_monitoring(loop_stop_tx.clone(), server_stop_tx.clone());
 
-    if cmd.no_device {
+    let result = if cmd.no_device {
         let s = format!("Serving repository '{repo_path}' over address '{}'.", server_addr);
         writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
         tracing::info!("{}", s);
+        Ok(())
     } else {
-        let _ = main_connect_loop(
+        let r = main_connect_loop(
             &cmd,
             &repo_path,
             server_addr,
@@ -445,11 +436,16 @@ $ ffx doctor --restart-daemon"#,
             writer,
         )
         .await;
-    }
+        if r.is_err() {
+            let _ = server_stop_tx.send(()).await;
+        }
+        r
+    };
 
     // Wait for the server to shut down.
     server_task.await;
-    Ok(())
+
+    result
 }
 
 ///////////////////////////////////////////////////////////////////////////////
