@@ -65,6 +65,13 @@ fn boot_dir_namespace_entry() -> NamespaceEntry {
     namespace_entry("/boot", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)
 }
 
+fn pdk_dir_namespace_entry() -> NamespaceEntry {
+    // Create a kind of link with /boot to programs that use /pkg
+    let mut pkg = boot_dir_namespace_entry();
+    pkg.path = CString::new("/pkg").expect("Failed to allocate CString");
+    pkg
+}
+
 fn svc_dir_namespace_entry() -> NamespaceEntry {
     namespace_entry("/svc", fio::OpenFlags::RIGHT_READABLE)
 }
@@ -318,7 +325,11 @@ fn main() {
                         .expect("");
                 }*/
 
-                let entries = vec![boot_dir_namespace_entry(), svc_dir_namespace_entry()];
+                let entries = vec![
+                    svc_dir_namespace_entry(),
+                    boot_dir_namespace_entry(),
+                    pdk_dir_namespace_entry(),
+                ];
                 builder.add_namespace_entries(entries).expect("");
 
                 let process = builder.build().await.expect("").start().expect("");
