@@ -1,0 +1,6 @@
+// TODO (Herrera) read it from elf_runner to process this options.
+// For now it is mock file to satisfy some test conditions.
+{
+    use_process_builder: true,
+    num_threads: 2,
+}
