@@ -766,6 +766,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//src/lib/fidl/cpp:cpp_sdk",
     "//src/lib/fidl/cpp:hlcpp_conversion_sdk",
     "//src/lib/fidl/cpp:natural_ostream_sdk",
+    "//src/lib/memory_barriers:memory_barriers_sdk",
     "//zircon/system/ulib/async:async-cpp_sdk",
     "//zircon/system/ulib/async:async_sdk",
     "//zircon/system/ulib/async-loop:async-loop-cpp_sdk",
@@ -876,7 +877,6 @@ sdk_molecule("platform_libs") {
     "//src/devices/testing/fake-bti:fake-bti_sdk",
     "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
-    "//src/lib/memory_barriers:memory_barriers_sdk",
     "//zircon/system/ulib/fzl:fzl_sdk",
   ]
 }
