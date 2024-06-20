@@ -159,6 +159,156 @@ async fn repo_client_from_optional_trusted_root(
     Ok(repo_client)
 }
 
+async fn main_connect_loop(
+    cmd: &ServeCommand,
+    repo_path: &Utf8Path,
+    server_addr: core::net::SocketAddr,
+    repo_manager: Arc<RepositoryManager>,
+    mut loop_stop_rx: futures::channel::mpsc::Receiver<()>,
+    rcs_proxy: Connector<RemoteControlProxy>,
+    target_proxy: Connector<TargetProxy>,
+    mut writer: impl Write + 'static,
+) -> Result<()> {
+    // We try to reconnect unless NUM_RECONNECT_RETRIES reconnect
+    // attempts in immediate succession fail.
+    let mut retries = 0;
+
+    // Outer connection loop, retries when disconnected.
+    loop {
+        // Check for an exit request before (re-)connecting.
+        if let Ok(Some(())) = loop_stop_rx.try_next() {
+            return Ok(());
+        }
+        let mut target_spec_from_rcs_proxy: Option<String> = None;
+        let rcs_proxy = timeout(
+            TIMEOUT,
+            rcs_proxy.try_connect(|target| {
+                tracing::info!(
+                    "Waiting for target '{}' to return",
+                    match target {
+                        Some(s) => s,
+                        _ => "None",
+                    }
+                );
+                target_spec_from_rcs_proxy = target.clone();
+                Ok(())
+            }),
+        )
+        .await;
+        let rcs_proxy = match rcs_proxy {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                return Err(e);
+            }
+            Err(e) => {
+                retries += 1;
+                tracing::warn!("Attempt #{retries}: failed to connect to rcs, trying again: {e}");
+                continue;
+            }
+        };
+        let mut target_spec_from_target_proxy: Option<String> = None;
+        let target_proxy = target_proxy
+            .try_connect(|target| {
+                tracing::info!(
+                    "Waiting for target '{}' to return",
+                    match target {
+                        Some(s) => s,
+                        _ => "None",
+                    }
+                );
+                target_spec_from_target_proxy = target.clone();
+                Ok(())
+            })
+            .await?;
+
+        // This catches an edge case where the environment is not populated consistently.
+        if target_spec_from_rcs_proxy != target_spec_from_target_proxy {
+            tracing::warn!(
+                "Obtained different targets from RCS and target proxies: '{:#?}', '{:#?}'",
+                target_spec_from_rcs_proxy,
+                target_spec_from_target_proxy
+            );
+            if retries >= NUM_RECONNECT_RETRIES {
+                tracing::error!("Stopping reconnecting after {retries} subsequent failed attempts");
+                return Ok(());
+            } else {
+                tracing::warn!("Retrying to reconnect ...");
+                retries += 1;
+                continue;
+            }
+        }
+
+        let target_info: TargetInfo = timeout(Duration::from_secs(2), target_proxy.identity())
+            .await
+            .context("Timed out getting target identity")?
+            .context("Failed to get target identity")?;
+
+        let connection = connect_to_target(
+            target_spec_from_rcs_proxy.clone(),
+            target_info,
+            Some(cmd.alias.clone()),
+            cmd.storage_type,
+            server_addr,
+            Arc::clone(&repo_manager),
+            &rcs_proxy,
+            cmd.alias_conflict_mode.into(),
+        )
+        .await;
+        match connection {
+            Ok(()) => {
+                retries = 0;
+                let s = match target_spec_from_rcs_proxy {
+                    Some(t) => format!(
+                        "Serving repository '{repo_path}' to target '{t}' over address '{}'.",
+                        server_addr
+                    ),
+                    None => {
+                        format!("Serving repository '{repo_path}' over address '{server_addr}'.")
+                    }
+                };
+                if let Err(e) = writeln!(writer, "{}", s) {
+                    tracing::error!("Failed to write to output: {:?}", e);
+                }
+                tracing::info!("{}", s);
+                loop {
+                    fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
+                    // Check for an exit request before knocking the target
+                    if let Ok(Some(())) = loop_stop_rx.try_next() {
+                        return Ok(());
+                    }
+                    match knock_target(&target_proxy).await {
+                        Ok(()) => {
+                            // Nothing to do, continue checking connection
+                        }
+                        Err(e) => {
+                            let s = format!("Connection to target lost, retrying. Error: {}", e);
+                            if let Err(e) = writeln!(writer, "{}", s) {
+                                tracing::error!("Failed to write to output: {:?}", e);
+                            }
+                            tracing::warn!(s);
+                            break;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!("Error connecting to target: {}", e);
+                if retries >= NUM_RECONNECT_RETRIES {
+                    tracing::error!(
+                        "Stopping reconnecting after {retries} subsequent failed attempts"
+                    );
+                    break;
+                } else {
+                    tracing::warn!("Retrying to connect ...");
+                    retries += 1;
+                    continue;
+                }
+            }
+        };
+    }
+    Ok(())
+}
+
 #[async_trait(?Send)]
 impl FfxMain for ServeTool {
     type Writer = SimpleWriter;
@@ -197,7 +347,7 @@ $ ffx doctor --restart-daemon"#,
 
     let repo_manager: Arc<RepositoryManager> = RepositoryManager::new();
 
-    let repo_path = match (cmd.repo_path, cmd.product_bundle) {
+    let repo_path = match (cmd.repo_path.clone(), cmd.product_bundle.clone()) {
         (Some(_), Some(_)) => {
             ffx_bail!("Cannot specify both --repo-path and --product-bundle");
         }
@@ -245,7 +395,7 @@ $ ffx doctor --restart-daemon"#,
 
             repo_client.update().await.context("updating the repository metadata")?;
 
-            let repo_name = cmd.repository.unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
+            let repo_name = cmd.repository.clone().unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
             repo_manager.add(repo_name, repo_client);
             repo_path
         }
@@ -258,7 +408,7 @@ $ ffx doctor --restart-daemon"#,
         .with_context(|| format!("starting repository server"))?;
 
     // Write port file if needed
-    if let Some(port_path) = cmd.port_path {
+    if let Some(port_path) = cmd.port_path.clone() {
         let port = server.local_addr().port().to_string();
 
         fs::write(port_path, port.clone())
@@ -269,7 +419,7 @@ $ ffx doctor --restart-daemon"#,
 
     let server_task = fasync::Task::local(server_fut);
     let (server_stop_tx, mut server_stop_rx) = futures::channel::mpsc::channel::<()>(1);
-    let (loop_stop_tx, mut loop_stop_rx) = futures::channel::mpsc::channel::<()>(1);
+    let (loop_stop_tx, loop_stop_rx) = futures::channel::mpsc::channel::<()>(1);
 
     // Register signal handler and monitor for server requests.
     let _server_stop_task = fasync::Task::local(async move {
@@ -279,155 +429,22 @@ $ ffx doctor --restart-daemon"#,
     });
     start_signal_monitoring(loop_stop_tx.clone(), server_stop_tx.clone());
 
-    if !cmd.no_device {
-        // We try to reconnect unless NUM_RECONNECT RETRIES reconnect
-        // attempts in immediate succession fail.
-        let mut retries = 0;
-
-        // Outer connection loop, retries when disconnected.
-        'conn: loop {
-            // Check for an exit request before (re-)connecting.
-            if let Ok(Some(_)) = loop_stop_rx.try_next() {
-                break;
-            }
-            let mut target_spec_from_rcs_proxy: Option<String> = None;
-            let rcs_proxy = timeout(
-                TIMEOUT,
-                rcs_proxy.try_connect(|target| {
-                    tracing::info!(
-                        "Waiting for target '{}' to return",
-                        match target {
-                            Some(s) => s,
-                            _ => "None",
-                        }
-                    );
-                    target_spec_from_rcs_proxy = target.clone();
-                    Ok(())
-                }),
-            )
-            .await;
-            let rcs_proxy = match rcs_proxy {
-                Ok(Ok(r)) => r,
-                Ok(Err(e)) => {
-                    return Err(e);
-                }
-                Err(e) => {
-                    retries += 1;
-                    tracing::warn!(
-                        "Attempt #{retries}: failed to connect to rcs, trying again: {e}"
-                    );
-                    continue;
-                }
-            };
-            let mut target_spec_from_target_proxy: Option<String> = None;
-            let target_proxy = target_proxy
-                .try_connect(|target| {
-                    tracing::info!(
-                        "Waiting for target '{}' to return",
-                        match target {
-                            Some(s) => s,
-                            _ => "None",
-                        }
-                    );
-                    target_spec_from_target_proxy = target.clone();
-                    Ok(())
-                })
-                .await?;
-
-            // This catches an edge case where the environment is not populated
-            // consistently.
-            if target_spec_from_rcs_proxy != target_spec_from_target_proxy {
-                tracing::warn!(
-                    "Obtained different targets from RCS and target proxies: '{:#?}', '{:#?}'",
-                    target_spec_from_rcs_proxy,
-                    target_spec_from_target_proxy
-                );
-                if retries >= NUM_RECONNECT_RETRIES {
-                    tracing::error!(
-                        "Stopping reconnecting after {retries} subsequent failed attempts"
-                    );
-                    break;
-                } else {
-                    tracing::warn!("Retrying to reconnect ...");
-                    retries += 1;
-                    continue;
-                }
-            }
-
-            let target_info: TargetInfo = timeout(Duration::from_secs(2), target_proxy.identity())
-                .await
-                .context("Timed out getting target identity")?
-                .context("Failed to get target identity")?;
-
-            let connection = connect_to_target(
-                target_spec_from_rcs_proxy.clone(),
-                target_info,
-                Some(cmd.alias.clone()),
-                cmd.storage_type,
-                server_addr,
-                Arc::clone(&repo_manager),
-                &rcs_proxy,
-                cmd.alias_conflict_mode.into(),
-            )
-            .await;
-            match connection {
-                Ok(()) => {
-                    retries = 0;
-                    let s = match target_spec_from_rcs_proxy {
-                        Some(t) => format!(
-                            "Serving repository '{repo_path}' to target '{t}' over address '{}'.",
-                            server_addr
-                        ),
-                        None => format!(
-                            "Serving repository '{repo_path}' over address '{}'.",
-                            server_addr
-                        ),
-                    };
-                    if let Err(e) = writeln!(writer, "{}", s) {
-                        tracing::error!("Failed to write to output: {:?}", e);
-                    }
-                    tracing::info!("{}", s);
-                    loop {
-                        fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
-                        // Check for an exit request before knocking the target
-                        if let Ok(Some(_)) = loop_stop_rx.try_next() {
-                            break 'conn;
-                        }
-                        match knock_target(&target_proxy).await {
-                            Ok(()) => {
-                                // Nothing to do, continue checking connection
-                            }
-                            Err(e) => {
-                                let s =
-                                    format!("Connection to target lost, retrying. Error: {}", e);
-                                if let Err(e) = writeln!(writer, "{}", s) {
-                                    tracing::error!("Failed to write to output: {:?}", e);
-                                }
-                                tracing::warn!(s);
-                                break;
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Error connecting to target: {}", e);
-                    if retries >= NUM_RECONNECT_RETRIES {
-                        tracing::error!(
-                            "Stopping reconnecting after {retries} subsequent failed attempts"
-                        );
-                        break;
-                    } else {
-                        tracing::warn!("Retrying to connect ...");
-                        retries += 1;
-                        continue;
-                    }
-                }
-            };
-        }
-    } else {
+    if cmd.no_device {
         let s = format!("Serving repository '{repo_path}' over address '{}'.", server_addr);
         writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
         tracing::info!("{}", s);
+    } else {
+        let _ = main_connect_loop(
+            &cmd,
+            &repo_path,
+            server_addr,
+            repo_manager,
+            loop_stop_rx,
+            rcs_proxy,
+            target_proxy,
+            writer,
+        )
+        .await;
     }
 
     // Wait for the server to shut down.
