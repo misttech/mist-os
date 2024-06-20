@@ -45,6 +45,8 @@ declare_args() {
   # This is useful for reducing the overall build time of any build that
   # includes the IDK/SDK in exchange for reduced coverage of API level support.
   # This includes `fx build final_fuchsia_idk` and products built in-tree.
+  #
+  # To override the set of target CPUs, see `override_idk_target_cpus`.
   override_build_time_supported_api_levels = false
 }
 
