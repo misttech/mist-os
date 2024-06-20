@@ -43,6 +43,8 @@ if (bump_api_level) {
   #   fx set bringup.x64 --with-host //scripts/versioning:bump_api_level --args=bump_api_level=true
   #   fx build
   action("bump_api_level") {
+    testonly = true
+
     # Generate the golden files and manifest before updating the platform version.
     deps = [ "//sdk:compatibility_testing_goldens($target_toolchain)" ]
 
@@ -95,7 +97,11 @@ if (bump_api_level) {
 
     outputs = [ _stamp_file ]
 
-    testonly = true
+    # TODO(https://fxbug.dev/42084512): Automate this.
+    # TODO(https://fxbug.dev/326277078): Move this to the instructions for
+    # promoting "NEXT" to a stable API level.
+    print(
+        "Before continuing, add `#define FUCHSIA_INTERNAL_LEVEL_${_next_level}_() ${_next_level}` to `//zircon/system/public/zircon/availability_levels.inc`, run `fx build zircon/public/sysroot/sdk:sysroot_sdk_verify_api`, and follow the instructions to update `//zircon/public/sysroot/sdk/sysroot.api`.")
   }
 }
 
@@ -113,6 +119,8 @@ if (freeze_api_level) {
   #   fx set bringup.x64 --with-host //scripts/versioning:freeze_api_level --args=freeze_api_level=true
   #   fx build
   action("freeze_api_level") {
+    testonly = true
+
     script = "//scripts/versioning/freeze_in_development_api_level.py"
 
     _stamp_file = "$target_out_dir/$target_name.status"
@@ -130,7 +138,5 @@ if (freeze_api_level) {
     inputs = [ _version_history_file ]
 
     outputs = [ _stamp_file ]
-
-    testonly = true
   }
 }
