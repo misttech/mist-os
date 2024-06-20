@@ -832,7 +832,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
 
             iter.advance().await?;
         }
-        reads.try_collect().await?;
+        reads.try_collect::<()>().await?;
         buf.as_mut_slice().fill(0);
         Ok(())
     }

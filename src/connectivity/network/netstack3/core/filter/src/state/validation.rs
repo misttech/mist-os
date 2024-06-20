@@ -217,7 +217,7 @@ fn validate_routine<I: IpExt, DeviceClass, RuleInfo: Clone>(
                             validation_info.clone(),
                         ));
                     };
-                    I::map_ip::<_, Result<_, _>>(
+                    I::map_ip::<_, Result<(), _>>(
                         proto,
                         |proto| match proto {
                             Ipv4Proto::Proto(IpProto::Tcp | IpProto::Udp) => Ok(()),
@@ -243,7 +243,7 @@ fn validate_routine<I: IpExt, DeviceClass, RuleInfo: Clone>(
                         validation_info.clone(),
                     ));
                 };
-                I::map_ip::<_, Result<_, _>>(
+                I::map_ip::<_, Result<(), _>>(
                     proto,
                     |proto| match proto {
                         Ipv4Proto::Proto(IpProto::Tcp | IpProto::Udp) => Ok(()),

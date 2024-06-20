@@ -138,6 +138,9 @@ pub extern "C" fn rs_test_trace_future_disabled_with_arg() {
         c"-disabled",
         c"name",
         3.into(),
-        "arg" => panic!("arg should not be evaluated")
+        "arg" => {
+            panic!("arg should not be evaluated");
+            ()
+        }
     ));
 }
