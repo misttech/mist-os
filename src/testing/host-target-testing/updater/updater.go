@@ -36,6 +36,7 @@ const (
 type client interface {
 	ExpectReboot(ctx context.Context, f func() error) error
 	Reboot(ctx context.Context) error
+	RunReboot(ctx context.Context) error
 	DisconnectionListener() <-chan struct{}
 	ServePackageRepository(
 		ctx context.Context,
@@ -234,7 +235,7 @@ func updateCheckNow(
 			line := scanner.Text()
 			if strings.Contains(line, "InstallationDeferredByPolicy") {
 				logger.Warningf(ctx, "InstallationDeferredByPolicy state detected, forcing reboot")
-				if err := c.Reboot(ctx); err != nil {
+				if err := c.RunReboot(ctx); err != nil {
 					return fmt.Errorf("failed to reboot the device after InstallationDeferredByPolicy state: %w", err)
 				}
 			}

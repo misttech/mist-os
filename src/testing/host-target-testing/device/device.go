@@ -226,22 +226,26 @@ func (c *Client) Reboot(ctx context.Context) error {
 	return c.ExpectReboot(ctx, func() error {
 		// Run the reboot in the background, which gives us a chance to
 		// observe us successfully executing the reboot command.
-		cmd := []string{"dm", "reboot", "&", "exit", "0"}
-		if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
-			// If the device rebooted before ssh was able to tell
-			// us the command ran, it will tell us the session
-			// exited without passing along an exit code. So,
-			// ignore that specific error.
-			var exitErr *ssh.ExitMissingError
-			if errors.As(err, &exitErr) {
-				logger.Infof(ctx, "ssh disconnected before returning a status")
-			} else {
-				return fmt.Errorf("failed to reboot: %w", err)
-			}
-		}
-
-		return nil
+		return c.RunReboot(ctx)
 	})
+}
+
+// RunReboot runs the reboot command
+func (c *Client) RunReboot(ctx context.Context) error {
+	cmd := []string{"dm", "reboot", "&", "exit", "0"}
+	if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
+		// If the device rebooted before ssh was able to tell
+		// us the command ran, it will tell us the session
+		// exited without passing along an exit code. So,
+		// ignore that specific error.
+		var exitErr *ssh.ExitMissingError
+		if errors.As(err, &exitErr) {
+			logger.Infof(ctx, "ssh disconnected before returning a status")
+		} else {
+			return fmt.Errorf("failed to reboot: %w", err)
+		}
+	}
+	return nil
 }
 
 // RebootToBootloader asks the device to reboot into the bootloader. It
