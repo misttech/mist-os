@@ -6,6 +6,7 @@
 #define LIB_LD_POSIX_H_
 
 #include <lib/elfldltl/mmap-loader.h>
+#include <lib/ld/log-posix.h>
 
 #include <array>
 #include <cstddef>
@@ -60,6 +61,8 @@ struct StartupData {
   size_t page_size = 0;
 
   bool ld_debug = false;
+
+  [[no_unique_address]] Log log;
 };
 
 }  // namespace ld

@@ -50,7 +50,6 @@ class DiagnosticsReport : public ModuleDiagnosticsPrintfReportBase<DiagnosticsRe
   void Printf(const char* format, va_list args) const;
 
   StartupData& startup_;
-  std::string_view module_;
 };
 
 // This is the main Diagnostics object for the startup dynamic linker.  It

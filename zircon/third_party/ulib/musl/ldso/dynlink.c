@@ -166,7 +166,6 @@ static bool log_libs = false;
 static atomic_uintptr_t unlogged_tail;
 
 static zx_handle_t loader_svc = ZX_HANDLE_INVALID;
-static zx_handle_t logger = ZX_HANDLE_INVALID;
 
 // Various tools use this value to bootstrap their knowledge of the process.
 // E.g., the list of loaded shared libraries is obtained from here.
@@ -1952,10 +1951,7 @@ LIBC_NO_SAFESTACK NO_ASAN static dl_start_return_t __dls3(void* start_arg) {
         exec_vmo = handles[i];
         break;
       case PA_FD:
-        if (logger != ZX_HANDLE_INVALID || handles[i] == ZX_HANDLE_INVALID) {
-          error("bootstrap message bad FD %#x vs %#x", handles[i], logger);
-        }
-        logger = handles[i];
+        _dl_log_write_init(handles[i], handle_info[i]);
         break;
       case PA_VMAR_LOADED:
         if (ldso.vmar != ZX_HANDLE_INVALID || handles[i] == ZX_HANDLE_INVALID) {
@@ -1975,11 +1971,7 @@ LIBC_NO_SAFESTACK NO_ASAN static dl_start_return_t __dls3(void* start_arg) {
     }
   }
 
-  // TODO(mcgrathr): For now, always use a kernel log channel.
-  // This needs to be replaced by a proper unprivileged logging scheme ASAP.
-  if (logger == ZX_HANDLE_INVALID) {
-    _zx_debuglog_create(ZX_HANDLE_INVALID, 0, &logger);
-  }
+  _dl_log_write_init_fallback();
 
   if (__zircon_process_self == ZX_HANDLE_INVALID)
     error("bootstrap message bad no proc self");
@@ -2659,31 +2651,6 @@ LIBC_NO_SAFESTACK zx_status_t dl_clone_loader_service(zx_handle_t* out) {
     *out = h0;
   }
   return status;
-}
-
-LIBC_NO_SAFESTACK __attribute__((__visibility__("hidden"))) void _dl_log_write(const char* buffer,
-                                                                               size_t len) {
-  if (logger != ZX_HANDLE_INVALID) {
-    while (len > 0) {
-      size_t chunk = len < ZX_LOG_RECORD_DATA_MAX ? len : ZX_LOG_RECORD_DATA_MAX;
-      // Write only a single line at a time so each line gets tagged.
-      const char* nl = memchr(buffer, '\n', chunk);
-      if (nl != NULL) {
-        chunk = nl + 1 - buffer;
-      }
-      zx_status_t status = _zx_debuglog_write(logger, 0, buffer, chunk);
-      if (status != ZX_OK) {
-        CRASH_WITH_UNIQUE_BACKTRACE();
-      }
-      buffer += chunk;
-      len -= chunk;
-    }
-  } else {
-    zx_status_t status = _zx_debug_write(buffer, len);
-    if (status != ZX_OK) {
-      CRASH_WITH_UNIQUE_BACKTRACE();
-    }
-  }
 }
 
 LIBC_NO_SAFESTACK static size_t errormsg_write(FILE* f, const unsigned char* buf, size_t len) {

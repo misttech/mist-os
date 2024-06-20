@@ -379,7 +379,16 @@ template("ifs_shared_library_libs") {
                              "testonly",
                            ])
     libs = [ gen_file ]
-    deps = [ ":$gen_target" ]
+
+    # **NOTE::** This cannot be plain deps!  The generated_file() target is not
+    # a barrier to libs propagating up from its own deps graph all the way
+    # through this source_set() into the containing link!  Anything in deps
+    # could cross any hermetic_source_set() boundary and bring in the
+    # constituents to that partial link also directly into the outer link.
+    # Using data_deps instead avoid this and it's more than sufficient because
+    # the generated_file() target is fully resolved at `gn gen` and doesn't
+    # cause any runtime work anyway.
+    data_deps = [ ":$gen_target" ]
   }
 
   generated_file(gen_target) {

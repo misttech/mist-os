@@ -4,6 +4,8 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -66,3 +68,13 @@ void* mmap(void* addr, size_t len, int prot, int flags, int fd, off_t pos) {
 int mprotect(void* addr, size_t len, int prot) { return sys_mprotect(addr, len, prot); }
 
 int munmap(void* addr, size_t len) { return sys_munmap(addr, len); }
+
+// TODO(https://fxbug.dev/42141211): The llvm-libc implementation would be
+// almost fine, but needs to be compiled in a way where it won't try to use a
+// thread_local variable.  Some special plumbing could achieve that, maybe do
+// it later.
+char* strerror(int errnum) {
+  static char buffer[32];
+  snprintf(buffer, sizeof(buffer), "errno %d", errnum);
+  return buffer;
+}

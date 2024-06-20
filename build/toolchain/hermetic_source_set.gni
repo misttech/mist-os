@@ -19,6 +19,13 @@ import("ifs_shared_library.gni")
 #
 # Parameters
 #
+#   * allow_init, allow_fini
+#     - Optional: Whether SHT_INIT_ARRAY or SHT_FINI_ARRAY sections are allowed
+#     in the hermetic code, respectively.  These typically represent global
+#     constructors and destructors.
+#     - Type: bool
+#     - Default: false
+#
 #   * global_symbols
 #     - Required: The list of linkage symbol names that the source_set()
 #     will define.  All other symbols will become local symbols.
@@ -50,8 +57,19 @@ template("hermetic_source_set") {
     undefined_symbols = invoker.undefined_symbols
   }
 
+  if (defined(invoker.allow_init)) {
+    allow_init = invoker.allow_init
+  } else {
+    allow_init = false
+  }
+  if (defined(invoker.allow_fini)) {
+    allow_fini = invoker.allow_fini
+  } else {
+    allow_fini = false
+  }
+
   undefs_deps = []
-  if (undefined_symbols != true) {
+  if (undefined_symbols != true || !allow_init || !allow_fini) {
     # TODO(https://fxbug.dev/345831253): undefs_target can go away when the
     # linker has the features to do the checking directly.
     undefs_target = "_hermetic_source_set.$target_name.undefs"
@@ -189,7 +207,7 @@ template("hermetic_source_set") {
     deps = [ ":$link_target" ]
   }
 
-  if (undefined_symbols != true) {
+  if (undefs_deps != []) {
     toolchain_utils_action(undefs_target) {
       visibility = [ ":$export_target" ]
       forward_variables_from(invoker, [ "testonly" ])
@@ -204,8 +222,18 @@ template("hermetic_source_set") {
         "--depfile=" + rebase_path(depfile, root_build_dir),
         "--rspfile=" + rebase_path(link_rspfile, root_build_dir),
       ]
-      foreach(symbol, undefined_symbols) {
-        args += [ "--ignore-unresolved-symbol=$symbol" ]
+      if (allow_init) {
+        args += [ "--init-array" ]
+      }
+      if (allow_fini) {
+        args += [ "--fini-array" ]
+      }
+      if (undefined_symbols == true) {
+        args += [ "--ignore-all-unresolved-symbols" ]
+      } else {
+        foreach(symbol, undefined_symbols) {
+          args += [ "--ignore-unresolved-symbol=$symbol" ]
+        }
       }
     }
   }
@@ -239,6 +267,12 @@ template("hermetic_source_set") {
   }
 }
 
+_add_configs = [
+  "//build/config/zircon:no-synthetic-sections",
+  "//build/config/zircon:nolibc",
+  "//build/config/zircon:static-libc++",
+  "//build/config:symbol_no_undefined",
+]
 _remove_configs = [
   # --icf is not compatible with -r.  ICF will be done in the outer link.
   "//build/config:icf",
@@ -249,24 +283,20 @@ _remove_configs = [
 ]
 
 if (linker == "gold") {
-  # Gold doesn't allow --gc-sections in the -r link, though the other
-  # linkers do.  The outer link will apply --gc-sections anyway.
+  # Gold doesn't allow --gc-sections in the -r link, though the other linkers
+  # do.  The outer link will apply --gc-sections anyway.
   _remove_configs += [
     "//build/config:default_linker_gc",
     "//build/config:linker_gc",
   ]
+
+  # To counteract this, add back the code-generation flags to enable the later
+  # --gc-sections to work.
+  _add_configs += [ "//build/config:linker_gc.compiler" ]
 }
 
 set_defaults("hermetic_source_set") {
   configs = default_common_binary_configs
-
-  configs += [
-    "//build/config/zircon:no-synthetic-sections",
-    "//build/config/zircon:nolibc",
-    "//build/config/zircon:static-libc++",
-    "//build/config:symbol_no_undefined",
-  ]
-
-  configs += _remove_configs
+  configs += _add_configs + _remove_configs
   configs -= _remove_configs
 }

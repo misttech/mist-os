@@ -6,6 +6,14 @@
 
 #include <cstdarg>
 
+#include "stdio/printf_core/wrapper.h"
+
+#ifdef __Fuchsia__
+#include "zircon.h"
+#else
+#include "posix.h"
+#endif
+
 namespace ld {
 
 void DiagnosticsReport::Printf(const char* format, ...) const {
@@ -13,6 +21,20 @@ void DiagnosticsReport::Printf(const char* format, ...) const {
   va_start(args, format);
   Printf(format, args);
   va_end(args);
+}
+
+// The formatted message from elfldltl::PrintfDiagnosticsReport should be a
+// single line with no newline, so append one.
+void DiagnosticsReport::Printf(const char* format, va_list args) const {
+  __llvm_libc::printf_core::Printf<Log::kBufferSize, __llvm_libc::printf_core::PrintfNewline::kYes>(
+      startup_.log, format, args);
+}
+
+template <>
+void DiagnosticsReport::ReportModuleLoaded<StartupModule>(const StartupModule& module) const {
+  if (startup_.ld_debug) {
+    ModuleSymbolizerContext<Log::kBufferSize>(startup_.log, module);
+  }
 }
 
 void CheckErrors(Diagnostics& diag) {
