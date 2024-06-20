@@ -19,6 +19,7 @@ enum GpioFunc {
   GetName,
   List,
   Interrupt,
+  AltFunction,
   Invalid
 };
 
@@ -31,7 +32,7 @@ zx::result<> GetStatus(const T& result);
 // Parse the command line arguments in |argv|
 int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
               fuchsia_hardware_gpio::wire::GpioFlags* in_flag, uint8_t* out_value, uint64_t* ds_ua,
-              uint32_t* interrupt_flags);
+              uint32_t* interrupt_flags, uint64_t* alt_function);
 
 zx::result<> ListGpios();
 
@@ -40,6 +41,6 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByNa
 
 int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFunc func,
                uint8_t write_value, fuchsia_hardware_gpio::wire::GpioFlags in_flag,
-               uint8_t out_value, uint64_t ds_ua, uint32_t interrupt_flags);
+               uint8_t out_value, uint64_t ds_ua, uint32_t interrupt_flags, uint64_t alt_function);
 
 #endif  // SRC_DEVICES_GPIO_BIN_GPIOUTIL_GPIOUTIL_H_

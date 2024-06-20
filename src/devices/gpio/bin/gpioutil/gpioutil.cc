@@ -58,7 +58,7 @@ constexpr std::optional<uint32_t> ParseInterruptFlags(std::string_view arg) {
 
 int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
               fuchsia_hardware_gpio::wire::GpioFlags* in_flag, uint8_t* out_value, uint64_t* ds_ua,
-              uint32_t* interrupt_flags) {
+              uint32_t* interrupt_flags, uint64_t* alt_function) {
   if (argc < 2) {
     return -1;
   }
@@ -81,6 +81,7 @@ int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
   *out_value = 0;
   *ds_ua = 0;
   *interrupt_flags = 0;
+  *alt_function = 0;
   switch (func_arg[0]) {
     case 'n':
       *func = GetName;
@@ -143,6 +144,14 @@ int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
         return -1;
       }
 
+      break;
+    case 'f':
+      *func = AltFunction;
+
+      if (argc < 4) {
+        return -1;
+      }
+      *alt_function = std::stoul(argv[3]);
       break;
     default:
       *func = Invalid;
@@ -243,7 +252,7 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByNa
 
 int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFunc func,
                uint8_t write_value, fuchsia_hardware_gpio::wire::GpioFlags in_flag,
-               uint8_t out_value, uint64_t ds_ua, uint32_t interrupt_flags) {
+               uint8_t out_value, uint64_t ds_ua, uint32_t interrupt_flags, uint64_t alt_function) {
   switch (func) {
     case GetName: {
       auto result_pin = client->GetPin();
@@ -383,6 +392,19 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
       if (release->is_error()) {
         fprintf(stderr, "Could not release GPIO interrupt: %s\n",
                 zx_status_get_string(release->error_value()));
+        return -2;
+      }
+      break;
+    }
+    case AltFunction: {
+      auto result = client->SetAltFunction(alt_function);
+      if (!result.ok()) {
+        fprintf(stderr, "Call to set function failed: %s\n", result.FormatDescription().c_str());
+        return -2;
+      }
+      if (result->is_error()) {
+        fprintf(stderr, "Could not set pin function: %s\n",
+                zx_status_get_string(result->error_value()));
         return -2;
       }
       break;

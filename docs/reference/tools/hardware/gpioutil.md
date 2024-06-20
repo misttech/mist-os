@@ -120,7 +120,7 @@ Aliases: `d`
 ### interrupt
 
 ```none
-gpioutil interrupt <name> [<value>]
+gpioutil interrupt <name> <value>
 ```
 
 Get the GPIO interrupt and wait for it to be triggered once.
@@ -131,6 +131,21 @@ Get the GPIO interrupt and wait for it to be triggered once.
 `edge-high`, `edge-low`, `edge-both`, `level-low`, or `level-high`.
 
 Aliases: `q`
+
+### function
+
+```none
+gpioutil function <name> <value>
+```
+
+Set the function for a pin.
+
+`<name>` should be one of the values returned from [`list`](#list).
+
+`<value>` is an function number that is specific to the GPIO controller being
+used.
+
+Aliases: `f`
 
 ### help
 
@@ -197,6 +212,12 @@ Set drive strength to 500
 ```none {:.devsite-disable-click-to-copy}
 $ gpioutil interrupt GPIO_HW_ID_3 edge-low
 Received interrupt at time 12345
+```
+
+### Set a pin to function six
+
+```none {:.devsite-disable-click-to-copy}
+$ gpioutil function GPIO_HW_ID_3 6
 ```
 
 ## Notes

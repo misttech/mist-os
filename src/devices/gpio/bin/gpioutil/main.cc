@@ -47,6 +47,8 @@ static void usage() {
       "  interrupt | q     Get the interrupt corresponding to <name> with flags <value>. Wait for\n"
       "                    it to trigger once, then exit. <value> should be `default`, \n"
       "                    `edge-high`, `edge-low`, `edge-both`, `level-low`, or `level-high`.\n"
+      "  function | f      Set the function of <name> to <value>. <value> is a function number\n"
+      "                    that is specific to the GPIO controller being used.\n"
       "  help | h          Print this help text.\n\n"
       "Examples:\n"
       "  List GPIO pins:\n"
@@ -71,7 +73,9 @@ static void usage() {
       "  Set drive strength to 500\n\n"
       "  Wait for a falling edge on a GPIO:\n"
       "  $ gpioutil interrupt GPIO_HW_ID_3 edge-low\n"
-      "  Received interrupt at time 12345\n\n");
+      "  Received interrupt at time 12345\n\n"
+      "  Set a pin to function six:\n"
+      "  $ gpioutil function GPIO_HW_ID_3 6\n\n");
 }
 // LINT.ThenChange(//docs/reference/tools/hardware/gpioutil.md)
 
@@ -81,7 +85,9 @@ int main(int argc, char** argv) {
   uint64_t ds_ua;
   fuchsia_hardware_gpio::wire::GpioFlags in_flag;
   uint32_t interrupt_flags;
-  if (ParseArgs(argc, argv, &func, &write_value, &in_flag, &out_value, &ds_ua, &interrupt_flags)) {
+  uint64_t alt_function;
+  if (ParseArgs(argc, argv, &func, &write_value, &in_flag, &out_value, &ds_ua, &interrupt_flags,
+                &alt_function)) {
     fprintf(stderr, "Unable to parse arguments!\n\n");
     usage();
     return -1;
@@ -110,7 +116,7 @@ int main(int argc, char** argv) {
 
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(client_end.value()));
     ret = ClientCall(std::move(client), func, write_value, in_flag, out_value, ds_ua,
-                     interrupt_flags);
+                     interrupt_flags, alt_function);
   } else {
     // Access by GPIO name
     auto client = FindGpioClientByName(argv[kArgDevice]);
@@ -122,7 +128,7 @@ int main(int argc, char** argv) {
     }
 
     ret = ClientCall(std::move(*client), func, write_value, in_flag, out_value, ds_ua,
-                     interrupt_flags);
+                     interrupt_flags, alt_function);
   }
 
   if (ret == -1) {
