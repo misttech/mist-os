@@ -102,6 +102,7 @@ fuchsia_cc_test(
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "//zircon/system/ulib/ddk-platform-defs",
+        "//zircon/system/ulib/fzl",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_bindlib_cc",
@@ -115,7 +116,6 @@ fuchsia_cc_test(
         "@fuchsia_sdk//pkg/fit-promise",
         "@fuchsia_sdk//pkg/mmio",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//pkg/fzl",
         "@internal_sdk//pkg/mock-mmio-reg",
     ],
 )

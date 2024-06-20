@@ -5,6 +5,7 @@
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/zircon/zx_library.gni")
 
+# LINT.IfChange
 zx_library("fbl") {
   sdk = "source"
   sdk_publishable = "cts"
@@ -91,6 +92,8 @@ zx_library("fbl") {
     deps += [ "//zircon/system/public" ]
   }
 }
+
+# LINT.ThenChange(BUILD.bazel)
 
 group("tests") {
   testonly = true

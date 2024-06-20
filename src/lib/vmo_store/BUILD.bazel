@@ -17,10 +17,9 @@ cc_library(
     ],
     target_compatible_with = ["@platforms//os:fuchsia"],
     deps = [
+        "//zircon/system/ulib/fzl",
         "@fuchsia_sdk//pkg/fit-promise",
         "@fuchsia_sdk//pkg/stdcompat",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//pkg/fbl",
-        "@internal_sdk//pkg/fzl",
     ],
 )

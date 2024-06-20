@@ -21,9 +21,12 @@ _common_sources = [
 ]
 
 _common_deps = [
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//src/devices/lib/amlogic",
     "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/ddk-platform-defs",
+    "//zircon/system/ulib/fbl",
+    "@fuchsia_sdk//fidl/fuchsia.buttons:fuchsia.buttons_cpp",
     "@fuchsia_sdk//fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_cpp",
     "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "@fuchsia_sdk//fidl/fuchsia.input.report:fuchsia.input.report_cpp",
@@ -32,9 +35,6 @@ _common_deps = [
     "@fuchsia_sdk//pkg/driver_runtime",
     "@fuchsia_sdk//pkg/input_report_reader",
     "@fuchsia_sdk//pkg/mmio",
-    "@internal_sdk//fidl/fuchsia.buttons:fuchsia.buttons_cpp",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "@internal_sdk//pkg/fbl",
 ]
 
 fuchsia_driver_bind_bytecode(
