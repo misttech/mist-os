@@ -29,6 +29,7 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 
 mod messages;
+#[cfg(not(feature = "starnix_lite"))]
 mod nl80211;
 mod taskstats;
 
@@ -425,6 +426,7 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlink<S> {
         let fut_with_server = async move {
             // Initialize the nl80211 family inside this async block so that
             // it shares an executor with the main netlink future.
+            #[cfg(not(feature = "starnix_lite"))]
             match nl80211::Nl80211Family::new() {
                 Ok(nl80211_family) => server.state.lock().add_family(Arc::new(nl80211_family) as _),
                 Err(e) => {

@@ -33,6 +33,7 @@ fidl("fuchsia.power.broker") {
     "//src/session/bin/*",
     "//src/session/tests/session_manager:*",
     "//src/starnix/kernel/*:*",
+    "//src/starnix_lite/kernel/*:*",
     "//src/sys/time/timekeeper/*:*",
     "//vendor/*",
   ]

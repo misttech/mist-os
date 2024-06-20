@@ -114,6 +114,7 @@ group("default") {
     "//src/lib/mistos-bootfs:tests",
     "//src/lib/mistos-logger:tests",
     "//src/starnix_lite:tests",
+    "//src/starnix_lite/lib/usercopy:tests",
 
     # Examples
     "//src/lib/zircon/rust/examples/zx_toy:zx_toy_zbi",

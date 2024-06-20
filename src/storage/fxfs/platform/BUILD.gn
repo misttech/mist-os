@@ -12,7 +12,7 @@ rustc_library("platform") {
   deps = []
   sources = [ "src/lib.rs" ]
   test_deps = []
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources += [
       "src/fuchsia.rs",
       "src/fuchsia/component.rs",
@@ -130,6 +130,7 @@ rustc_library("fxfs-testing") {
   visibility = [
     "//sdk/lib/zxio/tests/*",
     "//src/starnix/kernel/*",
+    "//src/starnix_lite/kernel/*",
     "//src/storage/conformance/conformance_harness/fxfs/*",
     "//src/storage/fxfs/*",
   ]

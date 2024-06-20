@@ -10,7 +10,9 @@ use crate::task::{
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps};
 use bstr::ByteSlice;
+#[cfg(not(feature = "starnix_lite"))]
 use ebpf::converter::{bpf_addressing_mode, bpf_class};
+#[cfg(not(feature = "starnix_lite"))]
 use ebpf::program::EbpfProgram;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_warn, track_stub};
@@ -24,10 +26,12 @@ use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data, seccomp_notif,
-    seccomp_notif_resp, sock_filter, BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD,
-    SECCOMP_IOCTL_NOTIF_ID_VALID, SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND,
-    SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
+    seccomp_notif_resp, sock_filter, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
+    SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA,
+    SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
 };
+#[cfg(not(feature = "starnix_lite"))]
+use starnix_uapi::{BPF_ABS, BPF_LD, BPF_ST};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
@@ -57,6 +61,7 @@ use starnix_uapi::AUDIT_ARCH_RISCV64;
 
 pub struct SeccompFilter {
     /// The BPF program associated with this filter.
+    #[cfg(not(feature = "starnix_lite"))]
     program: EbpfProgram<()>,
 
     /// The unique-to-this-process id of thi1s filter.  SECCOMP_FILTER_FLAG_TSYNC only works if all
@@ -93,6 +98,7 @@ impl SeccompFilter {
         // If an instruction loads from / stores to an absolute address, that address has to be
         // 32-bit aligned and inside the struct seccomp_data passed in.
         for insn in code {
+            #[cfg(not(feature = "starnix_lite"))]
             if (bpf_class(insn) == BPF_LD || bpf_class(insn) == BPF_ST)
                 && (bpf_addressing_mode(insn) == BPF_ABS)
                 && (insn.k & 0x3 != 0 || std::mem::size_of::<seccomp_data>() < insn.k as usize)
@@ -101,6 +107,7 @@ impl SeccompFilter {
             }
         }
 
+        #[cfg(not(feature = "starnix_lite"))]
         match EbpfProgram::from_cbpf::<seccomp_data>(code) {
             Ok(program) => Ok(SeccompFilter {
                 program,
@@ -113,6 +120,9 @@ impl SeccompFilter {
                 error!(EINVAL)
             }
         }
+
+        #[cfg(feature = "starnix_lite")]
+        error!(EINVAL)
     }
 
     pub fn run(&self, data: &mut seccomp_data) -> u32 {

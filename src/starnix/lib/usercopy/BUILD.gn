@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/boot_tests/mistos_unittest_zbi.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 import("//build/zircon/hermetic_code_blob.gni")
 
@@ -14,6 +15,10 @@ group("tests") {
     # Make sure that the hermetic copy/zero routines do not bitrot.
     ":usercopy_cpp_reference_routines",
   ]
+
+  if (is_mistos) {
+    deps += [ ":mistos-usercopy-unittests" ]
+  }
 }
 
 config("leaf-frame-pointer") {
@@ -78,4 +83,10 @@ fuchsia_test_component("usercopy-unittests-component") {
 
 fuchsia_test_package("usercopy-unittests") {
   test_components = [ ":usercopy-unittests-component" ]
+}
+
+mistos_unittest_zbi("mistos-usercopy-unittests") {
+  executable_path = "bin/usercopy_lib_test"
+  test_target_label = ":usercopy_test"
+  prefix = ""
 }

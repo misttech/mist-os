@@ -24,7 +24,7 @@ lib_deps = [
   "//third_party/rust_crates:tracing",
 ]
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   lib_srcs += [ "src/block_device.rs" ]
   lib_deps += [
     "//src/lib/fuchsia-runtime",

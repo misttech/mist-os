@@ -215,7 +215,7 @@ template("syscall_test_component") {
 
     configs += [ "//build/config:rtti" ]
 
-    if (!is_fuchsia) {
+    if (!is_fuchsia && !is_mistos) {
       configs += [ "//build/config:thread_safety_annotations" ]
     }
 

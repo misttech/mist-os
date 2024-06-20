@@ -93,6 +93,7 @@ fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
         None,
         None,
         fuchsia_inspect::Node::default(),
+        #[cfg(not(feature = "starnix_lite"))]
         None,
         security_server,
     )
