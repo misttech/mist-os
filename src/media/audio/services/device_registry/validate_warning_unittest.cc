@@ -788,15 +788,55 @@ TEST(ValidateWarningTest, ExternalDelayInfoInvalid) {
   }}));
 }
 
-// Unittest ValidateCodecProperties -- the missing, minimal and maximal possibilities
+// Negative-test ValidateCompositeProperties
+TEST(ValidateWarningTest, CompositePropertiesInvalid) {
+  // This should be an accepted configuration; the below cases are based on this.
+  EXPECT_TRUE(ValidateCompositeProperties(
+      fha::CompositeProperties{{.clock_domain = fha::kClockDomainMonotonic}}))
+      << "baseline";
+
+  // manufacturer, if present, cannot be empty
+  EXPECT_FALSE(ValidateCompositeProperties(
+      fha::CompositeProperties{{.manufacturer = "", .clock_domain = fha::kClockDomainMonotonic}}))
+      << "empty manufacturer";
+
+  // product, if present, cannot be empty
+  EXPECT_FALSE(ValidateCompositeProperties(
+      fha::CompositeProperties{{.product = "", .clock_domain = fha::kClockDomainMonotonic}}))
+      << "empty product";
+
+  // clock_domain is required
+  EXPECT_FALSE(ValidateCompositeProperties(fha::CompositeProperties{})) << "missing clock_domain";
+}
+
+// Negative-test ValidateCodecProperties
 TEST(ValidateWarningTest, CodecPropertiesInvalid) {
   EXPECT_FALSE(ValidateCodecProperties(fha::CodecProperties{{
-      .is_input = false, .manufacturer = "manufacturer", .product = "product", .unique_id = {{}},
+      .is_input = false,
+      .manufacturer = "",  // empty manufacturer
+      .product = "product",
+      .unique_id = {{}},
+      .plug_detect_capabilities = fha::PlugDetectCapabilities::kCanAsyncNotify,
+  }})) << "empty manufacturer";
+
+  EXPECT_FALSE(ValidateCodecProperties(fha::CodecProperties{{
+      .is_input = true,
+      .manufacturer = "manufacturer",
+      .product = "",  // empty product
+      .unique_id = {{}},
+      .plug_detect_capabilities = fha::PlugDetectCapabilities::kCanAsyncNotify,
+  }})) << "empty product";
+
+  EXPECT_FALSE(ValidateCodecProperties(fha::CodecProperties{{
+      .is_input = false,
+      .manufacturer = "manufacturer",
+      .product = "product",  //
+      .unique_id = {{}},
       // plug_detect_capabilities missing
   }})) << "missing plug_detect_capabilities";
 }
 
-// Unittest ValidateDaiFormatSets
+// Negative-test ValidateDaiFormatSets
 TEST(ValidateWarningTest, DaiSupportedFormatsInvalid) {
   // Entirely empty
   EXPECT_FALSE(ValidateDaiFormatSets(std::vector<fha::DaiSupportedFormats>{}));
@@ -934,7 +974,7 @@ TEST(ValidateWarningTest, DaiSupportedFormatsInvalid) {
   }}));
 }
 
-// Unittest ValidateDaiFormat
+// Negative-test ValidateDaiFormat
 TEST(ValidateWarningTest, DaiFormatInvalid) {
   // empty
   EXPECT_FALSE(ValidateDaiFormat({{}}));
@@ -1041,7 +1081,7 @@ TEST(ValidateWarningTest, DaiFormatInvalid) {
   EXPECT_FALSE(ValidateDaiFormat(fmt.bits_per_sample(33)));
 }
 
-// Unittest ValidateCodecFormatInfo
+// Negative-test ValidateCodecFormatInfo
 TEST(ValidateWarningTest, CodecFormatInfoInvalid) {
   // These durations cannot be negative.
   EXPECT_FALSE(ValidateCodecFormatInfo(fha::CodecFormatInfo{{

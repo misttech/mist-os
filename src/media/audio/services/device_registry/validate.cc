@@ -618,8 +618,7 @@ bool ValidateCompositeProperties(const fha::CompositeProperties& composite_props
 
   if ((composite_props.manufacturer().has_value() && composite_props.manufacturer()->empty()) ||
       (composite_props.product().has_value() && composite_props.product()->empty())) {
-    FX_LOGS(WARNING) << __func__
-                     << ": manufacturer and product, if present, must not be empty strings";
+    FX_LOGS(WARNING) << __func__ << ": manufacturer and product, if present, must not be empty";
     return false;
   }
 
@@ -1511,7 +1510,7 @@ bool ValidateElementState(const fhasp::ElementState& element_state, const fhasp:
   }
 
   if (element_state.vendor_specific_data().has_value()) {
-    // vendor_specific_data is opaque to us, so we can't really perform any other structured checks.
+    // vendor_specific_data is opaque to us, so we can't really perform other structured checks.
     if (element_state.vendor_specific_data()->empty()) {
       FX_LOGS(WARNING)
           << "WatchElementState: ElementState.vendor_specific_data, if present, must not be empty";
@@ -1596,7 +1595,7 @@ bool ValidateSettableElementState(const fhasp::SettableElementState& element_sta
   }
 
   if (element_state.vendor_specific_data().has_value()) {
-    // vendor_specific_data is opaque to us, so we can't really perform any other structured checks.
+    // vendor_specific_data is opaque to us, so we can't really perform other structured checks.
     if (element_state.vendor_specific_data()->empty()) {
       FX_LOGS(WARNING)
           << "WatchElementState: ElementState.vendor_specific_data, if present, must not be empty";

@@ -7,12 +7,12 @@
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.audio/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fit/function.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/sys/cpp/component_context.h>
 
 #include <string_view>
 
@@ -23,7 +23,7 @@ class MediaApp;
 template <typename ProtocolT>
 class FidlHandler : public fidl::AsyncEventHandler<ProtocolT> {
  public:
-  FidlHandler(MediaApp* parent, std::string_view name);
+  FidlHandler(MediaApp* parent, std::string_view name) : parent_(parent), name_(name) {}
   void on_fidl_error(fidl::UnbindInfo error) final;
 
  private:
@@ -36,6 +36,12 @@ class MediaApp : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
                  public fidl::AsyncEventHandler<fuchsia_audio_device::ControlCreator>,
                  public fidl::AsyncEventHandler<fuchsia_audio_device::Control>,
                  public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer> {
+  // Display device metadata received from AudioDeviceRegistry, for each device
+  static inline constexpr bool kLogDeviceInfo = false;
+
+  // Automatically connect to a StreamConfig ring buffer and play a sinusoid?
+  static inline constexpr bool kAutoplaySinusoid = true;
+
   // TODO(b/306455236): Use a format / rate supported by the detected device.
   static inline constexpr fuchsia_audio::SampleType kSampleFormat =
       fuchsia_audio::SampleType::kInt16;
@@ -54,14 +60,13 @@ class MediaApp : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
 
  private:
   void ConnectToRegistry();
-  void WaitForFirstAudioOutput();
 
-  void ObserveDevice();
-
+  void WaitForFirstAudioDevice();
   void ConnectToControlCreator();
-  void ControlDevice();
+  bool ConnectToControl();
 
-  void CreateRingBufferConnection();
+  void ObserveStreamOutput();
+  void ConnectToRingBuffer();
 
   bool MapRingBufferVmo();
   void WriteAudioToVmo();
@@ -73,9 +78,10 @@ class MediaApp : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
   async::Loop& loop_;
   fit::closure quit_callback_;
 
-  fidl::Client<fuchsia_audio_device::Registry> registry_client_;
+  static std::optional<fidl::Client<fuchsia_audio_device::Registry>> registry_client_;
   fidl::Client<fuchsia_audio_device::Observer> observer_client_;
-  fidl::Client<fuchsia_audio_device::ControlCreator> control_creator_client_;
+  static std::optional<fidl::SyncClient<fuchsia_audio_device::ControlCreator>>
+      control_creator_client_;
   fidl::Client<fuchsia_audio_device::Control> control_client_;
   fidl::Client<fuchsia_audio_device::RingBuffer> ring_buffer_client_;
 
@@ -90,7 +96,6 @@ class MediaApp : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
 
   FidlHandler<fuchsia_audio_device::Registry> reg_handler_{this, "Registry"};
   FidlHandler<fuchsia_audio_device::Observer> obs_handler_{this, "Observer"};
-  FidlHandler<fuchsia_audio_device::ControlCreator> ctl_crtr_handler_{this, "ControlCreator"};
   FidlHandler<fuchsia_audio_device::Control> ctl_handler_{this, "Control"};
   FidlHandler<fuchsia_audio_device::RingBuffer> rb_handler_{this, "RingBuffer"};
 };

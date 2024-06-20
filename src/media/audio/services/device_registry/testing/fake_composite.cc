@@ -12,8 +12,6 @@
 #include <lib/fit/result.h>
 #include <zircon/errors.h>
 
-#include <string>
-
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/logging.h"
@@ -256,16 +254,16 @@ void FakeComposite::GetProperties(GetPropertiesCompleter::Sync& completer) {
 
   // Gather the properties and return them.
   fha::CompositeProperties composite_properties{};
-  if (manufacturer_) {
+  if (manufacturer_.has_value()) {
     composite_properties.manufacturer(*manufacturer_);
   }
-  if (product_) {
+  if (product_.has_value()) {
     composite_properties.product(*product_);
   }
-  if (uid_) {
+  if (uid_.has_value()) {
     composite_properties.unique_id(*uid_);
   }
-  if (clock_domain_) {
+  if (clock_domain_.has_value()) {
     composite_properties.clock_domain(*clock_domain_);
   }
 
@@ -501,10 +499,10 @@ bool FakeComposite::DaiFormatIsSupported(ElementId element_id, const fha::DaiFor
     if (!match) {
       continue;
     }
-    // This DaiFormatSet survived with a match on all aspects.
+    // This DaiFormatSet matched all aspects.
     return true;
   }
-  // None of the DaiFormatSets survived through all of the aspects.]
+  // None of the DaiFormatSets matched all of the aspects.
   return false;
 }
 

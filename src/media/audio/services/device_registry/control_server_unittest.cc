@@ -1685,8 +1685,8 @@ TEST_F(ControlServerStreamConfigTest, SetGain) {
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
-// TODO(https://fxbug.dev/323270827): implement signalprocessing, including in the FakeStreamConfig
-// test fixture. Then add positive test cases for
+// TODO(https://fxbug.dev/323270827): implement signalprocessing, including in the
+// FakeStreamConfig test fixture. Then add positive test cases for
 // GetTopologies/GetElements/WatchTopology/WatchElementState, as are in Composite.
 
 // Verify GetTopologies if the driver does not support signalprocessing.
