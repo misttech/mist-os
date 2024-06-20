@@ -225,11 +225,12 @@ if (is_fuchsia) {
     # These arguments are always needed in the ZBI to run this executable.
     data_deps = [ ":core-tests-standalone.args" ]
 
-    # LTO for this target requires a massive amount of memory,
-    # and thus, should be run less concurrently with other large jobs.
+    # LTO for this target requires a massive amount of memory.
+    # Remotely: run on a bigger RBE worker
+    # Locally: run in a lower-concurrency pool
     # See https://fxbug.dev/338504187 for context.
     if (is_lto_variant || optimize == "size_lto") {
-      _concurrent_jobs = concurrent_jobs.link_highmem_local_only
+      _concurrent_jobs = concurrent_jobs.link_highmem
       configs += _concurrent_jobs.configs
       forward_variables_from(_concurrent_jobs.vars, "*")
     }
