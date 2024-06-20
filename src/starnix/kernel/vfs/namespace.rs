@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(not(feature = "starnix_lite"))]
 use crate::bpf::fs::BpfFs;
+#[cfg(not(feature = "starnix_lite"))]
 use crate::device::BinderFs;
 use crate::fs::devpts::dev_pts_fs;
 use crate::fs::devtmpfs::dev_tmp_fs;
@@ -28,6 +30,7 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
     PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget, UnlinkKind,
 };
+#[cfg(not(feature = "starnix_lite"))]
 use fidl_fuchsia_io as fio;
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;
@@ -722,8 +725,11 @@ impl FileSystemCreator for Arc<Kernel> {
         L: LockBefore<DeviceOpen>,
     {
         Ok(match &**fs_type {
+            #[cfg(not(feature = "starnix_lite"))]
             b"binder" => BinderFs::new_fs(self, options)?,
+            #[cfg(not(feature = "starnix_lite"))]
             b"bpf" => BpfFs::new_fs(self, options)?,
+            #[cfg(not(feature = "starnix_lite"))]
             b"remotefs" => crate::execution::create_remotefs_filesystem(
                 self,
                 self.container_data_dir

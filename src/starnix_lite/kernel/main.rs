@@ -14,6 +14,7 @@ use tracing_mutex as _;
 
 use mistos_bootfs::bootfs::BootfsSvc;
 use mistos_logger::klog;
+use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
 use starnix_logging::log_info;
 use {fuchsia_runtime as fruntime, fuchsia_zircon as zx};
 
@@ -23,17 +24,34 @@ extern "C" {
     ) -> fuchsia_zircon::sys::zx_handle_t;
 }
 
-fn main() {
-    // Make sure that if this process panics in normal mode that the whole kernel's job is killed.
-    if let Err(err) = fruntime::job_default()
-        .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &*fruntime::process_self())
-    {
-        panic!("Starnix Lite failed to set itself as critical: {}", err);
-    }
+/// Overrides the `zxio_maybe_faultable_copy` weak symbol found in zxio.
+#[no_mangle]
+extern "C" fn zxio_maybe_faultable_copy(
+    dest: *mut u8,
+    src: *const u8,
+    count: usize,
+    ret_dest: bool,
+) -> bool {
+    // SAFETY: we know that we are either copying from or to a buffer that
+    // zxio (and thus Starnix) owns per `zxio_maybe_faultable_copy`'s
+    // documentation.
+    unsafe { zxio_maybe_faultable_copy_impl(dest, src, count, ret_dest) }
+}
 
-    // Close any loader service passed to component manager so that the service session can be
-    // freed, as component manager won't make use of a loader service such as by calling dlopen.
-    // If userboot invoked component manager directly, this service was the only reason userboot
+/// Overrides the `zxio_fault_catching_disabled` weak symbol found in zxio.
+#[no_mangle]
+extern "C" fn zxio_fault_catching_disabled() -> bool {
+    false
+}
+
+fn main() {
+    klog::KernelLogger::init();
+
+    log_info!("Starnix Lite is starting up...");
+
+    // Close any loader service passed to so that the service session can be
+    // freed, as we won't make use of a loader service such as by calling dlopen.
+    // If userboot invoked this directly, this service was the only reason userboot
     // continued to run and closing it will let userboot terminate.
     let ldsvc = unsafe {
         fuchsia_zircon::Handle::from_raw(dl_set_loader_service(
@@ -42,18 +60,26 @@ fn main() {
     };
     drop(ldsvc);
 
-    klog::KernelLogger::init();
-
-    log_info!("Starnix Lite is starting up...");
+    // Make sure that if this process panics in normal mode that the whole kernel's job is killed.
+    if let Err(err) = fruntime::job_default()
+        .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &*fruntime::process_self())
+    {
+        panic!("Starnix Lite failed to set itself as critical: {}", err);
+    }
 
     let system_resource_handle =
         fruntime::take_startup_handle(fruntime::HandleType::SystemResource.into())
             .map(zx::Resource::from);
-    let bootfs_svc = BootfsSvc::new().expect("Failed to create Rust bootfs");
 
-    let service = bootfs_svc
+    let bootfs_svc = BootfsSvc::new().expect("Failed to create bootfs");
+    let bootfs_svc = bootfs_svc
         .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
         .expect("Failed to ingest bootfs");
+    let _ = bootfs_svc.create_and_bind_vfs();
 
-    let _ = service.create_and_bind_vfs();
+    //let mut executor = fasync::SendExecutor::new(1);
+
+    // We call this early during Starnix boot to make sure the usercopy utilities
+    // are ready for use before any restricted-mode/Linux processes are created.
+    init_usercopy();
 }
