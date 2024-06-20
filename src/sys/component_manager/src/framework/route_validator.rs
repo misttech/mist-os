@@ -38,16 +38,7 @@ lazy_static! {
     static ref CAPABILITY_NAME: Name = fsys::RouteValidatorMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
-/// Serves the fuchsia.sys2.RouteValidator protocol.
-pub struct RouteValidator {
-    model: Weak<Model>,
-}
-
-impl RouteValidator {
-    fn new(model: Weak<Model>) -> Arc<Self> {
-        Arc::new(Self { model })
-    }
-
+impl RouteValidatorCapabilityProvider {
     async fn validate(
         model: &Model,
         scope_moniker: &Moniker,
@@ -229,11 +220,7 @@ impl RouteValidator {
     }
 
     /// Serve the fuchsia.sys2.RouteValidator protocol for a given scope on a given stream
-    async fn serve(
-        self: Arc<Self>,
-        scope_moniker: Moniker,
-        mut stream: fsys::RouteValidatorRequestStream,
-    ) {
+    async fn serve(self, mut stream: fsys::RouteValidatorRequestStream) {
         let res: Result<(), fidl::Error> = async move {
             while let Some(request) = stream.try_next().await? {
                 let Some(model) = self.model.upgrade() else {
@@ -241,13 +228,14 @@ impl RouteValidator {
                 };
                 match request {
                     fsys::RouteValidatorRequest::Validate { moniker, responder } => {
-                        let result = Self::validate(&model, &scope_moniker, &moniker).await;
+                        let result = Self::validate(&model, &self.scope_moniker, &moniker).await;
                         if let Err(e) = responder.send(result.as_deref().map_err(|e| *e)) {
                             warn!(error = %e, "RouteValidator failed to send Validate response");
                         }
                     }
                     fsys::RouteValidatorRequest::Route { moniker, targets, responder } => {
-                        let result = Self::route(&model, &scope_moniker, &moniker, targets).await;
+                        let result =
+                            Self::route(&model, &self.scope_moniker, &moniker, targets).await;
                         if let Err(e) = responder.send(result.as_deref().map_err(|e| *e)) {
                             warn!(error = %e, "RouteValidator failed to send Route response");
                         }
@@ -416,12 +404,12 @@ impl TryFrom<Vec<&ExposeDecl>> for RouteRequest {
 }
 
 pub struct RouteValidatorFrameworkCapability {
-    host: Arc<RouteValidator>,
+    model: Weak<Model>,
 }
 
 impl RouteValidatorFrameworkCapability {
     pub fn new(model: Weak<Model>) -> Self {
-        Self { host: RouteValidator::new(model) }
+        Self { model }
     }
 }
 
@@ -435,26 +423,23 @@ impl FrameworkCapability for RouteValidatorFrameworkCapability {
         scope: WeakComponentInstance,
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
-        Box::new(RouteValidatorCapabilityProvider::new(self.host.clone(), scope.moniker.clone()))
+        Box::new(RouteValidatorCapabilityProvider {
+            model: self.model.clone(),
+            scope_moniker: scope.moniker.clone(),
+        })
     }
 }
 
-pub struct RouteValidatorCapabilityProvider {
-    query: Arc<RouteValidator>,
+struct RouteValidatorCapabilityProvider {
+    model: Weak<Model>,
     scope_moniker: Moniker,
-}
-
-impl RouteValidatorCapabilityProvider {
-    fn new(query: Arc<RouteValidator>, scope_moniker: Moniker) -> Self {
-        Self { query, scope_moniker }
-    }
 }
 
 #[async_trait]
 impl InternalCapabilityProvider for RouteValidatorCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fsys::RouteValidatorMarker>::new(server_end);
-        self.query.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
+        self.serve(server_end.into_stream().unwrap()).await;
     }
 }
 
@@ -530,6 +515,7 @@ async fn validate_exposes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capability;
     use crate::model::component::StartReason;
     use crate::model::start::Start;
     use crate::model::testing::out_dir::OutDir;
@@ -539,7 +525,16 @@ mod tests {
     use cm_rust::*;
     use cm_rust_testing::*;
     use fidl::endpoints;
-    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync};
+    use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
+
+    async fn route_validator(
+        test: &TestModelResult,
+    ) -> (fsys::RouteValidatorProxy, RouteValidatorFrameworkCapability) {
+        let host = RouteValidatorFrameworkCapability::new(Arc::downgrade(&test.model));
+        let (proxy, server) = endpoints::create_proxy::<fsys::RouteValidatorMarker>().unwrap();
+        capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
+        (proxy, host)
+    }
 
     #[derive(Ord, PartialOrd, Eq, PartialEq)]
     struct Key {
@@ -579,20 +574,13 @@ mod tests {
             ),
         ];
 
-        let TestModelResult { model, builtin_environment: _b, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
-        let validator_server = RouteValidator::new(Arc::downgrade(&model));
-        let (validator, request_stream) =
-            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (validator, _host) = route_validator(&test).await;
 
-        let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(Moniker::root(), request_stream).await
-        });
-
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         // `my_child` should not be resolved right now
-        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -642,7 +630,7 @@ mod tests {
         );
 
         // This validation should have caused `my_child` to be resolved
-        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
 
         // Validate `my_child`
@@ -681,21 +669,13 @@ mod tests {
             ("my_child", ComponentDeclBuilder::new().build()),
         ];
 
-        let TestModelResult { model, builtin_environment: _b, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
-        let validator_server = RouteValidator::new(Arc::downgrade(&model));
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (validator, _host) = route_validator(&test).await;
 
-        let (validator, validator_request_stream) =
-            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
-
-        let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(Moniker::root(), validator_request_stream).await
-        });
-
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         // `my_child` should not be resolved right now
-        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -732,7 +712,7 @@ mod tests {
         );
 
         // This validation should have caused `my_child` to be resolved
-        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
     }
 
@@ -776,16 +756,10 @@ mod tests {
             ),
         ];
 
-        let TestModelResult { model, builtin_environment: _b, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
-        let validator_server = RouteValidator::new(Arc::downgrade(&model));
-        let (validator, request_stream) =
-            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
-        let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(Moniker::root(), request_stream).await
-        });
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (validator, _host) = route_validator(&test).await;
 
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         // Validate the root
         let targets = &[
@@ -895,16 +869,10 @@ mod tests {
             ),
         ];
 
-        let TestModelResult { model, builtin_environment: _b, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
-        let validator_server = RouteValidator::new(Arc::downgrade(&model));
-        let (validator, request_stream) =
-            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
-        let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(Moniker::root(), request_stream).await
-        });
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (validator, _host) = route_validator(&test).await;
 
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         // Validate the root, passing an empty vector. This should match both capabilities
         let mut results = validator.route(".", &[]).await.unwrap().unwrap();
@@ -983,16 +951,10 @@ mod tests {
             ),
         ];
 
-        let TestModelResult { model, builtin_environment: _b, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
-        let validator_server = RouteValidator::new(Arc::downgrade(&model));
-        let (validator, request_stream) =
-            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
-        let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(Moniker::root(), request_stream).await
-        });
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (validator, _host) = route_validator(&test).await;
 
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         // Validate the root
         let targets = &[fsys::RouteTarget {
@@ -1091,22 +1053,15 @@ mod tests {
             ),
         ];
 
-        let TestModelResult { model, realm_proxy, mock_runner, builtin_environment: _b, .. } =
-            TestEnvironmentBuilder::new()
-                .set_components(components)
-                .set_realm_moniker(Moniker::root())
-                .build()
-                .await;
-        let realm_proxy = realm_proxy.unwrap();
+        let test = TestEnvironmentBuilder::new()
+            .set_components(components)
+            .set_realm_moniker(Moniker::root())
+            .build()
+            .await;
+        let realm_proxy = test.realm_proxy.as_ref().unwrap();
+        let (validator, _host) = route_validator(&test).await;
 
-        let validator_server = RouteValidator::new(Arc::downgrade(&model));
-        let (validator, request_stream) =
-            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
-        let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(Moniker::root(), request_stream).await
-        });
-
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         // Create two children in the collection, each exposing `my_service` with two instances.
         let collection_ref = fdecl::CollectionRef { name: "coll".parse().unwrap() };
@@ -1124,9 +1079,10 @@ mod tests {
             let mut out_dir = OutDir::new();
             out_dir.add_echo_protocol("/svc/foo.bar/instance_a/echo".parse().unwrap());
             out_dir.add_echo_protocol("/svc/foo.bar/instance_b/echo".parse().unwrap());
-            mock_runner.add_host_fn(&format!("test:///{}_resolved", name), out_dir.host_fn());
+            test.mock_runner.add_host_fn(&format!("test:///{}_resolved", name), out_dir.host_fn());
 
-            let child = model
+            let child = test
+                .model
                 .root()
                 .find_and_maybe_resolve(&format!("coll:{}", name).as_str().try_into().unwrap())
                 .await
@@ -1136,11 +1092,15 @@ mod tests {
 
         // Open the service directory from `target` so that it gets instantiated.
         {
-            let target =
-                model.root().find_and_maybe_resolve(&"target".try_into().unwrap()).await.unwrap();
+            let target = test
+                .model
+                .root()
+                .find_and_maybe_resolve(&"target".try_into().unwrap())
+                .await
+                .unwrap();
             target.ensure_started(&StartReason::Debug).await.unwrap();
-            mock_runner.wait_for_url("test:///target_resolved").await;
-            let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
+            test.mock_runner.wait_for_url("test:///target_resolved").await;
+            let ns = test.mock_runner.get_namespace("test:///target_resolved").unwrap();
             let ns = ns.lock().await;
             // /pkg and /svc
             let mut ns = ns.clone().flatten();
@@ -1223,19 +1183,13 @@ mod tests {
             ("my_child", ComponentDeclBuilder::new().build()),
         ];
 
-        let TestModelResult { model, builtin_environment: _b, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
-        let validator_server = RouteValidator::new(Arc::downgrade(&model));
-        let (validator, request_stream) =
-            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
-        let _validator_task = fasync::Task::local(async move {
-            validator_server.serve(Moniker::root(), request_stream).await
-        });
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (validator, _host) = route_validator(&test).await;
 
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         // `my_child` should not be resolved right now
-        let instance = model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         let targets = &[

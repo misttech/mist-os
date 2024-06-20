@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::framework::factory::FactoryCapabilityHost;
+use crate::capability;
+use crate::framework::factory::Factory;
 use crate::model::testing::out_dir::OutDir;
 use crate::model::testing::routing_test_helpers::*;
 use cm_rust::*;
@@ -1352,12 +1353,9 @@ async fn extend_from_program() {
     ];
     let test = RoutingTestBuilder::new("root", components).build().await;
 
-    let factory_host = FactoryCapabilityHost::new();
-    let (factory, stream) =
-        endpoints::create_proxy_and_stream::<fsandbox::FactoryMarker>().unwrap();
-    let _factory_task = fasync::Task::spawn(async move {
-        factory_host.serve(stream).await.unwrap();
-    });
+    let factory_host = Factory::new();
+    let (factory, server) = endpoints::create_proxy::<fsandbox::FactoryMarker>().unwrap();
+    capability::open_framework(&factory_host, test.model.root(), server.into()).await.unwrap();
 
     // Create a dictionary with a Sender at "A" for the Echo protocol.
     let dict = factory.create_dictionary().await.unwrap();

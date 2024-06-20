@@ -16,7 +16,6 @@ use futures::prelude::*;
 use lazy_static::lazy_static;
 use router_error::Explain;
 use sandbox::{Dict, Receiver};
-use std::sync::Arc;
 use tracing::warn;
 
 lazy_static! {
@@ -24,13 +23,7 @@ lazy_static! {
 }
 
 struct FactoryCapabilityProvider {
-    host: Arc<FactoryCapabilityHost>,
-}
-
-impl FactoryCapabilityProvider {
-    fn new(host: Arc<FactoryCapabilityHost>) -> Self {
-        Self { host }
-    }
+    tasks: TaskGroup,
 }
 
 #[async_trait]
@@ -39,7 +32,7 @@ impl InternalCapabilityProvider for FactoryCapabilityProvider {
         let server_end = ServerEnd::<fsandbox::FactoryMarker>::new(server_end);
         // We only need to look up the component matching this scope.
         // These operations should all work, even if the component is not running.
-        let serve_result = self.host.serve(server_end.into_stream().unwrap()).await;
+        let serve_result = self.serve(server_end.into_stream().unwrap()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.
             warn!(%error, "serve failed");
@@ -47,19 +40,8 @@ impl InternalCapabilityProvider for FactoryCapabilityProvider {
     }
 }
 
-pub struct FactoryCapabilityHost {
-    tasks: TaskGroup,
-}
-
-impl FactoryCapabilityHost {
-    pub fn new() -> Self {
-        Self { tasks: TaskGroup::new() }
-    }
-
-    pub async fn serve(
-        &self,
-        mut stream: fsandbox::FactoryRequestStream,
-    ) -> Result<(), fidl::Error> {
+impl FactoryCapabilityProvider {
+    async fn serve(&self, mut stream: fsandbox::FactoryRequestStream) -> Result<(), fidl::Error> {
         while let Some(request) = stream.try_next().await? {
             let method_name = request.method_name();
             let result = self.handle_request(request).await;
@@ -151,17 +133,18 @@ impl FactoryCapabilityHost {
     }
 }
 
-pub struct FactoryFrameworkCapability {
-    host: Arc<FactoryCapabilityHost>,
+#[derive(Clone)]
+pub struct Factory {
+    tasks: TaskGroup,
 }
 
-impl FactoryFrameworkCapability {
-    pub fn new(host: Arc<FactoryCapabilityHost>) -> Self {
-        Self { host }
+impl Factory {
+    pub fn new() -> Self {
+        Self { tasks: TaskGroup::new() }
     }
 }
 
-impl FrameworkCapability for FactoryFrameworkCapability {
+impl FrameworkCapability for Factory {
     fn matches(&self, capability: &InternalCapability) -> bool {
         capability.matches_protocol(&CAPABILITY_NAME)
     }
@@ -171,31 +154,43 @@ impl FrameworkCapability for FactoryFrameworkCapability {
         _scope: WeakComponentInstance,
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
-        Box::new(FactoryCapabilityProvider::new(self.host.clone()))
+        Box::new(FactoryCapabilityProvider { tasks: self.tasks.clone() })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capability;
+    use crate::model::component::ComponentInstance;
+    use crate::model::context::ModelContext;
+    use crate::model::environment::Environment;
     use assert_matches::assert_matches;
+    use fidl_fuchsia_component_sandbox as fsandbox;
     use fuchsia_zircon::{self as zx, HandleBased};
-    use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
+    use std::sync::{Arc, Weak};
 
-    fn factory() -> (fasync::TaskGroup, fsandbox::FactoryProxy) {
-        let mut tasks = fasync::TaskGroup::new();
-        let host = FactoryCapabilityHost::new();
-        let (factory_proxy, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::FactoryMarker>().unwrap();
-        tasks.spawn(async move {
-            host.serve(stream).await.unwrap();
-        });
-        (tasks, factory_proxy)
+    async fn new_root() -> Arc<ComponentInstance> {
+        ComponentInstance::new_root(
+            Environment::empty(),
+            Arc::new(ModelContext::new_for_test()),
+            Weak::new(),
+            "test:///root".parse().unwrap(),
+        )
+        .await
+    }
+
+    async fn factory(instance: &Arc<ComponentInstance>) -> (fsandbox::FactoryProxy, Factory) {
+        let host = Factory::new();
+        let (proxy, server) = endpoints::create_proxy::<fsandbox::FactoryMarker>().unwrap();
+        capability::open_framework(&host, instance, server.into()).await.unwrap();
+        (proxy, host)
     }
 
     #[fuchsia::test]
     async fn create_one_shot_handle() {
-        let (_tasks, factory_proxy) = factory();
+        let root = new_root().await;
+        let (factory_proxy, _host) = factory(&root).await;
 
         let event = zx::Event::create();
         let expected_koid = event.get_koid().unwrap();
@@ -218,7 +213,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_connector() {
-        let (_tasks, factory_proxy) = factory();
+        let root = new_root().await;
+        let (factory_proxy, _host) = factory(&root).await;
 
         let (receiver_client_end, mut receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
@@ -237,7 +233,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_dictionary() {
-        let (_tasks, factory_proxy) = factory();
+        let root = new_root().await;
+        let (factory_proxy, _host) = factory(&root).await;
 
         let dict = factory_proxy.create_dictionary().await.unwrap();
         let dict = dict.into_proxy().unwrap();
