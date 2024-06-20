@@ -8,7 +8,7 @@ import("//build/testing/boot_tests/zbi_test.gni")
 import("//build/zbi/kernel_cmdline.gni")
 
 template("mistos_unittest_zbi") {
-  userboot_prefix = "zbi-test"
+  userboot_prefix = ""
   if (defined(invoker.prefix)) {
     userboot_prefix = invoker.prefix
   }
@@ -38,6 +38,8 @@ template("mistos_unittest_zbi") {
 
     args = [
       "userboot.root=$userboot_prefix",
+
+      #"userboot.next=bin/mistos_elf_runner+${executable_path}+-Z+unstable-options+--force-run-in-process",
       "userboot.next=bin/mistos_elf_runner+${executable_path}",
     ]
   }
