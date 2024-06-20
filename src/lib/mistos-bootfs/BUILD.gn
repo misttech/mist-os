@@ -3,6 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/dist/resource.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/boot_tests/mistos_unittest_zbi.gni")
 
@@ -40,14 +41,18 @@ rustc_library("mistos-bootfs") {
     "src/bootfs.rs",
     "src/lib.rs",
   ]
+}
 
-  #data_deps = [ "//build/info:build_info_files" ]
+# This will force the /data dir for testing
+resource("dummy_config") {
+  sources = [ "config/dummy.json5" ]
+  outputs = "data/dummy"
 }
 
 mistos_unittest_zbi("mistos-bootfs-test") {
   executable_path = "bin/mistos_bootfs_lib_test"
   test_target_label = ":mistos-bootfs_test"
-  prefix = ""
+  deps = [ ":dummy_config" ]
 }
 
 group("tests") {
