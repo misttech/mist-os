@@ -4,13 +4,8 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//build/rust/rustc_link_directive.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/lib/vulkan/vulkan.gni")
-
-rustc_link_directive("vulkan.rust_link_directive") {
-  lib_shared_target = "//src/lib/vulkan"
-}
 
 rustc_library("fuchsia-vulkan") {
   name = "fuchsia_vulkan"
@@ -25,7 +20,7 @@ rustc_library("fuchsia-vulkan") {
     "//third_party/rust_crates:vk-sys",
   ]
 
-  non_rust_deps = [ ":vulkan.rust_link_directive" ]
+  non_rust_deps = [ "//src/lib/vulkan" ]
 
   sources = [ "src/lib.rs" ]
 }

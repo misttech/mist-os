@@ -4,7 +4,6 @@
 
 import("//build/host.gni")
 import("//build/rust/rustc_library.gni")
-import("//build/rust/rustc_link_directive.gni")
 import("//build/test.gni")
 import("//third_party/protobuf/proto_library.gni")
 
@@ -42,15 +41,11 @@ if (is_host) {
     sources = [ "samples_to_pprof_rust.cc" ]
   }
 
-  rustc_link_directive("rust_samples_to_pprof.rust_link_directive") {
-    lib_static_target = ":rust_samples_to_pprof"
-  }
-
   rustc_library("samples_to_pprof_rust") {
     name = "samples_to_pprof"
     edition = "2021"
     source_root = "rust/src/lib.rs"
-    deps = [ ":rust_samples_to_pprof.rust_link_directive" ]
+    deps = [ ":rust_samples_to_pprof" ]
 
     sources = [ "rust/src/lib.rs" ]
   }

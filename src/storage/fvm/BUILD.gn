@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/rust/rustc_link_directive.gni")
 import("//build/test.gni")
 
 group("tests") {
@@ -61,10 +60,6 @@ static_library("fvm") {
     # fvm-check.cpp has #include <zircon/status.h> even when built for host.
     public_deps += [ "//src/zircon/lib/zircon:zircon-headers" ]
   }
-}
-
-rustc_link_directive("fvm.rust_link_directive") {
-  lib_static_target = ":fvm"
 }
 
 static_library("test_support") {

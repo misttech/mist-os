@@ -229,14 +229,10 @@ template("rustc_artifact") {
     forward_variables_from(invoker,
                            [
                              "applicable_licenses",
-                             "public_deps",
                              "testonly",
                              "visibility",
                            ])
-    if (!defined(public_deps)) {
-      public_deps = []
-    }
-    public_deps += [ ":$_target_name" ]
+    public_deps = [ ":$_target_name" ]
     metadata = {
       test_component_manifest_program_barrier = [ ":$_target_name" ]
       link_output_barrier = [ ":$_target_name" ]
@@ -317,12 +313,6 @@ template("rustc_artifact") {
       foreach(link_arg, invoker.link_args) {
         rustflags += [ "-Clink-args=" + link_arg ]
       }
-    }
-
-    # The Fuchsia standard library has an implicit #[link] directive pointing to libfdio.so
-    if (is_fuchsia && (invoker.target_type == "executable" ||
-                       invoker.target_type == "shared_library")) {
-      deps += [ "//src/lib/fdio/rust:fdio_for_rust_stdlib" ]
     }
 
     rustenv = []

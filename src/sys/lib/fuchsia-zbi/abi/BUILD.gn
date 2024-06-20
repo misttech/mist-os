@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//build/rust/rustc_link_directive.gni")
 
 static_library("test-lib") {
   sources = [
@@ -12,10 +11,6 @@ static_library("test-lib") {
     "test/lib.h",
   ]
   deps = [ "//zircon/system/public" ]
-}
-
-rustc_link_directive("test-lib.rust_link_directive") {
-  lib_static_target = ":test-lib"
 }
 
 rustc_library("abi") {
@@ -31,7 +26,7 @@ rustc_library("abi") {
   ]
 
   test_deps = [
-    ":test-lib.rust_link_directive",
+    ":test-lib",
     "//src/lib/fuchsia",
   ]
 

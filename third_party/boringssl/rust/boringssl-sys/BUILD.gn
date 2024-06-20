@@ -3,16 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
-import("//build/rust/rustc_link_directive.gni")
-
-rustc_link_directive("crypto.rust_link_directive") {
-  lib_name = "crypto"
-  if (is_host) {
-    lib_static_target = "//third_party/boringssl:crypto-static"
-  } else {
-    lib_shared_target = "//third_party/boringssl:crypto-shared"
-  }
-}
 
 rustc_library("bssl-sys") {
   name = "bssl-sys"
@@ -22,8 +12,19 @@ rustc_library("bssl-sys") {
 
   non_rust_deps = [
     # only depend on libcrypto until we actually use the SSL bits
-    ":crypto.rust_link_directive",
+    "//third_party/boringssl:crypto",
   ]
 
   sources = [ "src/lib.rs" ]
+
+  if (current_toolchain == host_toolchain) {
+    # Unspeakable kludge to get the all wrong and completely fragile
+    # linking semantics for non_rust_deps to squeak through for the
+    # static libcrypto from boringssl.
+    crypto_out_dir = get_label_info(non_rust_deps[0], "target_out_dir")
+    static_libcrypto =
+        rebase_path("$crypto_out_dir/libcrypto.a", root_build_dir)
+    shlib_out_dir = get_label_info(":any($shlib_toolchain)", "root_out_dir")
+    write_file("$shlib_out_dir/libcrypto.so", [ "INPUT($static_libcrypto)" ])
+  }
 }

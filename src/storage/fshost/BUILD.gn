@@ -73,10 +73,7 @@ rustc_binary("fshost") {
     "//third_party/rust_crates:zstd",
     "//third_party/zstd",
   ]
-  non_rust_deps = [
-    "//src/storage/fvm:fvm.rust_link_directive",
-    "//src/storage/lib/fs_management/c",
-  ]
+  non_rust_deps = [ "//src/storage/lib/fs_management/c" ]
   test_deps = [
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fuchsia-async",

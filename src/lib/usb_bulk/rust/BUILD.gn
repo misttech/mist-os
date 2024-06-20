@@ -3,12 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
-import("//build/rust/rustc_link_directive.gni")
 import("//build/rust/rustc_test.gni")
-
-rustc_link_directive("usb_bulk.rust_link_directive") {
-  lib_static_target = "//src/lib/usb_bulk/cpp:usb_bulk"
-}
 
 rustc_library("lib") {
   name = "usb_bulk"
@@ -22,7 +17,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
-  non_rust_deps = [ ":usb_bulk.rust_link_directive" ]
+  non_rust_deps = [ "//src/lib/usb_bulk/cpp:usb_bulk" ]
 
   # The tests require a zedmon device attached to the host, and should not run
   # in the infrastructure currently.

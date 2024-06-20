@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//build/rust/rustc_link_directive.gni")
 
 group("rust_static_linking") {
   testonly = true
@@ -25,17 +24,13 @@ rustc_library("lib") {
   with_unit_tests = true
   version = "0.1.0"
   edition = "2021"
-  non_rust_deps = [ ":static.rust_link_directive" ]
+  non_rust_deps = [ ":static" ]
 
   sources = [ "src/lib.rs" ]
 }
 
 static_library("static") {
   sources = [ "static.c" ]
-}
-
-rustc_link_directive("static.rust_link_directive") {
-  lib_static_target = ":static"
 }
 
 fuchsia_unittest_package("static_linking_tests") {

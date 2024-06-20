@@ -28,10 +28,7 @@ rustc_library("storage-isolated-driver-manager") {
     "//third_party/rust_crates:uuid",
   ]
 
-  non_rust_deps = [
-    "//src/storage/fvm:fvm.rust_link_directive",
-    "//src/storage/lib/fs_management/c",
-  ]
+  non_rust_deps = [ "//src/storage/lib/fs_management/c" ]
 
   sources = [
     "src/fvm.rs",
