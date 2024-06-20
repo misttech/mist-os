@@ -16,7 +16,10 @@ use fuchsia_component_test::Capability;
 use futures::stream::StreamExt;
 use futures::{join, TryFutureExt};
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
-use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 /// AVRCP component URL.
 const AVRCP_URL: &str = "fuchsia-pkg://fuchsia.com/bt-avrcp-integration-tests#meta/bt-avrcp.cm";
@@ -217,7 +220,7 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
 
     // The observer of bt-avrcp.cm should be notified of the connection attempt.
     match tf.avrcp_observer.expect_observer_request().await.unwrap() {
-        bredr::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
+        bredr_test::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
             assert_eq!(tf.mock_peer.peer_id(), peer_id.into());
             responder.send().unwrap();
         }
@@ -284,7 +287,7 @@ async fn remote_initiates_browse_channel_before_control(mut tf: AvrcpIntegration
 
     // The observer of bt-avrcp.cm should be notified of the connection attempt.
     match tf.avrcp_observer.expect_observer_request().await.unwrap() {
-        bredr::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
+        bredr_test::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
             assert_eq!(tf.mock_peer.peer_id(), peer_id.into());
             responder.send().unwrap();
         }

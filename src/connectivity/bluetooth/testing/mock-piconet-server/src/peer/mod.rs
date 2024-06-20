@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::detachable_map::DetachableMap;
 use fuchsia_bluetooth::profile::Psm;
 use fuchsia_bluetooth::types::{Channel, PeerId};
@@ -13,6 +12,7 @@ use futures::Future;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tracing::{info, warn};
+use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test};
 
 mod search;
 pub mod service;
@@ -38,7 +38,7 @@ pub struct MockPeer {
 
     /// The PeerObserver relay for this peer. This is used to send updates about this peer.
     /// If not set, no updates will be relayed.
-    observer: Option<bredr::PeerObserverProxy>,
+    observer: Option<bredr_test::PeerObserverProxy>,
 
     /// Manages the active searches for this peer.
     search_mgr: Arc<RwLock<SearchSet>>,
@@ -52,7 +52,7 @@ pub struct MockPeer {
 }
 
 impl MockPeer {
-    pub fn new(id: PeerId, observer: Option<bredr::PeerObserverProxy>) -> Self {
+    pub fn new(id: PeerId, observer: Option<bredr_test::PeerObserverProxy>) -> Self {
         // TODO(https://fxbug.dev/42133093): If provided, take event stream of `observer` and listen for close.
         Self {
             id,
@@ -81,7 +81,7 @@ impl MockPeer {
     }
 
     /// Notifies the `observer` with the ServiceFound update from the ServiceRecord.
-    fn relay_service_found(observer: &bredr::PeerObserverProxy, record: ServiceRecord) {
+    fn relay_service_found(observer: &bredr_test::PeerObserverProxy, record: ServiceRecord) {
         let response = record.to_service_found_response().unwrap();
         let _ = observer.service_found(
             &response.id.into(),
@@ -92,7 +92,7 @@ impl MockPeer {
 
     /// Notifies the `observer` with the connection on `psm` established by peer `other`.
     fn relay_connected(
-        observer: &bredr::PeerObserverProxy,
+        observer: &bredr_test::PeerObserverProxy,
         other: PeerId,
         protocol: Vec<bredr::ProtocolDescriptor>,
     ) {
@@ -254,8 +254,10 @@ mod tests {
     use crate::profile::tests::{a2dp_service_definition, rfcomm_service_definition};
     use crate::types::RegisteredServiceId;
 
-    fn create_mock_peer(id: PeerId) -> Result<(MockPeer, bredr::PeerObserverRequestStream), Error> {
-        let (proxy, stream) = create_proxy_and_stream::<bredr::PeerObserverMarker>().unwrap();
+    fn create_mock_peer(
+        id: PeerId,
+    ) -> Result<(MockPeer, bredr_test::PeerObserverRequestStream), Error> {
+        let (proxy, stream) = create_proxy_and_stream::<bredr_test::PeerObserverMarker>().unwrap();
         Ok((MockPeer::new(id, Some(proxy)), stream))
     }
 
@@ -328,14 +330,14 @@ mod tests {
     /// Panics if the call doesn't happen.
     fn expect_observer_service_found(
         exec: &mut fasync::TestExecutor,
-        stream: &mut bredr::PeerObserverRequestStream,
+        stream: &mut bredr_test::PeerObserverRequestStream,
         other_peer: PeerId,
     ) {
         let observer_fut = stream.select_next_some();
         let mut observer_fut = pin!(observer_fut);
 
         match exec.run_until_stalled(&mut observer_fut) {
-            Poll::Ready(Ok(bredr::PeerObserverRequest::ServiceFound {
+            Poll::Ready(Ok(bredr_test::PeerObserverRequest::ServiceFound {
                 peer_id,
                 responder,
                 ..
@@ -413,7 +415,7 @@ mod tests {
         }
         // This should also be echo'ed on the observer.
         match exec.run_until_stalled(&mut observer_stream.next()) {
-            Poll::Ready(Some(Ok(bredr::PeerObserverRequest::PeerConnected {
+            Poll::Ready(Some(Ok(bredr_test::PeerObserverRequest::PeerConnected {
                 peer_id,
                 responder,
                 ..
@@ -606,7 +608,7 @@ mod tests {
 
         // Should be echoed on the observer.
         match exec.run_until_stalled(&mut observer_stream.next()) {
-            Poll::Ready(Some(Ok(bredr::PeerObserverRequest::PeerConnected {
+            Poll::Ready(Some(Ok(bredr_test::PeerObserverRequest::PeerConnected {
                 peer_id,
                 responder,
                 ..

@@ -16,7 +16,10 @@ use fuchsia_zircon::{self as zx, Duration, DurationNum};
 use futures::stream::StreamExt;
 use futures::{TryFutureExt, TryStreamExt};
 use tracing::info;
-use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_component_test as ftest};
+use {
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,
+    fidl_fuchsia_component_test as ftest,
+};
 
 /// Timeout for updates over the PeerObserver of a MockPeer.
 ///
@@ -72,7 +75,7 @@ pub struct PiconetMemberSpec {
     /// `fuchsia.bluetooth.hfp.Hfp-321abc` where `321abc` is the PeerId for this member).
     /// Note: Only protocol capabilities may be specified here.
     expose_decls: Vec<ExposeDecl>,
-    observer: Option<bredr::PeerObserverProxy>,
+    observer: Option<bredr_test::PeerObserverProxy>,
 }
 
 impl PiconetMemberSpec {
@@ -99,7 +102,7 @@ impl PiconetMemberSpec {
         name: String,
         rfcomm_url: Option<String>,
         expose_capabilities: Vec<ftest::Capability>,
-    ) -> Result<(Self, bredr::PeerObserverRequestStream), Error> {
+    ) -> Result<(Self, bredr_test::PeerObserverRequestStream), Error> {
         let id = bt_types::PeerId::random();
         let capability_names = expose_capabilities
             .iter()
@@ -110,7 +113,7 @@ impl PiconetMemberSpec {
             .map(|capability_name| expose_decl(&name, id, capability_name))
             .collect();
         let (peer_proxy, peer_stream) =
-            f_end::create_proxy_and_stream::<bredr::PeerObserverMarker>().unwrap();
+            f_end::create_proxy_and_stream::<bredr_test::PeerObserverMarker>().unwrap();
 
         Ok((Self { name, id, rfcomm_url, expose_decls, observer: Some(peer_proxy) }, peer_stream))
     }
@@ -220,12 +223,12 @@ impl PiconetMember {
 /// Note: Only capabilities that are specified in the `expose_capabilities` field of the
 ///       PiconetHarness::add_profile_with_capabilities() method will be available for connection.
 pub struct BtProfileComponent {
-    observer_stream: bredr::PeerObserverRequestStream,
+    observer_stream: bredr_test::PeerObserverRequestStream,
     profile_id: bt_types::PeerId,
 }
 
 impl BtProfileComponent {
-    pub fn new(stream: bredr::PeerObserverRequestStream, id: bt_types::PeerId) -> Self {
+    pub fn new(stream: bredr_test::PeerObserverRequestStream, id: bt_types::PeerId) -> Self {
         Self { observer_stream: stream, profile_id: id }
     }
 
@@ -250,7 +253,9 @@ impl BtProfileComponent {
     /// Expects a request over the `PeerObserver` protocol for this MockPeer.
     ///
     /// Returns the request if successful.
-    pub async fn expect_observer_request(&mut self) -> Result<bredr::PeerObserverRequest, Error> {
+    pub async fn expect_observer_request(
+        &mut self,
+    ) -> Result<bredr_test::PeerObserverRequest, Error> {
         // The Future is gated by a timeout so that tests consistently terminate.
         self.observer_stream
             .select_next_some()
@@ -271,7 +276,7 @@ impl BtProfileComponent {
     ) -> Result<(), Error> {
         let request = self.expect_observer_request().await?;
         match request {
-            bredr::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
+            bredr_test::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
                 responder.send().unwrap();
                 if other == peer_id.into() {
                     Ok(())
@@ -293,7 +298,7 @@ impl BtProfileComponent {
     ) -> Result<(), Error> {
         let request = self.expect_observer_request().await?;
         match request {
-            bredr::PeerObserverRequest::ServiceFound { peer_id, responder, .. } => {
+            bredr_test::PeerObserverRequest::ServiceFound { peer_id, responder, .. } => {
                 responder.send().unwrap();
                 if other == peer_id.into() {
                     Ok(())
@@ -385,7 +390,7 @@ async fn add_profile_to_topology<'a>(
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol::<bredr::ProfileTestMarker>())
+                    .capability(Capability::protocol::<bredr_test::ProfileTestMarker>())
                     .from(Ref::child(&server_moniker))
                     .to(Ref::child(&mock_piconet_member_name)),
             )
@@ -452,7 +457,7 @@ async fn add_mock_piconet_member<'a, 'b>(
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol::<bredr::ProfileTestMarker>())
+                    .capability(Capability::protocol::<bredr_test::ProfileTestMarker>())
                     .from(Ref::child(&server_moniker))
                     .to(Ref::child(&mock.name)),
             )
@@ -489,14 +494,14 @@ async fn add_mock_piconet_component(
     name: String,
     id: bt_types::PeerId,
     profile_svc_path: String,
-    observer_src: Option<bredr::PeerObserverProxy>,
+    observer_src: Option<bredr_test::PeerObserverProxy>,
 ) -> Result<(), Error> {
     // If there is no observer, make a channel and fill it in. The server end
     // of the channel is passed to a future which just reads the channel to
     // completion.
     let observer = observer_src.unwrap_or_else(|| {
         let (proxy, stream) =
-            f_end::create_proxy_and_stream::<bredr::PeerObserverMarker>().unwrap();
+            f_end::create_proxy_and_stream::<bredr_test::PeerObserverMarker>().unwrap();
         fasync::Task::local(async move {
             let _ = drain_observer(stream).await;
         })
@@ -525,10 +530,10 @@ async fn piconet_member(
     handles: LocalComponentHandles,
     id: bt_types::PeerId,
     profile_svc_path: String,
-    peer_observer: bredr::PeerObserverProxy,
+    peer_observer: bredr_test::PeerObserverProxy,
 ) -> Result<(), Error> {
     // connect to the profile service to drive the mock peer
-    let pro_test = handles.connect_to_protocol::<bredr::ProfileTestMarker>()?;
+    let pro_test = handles.connect_to_protocol::<bredr_test::ProfileTestMarker>()?;
     let mut fs = ServiceFs::new();
 
     let _ = fs.dir("svc").add_service_at(profile_svc_path, move |chan: zx::Channel| {
@@ -560,13 +565,13 @@ async fn piconet_member(
 /// Use the ProfileTestProxy to register a piconet member with the Bluetooth Profile Test
 /// Server.
 async fn register_piconet_member(
-    profile_test_proxy: &bredr::ProfileTestProxy,
+    profile_test_proxy: &bredr_test::ProfileTestProxy,
     id: bt_types::PeerId,
-) -> Result<(bredr::MockPeerProxy, bredr::PeerObserverRequestStream), Error> {
+) -> Result<(bredr_test::MockPeerProxy, bredr_test::PeerObserverRequestStream), Error> {
     info!("Sending RegisterPeer request for peer {:?} to the Mock Piconet Server.", id);
-    let (client, server) = f_end::create_proxy::<bredr::MockPeerMarker>()?;
+    let (client, server) = f_end::create_proxy::<bredr_test::MockPeerMarker>()?;
     let (observer_client, observer_server) =
-        f_end::create_request_stream::<bredr::PeerObserverMarker>()?;
+        f_end::create_request_stream::<bredr_test::PeerObserverMarker>()?;
 
     profile_test_proxy
         .register_peer(&id.into(), server, observer_client)
@@ -585,15 +590,15 @@ fn handle_fidl_err(fidl_err: fidl::Error, ctx: String) -> Result<(), Error> {
 
 /// Given a request stream and a proxy, forward from one to the other
 async fn fwd_observer_callbacks(
-    mut source_req_stream: bredr::PeerObserverRequestStream,
-    observer: &bredr::PeerObserverProxy,
+    mut source_req_stream: bredr_test::PeerObserverRequestStream,
+    observer: &bredr_test::PeerObserverProxy,
     id: bt_types::PeerId,
 ) -> Result<(), Error> {
     while let Some(req) =
         source_req_stream.try_next().await.context("reading peer observer failed")?
     {
         match req {
-            bredr::PeerObserverRequest::ServiceFound {
+            bredr_test::PeerObserverRequest::ServiceFound {
                 peer_id,
                 protocol,
                 attributes,
@@ -619,7 +624,7 @@ async fn fwd_observer_callbacks(
                 })?;
             }
 
-            bredr::PeerObserverRequest::PeerConnected { peer_id, protocol, responder } => {
+            bredr_test::PeerObserverRequest::PeerConnected { peer_id, protocol, responder } => {
                 observer.peer_connected(&peer_id, &protocol).await.or_else(|e| {
                     handle_fidl_err(
                         e,
@@ -638,13 +643,15 @@ async fn fwd_observer_callbacks(
     Ok(())
 }
 
-async fn drain_observer(mut stream: bredr::PeerObserverRequestStream) -> Result<(), fidl::Error> {
+async fn drain_observer(
+    mut stream: bredr_test::PeerObserverRequestStream,
+) -> Result<(), fidl::Error> {
     while let Some(req) = stream.try_next().await? {
         match req {
-            bredr::PeerObserverRequest::ServiceFound { responder, .. } => {
+            bredr_test::PeerObserverRequest::ServiceFound { responder, .. } => {
                 responder.send()?;
             }
-            bredr::PeerObserverRequest::PeerConnected { responder, .. } => {
+            bredr_test::PeerObserverRequest::PeerConnected { responder, .. } => {
                 responder.send()?;
             }
         }
@@ -1098,9 +1105,9 @@ mod tests {
             .expect("piconet member had no decl");
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: bredr::ProfileTestMarker::PROTOCOL_NAME.parse().unwrap(),
+            source_name: bredr_test::ProfileTestMarker::PROTOCOL_NAME.parse().unwrap(),
             source_dictionary: Default::default(),
-            target_path: format!("/svc/{}", bredr::ProfileTestMarker::PROTOCOL_NAME)
+            target_path: format!("/svc/{}", bredr_test::ProfileTestMarker::PROTOCOL_NAME)
                 .parse()
                 .unwrap(),
             dependency_type: DependencyType::Strong,
@@ -1110,7 +1117,7 @@ mod tests {
 
         // Check that the root offers ProfileTest to the piconet member from
         // the Mock Piconet Server
-        let profile_test_name = Name::new(bredr::ProfileTestMarker::PROTOCOL_NAME).unwrap();
+        let profile_test_name = Name::new(bredr_test::ProfileTestMarker::PROTOCOL_NAME).unwrap();
         let root = builder.get_realm_decl().await.expect("failed to get root");
         let offer_profile_test = OfferDecl::Protocol(OfferProtocolDecl {
             source: offer_source_static_child(&super::mock_piconet_server_moniker()),
@@ -1168,12 +1175,12 @@ mod tests {
         assert!(interposer.exposes.contains(&profile_expose));
 
         // ProfileTest is used by interposer
-        let profile_test_name = Name::new(bredr::ProfileTestMarker::PROTOCOL_NAME).unwrap();
+        let profile_test_name = Name::new(bredr_test::ProfileTestMarker::PROTOCOL_NAME).unwrap();
         let profile_test_use = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: profile_test_name.clone(),
             source_dictionary: Default::default(),
-            target_path: format!("/svc/{}", bredr::ProfileTestMarker::PROTOCOL_NAME)
+            target_path: format!("/svc/{}", bredr_test::ProfileTestMarker::PROTOCOL_NAME)
                 .parse()
                 .unwrap(),
             dependency_type: DependencyType::Strong,

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth_bredr::PeerObserverRequest;
+use fidl_fuchsia_bluetooth_bredr_test::PeerObserverRequest;
 use fidl_fuchsia_media::{AudioDeviceEnumeratorMarker, SessionAudioConsumerFactoryMarker};
 use fidl_fuchsia_mediacodec::CodecFactoryMarker;
 use fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker;

@@ -1,9 +1,10 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.bluetooth.bredr;
+library fuchsia.bluetooth.bredr.test;
 
 using fuchsia.bluetooth;
+using fuchsia.bluetooth.bredr;
 
 /// `PeerObserver` provides the integration test client with a way to validate the
 /// behavior of a peer in the piconet.
@@ -17,8 +18,8 @@ closed protocol PeerObserver {
     ///                        are present on the peer record.
     strict ServiceFound(struct {
         peer_id fuchsia.bluetooth.PeerId;
-        protocol ProtocolDescriptorList:optional;
-        attributes vector<Attribute>:MAX_ATTRIBUTES;
+        protocol fuchsia.bluetooth.bredr.ProtocolDescriptorList:optional;
+        attributes vector<fuchsia.bluetooth.bredr.Attribute>:fuchsia.bluetooth.bredr.MAX_ATTRIBUTES;
     }) -> ();
 
     /// Called when a peer has connected to a service.
@@ -27,7 +28,7 @@ closed protocol PeerObserver {
     /// + request `protocol` Contains the protocol list of the connection.
     strict PeerConnected(struct {
         peer_id fuchsia.bluetooth.PeerId;
-        protocol ProtocolDescriptorList;
+        protocol fuchsia.bluetooth.bredr.ProtocolDescriptorList;
     }) -> ();
 };
 
@@ -51,7 +52,7 @@ closed protocol MockPeer {
     ///
     /// + request `interface` Interface to drive mock peer behavior.
     strict ConnectProxy(resource struct {
-        interface server_end:Profile;
+        interface server_end:fuchsia.bluetooth.bredr.Profile;
     }) -> ();
 };
 
