@@ -300,7 +300,7 @@ class Device final : public DdkDeviceType,
 
   inspect::Node collections_node_;
 
-  fidl::SyncClient<fuchsia_hardware_platform_device::Device> pdev_;
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
   zx::bti bti_;
 
   // Initialize these to a value that won't be mistaken for a real vid or pid.

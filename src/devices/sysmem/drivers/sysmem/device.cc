@@ -522,41 +522,42 @@ zx_status_t Device::Bind() {
     return pdev_client.status_value();
   }
 
-  pdev_ = fidl::SyncClient(std::move(*pdev_client));
+  pdev_.Bind(std::move(*pdev_client));
 
   int64_t protected_memory_size = kDefaultProtectedMemorySize;
   int64_t contiguous_memory_size = kDefaultContiguousMemorySize;
 
-  size_t metadata_size = 0;
-  zx_status_t status = DdkGetMetadataSize(fuchsia_hardware_sysmem::kMetadataType, &metadata_size);
-  if (status == ZX_OK) {
-    std::vector<uint8_t> raw_metadata(metadata_size);
-    size_t metadata_actual = 0;
-    status = DdkGetMetadata(fuchsia_hardware_sysmem::kMetadataType, raw_metadata.data(),
-                            raw_metadata.size(), &metadata_actual);
-    if (status == ZX_OK) {
-      ZX_ASSERT(metadata_actual == metadata_size);
-      auto unpersist_result =
-          fidl::Unpersist<fuchsia_hardware_sysmem::Metadata>(cpp20::span(raw_metadata));
-      if (unpersist_result.is_error()) {
-        DRIVER_ERROR("Failed fidl::Unpersist - status: %s",
-                     zx_status_get_string(unpersist_result.error_value().status()));
-        return unpersist_result.error_value().status();
-      }
-      auto& metadata = unpersist_result.value();
-
-      // Default is zero when field un-set.
-      pdev_device_info_vid_ = metadata.vid().has_value() ? *metadata.vid() : 0;
-      pdev_device_info_pid_ = metadata.pid().has_value() ? *metadata.pid() : 0;
-      protected_memory_size =
-          metadata.protected_memory_size().has_value() ? *metadata.protected_memory_size() : 0;
-      contiguous_memory_size =
-          metadata.contiguous_memory_size().has_value() ? *metadata.contiguous_memory_size() : 0;
+  fidl::WireResult raw_metadata = pdev_->GetMetadata(fuchsia_hardware_sysmem::kMetadataType);
+  if (!raw_metadata.ok()) {
+    DRIVER_ERROR("Failed to send GetMetadata request: %s", raw_metadata.status_string());
+    return raw_metadata.status();
+  }
+  if (raw_metadata->is_error()) {
+    if (raw_metadata->error_value() != ZX_ERR_NOT_FOUND) {
+      return raw_metadata->error_value();
     }
+    DRIVER_DEBUG("Metadata not found.");
+  } else {
+    auto unpersist_result =
+        fidl::Unpersist<fuchsia_hardware_sysmem::Metadata>(raw_metadata->value()->metadata.get());
+    if (unpersist_result.is_error()) {
+      DRIVER_ERROR("Failed fidl::Unpersist - status: %s",
+                   zx_status_get_string(unpersist_result.error_value().status()));
+      return unpersist_result.error_value().status();
+    }
+    auto& metadata = unpersist_result.value();
+
+    // Default is zero when field un-set.
+    pdev_device_info_vid_ = metadata.vid().has_value() ? *metadata.vid() : 0;
+    pdev_device_info_pid_ = metadata.pid().has_value() ? *metadata.pid() : 0;
+    protected_memory_size =
+        metadata.protected_memory_size().has_value() ? *metadata.protected_memory_size() : 0;
+    contiguous_memory_size =
+        metadata.contiguous_memory_size().has_value() ? *metadata.contiguous_memory_size() : 0;
   }
 
   zx_handle_t structured_config_vmo;
-  status = device_get_config_vmo(parent_, &structured_config_vmo);
+  zx_status_t status = device_get_config_vmo(parent_, &structured_config_vmo);
   if (status != ZX_OK) {
     DRIVER_ERROR("Failed to get config vmo: %s", zx_status_get_string(status));
     return status;
@@ -596,7 +597,7 @@ zx_status_t Device::Bind() {
   auto heap = sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0);
   allocators_[std::move(heap)] = std::make_unique<SystemRamMemoryAllocator>(this);
 
-  auto result = pdev_.wire()->GetBtiById(0);
+  auto result = pdev_->GetBtiById(0);
   if (!result.ok()) {
     DRIVER_ERROR("Transport error for PDev::GetBtiById() - status: %s", result.status_string());
     return result.status();

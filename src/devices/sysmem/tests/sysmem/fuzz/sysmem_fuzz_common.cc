@@ -29,24 +29,6 @@ bool MockDdkSysmem::Init() {
   }
   // Avoid wasting fuzzer time outputting logs.
   mock_ddk::SetMinLogSeverity(FX_LOG_FATAL);
-  // Pick a platform where AFBC textures will be used. Also add a protected pool to test code that
-  // handles that specially (though protected allocations will always fail because the pool is never
-  // marked ready).
-  static const fuchsia_hardware_sysmem::Metadata metadata = [] {
-    fuchsia_hardware_sysmem::Metadata metadata;
-    metadata.vid() = PDEV_VID_AMLOGIC;
-    metadata.pid() = PDEV_PID_AMLOGIC_S905D2;
-    metadata.protected_memory_size() = 1024 * 1024;
-    metadata.contiguous_memory_size() = 0;
-    return metadata;
-  }();
-
-  auto persist_result = fidl::Persist(metadata);
-  ZX_ASSERT(persist_result.is_ok());
-  auto& persisted_metadata = persist_result.value();
-
-  root_->SetMetadata(fuchsia_hardware_sysmem::wire::kMetadataType, persisted_metadata.data(),
-                     persisted_metadata.size());
 
   sysmem_.set_settings(sysmem_driver::Settings{.max_allocation_size = 256 * 1024});
 
