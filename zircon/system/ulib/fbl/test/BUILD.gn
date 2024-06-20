@@ -1,4 +1,3 @@
-# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -61,11 +60,11 @@ test("fbl") {
     "//zircon/system/ulib/zxtest",
   ]
 
-  if (!is_fuchsia) {
+  if (!is_fuchsia && !is_mistos) {
     defines = [ "FBL_TEST_ENABLE_WAVL_TREE_BALANCE_TEST=1" ]
   }
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     # These tests won't run on the host. There are two primary reasons for this.
     #
     # First, Some of these tests (ref_counted_upgradeable and
@@ -97,58 +96,6 @@ test("fbl") {
     _concurrent_jobs = concurrent_jobs.link_highmem
     configs += _concurrent_jobs.configs
     forward_variables_from(_concurrent_jobs.vars, "*")
-  }
-}
-
-if (is_mistos && is_kernel) {
-  group("tests-mistos") {
-    deps = [ ":fbl-tests-mistos" ]
-  }
-}
-
-if (is_mistos && is_kernel) {
-  source_set("fbl-tests-mistos") {
-    include_dirs = [ "include" ]
-    sources = [
-      "algorithm_tests.cc",
-      "array_tests.cc",
-      "bit_tests.cc",
-      "conditional_select_nospec_tests.cc",
-      "confine_array_index_tests.cc",
-      "enum_bits.cc",
-      "forward_tests.cc",
-      "hard_int_tests.cc",
-      "inline_array_tests.cc",
-      "intrusive_container_node_tests.cc",
-      "intrusive_container_tests.cc",
-      "intrusive_doubly_linked_list_tests.cc",
-      "intrusive_hash_table_dll_tests.cc",
-      "intrusive_hash_table_sll_tests.cc",
-      "intrusive_singly_linked_list_tests.cc",
-      "intrusive_sized_doubly_linked_list_tests.cc",
-      "intrusive_sized_singly_linked_list_tests.cc",
-
-      #"intrusive_wavl_tree_tests.cc",
-      "macro_tests.cc",
-
-      #"no_destructor_tests.cc",
-      "recycler_tests.cc",
-      "ref_ptr_tests.cc",
-
-      #"static_vector_tests.cc",
-      "string_buffer_tests.cc",
-      "string_printf_tests.cc",
-      "string_tests.cc",
-      "string_traits_tests.cc",
-
-      #"strong_int_tests.cc",
-      "type_info_tests.cc",
-      "unaligned_tests.cc",
-      "vector_tests.cc",
-
-      #"wavl_tree_best_node_observer_tests.cc",
-    ]
-    deps = [ "//zircon/system/ulib/zxtest:zxtest-mistos" ]
   }
 }
 
