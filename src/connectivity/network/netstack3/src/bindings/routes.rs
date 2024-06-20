@@ -396,7 +396,7 @@ pub(crate) struct State<I: Ip> {
     new_rule_set_receiver: mpsc::UnboundedReceiver<NewRuleSet<I>>,
     tables: HashMap<TableId<I>, Table<I::Addr>>,
     rules: RuleTable<I>,
-    update_dispatcher: crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+    update_dispatcher: state::RouteUpdateDispatcher<I>,
 }
 
 #[derive(derivative::Derivative)]
@@ -513,7 +513,7 @@ where
     fn handle_route_change(
         ctx: &mut Ctx,
         tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
-        update_dispatcher: &mut crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+        update_dispatcher: &mut state::RouteUpdateDispatcher<I>,
         RouteWorkItem { change, responder }: RouteWorkItem<I::Addr>,
     ) {
         let result = handle_route_change::<I>(tables, ctx, change, update_dispatcher);
@@ -604,7 +604,7 @@ fn handle_single_table_route_change<I>(
     table_id: TableId<I>,
     ctx: &mut Ctx,
     change: Change<I::Addr>,
-    route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+    route_update_dispatcher: &state::RouteUpdateDispatcher<I>,
 ) -> Result<ChangeOutcome, ChangeError>
 where
     I: IpExt + FidlRouteAdminIpExt,
@@ -735,9 +735,7 @@ where
                 .try_into_fidl_with_ctx(ctx.bindings_ctx())
                 .expect("failed to convert route to FIDL");
             route_update_dispatcher
-                .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteAdded(
-                    installed_route,
-                ))
+                .notify(state::Update::Added(installed_route))
                 .expect("failed to notify route update dispatcher");
         }
         TableChange::Remove(removed) => {
@@ -760,7 +758,7 @@ fn handle_route_change<I>(
     tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
     ctx: &mut Ctx,
     change: Change<I::Addr>,
-    route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+    route_update_dispatcher: &state::RouteUpdateDispatcher<I>,
 ) -> Result<ChangeOutcome, ChangeError>
 where
     I: IpExt + FidlRouteAdminIpExt,
@@ -814,7 +812,7 @@ where
 
 fn notify_removed_routes<I: Ip>(
     bindings_ctx: &crate::bindings::BindingsCtx,
-    dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+    dispatcher: &state::RouteUpdateDispatcher<I>,
     removed_routes: impl IntoIterator<Item = EntryAndTableId<I>>,
     table: &Table<I::Addr>,
 ) {
@@ -851,9 +849,7 @@ fn notify_removed_routes<I: Ip>(
             .try_into_fidl_with_ctx(bindings_ctx)
             .expect("failed to convert route to FIDL");
         dispatcher
-            .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteRemoved(
-                installed_route,
-            ))
+            .notify(state::Update::Removed(installed_route))
             .expect("failed to notify route update dispatcher");
     }
 }
@@ -873,10 +869,7 @@ pub(crate) struct ChangeRunner {
 impl ChangeRunner {
     pub(crate) fn route_update_dispatchers(
         &self,
-    ) -> (
-        crate::bindings::routes::state::RouteUpdateDispatcher<Ipv4>,
-        crate::bindings::routes::state::RouteUpdateDispatcher<Ipv6>,
-    ) {
+    ) -> (state::RouteUpdateDispatcher<Ipv4>, state::RouteUpdateDispatcher<Ipv6>) {
         let Self { v4, v6 } = self;
         (v4.update_dispatcher.clone(), v6.update_dispatcher.clone())
     }
