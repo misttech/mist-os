@@ -18,8 +18,11 @@ use crate::security;
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
     ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
-    PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, Task, PR_SET_PTRACER_ANY,
+    PtraceOptions, SchedulerPolicy, Task, PR_SET_PTRACER_ANY,
 };
+
+#[cfg(not(feature = "starnix_lite"))]
+use crate::task::{SeccompAction, SeccompStateValue};
 use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
     VecOutputBuffer,
@@ -42,6 +45,7 @@ use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::time::timeval_from_duration;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
     gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, sock_fprog, uid_t, AT_EMPTY_PATH,
@@ -58,6 +62,20 @@ use starnix_uapi::{
     SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES,
     SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT,
     _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
+};
+#[cfg(feature = "starnix_lite")]
+use starnix_uapi::{
+    __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
+    gid_t, pid_t, rlimit, rusage, sched_param, uid_t, AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW,
+    CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1, CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS,
+    CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP,
+    PR_CAPBSET_READ, PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET,
+    PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE,
+    PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS, PR_GET_SECUREBITS, PR_SET_CHILD_SUBREAPER,
+    PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG,
+    PR_SET_PTRACER, PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA, PR_SET_VMA_ANON_NAME,
+    PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN, _LINUX_CAPABILITY_VERSION_1,
+    _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 
 pub fn do_clone<L>(
@@ -1022,6 +1040,7 @@ pub fn sys_prctl(
             }
             Ok(current_task.read().no_new_privs().into())
         }
+        #[cfg(not(feature = "starnix_lite"))]
         PR_GET_SECCOMP => {
             if current_task.seccomp_filter_state.get() == SeccompStateValue::None {
                 Ok(0.into())
@@ -1029,6 +1048,7 @@ pub fn sys_prctl(
                 Ok(2.into())
             }
         }
+        #[cfg(not(feature = "starnix_lite"))]
         PR_SET_SECCOMP => {
             if arg2 == SECCOMP_MODE_STRICT as u64 {
                 return sys_seccomp(
@@ -1431,6 +1451,7 @@ pub fn sys_capset(
     Ok(())
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 pub fn sys_seccomp(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,

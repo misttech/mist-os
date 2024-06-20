@@ -14,14 +14,18 @@ use crate::signals::{
 };
 use crate::task::{
     ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
-    PtraceOptions, SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle, SeccompState,
-    SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, Waiter,
+    PtraceOptions, StopState, Task, TaskFlags, ThreadGroup, Waiter,
+};
+#[cfg(not(feature = "starnix_lite"))]
+use crate::task::{
+    SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue,
 };
 use crate::vfs::{
     CheckAccessReason, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext,
     NamespaceNode, ResolveBase, SymlinkMode, SymlinkTarget, MAX_SYMLINK_FOLLOWS,
 };
 use extended_pstate::ExtendedPstateState;
+#[cfg(not(feature = "starnix_lite"))]
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon::sys::zx_thread_state_general_regs_t;
 use fuchsia_zircon::{self as zx};
@@ -30,6 +34,7 @@ use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable,
     ProcessGroupState, RwLock, RwLockWriteGuard, TaskRelease, WakeReason,
 };
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::auth::{Credentials, CAP_SYS_ADMIN};
@@ -42,6 +47,7 @@ use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SIGTRAP};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::{
     clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter,
     CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
@@ -49,6 +55,13 @@ use starnix_uapi::{
     CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK, ROBUST_LIST_LIMIT,
     SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC,
     SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
+};
+#[cfg(feature = "starnix_lite")]
+use starnix_uapi::{
+    clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, CLONE_CHILD_CLEARTID,
+    CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP, CLONE_NEWUTS,
+    CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM, CLONE_THREAD,
+    CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK, ROBUST_LIST_LIMIT, SI_KERNEL,
 };
 use std::ffi::CString;
 use std::fmt;
@@ -939,6 +952,7 @@ impl CurrentTask {
         Ok(())
     }
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub fn add_seccomp_filter(
         &mut self,
         code: Vec<sock_filter>,
@@ -1014,6 +1028,7 @@ impl CurrentTask {
         }
     }
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub fn run_seccomp_filters(
         &mut self,
         syscall: &Syscall,
@@ -1031,6 +1046,7 @@ impl CurrentTask {
         SeccompState::do_user_defined(result, self, syscall)
     }
 
+    #[cfg(not(feature = "starnix_lite"))]
     fn seccomp_tsync_error(id: i32, flags: u32) -> Result<SyscallResult, Errno> {
         // By default, TSYNC indicates failure state by returning the first thread
         // id not to be able to sync, rather than by returning -1 and setting
@@ -1105,10 +1121,12 @@ impl CurrentTask {
     }
 
     /// Returns a ref to this thread's SeccompNotifier.
+    #[cfg(not(feature = "starnix_lite"))]
     pub fn get_seccomp_notifier(&mut self) -> Option<SeccompNotifierHandle> {
         self.task.write().seccomp_filters.notifier.clone()
     }
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub fn set_seccomp_notifier(&mut self, notifier: Option<SeccompNotifierHandle>) {
         self.task.write().seccomp_filters.notifier = notifier;
     }
@@ -1382,7 +1400,9 @@ impl CurrentTask {
                 Default::default(),
                 kernel.root_uts_ns.clone(),
                 false,
+                #[cfg(not(feature = "starnix_lite"))]
                 SeccompState::default(),
+                #[cfg(not(feature = "starnix_lite"))]
                 SeccompFilterContainer::default(),
                 UserAddress::NULL.into(),
                 default_timerslack,
@@ -1451,7 +1471,9 @@ impl CurrentTask {
             scheduler_policy,
             uts_ns,
             false,
+            #[cfg(not(feature = "starnix_lite"))]
             SeccompState::default(),
+            #[cfg(not(feature = "starnix_lite"))]
             SeccompFilterContainer::default(),
             UserAddress::NULL.into(),
             default_timerslack_ns,
@@ -1584,6 +1606,7 @@ impl CurrentTask {
         let scheduler_policy;
         let uts_ns;
         let no_new_privs;
+        #[cfg(not(feature = "starnix_lite"))]
         let seccomp_filters;
         let robust_list_head = UserAddress::NULL.into();
         let child_signal_mask;
@@ -1596,7 +1619,12 @@ impl CurrentTask {
             let state = self.read();
 
             no_new_privs = state.no_new_privs();
-            seccomp_filters = state.seccomp_filters.clone();
+
+            #[cfg(not(feature = "starnix_lite"))]
+            {
+                seccomp_filters = state.seccomp_filters.clone();
+            }
+
             child_signal_mask = state.signal_mask();
 
             pid = pids.allocate_pid();
@@ -1665,7 +1693,9 @@ impl CurrentTask {
             scheduler_policy,
             uts_ns,
             no_new_privs,
+            #[cfg(not(feature = "starnix_lite"))]
             SeccompState::from(&self.seccomp_filter_state),
+            #[cfg(not(feature = "starnix_lite"))]
             seccomp_filters,
             robust_list_head,
             timerslack_ns,
