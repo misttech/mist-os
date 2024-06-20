@@ -38,7 +38,7 @@ library_headers("headers") {
     "//zircon/kernel/lib/arch:headers",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     headers += [
       "lib/ld/log-zircon.h",
       "lib/ld/remote-abi-heap.h",
@@ -174,7 +174,7 @@ template("verify_ld_abi") {
 # in which it could be in the same variant as its users.
 loadable_module("ld-stub") {
   configs += [
-    "//build/config/fuchsia:no_cpp_standard_library",
+    "//build/config/mistos:no_cpp_standard_library",
     "//build/config/zircon:nolibc",
     ":abi-soname",
   ]
@@ -328,7 +328,7 @@ shared_library("ld-startup") {
     ":tlsdesc",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources += [
       "zircon-startup.S",
       "zircon-startup.cc",
@@ -391,7 +391,7 @@ source_set("startup-diagnostics") {
     ":startup-diagnostics.headers",
     "//zircon/system/ulib/c/stdio/printf_core:wrapper",
   ]
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     deps += [
       ":ld-log-zircon",
       ":zircon.headers",

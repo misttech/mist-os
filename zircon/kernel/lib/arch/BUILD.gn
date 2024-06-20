@@ -70,7 +70,7 @@ static_library("arch") {
     "riscv64-features.cc",
   ]
 
-  if (is_fuchsia || is_kernel) {
+  if (is_fuchsia || is_mistos || is_kernel) {
     deps = [ zircon_cpu ]
   }
 }

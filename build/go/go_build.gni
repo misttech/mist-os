@@ -116,7 +116,7 @@ template("go_build") {
                       invoker.sdk_category != "excluded" && !is_test
 
   # Strip target binaries and binaries that are included in the SDK.
-  use_strip = is_fuchsia || define_sdk_target
+  use_strip = (is_fuchsia || is_mistos) || define_sdk_target
 
   output_path = "${output_dir}/${output_name}"
   if (use_strip) {
@@ -124,7 +124,7 @@ template("go_build") {
     stripped_output_path = "${output_dir}/${output_name}"
   }
 
-  use_prebuilt_go = !is_fuchsia
+  use_prebuilt_go = !is_fuchsia && !is_mistos
   if (defined(invoker.use_prebuilt_go)) {
     use_prebuilt_go = invoker.use_prebuilt_go
   }
@@ -269,7 +269,7 @@ template("go_build") {
     ]
 
     if (sysroot != "") {
-      if (is_fuchsia) {
+      if (is_fuchsia || is_mistos) {
         # For Fuchsia binaries, use a Go-specific sysroot instead of the
         # standard one which only contains empty linker stubs (see
         # comments in //zircon/public/sysroot/BUILD.gn for details).
@@ -296,7 +296,7 @@ template("go_build") {
     if (!defined(invoker.cgo) || invoker.cgo) {
       args += [ "--cgo" ]
 
-      if (is_fuchsia) {
+      if (is_fuchsia || is_mistos) {
         # Inject a dependency to libfdio.so. Note that as a special case,
         # when building fuzzing binaries, this library should be built in
         # a non-fuzzing variant (because the fuzzing runtime depends on it).
@@ -368,7 +368,7 @@ template("go_build") {
       }
     }
 
-    if (is_fuchsia) {
+    if (is_fuchsia || is_mistos) {
       args += [ "--clang-fuchsia-api-level=${current_build_target_api_level_as_integer}" ]
 
       # When building with an instrumented variant, ensure the binary embeds a reference

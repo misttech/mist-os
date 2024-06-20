@@ -332,7 +332,7 @@ template("rustc_artifact") {
 
     # The Fuchsia standard library has an implicit #[link] directive
     # pointing to libfdio.so
-    if (is_fuchsia && (invoker.target_type == "executable" ||
+    if ((is_fuchsia || is_mistos) && (invoker.target_type == "executable" ||
                        invoker.target_type == "shared_library")) {
       deps += [ "//src/lib/fdio/rust:fdio_for_rust_stdlib" ]
     }
