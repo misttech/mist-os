@@ -198,34 +198,35 @@ impl<'a> CapabilityOpenRequest<'a> {
                     })
                     .await?;
 
-                // If there is an existing collection service directory, provide it.
+                // These are defined in the lock, but used after it, so forward
+                // declare them.
+                let provider;
+                let service_dir;
+                // Lock while we set up the service collection, and drop the lock
+                // before adding children.
                 {
-                    let state = source_component_instance.lock_resolved_state().await?;
+                    let mut state = source_component_instance.lock_resolved_state().await?;
+
+                    // If there is an existing collection service directory, provide it instead
                     if let Some(service_dir) = state.anonymized_services.get(&route) {
                         let provider = DirectoryEntryCapabilityProvider {
                             entry: service_dir.dir_entry().await,
                         };
                         return Ok(Some(Box::new(provider)));
                     }
-                }
 
-                // Otherwise, create one. This must be done while the component ResolvedInstanceState
-                // is unlocked because the AggregateCapabilityProvider uses locked state.
-                let service_dir = Arc::new(AnonymizedAggregateServiceDir::new(
-                    component.clone(),
-                    route.clone(),
-                    aggregate_capability_provider.clone_boxed(),
-                ));
+                    service_dir = Arc::new(AnonymizedAggregateServiceDir::new(
+                        component.clone(),
+                        route.clone(),
+                        aggregate_capability_provider.clone_boxed(),
+                    ));
 
-                source_component_instance.hooks.install(service_dir.hooks()).await;
-
-                let provider = {
-                    let mut state = source_component_instance.lock_resolved_state().await?;
                     let entry = service_dir.dir_entry().await;
+                    source_component_instance.hooks.install(service_dir.hooks()).await;
 
                     state.anonymized_services.insert(route, service_dir.clone());
 
-                    DirectoryEntryCapabilityProvider { entry }
+                    provider = DirectoryEntryCapabilityProvider { entry };
                 };
 
                 // Populate the service dir with service entries from children that may have been started before the service
