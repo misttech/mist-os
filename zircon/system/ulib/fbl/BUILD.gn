@@ -1,4 +1,3 @@
-# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -56,8 +55,7 @@ zx_library("fbl") {
   ]
 
   sources = [ "alloc_checker.cc" ]
-  if (!is_kernel || is_mistos) {
-    # mist-os: Support strings inside the kernel.
+  if (!is_kernel) {
     sources += [
       "string.cc",
       "string_buffer.cc",
@@ -69,6 +67,7 @@ zx_library("fbl") {
     "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
   ]
+
   deps = []
 
   if (is_kernel) {
@@ -89,7 +88,7 @@ zx_library("fbl") {
     configs -= [ "//zircon/kernel/vm:headers.config" ]
   }
 
-  if (!(is_fuchsia || is_mistos || is_kernel)) {
+  if (!is_fuchsia && !is_kernel) {
     deps += [ "//zircon/system/public" ]
   }
 }

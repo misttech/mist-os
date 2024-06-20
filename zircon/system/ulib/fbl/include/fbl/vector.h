@@ -1,4 +1,3 @@
-// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -6,17 +5,15 @@
 #ifndef FBL_VECTOR_H_
 #define FBL_VECTOR_H_
 
-#include <string.h>
-#include <zircon/assert.h>
-
-#include <initializer_list>
-#include <iterator>
 #include <new>
-#include <type_traits>
-#include <utility>
+#include <string.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/macros.h>
+#include <initializer_list>
+#include <type_traits>
+#include <utility>
+#include <zircon/assert.h>
 
 namespace fbl {
 
@@ -100,20 +97,6 @@ struct AlignedAllocatorTraits {
 template <typename T, typename AllocatorTraits = AlignedAllocatorTraits<T>>
 class __OWNER(T) Vector {
  public:
-#if _KERNEL_MISTOS
-  using value_type = T;
-  using pointer = T*;
-  using const_pointer = const T*;
-  using reference = value_type&;
-  using const_reference = const value_type&;
-  using size_type = size_t;
-  using difference_type = ptrdiff_t;
-  using iterator = T*;
-  using const_iterator = const T*;
-  using reverse_iterator = std::reverse_iterator<iterator>;
-  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-#endif
-
   // move semantics only
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Vector);
 
@@ -256,26 +239,6 @@ class __OWNER(T) Vector {
 
   T* end() { return &ptr_[size_]; }
   const T* end() const { return &ptr_[size_]; }
-
-#if _KERNEL_MISTOS
-  //
-  // Reverse Iterators
-  //
-
-  // clang-format off
-
-  constexpr reverse_iterator       rbegin()        noexcept { return reverse_iterator(end()); }
-  constexpr const_reverse_iterator rbegin()  const noexcept { return const_reverse_iterator(end()); }
-  constexpr reverse_iterator       rend()          noexcept { return reverse_iterator(begin()); }
-  constexpr const_reverse_iterator rend()    const noexcept { return const_reverse_iterator(begin()); }
-
-  // clang-format on
-
-  void set_size(size_t size) {
-    ZX_DEBUG_ASSERT(size <= capacity_);
-    size_ = size;
-  }
-#endif
 
  private:
   // TODO(smklein): In the future, if we want to be able to push back
