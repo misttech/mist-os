@@ -67,6 +67,7 @@ fuchsia_structured_config_cpp_elf_lib(
 fuchsia_structured_config_values(
     name = "sc-values",
     cm_label = ":manifest",
+    cvf_output_name = "driver-config",
     values = {
         "enable_suspend": False,
         "device_path": "/dev/class/bt-hci/000",

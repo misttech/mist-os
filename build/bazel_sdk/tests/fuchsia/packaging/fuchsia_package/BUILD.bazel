@@ -38,6 +38,7 @@ fuchsia_package_checker_test(
     manifests = [
         "meta/cc_component.cm",
         "meta/empty_component.cm",
+        "meta/cc_component.cvf",
     ],
     package_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg",
     visibility = ["//visibility:public"],
@@ -113,7 +114,10 @@ fuchsia_package_checker_test(
         "lib/libdriver_runtime.so": "libdriver_runtime.so_stripped",
         "lib/libsyslog.so": "libsyslog.so_stripped",
     },
-    manifests = ["meta/test_driver.cm"],
+    manifests = [
+        "meta/test_driver.cm",
+        "meta/test_driver.cvf",
+    ],
     package_under_test = "//fuchsia/packaging/fuchsia_package/cc_driver:pkg",
     visibility = ["//visibility:public"],
 )

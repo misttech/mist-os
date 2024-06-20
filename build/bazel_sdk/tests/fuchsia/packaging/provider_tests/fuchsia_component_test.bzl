@@ -4,7 +4,7 @@
 
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_driver_component", "fuchsia_package")
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaComponentInfo")
 load("//test_utils:make_file.bzl", "make_file")
 
@@ -117,16 +117,57 @@ def _test_provider():
         run_tag = _local_name("driver"),
     )
 
+## Failure Tests
+
+def _failure_testing_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    asserts.expect_failure(env, ctx.attr.expected_failure_message)
+    return analysistest.end(env)
+
+failure_testing_test = analysistest.make(
+    _failure_testing_test_impl,
+    expect_failure = True,
+    attrs = {
+        "expected_failure_message": attr.string(),
+    },
+)
+
+def _test_component_name_defined_twice_failure():
+    fuchsia_component_manifest(
+        name = "component_name_defined_twice_should_fail_manifest",
+        src = "meta/foo.cml",
+        component_name = "component_name_A",
+    )
+    fuchsia_component(
+        name = "component_name_defined_twice_should_fail_component",
+        component_name = "component_name_B",
+        manifest = ":component_name_defined_twice_should_fail_manifest",
+    )
+    fuchsia_package(
+        name = "component_name_defined_twice_should_fail_package",
+        package_name = "component_name_defined_twice_should_fail_package",
+        components = [":component_name_defined_twice_should_fail_component"],
+        fuchsia_api_level = "HEAD",
+        package_repository_name = "fuchsia.com",
+    )
+    failure_testing_test(
+        name = "component_name_defined_twice_should_fail_test",
+        target_under_test = ":component_name_defined_twice_should_fail_package",
+        expected_failure_message = "If both are set, they must match.",
+    )
+
 # Entry point from the BUILD file; macro for running each test case's macro and
 # declaring a test suite that wraps them together.
 def fuchsia_component_test_suite(name, **kwargs):
     _test_provider()
+    _test_component_name_defined_twice_failure()
 
     native.test_suite(
         name = name,
         tests = [
             ":test_component_providers",
             ":test_driver_component_providers",
+            ":component_name_defined_twice_should_fail_test",
         ],
         **kwargs
     )

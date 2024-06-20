@@ -111,17 +111,18 @@ def _fuchsia_component_impl(ctx):
     component_name = ctx.attr.component_name or ctx.label.name
     manifest = ctx.file.manifest
 
+    if FuchsiaComponentManifestInfo in ctx.attr.manifest:
+        left = ctx.attr.component_name
+        right = ctx.attr.manifest[FuchsiaComponentManifestInfo].component_name
+        if left and right and left != right:
+            msg = "\nError setting 'component_name' in '%s' target: " % str(ctx.label)
+            msg += "The 'fuchsia_component' target defines it as '%s', " % left
+            msg += "whereas the associated 'fuchsia_component_manifest' target "
+            msg += "defines it as '%s'. If both are set, they must match." % right
+            fail(msg)
+
     resources = []
     for dep in ctx.attr.deps:
-        if FuchsiaComponentManifestInfo in dep:
-            left = ctx.attr.component_name
-            right = dep[FuchsiaComponentManifestInfo].component_name
-            if left and right and left != right:
-                msg = "\nError setting 'component_name' in '%s' target: " % str(ctx.label)
-                msg += "The 'fuchsia_component' target defines it as '%s', "
-                msg += "whereas the associated 'fuchsia_component_manifest' target "
-                msg += "defines it as '%s'. If both are set, they must match." % (left, right)
-                fail(msg)
         if FuchsiaPackageResourcesInfo in dep:
             resources += dep[FuchsiaPackageResourcesInfo].resources
         else:
