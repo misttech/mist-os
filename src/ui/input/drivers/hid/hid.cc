@@ -80,28 +80,23 @@ void HidDevice::ParseUsagePage(const hid::ReportDescriptor* descriptor) {
       HidPageUsage{.page = collection->usage.page, .usage = collection->usage.usage});
 }
 
-size_t HidDevice::GetReportSizeById(input_report_id_t id, fuchsia_hardware_input::ReportType type) {
+size_t HidDevice::GetReportSizeById(input_report_id_t id, fhidbus::ReportType type) {
   for (size_t i = 0; i < parsed_hid_desc_->rep_count; i++) {
     // If we have more than one report, get the report with the right id. If we only have
     // one report, then always match that report.
     if ((parsed_hid_desc_->report[i].report_id == id) || (parsed_hid_desc_->rep_count == 1)) {
       switch (type) {
-        case fuchsia_hardware_input::ReportType::kInput:
+        case fhidbus::ReportType::kInput:
           return parsed_hid_desc_->report[i].input_byte_sz;
-        case fuchsia_hardware_input::ReportType::kOutput:
+        case fhidbus::ReportType::kOutput:
           return parsed_hid_desc_->report[i].output_byte_sz;
-        case fuchsia_hardware_input::ReportType::kFeature:
+        case fhidbus::ReportType::kFeature:
           return parsed_hid_desc_->report[i].feature_byte_sz;
       }
     }
   }
 
   return 0;
-}
-
-fuchsia_hardware_input::BootProtocol HidDevice::GetBootProtocol() {
-  return static_cast<fuchsia_hardware_input::BootProtocol>(
-      info_.boot_protocol().value_or(fhidbus::HidBootProtocol::kNone));
 }
 
 zx::result<fbl::RefPtr<HidInstance>> HidDevice::CreateInstance(
@@ -215,8 +210,15 @@ void HidDevice::DdkUnbind(ddk::UnbindTxn txn) {
 }
 
 void HidDevice::OnReportReceived(fidl::WireEvent<fhidbus::Hidbus::OnReportReceived>* event) {
-  size_t len = event->buf.count();
-  const uint8_t* buf = event->buf.data();
+  if (!event->report.has_buf()) {
+    return;
+  }
+
+  size_t len = event->report.buf().count();
+  const uint8_t* buf = event->report.buf().data();
+  auto timestamp =
+      event->report.has_timestamp() ? event->report.timestamp() : zx_clock_get_monotonic();
+
   fbl::AutoLock lock(&instance_lock_);
 
   while (len) {
@@ -252,7 +254,7 @@ void HidDevice::OnReportReceived(fidl::WireEvent<fhidbus::Hidbus::OnReportReceiv
     } else {
       // No reassembly is in progress.  Start by identifying this report's
       // size.
-      size_t report_size = GetReportSizeById(buf[0], fuchsia_hardware_input::ReportType::kInput);
+      size_t report_size = GetReportSizeById(buf[0], fhidbus::ReportType::kInput);
 
       // If we don't recognize this report ID, we are in trouble.  Drop
       // the rest of this payload and hope that the next one gets us back
@@ -285,13 +287,13 @@ void HidDevice::OnReportReceived(fidl::WireEvent<fhidbus::Hidbus::OnReportReceiv
     len -= consumed;
 
     for (auto& instance : instance_list_) {
-      instance.WriteToFifo(rbuf, rlen, event->timestamp);
+      instance.WriteToFifo(rbuf, rlen, timestamp);
     }
 
     {
       fbl::AutoLock lock(&listener_lock_);
       if (report_listener_.is_valid()) {
-        report_listener_.ReceiveReport(rbuf, rlen, event->timestamp);
+        report_listener_.ReceiveReport(rbuf, rlen, timestamp);
       }
     }
   }
@@ -314,10 +316,10 @@ void HidDevice::HidDeviceUnregisterListener() {
 }
 
 void HidDevice::HidDeviceGetHidDeviceInfo(hid_device_info_t* out_info) {
+  out_info->polling_rate = info_.polling_rate().value_or(0);
   out_info->vendor_id = info_.vendor_id().value_or(0);
   out_info->product_id = info_.product_id().value_or(0);
   out_info->version = info_.version().value_or(0);
-  out_info->polling_rate = info_.polling_rate().value_or(0);
 }
 
 zx_status_t HidDevice::HidDeviceGetDescriptor(uint8_t* out_descriptor_data, size_t descriptor_count,
@@ -333,8 +335,7 @@ zx_status_t HidDevice::HidDeviceGetDescriptor(uint8_t* out_descriptor_data, size
 zx_status_t HidDevice::HidDeviceGetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
                                           uint8_t* out_report_data, size_t report_count,
                                           size_t* out_report_actual) {
-  size_t needed =
-      GetReportSizeById(rpt_id, static_cast<fuchsia_hardware_input::ReportType>(rpt_type));
+  size_t needed = GetReportSizeById(rpt_id, static_cast<fhidbus::ReportType>(rpt_type));
   if (needed == 0) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -347,8 +348,8 @@ zx_status_t HidDevice::HidDeviceGetReport(hid_report_type_t rpt_type, uint8_t rp
     return ZX_ERR_INTERNAL;
   }
 
-  auto result = hidbus_.sync()->GetReport(static_cast<fuchsia_hardware_input::ReportType>(rpt_type),
-                                          rpt_id, needed);
+  auto result =
+      hidbus_.sync()->GetReport(static_cast<fhidbus::ReportType>(rpt_type), rpt_id, needed);
   if (!result.ok()) {
     zxlogf(ERROR, "FIDL transport failed on GetReport(): %s",
            result.error().FormatDescription().c_str());
@@ -372,14 +373,13 @@ zx_status_t HidDevice::HidDeviceGetReport(hid_report_type_t rpt_type, uint8_t rp
 
 zx_status_t HidDevice::HidDeviceSetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
                                           const uint8_t* report_data, size_t report_count) {
-  size_t needed =
-      GetReportSizeById(rpt_id, static_cast<fuchsia_hardware_input::ReportType>(rpt_type));
+  size_t needed = GetReportSizeById(rpt_id, static_cast<fhidbus::ReportType>(rpt_type));
   if (needed < report_count) {
     return ZX_ERR_BUFFER_TOO_SMALL;
   }
 
   auto result = hidbus_.sync()->SetReport(
-      static_cast<fuchsia_hardware_input::ReportType>(rpt_type), rpt_id,
+      static_cast<fhidbus::ReportType>(rpt_type), rpt_id,
       fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(report_data), report_count));
   if (!result.ok()) {
     zxlogf(ERROR, "FIDL transport failed on SetReport(): %s",
@@ -443,9 +443,8 @@ zx_status_t HidDevice::SetReportDescriptor() {
     // Disable numlock
     uint8_t zero = 0;
     auto result =
-        hidbus_.sync()->SetReport(static_cast<fuchsia_hardware_input::ReportType>(
-                                      fuchsia_hardware_input::ReportType::kOutput),
-                                  0, fidl::VectorView<uint8_t>::FromExternal(&zero, sizeof(zero)));
+        hidbus_.sync()->SetReport(fhidbus::ReportType::kOutput, 0,
+                                  fidl::VectorView<uint8_t>::FromExternal(&zero, sizeof(zero)));
     if (!result.ok()) {
       zxlogf(ERROR, "FIDL transport failed on SetReport(): %s",
              result.error().FormatDescription().c_str());

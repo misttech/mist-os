@@ -33,6 +33,8 @@
 
 #include <fbl/algorithm.h>
 
+namespace fhidbus = fuchsia_hardware_hidbus;
+
 // defined in report.cpp
 void print_report_descriptor(const uint8_t* rpt_desc, size_t desc_len);
 
@@ -66,7 +68,7 @@ struct input_args_t {
   char devpath[kDevPathSize];
   size_t num_reads;
 
-  fuchsia_hardware_input::wire::ReportType report_type;
+  fhidbus::wire::ReportType report_type;
   uint8_t report_id;
 
   const char** data;
@@ -107,19 +109,18 @@ static zx_status_t parse_uint_arg(const char* arg, uint32_t min, uint32_t max, u
   return ZX_OK;
 }
 
-static zx_status_t parse_input_report_type(const char* arg,
-                                           fuchsia_hardware_input::wire::ReportType* out_type) {
+static zx_status_t parse_input_report_type(const char* arg, fhidbus::wire::ReportType* out_type) {
   if ((arg == nullptr) || (out_type == nullptr)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   static const struct {
     const char* name;
-    fuchsia_hardware_input::wire::ReportType type;
+    fhidbus::wire::ReportType type;
   } LUT[] = {
-      {.name = "in", .type = fuchsia_hardware_input::wire::ReportType::kInput},
-      {.name = "out", .type = fuchsia_hardware_input::wire::ReportType::kOutput},
-      {.name = "feature", .type = fuchsia_hardware_input::wire::ReportType::kFeature},
+      {.name = "in", .type = fhidbus::wire::ReportType::kInput},
+      {.name = "out", .type = fhidbus::wire::ReportType::kOutput},
+      {.name = "feature", .type = fhidbus::wire::ReportType::kFeature},
   };
 
   for (auto i : LUT) {
@@ -133,11 +134,14 @@ static zx_status_t parse_input_report_type(const char* arg,
 }
 
 static zx_status_t print_hid_protocol(input_args_t* args) {
-  auto result = args->sync_client->GetBootProtocol();
+  auto result = args->sync_client->Query();
   if (result.status() != ZX_OK) {
-    lprintf("hid: could not get protocol from %s (status=%d)\n", args->devpath, result.status());
+    lprintf("hid: could not query %s (status=%d)\n", args->devpath, result.status());
+  } else if (!result.value()->info.has_boot_protocol()) {
+    lprintf("hid: %s does not have boot protocol\n", args->devpath);
   } else {
-    lprintf("hid: %s proto=%d\n", args->devpath, static_cast<uint32_t>(result.value().protocol));
+    lprintf("hid: %s proto=%d\n", args->devpath,
+            static_cast<uint32_t>(result.value()->info.boot_protocol()));
   }
   return ZX_OK;
 }
@@ -224,16 +228,19 @@ static zx_status_t hid_input_read_report(input_args_t* args, const zx::event& re
     if (result.status() != ZX_OK) {
       return result.status();
     }
-    if (result.value().status == ZX_ERR_SHOULD_WAIT) {
+    if (result->is_error() && result->error_value() == ZX_ERR_SHOULD_WAIT) {
       report_event.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), nullptr);
       continue;
     }
-    if (result.value().data.count() > report_size) {
+    if (!result.value()->report.has_buf()) {
+      return ZX_ERR_INTERNAL;
+    }
+    if (result.value()->report.buf().count() > report_size) {
       return ZX_ERR_BUFFER_TOO_SMALL;
     }
 
-    *returned_size = result.value().data.count();
-    memcpy(report_data, result.value().data.data(), result.value().data.count());
+    *returned_size = result.value()->report.buf().count();
+    memcpy(report_data, result.value()->report.buf().data(), result.value()->report.buf().count());
 
     return ZX_OK;
   }
@@ -247,16 +254,16 @@ static int hid_read_reports(input_args_t* args) {
 
   zx::event report_event;
   auto result = args->sync_client->GetReportsEvent();
-  if ((result.status() != ZX_OK) || (result.value().status != ZX_OK)) {
+  if ((result.status() != ZX_OK) || result->is_error()) {
     mtx_lock(&print_lock);
     printf("read returned error: (call_status=%d) (status=%d)\n", result.status(),
-           result.value().status);
+           result->error_value());
     mtx_unlock(&print_lock);
     return ZX_ERR_INTERNAL;
   }
-  report_event = std::move(result.value().event);
+  report_event = std::move(result.value()->event);
 
-  std::vector<uint8_t> report(fuchsia_hardware_input::wire::kMaxReportLen);
+  std::vector<uint8_t> report(fhidbus::wire::kMaxReportLen);
   for (uint32_t i = 0; i < args->num_reads; i++) {
     size_t returned_size;
     status =
@@ -351,13 +358,13 @@ int watch_all_devices(Command command) {
 // Get a single report from the device with a given report id and then print it.
 int get_report(input_args_t* args) {
   auto result = args->sync_client->GetReport(args->report_type, args->report_id);
-  if (result.status() != ZX_OK || result.value().status != ZX_OK) {
-    printf("hid: could not get report: %d, %d\n", result.status(), result.value().status);
+  if (result.status() != ZX_OK || result->is_error()) {
+    printf("hid: could not get report: %d, %d\n", result.status(), result->error_value());
     return -1;
   }
 
-  printf("hid: got %zu bytes\n", result.value().report.count());
-  print_hex(result.value().report.data(), result.value().report.count());
+  printf("hid: got %zu bytes\n", result.value()->report.count());
+  print_hex(result.value()->report.data(), result.value()->report.count());
   return 0;
 }
 
@@ -378,8 +385,8 @@ int set_report(input_args_t* args) {
 
   auto report_view = fidl::VectorView<uint8_t>::FromExternal(report.get(), args->data_size);
   auto res = args->sync_client->SetReport(args->report_type, args->report_id, report_view);
-  if (res.status() != ZX_OK || res.value().status != ZX_OK) {
-    printf("hid: could not set report: %d, %d\n", res.status(), res.value().status);
+  if (res.status() != ZX_OK || res->is_error()) {
+    printf("hid: could not set report: %d, %d\n", res.status(), res->error_value());
     return -1;
   }
 
@@ -478,7 +485,7 @@ zx_status_t parse_input_args(int argc, const char** argv, input_args_t* args) {
   }
 
   // Parse ReportType argument.
-  fuchsia_hardware_input::wire::ReportType report_type;
+  fhidbus::wire::ReportType report_type;
   status = parse_input_report_type(argv[2], &report_type);
   if (status != ZX_OK) {
     return status;

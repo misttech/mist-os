@@ -46,7 +46,7 @@ constexpr uint8_t SetI2cCommandBytes(uint16_t command_register, uint8_t command,
 
 // Set the command bytes for a HID GET/SET command. Returns the number of bytes set.
 static uint8_t SetI2cGetSetCommandBytes(uint16_t command_register, uint8_t command,
-                                        fuchsia_hardware_input::ReportType rpt_type, uint8_t rpt_id,
+                                        fhidbus::ReportType rpt_type, uint8_t rpt_id,
                                         uint8_t* command_bytes) {
   uint8_t command_bytes_index = 0;
   uint8_t command_data = static_cast<uint8_t>(static_cast<uint8_t>(rpt_type) << 4U);
@@ -323,9 +323,12 @@ int I2cHidbus::WorkerThreadNoIrq() {
       if (!(started_ && binding_)) {
         return;
       }
+      fidl::Arena arena;
       auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
-          fidl::VectorView<uint8_t>::FromExternal(buf + 2, report_len - 2),
-          zx_clock_get_monotonic());
+          fhidbus::wire::Report::Builder(arena)
+              .buf(fidl::VectorView<uint8_t>::FromExternal(buf + 2, report_len - 2))
+              .timestamp(zx_clock_get_monotonic())
+              .Build());
       if (!result.ok()) {
         zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
       }
@@ -413,8 +416,12 @@ int I2cHidbus::WorkerThreadIrq() {
       if (!(started_ && binding_)) {
         return;
       }
+      fidl::Arena arena;
       auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
-          fidl::VectorView<uint8_t>::FromExternal(buf + 2, report_len - 2), timestamp.get());
+          fhidbus::wire::Report::Builder(arena)
+              .buf(fidl::VectorView<uint8_t>::FromExternal(buf + 2, report_len - 2))
+              .timestamp(timestamp.get())
+              .Build());
       if (!result.ok()) {
         zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
       }

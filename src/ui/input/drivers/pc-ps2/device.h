@@ -45,7 +45,7 @@ struct PS2MouseInputReport {
 
 struct PS2InputReport {
   zx::time event_time;
-  fuchsia_hardware_input::BootProtocol type;
+  fuchsia_hardware_hidbus::HidBootProtocol type;
   std::variant<PS2KbdInputReport, PS2MouseInputReport> report;
 
   void ToFidlInputReport(
@@ -53,7 +53,7 @@ struct PS2InputReport {
       fidl::AnyArena& allocator);
   void Reset() {
     event_time = {};
-    type = fuchsia_hardware_input::BootProtocol::kNone;
+    type = fuchsia_hardware_hidbus::HidBootProtocol::kNone;
     if (std::holds_alternative<PS2KbdInputReport>(report)) {
       std::get<PS2KbdInputReport>(report).Reset();
     } else if (std::holds_alternative<PS2MouseInputReport>(report)) {
@@ -89,7 +89,7 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
         port_(port),
         report_({
             .event_time = {},
-            .type = fuchsia_hardware_input::BootProtocol::kNone,
+            .type = fuchsia_hardware_hidbus::HidBootProtocol::kNone,
         }) {}
 
   static zx_status_t Bind(Controller* parent, async_dispatcher_t* dispatcher, Port port);
@@ -141,7 +141,7 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
 
   Controller* controller_;
   Port port_;
-  fuchsia_hardware_input::wire::BootProtocol protocol_;
+  fuchsia_hardware_hidbus::wire::HidBootProtocol protocol_;
   zx::interrupt irq_;
   async::IrqMethod<I8042Device, &I8042Device::HandleIrq> irq_handler_{this};
 
@@ -163,7 +163,7 @@ class I8042Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INP
     return std::get<PS2MouseInputReport>(report_.report);
   }
 
-  zx::result<fuchsia_hardware_input::wire::BootProtocol> Identify();
+  zx::result<fuchsia_hardware_hidbus::wire::HidBootProtocol> Identify();
   // Keyboard input
   void ProcessScancode(zx::time timestamp, uint8_t code);
   KeyStatus AddKey(fuchsia_input::wire::Key key);

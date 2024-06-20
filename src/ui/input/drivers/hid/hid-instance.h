@@ -41,14 +41,13 @@ class HidInstance : public fidl::WireServer<fuchsia_hardware_input::Device>,
               fidl::ServerEnd<fuchsia_hardware_input::Device> session);
   ~HidInstance() override = default;
 
-  void GetBootProtocol(GetBootProtocolCompleter::Sync& _completer) override;
-  void GetDeviceIds(GetDeviceIdsCompleter::Sync& _completer) override;
-  void GetReportDesc(GetReportDescCompleter::Sync& _completer) override;
-  void GetReportsEvent(GetReportsEventCompleter::Sync& _completer) override;
-  void GetReport(GetReportRequestView request, GetReportCompleter::Sync& _completer) override;
-  void SetReport(SetReportRequestView request, SetReportCompleter::Sync& _completer) override;
-  void SetTraceId(SetTraceIdRequestView request, SetTraceIdCompleter::Sync& _completer) override;
-  void ReadReports(ReadReportsCompleter::Sync& _completer) override;
+  void Query(QueryCompleter::Sync& completer) override;
+  void GetReportDesc(GetReportDescCompleter::Sync& completer) override;
+  void GetReportsEvent(GetReportsEventCompleter::Sync& completer) override;
+  void GetReport(GetReportRequestView request, GetReportCompleter::Sync& completer) override;
+  void SetReport(SetReportRequestView request, SetReportCompleter::Sync& completer) override;
+  void SetTraceId(SetTraceIdRequestView request, SetTraceIdCompleter::Sync& completer) override;
+  void ReadReports(ReadReportsCompleter::Sync& completer) override;
   void ReadReport(ReadReportCompleter::Sync& completer) override;
   void GetDeviceReportsReader(GetDeviceReportsReaderRequestView request,
                               GetDeviceReportsReaderCompleter::Sync& completer) override;

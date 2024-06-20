@@ -29,6 +29,8 @@
 namespace usb_virtual_bus {
 namespace {
 
+namespace fhidbus = fuchsia_hardware_hidbus;
+
 using usb_virtual::BusLauncher;
 
 std::string GetDeviceControllerPath(std::string_view dev_path) {
@@ -152,30 +154,31 @@ class UsbOneEndpointTest : public UsbHidTest {
 // TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
 TEST_F(UsbOneEndpointTest, DISABLED_GetDeviceIdsVidPid) {
   // Check USB device descriptor VID/PID plumbing.
-  auto result = sync_client_->GetDeviceIds();
+  auto result = sync_client_->Query();
   ASSERT_OK(result.status());
-  EXPECT_EQ(0x18d1, result.value().ids.vendor_id);
-  EXPECT_EQ(0xaf10, result.value().ids.product_id);
+  ASSERT_TRUE(result->is_ok());
+  EXPECT_EQ(0x18d1, result.value()->info.vendor_id());
+  EXPECT_EQ(0xaf10, result.value()->info.product_id());
 }
 
 // TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
 TEST_F(UsbOneEndpointTest, DISABLED_SetAndGetReport) {
   uint8_t buf[sizeof(hid_boot_mouse_report_t)] = {0xab, 0xbc, 0xde};
 
-  auto set_result = sync_client_->SetReport(fuchsia_hardware_input::wire::ReportType::kInput, 0,
+  auto set_result = sync_client_->SetReport(fhidbus::wire::ReportType::kInput, 0,
                                             fidl::VectorView<uint8_t>::FromExternal(buf));
-  auto get_result = sync_client_->GetReport(fuchsia_hardware_input::wire::ReportType::kInput, 0);
+  auto get_result = sync_client_->GetReport(fhidbus::wire::ReportType::kInput, 0);
 
-  ASSERT_OK(set_result.status());
-  ASSERT_OK(set_result.value().status);
+  ASSERT_TRUE(set_result.ok());
+  ASSERT_TRUE(set_result->is_ok());
 
-  ASSERT_OK(get_result.status());
-  ASSERT_OK(get_result.value().status);
+  ASSERT_TRUE(get_result.ok());
+  ASSERT_TRUE(get_result->is_ok());
 
-  ASSERT_EQ(get_result.value().report.count(), sizeof(hid_boot_mouse_report_t));
-  ASSERT_EQ(0xab, get_result.value().report[0]);
-  ASSERT_EQ(0xbc, get_result.value().report[1]);
-  ASSERT_EQ(0xde, get_result.value().report[2]);
+  ASSERT_EQ(get_result.value()->report.count(), sizeof(hid_boot_mouse_report_t));
+  ASSERT_EQ(0xab, get_result.value()->report[0]);
+  ASSERT_EQ(0xbc, get_result.value()->report[1]);
+  ASSERT_EQ(0xde, get_result.value()->report[2]);
 }
 
 // TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
@@ -196,20 +199,20 @@ class UsbTwoEndpointTest : public UsbHidTest {
 TEST_F(UsbTwoEndpointTest, DISABLED_SetAndGetReport) {
   uint8_t buf[sizeof(hid_boot_mouse_report_t)] = {0xab, 0xbc, 0xde};
 
-  auto set_result = sync_client_->SetReport(fuchsia_hardware_input::wire::ReportType::kInput, 0,
+  auto set_result = sync_client_->SetReport(fhidbus::wire::ReportType::kInput, 0,
                                             fidl::VectorView<uint8_t>::FromExternal(buf));
-  auto get_result = sync_client_->GetReport(fuchsia_hardware_input::wire::ReportType::kInput, 0);
+  auto get_result = sync_client_->GetReport(fhidbus::wire::ReportType::kInput, 0);
 
-  ASSERT_OK(set_result.status());
-  ASSERT_OK(set_result.value().status);
+  ASSERT_TRUE(set_result.ok());
+  ASSERT_TRUE(set_result->is_ok());
 
-  ASSERT_OK(get_result.status());
-  ASSERT_OK(get_result.value().status);
+  ASSERT_TRUE(get_result.ok());
+  ASSERT_TRUE(get_result->is_ok());
 
-  ASSERT_EQ(get_result.value().report.count(), sizeof(hid_boot_mouse_report_t));
-  ASSERT_EQ(0xab, get_result.value().report[0]);
-  ASSERT_EQ(0xbc, get_result.value().report[1]);
-  ASSERT_EQ(0xde, get_result.value().report[2]);
+  ASSERT_EQ(get_result.value()->report.count(), sizeof(hid_boot_mouse_report_t));
+  ASSERT_EQ(0xab, get_result.value()->report[0]);
+  ASSERT_EQ(0xbc, get_result.value()->report[1]);
+  ASSERT_EQ(0xde, get_result.value()->report[2]);
 }
 
 // TODO(b/316176095): Re-enable test after ensuring it works with DFv2.

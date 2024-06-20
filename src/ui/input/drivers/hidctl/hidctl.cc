@@ -152,10 +152,10 @@ void HidDevice::Query(QueryCompleter::Sync& completer) {
   completer.ReplySuccess(fhidbus::wire::HidInfo::Builder(arena)
                              .dev_num(0)
                              .boot_protocol(boot_protocol_)
-                             .product_id(0)
                              .vendor_id(0)
-                             .polling_rate(0)
+                             .product_id(0)
                              .version(0)
+                             .polling_rate(0)
                              .Build());
 }
 
@@ -291,8 +291,12 @@ zx_status_t HidDevice::Recv(uint8_t* buffer, uint32_t capacity) {
       hexdump8_ex(buffer, actual, 0);
     }
     if (started_ && binding_) {
+      fidl::Arena arena;
       auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
-          fidl::VectorView<uint8_t>::FromExternal(buffer, actual), zx_clock_get_monotonic());
+          fhidbus::wire::Report::Builder(arena)
+              .buf(fidl::VectorView<uint8_t>::FromExternal(buffer, actual))
+              .timestamp(zx_clock_get_monotonic())
+              .Build());
       if (!result.ok()) {
         zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
       }

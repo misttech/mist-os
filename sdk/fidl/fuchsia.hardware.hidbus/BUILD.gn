@@ -6,8 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.hidbus") {
   sources = [ "hidbus.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.input",
-    "//zircon/vdso/zx",
-  ]
+  public_deps = [ "//zircon/vdso/zx" ]
 }

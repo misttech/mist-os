@@ -5,7 +5,18 @@
 library fuchsia.hardware.hidbus;
 
 using zx;
-using fuchsia.hardware.input;
+
+alias ReportId = uint8;
+
+const MAX_DESC_LEN uint16 = 8192;
+const MAX_REPORT_LEN uint16 = 8192;
+const MAX_REPORT_DATA uint16 = 8192;
+
+type ReportType = strict enum : uint8 {
+    INPUT = 1;
+    OUTPUT = 2;
+    FEATURE = 3;
+};
 
 /// HID 1.11 Chapter 7.1 Class Descriptor Types
 type HidDescriptorType = strict enum : uint8 {
@@ -41,6 +52,11 @@ type HidInfo = table {
     6: polling_rate zx.Duration;
 };
 
+type Report = table {
+    1: buf vector<uint8>:MAX_REPORT_DATA;
+    2: timestamp zx.Time;
+};
+
 closed protocol Hidbus {
     /// Obtain information about the hidbus device and supported features.
     /// Safe to call at any time.
@@ -63,8 +79,7 @@ closed protocol Hidbus {
     /// come from the driver's IRQ callback. If the driver doesn't have
     /// something like that it should fill this with `zx_clock_get_monotonic()`
     strict -> OnReportReceived(struct {
-        buf vector<uint8>:fuchsia.hardware.input.MAX_REPORT_DATA;
-        timestamp zx.Time;
+        report Report;
     });
 
     /// Methods matching HID spec 1.11 Chapter 7 Requests
@@ -72,36 +87,36 @@ closed protocol Hidbus {
     strict GetDescriptor(struct {
         desc_type HidDescriptorType;
     }) -> (struct {
-        data vector<uint8>:fuchsia.hardware.input.MAX_DESC_LEN;
+        data vector<uint8>:MAX_DESC_LEN;
     }) error zx.Status;
     /// 7.1.2 Set_Descriptor (optional)
     strict SetDescriptor(struct {
         desc_type HidDescriptorType;
-        data vector<uint8>:fuchsia.hardware.input.MAX_DESC_LEN;
+        data vector<uint8>:MAX_DESC_LEN;
     }) -> () error zx.Status;
     /// 7.2.1 Get_Report
     strict GetReport(struct {
-        rpt_type fuchsia.hardware.input.ReportType;
-        rpt_id uint8;
+        rpt_type ReportType;
+        rpt_id ReportId;
         len uint64;
     }) -> (struct {
-        data vector<uint8>:fuchsia.hardware.input.MAX_REPORT_LEN;
+        data vector<uint8>:MAX_REPORT_LEN;
     }) error zx.Status;
     /// 7.2.2 Set_Report
     strict SetReport(struct {
-        rpt_type fuchsia.hardware.input.ReportType;
-        rpt_id uint8;
-        data vector<uint8>:fuchsia.hardware.input.MAX_REPORT_LEN;
+        rpt_type ReportType;
+        rpt_id ReportId;
+        data vector<uint8>:MAX_REPORT_LEN;
     }) -> () error zx.Status;
     /// 7.2.3 Get_Idle
     strict GetIdle(struct {
-        rpt_id uint8;
+        rpt_id ReportId;
     }) -> (struct {
         duration zx.Duration;
     }) error zx.Status;
     /// 7.2.4 Set_Idle
     strict SetIdle(struct {
-        rpt_id uint8;
+        rpt_id ReportId;
         duration zx.Duration;
     }) -> () error zx.Status;
     /// 7.2.5 Get_Protocol

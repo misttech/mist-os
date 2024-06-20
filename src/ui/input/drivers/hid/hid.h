@@ -86,8 +86,7 @@ class HidDevice : public HidDeviceType,
 
   size_t GetMaxInputReportSize();
 
-  size_t GetReportSizeById(input_report_id_t id, fuchsia_hardware_input::wire::ReportType type);
-  fuchsia_hardware_input::wire::BootProtocol GetBootProtocol();
+  size_t GetReportSizeById(input_report_id_t id, fuchsia_hardware_hidbus::wire::ReportType type);
   // Owned by HidDevice. Will be destructed when HidDevice is destructed.
   const fuchsia_hardware_hidbus::HidInfo& GetHidInfo() { return info_; }
 

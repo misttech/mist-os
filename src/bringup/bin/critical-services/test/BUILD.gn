@@ -14,6 +14,7 @@ rustc_binary("mock_services") {
 
   deps = [
     "fidl:fuchsia.test.pwrbtn_rust",
+    "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_rust",
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",

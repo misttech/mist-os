@@ -4,19 +4,9 @@
 library fuchsia.hardware.input;
 
 using zx;
+using fuchsia.hardware.hidbus;
 
-alias ReportId = uint8;
-
-const MAX_DESC_LEN uint16 = 8192;
-const MAX_REPORT_LEN uint16 = 8192;
-const MAX_REPORT_DATA uint16 = 8192;
 const MAX_REPORTS_COUNT uint32 = 50;
-
-type ReportType = strict enum : uint8 {
-    INPUT = 1;
-    OUTPUT = 2;
-    FEATURE = 3;
-};
 
 /// Each `DeviceReportsReader` has its own FIFO of reports in the driver.
 /// Calling `ReadReports` drains the Report FIFO. If the Report FIFO fills up
@@ -27,45 +17,21 @@ closed protocol DeviceReportsReader {
     /// If there is already one outstanding Hanging-Get, calling this again will
     /// return ZX_ERR_ALREADY_BOUND.
     strict ReadReports() -> (struct {
-        reports vector<@generated_name("Report") struct {
-            /// The time the report was created, from the view of the monotonic
-            /// clock.
-            time zx.Time;
-            /// The HID report data. This is guaranteed to always be a full HID
-            /// report.
-            data vector<uint8>:MAX_REPORT_DATA;
-        }>:MAX_REPORTS_COUNT;
+        reports vector<fuchsia.hardware.hidbus.Report>:MAX_REPORTS_COUNT;
     }) error zx.Status;
 };
 
 // TODO(https://fxbug.dev/42126285): This API doesn't follow best practices and needs to be
 // cleaned up.
 closed protocol Device {
-    /// Get the HID boot interface protocol this device supports
-    strict GetBootProtocol() -> (struct {
-        protocol @generated_name("BootProtocol") strict enum : uint32 {
-            NONE = 0;
-            KBD = 1;
-            MOUSE = 2;
-        };
-    });
-
-    /// Get the Device's IDs.
-    ///
-    /// If this is a real HID device, then the id information will come from the
-    /// device itself. Mock HID devices may assign the ids in the driver. If the
-    /// mock HID driver does not assign ids, zeros will be used instead.
-    strict GetDeviceIds() -> (struct {
-        ids @generated_name("DeviceIds") struct {
-            vendor_id uint32;
-            product_id uint32;
-            version uint32;
-        };
-    });
+    /// Obtain information about the hidbus device and supported features.
+    strict Query() -> (struct {
+        info fuchsia.hardware.hidbus.HidInfo;
+    }) error zx.Status;
 
     /// Get the report descriptor
     strict GetReportDesc() -> (struct {
-        desc vector<uint8>:MAX_DESC_LEN;
+        desc vector<uint8>:fuchsia.hardware.hidbus.MAX_DESC_LEN;
     });
 
     /// Open a new DeviceReportsReader on this device. Opening a DeviceReportsReader
@@ -80,10 +46,8 @@ closed protocol Device {
     /// If status is ZX_ERR_SHOULD_WAIT the client can wait on the event
     /// from `GetReportsEvent`.
     strict ReadReport() -> (struct {
-        status zx.Status;
-        data vector<uint8>:MAX_REPORT_DATA;
-        time zx.Time;
-    });
+        report fuchsia.hardware.hidbus.Report;
+    }) error zx.Status;
 
     /// Read up to MAX_REPORT_DATA bytes of reports that have been sent from a device.
     /// This is the interface that is supposed to be used for continuous polling.
@@ -93,38 +57,33 @@ closed protocol Device {
     /// If there are no reports, this will return ZX_ERR_SHOULD_WAIT, and the client can
     /// wait on the event from `GetReportsEvent`.
     strict ReadReports() -> (struct {
-        status zx.Status;
-        data vector<uint8>:MAX_REPORT_DATA;
-    });
+        data vector<uint8>:fuchsia.hardware.hidbus.MAX_REPORT_DATA;
+    }) error zx.Status;
 
     /// Receive an event that will signal on `ZX_USER_SIGNAL_0` when there are reports in the
     /// Device's report FIFO. This signal will be de-asserted when there are no
     /// reports in the Device's report FIFO. This event can be re-used each time
     /// the client wishes to know if there are reports in the FIFO.
     strict GetReportsEvent() -> (resource struct {
-        status zx.Status;
         event zx.Handle:EVENT;
-    });
+    }) error zx.Status;
 
     /// Send a request to the hardware for a given report described by type and id.
     /// Returns the hardware's response. This interface is not intended
     /// to be used for continuous polling of the reports.
     strict GetReport(struct {
-        type ReportType;
-        id ReportId;
+        type fuchsia.hardware.hidbus.ReportType;
+        id fuchsia.hardware.hidbus.ReportId;
     }) -> (struct {
-        status zx.Status;
-        report vector<uint8>:MAX_REPORT_LEN;
-    });
+        report vector<uint8>:fuchsia.hardware.hidbus.MAX_REPORT_LEN;
+    }) error zx.Status;
 
     /// Set a single report of the given (type, id) pair.
     strict SetReport(struct {
-        type ReportType;
-        id ReportId;
-        report vector<uint8>:MAX_REPORT_LEN;
-    }) -> (struct {
-        status zx.Status;
-    });
+        type fuchsia.hardware.hidbus.ReportType;
+        id fuchsia.hardware.hidbus.ReportId;
+        report vector<uint8>:fuchsia.hardware.hidbus.MAX_REPORT_LEN;
+    }) -> () error zx.Status;
 
     /// Set the trace ID that is used for HID report flow events.
     strict SetTraceId(struct {
