@@ -6,17 +6,21 @@
 use crate::builtin::log::{ReadOnlyLog, WriteOnlyLog};
 use crate::builtin::log_sink::LogSink;
 use crate::builtin::svc_controller::SvcController;
+use process_builder::{NamespaceEntry, ProcessBuilder, StartupHandle};
 
 use elf_runner::process_launcher::ProcessLauncher;
+use elf_runner::vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo};
+use fidl::endpoints::{ClientEnd, Proxy};
 use fidl::HandleBased;
 use fuchsia_component::server::*;
-use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use fuchsia_runtime::{job_default, take_startup_handle, HandleInfo, HandleType};
 use futures::channel::oneshot;
 use futures::prelude::*;
 use mistos_bootfs::bootfs::BootfsSvc;
 use mistos_logger::klog;
+use std::ffi::CString;
 use std::io::{self, Write};
-use std::process::{self, Command, ExitCode};
+use std::process::{self, Command};
 use std::sync::Arc;
 use std::{env, thread};
 use tracing::{info, warn};
@@ -31,6 +35,38 @@ extern "C" {
     fn dl_set_loader_service(
         handle: fuchsia_zircon::sys::zx_handle_t,
     ) -> fuchsia_zircon::sys::zx_handle_t;
+}
+
+extern "C" {
+    fn dl_clone_loader_service(handle: *mut zx::sys::zx_handle_t) -> zx::sys::zx_status_t;
+}
+
+// Clone the current loader service to provide to the new test processes.
+fn clone_loader_service() -> Result<ClientEnd<fldsvc::LoaderMarker>, zx::Status> {
+    let mut raw = 0;
+    let status = unsafe { dl_clone_loader_service(&mut raw) };
+    zx::Status::ok(status)?;
+
+    let handle = unsafe { zx::Handle::from_raw(raw) };
+    Ok(ClientEnd::new(zx::Channel::from(handle)))
+}
+
+fn namespace_entry(path: &str, flags: fio::OpenFlags) -> NamespaceEntry {
+    let ns_path = path.to_string();
+    let ns_dir = fuchsia_fs::directory::open_in_namespace(path, flags).unwrap();
+    // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
+    let client_end = ClientEnd::new(
+        ns_dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
+    );
+    NamespaceEntry { path: CString::new(ns_path).expect(""), directory: client_end }
+}
+
+fn boot_dir_namespace_entry() -> NamespaceEntry {
+    namespace_entry("/boot", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)
+}
+
+fn svc_dir_namespace_entry() -> NamespaceEntry {
+    namespace_entry("/svc", fio::OpenFlags::RIGHT_READABLE)
 }
 
 fn main() {
@@ -59,7 +95,13 @@ fn main() {
     let bootfs_svc = BootfsSvc::new().expect("Failed to create Rust bootfs");
     let service = bootfs_svc
         .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
-        .expect("Failed to ingest bootfs");
+        .expect("Failed to ingest bootfs")
+        .publish_kernel_vmo(get_stable_vdso_vmo().unwrap())
+        .expect("Failed to publish vdso/stable")
+        .publish_kernel_vmo(get_next_vdso_vmo().unwrap())
+        .expect("Failed to publish vdso/next")
+        .publish_kernel_vmos(HandleType::KernelFileVmo, 0)
+        .expect("Failed to publish KernelFileVmo");
 
     let _ = service.create_and_bind_vfs();
 
@@ -196,31 +238,125 @@ fn main() {
     };
 
     thread::spawn(|| {
-        let args: Vec<String> = env::args().collect();
-
         // Wait until services are up
         futures::executor::block_on(async {
             assert_eq!(receiver.await, Ok(42));
         });
 
-        // TODO (Herrera) Check if the file exists in BootFS
-        let mut command = Command::new("/boot/".to_owned() + &args[1]);
+        let as_process = true;
 
-        // Add args
-        command.args(&args[2..]);
+        let args: Vec<String> = env::args().collect();
+        if as_process {
+            let mut executor = fasync::SendExecutor::new(1);
+            let run_root_fut = async move {
+                let bin_path = "/boot/".to_owned() + &args[1];
+                let file = fdio::open_fd(
+                    bin_path.as_str(),
+                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+                )
+                .expect("");
+                let vmo = fdio::get_vmo_exec_from_file(&file).expect("");
 
-        let output = match command.output() {
-            Ok(out) => out,
-            Err(e) => {
-                let err = format!("Failed to spawn {} as child: {:?}", args[0], e);
-                return ("failed".to_owned(), err.into_bytes(), ExitCode::FAILURE);
-            }
-        };
-        let std::process::Output { stdout, stderr, status } = output;
+                // Create a new child job of this process's (this process that this code is running in) own 'default job'.
+                let job = job_default().create_child_job().expect("");
 
-        io::stdout().write_all(&stdout).unwrap();
-        io::stdout().write_all(&stderr).unwrap();
-        process::exit(status.code().unwrap());
+                let procname = CString::new(bin_path.as_bytes()).expect("");
+                let mut builder = ProcessBuilder::new(
+                    &procname,
+                    &job,
+                    zx::ProcessOptions::empty(),
+                    vmo,
+                    get_next_vdso_vmo().unwrap(),
+                )
+                .expect("");
+
+                // Build the command line args for the new process and send them to the launcher.
+                let mut all_args: Vec<String> = vec![bin_path];
+                all_args.extend(args[2..].to_vec());
+
+                let arg_cstr =
+                    all_args.into_iter().map(|a| CString::new(a)).collect::<Result<_, _>>();
+
+                builder.add_arguments(arg_cstr.expect(""));
+
+                // Send environment variables for the new process
+                /*let vec_of_env: Result<Vec<CString>, _> =
+                    vec![{ "LD_DEBUG=1" }].into_iter().map(CString::new).collect();
+                builder.add_environment_variables(vec_of_env.expect(""));*/
+
+                let stdout_res = zx::Resource::from(zx::Handle::invalid());
+                let stdout = zx::DebugLog::create(&stdout_res, zx::DebugLogOpts::empty()).unwrap();
+
+                // Add handles for the new process's default job (by convention, this is the same job that the
+                // new process is launched in) and the fuchsia.ldsvc.Loader service created above, then send to
+                // the launcher.
+                let job_dup = job.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("");
+                builder
+                    .add_handles(vec![
+                        StartupHandle {
+                            handle: job_dup.into_handle(),
+                            info: HandleInfo::new(HandleType::DefaultJob, 0),
+                        },
+                        StartupHandle {
+                            handle: clone_loader_service().expect("").into_handle(),
+                            info: HandleInfo::new(HandleType::LdsvcLoader, 0),
+                        },
+                        StartupHandle {
+                            handle: stdout.into(),
+                            info: HandleInfo::new(
+                                HandleType::FileDescriptor,
+                                0 | 32768, /*USE_FOR_STDIO */
+                            ),
+                        },
+                    ])
+                    .expect("");
+
+                /*let next_vdso = true;
+                if next_vdso {
+                    builder
+                        .add_handles(vec![::StartupHandle {
+                            handle: get_next_vdso_vmo().unwrap().into_handle(),
+                            info: HandleInfo::new(HandleType::VdsoVmo, 0),
+                        }])
+                        .expect("");
+                }*/
+
+                let entries = vec![boot_dir_namespace_entry(), svc_dir_namespace_entry()];
+                builder.add_namespace_entries(entries).expect("");
+
+                let process = builder.build().await.expect("").start().expect("");
+
+                // Wait for process to return
+                fasync::OnSignals::new(&process, zx::Signals::PROCESS_TERMINATED).await.unwrap();
+                let process_info = process.info().expect("");
+
+                info!("Return code : {:?}", process_info.return_code);
+                process::exit(process_info.return_code as i32);
+            };
+            executor.run(run_root_fut);
+        } else {
+            // TODO (Herrera) Check if the file exists in BootFS
+            let mut command = Command::new("/boot/".to_owned() + &args[1]);
+
+            //command.env("LD_DEBUG", "1");
+
+            // Add args
+            command.args(&args[2..]);
+
+            /*let output = match command.output() {
+                Ok(out) => out,
+                Err(e) => {
+                    let err = format!("Failed to spawn {} as child: {:?}", args[0], e);
+                    return ("failed".to_owned(), err.into_bytes(), ExitCode::FAILURE);
+                }
+            };*/
+            let std::process::Output { stdout, stderr, status } = command.output().expect("");
+
+            io::stdout().write_all(&stdout).unwrap();
+            io::stdout().write_all(&stderr).unwrap();
+
+            process::exit(status.code().unwrap());
+        }
     });
 
     executor.run(run_root_fut);
