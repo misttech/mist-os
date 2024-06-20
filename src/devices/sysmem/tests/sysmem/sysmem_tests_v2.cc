@@ -3714,15 +3714,102 @@ TEST(Sysmem, HeapAmlogicSecureVdecV2) {
   }
 
   for (uint32_t is_id_unset = 0; is_id_unset < 2; ++is_id_unset) {
-    for (uint32_t i = 0; i < 64; ++i) {
-      auto collection = make_single_participant_collection_v2();
+    auto collection = make_single_participant_collection_v2();
 
+    v2::BufferCollectionConstraints constraints;
+    constraints.usage().emplace();
+    constraints.usage()->video() = fuchsia_sysmem::wire::kVideoUsageDecryptorOutput |
+                                   fuchsia_sysmem::wire::kVideoUsageHwDecoder;
+    constexpr uint32_t kBufferCount = 4;
+    constraints.min_buffer_count_for_camping() = kBufferCount;
+    constraints.buffer_memory_constraints().emplace();
+    auto& buffer_memory = constraints.buffer_memory_constraints().value();
+    constexpr uint32_t kBufferSizeBytes = 64 * 1024 - 1;
+    buffer_memory.min_size_bytes() = kBufferSizeBytes;
+    buffer_memory.max_size_bytes() = 128 * 1024;
+    buffer_memory.physically_contiguous_required() = true;
+    buffer_memory.secure_required() = true;
+    buffer_memory.ram_domain_supported() = false;
+    buffer_memory.cpu_domain_supported() = false;
+    buffer_memory.inaccessible_domain_supported() = true;
+    auto heap =
+        sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC, 0);
+    if (is_id_unset == 1) {
+      // intentionally don't set id for this singleton heap to make sure un-set id works for a
+      // singleton heap
+      heap.id().reset();
+    }
+    buffer_memory.permitted_heaps() = {std::move(heap)};
+    ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
+
+    v2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.constraints() = std::move(constraints);
+    ASSERT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
+
+    auto allocate_result = collection->WaitForAllBuffersAllocated();
+    // This is the first round-trip to/from sysmem.  A failure here can be due
+    // to any step above failing async.
+    ASSERT_TRUE(allocate_result.is_ok());
+    auto& buffer_collection_info = allocate_result->buffer_collection_info().value();
+
+    EXPECT_EQ(buffer_collection_info.buffers()->size(), kBufferCount);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->size_bytes().value(),
+              kBufferSizeBytes);
+    EXPECT_EQ(
+        buffer_collection_info.settings()->buffer_settings()->is_physically_contiguous().value(),
+        true);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->is_secure().value(), true);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->coherency_domain().value(),
+              v2::CoherencyDomain::kInaccessible);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->heap_type().value(),
+              bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->id().value(), 0);
+    EXPECT_FALSE(buffer_collection_info.settings()->image_format_constraints().has_value());
+
+    auto expected_size = fbl::round_up(kBufferSizeBytes, zx_system_get_page_size());
+    for (uint32_t i = 0; i < buffer_collection_info.buffers()->size(); ++i) {
+      EXPECT_NE(buffer_collection_info.buffers()->at(i).vmo()->get(), ZX_HANDLE_INVALID);
+      uint64_t size_bytes = 0;
+      auto status =
+          zx_vmo_get_size(buffer_collection_info.buffers()->at(i).vmo()->get(), &size_bytes);
+      ASSERT_EQ(status, ZX_OK);
+      EXPECT_EQ(size_bytes, expected_size);
+    }
+
+    zx::vmo the_vmo = std::move(buffer_collection_info.buffers()->at(0).vmo().value());
+    buffer_collection_info.buffers()->at(0).vmo().reset();
+    SecureVmoReadTester tester(std::move(the_vmo));
+    ASSERT_DEATH(([&] { tester.AttemptReadFromSecure(); }));
+    ASSERT_FALSE(tester.IsReadFromSecureAThing());
+  }
+}
+
+TEST(Sysmem, NonOverlappingHeapListsFails) {
+  if (!is_board_with_amlogic_secure_vdec()) {
+    // In future we may want to add some test heaps just to be able to cover this case on any HW,
+    // but for now we just return if we don't have two specific heaps with very similar properties.
+    return;
+  }
+  if (!is_board_with_amlogic_secure()) {
+    // In future we may want to add some test heaps just to be able to cover this case on any HW,
+    // but for now we just return if we don't have two specific heaps with very similar properties.
+    return;
+  }
+
+  for (uint32_t conflicting_heaps = 0; conflicting_heaps < 3; ++conflicting_heaps) {
+    auto parent = create_initial_token_v2();
+    auto child = create_token_under_token_v2(parent);
+
+    auto parent_collection = convert_token_to_collection_v2(std::move(parent));
+    auto child_collection = convert_token_to_collection_v2(std::move(child));
+
+    // parent constraints
+    {
       v2::BufferCollectionConstraints constraints;
       constraints.usage().emplace();
       constraints.usage()->video() = fuchsia_sysmem::wire::kVideoUsageDecryptorOutput |
                                      fuchsia_sysmem::wire::kVideoUsageHwDecoder;
-      constexpr uint32_t kBufferCount = 4;
-      constraints.min_buffer_count_for_camping() = kBufferCount;
+      constraints.min_buffer_count_for_camping() = 1;
       constraints.buffer_memory_constraints().emplace();
       auto& buffer_memory = constraints.buffer_memory_constraints().value();
       constexpr uint32_t kBufferSizeBytes = 64 * 1024 - 1;
@@ -3735,53 +3822,61 @@ TEST(Sysmem, HeapAmlogicSecureVdecV2) {
       buffer_memory.inaccessible_domain_supported() = true;
       auto heap =
           sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC, 0);
-      if (is_id_unset == 1) {
-        // intentionally don't set id for this singleton heap to make sure un-set id works for a
-        // singleton heap
-        heap.id().reset();
-      }
       buffer_memory.permitted_heaps() = {std::move(heap)};
       ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
       v2::BufferCollectionSetConstraintsRequest set_constraints_request;
       set_constraints_request.constraints() = std::move(constraints);
-      ASSERT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
+      ASSERT_TRUE(parent_collection->SetConstraints(std::move(set_constraints_request)).is_ok());
+    }
 
-      auto allocate_result = collection->WaitForAllBuffersAllocated();
-      // This is the first round-trip to/from sysmem.  A failure here can be due
-      // to any step above failing async.
-      ASSERT_TRUE(allocate_result.is_ok());
-      auto& buffer_collection_info = allocate_result->buffer_collection_info().value();
-
-      EXPECT_EQ(buffer_collection_info.buffers()->size(), kBufferCount);
-      EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->size_bytes().value(),
-                kBufferSizeBytes);
-      EXPECT_EQ(
-          buffer_collection_info.settings()->buffer_settings()->is_physically_contiguous().value(),
-          true);
-      EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->is_secure().value(), true);
-      EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->coherency_domain().value(),
-                v2::CoherencyDomain::kInaccessible);
-      EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->heap_type().value(),
-                bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC);
-      EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->id().value(), 0);
-      EXPECT_FALSE(buffer_collection_info.settings()->image_format_constraints().has_value());
-
-      auto expected_size = fbl::round_up(kBufferSizeBytes, zx_system_get_page_size());
-      for (uint32_t i = 0; i < buffer_collection_info.buffers()->size(); ++i) {
-        EXPECT_NE(buffer_collection_info.buffers()->at(i).vmo()->get(), ZX_HANDLE_INVALID);
-        uint64_t size_bytes = 0;
-        auto status =
-            zx_vmo_get_size(buffer_collection_info.buffers()->at(i).vmo()->get(), &size_bytes);
-        ASSERT_EQ(status, ZX_OK);
-        EXPECT_EQ(size_bytes, expected_size);
+    // child constraints
+    {
+      v2::BufferCollectionConstraints constraints;
+      constraints.usage().emplace();
+      constraints.usage()->video() = fuchsia_sysmem::wire::kVideoUsageDecryptorOutput |
+                                     fuchsia_sysmem::wire::kVideoUsageHwDecoder;
+      constraints.min_buffer_count_for_camping() = 1;
+      constraints.buffer_memory_constraints().emplace();
+      auto& buffer_memory = constraints.buffer_memory_constraints().value();
+      constexpr uint32_t kBufferSizeBytes = 64 * 1024 - 1;
+      buffer_memory.min_size_bytes() = kBufferSizeBytes;
+      buffer_memory.max_size_bytes() = 128 * 1024;
+      buffer_memory.physically_contiguous_required() = true;
+      buffer_memory.secure_required() = true;
+      buffer_memory.ram_domain_supported() = false;
+      buffer_memory.cpu_domain_supported() = false;
+      buffer_memory.inaccessible_domain_supported() = true;
+      if (!conflicting_heaps) {
+        auto heap =
+            sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC, 0);
+        buffer_memory.permitted_heaps() = {std::move(heap)};
+      } else {
+        auto heap =
+            sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0);
+        buffer_memory.permitted_heaps() = {std::move(heap)};
       }
+      ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
-      zx::vmo the_vmo = std::move(buffer_collection_info.buffers()->at(0).vmo().value());
-      buffer_collection_info.buffers()->at(0).vmo().reset();
-      SecureVmoReadTester tester(std::move(the_vmo));
-      ASSERT_DEATH(([&] { tester.AttemptReadFromSecure(); }));
-      ASSERT_FALSE(tester.IsReadFromSecureAThing());
+      v2::BufferCollectionSetConstraintsRequest set_constraints_request;
+      set_constraints_request.constraints() = std::move(constraints);
+      ASSERT_TRUE(child_collection->SetConstraints(std::move(set_constraints_request)).is_ok());
+    }
+
+    auto parent_allocate_result = parent_collection->WaitForAllBuffersAllocated();
+
+    if (!conflicting_heaps) {
+      ASSERT_TRUE(parent_allocate_result.is_ok());
+      ASSERT_EQ(
+          parent_allocate_result->buffer_collection_info()
+              ->settings()
+              ->buffer_settings()
+              ->heap()
+              .value(),
+          sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC, 0));
+    } else {
+      ZX_ASSERT(conflicting_heaps);
+      ASSERT_TRUE(parent_allocate_result.is_error());
     }
   }
 }
