@@ -16,11 +16,13 @@ type DaiProperties = table {
     1: is_input bool;
 
     /// UI string for the manufacturer name. If not included, the manufacturer is unspecified.
+    /// If included, this string must be non-empty.
     ///
     /// Optional.
     2: manufacturer string:MAX_DAI_UI_STRING_SIZE;
 
     /// UI string for the product name. If not included, the product name is unspecified.
+    /// If included, this string must be non-empty.
     ///
     /// Optional.
     3: product_name string:MAX_DAI_UI_STRING_SIZE;

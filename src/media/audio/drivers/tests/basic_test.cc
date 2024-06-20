@@ -182,47 +182,59 @@ void BasicTest::DisplayBaseProperties() {
   ASSERT_TRUE(properties_);
 
   FX_LOGS(INFO) << driver_type() << " is_input: "
-                << (properties_->is_input ? std::to_string(*properties_->is_input) : "NONE");
+                << (properties_->is_input.has_value() ? std::to_string(*properties_->is_input)
+                                                      : "NONE");
   FX_LOGS(INFO) << driver_type() << " manufacturer is "
-                << (properties_->manufacturer ? "'" + *properties_->manufacturer + "'" : "NONE");
+                << (properties_->manufacturer.has_value() ? "'" + *properties_->manufacturer + "'"
+                                                          : "NONE");
   FX_LOGS(INFO) << driver_type() << " product is "
-                << (properties_->product ? "'" + *properties_->product + "'" : "NONE");
+                << (properties_->product.has_value() ? "'" + *properties_->product + "'" : "NONE");
   FX_LOGS(INFO) << driver_type() << " unique_id is " << properties_->unique_id;
   FX_LOGS(INFO) << driver_type() << " clock domain is "
-                << (properties_->clock_domain ? std::to_string(*properties_->clock_domain)
-                                              : "NONE");
+                << (properties_->clock_domain.has_value()
+                        ? std::to_string(*properties_->clock_domain)
+                        : "NONE");
   FX_LOGS(INFO) << driver_type() << " plug_detect is " << properties_->plug_detect_capabilities;
   FX_LOGS(INFO) << driver_type() << " min_gain_db is "
-                << (properties_->min_gain_db ? std::to_string(*properties_->min_gain_db) : "NONE");
+                << (properties_->min_gain_db.has_value() ? std::to_string(*properties_->min_gain_db)
+                                                         : "NONE");
   FX_LOGS(INFO) << driver_type() << " max_gain_db is "
-                << (properties_->max_gain_db ? std::to_string(*properties_->max_gain_db) : "NONE");
+                << (properties_->max_gain_db.has_value() ? std::to_string(*properties_->max_gain_db)
+                                                         : "NONE");
   FX_LOGS(INFO) << driver_type() << " gain_step_db is "
-                << (properties_->gain_step_db ? std::to_string(*properties_->gain_step_db)
-                                              : "NONE");
+                << (properties_->gain_step_db.has_value()
+                        ? std::to_string(*properties_->gain_step_db)
+                        : "NONE");
   FX_LOGS(INFO) << driver_type() << " can_mute is "
-                << (properties_->can_mute ? std::to_string(*properties_->can_mute) : "NONE");
+                << (properties_->can_mute.has_value() ? std::to_string(*properties_->can_mute)
+                                                      : "NONE");
   FX_LOGS(INFO) << driver_type() << " can_agc is "
-                << (properties_->can_agc ? std::to_string(*properties_->can_agc) : "NONE");
+                << (properties_->can_agc.has_value() ? std::to_string(*properties_->can_agc)
+                                                     : "NONE");
 }
 
 void BasicTest::ValidateProperties() {
   ASSERT_TRUE(properties_);
 
+  // The following fields are optional, but must be non-empty if they are specified.
+  EXPECT_FALSE(properties_->manufacturer.has_value() && properties_->manufacturer->empty());
+  EXPECT_FALSE(properties_->product.has_value() && properties_->product->empty());
+
   // Just check that required fields are present
   if (device_entry().isCodec()) {
-    EXPECT_TRUE(properties_->plug_detect_capabilities);
+    EXPECT_TRUE(properties_->plug_detect_capabilities.has_value());
   } else if (device_entry().isComposite()) {
-    EXPECT_TRUE(properties_->clock_domain);
+    EXPECT_TRUE(properties_->clock_domain.has_value());
   } else if (device_entry().isDai()) {
-    EXPECT_TRUE(properties_->is_input);
-    EXPECT_TRUE(properties_->clock_domain);
+    EXPECT_TRUE(properties_->is_input.has_value());
+    EXPECT_TRUE(properties_->clock_domain.has_value());
   } else if (device_entry().isStreamConfig()) {
-    ASSERT_TRUE(properties_->is_input);
-    EXPECT_TRUE(properties_->clock_domain);
-    EXPECT_TRUE(properties_->plug_detect_capabilities);
-    ASSERT_TRUE(properties_->min_gain_db);
-    ASSERT_TRUE(properties_->max_gain_db);
-    ASSERT_TRUE(properties_->gain_step_db);
+    ASSERT_TRUE(properties_->is_input.has_value());
+    EXPECT_TRUE(properties_->clock_domain.has_value());
+    EXPECT_TRUE(properties_->plug_detect_capabilities.has_value());
+    ASSERT_TRUE(properties_->min_gain_db.has_value());
+    ASSERT_TRUE(properties_->max_gain_db.has_value());
+    ASSERT_TRUE(properties_->gain_step_db.has_value());
 
     // For StreamConfig, we can do additional data validity/range checks.
     EXPECT_EQ(*properties_->is_input, driver_type() == DriverType::StreamConfigInput);
@@ -325,7 +337,7 @@ void BasicTest::ValidatePlugState(const fuchsia::hardware::audio::PlugState& plu
   ASSERT_TRUE(plug_state.has_plugged());
   if (!plug_state.plugged()) {
     ASSERT_TRUE(properties_);
-    ASSERT_TRUE(properties_->plug_detect_capabilities);
+    ASSERT_TRUE(properties_->plug_detect_capabilities.has_value());
     EXPECT_NE(*properties_->plug_detect_capabilities,
               fuchsia::hardware::audio::PlugDetectCapabilities::HARDWIRED)
         << "Device reported plug capabilities as HARDWIRED, but now reports as unplugged";
