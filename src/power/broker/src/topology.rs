@@ -314,12 +314,12 @@ impl Topology {
     pub fn get_level_index(
         &self,
         element_id: &ElementID,
-        level: fpb::PowerLevel,
+        level: &fpb::PowerLevel,
     ) -> Option<&IndexedPowerLevel> {
         let Some(elem) = self.elements.get(element_id) else {
             return Some(&IndexedPowerLevel::MIN);
         };
-        elem.valid_levels.iter().find(|l| l.level == level)
+        elem.valid_levels.iter().find(|l| &l.level == level)
     }
 
     fn decrement_element_level_index(

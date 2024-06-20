@@ -120,7 +120,10 @@ TEST_F(WakeLeaseTest, AcquiresLeaseSuccessfully) {
             fpb::DependencyType::kPassive);
   EXPECT_EQ(topology->Dependencies("exceptions-element-001").front().dependent_level(),
             kPowerLevelActive);
-  EXPECT_EQ(topology->Dependencies("exceptions-element-001").front().requires_level(),
+  EXPECT_EQ(topology->Dependencies("exceptions-element-001")
+                .front()
+                .requires_level_by_preference()
+                .front(),
             fidl::ToUnderlying(fps::ExecutionStateLevel::kWakeHandling));
 }
 
@@ -283,7 +286,10 @@ TEST_F(WakeLeaseTest, WaitsUntilLeaseSatisfied) {
             fpb::DependencyType::kPassive);
   EXPECT_EQ(topology->Dependencies("exceptions-element-001").front().dependent_level(),
             kPowerLevelActive);
-  EXPECT_EQ(topology->Dependencies("exceptions-element-001").front().requires_level(),
+  EXPECT_EQ(topology->Dependencies("exceptions-element-001")
+                .front()
+                .requires_level_by_preference()
+                .front(),
             fidl::ToUnderlying(fps::ExecutionStateLevel::kWakeHandling));
 
   EXPECT_FALSE(lease.has_value());

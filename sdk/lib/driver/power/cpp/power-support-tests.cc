@@ -83,7 +83,7 @@ class TopologyServer : public fidl::Server<fuchsia_power_broker::Topology> {
           .dependency_type = it.dependency_type(),
           .dependent_level = it.dependent_level(),
           .requires_token = std::move(token_copy),
-          .requires_level = it.requires_level(),
+          .requires_level_by_preference = it.requires_level_by_preference(),
       }};
       received_deps_.emplace_back(std::move(dep));
     }
@@ -284,7 +284,7 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
               dep.requires_token().get_info(ZX_INFO_HANDLE_BASIC, &copy_info,
                                             sizeof(zx_info_handle_basic_t), nullptr, nullptr);
               auto entry = child_to_parent_levels.extract(dep.dependent_level());
-              ASSERT_EQ(entry.mapped(), dep.requires_level());
+              ASSERT_EQ(entry.mapped(), dep.requires_level_by_preference().front());
               ASSERT_EQ(copy_info.koid, orig_info.koid);
             }
             ASSERT_EQ(child_to_parent_levels.size(), static_cast<size_t>(0));
@@ -414,7 +414,7 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
                 ASSERT_EQ(copy_info.koid, parent_two_info.koid);
               }
               auto entry = child_to_parent_levels.extract(dep.dependent_level());
-              ASSERT_EQ(entry.mapped(), dep.requires_level());
+              ASSERT_EQ(entry.mapped(), dep.requires_level_by_preference().front());
             }
 
             ASSERT_EQ(child_to_parent_levels.size(), static_cast<size_t>(0));
@@ -483,7 +483,7 @@ TEST_F(PowerLibTest, LevelDependencyWithSingleParent) {
     ASSERT_EQ(dep.dependency_type(), fuchsia_power_broker::DependencyType::kActive);
     uint8_t parent_level =
         static_cast<uint8_t>(child_to_parent_levels.extract(dep.dependent_level()).mapped());
-    ASSERT_EQ(dep.requires_level(), parent_level);
+    ASSERT_EQ(dep.requires_level_by_preference().front(), parent_level);
   }
 
   // Check that we took out all the mappings

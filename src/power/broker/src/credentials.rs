@@ -85,7 +85,7 @@ impl Registry {
         self.credentials.get(koid).cloned()
     }
 
-    pub fn lookup(&self, token: Token) -> Option<Credential> {
+    pub fn lookup(&self, token: &Token) -> Option<Credential> {
         let Some(koid) = token.koid() else {
             tracing::debug!("could not get koid for {:?}", token);
             return None;
@@ -226,7 +226,7 @@ mod tests {
         use fuchsia_zircon::HandleBased;
         let token_kryptonite_dup =
             token_kryptonite.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed");
-        let credential = registry.lookup(token_kryptonite_dup.into()).unwrap();
+        let credential = registry.lookup(&token_kryptonite_dup.into()).unwrap();
         assert_eq!(credential.id, token_kryptonite.basic_info().expect("basic_info failed").koid);
         assert_eq!(credential.element, element_kryptonite);
         assert_eq!(credential.permissions.contains(Permissions::MODIFY_ACTIVE_DEPENDENT), true);
@@ -234,7 +234,7 @@ mod tests {
 
         let unregistered = registry.unregister(&credential);
         assert_eq!(unregistered, Some(credential.clone()));
-        let lookup_not_found = registry.lookup(token_kryptonite.into());
+        let lookup_not_found = registry.lookup(&token_kryptonite.into());
         assert_eq!(lookup_not_found, None);
 
         let extra_unregister = registry.unregister(&credential);

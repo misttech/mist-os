@@ -162,8 +162,9 @@ impl SuspendResumeManager {
                             dependency_type: fbroker::DependencyType::Active,
                             dependent_level: STARNIX_POWER_ON_LEVEL,
                             requires_token: application_activity_token,
-                            requires_level: fsystem::ApplicationActivityLevel::Active
-                                .into_primitive(),
+                            requires_level_by_preference: vec![
+                                fsystem::ApplicationActivityLevel::Active.into_primitive(),
+                            ],
                         }]),
                         lessor_channel: Some(lessor_server_end),
                         level_control_channels: Some(level_control_channels),
@@ -512,7 +513,9 @@ impl WakeLease {
                             dependency_type: fbroker::DependencyType::Active,
                             dependent_level: fbroker::BinaryPowerLevel::On.into_primitive(),
                             requires_token: active_wake_token,
-                            requires_level: fsystem::WakeHandlingLevel::Active.into_primitive(),
+                            requires_level_by_preference: vec![
+                                fsystem::WakeHandlingLevel::Active.into_primitive()
+                            ],
                         }]),
                         lessor_channel: Some(lessor_server_end),
                         ..Default::default()

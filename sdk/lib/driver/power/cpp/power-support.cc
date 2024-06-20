@@ -72,7 +72,8 @@ fit::result<Error, std::vector<fuchsia_power_broker::LevelDependency>> ConvertPo
 
     power_framework_dep.dependency_type() = dep_type;
     power_framework_dep.dependent_level() = driver_framework_level_dep.child_level();
-    power_framework_dep.requires_level() = driver_framework_level_dep.parent_level();
+    power_framework_dep.requires_level_by_preference() =
+        std::vector<uint8_t>(1, driver_framework_level_dep.parent_level());
     power_framework_deps.push_back(std::move(power_framework_dep));
   }
 
@@ -478,10 +479,11 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
         // This should only fail if the supplied event handle is invalid
         return fit::error(Error::INVALID_ARGS);
       }
-      fuchsia_power_broker::LevelDependency c{{.dependency_type = needs.dependency_type(),
-                                               .dependent_level = needs.dependent_level(),
-                                               .requires_token = std::move(dupe),
-                                               .requires_level = needs.requires_level()}};
+      fuchsia_power_broker::LevelDependency c{
+          {.dependency_type = needs.dependency_type(),
+           .dependent_level = needs.dependent_level(),
+           .requires_token = std::move(dupe),
+           .requires_level_by_preference = needs.requires_level_by_preference()}};
       level_deps[dep_index] = std::move(c);
       dep_index++;
     }

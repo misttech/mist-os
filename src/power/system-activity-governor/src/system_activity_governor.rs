@@ -437,7 +437,7 @@ impl SystemActivityGovernor {
             dependency_type: fbroker::DependencyType::Active,
             dependent_level: ApplicationActivityLevel::Active.into_primitive(),
             requires_token: execution_state.active_dependency_token(),
-            requires_level: ExecutionStateLevel::Active.into_primitive(),
+            requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
         }])
         .build()
         .await
@@ -463,7 +463,7 @@ impl SystemActivityGovernor {
             dependency_type: fbroker::DependencyType::Active,
             dependent_level: FullWakeHandlingLevel::Active.into_primitive(),
             requires_token: execution_state.active_dependency_token(),
-            requires_level: ExecutionStateLevel::WakeHandling.into_primitive(),
+            requires_level_by_preference: vec![ExecutionStateLevel::WakeHandling.into_primitive()],
         }])
         .build()
         .await
@@ -489,7 +489,7 @@ impl SystemActivityGovernor {
             dependency_type: fbroker::DependencyType::Active,
             dependent_level: WakeHandlingLevel::Active.into_primitive(),
             requires_token: execution_state.active_dependency_token(),
-            requires_level: ExecutionStateLevel::WakeHandling.into_primitive(),
+            requires_level_by_preference: vec![ExecutionStateLevel::WakeHandling.into_primitive()],
         }])
         .build()
         .await
@@ -512,7 +512,7 @@ impl SystemActivityGovernor {
             dependency_type: fbroker::DependencyType::Active,
             dependent_level: BootControlLevel::Active.into(),
             requires_token: execution_state.active_dependency_token(),
-            requires_level: ExecutionStateLevel::Active.into_primitive(),
+            requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
         }])
         .build()
         .await

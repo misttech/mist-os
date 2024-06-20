@@ -106,7 +106,7 @@ async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<PowerElemen
             dependency_type: fbroker::DependencyType::Active,
             dependent_level: 1,
             requires_token: aa_token,
-            requires_level: 1,
+            requires_level_by_preference: vec![1],
         }])
         .build()
         .await?;
@@ -125,7 +125,7 @@ async fn create_wake_topology(realm: &RealmProxyClient) -> Result<PowerElementCo
             dependency_type: fbroker::DependencyType::Active,
             dependent_level: 1,
             requires_token: wh_token,
-            requires_level: 1,
+            requires_level_by_preference: vec![1],
         }])
         .build()
         .await?;
@@ -145,7 +145,7 @@ async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElem
                 dependency_type: fbroker::DependencyType::Active,
                 dependent_level: 1,
                 requires_token: fwh_token,
-                requires_level: 1,
+                requires_level_by_preference: vec![1],
             }])
             .build()
             .await?;
@@ -175,7 +175,7 @@ async fn create_latency_topology(
                     dependency_type: fbroker::DependencyType::Active,
                     dependent_level: *level,
                     requires_token: erl_token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-                    requires_level: *level,
+                    requires_level_by_preference: vec![*level],
                 })
                 .collect(),
         )
