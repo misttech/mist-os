@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -6,6 +7,7 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/testing/boot_tests/mistos_unittest_zbi.gni")
 
 rustc_library("process_builder") {
   with_unit_tests = true
@@ -88,10 +90,17 @@ executable("static_pie_test_util") {
   disable_syslog_backend = true
 
   sources = [ "test-utils/static_pie_test_util.c" ]
-  configs += [
-    "//build/config/fuchsia:no_cpp_standard_library",
-    "//build/config/fuchsia:static-pie-config",
-  ]
+  if (is_mistos) {
+    configs += [
+      "//build/config/mistos:no_cpp_standard_library",
+      "//build/config/mistos:static-pie-config",
+    ]
+  } else {
+    configs += [
+      "//build/config/fuchsia:no_cpp_standard_library",
+      "//build/config/fuchsia:static-pie-config",
+    ]
+  }
 
   exclude_toolchain_tags = [ "instrumented" ]
 
@@ -112,7 +121,20 @@ fuchsia_unittest_package("process-builder-tests") {
   test_type = "system"
 }
 
+mistos_unittest_zbi("mistos-process-builder-tests") {
+  executable_path = "bin/process_builder_lib_test"
+  test_target_label = ":process_builder_test"
+  deps = [
+    ":static_pie_test_util",
+    ":test_util",
+  ]
+  prefix = ""
+}
+
 group("tests") {
   testonly = true
   deps = [ ":process-builder-tests" ]
+  if (is_mistos) {
+    deps += [ ":mistos-process-builder-tests" ]
+  }
 }
