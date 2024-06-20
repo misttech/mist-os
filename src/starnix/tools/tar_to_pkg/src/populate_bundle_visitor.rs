@@ -44,7 +44,7 @@ impl DirectoryVisitor for PopulateBundleVisitor {
                 file.metadata().mode() | S_IFREG,
                 file.metadata().uid(),
                 file.metadata().gid(),
-                file.metadata().extended_attributes(),
+                file.metadata().extended_attributes().clone(),
             );
             self.manifest
                 .insert(format!("{inode_num}"), file.data_file_path().path_to_string().unwrap());
@@ -67,7 +67,7 @@ impl DirectoryVisitor for PopulateBundleVisitor {
                 symlink.metadata().mode() | S_IFLNK,
                 symlink.metadata().uid(),
                 symlink.metadata().gid(),
-                symlink.metadata().extended_attributes(),
+                symlink.metadata().extended_attributes().clone(),
             );
         }
 
@@ -87,7 +87,7 @@ impl DirectoryVisitor for PopulateBundleVisitor {
                 directory.metadata().mode() | S_IFDIR,
                 directory.metadata().uid(),
                 directory.metadata().gid(),
-                directory.metadata().extended_attributes(),
+                directory.metadata().extended_attributes().clone(),
             );
         }
 

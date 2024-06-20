@@ -99,7 +99,7 @@ fn tar_img_extract(
         root_dir.metadata().mode() | S_IFDIR,
         root_dir.metadata().uid(),
         root_dir.metadata().gid(),
-        root_dir.metadata().extended_attributes(),
+        root_dir.metadata().extended_attributes().clone(),
     );
     root_dir.visit(&mut bundle_visitor);
 

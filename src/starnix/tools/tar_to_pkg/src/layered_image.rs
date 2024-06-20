@@ -9,7 +9,7 @@ use std::fs::create_dir_all;
 use std::io::{copy, Read};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use tar::{Archive, Header};
+use tar::{Archive, Entry};
 
 /// Prefix for "whiteout" files, whose purpose is to hide files from lower layers.
 ///
@@ -138,7 +138,7 @@ impl LayeredImage {
                 // Keep the root dir's entries but rebuild its metadata.
                 let entries = self.root.entries.take();
                 self.root = Rc::new(Directory {
-                    metadata: Metadata::from_header(entry.header())?,
+                    metadata: Metadata::from_entry(&mut entry)?,
                     entries: RefCell::new(entries),
                 });
                 continue;
@@ -171,7 +171,7 @@ impl LayeredImage {
                     copy(&mut entry, &mut std::fs::File::create(&extracted_path)?)?;
 
                     let file = File {
-                        metadata: Metadata::from_header(entry.header())?,
+                        metadata: Metadata::from_entry(&mut entry)?,
                         data_file_path: extracted_path,
                     };
                     NodeRef::File(Rc::new(file))
@@ -186,7 +186,7 @@ impl LayeredImage {
                 tar::EntryType::Symlink => {
                     let link_path = entry.link_name_bytes().unwrap().to_vec();
                     let symlink = Symlink {
-                        metadata: Metadata::from_header(entry.header())?,
+                        metadata: Metadata::from_entry(&mut entry)?,
                         target: Name(link_path),
                     };
                     NodeRef::Symlink(Rc::new(symlink))
@@ -199,7 +199,7 @@ impl LayeredImage {
                     };
 
                     let directory = Directory {
-                        metadata: Metadata::from_header(entry.header())?,
+                        metadata: Metadata::from_entry(&mut entry)?,
                         entries: RefCell::new(entries),
                     };
                     NodeRef::Directory(Rc::new(directory))
@@ -292,17 +292,30 @@ pub struct Metadata {
     mode: u16,
     uid: u16,
     gid: u16,
+    xattrs: BTreeMap<Box<[u8]>, Box<[u8]>>,
 
     // Assigned by `AssignInodeNumberVisitor` when `LayeredImage::finalize` is called.
     inode_num: Cell<Option<u64>>,
 }
 
 impl Metadata {
-    fn from_header(header: &Header) -> Result<Metadata> {
+    fn from_entry<R: Read>(entry: &mut Entry<'_, R>) -> Result<Metadata> {
+        let header = entry.header();
         let mode = (header.mode()? & 0o7777).try_into().unwrap();
         let uid = header.uid()?.try_into().context("uid")?;
         let gid = header.gid()?.try_into().context("gid")?;
-        Ok(Metadata { mode, uid, gid, inode_num: Cell::new(None) })
+
+        let mut xattrs = BTreeMap::new();
+        if let Some(extensions) = entry.pax_extensions()? {
+            for extension in extensions {
+                let extension = extension?;
+                if let Some(key) = extension.key_bytes().strip_prefix(b"SCHILY.xattr.") {
+                    xattrs.insert(key.into(), extension.value_bytes().into());
+                }
+            }
+        }
+
+        Ok(Metadata { mode, uid, gid, xattrs, inode_num: Cell::new(None) })
     }
 
     pub fn mode(&self) -> u16 {
@@ -317,9 +330,8 @@ impl Metadata {
         self.gid
     }
 
-    pub fn extended_attributes(&self) -> BTreeMap<Box<[u8]>, Box<[u8]>> {
-        // TODO(fdurso): Not supported yet.
-        BTreeMap::new()
+    pub fn extended_attributes(&self) -> &BTreeMap<Box<[u8]>, Box<[u8]>> {
+        &self.xattrs
     }
 
     pub fn inode_num(&self) -> u64 {
@@ -380,7 +392,13 @@ impl Default for Directory {
     /// explicitly listed in the source archive.
     fn default() -> Self {
         Self {
-            metadata: Metadata { mode: 0o755, uid: 0, gid: 0, inode_num: Cell::new(None) },
+            metadata: Metadata {
+                mode: 0o755,
+                uid: 0,
+                gid: 0,
+                xattrs: BTreeMap::new(),
+                inode_num: Cell::new(None),
+            },
             entries: RefCell::new(HashMap::new()),
         }
     }
