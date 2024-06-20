@@ -35,7 +35,7 @@ group("headers") {
     ":zircon-headers",
     "//zircon/vdso:public",
   ]
-  if (!is_fuchsia && !is_kernel) {
+  if (!is_fuchsia && !is_mistos && !is_kernel) {
     public_deps += [ "//zircon/system/public" ]
   }
 }
