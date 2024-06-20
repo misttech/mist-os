@@ -2,18 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("@fuchsia_build_info//:args.bzl", "authorized_ssh_keys_label")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "ARCH",
     "BUILD_TYPES",
-    "fuchsia_elf_sizes",
-    "fuchsia_prebuilt_package",
     "fuchsia_product",
     "fuchsia_product_bundle",
     "fuchsia_product_configuration",
     "fuchsia_virtual_device",
 )
-load("@fuchsia_build_info//:args.bzl", "authorized_ssh_keys_label")
 
 package(default_visibility = [
     "//build/bazel/assembly:__pkg__",
@@ -69,16 +67,6 @@ fuchsia_product(
     product_config = ":assembly_config_eng",
 )
 
-fuchsia_elf_sizes(
-    name = "elf_sizes.x64",
-    product = ":microfuchsia_eng.x64",
-)
-
-fuchsia_elf_sizes(
-    name = "elf_sizes.arm64",
-    product = ":microfuchsia_eng.arm64",
-)
-
 fuchsia_product_configuration(
     name = "assembly_config_eng",
     product_config_json = {
@@ -91,6 +79,11 @@ fuchsia_product_configuration(
             "development_support": {
                 "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
                 "vsock_development": True,
+            },
+            "storage": {
+                "filesystems": {
+                    "image_mode": "no_image",
+                },
             },
         },
     },
