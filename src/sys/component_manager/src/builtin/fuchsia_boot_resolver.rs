@@ -24,11 +24,11 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
 };
 
-pub static SCHEME: &str = "fuchsia-boot";
+pub const SCHEME: &str = "fuchsia-boot";
 
 /// The path for the bootfs package index relative to root of
 /// the /boot directory.
-pub static BOOT_PACKAGE_INDEX: &str = "data/bootfs_packages";
+const BOOT_PACKAGE_INDEX: &str = "data/bootfs_packages";
 
 /// The subdirectory of /boot that holds all merkle-root named
 /// blobs used by package resolution.
@@ -45,17 +45,17 @@ static BOOTFS_BLOB_DIR: &str = "blob";
 ///
 /// URL syntax:
 /// - fuchsia-boot:///path/within/bootfs#meta/component.cm
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FuchsiaBootResolver {
     boot_proxy: fio::DirectoryProxy,
-    boot_package_resolver: Option<BootPackageResolver>,
+    boot_package_resolver: Option<Arc<BootPackageResolver>>,
 }
 
 impl FuchsiaBootResolver {
     /// Create a new FuchsiaBootResolver. This first checks whether the path passed in is present in
     /// the namespace, and returns Ok(None) if not present. For unit and integration tests, this
     /// path may point to /pkg.
-    async fn new(path: &'static str) -> Result<Option<Arc<Self>>, Error> {
+    pub async fn new(path: &'static str) -> Result<Option<Self>, Error> {
         let bootfs_dir = Path::new(path);
 
         // TODO(97517): Remove this check if there is never a case for starting component manager
@@ -74,10 +74,10 @@ impl FuchsiaBootResolver {
 
     /// Create a new FuchsiaBootResolver that resolves URLs within the given directory. Used for
     /// injection in unit tests.
-    async fn new_from_directory(proxy: fio::DirectoryProxy) -> Result<Arc<Self>, Error> {
+    async fn new_from_directory(proxy: fio::DirectoryProxy) -> Result<Self, Error> {
         let boot_package_resolver = BootPackageResolver::try_instantiate(&proxy).await?;
 
-        Ok(Arc::new(Self { boot_proxy: proxy, boot_package_resolver }))
+        Ok(Self { boot_proxy: proxy, boot_package_resolver })
     }
 
     async fn resolve_unpackaged_component(
@@ -209,10 +209,7 @@ impl FuchsiaBootResolver {
         }
     }
 
-    pub async fn serve(
-        self: Arc<Self>,
-        mut stream: fresolution::ResolverRequestStream,
-    ) -> Result<(), Error> {
+    pub async fn serve(self, mut stream: fresolution::ResolverRequestStream) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await? {
             match request {
                 fresolution::ResolverRequest::Resolve { component_url, responder } => {
@@ -233,36 +230,22 @@ impl FuchsiaBootResolver {
     }
 }
 
-pub struct FuchsiaBootResolverBuiltinCapability {
-    host: Arc<FuchsiaBootResolver>,
-}
-
-impl FuchsiaBootResolverBuiltinCapability {
-    pub async fn new(path: &'static str) -> Result<Option<Self>, Error> {
-        Ok(FuchsiaBootResolver::new(path).await?.map(|host| Self { host }))
-    }
-
-    pub fn host(&self) -> &Arc<FuchsiaBootResolver> {
-        &self.host
-    }
-}
-
-impl BuiltinCapability for FuchsiaBootResolverBuiltinCapability {
+impl BuiltinCapability for FuchsiaBootResolver {
     fn matches(&self, capability: &InternalCapability) -> bool {
         matches!(capability, InternalCapability::Resolver(n) if n.as_str() == "boot_resolver")
     }
 
     fn new_provider(&self, _target: WeakComponentInstance) -> Box<dyn CapabilityProvider> {
-        Box::new(ComponentResolverCapabilityProvider::new(self.host.clone()))
+        Box::new(ComponentResolverCapabilityProvider::new(self.clone()))
     }
 }
 
 struct ComponentResolverCapabilityProvider {
-    component_resolver: Arc<FuchsiaBootResolver>,
+    component_resolver: FuchsiaBootResolver,
 }
 
 impl ComponentResolverCapabilityProvider {
-    pub fn new(component_resolver: Arc<FuchsiaBootResolver>) -> Self {
+    pub fn new(component_resolver: FuchsiaBootResolver) -> Self {
         Self { component_resolver }
     }
 }
@@ -295,7 +278,7 @@ impl BootPackageResolver {
     //
     // - The presence of a /boot/blob dir, but absence of a package index implies incorrect
     //   bootfs assembly, and produces a FuchsiaBootResolver instantiation error.
-    async fn try_instantiate(proxy: &fio::DirectoryProxy) -> Result<Option<Self>, Error> {
+    async fn try_instantiate(proxy: &fio::DirectoryProxy) -> Result<Option<Arc<Self>>, Error> {
         // Check for the existence of a /boot/blob directory. Until we've started our migration,
         // it's a valid state for no packages to exist in the bootfs, in which case no blobs will
         // exist.
@@ -318,7 +301,7 @@ impl BootPackageResolver {
                 )
             })?;
 
-        Ok(Some(BootPackageResolver { boot_blob_storage, boot_package_index }))
+        Ok(Some(Arc::new(BootPackageResolver { boot_blob_storage, boot_package_index })))
     }
 
     /// Load `data/bootfs_packages` from /boot, if present.

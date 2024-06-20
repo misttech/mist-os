@@ -11,9 +11,7 @@ use builtins::ioport_resource::IoportResource;
 use crate::bootfs::BootfsSvc;
 use crate::builtin::builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME};
 use crate::builtin::crash_introspect::CrashIntrospectSvc;
-use crate::builtin::fuchsia_boot_resolver::{
-    FuchsiaBootResolverBuiltinCapability, SCHEME as BOOT_SCHEME,
-};
+use crate::builtin::fuchsia_boot_resolver::{FuchsiaBootResolver, SCHEME as BOOT_SCHEME};
 use crate::builtin::log::{ReadOnlyLog, WriteOnlyLog};
 use crate::builtin::realm_builder::{
     RealmBuilderResolver, RealmBuilderRunnerFactory, RUNNER_NAME as REALM_BUILDER_RUNNER_NAME,
@@ -43,7 +41,7 @@ use crate::model::events::serve::serve_event_stream;
 use crate::model::events::source_factory::{EventSourceFactory, EventSourceFactoryCapability};
 use crate::model::events::stream_provider::EventStreamProvider;
 use crate::model::model::{Model, ModelParams};
-use crate::model::resolver::{box_arc_resolver, ResolverRegistry};
+use crate::model::resolver::ResolverRegistry;
 use crate::model::token::InstanceRegistry;
 use crate::root_stop_notifier::RootStopNotifier;
 use crate::sandbox_util::LaunchTaskOnReceive;
@@ -520,7 +518,7 @@ pub struct BuiltinEnvironment {
     pub num_threads: usize,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
-    pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
+    pub realm_builder_resolver: Option<RealmBuilderResolver>,
     pub root_component_input: ComponentInput,
     capability_passthrough: bool,
     _service_fs_task: Option<fasync::Task<()>>,
@@ -532,8 +530,8 @@ impl BuiltinEnvironment {
         runtime_config: Arc<RuntimeConfig>,
         system_resource_handle: Option<Resource>,
         builtin_runners: Vec<BuiltinRunner>,
-        boot_resolver: Option<FuchsiaBootResolverBuiltinCapability>,
-        realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
+        boot_resolver: Option<FuchsiaBootResolver>,
+        realm_builder_resolver: Option<RealmBuilderResolver>,
         utc_clock: Option<Arc<Clock>>,
         inspector: Inspector,
         crash_records: CrashRecords,
@@ -1144,7 +1142,7 @@ impl BuiltinEnvironment {
 
         // Set up the boot resolver so it is routable from "above root".
         if let Some(boot_resolver) = boot_resolver {
-            let b = boot_resolver.host().clone();
+            let b = boot_resolver.clone();
             root_input_builder.add_builtin_protocol_if_enabled::<fresolution::ResolverMarker>(
                 move |stream| {
                     let b = b.clone();
@@ -1511,32 +1509,30 @@ fn register_builtin_resolver(resolvers: &mut ResolverRegistry) {
 async fn register_boot_resolver(
     resolvers: &mut ResolverRegistry,
     runtime_config: &RuntimeConfig,
-) -> Result<Option<FuchsiaBootResolverBuiltinCapability>, Error> {
+) -> Result<Option<FuchsiaBootResolver>, Error> {
     let path = match &runtime_config.builtin_boot_resolver {
         BuiltinBootResolver::Boot => "/boot",
         BuiltinBootResolver::None => return Ok(None),
     };
-    let boot_resolver = FuchsiaBootResolverBuiltinCapability::new(path)
-        .await
-        .context("Failed to create boot resolver")?;
-    match boot_resolver {
+    let resolver =
+        FuchsiaBootResolver::new(path).await.context("Failed to create boot resolver")?;
+    match resolver {
         None => {
             info!(%path, "fuchsia-boot resolver unavailable, not in namespace");
             Ok(None)
         }
-        Some(boot_resolver) => {
-            resolvers.register(BOOT_SCHEME.to_string(), box_arc_resolver(boot_resolver.host()));
-            Ok(Some(boot_resolver))
+        Some(resolver) => {
+            resolvers.register(BOOT_SCHEME.to_string(), Box::new(resolver.clone()));
+            Ok(Some(resolver))
         }
     }
 }
 
 fn register_realm_builder_resolver(
     resolvers: &mut ResolverRegistry,
-) -> Result<Arc<RealmBuilderResolver>, Error> {
-    let realm_builder_resolver =
+) -> Result<RealmBuilderResolver, Error> {
+    let resolver =
         RealmBuilderResolver::new().context("Failed to create realm builder resolver")?;
-    let resolver = Arc::new(realm_builder_resolver);
-    resolvers.register(REALM_BUILDER_SCHEME.to_string(), box_arc_resolver(&resolver));
+    resolvers.register(REALM_BUILDER_SCHEME.to_string(), Box::new(resolver.clone()));
     Ok(resolver)
 }

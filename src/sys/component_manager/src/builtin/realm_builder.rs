@@ -32,7 +32,7 @@ pub static RUNNER_NAME: &str = "realm_builder";
 ///
 /// Both of these protocols are typically implemented by the realm builder library, for use when
 /// integration testing a nested component manager.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RealmBuilderResolver {
     resolver_proxy: fresolution::ResolverProxy,
 }
