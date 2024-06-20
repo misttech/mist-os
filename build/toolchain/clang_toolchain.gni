@@ -1114,7 +1114,7 @@ template("clang_toolchain") {
                                "cxx_link_remote_strip_prefix",
                                "cxx_link_remote_dump_syms_prefix",
                              ])
-      _concurrent_jobs = concurrent_jobs.local
+      _link_concurrent_jobs = concurrent_jobs.local
       rspfile = "$outfile.rsp"
 
       use_llvm_ifs =
@@ -1140,7 +1140,7 @@ template("clang_toolchain") {
             _linker_prefix_list += [ "--compare" ]
             not_needed([ "_link_rbe_exec_strategy_flags" ])
           } else if (link_rbe_check == "none") {
-            _concurrent_jobs = concurrent_jobs.remote
+            _link_concurrent_jobs = concurrent_jobs.remote
             _linker_prefix_list += _link_rbe_exec_strategy_flags
           }
           if (!link_rbe_download_unstripped_outputs) {
@@ -1166,7 +1166,7 @@ template("clang_toolchain") {
         rspfile_content = "{{inputs}}"
       }
 
-      forward_variables_from(_concurrent_jobs, "*")
+      forward_variables_from(_link_concurrent_jobs, "*")
       restat = _restat_link
 
       # Expand {{REMOTE_STRIP_PREFIX}}
