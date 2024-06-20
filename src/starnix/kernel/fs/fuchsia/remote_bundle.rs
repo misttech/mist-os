@@ -111,6 +111,25 @@ impl RemoteBundle {
     fn get_node(&self, inode_num: u64) -> &Node {
         self.metadata.get(inode_num).unwrap()
     }
+
+    fn get_xattr(&self, node: &FsNode, name: &FsStr) -> Result<ValueOrSize<FsString>, Errno> {
+        let value = &self
+            .get_node(node.node_id)
+            .extended_attributes
+            .get(&**name)
+            .ok_or(errno!(ENOENT))?[..];
+        Ok(FsString::from(value).into())
+    }
+
+    fn list_xattrs(&self, node: &FsNode) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        Ok(self
+            .get_node(node.node_id)
+            .extended_attributes
+            .keys()
+            .map(|k| FsString::from(&k[..]))
+            .collect::<Vec<_>>()
+            .into())
+    }
 }
 
 impl FileSystemOps for RemoteBundle {
@@ -204,14 +223,7 @@ impl FsNodeOps for File {
     ) -> Result<ValueOrSize<FsString>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        Ok(FsString::from(
-            &bundle
-                .get_node(node.node_id)
-                .extended_attributes
-                .get(&**name)
-                .ok_or(errno!(ENOENT))?[..],
-        )
-        .into())
+        bundle.get_xattr(node, name)
     }
 
     fn list_xattrs(
@@ -222,13 +234,7 @@ impl FsNodeOps for File {
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        Ok(bundle
-            .get_node(node.node_id)
-            .extended_attributes
-            .keys()
-            .map(|k| FsString::from(&k[..]))
-            .collect::<Vec<_>>()
-            .into())
+        bundle.list_xattrs(node)
     }
 }
 
@@ -435,14 +441,7 @@ impl FsNodeOps for DirectoryObject {
     ) -> Result<ValueOrSize<FsString>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        let value = FsString::from(
-            &bundle
-                .get_node(node.node_id)
-                .extended_attributes
-                .get(&**name)
-                .ok_or(errno!(ENOENT))?[..],
-        );
-        Ok(value.into())
+        bundle.get_xattr(node, name)
     }
 
     fn list_xattrs(
@@ -453,13 +452,7 @@ impl FsNodeOps for DirectoryObject {
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        Ok(bundle
-            .get_node(node.node_id)
-            .extended_attributes
-            .keys()
-            .map(|k| FsString::from(&**k))
-            .collect::<Vec<_>>()
-            .into())
+        bundle.list_xattrs(node)
     }
 }
 
@@ -473,6 +466,29 @@ impl FsNodeOps for SymlinkObject {
         let bundle = RemoteBundle::from_fs(&fs);
         let target = bundle.get_node(node.node_id).symlink().ok_or(errno!(EIO))?.target.clone();
         Ok(SymlinkTarget::Path(target.into()))
+    }
+
+    fn get_xattr(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        name: &FsStr,
+        _size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
+        let fs = node.fs();
+        let bundle = RemoteBundle::from_fs(&fs);
+        bundle.get_xattr(node, name)
+    }
+
+    fn list_xattrs(
+        &self,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+        _size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        let fs = node.fs();
+        let bundle = RemoteBundle::from_fs(&fs);
+        bundle.list_xattrs(node)
     }
 }
 
