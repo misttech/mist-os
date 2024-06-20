@@ -3701,7 +3701,7 @@ template("loadable_module") {
         },
       ]
 
-      if (is_fuchsia && !is_kernel) {
+      if ((is_fuchsia || is_mistos) && !is_kernel) {
         if (!defined(distribution_entries)) {
           # Used by the distribution_manifest template.
           distribution_entries = [
