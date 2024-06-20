@@ -245,15 +245,15 @@ fn main() {
     };
 
     thread::spawn(|| {
+        let use_process_builder = true;
+
         // Wait until services are up
         futures::executor::block_on(async {
             assert_eq!(receiver.await, Ok(42));
         });
 
-        let as_process = true;
-
         let args: Vec<String> = env::args().collect();
-        if as_process {
+        if use_process_builder {
             let mut executor = fasync::SendExecutor::new(1);
             let run_root_fut = async move {
                 let bin_path = "/boot/".to_owned() + &args[1];
