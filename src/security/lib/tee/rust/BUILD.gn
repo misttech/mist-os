@@ -11,7 +11,9 @@ group("rust") {
 rustc_library("tee") {
   edition = "2021"
   deps = [ "//third_party/rust_crates:tracing" ]
-  non_rust_deps = [ "//src/security/lib/tee/tee-client-api" ]
+  non_rust_deps = [
+    "//src/security/lib/tee/tee-client-api:tee-client-api.rust_link_directive",
+  ]
   sources = [
     "src/lib.rs",
     "src/tee_client_api.rs",

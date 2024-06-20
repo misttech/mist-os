@@ -111,8 +111,7 @@ pub const TT_MS_ID_UNICODE_CS: c_ushort = 1;
 // Language IDs
 pub const TT_MS_LANGID_ENGLISH_UNITED_STATES: c_ushort = 0x0409;
 
-#[cfg_attr(target_os = "fuchsia", link(name = "freetype2"))]
-#[cfg_attr(not(target_os = "fuchsia"), link(name = "freetype2_for_rust_host", kind = "static"))]
+#[link(name = "freetype2")]
 extern "C" {
     pub fn FT_New_Library(memory: FT_Memory, alibrary: *mut FT_Library) -> FT_Error;
     pub fn FT_Done_Library(library: FT_Library) -> FT_Error;

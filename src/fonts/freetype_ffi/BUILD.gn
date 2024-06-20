@@ -3,7 +3,20 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_link_directive.gni")
 import("//build/testing/environments.gni")
+
+if (is_host) {
+  rustc_link_directive("freetype2.rust_link_directive") {
+    # TODO(https://fxbug.dev/42111830): Remove workaround for Rust host_toolchain
+    lib_static_target = "//third_party/freetype2:freetype2_for_rust_host"
+    lib_name = "freetype2:freetype2_for_rust_host"
+  }
+} else {
+  rustc_link_directive("freetype2.rust_link_directive") {
+    lib_shared_target = "//third_party/freetype2"
+  }
+}
 
 rustc_library("freetype_ffi") {
   name = "freetype_ffi"
@@ -12,12 +25,7 @@ rustc_library("freetype_ffi") {
 
   deps = [ "//third_party/rust_crates:libc" ]
 
-  if (is_fuchsia) {
-    non_rust_deps = [ "//third_party/freetype2" ]
-  } else {
-    # TODO(https://fxbug.dev/42111830): Remove workaround for Rust host_toolchain
-    non_rust_deps = [ "//third_party/freetype2:freetype2_for_rust_host" ]
-  }
+  non_rust_deps = [ ":freetype2.rust_link_directive" ]
 
   sources = [ "src/lib.rs" ]
 }

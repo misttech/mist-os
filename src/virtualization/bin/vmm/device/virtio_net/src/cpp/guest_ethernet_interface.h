@@ -11,20 +11,22 @@
 #include "src/virtualization/bin/vmm/device/virtio_net/src/cpp/guest_ethernet_context.h"
 
 extern "C" {
-zx_status_t guest_ethernet_context_create(GuestEthernetContext** context_out);
-void guest_ethernet_context_destroy(GuestEthernetContext* context);
+__EXPORT zx_status_t guest_ethernet_context_create(GuestEthernetContext** context_out);
+__EXPORT void guest_ethernet_context_destroy(GuestEthernetContext* context);
 
 // Creation, initialization, and destruction functions for the C++ device.
-zx_status_t guest_ethernet_create(GuestEthernetContext* context,
-                                  GuestEthernet** guest_ethernet_out);
-zx_status_t guest_ethernet_initialize(GuestEthernet* guest_ethernet,
-                                      const void* rust_guest_ethernet, const uint8_t* mac,
-                                      size_t mac_len, bool enable_bridge);
-void guest_ethernet_destroy(GuestEthernet* guest_ethernet);
+__EXPORT zx_status_t guest_ethernet_create(GuestEthernetContext* context,
+                                           GuestEthernet** guest_ethernet_out);
+__EXPORT zx_status_t guest_ethernet_initialize(GuestEthernet* guest_ethernet,
+                                               const void* rust_guest_ethernet, const uint8_t* mac,
+                                               size_t mac_len, bool enable_bridge);
+__EXPORT void guest_ethernet_destroy(GuestEthernet* guest_ethernet);
 
 // Rust device -> C++ device interface.
-zx_status_t guest_ethernet_send(GuestEthernet* guest_ethernet, const void* data, uint16_t length);
-void guest_ethernet_complete(GuestEthernet* guest_ethernet, uint32_t buffer_id, zx_status_t status);
+__EXPORT zx_status_t guest_ethernet_send(GuestEthernet* guest_ethernet, const void* data,
+                                         uint16_t length);
+__EXPORT void guest_ethernet_complete(GuestEthernet* guest_ethernet, uint32_t buffer_id,
+                                      zx_status_t status);
 
 // C++ device -> Rust device interface.
 void guest_ethernet_set_status(const void* device, zx_status_t status);

@@ -3,6 +3,11 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_link_directive.gni")
+
+rustc_link_directive("buildid.rust_link_directive") {
+  lib_static_target = "cpp:buildid"
+}
 
 rustc_library("lib") {
   name = "buildid"
@@ -10,7 +15,7 @@ rustc_library("lib") {
   with_unit_tests = true
 
   deps = [ "//third_party/rust_crates:thiserror" ]
-  non_rust_deps = [ "cpp:buildid" ]
+  non_rust_deps = [ ":buildid.rust_link_directive" ]
 
   sources = [ "src/lib.rs" ]
 }

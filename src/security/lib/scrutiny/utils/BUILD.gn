@@ -4,6 +4,7 @@
 
 import("//build/host.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_link_directive.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/zircon/tools.gni")
@@ -66,6 +67,14 @@ if (is_host) {
     outputs = [ "$target_out_dir/testdata/{{source_file_part}}" ]
   }
 
+  rustc_link_directive("zstd.rust_link_directive") {
+    lib_static_target = "//third_party/zstd"
+  }
+
+  rustc_link_directive("ffi.rust_link_directive") {
+    lib_static_target = "//src/security/lib/scrutiny/utils/ffi"
+  }
+
   rustc_library("utils") {
     name = "scrutiny_utils"
     with_unit_tests = true
@@ -100,9 +109,9 @@ if (is_host) {
     ]
 
     non_rust_deps = [
+      ":ffi.rust_link_directive",
+      ":zstd.rust_link_directive",
       "//src/lib/chunked-compression",
-      "//src/security/lib/scrutiny/utils/ffi",
-      "//third_party/zstd",
     ]
 
     sources = [

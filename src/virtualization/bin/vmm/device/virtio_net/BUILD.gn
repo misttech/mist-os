@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_link_directive.gni")
 
 static_library("guest-ethernet") {
   sources = [
@@ -23,6 +24,7 @@ static_library("guest-ethernet") {
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_hlcpp",
     "//sdk/fidl/fuchsia.net:fuchsia.net_hlcpp",
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_hlcpp",
+    "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
@@ -37,6 +39,10 @@ static_library("guest-ethernet") {
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/virtio",
   ]
+}
+
+rustc_link_directive("guest-ethernet.rust_link_directive") {
+  lib_static_target = ":guest-ethernet"
 }
 
 group("tests") {
@@ -61,7 +67,7 @@ rustc_binary("virtio_net_bin") {
   ]
 
   deps = [
-    ":guest-ethernet",
+    ":guest-ethernet.rust_link_directive",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.virtualization.hardware:fuchsia.virtualization.hardware_rust",
     "//src/lib/fidl/rust/fidl",

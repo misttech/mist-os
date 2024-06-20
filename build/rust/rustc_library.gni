@@ -195,11 +195,18 @@ template("rustc_library") {
                                "name",
                                "assert_no_deps",
                                "disable_rustdoc",
+                               "public_deps",
                                "test_disable_rbe",
                                "non_test_deps",
                              ])
       if (defined(invoker.test_disable_rbe)) {
         disable_rbe = invoker.test_disable_rbe
+      }
+      if (defined(invoker.public_deps)) {
+        if (!defined(deps)) {
+          deps = []
+        }
+        deps += invoker.public_deps
       }
     }
   }

@@ -5,8 +5,13 @@
 import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_link_directive.gni")
 import("//build/rust/rustc_staticlib.gni")
 import("//build/test.gni")
+
+rustc_link_directive("trace-engine.rust_link_directive") {
+  lib_shared_target = "//zircon/system/ulib/trace-engine"
+}
 
 rustc_library("trace") {
   name = "fuchsia_trace"
@@ -18,7 +23,7 @@ rustc_library("trace") {
     "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:rand",
   ]
-  non_rust_deps = [ "//zircon/system/ulib/trace-engine" ]
+  non_rust_deps = [ ":trace-engine.rust_link_directive" ]
 
   sources = [ "src/lib.rs" ]
 }
@@ -103,6 +108,10 @@ shared_library("rust-trace-provider") {
   sources = [ "trace-provider/trace_provider.cc" ]
 }
 
+rustc_link_directive("rust-trace-provider.rust_link_directive") {
+  lib_shared_target = ":rust-trace-provider"
+}
+
 bootfs_files_for_assembly("bootfs") {
   deps = [ ":rust-trace-provider" ]
 }
@@ -111,7 +120,7 @@ rustc_library("trace-provider") {
   name = "fuchsia_trace_provider"
   edition = "2021"
   source_root = "trace-provider/src/lib.rs"
-  non_rust_deps = [ ":rust-trace-provider" ]
+  public_deps = [ ":rust-trace-provider.rust_link_directive" ]
 
   sources = [ "trace-provider/src/lib.rs" ]
 }
@@ -126,14 +135,17 @@ shared_library("rust-trace-observer") {
   sources = [ "trace-observer/trace_observer.cc" ]
 }
 
+rustc_link_directive("rust-trace-observer.rust_link_directive") {
+  lib_shared_target = ":rust-trace-observer"
+}
+
 rustc_library("trace-observer") {
   name = "fuchsia_trace_observer"
   edition = "2021"
   source_root = "trace-observer/src/lib.rs"
   non_rust_deps = [
-    ":rust-trace-observer",
+    ":rust-trace-observer.rust_link_directive",
     "//zircon/system/ulib/trace",
   ]
-
   sources = [ "trace-observer/src/lib.rs" ]
 }

@@ -7,9 +7,12 @@
 # More advanced usages of might require more sophisticated
 # build rules
 
+import("//build/rust/rustc_link_directive.gni")
+
 generator_crate = "../../vendor/generator-0.7.5"
 
-static_library("asm") {
+static_library("asm-static") {
+  output_name = "asm"
   if (current_cpu == "x64" && !is_mac) {
     sources = [ "$generator_crate/src/detail/asm/asm_x86_64_sysv_elf_gas.S" ]
   } else if (current_cpu == "x64" && is_mac) {
@@ -22,4 +25,9 @@ static_library("asm") {
   } else {
     assert(false, "unsupported OS or CPU: $current_os/$current_cpu")
   }
+}
+
+rustc_link_directive("asm") {
+  lib_name = "asm"
+  lib_static_target = ":asm-static"
 }
