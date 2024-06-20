@@ -50,9 +50,14 @@ rustc_test("netstack_proxy_test") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-network_unified_binary_regular_and_gub_components("component") {
+fuchsia_component_manifest("component_manifest") {
   component_name = "netstack-proxy"
   manifest = "meta/netstack-proxy.cml"
+}
+
+network_unified_binary_regular_and_gub_components("component") {
+  component_name = "netstack-proxy"
+  cm_label = ":component_manifest"
   gub_deps = [
     ":bin",
     "//src/connectivity/network/netstack3:bin",
@@ -78,6 +83,12 @@ fuchsia_test_component("component-test") {
 
 fuchsia_test_package("netstack-proxy-test") {
   test_components = [ ":component-test" ]
+  deps = [ ":config_for_tests" ]
+}
+
+fuchsia_structured_config_values("config_for_tests") {
+  cm_label = ":component_manifest"
+  values_source = "//src/connectivity/network/netstack3/config/test.json5"
 }
 
 group("tests") {

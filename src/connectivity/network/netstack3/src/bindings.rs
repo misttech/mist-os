@@ -1179,8 +1179,6 @@ impl NetstackSeed {
         services: S,
         inspect_publisher: InspectPublisher<'_>,
     ) {
-        info!("serving netstack with netstack3");
-
         let Self {
             mut netstack,
             interfaces_worker,

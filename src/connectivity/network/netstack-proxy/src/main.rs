@@ -119,6 +119,12 @@ pub async fn main() {
     actions
         .push(fdio::SpawnAction::add_namespace_entry(cstr!("/svc"), svc_dir.into_channel().into()));
 
+    // Pass down the configuration VMO if we have it.
+    let config_vmo_handle_info = fuchsia_runtime::HandleType::ComponentConfigVmo.into();
+    if let Some(config_vmo) = fuchsia_runtime::take_startup_handle(config_vmo_handle_info) {
+        actions.push(fdio::SpawnAction::add_handle(config_vmo_handle_info, config_vmo))
+    }
+
     let proc = fdio::spawn_etc(
         &fuchsia_runtime::job_default(),
         fdio::SpawnOptions::CLONE_ALL - fdio::SpawnOptions::CLONE_NAMESPACE,

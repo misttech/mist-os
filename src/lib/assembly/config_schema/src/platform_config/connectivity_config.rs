@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::num::NonZeroU8;
+
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -49,6 +51,12 @@ pub struct PlatformNetworkConfig {
     #[schemars(schema_with = "crate::option_path_schema")]
     pub netstack_config_path: Option<FileRelativePathBuf>,
 
+    /// Number of threads used by the network stack.
+    ///
+    /// Platform default will be used if unspecified.
+    #[serde(default)]
+    pub netstack_thread_count: NetstackThreadCount,
+
     #[serde(default)]
     #[file_relative_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
@@ -73,6 +81,35 @@ pub struct PlatformNetworkConfig {
     /// Whether to include network-tun.
     #[serde(default)]
     pub include_tun: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(try_from = "u8")]
+pub struct NetstackThreadCount(NonZeroU8);
+
+impl TryFrom<u8> for NetstackThreadCount {
+    type Error = &'static str;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        NonZeroU8::new(value)
+            .map(NetstackThreadCount)
+            .ok_or("netstack thread count must be nonzero")
+    }
+}
+
+impl Default for NetstackThreadCount {
+    fn default() -> Self {
+        // TODO(https://fxbug.dev/316616750): Update this default once
+        // multithreading is stabilized.
+        Self(NonZeroU8::new(1).unwrap())
+    }
+}
+
+impl NetstackThreadCount {
+    pub fn get(&self) -> u8 {
+        let Self(v) = self;
+        v.get()
+    }
 }
 
 /// Network stack version to use.

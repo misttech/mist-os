@@ -40,6 +40,7 @@ group("for_transition") {
 # TODO(https://fxbug.dev/42083163): Define a package here instead of a group, then
 # use it as a subpackage within the tests that need it.
 group("netstack-for-tests") {
+  testonly = true
   deps = [ "netstack:component" ]
 
   if (current_cpu == "riscv64") {
@@ -76,6 +77,10 @@ network_unified_binary_regular_and_gub_packages("netstack3") {
     "dhcpv4/client/bindings:component",
     "netstack3:component",
   ]
+
+  # Handled by assembly.
+  validate_structured_config = false
+
   visibility = [
     ":*",
     "//bundles/assembly:*",
@@ -87,6 +92,10 @@ network_unified_binary_regular_and_gub_packages("netstack-migration") {
     "netstack-proxy:component",
     "stack-migration:component",
   ]
+
+  # Handled by assembly.
+  validate_structured_config = false
+
   visibility = [
     ":*",
     "//bundles/assembly:*",

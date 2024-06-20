@@ -155,6 +155,20 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 }
             }
 
+            // Define netstack3 structured configuration keys.
+            //
+            // It must be set twice, because netstack3 is both in the
+            // netstack-migration package and the netstack3 package.
+            for (package, component) in [
+                ("netstack3", "meta/netstack3.cm"),
+                ("netstack-migration", "meta/netstack-proxy.cm"),
+            ] {
+                builder.package(package).component(component)?.field(
+                    "num_threads",
+                    connectivity_config.network.netstack_thread_count.get(),
+                )?;
+            }
+
             // Add the networking test collection on all eng builds. The test
             // collection allows components to be launched inside the network
             // realm with access to all networking related capabilities.

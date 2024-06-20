@@ -76,6 +76,7 @@ fuchsia_test_package("tun-socket-benchmarks-tests-netstack3") {
     ":tun-socket-benchmarks-netstack3",
     ":tun-socket-benchmarks-netstack3-with-tracing",
   ]
+  deps = [ "//src/connectivity/network/netstack3:config_for_tests" ]
 }
 
 fuchsia_component_perf_test("tun_socket_benchmarks_with_netstack3") {
