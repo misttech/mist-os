@@ -10,8 +10,8 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/nelson",
       "sys/platform/pt/nelson/post-init/post-init",
-      "sys/platform/05:05:1/aml-gpio/gpio",
-      "sys/platform/05:05:1/aml-gpio/gpio-init",
+      "sys/platform/gpio/aml-gpio/gpio",
+      "sys/platform/gpio/aml-gpio/gpio-init",
       "sys/platform/gpio-h/aml-gpio/gpio",
       "sys/platform/nelson-buttons/nelson-buttons/buttons",
       "sys/platform/bt-uart/bluetooth-composite-spec/aml-uart/bt-transport-uart",

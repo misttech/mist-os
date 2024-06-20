@@ -10,8 +10,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/astro",
       "sys/platform/pt/astro/post-init/post-init",
-      "sys/platform/05:03:1/aml-gpio/gpio",
-      "sys/platform/05:03:1/aml-gpio/gpio-init",
+      "sys/platform/gpio/aml-gpio/gpio",
+      "sys/platform/gpio/aml-gpio/gpio-init",
       "sys/platform/astro-buttons/astro-buttons/buttons",
       "sys/platform/i2c-0/i2c-0/aml-i2c",
       "sys/platform/i2c-1/i2c-1/aml-i2c",

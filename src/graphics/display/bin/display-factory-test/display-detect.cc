@@ -77,7 +77,7 @@ int main(int argc, const char* argv[]) {
   const Board board = GetBoard();
 
   if (board == Board::kSherlock) {
-    static constexpr char kSherlockGpioPath[] = "/dev/sys/platform/05:04:1/aml-gpio/gpio-76";
+    static constexpr char kSherlockGpioPath[] = "/dev/sys/platform/gpio/aml-gpio/gpio-76";
     zx::result<uint8_t> gpio_value_result = GetGpioValue(kSherlockGpioPath);
     if (gpio_value_result.is_error()) {
       std::printf("MIPI device detect failed: %s\n", gpio_value_result.status_string());

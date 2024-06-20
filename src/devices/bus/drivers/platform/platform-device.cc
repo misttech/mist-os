@@ -324,7 +324,6 @@ zx_status_t PlatformDevice::Start() {
       "thermistor",       // 03:0a:27
       "pll-temp-sensor",  // 05:06:39
       "sysmem",           // 00:00:1b
-      "gpio",             // 05:04:1,05:03:1,05:05:1,05:06:1
   };
 
   char name[ZX_DEVICE_NAME_MAX];
