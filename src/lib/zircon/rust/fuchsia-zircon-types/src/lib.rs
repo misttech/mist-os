@@ -956,10 +956,10 @@ impl Debug for zx_packet_guest_vcpu_t {
 pub struct zx_packet_page_request_t {
     pub command: zx_page_request_command_t,
     pub flags: u16,
-    _reserved0: u32,
+    pub reserved0: u32,
     pub offset: u64,
     pub length: u64,
-    _reserved1: u64,
+    pub reserved1: u64,
 }
 
 #[repr(u16)]
@@ -1458,7 +1458,7 @@ pub struct zx_vcpu_state_t {
     pub sp: u64,
     // Contains only the user-controllable upper 4-bits (NZCV).
     pub cpsr: u32,
-    pub _padding1: [PadByte; 4],
+    pub padding1: [PadByte; 4],
 }
 
 #[cfg(target_arch = "riscv64")]
@@ -1472,7 +1472,7 @@ pub struct zx_vcpu_state_t {
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_vcpu_io_t {
     pub access_size: u8,
-    pub _padding1: [PadByte; 3],
+    pub padding1: [PadByte; 3],
     pub data: [u8; 4],
 }
 
@@ -1984,7 +1984,7 @@ multiconst!(u32, [
 pub struct zx_system_powerctl_arg_t {
     // rust can't express anonymous unions at this time
     // https://github.com/rust-lang/rust/issues/49804
-    powerctl_internal: zx_powerctl_union,
+    pub powerctl_internal: zx_powerctl_union,
 }
 
 #[repr(C)]
@@ -2024,12 +2024,12 @@ multiconst!(zx_pci_bar_types_t, [
 
 #[repr(C)]
 pub struct zx_pci_bar_t {
-    id: u32,
-    ty: u32,
-    size: usize,
+    pub id: u32,
+    pub ty: u32,
+    pub size: usize,
     // rust can't express anonymous unions at this time
     // https://github.com/rust-lang/rust/issues/49804
-    zx_pci_bar_union: zx_pci_bar_union,
+    pub zx_pci_bar_union: zx_pci_bar_union,
 }
 
 #[repr(C)]
@@ -2050,27 +2050,27 @@ pub struct zx_pci_bar_union_struct {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct zx_smc_parameters_t {
-    func_id: u32,
-    _padding1: [PadByte; 4],
-    arg1: u64,
-    arg2: u64,
-    arg3: u64,
-    arg4: u64,
-    arg5: u64,
-    arg6: u64,
-    client_id: u16,
-    secure_os_id: u16,
-    _padding2: [PadByte; 4],
+    pub func_id: u32,
+    pub padding1: [PadByte; 4],
+    pub arg1: u64,
+    pub arg2: u64,
+    pub arg3: u64,
+    pub arg4: u64,
+    pub arg5: u64,
+    pub arg6: u64,
+    pub client_id: u16,
+    pub secure_os_id: u16,
+    pub padding2: [PadByte; 4],
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct zx_smc_result_t {
-    arg0: u64,
-    arg1: u64,
-    arg2: u64,
-    arg3: u64,
-    arg6: u64,
+    pub arg0: u64,
+    pub arg1: u64,
+    pub arg2: u64,
+    pub arg3: u64,
+    pub arg6: u64,
 }
 
 const ZX_CPU_SET_MAX_CPUS: usize = 512;
@@ -2079,39 +2079,39 @@ const ZX_CPU_SET_BITS_PER_WORD: usize = 64;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct zx_cpu_set_t {
-    mask: [u64; ZX_CPU_SET_MAX_CPUS / ZX_CPU_SET_BITS_PER_WORD],
+    pub mask: [u64; ZX_CPU_SET_MAX_CPUS / ZX_CPU_SET_BITS_PER_WORD],
 }
 
 // source: zircon/system/public/zircon/syscalls/scheduler.h
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct zx_profile_info_t {
-    flags: u32,
-    _padding1: [PadByte; 4],
-    zx_profile_info_union: zx_profile_info_union,
-    cpu_affinity_mask: zx_cpu_set_t,
+    pub flags: u32,
+    pub padding1: [PadByte; 4],
+    pub zx_profile_info_union: zx_profile_info_union,
+    pub cpu_affinity_mask: zx_cpu_set_t,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-struct priority_params {
+pub struct priority_params {
     priority: i32,
     _padding2: [PadByte; 20],
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-union zx_profile_info_union {
-    priority_params: priority_params,
-    deadline_params: zx_sched_deadline_params_t,
+pub union zx_profile_info_union {
+    pub priority_params: priority_params,
+    pub deadline_params: zx_sched_deadline_params_t,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-struct zx_sched_deadline_params_t {
-    capacity: zx_duration_t,
-    relative_deadline: zx_duration_t,
-    period: zx_duration_t,
+pub struct zx_sched_deadline_params_t {
+    pub capacity: zx_duration_t,
+    pub relative_deadline: zx_duration_t,
+    pub period: zx_duration_t,
 }
 
 #[repr(C)]
