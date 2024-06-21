@@ -845,11 +845,23 @@ mod tests {
         assert!(matches!(extra_remove_dep_res, Err(ModifyDependencyError::NotFound { .. })));
 
         assert_eq!(t.element_exists(&fire), true);
+        t.add_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: fire.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+        })
+        .expect("add_assertive_dependency failed");
         t.remove_element(&fire);
         assert_eq!(t.element_exists(&fire), false);
+        let removed_element_dep_res = t.remove_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: fire.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+        });
+        assert!(matches!(removed_element_dep_res, Err(ModifyDependencyError::NotFound { .. })));
+
         assert_eq!(t.element_exists(&air), true);
         t.remove_element(&air);
         assert_eq!(t.element_exists(&air), false);
+
         assert_data_tree!(inspect, root: {
            test: {
                 "fuchsia.inspect.Graph": {
