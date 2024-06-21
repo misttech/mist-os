@@ -877,7 +877,6 @@ sdk_molecule("platform_libs") {
     "//src/devices/testing/fake-bti:fake-bti_sdk",
     "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
-    "//zircon/system/ulib/fzl:fzl_sdk",
   ]
 }
 
