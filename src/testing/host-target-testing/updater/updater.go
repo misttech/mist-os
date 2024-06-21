@@ -224,6 +224,7 @@ func updateCheckNow(
 
 		var stdout bytes.Buffer
 		err = c.Run(ctx, cmd, &stdout, os.Stderr)
+		logger.Debugf(ctx, "Output from check-now monitor: %s", stdout.String())
 		if err == nil && checkForUnkownFirmware {
 			// FIXME(https://fxbug.dev/42077484): We wouldn't have to ignore disconnects
 			// if we could trigger an update without it automatically rebooting.
@@ -234,10 +235,11 @@ func updateCheckNow(
 		for scanner.Scan() {
 			line := scanner.Text()
 			if strings.Contains(line, "InstallationDeferredByPolicy") {
-				logger.Warningf(ctx, "InstallationDeferredByPolicy state detected, forcing reboot")
+				logger.Debugf(ctx, "InstallationDeferredByPolicy state detected, forcing reboot")
 				if err := c.RunReboot(ctx); err != nil {
 					return fmt.Errorf("failed to reboot the device after InstallationDeferredByPolicy state: %w", err)
 				}
+				break
 			}
 		}
 
