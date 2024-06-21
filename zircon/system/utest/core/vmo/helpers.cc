@@ -60,6 +60,34 @@ zx::result<PhysVmo> GetTestPhysVmo(size_t size) {
     return zx::error_result(res);
   }
 
+  // The test VMO is, due to being a physical VMO, uncached by default, however this VMO is reused
+  // by different tests and these tests may changed it to cached etc. To ensure that every test then
+  // gets a clean version of the VMO we do a cache clean so that if the test that is now creating
+  // this VMO uses in the default uncached state there is no cached data waiting to be written out
+  // as a cache-bomb.
+  uintptr_t vaddr;
+  res = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ret.vmo, 0, ret.size,
+                                   &vaddr);
+  EXPECT_OK(res);
+  if (res != ZX_OK) {
+    return zx::error_result(res);
+  }
+  auto unmap =
+      fit::defer([vaddr, size = ret.size]() { zx::vmar::root_self()->unmap(vaddr, size); });
+  res = zx_cache_flush(reinterpret_cast<void*>(vaddr), ret.size, ZX_CACHE_FLUSH_DATA);
+  if (res != ZX_OK) {
+#if defined(__riscv)
+    // zx_cache_flush is not implemented for riscv so we must fall back to performing a cache op
+    // directly on the VMO. Cannot just always do the VMO cache op as other architectures, like ARM,
+    // do not have the physical VMO mapped into the kernel and so the cache op will not work.
+    res = ret.vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, ret.size, nullptr, 0);
+#endif
+    EXPECT_OK(res);
+    if (res != ZX_OK) {
+      return zx::error_result(res);
+    }
+  }
+
   return zx::ok(std::move(ret));
 }
 
