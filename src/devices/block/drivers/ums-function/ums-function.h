@@ -119,7 +119,7 @@ class UmsFunction : public DeviceType, public ddk::UsbFunctionInterfaceProtocol<
   bool active_;
   fbl::Mutex mtx_;
   fbl::ConditionVariable condvar_ __TA_GUARDED(mtx_);
-  std::atomic_int pending_request_count_;
+  std::atomic_int pending_request_count_ = 0;
 };
 
 }  // namespace ums
