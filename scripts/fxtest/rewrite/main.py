@@ -22,6 +22,8 @@ import textwrap
 import typing
 
 import args
+import async_utils.command as command
+import async_utils.signals as signals
 import config
 import console
 import dataparse
@@ -36,8 +38,6 @@ import statusinfo
 import termout
 import test_list_file
 import tests_json_file
-import util.command as command
-import util.signals
 
 
 def main() -> None:
@@ -70,7 +70,7 @@ def main() -> None:
     fut = asyncio.ensure_future(
         async_main_wrapper(real_flags, config_file=config_file)
     )
-    util.signals.register_on_terminate_signal(fut.cancel)  # type: ignore[arg-type]
+    signals.register_on_terminate_signal(fut.cancel)  # type: ignore[arg-type]
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(fut)

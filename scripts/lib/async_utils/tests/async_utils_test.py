@@ -11,8 +11,8 @@ import stat
 import tempfile
 import unittest
 
-from util import command
-import util.signals
+from async_utils import command
+import async_utils.signals
 
 
 class TestCommand(unittest.IsolatedAsyncioTestCase):
@@ -284,7 +284,7 @@ class TestSignals(unittest.TestCase):
                     f.write("Handler printed message\n")
                 fut.cancel()
 
-            util.signals.register_on_terminate_signal(write_output)
+            async_utils.signals.register_on_terminate_signal(write_output)
             try:
                 loop.run_until_complete(fut)
             except asyncio.CancelledError:

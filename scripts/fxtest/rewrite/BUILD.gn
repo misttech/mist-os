@@ -25,7 +25,6 @@ group("tests") {
     ":test_list_file_test($host_toolchain)",
     ":tests_json_file_test($host_toolchain)",
     "dataparse:tests",
-    "util:tests",
   ]
 }
 
@@ -49,7 +48,7 @@ if (is_host) {
 
   binary_deps = [
     "dataparse",
-    "util",
+    "//scripts/lib/async_utils",
     "//scripts/lib/statusinfo",
     "//scripts/lib/termout",
     "//third_party/colorama",

@@ -18,7 +18,7 @@ import event
 import execution
 import test_list_file
 import tests_json_file
-import util.command as command
+import async_utils.command as command
 
 
 class TestExecution(unittest.IsolatedAsyncioTestCase):

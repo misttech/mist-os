@@ -21,7 +21,7 @@ import environment
 import event
 import main
 import test_list_file
-import util.command
+import async_utils.command as command
 
 
 class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
@@ -517,9 +517,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         command_mock = self._mock_run_command(1)
         command_mock.side_effect = [
-            util.command.CommandOutput("out", "err", 1, 10, None),
-            util.command.CommandOutput("out", "err", 1, 10, None),
-            util.command.CommandOutput("out", "err", 1, 10, None),
+            command.CommandOutput("out", "err", 1, 10, None),
+            command.CommandOutput("out", "err", 1, 10, None),
+            command.CommandOutput("out", "err", 1, 10, None),
         ]
 
         self._mock_has_device_connected(True)
@@ -582,7 +582,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         """Test that we abort running the rest of the tests in a --count group if a timeout occurs."""
 
         command_mock = self._mock_run_command(1)
-        command_mock.return_value = util.command.CommandOutput(
+        command_mock.return_value = command.CommandOutput(
             "", "", 1, 10, None, was_timeout=True
         )
 
