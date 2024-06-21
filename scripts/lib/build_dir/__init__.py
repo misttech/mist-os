@@ -2,12 +2,4 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
-  testonly = true
-  deps = [
-    "async_utils:tests",
-    "build_dir:tests",
-    "statusinfo:tests",
-    "termout:tests",
-  ]
-}
+from .lib import *
