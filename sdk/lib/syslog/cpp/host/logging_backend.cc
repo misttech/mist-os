@@ -109,6 +109,26 @@ void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value) {
   WriteKeyValueLegacy(buffer, key, value);
 }
 
+void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) {
+  syslog_runtime::WriteKeyValue(this, key, value);
+}
+
+void LogBuffer::WriteKeyValue(cpp17::string_view key, int64_t value) {
+  syslog_runtime::WriteKeyValue(this, key, value);
+}
+
+void LogBuffer::WriteKeyValue(cpp17::string_view key, uint64_t value) {
+  syslog_runtime::WriteKeyValue(this, key, value);
+}
+
+void LogBuffer::WriteKeyValue(cpp17::string_view key, double value) {
+  syslog_runtime::WriteKeyValue(this, key, value);
+}
+
+void LogBuffer::WriteKeyValue(cpp17::string_view key, bool value) {
+  syslog_runtime::WriteKeyValue(this, key, value);
+}
+
 void EndRecord(LogBuffer* buffer) { EndRecordLegacy(buffer); }
 
 bool LogBuffer::Flush() {

@@ -79,6 +79,8 @@ void SetInterestChangedListener(void (*callback)(void* context,
 void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
                  unsigned int line, NullSafeStringView msg, NullSafeStringView condition);
 
+// These methods are deprecated and are being removed.
+// Use WriteKeyValue on LogBuffer instead.
 void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value);
 
 void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, int64_t value);
@@ -89,6 +91,7 @@ void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, double value);
 
 void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value);
 
+[[maybe_unused]]
 static void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, const char* value) {
   WriteKeyValue(buffer, key, cpp17::string_view(value));
 }
@@ -128,6 +131,20 @@ struct LogBuffer final {
   // for this is backend-specific.
   uint64_t data[kBufferSize];
 
+  void WriteKeyValue(cpp17::string_view key, cpp17::string_view value);
+
+  void WriteKeyValue(cpp17::string_view key, int64_t value);
+
+  void WriteKeyValue(cpp17::string_view key, uint64_t value);
+
+  void WriteKeyValue(cpp17::string_view key, double value);
+
+  void WriteKeyValue(cpp17::string_view key, bool value);
+
+  void WriteKeyValue(cpp17::string_view key, const char* value) {
+    WriteKeyValue(key, cpp17::string_view(value));
+  }
+
   // Encodes an int8
   void Encode(KeyValue<const char*, int8_t> value) {
     Encode(KeyValue<const char*, int64_t>(value.key, value.value));
@@ -144,14 +161,12 @@ struct LogBuffer final {
   }
 
   // Encodes an int64
-  void Encode(KeyValue<const char*, int64_t> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, value.value);
-  }
+  void Encode(KeyValue<const char*, int64_t> value) { WriteKeyValue(value.key, value.value); }
 
 #ifdef __APPLE__
   // Encodes a size_t. On Apple Clang, size_t is a special type.
   void Encode(KeyValue<const char*, size_t> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, static_cast<int64_t>(value.value));
+    WriteKeyValue(value.key, static_cast<int64_t>(value.value));
   }
 #endif
 
@@ -171,44 +186,30 @@ struct LogBuffer final {
   }
 
   // Encodes an uint64
-  void Encode(KeyValue<const char*, uint64_t> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, value.value);
-  }
+  void Encode(KeyValue<const char*, uint64_t> value) { WriteKeyValue(value.key, value.value); }
 
   // Encodes a NULL-terminated C-string.
-  void Encode(KeyValue<const char*, const char*> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, value.value);
-  }
+  void Encode(KeyValue<const char*, const char*> value) { WriteKeyValue(value.key, value.value); }
 
   // Encodes a NULL-terminated C-string.
-  void Encode(KeyValue<const char*, char*> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, value.value);
-  }
+  void Encode(KeyValue<const char*, char*> value) { WriteKeyValue(value.key, value.value); }
 
   // Encodes a C++ std::string.
-  void Encode(KeyValue<const char*, std::string> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, value.value);
-  }
+  void Encode(KeyValue<const char*, std::string> value) { WriteKeyValue(value.key, value.value); }
 
   // Encodes a C++ std::string_view.
   void Encode(KeyValue<const char*, std::string_view> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, value.value);
+    WriteKeyValue(value.key, value.value);
   }
 
   // Encodes a double floating point value
-  void Encode(KeyValue<const char*, double> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, value.value);
-  }
+  void Encode(KeyValue<const char*, double> value) { WriteKeyValue(value.key, value.value); }
 
   // Encodes a floating point value
-  void Encode(KeyValue<const char*, float> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, value.value);
-  }
+  void Encode(KeyValue<const char*, float> value) { WriteKeyValue(value.key, value.value); }
 
   // Encodes a boolean value
-  void Encode(KeyValue<const char*, bool> value) {
-    syslog_runtime::WriteKeyValue(this, value.key, value.value);
-  }
+  void Encode(KeyValue<const char*, bool> value) { WriteKeyValue(value.key, value.value); }
 
   // Writes the log to a socket.
   bool Flush();
