@@ -39,7 +39,7 @@ use timeout::timeout;
 use tuf::metadata::RawSignedMetadata;
 
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
-const NUM_RECONNECT_RETRIES: u8 = 10;
+const MAX_CONSECUTIVE_CONNECT_ATTEMPTS: u8 = 10;
 const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
 const REPO_FOREGROUND_FEATURE_FLAG: &str = "repository.foreground.enabled";
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
@@ -169,9 +169,9 @@ async fn main_connect_loop(
     target_proxy: Connector<TargetProxy>,
     mut writer: impl Write + 'static,
 ) -> Result<()> {
-    // We try to reconnect unless NUM_RECONNECT_RETRIES reconnect
+    // We try to reconnect unless MAX_CONSECUTIVE_CONNECT_ATTEMPTS reconnect
     // attempts in immediate succession fail.
-    let mut retries = 0;
+    let mut attempts = 0;
 
     // Outer connection loop, retries when disconnected.
     loop {
@@ -179,8 +179,10 @@ async fn main_connect_loop(
         if let Ok(Some(())) = loop_stop_rx.try_next() {
             return Ok(());
         }
-        if retries >= NUM_RECONNECT_RETRIES {
-            ffx_bail!("Stopping reconnecting after {retries} subsequent failed attempts");
+        if attempts >= MAX_CONSECUTIVE_CONNECT_ATTEMPTS {
+            ffx_bail!("Stopping reconnecting after {attempts} consecutive failed attempts");
+        } else {
+            attempts += 1;
         }
 
         let mut target_spec_from_rcs_proxy: Option<String> = None;
@@ -205,8 +207,7 @@ async fn main_connect_loop(
                 return Err(e);
             }
             Err(e) => {
-                retries += 1;
-                tracing::warn!("Attempt #{retries}: failed to connect to rcs, retrying: {e}");
+                tracing::warn!("Attempt #{attempts}: failed to connect to rcs, retrying: {e}");
                 continue;
             }
         };
@@ -229,11 +230,10 @@ async fn main_connect_loop(
         if target_spec_from_rcs_proxy != target_spec_from_target_proxy {
             tracing::warn!(
                 "Attempt #{}: RCS and target proxies do not match: '{:?}', '{:?}', retrying.",
-                retries,
+                attempts,
                 target_spec_from_rcs_proxy,
                 target_spec_from_target_proxy,
             );
-            retries += 1;
             continue;
         }
 
@@ -255,7 +255,7 @@ async fn main_connect_loop(
         .await;
         match connection {
             Ok(()) => {
-                retries = 0;
+                attempts = 0;
                 let s = match target_spec_from_rcs_proxy {
                     Some(t) => format!(
                         "Serving repository '{repo_path}' to target '{t}' over address '{}'.",
@@ -292,7 +292,6 @@ async fn main_connect_loop(
             }
             Err(e) => {
                 tracing::warn!("Cannot connect to target: {:?}, retrying.", e);
-                retries += 1;
                 continue;
             }
         };
