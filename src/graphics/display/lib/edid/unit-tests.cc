@@ -263,9 +263,9 @@ TEST(EdidTest, GetManufacturerIdAndName) {
       0x30, 0x59, 0x48, 0x0a, 0x20, 0x20, 0x00, 0x40};
   static constexpr cpp20::span<const uint8_t> kHpZr30wEdid(kHpZr30wEdidArray);
 
-  edid::Edid edid;
-  fit::result<const char*> result = edid.Init(kHpZr30wEdid);
+  fit::result<const char*, edid::Edid> result = edid::Edid::Create(kHpZr30wEdid);
   ASSERT_FALSE(result.is_error()) << "Error while reading EDID: " << result.error_value();
+  edid::Edid edid = std::move(result).value();
 
   // The byte 0x08 and byte 0x09 of the EDID are 0x22 and 0xf0.
   //
@@ -296,9 +296,9 @@ TEST(EdidTest, GetDisplayProductNameWithNameDescriptor) {
       0x30, 0x59, 0x48, 0x0a, 0x20, 0x20, 0x00, 0x40};
   static constexpr cpp20::span<const uint8_t> kHpZr30wEdid(kHpZr30wEdidArray);
 
-  edid::Edid edid;
-  fit::result<const char*> result = edid.Init(kHpZr30wEdid);
+  fit::result<const char*, edid::Edid> result = edid::Edid::Create(kHpZr30wEdid);
   ASSERT_FALSE(result.is_error()) << "Error while reading EDID: " << result.error_value();
+  edid::Edid edid = std::move(result).value();
 
   // The third 18-byte descriptor:
   // 0x00, 0x00, 0x00, 0xfc, 0x00, 0x48, 0x50, 0x20, 0x5a, 0x52,
@@ -328,9 +328,10 @@ TEST(EdidTest, GetDisplayProductNameWithoutNameDescriptor) {
   static constexpr cpp20::span<const uint8_t> kHpZr30wWithoutNameDescriptorEdid(
       kHpZr30wWithoutNameDescriptorEdidArray);
 
-  edid::Edid edid;
-  fit::result<const char*> result = edid.Init(kHpZr30wWithoutNameDescriptorEdid);
+  fit::result<const char*, edid::Edid> result =
+      edid::Edid::Create(kHpZr30wWithoutNameDescriptorEdid);
   ASSERT_FALSE(result.is_error()) << "Error while reading EDID: " << result.error_value();
+  edid::Edid edid = std::move(result).value();
 
   // There is no display product name descriptor. GetDisplayProductName() should
   // return an empty string instead.
@@ -350,9 +351,9 @@ TEST(EdidTest, GetDisplayProductSerialWithSerialDescriptor) {
       0x30, 0x59, 0x48, 0x0a, 0x20, 0x20, 0x00, 0x40};
   static constexpr cpp20::span<const uint8_t> kHpZr30wEdid(kHpZr30wEdidArray);
 
-  edid::Edid edid;
-  fit::result<const char*> result = edid.Init(kHpZr30wEdid);
+  fit::result<const char*, edid::Edid> result = edid::Edid::Create(kHpZr30wEdid);
   ASSERT_FALSE(result.is_error()) << "Error while reading EDID: " << result.error_value();
+  edid::Edid edid = std::move(result).value();
 
   // The fourth 18-byte descriptor:
   // 0x00, 0x00, 0x00, 0xff, 0x00, 0x43, 0x4e, 0x34, 0x31, 0x33,
@@ -381,9 +382,10 @@ TEST(EdidTest, GetDisplayProductSerialWithoutSerialDescriptor) {
   static constexpr cpp20::span<const uint8_t> kHpZr30wWithoutSerialDescriptorEdid(
       kHpZr30wWithoutSerialDescriptorEdidArray);
 
-  edid::Edid edid;
-  fit::result<const char*> result = edid.Init(kHpZr30wWithoutSerialDescriptorEdid);
+  fit::result<const char*, edid::Edid> result =
+      edid::Edid::Create(kHpZr30wWithoutSerialDescriptorEdid);
   ASSERT_FALSE(result.is_error()) << "Error while reading EDID: " << result.error_value();
+  edid::Edid edid = std::move(result).value();
 
   // There is no display product serial number descriptor.
   // GetDisplayProductSerialNumber() should fall back to the decimal expression

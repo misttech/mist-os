@@ -10,15 +10,15 @@
 
 // fuzz_target.cc
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-  edid::Edid edid;
   if (size > UINT16_MAX) {
     return 0;
   }
 
-  fit::result<const char*> result = edid.Init(cpp20::span(data, size));
+  fit::result<const char*, edid::Edid> result = edid::Edid::Create(cpp20::span(data, size));
   if (!result.is_ok()) {
     return 0;
   }
+  edid::Edid edid = std::move(result).value();
 
   // Use a static variable to introduce optimization-preventing side-effects.
   [[maybe_unused]] static size_t count = 0;
