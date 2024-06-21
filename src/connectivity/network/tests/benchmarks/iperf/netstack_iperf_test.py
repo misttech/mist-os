@@ -302,7 +302,7 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                         os.path.join(self.test_case_path, "trace.fxt")
                     )
                     asserts.assert_equal(len(cpu_results), 1)
-                    cpu_percentages: list[float] = cpu_results[0].values
+                    cpu_percentages = list(cpu_results[0].values)
                     results += self._iperf_results_to_fuchsiaperf(
                         result_files,
                         cpu_percentages,

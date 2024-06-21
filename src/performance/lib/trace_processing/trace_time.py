@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Nanonsecond-resolution time values for trace models."""
 
+import dataclasses
 from typing import Any, Self, overload
 
 
@@ -111,6 +112,9 @@ class TimeDelta:
     def __hash__(self) -> int:
         return hash(self._delta)
 
+    def __repr__(self) -> str:
+        return f"{self._delta}ns"
+
 
 class TimePoint:
     """Represents a point in time as an integer number of nanoseconds elapsed
@@ -175,3 +179,22 @@ class TimePoint:
 
     def __hash__(self) -> int:
         return hash(self._ticks)
+
+    def __repr__(self) -> str:
+        return f"{self.to_epoch_delta()}"
+
+
+@dataclasses.dataclass(frozen=True)
+class Window:
+    """A pair of TimePoints during which the device was in an interesting state.
+
+    Args:
+      start: a TimePoint by which the device was in the desired state.
+      end: a TimePoint after which the device exited the relevant state.
+    """
+
+    start: TimePoint
+    end: TimePoint
+
+    def __contains__(self, b: TimePoint) -> bool:
+        return self.start <= b < self.end
