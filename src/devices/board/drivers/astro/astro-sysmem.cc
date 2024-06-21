@@ -26,19 +26,6 @@ static const std::vector<uint8_t> sysmem_metadata = [] {
 
   metadata.vid() = PDEV_VID_AMLOGIC;
   metadata.pid() = PDEV_PID_AMLOGIC_S905D2;
-
-  // On astro there are two protected memory ranges.  The protected_memory_size field configures
-  // the size of the non-VDEC range.  In contrast, the VDEC range is configured and allocated via
-  // the TEE, and is currently 7.5 MiB.  The VDEC range is a fixed location within the overall
-  // optee reserved range passed to Zircon during boot - the specific location is obtained by
-  // sysmem calling the secmem TA via fuchsia::sysmem::Tee protocol between sysmem and TEE
-  // Controller.
-  //
-  // The values below aren't use and are overridden by the kernel command-line set in the board
-  // file.
-  metadata.protected_memory_size() = 0;
-  metadata.contiguous_memory_size() = 0;
-
   auto persist_result = fidl::Persist(metadata);
   // Given permitted values set above, we won't see failure here. OOM would fail before getting
   // here.

@@ -79,6 +79,18 @@
             ],
         },
         {
+            from: "parent",
+            to: "#boot-drivers",
+            config: [
+                "fuchsia.sysmem.ContiguousGuardPagesUnused",
+                "fuchsia.sysmem.FixedContiguousMemorySize",
+                "fuchsia.sysmem.FixedProtectedMemorySize",
+                "fuchsia.sysmem.PercentContiguousMemorySize",
+                "fuchsia.sysmem.PercentProtectedMemorySize",
+            ],
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: [

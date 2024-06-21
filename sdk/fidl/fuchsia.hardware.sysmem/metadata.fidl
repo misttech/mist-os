@@ -33,6 +33,12 @@ type Metadata = table {
     /// ZX_PAGE_SIZE.
     ///
     /// un-set or 0 means there is no protected memory pool.
+    ///
+    /// This field is only for testing and may be removed. This field should not
+    /// be set outside of tests. For board-level config, see
+    /// PlatformSysmemConfig.protected_memory_size in assembly board info
+    /// platform.sysmem_defaults field. For product/platform level config, see
+    /// assembly platform config "sysmem" field.
     3: protected_memory_size int64;
 
     /// contiguous_memory_size
@@ -53,5 +59,11 @@ type Metadata = table {
     ///
     /// There is no fallback from pre-reserved to zx::vmo::create_contiguous().
     /// If we're pre-reserving memory, we should reserve enough.
+    ///
+    /// This field is only for testing and may be removed. This field should not
+    /// be set outside of tests. For board-level config, see
+    /// PlatformSysmemConfig.contiguous_memory_size in assembly board info
+    /// platform.sysmem_defaults field. For product/platform level config, see
+    /// assembly platform config "sysmem" field.
     4: contiguous_memory_size int64;
 };

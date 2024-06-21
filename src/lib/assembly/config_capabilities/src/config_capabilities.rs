@@ -19,6 +19,9 @@ pub use cm_rust::ConfigValueType;
 
 /// A collection of configuration capabilities.
 /// The name is the capability name, and the Config struct contains the configuration type and value.
+///
+/// A None value corresponds to a capability that explicitly ends in "void", which is relevant for
+/// availability optional config capabilities - when explicitly absent, they must route to "void".
 pub type CapabilityNamedMap = NamedMap<String, Config>;
 
 /// This represents a single configuration capabilility. It can easily be
@@ -34,6 +37,12 @@ impl Config {
     /// Create a new configuration capability.
     pub fn new(type_: ConfigValueType, value: Value) -> Self {
         Config { type_, value }
+    }
+
+    /// Create a new configuration capability whose source is "void". This is for any optional
+    /// config capabilities that should be absent.
+    pub fn new_void() -> Self {
+        Config { type_: ConfigValueType::Bool, value: Value::Null }
     }
 
     /// The value of this configuration capability.

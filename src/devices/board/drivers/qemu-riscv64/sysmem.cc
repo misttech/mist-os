@@ -27,8 +27,6 @@ zx::result<> QemuRiscv64::SysmemInit() {
     fuchsia_hardware_sysmem::Metadata metadata;
     metadata.vid() = PDEV_VID_QEMU;
     metadata.pid() = PDEV_PID_QEMU;
-    metadata.protected_memory_size() = 0;    // no protected pool
-    metadata.contiguous_memory_size() = -5;  // 5% of physical ram
     return metadata;
   }();
 

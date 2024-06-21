@@ -54,6 +54,18 @@
             ],
         },
         {
+            from: "#config",
+            to: "#bootstrap",
+            config: [
+                "fuchsia.sysmem.ContiguousGuardPagesUnused",
+                "fuchsia.sysmem.FixedContiguousMemorySize",
+                "fuchsia.sysmem.FixedProtectedMemorySize",
+                "fuchsia.sysmem.PercentContiguousMemorySize",
+                "fuchsia.sysmem.PercentProtectedMemorySize",
+            ],
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.process.Launcher",
             from: "parent",
             to: "#elf_runner",

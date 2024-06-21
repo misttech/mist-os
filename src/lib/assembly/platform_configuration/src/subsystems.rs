@@ -54,6 +54,7 @@ mod setui;
 mod starnix;
 mod storage;
 mod swd;
+mod sysmem;
 mod thermal;
 mod timekeeper;
 mod trusted_apps;
@@ -344,6 +345,9 @@ fn configure_subsystems(
 
     swd::SwdSubsystemConfig::define_configuration(context, &platform.software_delivery, builder)
         .context("Configuring the 'software_delivery' subsystem")?;
+
+    sysmem::SysmemConfig::define_configuration(context, &platform.sysmem, builder)
+        .context("Configuring 'sysmem'")?;
 
     thermal::ThermalSubsystem::define_configuration(context, &(), builder)
         .context("Configuring the 'thermal' subsystem")?;

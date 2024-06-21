@@ -305,18 +305,17 @@ zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_conf
   *unused_guard_pattern_period_bytes =
       config->contiguous_guard_pages_unused_fraction_denominator() * zx_system_get_page_size();
 
-  int64_t unused_page_check_cycle_seconds_override =
-      config->contiguous_guard_pages_unused_cycle_seconds_override();
-  if (unused_page_check_cycle_seconds_override > 0) {
+  int64_t unused_page_check_cycle_seconds = config->contiguous_guard_pages_unused_cycle_seconds();
+  if (unused_page_check_cycle_seconds > 0) {
     DRIVER_INFO("Overriding unused page check period to %ld seconds",
-                unused_page_check_cycle_seconds_override);
-    *unused_page_check_cycle_period = zx::sec(unused_page_check_cycle_seconds_override);
+                unused_page_check_cycle_seconds);
+    *unused_page_check_cycle_period = zx::sec(unused_page_check_cycle_seconds);
   }
 
-  int64_t guard_page_count_override = config->contiguous_guard_page_count_override();
-  if (guard_page_count_override > 0) {
-    DRIVER_INFO("Overriding guard page count to %ld", guard_page_count_override);
-    *guard_bytes_out = zx_system_get_page_size() * guard_page_count_override;
+  int64_t guard_page_count = config->contiguous_guard_page_count();
+  if (guard_page_count > 0) {
+    DRIVER_INFO("Overriding guard page count to %ld", guard_page_count);
+    *guard_bytes_out = zx_system_get_page_size() * guard_page_count;
   }
 
   return ZX_OK;
@@ -567,32 +566,52 @@ zx_status_t Device::Bind() {
     DRIVER_DEBUG("Skipping config: config vmo handle does not exist");
   } else {
     config.emplace(sysmem_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo)));
-    if (config->protected_memory_size_override() >= 0) {
-      protected_memory_size = config->protected_memory_size_override();
+    if (config->contiguous_memory_size() >= 0) {
+      contiguous_memory_size = config->contiguous_memory_size();
+    } else if (config->contiguous_memory_size_percent() >= 0 &&
+               config->contiguous_memory_size_percent() <= 99) {
+      // the negation is un-done below
+      contiguous_memory_size = -config->contiguous_memory_size_percent();
     }
-    if (config->contiguous_memory_size_override() >= 0) {
-      contiguous_memory_size = config->contiguous_memory_size_override();
+
+    // TODO(b/322009732): remove
+    if (config->deprecated_contiguous_memory_size_override() >= 0) {
+      contiguous_memory_size = config->deprecated_contiguous_memory_size_override();
     }
+
+    if (config->protected_memory_size() >= 0) {
+      protected_memory_size = config->protected_memory_size();
+    } else if (config->protected_memory_size_percent() >= 0 &&
+               config->protected_memory_size_percent() <= 99) {
+      // the negation is un-done below
+      protected_memory_size = -config->protected_memory_size_percent();
+    }
+
+    // TODO(b/322009732): remove
+    if (config->deprecated_protected_memory_size_override() >= 0) {
+      protected_memory_size = config->deprecated_protected_memory_size_override();
+    }
+
     protected_ranges_disable_dynamic_ = config->protected_ranges_disable_dynamic();
   }
 
   // Negative values are interpreted as a percentage of physical RAM.
-  if (protected_memory_size < 0) {
-    protected_memory_size = -protected_memory_size;
-    ZX_DEBUG_ASSERT(protected_memory_size >= 1 && protected_memory_size <= 99);
-    protected_memory_size = zx_system_get_physmem() * protected_memory_size / 100;
-  }
   if (contiguous_memory_size < 0) {
     contiguous_memory_size = -contiguous_memory_size;
     ZX_DEBUG_ASSERT(contiguous_memory_size >= 1 && contiguous_memory_size <= 99);
     contiguous_memory_size = zx_system_get_physmem() * contiguous_memory_size / 100;
   }
+  if (protected_memory_size < 0) {
+    protected_memory_size = -protected_memory_size;
+    ZX_DEBUG_ASSERT(protected_memory_size >= 1 && protected_memory_size <= 99);
+    protected_memory_size = zx_system_get_physmem() * protected_memory_size / 100;
+  }
 
   constexpr int64_t kMinProtectedAlignment = 64 * 1024;
   assert(kMinProtectedAlignment % zx_system_get_page_size() == 0);
-  protected_memory_size = AlignUp(protected_memory_size, kMinProtectedAlignment);
   contiguous_memory_size =
       AlignUp(contiguous_memory_size, safe_cast<int64_t>(zx_system_get_page_size()));
+  protected_memory_size = AlignUp(protected_memory_size, kMinProtectedAlignment);
 
   auto heap = sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0);
   allocators_[std::move(heap)] = std::make_unique<SystemRamMemoryAllocator>(this);

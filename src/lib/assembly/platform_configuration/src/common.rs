@@ -293,7 +293,7 @@ pub(crate) struct ConfigurationBuilderImpl {
     /// The core shards to add.
     core_shards: Vec<Utf8PathBuf>,
 
-    /// The configuration capabilities to add.
+    /// The configuration capabilities to add (or route to "void").
     configuration_capabilities: CapabilityNamedMap,
 
     /// The Kernel Commandline Arguments to add.
@@ -378,7 +378,7 @@ pub struct CompletedConfiguration {
     // The list of core shards to add.
     pub core_shards: Vec<Utf8PathBuf>,
 
-    // The configuration capabilities to add.
+    // The configuration capabilities to add (or route to "void").
     pub configuration_capabilities: CapabilityNamedMap,
 
     /// The Kernel Commandline Arguments to add.

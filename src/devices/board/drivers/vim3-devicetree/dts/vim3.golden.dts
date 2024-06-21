@@ -358,7 +358,6 @@
 
 		fuchsia,sysmem {
 			compatible = "fuchsia,sysmem";
-			contiguous-size = <0x00 0xc800000>;
 			iommus = <0x03 0x01>;
 			phandle = <0x04>;
 			pid = <0x06>;

@@ -34,7 +34,6 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "legacy_power_framework",
     "live_usb",
     "paver_legacy",
-    "sysmem_no_allocate",
     "resources",
     "virtcon",
     "virtcon_disable",
