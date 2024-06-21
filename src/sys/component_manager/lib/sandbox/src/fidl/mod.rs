@@ -9,6 +9,7 @@ mod data;
 mod dict;
 mod directory;
 mod handle;
+mod open;
 pub mod registry;
 mod router;
 mod unit;

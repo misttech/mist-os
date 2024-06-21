@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
 use cm_rust::{ComponentDecl, FidlIntoNative};
 use fidl::endpoints::{
     create_endpoints, create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd,
@@ -597,18 +598,16 @@ async fn start_when_already_started(spawn_child_future: BoxFuture<'static, Spawn
 
 #[fuchsia::test]
 async fn get_exposed_dictionary() {
-    let (controller_proxy, instance) = spawn_child_with_url("#meta/echo_server.cm").await;
+    let (controller_proxy, _instance) = spawn_child_with_url("#meta/echo_server.cm").await;
     let (exposed_dict, server_end) = create_proxy().unwrap();
 
     controller_proxy.get_exposed_dictionary(server_end).await.unwrap().unwrap();
     let echo_cap = exposed_dict.get(fecho::EchoMarker::DEBUG_NAME).await.unwrap().unwrap();
-    let fsandbox::Capability::Connector(echo_connector_capability) = echo_cap else {
-        panic!("wrong type")
-    };
-    let factory =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsandbox::FactoryMarker>().unwrap();
-    let (echo_proxy, server_end) = create_proxy::<fecho::EchoMarker>().unwrap();
-    factory.open_connector(echo_connector_capability, server_end.into_channel()).unwrap();
-    let response = echo_proxy.echo_string(Some("hello")).await.unwrap().unwrap();
-    assert_eq!(response, "hello");
+
+    // TODO(https://fxbug.dev/340891837): The Open type here is a stopgap until we have updated the
+    // exposed dictionary to use other bedrock capability types. Since externally Open is just an
+    // opaque token, there's not much we can do with the capability in this test. But once we
+    // switch over exposed dictionary to use a different capability to represent protocols, we can
+    // update this test to exercise the capability.
+    assert_matches!(echo_cap, fsandbox::Capability::Open(_));
 }
