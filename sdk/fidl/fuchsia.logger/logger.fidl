@@ -87,7 +87,7 @@ type LogMessage = struct {
 };
 
 /// Interface for LogListenerSafe to register to listen to logs.
-@discoverable
+@discoverable(server="platform")
 closed protocol Log {
     /// Dumps all cached logs by calling LogMany() in batches followed by Log() for each new log
     /// message.
@@ -122,7 +122,7 @@ type InterestChangeError = strict enum : uint32 {
 };
 
 /// Drains a program's logs.
-@discoverable
+@discoverable(server="platform")
 closed protocol LogSink {
     /// Send this socket to be drained.
     ///
