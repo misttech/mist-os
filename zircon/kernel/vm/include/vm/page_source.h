@@ -239,7 +239,9 @@ class PageSource final : public PageRequestInterface {
   // Returns ZX_ERR_SHOULD_WAIT if the request will be asynchronously fulfilled and the caller
   // should wait on |req|.
   zx_status_t GetPages(uint64_t offset, uint64_t len, PageRequest* req,
-                       VmoDebugInfo vmo_debug_info);
+                       VmoDebugInfo vmo_debug_info) {
+    return PopulateRequest(req, offset, len, vmo_debug_info, page_request_type::READ);
+  }
 
   void FreePages(list_node* pages);
 
@@ -306,7 +308,9 @@ class PageSource final : public PageRequestInterface {
   // in the range, the |request| might be generated for a range that is a subset of
   // [offset, offset + len).
   zx_status_t RequestDirtyTransition(PageRequest* request, uint64_t offset, uint64_t len,
-                                     VmoDebugInfo vmo_debug_info);
+                                     VmoDebugInfo vmo_debug_info) {
+    return PopulateRequest(request, offset, len, vmo_debug_info, page_request_type::DIRTY);
+  }
 
   // Updates the request tracking metadata to account for pages [offset, offset + len) having
   // been dirtied in the owning VMO.
@@ -369,7 +373,8 @@ class PageSource final : public PageRequestInterface {
   //
   // This function will always return |ZX_ERR_SHOULD_WAIT|.
   zx_status_t PopulateRequestLocked(PageRequest* request, uint64_t offset, uint64_t len,
-                                    page_request_type type) TA_REQ(page_source_mtx_);
+                                    VmoDebugInfo vmo_debug_info, page_request_type type)
+      TA_REQ(page_source_mtx_);
 
   // Sends a request to the backing source, or adds the request to the overlap_ list if
   // the needed region has already been requested from the source.
@@ -387,6 +392,9 @@ class PageSource final : public PageRequestInterface {
   // Removes |request| from any internal tracking. Called by a PageRequest if
   // it needs to abort itself.
   void CancelRequest(PageRequest* request) override TA_EXCL(page_source_mtx_);
+
+  zx_status_t PopulateRequest(PageRequest* request, uint64_t offset, uint64_t len,
+                              VmoDebugInfo vmo_debug_info, page_request_type type);
 
   zx_status_t WaitOnRequest(PageRequest* request) override;
 };

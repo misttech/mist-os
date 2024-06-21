@@ -206,19 +206,17 @@ bool PageSource::IsValidInternalFailureCode(zx_status_t error_status) {
   }
 }
 
-zx_status_t PageSource::GetPages(uint64_t offset, uint64_t len, PageRequest* request,
-                                 VmoDebugInfo vmo_debug_info) {
+zx_status_t PageSource::PopulateRequest(PageRequest* request, uint64_t offset, uint64_t len,
+                                        VmoDebugInfo vmo_debug_info, page_request_type type) {
   canary_.Assert();
+  DEBUG_ASSERT(request);
   DEBUG_ASSERT(len > 0);
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
 
-  if (!page_provider_->SupportsPageRequestType(page_request_type::READ)) {
+  if (!page_provider_->SupportsPageRequestType(type)) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-
-  ASSERT(request);
-  offset = fbl::round_down(offset, static_cast<uint64_t>(PAGE_SIZE));
 
   LTRACEF_LEVEL(2, "%p offset %" PRIx64 " prefetch_len %" PRIx64, this, offset, len);
 
@@ -227,29 +225,21 @@ zx_status_t PageSource::GetPages(uint64_t offset, uint64_t len, PageRequest* req
     return ZX_ERR_BAD_STATE;
   }
 
-  DEBUG_ASSERT(!request->IsInitialized());
-
-  request->Init(fbl::RefPtr<PageRequestInterface>(this), offset, page_request_type::READ,
-                vmo_debug_info);
-
-  return PopulateRequestLocked(request, offset, len, page_request_type::READ);
+  return PopulateRequestLocked(request, offset, len, vmo_debug_info, type);
 }
 
 void PageSource::FreePages(list_node* pages) { page_provider_->FreePages(pages); }
 
 zx_status_t PageSource::PopulateRequestLocked(PageRequest* request, uint64_t offset, uint64_t len,
-                                              page_request_type type) {
-  ASSERT(request);
+                                              VmoDebugInfo vmo_debug_info, page_request_type type) {
+  DEBUG_ASSERT(request);
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(len > 0);
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
   DEBUG_ASSERT(type < page_request_type::COUNT);
-  DEBUG_ASSERT(request->type_ == type);
-  DEBUG_ASSERT(request->IsInitialized());
+  DEBUG_ASSERT(!request->IsInitialized());
 
-  DEBUG_ASSERT(!request->provider_owned_);
-  DEBUG_ASSERT(request->offset_ == offset);
-  DEBUG_ASSERT(request->len_ == 0);
+  request->Init(fbl::RefPtr<PageRequestInterface>(this), offset, type, vmo_debug_info);
 
   // Assert on overflow, since it means vmobject is trying to get out-of-bounds pages.
   [[maybe_unused]] bool overflowed = add_overflow(request->len_, len, &request->len_);
@@ -382,34 +372,6 @@ zx_status_t PageSource::WaitOnRequest(PageRequest* request) {
   // If we have been detached the request will already have been completed in ::Detach and so the
   // provider should instantly wake from the event.
   return page_provider_->WaitOnEvent(&request->event_);
-}
-
-zx_status_t PageSource::RequestDirtyTransition(PageRequest* request, uint64_t offset, uint64_t len,
-                                               VmoDebugInfo vmo_debug_info) {
-  canary_.Assert();
-  ASSERT(request);
-
-  if (!page_provider_->SupportsPageRequestType(page_request_type::DIRTY)) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  uint64_t end;
-  bool overflow = add_overflow(offset, len, &end);
-  DEBUG_ASSERT(!overflow);
-  offset = fbl::round_down(offset, static_cast<uint64_t>(PAGE_SIZE));
-  end = fbl::round_up(end, static_cast<uint64_t>(PAGE_SIZE));
-
-  Guard<Mutex> guard{&page_source_mtx_};
-  if (detached_) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  // Request should not be previously initialized.
-  DEBUG_ASSERT(!request->IsInitialized());
-  request->Init(fbl::RefPtr<PageRequestInterface>(this), offset, page_request_type::DIRTY,
-                vmo_debug_info);
-
-  return PopulateRequestLocked(request, offset, end - offset, page_request_type::DIRTY);
 }
 
 void PageSource::Dump(uint depth) const {
