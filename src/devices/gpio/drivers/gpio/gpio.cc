@@ -307,21 +307,6 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
     controller_id = decoded->id;
   }
 
-  {
-    zx::result gpio_fidl_client = incoming()->Connect<fuchsia_hardware_gpioimpl::Service::Device>();
-    if (gpio_fidl_client.is_error()) {
-      FDF_LOG(ERROR, "Failed to get gpioimpl protocol");
-      return completer(gpio_fidl_client.take_error());
-    }
-
-    fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_fidl(
-        *std::move(gpio_fidl_client));
-
-    // Process init metadata while we are still the exclusive owner of the GPIO client.
-    init_device_ = GpioInitDevice::Create(incoming(), node(), logger(), controller_id,
-                                          gpio_fidl.TakeClientEnd());
-  }
-
   zx::result scheduler_role = compat::GetMetadata<fuchsia_scheduler::RoleName>(
       incoming(), DEVICE_METADATA_SCHEDULER_ROLE_NAME);
   if (scheduler_role.is_ok()) {
@@ -337,6 +322,22 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
     fidl_dispatcher_.emplace(*std::move(result));
 
     FDF_LOG(DEBUG, "Using dispatcher with role \"%s\"", scheduler_role->role().c_str());
+  }
+
+  {
+    zx::result gpio_fidl_client = incoming()->Connect<fuchsia_hardware_gpioimpl::Service::Device>();
+    if (gpio_fidl_client.is_error()) {
+      FDF_LOG(ERROR, "Failed to get gpioimpl protocol");
+      return completer(gpio_fidl_client.take_error());
+    }
+
+    gpio_.Bind(
+        *std::move(gpio_fidl_client), fidl_dispatcher()->get(),
+        fidl::ObserveTeardown(fit::bind_member<&GpioRootDevice::ClientTeardownHandler>(this)));
+
+    // Process init metadata while we are still the exclusive owner of the GPIO client.
+    init_device_ =
+        GpioInitDevice::Create(incoming(), node().borrow(), logger(), controller_id, gpio_);
   }
 
   if (zx::result<fdf::OwnedChildNode> node = AddOwnedChild("gpio"); node.is_error()) {
@@ -373,16 +374,18 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
   }
 }
 
+void GpioRootDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
+  ZX_DEBUG_ASSERT(!stop_completer_);
+  stop_completer_.emplace(std::move(completer));
+  gpio_.AsyncTeardown();
+}
+
 void GpioRootDevice::CreatePinDevices(const uint32_t controller_id,
                                       const std::vector<gpio_pin_t>& pins,
                                       fdf::StartCompleter completer) {
   for (const auto& pin : pins) {
-    zx::result gpio = incoming()->Connect<fuchsia_hardware_gpioimpl::Service::Device>();
-    ZX_ASSERT_MSG(gpio.is_ok(), "Failed to get additional FIDL client: %s", gpio.status_string());
-
     fbl::AllocChecker ac;
-    children_.emplace_back(new (&ac)
-                               GpioDevice(*std::move(gpio), pin.pin, controller_id, pin.name));
+    children_.emplace_back(new (&ac) GpioDevice(gpio_.Clone(), pin.pin, controller_id, pin.name));
     if (!ac.check()) {
       return completer(zx::error(ZX_ERR_NO_MEMORY));
     }
@@ -416,10 +419,18 @@ void GpioRootDevice::AddPinDevices(fdf::StartCompleter completer) {
   completer(zx::ok());
 }
 
+void GpioRootDevice::ClientTeardownHandler() {
+  async::PostTask(dispatcher(), [this]() {
+    if (stop_completer_) {
+      (*stop_completer_)(zx::ok());
+    }
+  });
+}
+
 std::unique_ptr<GpioInitDevice> GpioInitDevice::Create(
     const std::shared_ptr<fdf::Namespace>& incoming,
     fidl::UnownedClientEnd<fuchsia_driver_framework::Node> node, fdf::Logger& logger,
-    uint32_t controller_id, fdf::ClientEnd<fuchsia_hardware_gpioimpl::GpioImpl> gpio) {
+    uint32_t controller_id, fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl>& gpio) {
   // Don't add the init device if anything goes wrong here, as the hardware may be in a state that
   // child devices don't expect.
   fdf::Arena arena('GPIO');
@@ -435,7 +446,7 @@ std::unique_ptr<GpioInitDevice> GpioInitDevice::Create(
   }
 
   std::unique_ptr device = std::make_unique<GpioInitDevice>();
-  if (device->ConfigureGpios(**decoded, fdf::WireSyncClient(std::move(gpio))) != ZX_OK) {
+  if (device->ConfigureGpios(**decoded, gpio) != ZX_OK) {
     // Return without adding the init device if some GPIOs could not be configured. This will
     // prevent all drivers that depend on the initial state from binding, which should make it more
     // obvious that something has gone wrong.
@@ -460,14 +471,14 @@ std::unique_ptr<GpioInitDevice> GpioInitDevice::Create(
 
 zx_status_t GpioInitDevice::ConfigureGpios(
     const fuchsia_hardware_gpioimpl::wire::InitMetadata& metadata,
-    fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio) {
+    fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl>& gpio) {
   // Stop processing the list if any call returns an error so that GPIOs are not accidentally put
   // into an unexpected state.
   for (const auto& step : metadata.steps) {
     fdf::Arena arena('GPIO');
 
     if (step.call.is_input_flags()) {
-      auto result = gpio.buffer(arena)->ConfigIn(step.index, step.call.input_flags());
+      auto result = gpio.sync().buffer(arena)->ConfigIn(step.index, step.call.input_flags());
       if (!result.ok()) {
         FDF_LOG(ERROR, "Call to ConfigIn failed: %s", result.status_string());
         return result.status();
@@ -479,7 +490,7 @@ zx_status_t GpioInitDevice::ConfigureGpios(
         return result->error_value();
       }
     } else if (step.call.is_output_value()) {
-      auto result = gpio.buffer(arena)->ConfigOut(step.index, step.call.output_value());
+      auto result = gpio.sync().buffer(arena)->ConfigOut(step.index, step.call.output_value());
       if (!result.ok()) {
         FDF_LOG(ERROR, "Call to ConfigOut failed: %s", result.status_string());
         return result.status();
@@ -490,7 +501,7 @@ zx_status_t GpioInitDevice::ConfigureGpios(
         return result->error_value();
       }
     } else if (step.call.is_alt_function()) {
-      auto result = gpio.buffer(arena)->SetAltFunction(step.index, step.call.alt_function());
+      auto result = gpio.sync().buffer(arena)->SetAltFunction(step.index, step.call.alt_function());
       if (!result.ok()) {
         FDF_LOG(ERROR, "Call to SetAltFunction failed: %s", result.status_string());
         return result.status();
@@ -501,7 +512,8 @@ zx_status_t GpioInitDevice::ConfigureGpios(
         return result->error_value();
       }
     } else if (step.call.is_drive_strength_ua()) {
-      auto result = gpio.buffer(arena)->SetDriveStrength(step.index, step.call.drive_strength_ua());
+      auto result =
+          gpio.sync().buffer(arena)->SetDriveStrength(step.index, step.call.drive_strength_ua());
       if (!result.ok()) {
         FDF_LOG(ERROR, "Call to SetDriveStrength failed: %s", result.status_string());
         return result.status();

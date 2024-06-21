@@ -9,6 +9,8 @@
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
+#include <optional>
+
 #include <bind/fuchsia/cpp/bind.h>
 #include <ddk/metadata/gpio.h>
 
@@ -37,12 +39,15 @@ class MockGpioImpl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl>
   void set_pin_state(uint32_t index, PinState state) { pin_state_internal(index) = state; }
 
   zx_status_t Serve(fdf::OutgoingDirectory& to_driver_vfs) {
-    return to_driver_vfs
-        .AddService<fuchsia_hardware_gpioimpl::Service>(
-            fuchsia_hardware_gpioimpl::Service::InstanceHandler({
-                .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
-                                                  fidl::kIgnoreBindingClosure),
-            }))
+    fuchsia_hardware_gpioimpl::Service::InstanceHandler instance_handler({
+        .device =
+            [this](fdf::ServerEnd<fuchsia_hardware_gpioimpl::GpioImpl> server) {
+              EXPECT_FALSE(binding_);
+              binding_.emplace(fdf::Dispatcher::GetCurrent()->get(), std::move(server), this,
+                               fidl::kIgnoreBindingClosure);
+            },
+    });
+    return to_driver_vfs.AddService<fuchsia_hardware_gpioimpl::Service>(std::move(instance_handler))
         .status_value();
   }
 
@@ -118,7 +123,7 @@ class MockGpioImpl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl>
   void GetInitSteps(fdf::Arena& arena, GetInitStepsCompleter::Sync& completer) override {}
   void GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync& completer) override {}
 
-  fdf::ServerBindingGroup<fuchsia_hardware_gpioimpl::GpioImpl> bindings_;
+  std::optional<fdf::ServerBinding<fuchsia_hardware_gpioimpl::GpioImpl>> binding_;
   std::vector<PinState> pins_;
 };
 
@@ -642,6 +647,38 @@ TEST_F(GpioTest, SchedulerRole) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   }
+
+  EXPECT_TRUE(StopDriver().is_ok());
+}
+
+TEST_F(GpioTest, MultipleClients) {
+  constexpr gpio_pin_t pins[] = {
+      DECL_GPIO_PIN(0),
+      DECL_GPIO_PIN(1),
+      DECL_GPIO_PIN(2),
+  };
+
+  RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
+    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
+                                       std::size(pins) * sizeof(gpio_pin_t)));
+  });
+
+  EXPECT_TRUE(StartDriver().is_ok());
+
+  fidl::WireClient<fuchsia_hardware_gpio::Gpio> clients[std::size(pins)]{};
+  for (size_t i = 0; i < std::size(clients); i++) {
+    zx::result client_end =
+        Connect<fuchsia_hardware_gpio::Service::Device>(std::string{"gpio-"} + pins[i].name);
+    EXPECT_TRUE(client_end.is_ok());
+
+    clients[i].Bind(*std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    clients[i]->Write(1).ThenExactlyOnce([](auto& result) {
+      ASSERT_TRUE(result.ok());
+      EXPECT_TRUE(result->is_ok());
+    });
+  }
+
+  runtime().RunUntilIdle();
 
   EXPECT_TRUE(StopDriver().is_ok());
 }
