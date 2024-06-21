@@ -7,66 +7,40 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/wire.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
+#include <stdio.h>
 
 #include <optional>
+#include <string>
 #include <string_view>
 
 #include <ddk/metadata/gpio.h>
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
 
 namespace gpio {
 
-class GpioDevice;
-using GpioDeviceType =
-    ddk::Device<GpioDevice, ddk::Messageable<fuchsia_hardware_gpio::Gpio>::Mixin, ddk::Unbindable>;
-
-class GpioRootDevice;
-using GpioRootDeviceType = ddk::Device<GpioRootDevice, ddk::Unbindable>;
-
-class GpioRootDevice : public GpioRootDeviceType {
+class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
  public:
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-
- private:
-  explicit GpioRootDevice(zx_device_t* parent)
-      : GpioRootDeviceType(parent), driver_dispatcher_(fdf::Dispatcher::GetCurrent()) {}
-
-  zx_status_t AddPinDevices(uint32_t controller_id, const std::vector<gpio_pin_t>& pins);
-  void DispatcherShutdownHandler(fdf_dispatcher_t* dispatcher);
-
-  const fdf::UnownedDispatcher driver_dispatcher_;
-  std::optional<fdf::SynchronizedDispatcher> fidl_dispatcher_;
-  std::optional<ddk::UnbindTxn> unbind_txn_;
-};
-
-// GpioDevice instances live on fidl_dispatcher_, which is either a dispatcher owned by the
-// GpioRootDevice, or the default driver dispatcher. Driver hooks (DdkUnbind and DdkRelease) always
-// run on the default driver dispatcher.
-class GpioDevice : public GpioDeviceType {
- public:
-  GpioDevice(zx_device_t* parent, fdf::UnownedDispatcher fidl_dispatcher,
-             fdf::ClientEnd<fuchsia_hardware_gpioimpl::GpioImpl> gpio, uint32_t pin,
+  GpioDevice(fdf::ClientEnd<fuchsia_hardware_gpioimpl::GpioImpl> gpio, uint32_t pin,
              uint32_t controller_id, std::string_view name)
-      : GpioDeviceType(parent),
-        fidl_dispatcher_(std::move(fidl_dispatcher)),
+      : fidl_dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
         pin_(pin),
         controller_id_(controller_id),
         name_(name),
-        gpio_(std::in_place, std::move(gpio), fidl_dispatcher_->get()),
-        bindings_(std::in_place),
-        outgoing_(std::in_place, fidl_dispatcher_->async_dispatcher()) {}
+        gpio_(std::move(gpio), fdf::Dispatcher::GetCurrent()->get()),
+        devfs_connector_(fit::bind_member<&GpioDevice::DevfsConnect>(this)) {}
 
-  zx_status_t InitAddDevice();
+  zx::result<> AddServices(const std::shared_ptr<fdf::Namespace>& incoming,
+                           const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+                           const std::optional<std::string>& node_name);
 
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
+  zx::result<> AddDevice(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> root_node,
+                         fdf::Logger& logger);
 
  private:
+  void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server);
+
   void GetPin(GetPinCompleter::Sync& completer) override;
   void GetName(GetNameCompleter::Sync& completer) override;
   void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override;
@@ -83,34 +57,76 @@ class GpioDevice : public GpioDeviceType {
                       SetAltFunctionCompleter::Sync& completer) override;
   void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override;
 
- private:
-  const fdf::UnownedDispatcher fidl_dispatcher_;
+  std::string pin_name() const {
+    char name[20];
+    snprintf(name, sizeof(name), "gpio-%u", pin_);
+    return name;
+  }
+
+  async_dispatcher_t* const fidl_dispatcher_;
   const uint32_t pin_;
   const uint32_t controller_id_;
   const std::string name_;
 
-  // These objects can only be accessed on the FIDL dispatcher. Making them optional allows them to
-  // be destroyed manually in our unbind hook.
-  std::optional<fdf::WireClient<fuchsia_hardware_gpioimpl::GpioImpl>> gpio_;
-  std::optional<fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio>> bindings_;
-  std::optional<component::OutgoingDirectory> outgoing_;
+  fdf::WireClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_;
+  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
+  compat::SyncInitializedDeviceServer compat_server_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_;
+  driver_devfs::Connector<fuchsia_hardware_gpio::Gpio> devfs_connector_;
 };
 
-class GpioInitDevice;
-using GpioInitDeviceType = ddk::Device<GpioInitDevice>;
-
-class GpioInitDevice : public GpioInitDeviceType {
+class GpioInitDevice {
  public:
-  static void Create(zx_device_t* parent, fdf::ClientEnd<fuchsia_hardware_gpioimpl::GpioImpl> gpio,
-                     uint32_t controller_id);
-
-  explicit GpioInitDevice(zx_device_t* parent) : GpioInitDeviceType(parent) {}
-
-  void DdkRelease() { delete this; }
+  static std::unique_ptr<GpioInitDevice> Create(
+      const std::shared_ptr<fdf::Namespace>& incoming,
+      fidl::UnownedClientEnd<fuchsia_driver_framework::Node> node, fdf::Logger& logger,
+      uint32_t controller_id, fdf::ClientEnd<fuchsia_hardware_gpioimpl::GpioImpl> gpio);
 
  private:
   static zx_status_t ConfigureGpios(const fuchsia_hardware_gpioimpl::wire::InitMetadata& metadata,
                                     fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio);
+
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+};
+
+class GpioRootDevice : public fdf::DriverBase {
+ public:
+  GpioRootDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase("gpio", std::move(start_args), std::move(dispatcher)) {}
+
+  void Start(fdf::StartCompleter completer) override;
+
+ private:
+  // GpioDevice instances live on fidl_dispatcher_ so that they can run with a certain scheduler
+  // role if one is provided. This conflicts with the requirement on our outgoing directory, which
+  // serves the GPIO service and lives on the driver dispatcher. To handle this, initializing
+  // GpioDevice instances uses a three-step process:
+  //     1. Create the GpioDevice instances on fidl_dispatcher_ so that their thread-unsafe members
+  //        (fdf::WireClient, fidl::ServerBindingGroup) live there.
+  //     2. Add services to outgoing() on the driver dispatcher. Connections will be made using this
+  //        dispatcher, so service handlers should post tasks to fidl_dispatcher_ if needed.
+  //     3. Add GpioDevice nodes on fidl_dispatcher_.
+
+  // Must be run on the FIDL dispatcher.
+  void CreatePinDevices(uint32_t controller_id, const std::vector<gpio_pin_t>& pins,
+                        fdf::StartCompleter completer);
+
+  // Must be run on the driver dispatcher.
+  void ServePinDevices(fdf::StartCompleter completer);
+
+  // Must be run on the FIDL dispatcher.
+  void AddPinDevices(fdf::StartCompleter completer);
+
+  fdf::UnownedDispatcher fidl_dispatcher() const {
+    return fidl_dispatcher_ ? fdf::UnownedDispatcher(fidl_dispatcher_->get())
+                            : fdf::Dispatcher::GetCurrent();
+  }
+
+  std::optional<fdf::SynchronizedDispatcher> fidl_dispatcher_;
+  std::vector<std::unique_ptr<GpioDevice>> children_;
+  std::unique_ptr<GpioInitDevice> init_device_;
+
+  fdf::OwnedChildNode node_;
 };
 
 }  // namespace gpio
