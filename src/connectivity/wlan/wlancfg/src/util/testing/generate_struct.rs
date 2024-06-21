@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
+use crate::client::roaming::lib::RoamingConnectionData;
 use crate::client::types;
 use crate::config_management::{Credential, HistoricalListsByBssid};
 use crate::util::pseudo_energy::EwmaSignalData;
@@ -331,6 +332,11 @@ pub fn generate_connect_selection() -> types::ConnectSelection {
     }
 }
 
+pub fn generate_random_signal() -> types::Signal {
+    let mut rng = rand::thread_rng();
+    types::Signal { rssi_dbm: rng.gen_range(-80..-20), snr_db: rng.gen_range(0..80) }
+}
+
 pub fn generate_random_ewma_signal_data() -> EwmaSignalData {
     let mut rng = rand::thread_rng();
     EwmaSignalData::new(
@@ -338,4 +344,8 @@ pub fn generate_random_ewma_signal_data() -> EwmaSignalData {
         rng.gen_range(0..80),
         rng.gen_range(0..10) as usize,
     )
+}
+
+pub fn generate_random_roaming_connection_data() -> RoamingConnectionData {
+    RoamingConnectionData::new(generate_connect_selection(), generate_random_ewma_signal_data())
 }

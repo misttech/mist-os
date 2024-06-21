@@ -5,7 +5,7 @@
 use crate::access_point::state_machine::AccessPointApi;
 use crate::access_point::{state_machine as ap_fsm, types as ap_types};
 use crate::client::connection_selection::ConnectionSelectionRequester;
-use crate::client::roaming::local_roam_manager::LocalRoamManagerApi;
+use crate::client::roaming::local_roam_manager::RoamManager;
 use crate::client::{state_machine as client_fsm, types as client_types};
 use crate::config_management::SavedNetworksManagerApi;
 use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan};
@@ -78,7 +78,7 @@ async fn create_client_state_machine(
     connect_selection: Option<client_types::ConnectSelection>,
     telemetry_sender: TelemetrySender,
     defect_sender: mpsc::UnboundedSender<Defect>,
-    roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
+    roam_manager: RoamManager,
 ) -> Result<
     (
         Box<dyn client_fsm::ClientApi + Send>,
@@ -132,7 +132,7 @@ pub(crate) struct IfaceManagerService {
     aps: Vec<ApIfaceContainer>,
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
     connection_selection_requester: ConnectionSelectionRequester,
-    local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
+    roam_manager: RoamManager,
     fsm_futures:
         FuturesUnordered<future_with_metadata::FutureWithMetadata<(), StateMachineMetadata>>,
     connection_selection_futures:
@@ -150,7 +150,7 @@ impl IfaceManagerService {
         dev_monitor_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
         saved_networks: Arc<dyn SavedNetworksManagerApi>,
         connection_selection_requester: ConnectionSelectionRequester,
-        local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
+        roam_manager: RoamManager,
         telemetry_sender: TelemetrySender,
         defect_sender: mpsc::UnboundedSender<Defect>,
     ) -> Self {
@@ -163,7 +163,7 @@ impl IfaceManagerService {
             aps: Vec::new(),
             saved_networks,
             connection_selection_requester,
-            local_roam_manager,
+            roam_manager,
             fsm_futures: FuturesUnordered::new(),
             connection_selection_futures: FuturesUnordered::new(),
             telemetry_sender,
@@ -490,7 +490,7 @@ impl IfaceManagerService {
                     Some(selection),
                     self.telemetry_sender.clone(),
                     self.defect_sender.clone(),
-                    self.local_roam_manager.clone(),
+                    self.roam_manager.clone(),
                 )
                 .await?;
                 client_iface.client_state_machine = Some(new_client);
@@ -577,7 +577,7 @@ impl IfaceManagerService {
                     Some(connect_selection.clone()),
                     self.telemetry_sender.clone(),
                     self.defect_sender.clone(),
-                    self.local_roam_manager.clone(),
+                    self.roam_manager.clone(),
                 )
                 .await?;
 
@@ -618,7 +618,7 @@ impl IfaceManagerService {
                     None,
                     self.telemetry_sender.clone(),
                     self.defect_sender.clone(),
-                    self.local_roam_manager.clone(),
+                    self.roam_manager.clone(),
                 )
                 .await?;
 
@@ -1458,7 +1458,7 @@ mod tests {
     use crate::mode_management::recovery::RecoverySummary;
     use crate::mode_management::{IfaceFailure, PhyFailure};
     use crate::regulatory_manager::REGION_CODE_LEN;
-    use crate::util::testing::fakes::{FakeLocalRoamManager, FakeScanRequester};
+    use crate::util::testing::fakes::FakeScanRequester;
     use crate::util::testing::{
         generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
         poll_sme_req,
@@ -1504,7 +1504,6 @@ mod tests {
         pub client_update_receiver: mpsc::UnboundedReceiver<listener::ClientListenerMessage>,
         pub ap_update_sender: listener::ApListenerMessageSender,
         pub saved_networks: Arc<dyn SavedNetworksManagerApi>,
-        pub local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
         pub scan_requester: Arc<FakeScanRequester>,
         pub node: inspect::Node,
         pub telemetry_sender: TelemetrySender,
@@ -1515,6 +1514,7 @@ mod tests {
         pub recovery_receiver: recovery::RecoveryActionReceiver,
         pub connection_selection_requester: ConnectionSelectionRequester,
         pub connection_selection_request_receiver: mpsc::Receiver<ConnectionSelectionRequest>,
+        pub roam_manager: RoamManager,
     }
 
     /// Create a TestValues for a unit test.
@@ -1536,13 +1536,15 @@ mod tests {
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let scan_requester = Arc::new(FakeScanRequester::new());
         let (defect_sender, defect_receiver) = mpsc::unbounded();
-        let local_roam_manager = Arc::new(Mutex::new(FakeLocalRoamManager::new()));
         let (recovery_sender, recovery_receiver) =
             mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
         let (connection_selection_request_sender, connection_selection_request_receiver) =
             mpsc::channel(5);
         let connection_selection_requester =
             ConnectionSelectionRequester::new(connection_selection_request_sender);
+
+        let (roam_service_request_sender, _roam_service_request_receiver) = mpsc::channel(100);
+        let roam_manager = RoamManager::new(roam_service_request_sender);
 
         TestValues {
             monitor_service_proxy,
@@ -1551,7 +1553,6 @@ mod tests {
             client_update_receiver: client_receiver,
             ap_update_sender: ap_sender,
             saved_networks,
-            local_roam_manager,
             scan_requester,
             node,
             telemetry_sender,
@@ -1562,6 +1563,7 @@ mod tests {
             recovery_receiver,
             connection_selection_requester,
             connection_selection_request_receiver,
+            roam_manager,
         }
     }
 
@@ -1819,7 +1821,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester.clone(),
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
         );
@@ -1878,7 +1880,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester.clone(),
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
         );
@@ -2405,7 +2407,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager,
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -2445,7 +2447,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -2592,7 +2594,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -2731,7 +2733,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -2848,7 +2850,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -2982,7 +2984,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -3194,7 +3196,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -3332,7 +3334,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -3484,7 +3486,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -3797,7 +3799,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -3907,7 +3909,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -3981,7 +3983,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks,
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -4447,7 +4449,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -4570,7 +4572,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -4676,7 +4678,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -4756,7 +4758,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -4977,7 +4979,7 @@ mod tests {
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester,
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
         );
@@ -5542,7 +5544,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester.clone(),
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender,
         );
@@ -5668,7 +5670,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester.clone(),
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
         );
@@ -5725,7 +5727,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester.clone(),
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
         );
@@ -5787,7 +5789,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester.clone(),
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
         );
@@ -5869,7 +5871,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
             test_values.connection_selection_requester.clone(),
-            test_values.local_roam_manager.clone(),
+            test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
         );

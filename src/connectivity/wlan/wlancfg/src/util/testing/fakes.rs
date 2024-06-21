@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
-use crate::client::roaming::local_roam_manager::LocalRoamManagerApi;
+use crate::client::roaming::lib::{RoamTriggerData, RoamingConnectionData};
 use crate::client::roaming::roam_monitor::RoamMonitorApi;
 use crate::client::{scan, types as client_types};
 use crate::config_management::{
     Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
     PastConnectionList, SavedNetworksManagerApi,
 };
-use crate::telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS;
-use crate::util::pseudo_energy::EwmaSignalData;
+use crate::util::testing::generate_random_roaming_connection_data;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
@@ -20,8 +19,8 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tracing::{info, warn};
 use {
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 pub struct FakeSavedNetworksManager {
@@ -279,59 +278,6 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
     }
 }
 
-/// Stubbed instance of LocalRoamManagerApi for testing, and for creating FakeRoamMonitors.
-pub struct FakeLocalRoamManager {
-    stats_sender: Option<mpsc::UnboundedSender<fidl_internal::SignalReportIndication>>,
-}
-
-impl LocalRoamManagerApi for FakeLocalRoamManager {
-    fn get_roam_monitor(
-        &mut self,
-        signal: client_types::Signal,
-        _currently_fulfilled_connection: client_types::ConnectSelection,
-        _roam_sender: mpsc::UnboundedSender<client_types::ScannedCandidate>,
-    ) -> Box<dyn RoamMonitorApi> {
-        let signal_data =
-            EwmaSignalData::new(signal.rssi_dbm, signal.snr_db, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        Box::new(FakeRoamMonitor {
-            stats_sender: self.stats_sender.clone(),
-            signal_data: Some(signal_data),
-        })
-    }
-}
-
-impl FakeLocalRoamManager {
-    pub fn new() -> Self {
-        Self { stats_sender: None }
-    }
-
-    pub fn new_with_roam_monitor_stats_sender(
-        stats_sender: mpsc::UnboundedSender<fidl_internal::SignalReportIndication>,
-    ) -> Self {
-        Self { stats_sender: Some(stats_sender) }
-    }
-}
-
-/// Stubbed instance of RoamMonitorApi for testing.
-pub struct FakeRoamMonitor {
-    stats_sender: Option<mpsc::UnboundedSender<fidl_internal::SignalReportIndication>>,
-    signal_data: Option<EwmaSignalData>,
-}
-impl RoamMonitorApi for FakeRoamMonitor {
-    fn handle_connection_stats(
-        &mut self,
-        stats: fidl_internal::SignalReportIndication,
-    ) -> Result<u8, anyhow::Error> {
-        if let Some(sender) = &self.stats_sender {
-            sender.clone().unbounded_send(stats).expect("failed to send stats via fake sender");
-        }
-        return Ok(u8::MIN);
-    }
-    fn get_signal_data(&self) -> EwmaSignalData {
-        self.signal_data.expect("signal data not set.")
-    }
-}
-
 pub fn create_inspect_persistence_channel() -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
     const DEFAULT_BUFFER_SIZE: usize = 100; // arbitrary value
     mpsc::channel(DEFAULT_BUFFER_SIZE)
@@ -407,5 +353,40 @@ impl scan::ScanRequestApi for FakeScanRequester {
     ) -> Result<Vec<client_types::ScanResult>, client_types::ScanError> {
         self.scan_requests.lock().await.push_back((scan_reason, ssids, channels));
         self.scan_results.lock().await.pop_front().unwrap()
+    }
+}
+
+#[derive(Clone)]
+pub struct FakeRoamMonitor {
+    pub trigger_data_queue: VecDeque<RoamTriggerData>,
+    pub response_to_should_roam_scan: bool,
+    pub response_to_should_send_roam_request: bool,
+    pub response_to_get_roam_data: RoamingConnectionData,
+}
+
+impl FakeRoamMonitor {
+    pub fn new() -> Self {
+        Self {
+            trigger_data_queue: VecDeque::new(),
+            response_to_should_roam_scan: false,
+            response_to_should_send_roam_request: false,
+            response_to_get_roam_data: generate_random_roaming_connection_data(),
+        }
+    }
+}
+
+impl RoamMonitorApi for FakeRoamMonitor {
+    fn should_roam_search(&mut self, data: RoamTriggerData) -> Result<bool, anyhow::Error> {
+        self.trigger_data_queue.push_back(data);
+        Ok(self.response_to_should_roam_scan)
+    }
+    fn should_send_roam_request(
+        &self,
+        _candidate: client_types::ScannedCandidate,
+    ) -> Result<bool, anyhow::Error> {
+        Ok(self.response_to_should_send_roam_request)
+    }
+    fn get_roam_data(&self) -> Result<RoamingConnectionData, anyhow::Error> {
+        Ok(self.response_to_get_roam_data.clone())
     }
 }

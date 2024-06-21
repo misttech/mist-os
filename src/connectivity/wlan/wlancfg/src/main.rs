@@ -25,8 +25,14 @@ use std::pin::pin;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use wlancfg_lib::access_point::AccessPoint;
-use wlancfg_lib::client::connection_selection::*;
-use wlancfg_lib::client::roaming::local_roam_manager;
+use wlancfg_lib::client::connection_selection::{
+    serve_connection_selection_request_loop, ConnectionSelectionRequester, ConnectionSelector,
+    CONNECTION_SELECTION_REQUEST_BUFFER_SIZE,
+};
+use wlancfg_lib::client::roaming::lib::ROAMING_CHANNEL_BUFFER_SIZE;
+use wlancfg_lib::client::roaming::local_roam_manager::{
+    serve_local_roam_manager_requests, RoamManager,
+};
 use wlancfg_lib::client::{self, scan};
 use wlancfg_lib::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
 use wlancfg_lib::legacy::{self, IfaceRef};
@@ -299,24 +305,20 @@ async fn run_all_futures() -> Result<(), Error> {
         ConnectionSelectionRequester::new(connection_selection_request_sender);
 
     info!("Roaming profile: {}", cfg.roaming_profile);
-    let (roam_search_sender, roam_search_receiver) = mpsc::unbounded();
-    let local_roam_manager = Arc::new(Mutex::new(local_roam_manager::LocalRoamManager::new(
-        roam_search_sender,
-        telemetry_sender.clone(),
-    )));
-    let roam_manager_service = local_roam_manager::LocalRoamManagerService::new(
-        roam_search_receiver,
-        telemetry_sender.clone(),
+    let (roam_service_request_sender, roam_service_request_receiver) =
+        mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+    let roam_manager_service_fut = serve_local_roam_manager_requests(
+        roam_service_request_receiver,
         connection_selection_requester.clone(),
+        telemetry_sender.clone(),
     );
-    let roam_manager_service_fut = roam_manager_service.serve();
+    let roam_manager = RoamManager::new(roam_service_request_sender);
 
     let (recovery_sender, recovery_receiver) =
         mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
     // Get the recovery settings.
     info!("Recovery Profile: {}", cfg.recovery_profile);
     info!("Recovery Enabled: {}", cfg.recovery_enabled);
-
     let phy_manager = Arc::new(Mutex::new(PhyManager::new(
         monitor_svc.clone(),
         recovery::lookup_recovery_profile(&cfg.recovery_profile),
@@ -339,8 +341,8 @@ async fn run_all_futures() -> Result<(), Error> {
         ap_sender.clone(),
         monitor_svc.clone(),
         saved_networks.clone(),
-        local_roam_manager,
-        connection_selection_requester.clone(),
+        connection_selection_requester,
+        roam_manager,
         telemetry_sender.clone(),
         recovery_receiver,
     );

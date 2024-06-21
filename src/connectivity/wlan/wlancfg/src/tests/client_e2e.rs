@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::client::roaming::local_roam_manager::{LocalRoamManager, LocalRoamManagerService};
+use crate::client::roaming::lib::ROAMING_CHANNEL_BUFFER_SIZE;
+use crate::client::roaming::local_roam_manager::{serve_local_roam_manager_requests, RoamManager};
 use crate::client::{connection_selection, scan, serve_provider_requests, types};
 use crate::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
 use crate::legacy;
@@ -201,24 +202,21 @@ fn test_setup(
     let connection_selection_requester = connection_selection::ConnectionSelectionRequester::new(
         connection_selection_request_sender,
     );
-    let (roam_stats_sender, roam_stats_receiver) = mpsc::unbounded();
-    let local_roam_manager =
-        Arc::new(Mutex::new(LocalRoamManager::new(roam_stats_sender, telemetry_sender.clone())));
-    let roam_manager_service = LocalRoamManagerService::new(
-        roam_stats_receiver,
-        telemetry_sender.clone(),
-        connection_selection_requester.clone(),
-    );
+    let (roam_service_request_sender, roam_service_request_receiver) =
+        mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
     let roam_manager_service_fut = Box::pin(
-        roam_manager_service
-            .serve()
-            // Map the output type of this future to match the other ones we want to combine with it
-            .map(|_| {
-                let result: Result<Infallible, Error> =
-                    Err(format_err!("roam_manager_service future exited unexpectedly"));
-                result
-            }),
+        serve_local_roam_manager_requests(
+            roam_service_request_receiver,
+            connection_selection_requester.clone(),
+            telemetry_sender.clone(),
+        )
+        .map(|_| {
+            let result: Result<Infallible, Error> =
+                Err(format_err!("roam manager service future exited unexpectedly"));
+            result
+        }),
     );
+    let roam_manager = RoamManager::new(roam_service_request_sender);
 
     let (client_provider_proxy, client_provider_requests) =
         create_proxy::<fidl_policy::ClientProviderMarker>()
@@ -243,8 +241,8 @@ fn test_setup(
         ap_update_sender.clone(),
         monitor_service_proxy.clone(),
         saved_networks.clone(),
-        local_roam_manager,
         connection_selection_requester.clone(),
+        roam_manager.clone(),
         telemetry_sender.clone(),
         recovery_receiver,
     );
