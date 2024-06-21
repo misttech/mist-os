@@ -4,6 +4,7 @@
 
 #include "aml-thermal.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>

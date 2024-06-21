@@ -4,6 +4,8 @@
 
 #include "src/devices/usb/lib/usb-phy/include/usb-phy/usb-phy.h"
 
+#include <lib/ddk/debug.h>
+
 #include <ddktl/device.h>
 
 namespace usb_phy {

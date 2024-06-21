@@ -4,6 +4,8 @@
 
 #include "thermistor-channel.h"
 
+#include <lib/ddk/debug.h>
+
 #include <ddktl/fidl.h>
 
 namespace thermal {

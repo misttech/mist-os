@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.compat.runtime.test/cpp/driver/fidl.h>
 #include <fidl/fuchsia.compat.runtime.test/cpp/fidl.h>
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/dispatcher.h>
 

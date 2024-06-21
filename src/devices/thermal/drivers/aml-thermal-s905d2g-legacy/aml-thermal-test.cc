@@ -9,6 +9,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio.h>

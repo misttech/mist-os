@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.examples.gizmo/cpp/driver/wire.h>
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 
 #include <ddktl/device.h>

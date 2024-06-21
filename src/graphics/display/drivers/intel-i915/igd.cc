@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/igd.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/result.h>

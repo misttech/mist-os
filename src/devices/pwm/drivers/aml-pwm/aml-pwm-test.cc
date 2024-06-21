@@ -4,6 +4,8 @@
 
 #include "aml-pwm.h"
 
+#include <lib/ddk/debug.h>
+
 #include <vector>
 
 #include <fbl/alloc_checker.h>
@@ -334,7 +336,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
   EXPECT_OK(pwm_->PwmImplSetConfig(1, &on_cfg));  // Change Duty Cycle
 
   (*mock_mmios_[0])[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFEFFFFF5);  // SetMode
-  EXPECT_OK(pwm_->PwmImplSetConfig(1, &off_cfg));                        // Change Mode
+  EXPECT_OK(pwm_->PwmImplSetConfig(1, &off_cfg));                           // Change Mode
 
   // Mode::kDeltaSigma
   (*mock_mmios_[1])[2 * 4].ExpectRead(0x02000000).ExpectWrite(0x00000004);  // SetMode

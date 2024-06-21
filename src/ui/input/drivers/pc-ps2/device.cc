@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <fidl/fuchsia.hardware.input/cpp/wire_types.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/hid/boot.h>
 #include <zircon/syscalls.h>

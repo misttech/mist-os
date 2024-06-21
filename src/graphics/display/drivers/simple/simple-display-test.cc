@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/ddk/debug.h>
 #include <lib/zx/object.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>

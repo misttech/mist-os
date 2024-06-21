@@ -10,6 +10,7 @@
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/debug.h>
 #include <threads.h>
 
 #include <ddktl/device.h>

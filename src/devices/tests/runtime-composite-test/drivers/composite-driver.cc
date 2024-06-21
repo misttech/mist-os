@@ -5,6 +5,7 @@
 #include "src/devices/tests/runtime-composite-test/drivers/composite-driver.h"
 
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 
