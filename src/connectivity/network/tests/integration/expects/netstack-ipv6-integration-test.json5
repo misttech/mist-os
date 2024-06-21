@@ -12,6 +12,7 @@
         {
             type: "expect_failure_with_err_logs",
             matchers: [
+                "dad_assigns_when_echoed_ns3",
                 "sends_mld_reports_ns3*",
                 "slaac_regeneration_after_dad_failure_ns3",
             ],

@@ -1181,7 +1181,7 @@ async fn udp_send_msg_preflight_dad_failure<N: Netstack>(name: &str) {
 
     // Expect the netstack to send a DAD message, and simulate another node already
     // owning the address. Expect DAD to fail as a result.
-    ndp::expect_dad_neighbor_solicitation(&fake_ep).await;
+    let _: Vec<u8> = ndp::expect_dad_neighbor_solicitation(&fake_ep).await;
     ndp::fail_dad_with_na(&fake_ep).await;
     ndp::assert_dad_failed(state_stream).await;
 
