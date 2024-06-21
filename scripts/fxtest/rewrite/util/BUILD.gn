@@ -17,7 +17,6 @@ if (is_host) {
     enable_mypy = true
     sources = [
       "__init__.py",
-      "arg_option.py",
       "command.py",
       "signals.py",
     ]

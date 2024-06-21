@@ -11,55 +11,8 @@ import stat
 import tempfile
 import unittest
 
-from util import arg_option
 from util import command
 import util.signals
-
-
-class TestArgOptions(unittest.TestCase):
-    def test_selection_action(self) -> None:
-        """Test SelectionAction.
-
-        This test ensures that multiple arguments can all write to the
-        same destination variable. Short/long names for flags are
-        canonicalized to the long version.
-        """
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "-p",
-            "--package",
-            action=arg_option.SelectionAction,
-            nargs=0,
-            dest="option",
-        )
-        parser.add_argument(
-            "-c",
-            "--component",
-            action=arg_option.SelectionAction,
-            nargs=0,
-            dest="option",
-        )
-        parser.add_argument(
-            "option", action=arg_option.SelectionAction, nargs="*"
-        )
-
-        args = parser.parse_intermixed_args(
-            arg_option.SelectionAction.preprocess_args(
-                ["-p", "one", "two", "-c", "three", "four"]
-            )
-        )
-        self.assertListEqual(
-            args.option,
-            [
-                "--package",
-                "one",
-                "two",
-                "--component",
-                "three",
-                "four",
-            ],
-        )
 
 
 class TestCommand(unittest.IsolatedAsyncioTestCase):
