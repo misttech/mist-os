@@ -4,11 +4,13 @@
 #include <fidl/fuchsia.hardware.pci/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/ddk/binding.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/fit/defer.h>
 #include <zircon/errors.h>
+
+#include <bind/fuchsia/cpp/bind.h>
 
 #include "src/devices/bus/drivers/pci/composite.h"
 #include "src/devices/bus/drivers/pci/device.h"
@@ -46,17 +48,16 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
 
   auto pci_bind_topo = static_cast<uint32_t>(
       BIND_PCI_TOPO_PACK(device->bus_id(), device->dev_id(), device->func_id()));
-  // clang-format off
-  zx_device_prop_t pci_device_props[] = {
-      {BIND_PCI_VID, 0, device->vendor_id()},
-      {BIND_PCI_DID, 0, device->device_id()},
-      {BIND_PCI_CLASS, 0, device->class_id()},
-      {BIND_PCI_SUBCLASS, 0, device->subclass()},
-      {BIND_PCI_INTERFACE, 0, device->prog_if()},
-      {BIND_PCI_REVISION, 0, device->rev_id()},
-      {BIND_PCI_TOPO, 0, pci_bind_topo},
+
+  zx_device_str_prop_t pci_device_props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PCI_VID, static_cast<uint32_t>(device->vendor_id())),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_DID, static_cast<uint32_t>(device->device_id())),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_CLASS, static_cast<uint32_t>(device->class_id())),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_SUBCLASS, static_cast<uint32_t>(device->subclass())),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_INTERFACE, static_cast<uint32_t>(device->prog_if())),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_REVISION, static_cast<uint32_t>(device->rev_id())),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_TOPO, pci_bind_topo),
   };
-  // clang-format on
   std::array offers = {
       fpci::Service::Name,
   };
@@ -82,7 +83,7 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
   // instance which will talk to this device.
   const auto name = std::string(device->config()->addr());
   zx_status_t status = fidl_dev->DdkAdd(ddk::DeviceAddArgs(name.c_str())
-                                            .set_props(pci_device_props)
+                                            .set_str_props(pci_device_props)
                                             .set_flags(DEVICE_ADD_MUST_ISOLATE)
                                             .set_outgoing_dir(endpoints->client.TakeChannel())
                                             .set_fidl_service_offers(offers));
