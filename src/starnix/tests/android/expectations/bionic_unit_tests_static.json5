@@ -80,6 +80,8 @@
                 "stdio_nofortify.swprintf_1$ju_UINTMAX_MAX",
                 "stdio_nofortify.tmpfile_TMPDIR",
                 "stdlib.getloadavg",
+                "sys_io.iopl",
+                "sys_io.ioperm",
                 "sys_msg.smoke",
                 "sys_ptrace.hardware_breakpoint",
                 "sys_ptrace.watchpoint_imprecise",
