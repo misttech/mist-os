@@ -122,12 +122,9 @@ meta/amlogic-display.cm` will be the DFv2 version of the driver component
 (`:amlogic-display-dfv2`). Otherwise, it will be the DFv1 version of the
 driver component (`:amlogic-display-dfv1`).
 
-TODO(https://fxbug.dev/323061435): Enable the DFv2 amlogic-display driver
-by default.
+**Current value (from the default):** `true`
 
-**Current value (from the default):** `false`
-
-From //src/graphics/display/drivers/amlogic-display/BUILD.gn:19
+From //src/graphics/display/drivers/amlogic-display/BUILD.gn:16
 
 ### api_compatibility_testing
 
