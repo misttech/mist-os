@@ -163,3 +163,18 @@ FuchsiaOmahaOtaConfigInfo = provider(
         "tuf_repositories": "A dict of TUF repository configurations, by hostname.",
     },
 )
+
+FuchsiaAssemblyDeveloperOverridesListInfo = provider(
+    doc = "Map a target pattern to a fuchsia_assembly_developer_overrides() target label.",
+    fields = {
+        "maps": "A list of (pattern_string, info) pairs, where pattern_string is a label pattern string, and info is a corresponding FuchsiaAssemblyDeveloperOverridesInfo",
+    },
+)
+
+FuchsiaAssemblyDeveloperOverridesInfo = provider(
+    doc = "Info describing developer overrides for assembly.",
+    fields = {
+        "manifest": "A File value pointing to an input JSON file passed to ffx's --developer-overrides option.",
+        "inputs": "A File list pointing to extra inputs listed in the manifest that will be used by ffx when applying the overrides.",
+    },
+)

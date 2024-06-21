@@ -7,6 +7,7 @@
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
+    "FuchsiaAssemblyDeveloperOverridesListInfo",
     "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
     "FuchsiaProductAssemblyBundleInfo",
@@ -35,6 +36,19 @@ $FFX \
     {mode_arg} \
     --outdir $OUTDIR
 """
+
+def _match_assembly_pattern_string(label, pattern):
+    package = label.package
+    assembly_pattern = pattern.removeprefix("//")
+    if assembly_pattern.endswith("/*"):
+        # Match any target in the package or below
+        return package.startswith(assembly_pattern.removesuffix("/*"))
+    elif assembly_pattern.endswith(":*"):
+        # Match package exactly.
+        return package == assembly_pattern.removesuffix(":*")
+    else:
+        # Match label exactly.
+        return assembly_pattern == "%s:%s" % (package, label.name)
 
 def _fuchsia_product_assembly_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -124,6 +138,17 @@ def _fuchsia_product_assembly_impl(ctx):
         legacy_bundle = ctx.attr.legacy_bundle[FuchsiaProductAssemblyBundleInfo]
         ffx_invocation.extend(["--legacy-bundle", legacy_bundle.root])
         ffx_inputs += legacy_bundle.files
+
+    # Add developer overrides manifest and inputs if necessary.
+    overrides_maps = ctx.attr._developer_overrides_list[FuchsiaAssemblyDeveloperOverridesListInfo].maps
+    for pattern_string, overrides_info in overrides_maps:
+        if _match_assembly_pattern_string(ctx.label, pattern_string):
+            print("Found assembly developer overrides: %s" % overrides_info)
+            ffx_inputs += overrides_info.inputs
+            ffx_invocation.extend([
+                "--developer-overrides",
+                overrides_info.manifest.path,
+            ])
 
     _ffx_invocation = []
     _ffx_invocation.extend(ffx_invocation)
@@ -227,6 +252,9 @@ fuchsia_product_assembly = rule(
             default = "//fuchsia/tools:create_platform_aibs_file",
             executable = True,
             cfg = "exec",
+        ),
+        "_developer_overrides_list": attr.label(
+            default = "//fuchsia:assembly_developer_overrides_list",
         ),
     },
 )
