@@ -106,6 +106,7 @@ group("default") {
 
     # Produce Fuchsia libs zbi tests
     "//src/lib/fuchsia:tests",
+    "//src/lib/fuchsia-runtime:tests",
     "//src/lib/process_builder:tests",
     "//src/lib/zircon:tests",
     "//src/sys/lib/elf_runner:tests",
