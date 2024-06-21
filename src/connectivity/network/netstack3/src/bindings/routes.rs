@@ -40,6 +40,7 @@ use admin::{StrongUserRouteSet, WeakUserRouteSet};
 use rules_admin::{NewRuleSet, RuleOp, RuleTable, RuleWorkItem, SetPriorityConflict};
 
 pub(crate) mod state;
+pub(crate) mod watcher;
 mod witness;
 pub(crate) use witness::{main_table_id, TableId};
 
@@ -735,7 +736,7 @@ where
                 .try_into_fidl_with_ctx(ctx.bindings_ctx())
                 .expect("failed to convert route to FIDL");
             route_update_dispatcher
-                .notify(state::Update::Added(installed_route))
+                .notify(watcher::Update::Added(installed_route))
                 .expect("failed to notify route update dispatcher");
         }
         TableChange::Remove(removed) => {
@@ -849,7 +850,7 @@ fn notify_removed_routes<I: Ip>(
             .try_into_fidl_with_ctx(bindings_ctx)
             .expect("failed to convert route to FIDL");
         dispatcher
-            .notify(state::Update::Removed(installed_route))
+            .notify(watcher::Update::Removed(installed_route))
             .expect("failed to notify route update dispatcher");
     }
 }
