@@ -68,39 +68,69 @@ type DisplayConfig = struct {
 // bytes. So it can contain up to 256 * 128 = 32768 bytes of data.
 const MAX_COUNT_EDID_BYTES uint32 = 32768;
 
-/// The capabilities of a display panel.
-type Panel = flexible resource union {
-    /// Connection to the display's implementation of the E-DDC standard.
-    ///
-    /// E-DDC (Enhanced Display Data Channel) is a VESA standard that describes
-    /// exposing display information over an I2C bus. The information is encoded
-    /// using the VESA E-EDID or DisplayID standards.
-    1: i2c client_end:fuchsia.hardware.i2cimpl.Device;
+const MAX_COUNT_DISPLAY_PIXEL_FORMATS uint32 = fuchsia.sysmem2.MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS;
 
-    /// Hard-coded display configuration.
-    ///
-    /// Can be used when the device does not implement EDID,
-    /// or when the driver needs to override the EDID contents.
-    2: mode DisplayMode;
+const MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES uint32 = 4;
 
-    /// Display capabilities encoded using the E-EDID standard.
+// TODO(https://fxbug.dev/42150719): Convert RawDisplayInfo to a table, for
+// extensibility. The comments about empty vectors will mention members not
+// being present, instead.
+
+/// Collects the information reported by the engine hardware about a display.
+///
+/// The data representation closely matches the formats used by display engine
+/// hardware. The display coordinator is responsible for parsing these formats
+/// and converting the information into forms that are more suitable for
+/// higher-level software.
+type RawDisplayInfo = resource struct {
+    display_id uint64;
+
+    /// Operational modes known to be supported by the display.
+    ///
+    /// When this vector is not empty, the display modes here take precedence
+    /// over the modes retrieved from `edid_bytes` and from `eddc_client`. The
+    /// modes are ordered by suitability. The first mode is most preferred. The
+    /// display modes here may overlap with the modes encoded in the display's
+    /// E-EDID.
+    ///
+    /// Drivers for internal (embedded) displays typically report the display's
+    /// only supported operational mode in this member. Drivers that support
+    /// seamless display handoff from a bootloader report the display's initial
+    /// mode in this member.
+    preferred_modes vector<DisplayMode>:MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES;
+
+    /// Display capabilities, encoded using the E-EDID standard.
     ///
     /// E-EDID (Enhanced Extended Display Identification Data) is a VESA
     /// standard that describes display capabilities as a series of 128-byte
     /// data blocks.
-    3: edid_bytes vector<uint8>:MAX_COUNT_EDID_BYTES;
-};
+    ///
+    /// When this vector is not empty and contains valid E-EDID information, it
+    /// is used as the definitive description of the display's capabilities. In
+    /// this case, the `eddc_client` connection is not used to read E-EDID
+    /// information.
+    ///
+    /// Drivers for external (connected) displays use this member to report the
+    /// display's E-EDID, when it is exposed in a non-standard manner.
+    edid_bytes vector<uint8>:MAX_COUNT_EDID_BYTES;
 
-const MAX_COUNT_DISPLAY_PIXEL_FORMATS uint32 = fuchsia.sysmem2.MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS;
+    /// Connection to the display's implementation of the E-DDC standard.
+    ///
+    /// E-DDC (Enhanced Display Data Channel) is a VESA standard that describes
+    /// exposing display information over an I2C bus. The information is encoded
+    /// using the VESA E-EDID or DisplayID standards. Displays that offer an
+    /// E-DDC connection may also support DDC/CI (DDC Command Interface) over
+    /// the connection.
+    ///
+    /// When this client is valid, the E-DDC connection may be used to retrieve
+    /// the display's E-EDID information, and may be used to issue DDC/CI
+    /// commands.
+    eddc_client client_end:fuchsia.hardware.i2cimpl.Device;
 
-/// A structure containing information a connected display.
-type AddedDisplayArgs = resource struct {
-    display_id uint64;
-
-    panel Panel;
-
-    /// A list of pixel formats supported by the display. The first entry is the
-    /// preferred pixel format.
+    /// A list of pixel formats supported by the display.
+    ///
+    /// The pixel formats modes are ordered by suitability. The first format is
+    /// most preferred.
     pixel_formats vector<fuchsia.images2.PixelFormat>:MAX_COUNT_DISPLAY_PIXEL_FORMATS;
 };
 
@@ -318,7 +348,7 @@ open protocol Engine {
     /// Display Engine drivers must emit this event for all displays connected
     /// prior to initialization.
     flexible -> OnDisplayAdded(resource struct {
-        added_display AddedDisplayArgs;
+        display_info RawDisplayInfo;
     });
 
     /// Emitted when a display is removed.
