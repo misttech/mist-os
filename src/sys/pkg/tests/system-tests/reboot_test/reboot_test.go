@@ -109,13 +109,13 @@ func doTest(ctx context.Context) error {
 		return fmt.Errorf("initialization failed: %w", err)
 	}
 
-	return testReboot(ctx, deviceClient, ffx.IsolateDir(), build)
+	return testReboot(ctx, deviceClient, ffx, build)
 }
 
 func testReboot(
 	ctx context.Context,
 	device *device.Client,
-	ffxIsolateDir ffx.IsolateDir,
+	ffxTool *ffx.FFXTool,
 	build artifacts.Build,
 ) error {
 	if err := sleepAfterReboot(ctx, device); err != nil {
@@ -129,7 +129,7 @@ func testReboot(
 		// setting a timeout on the context, and running the actual test in a
 		// closure.
 		if err := util.RunWithTimeout(ctx, c.cycleTimeout, func() error {
-			return doTestReboot(ctx, device, ffxIsolateDir, build)
+			return doTestReboot(ctx, device, ffxTool, build)
 		}); err != nil {
 			return fmt.Errorf("Reboot Cycle %d failed: %w", i, err)
 		}
@@ -141,14 +141,14 @@ func testReboot(
 func doTestReboot(
 	ctx context.Context,
 	device *device.Client,
-	ffxIsolateDir ffx.IsolateDir,
+	ffxTool *ffx.FFXTool,
 	build artifacts.Build,
 ) error {
 	// We don't install an OTA, so we don't need to prefetch the blobs.
 	repo, err := build.GetPackageRepository(
 		ctx,
 		artifacts.LazilyFetchBlobs,
-		ffxIsolateDir,
+		ffxTool.IsolateDir(),
 	)
 	if err != nil {
 		return fmt.Errorf("unable to get repository: %w", err)
@@ -184,7 +184,7 @@ func doTestReboot(
 		return err
 	}
 
-	if err := device.Reboot(ctx); err != nil {
+	if err := device.Reboot(ctx, ffxTool); err != nil {
 		return fmt.Errorf("error rebooting: %w", err)
 	}
 

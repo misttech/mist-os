@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -168,6 +169,36 @@ func (f *FFXTool) TargetAdd(ctx context.Context, target string) error {
 	args := []string{"target", "add", "--nowait", target}
 	_, err := f.runFFXCmd(ctx, args...)
 	return err
+}
+
+func (f *FFXTool) TargetGetSshTime(ctx context.Context, target string) (time.Duration, error) {
+	args := []string{
+		"--target",
+		target,
+		"target",
+		"get-time",
+	}
+
+	t0 := time.Now()
+	stdout, err := f.runFFXCmd(ctx, args...)
+	t1 := time.Now()
+
+	if err != nil {
+		return 0, fmt.Errorf("ffx target get-ssh-address failed: %w", err)
+	}
+
+	t, err := strconv.Atoi(strings.TrimSpace(string(stdout)))
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse ffx target-get-ssh-address output: %w", err)
+	}
+
+	// Estimate the latency as half the time to execute the command.
+	latency := t1.Sub(t0) / 2
+
+	// The output is in nanoseconds.
+	monotonicTime := (time.Duration(t) * time.Nanosecond) - latency
+
+	return monotonicTime, nil
 }
 
 func (f *FFXTool) Flasher() *Flasher {

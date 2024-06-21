@@ -12,8 +12,10 @@ import (
 	"os"
 	"testing"
 
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/errutil"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/paver"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
@@ -100,6 +102,43 @@ func doTest(ctx context.Context) error {
 		return fmt.Errorf("failed to get upgrade build: %w", err)
 	}
 
+	return testPaves(ctx, deviceClient, downgradeBuild, upgradeBuild, ffx.IsolateDir())
+}
+
+func testPaves(
+	ctx context.Context,
+	deviceClient *device.Client,
+	downgradeBuild artifacts.Build,
+	upgradeBuild artifacts.Build,
+	ffxIsolateDir ffx.IsolateDir,
+) error {
+	for i := 1; i <= c.cycleCount; i++ {
+		logger.Infof(ctx, "Pave Attempt %d", i)
+
+		if err := util.RunWithTimeout(ctx, c.cycleTimeout, func() error {
+			return doTestPave(
+				ctx,
+				deviceClient,
+				downgradeBuild,
+				upgradeBuild,
+				ffxIsolateDir,
+			)
+		}); err != nil {
+			return fmt.Errorf("Pave Attempt %d failed: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+func doTestPave(
+	ctx context.Context,
+	deviceClient *device.Client,
+	downgradeBuild artifacts.Build,
+	upgradeBuild artifacts.Build,
+	ffxIsolateDir ffx.IsolateDir,
+) error {
+
 	sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
 	if err != nil {
 		return fmt.Errorf("failed to get ssh key: %w", err)
@@ -115,34 +154,11 @@ func doTest(ctx context.Context) error {
 		return fmt.Errorf("failed to get paver to pave device: %w", err)
 	}
 
-	return testPaves(ctx, deviceClient, downgradePaver, upgradePaver)
-}
-
-func testPaves(
-	ctx context.Context,
-	deviceClient *device.Client,
-	downgradePaver paver.Paver,
-	upgradePaver paver.Paver,
-) error {
-	for i := 1; i <= c.cycleCount; i++ {
-		logger.Infof(ctx, "Pave Attempt %d", i)
-
-		if err := util.RunWithTimeout(ctx, c.cycleTimeout, func() error {
-			return doTestPave(ctx, deviceClient, downgradePaver, upgradePaver)
-		}); err != nil {
-			return fmt.Errorf("Pave Attempt %d failed: %w", i, err)
-		}
+	upgradeFfxTool, err := upgradeBuild.GetFfx(ctx, ffxIsolateDir)
+	if err != nil {
+		return fmt.Errorf("failed to get ffx from build %s: %w", upgradeBuild, err)
 	}
 
-	return nil
-}
-
-func doTestPave(
-	ctx context.Context,
-	deviceClient *device.Client,
-	downgradePaver paver.Paver,
-	upgradePaver paver.Paver,
-) error {
 	if err := util.RunWithTimeout(ctx, c.paveTimeout, func() error {
 		if err := deviceClient.RebootToRecovery(ctx); err != nil {
 			return fmt.Errorf("failed to reboot to recovery during paving: %w", err)
@@ -175,7 +191,7 @@ func doTestPave(
 	logger.Infof(ctx, "paver completed, waiting for device to boot")
 
 	// Reconnect to the device.
-	if err := deviceClient.Reconnect(ctx); err != nil {
+	if err := deviceClient.Reconnect(ctx, upgradeFfxTool); err != nil {
 		return fmt.Errorf("device failed to connect after pave: %w", err)
 	}
 

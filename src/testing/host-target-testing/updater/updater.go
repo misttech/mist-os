@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
@@ -34,8 +35,15 @@ const (
 )
 
 type client interface {
-	ExpectReboot(ctx context.Context, f func() error) error
-	Reboot(ctx context.Context) error
+	ExpectReboot(
+		ctx context.Context,
+		ffxTool *ffx.FFXTool,
+		f func() error,
+	) error
+	Reboot(
+		ctx context.Context,
+		ffxTool *ffx.FFXTool,
+	) error
 	RunReboot(ctx context.Context) error
 	DisconnectionListener() <-chan struct{}
 	ServePackageRepository(
@@ -50,6 +58,7 @@ type client interface {
 type Updater interface {
 	Update(
 		ctx context.Context,
+		ffxTool *ffx.FFXTool,
 		c client,
 		updatePackage *packages.UpdatePackage,
 	) error
@@ -112,6 +121,7 @@ func NewSystemUpdateChecker(checkForUnkownFirmware bool) *SystemUpdateChecker {
 
 func (u *SystemUpdateChecker) Update(
 	ctx context.Context,
+	ffxTool *ffx.FFXTool,
 	c client,
 	srcUpdatePackage *packages.UpdatePackage,
 ) error {
@@ -120,6 +130,7 @@ func (u *SystemUpdateChecker) Update(
 	if srcUpdatePackage.Path() == defaultUpdatePackagePath {
 		return updateCheckNow(
 			ctx,
+			ffxTool,
 			c,
 			srcUpdatePackage.Repository(),
 			true,
@@ -164,11 +175,19 @@ func (u *SystemUpdateChecker) Update(
 		return fmt.Errorf("failed to publish %s: %w", defaultUpdatePackagePath, err)
 	}
 
-	return updateCheckNow(ctx, c, tempRepo, true, u.checkForUnkownFirmware)
+	return updateCheckNow(
+		ctx,
+		ffxTool,
+		c,
+		tempRepo,
+		true,
+		u.checkForUnkownFirmware,
+	)
 }
 
 func updateCheckNow(
 	ctx context.Context,
+	ffxTool *ffx.FFXTool,
 	c client,
 	repo *packages.Repository,
 	createRewriteRule bool,
@@ -177,7 +196,7 @@ func updateCheckNow(
 	logger.Infof(ctx, "Triggering OTA")
 
 	startTime := time.Now()
-	err := c.ExpectReboot(ctx, func() error {
+	err := c.ExpectReboot(ctx, ffxTool, func() error {
 		// Since an update can trigger a reboot, we can run into all
 		// sorts of races. The two main ones are:
 		//
@@ -296,6 +315,7 @@ func NewSystemUpdater(checkForUnkownFirmware bool) *SystemUpdater {
 
 func (u *SystemUpdater) Update(
 	ctx context.Context,
+	ffxTool *ffx.FFXTool,
 	c client,
 	srcUpdate *packages.UpdatePackage,
 ) error {
@@ -336,7 +356,7 @@ func (u *SystemUpdater) Update(
 	logger.Infof(ctx, "Rebooting device")
 	startTime = time.Now()
 
-	if err = c.Reboot(ctx); err != nil {
+	if err = c.Reboot(ctx, ffxTool); err != nil {
 		return fmt.Errorf("device failed to reboot after OTA applied: %w", err)
 	}
 
@@ -376,6 +396,7 @@ func NewOmahaUpdater(
 
 func (u *OmahaUpdater) Update(
 	ctx context.Context,
+	ffxTool *ffx.FFXTool,
 	c client,
 	srcUpdate *packages.UpdatePackage,
 ) error {
@@ -432,5 +453,12 @@ func (u *OmahaUpdater) Update(
 	}
 
 	// Trigger an update
-	return updateCheckNow(ctx, c, dstUpdate.Repository(), !u.workaroundOtaNoRewriteRules, u.checkForUnkownFirmware)
+	return updateCheckNow(
+		ctx,
+		ffxTool,
+		c,
+		dstUpdate.Repository(),
+		!u.workaroundOtaNoRewriteRules,
+		u.checkForUnkownFirmware,
+	)
 }

@@ -14,7 +14,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -52,6 +51,7 @@ func NewClient(
 	sshConnectBackoff retry.Backoff,
 	workaroundBrokenTimeSkip bool,
 	serialConn *SerialConn,
+	ffxTool *ffx.FFXTool,
 ) (*Client, error) {
 	sshConfig, err := newSSHConfig(privateKey)
 	if err != nil {
@@ -94,7 +94,7 @@ func NewClient(
 		repoPort:                 repoPort,
 	}
 
-	if err := c.postConnectSetup(ctx); err != nil {
+	if err := c.postConnectSetup(ctx, ffxTool); err != nil {
 		c.Close()
 		return nil, err
 
@@ -124,7 +124,10 @@ func (c *Client) Close() {
 }
 
 // Run all setup steps after we've connected to a device.
-func (c *Client) postConnectSetup(ctx context.Context) error {
+func (c *Client) postConnectSetup(
+	ctx context.Context,
+	ffxTool *ffx.FFXTool,
+) error {
 	// TODO(https://fxbug.dev/42154680): The device might drop connections
 	// early after boot when the RTC is updated, which typically happens
 	// about 10 seconds after boot. To avoid this, if we find that we
@@ -138,45 +141,34 @@ func (c *Client) postConnectSetup(ctx context.Context) error {
 		}
 	}
 
-	return c.setInitialMonotonicTime(ctx)
+	c.setInitialMonotonicTime(ctx, ffxTool)
+
+	return nil
 }
 
-func (c *Client) Reconnect(ctx context.Context) error {
+func (c *Client) Reconnect(ctx context.Context, ffxTool *ffx.FFXTool) error {
 	if err := c.sshClient.Reconnect(ctx); err != nil {
 		return err
 	}
 
-	return c.postConnectSetup(ctx)
+	return c.postConnectSetup(ctx, ffxTool)
 }
 
-func (c *Client) setInitialMonotonicTime(ctx context.Context) error {
-	var b bytes.Buffer
-	cmd := []string{"/boot/bin/clock", "--monotonic"}
+func (c *Client) setInitialMonotonicTime(
+	ctx context.Context,
+	ffxTool *ffx.FFXTool,
+) {
+	nodeName := c.deviceResolver.NodeName()
+	monotonicTime, err := ffxTool.TargetGetSshTime(ctx, nodeName)
 
-	// Get the device's monotonic time.
-	t0 := time.Now()
-	err := c.sshClient.Run(ctx, cmd, &b, os.Stderr)
-	t1 := time.Now()
+	if err == nil {
+		c.initialMonotonicTime = time.Now().Add(-monotonicTime)
+	} else {
+		logger.Warningf(ctx, "failed to get time with ffx: %v", err)
+		logger.Warningf(ctx, "resetting time to zero")
 
-	if err != nil {
 		c.initialMonotonicTime = time.Time{}
-		return err
 	}
-
-	// Estimate the latency as half the time to execute the command.
-	latency := t1.Sub(t0) / 2
-
-	t, err := strconv.Atoi(strings.TrimSpace(b.String()))
-	if err != nil {
-		c.initialMonotonicTime = time.Time{}
-		return err
-	}
-
-	// The output from `clock --monotonic` is in nanoseconds.
-	monotonicTime := (time.Duration(t) * time.Nanosecond) - latency
-	c.initialMonotonicTime = time.Now().Add(-monotonicTime)
-
-	return nil
 }
 
 func (c *Client) getEstimatedMonotonicTime() time.Duration {
@@ -220,10 +212,10 @@ func (c *Client) GetSystemImageMerkle(ctx context.Context) (build.MerkleRoot, er
 
 // Reboot asks the device to reboot. It waits until the device reconnects
 // before returning.
-func (c *Client) Reboot(ctx context.Context) error {
+func (c *Client) Reboot(ctx context.Context, ffxTool *ffx.FFXTool) error {
 	logger.Infof(ctx, "rebooting")
 
-	return c.ExpectReboot(ctx, func() error {
+	return c.ExpectReboot(ctx, ffxTool, func() error {
 		// Run the reboot in the background, which gives us a chance to
 		// observe us successfully executing the reboot command.
 		return c.RunReboot(ctx)
@@ -352,7 +344,11 @@ func (c *Client) ExpectDisconnect(ctx context.Context, f func() error) error {
 // reconnect, we check if `/tmp/ota_test_should_reboot` exists. If not, exit
 // with `nil`. Otherwise, we failed to reboot, or some competing test is also
 // trying to reboot the device. Either way, err out.
-func (c *Client) ExpectReboot(ctx context.Context, f func() error) error {
+func (c *Client) ExpectReboot(
+	ctx context.Context,
+	ffxTool *ffx.FFXTool,
+	f func() error,
+) error {
 	// Generate a unique value.
 	b := make([]byte, 16)
 	_, err := rand.Read(b)
@@ -405,7 +401,7 @@ func (c *Client) ExpectReboot(ctx context.Context, f func() error) error {
 
 	logger.Infof(ctx, "device disconnected, waiting for device to boot")
 
-	if err := c.Reconnect(ctx); err != nil {
+	if err := c.Reconnect(ctx, ffxTool); err != nil {
 		return fmt.Errorf("failed to reconnect: %w", err)
 	}
 

@@ -30,7 +30,7 @@ func FlashDevice(
 		return fmt.Errorf("device failed to flash: %w", err)
 	}
 
-	if err := d.Reconnect(ctx); err != nil {
+	if err := d.Reconnect(ctx, ffx); err != nil {
 		return fmt.Errorf("device failed to connect after flash: %w", err)
 	}
 
