@@ -7,7 +7,6 @@
 use tracing_mutex as _;
 
 pub mod arch;
-//pub mod bpf;
 pub mod device;
 pub mod dynamic_thread_spawner;
 pub mod execution;
