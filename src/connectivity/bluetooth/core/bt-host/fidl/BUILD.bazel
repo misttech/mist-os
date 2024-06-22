@@ -78,6 +78,7 @@ cc_library(
         "@fuchsia_sdk//fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_hlcpp",
         "@internal_sdk//fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_cpp",
         "@internal_sdk//fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_hlcpp",
+        "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     ],
 )
 
@@ -140,10 +141,16 @@ cc_library(
     testonly = True,
     hdrs = [
         "fake_hci_server.h",
+        "fake_vendor_server.h",
     ],
     deps = [
+        "//src/connectivity/bluetooth/core/bt-host/common",
         "//src/connectivity/bluetooth/core/bt-host/iso",
         "//src/connectivity/bluetooth/core/bt-host/transport",
+        "@com_google_googletest//:gtest",
+        "@fuchsia_sdk//pkg/async-cpp",
+        "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     ],
 )
 
