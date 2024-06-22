@@ -72,16 +72,6 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         len(in_development_api_levels) < 2
     ), f"Should be at most one in-development API level. Found: {in_development_api_levels}"
 
-    # The current numbered "in-development" API level or the highest numbered
-    # API level when there is no such API level, which can happen during API
-    # freezes before a new API level is introduced.
-    # TODO(https://fxbug.dev/305961460): This is only used for a deprecated GN
-    # arg. Remove the thiis local variable entirely once the GN arg is unused.
-    if not in_development_api_levels:
-        deprecated_in_development_api_level: int = max(supported_api_levels)
-    else:
-        deprecated_in_development_api_level = in_development_api_levels[0]
-
     # Exclude "PLATFORM" because it represents a set of other API levels.
     special_api_levels = data["data"]["special_api_levels"]
     in_development_special_api_levels: list[str] = [
@@ -106,14 +96,16 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         # TODO(https://fxbug.dev/326277078): Add that these levels are all
         # frozen once "NEXT" is implemented.
         "all_numbered_api_levels": all_numbered_api_levels,
-        # TODO: https://fxbug.dev/305961460 - Remove this.
-        "in_development_api_level": deprecated_in_development_api_level,
         # API levels that the IDK supports targeting.
         "build_time_supported_api_levels": build_time_supported_api_levels,
         # API levels that the platform build supports at runtime.
         "runtime_supported_api_levels": runtime_supported_api_levels,
         # API levels whose contents should not change anymore.
         "frozen_api_levels": sunset_api_levels + supported_api_levels,
+        # The greatest number assigned to a numbered API level.
+        # TODO(https://fxbug.dev/305961460): Remove this because the highest
+        # numbered API level should not be particularly special.
+        "deprecated_highest_numbered_api_level": max(all_numbered_api_levels),
     }
 
 

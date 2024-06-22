@@ -47,6 +47,7 @@ sdk_source_set("cpp") {
       ":backend_fuchsia_globals",
       "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_cpp",
       "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+      "//sdk/lib/component/incoming/cpp",
       "//sdk/lib/fdio",
       "//sdk/lib/stdcompat",
       "//sdk/lib/syslog/structured_backend",

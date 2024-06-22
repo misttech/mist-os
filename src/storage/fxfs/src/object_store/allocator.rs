@@ -906,13 +906,14 @@ impl Allocator {
     /// Walk all allocations to generate the set of free regions between allocations.
     /// It is safe to re-run this on live filesystems but it should not be called concurrently
     /// with allocations, trims or other rebuild_strategy invocations -- use allocation_mutex.
-    /// Returns true if the rebuild made changes.
+    /// Returns true if the rebuild made changes to either the free ranges or overflow markers.
     async fn rebuild_strategy(self: &Arc<Self>) -> Result<bool, Error> {
         let mut changed = false;
         let mut layer_set = self.tree.empty_layer_set();
         layer_set.layers.push((self.temporary_allocations.clone() as Arc<dyn Layer<_, _>>).into());
         self.tree.add_all_layers_to_layer_set(&mut layer_set);
 
+        let overflow_markers = self.inner.lock().unwrap().strategy.overflow_markers();
         self.inner.lock().unwrap().strategy.reset_overflow_markers();
 
         let mut to_add = Vec::new();
@@ -956,6 +957,9 @@ impl Allocator {
         let mut inner = self.inner.lock().unwrap();
         for range in to_add {
             changed |= inner.strategy.force_free(range)?;
+        }
+        if overflow_markers != inner.strategy.overflow_markers() {
+            changed = true;
         }
         Ok(changed)
     }

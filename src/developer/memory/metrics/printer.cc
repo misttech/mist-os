@@ -181,8 +181,6 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
 
 namespace memory {
 
-const size_t kMaxFormattedStringSize = sizeof("1023.5T");
-
 const char* FormatSize(uint64_t bytes, char* buf) {
   const char units[] = "BKMGTPE";
   uint16_t r = 0;

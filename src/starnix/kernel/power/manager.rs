@@ -6,7 +6,7 @@ use crate::power::{SuspendState, SuspendStats};
 use crate::task::CurrentTask;
 
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex as StdMutex};
 
 use anyhow::{anyhow, Context};
 use async_utils::hanging_get::client::HangingGetStream;
@@ -60,6 +60,37 @@ pub struct SuspendResumeManager {
 }
 static STARNIX_POWER_ON_LEVEL: fbroker::PowerLevel = 4;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum SuspendResult {
+    /// Indicates suspension was successful.
+    ///
+    /// Note that a successful suspension result may be returned _after_ resuming
+    /// from a suspend. Observers may not assume that this result will be observed
+    /// before the system actually suspends.
+    Success,
+    Failure,
+}
+
+#[derive(Default)]
+struct SuspendWaiter {
+    cond_var: Condvar,
+    result: StdMutex<Option<SuspendResult>>,
+}
+
+impl SuspendWaiter {
+    fn new() -> Arc<Self> {
+        Arc::new(SuspendWaiter::default())
+    }
+
+    fn wait(self: Arc<Self>) -> SuspendResult {
+        let guard = self.result.lock().unwrap();
+        self.cond_var
+            .wait_while(guard, |result| result.is_none())
+            .unwrap()
+            .expect("result is set before being notified")
+    }
+}
+
 /// Manager for suspend and resume.
 #[derive(Default)]
 pub struct SuspendResumeManagerInner {
@@ -67,6 +98,8 @@ pub struct SuspendResumeManagerInner {
     sync_on_suspend_enabled: bool,
     /// Lease control channel to hold the system power state as active.
     lease_control_channel: Option<zx::Channel>,
+
+    suspend_waiter: Option<Arc<SuspendWaiter>>,
 }
 
 pub type SuspendResumeManagerHandle = Arc<SuspendResumeManager>;
@@ -129,8 +162,9 @@ impl SuspendResumeManager {
                             dependency_type: fbroker::DependencyType::Active,
                             dependent_level: STARNIX_POWER_ON_LEVEL,
                             requires_token: application_activity_token,
-                            requires_level: fsystem::ApplicationActivityLevel::Active
-                                .into_primitive(),
+                            requires_level_by_preference: vec![
+                                fsystem::ApplicationActivityLevel::Active.into_primitive(),
+                            ],
                         }]),
                         lessor_channel: Some(lessor_server_end),
                         level_control_channels: Some(level_control_channels),
@@ -206,18 +240,34 @@ impl SuspendResumeManager {
                                 }
                                 Err(e) => log_error!("Failed to create a power-on lease: {}", e),
                             }
+
+                            // Wake up a potentially blocked suspend.
+                            //
+                            // NB: We can't send this event on the `OnSuspend` listener event
+                            // since that event is emitted before suspension is actually
+                            // attempted.
+                            self_ref.notify_suspension(SuspendResult::Success);
                         }
                         fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
-                            log_info!("Transiting to a low-power state");
+                            log_info!("Attempting to transition to a low-power state");
                         }
                         fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                            // TODO(b/337924793): Update Starnix to handle suspend failures.
+                            log_warn!("Failed to suspend");
+
+                            // We failed to suspend so bring us back to the power on level.
+                            match self_ref.update_power_level(STARNIX_POWER_ON_LEVEL) {
+                                Ok(()) => {}
+                                // What can we really do here?
+                                Err(e) => log_error!(
+                                    "Failed to create a power-on lease after suspend failure: {e}"
+                                ),
+                            }
+
+                            // Wake up a potentially blocked suspend.
+                            self_ref.notify_suspension(SuspendResult::Failure);
+
                             if let Err(e) = responder.send() {
-                                log_error!(
-                                    "OnSuspendFail server failed to send a respond to its
-                                    client: {}",
-                                    e
-                                );
+                                log_error!("Failed to send OnSuspendFail response: {e}");
                             }
                         }
                         fsystem::ActivityGovernorListenerRequest::_UnknownMethod {
@@ -247,6 +297,27 @@ impl SuspendResumeManager {
         }
     }
 
+    fn update_stats(&self, stats: fsuspend::SuspendStats) {
+        let stats_guard = &mut self.lock().suspend_stats;
+
+        // Only update the stats if the new stats moves forward.
+        let success_count = stats.success_count.unwrap_or_default();
+        if stats_guard.success_count > success_count {
+            return;
+        }
+        let fail_count = stats.fail_count.unwrap_or_default();
+        if stats_guard.fail_count > fail_count {
+            return;
+        }
+
+        stats_guard.success_count = stats.success_count.unwrap_or_default();
+        stats_guard.fail_count = stats.fail_count.unwrap_or_default();
+        stats_guard.last_time_in_sleep =
+            zx::Duration::from_millis(stats.last_time_in_suspend.unwrap_or_default());
+        stats_guard.last_time_in_suspend_operations =
+            zx::Duration::from_millis(stats.last_time_in_suspend_operations.unwrap_or_default());
+    }
+
     fn init_stats_watcher(self: &SuspendResumeManagerHandle, system_task: &CurrentTask) {
         let self_ref = self.clone();
         system_task.kernel().kthreads.spawn_future(async move {
@@ -254,19 +325,9 @@ impl SuspendResumeManager {
             let stats_proxy = connect_to_protocol::<fsuspend::StatsMarker>()
                 .expect("connection to fuchsia.power.suspend.Stats");
             let mut stats_stream = HangingGetStream::new(stats_proxy, fsuspend::StatsProxy::watch);
-            while let Some(stream) = stats_stream.next().await {
-                match stream {
-                    Ok(stats) => {
-                        let stats_guard = &mut self_ref.lock().suspend_stats;
-                        stats_guard.success_count = stats.success_count.unwrap_or_default();
-                        stats_guard.fail_count = stats.fail_count.unwrap_or_default();
-                        stats_guard.last_time_in_sleep = zx::Duration::from_millis(
-                            stats.last_time_in_suspend.unwrap_or_default(),
-                        );
-                        stats_guard.last_time_in_suspend_operations = zx::Duration::from_millis(
-                            stats.last_time_in_suspend_operations.unwrap_or_default(),
-                        );
-                    }
+            while let Some(stats) = stats_stream.next().await {
+                match stats {
+                    Ok(stats) => self_ref.update_stats(stats),
                     Err(e) => {
                         log_error!("stats watcher got an error: {}", e);
                         break;
@@ -355,9 +416,41 @@ impl SuspendResumeManager {
         Ok(())
     }
 
+    fn notify_suspension(&self, result: SuspendResult) {
+        let waiters = std::mem::take(&mut self.lock().suspend_waiter);
+        for waiter in waiters.into_iter() {
+            let mut guard = waiter.result.lock().unwrap();
+            let prev = guard.replace(result);
+            debug_assert_eq!(prev, None, "waiter should only be notified once");
+            // We should only have a single thread blocked per waiter.
+            waiter.cond_var.notify_one();
+        }
+    }
+
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
-        self.update_power_level(state.into())?;
-        self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)
+        let waiter = SuspendWaiter::new();
+        let prev = self.lock().suspend_waiter.replace(Arc::clone(&waiter));
+        debug_assert!(prev.is_none(), "Should not have concurrent suspend attempts");
+
+        self.update_power_level(state.into()).inspect_err(|_| {
+            self.lock().suspend_waiter.take();
+        })?;
+
+        let suspend_result = waiter.wait();
+
+        // Synchronously update the stats after performing suspend so that a later
+        // query of stats is guaranteed to reflect the current suspend operation.
+        let stats_proxy = connect_to_protocol_sync::<fsuspend::StatsMarker>()
+            .expect("connection to fuchsia.power.suspend.Stats");
+        match stats_proxy.watch(zx::Time::INFINITE) {
+            Ok(stats) => self.update_stats(stats),
+            Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
+        }
+
+        match suspend_result {
+            SuspendResult::Success => self.wait_for_power_level(STARNIX_POWER_ON_LEVEL),
+            SuspendResult::Failure => error!(EINVAL, format!("failed to suspend")),
+        }
     }
 }
 
@@ -371,13 +464,23 @@ impl SuspendResumeManager {
 ///
 /// This is useful for syscalls that need to keep the system awake for a period of time, such as
 /// `EPOLLWAKEUP` event in epoll.
-#[derive(Default)]
 pub struct WakeLease {
+    name: String,
     element: OnceCell<PowerElement>,
     lease: Mutex<Option<zx::Channel>>,
 }
 
 impl WakeLease {
+    pub fn new(name: &str) -> Self {
+        let random_string: String =
+            rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
+        Self {
+            name: format!("{}-{}", name, random_string),
+            element: Default::default(),
+            lease: Default::default(),
+        }
+    }
+
     fn element(&self) -> Result<&PowerElement, Errno> {
         self.element.get_or_try_init(|| {
             let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()
@@ -398,12 +501,10 @@ impl WakeLease {
             let power_levels: Vec<u8> =
                 (0..=fbroker::BinaryPowerLevel::On.into_primitive()).collect();
             let (lessor_proxy, lessor_server_end) = create_sync_proxy::<fbroker::LessorMarker>();
-            let random_string: String =
-                rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
             let element_proxy = topology
                 .add_element(
                     fbroker::ElementSchema {
-                        element_name: Some(format!("starnix-wake-lease-{random_string}")),
+                        element_name: Some(format!("starnix-wake-lock-{}", self.name)),
                         initial_current_level: Some(
                             fbroker::BinaryPowerLevel::Off.into_primitive(),
                         ),
@@ -412,7 +513,9 @@ impl WakeLease {
                             dependency_type: fbroker::DependencyType::Active,
                             dependent_level: fbroker::BinaryPowerLevel::On.into_primitive(),
                             requires_token: active_wake_token,
-                            requires_level: fsystem::WakeHandlingLevel::Active.into_primitive(),
+                            requires_level_by_preference: vec![
+                                fsystem::WakeHandlingLevel::Active.into_primitive()
+                            ],
                         }]),
                         lessor_channel: Some(lessor_server_end),
                         ..Default::default()

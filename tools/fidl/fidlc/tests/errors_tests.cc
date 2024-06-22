@@ -75,9 +75,9 @@ protocol MyProtocol {
   ASSERT_EQ(protocol->methods.size(), 1u);
 
   auto& method = protocol->methods[0];
-  EXPECT_TRUE(method.has_request);
-  EXPECT_EQ(method.maybe_request.get(), nullptr);
-  ASSERT_TRUE(method.has_response && method.maybe_response.get());
+  EXPECT_EQ(method.kind, Protocol::Method::Kind::kTwoWay);
+  EXPECT_EQ(method.maybe_request, nullptr);
+  ASSERT_NE(method.maybe_response, nullptr);
 
   auto id = static_cast<const IdentifierType*>(method.maybe_response->type);
   auto response = static_cast<const Union*>(id->type_decl);

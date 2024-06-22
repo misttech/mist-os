@@ -132,13 +132,13 @@ void AmlSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
   completer.ReplySuccess(resp);
 }
 
+zx_status_t AmlSuspend::SystemSuspendEnter(zx_time_t resume_deadline) {
+  return zx_system_suspend_enter(cpu_resource_.get(), resume_deadline);
+}
+
 void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& completer) {
   fidl::Arena arena;
-
-  auto resp = fuchsia_hardware_suspend::wire::SuspenderSuspendResponse::Builder(arena)
-                  .suspend_duration(0)
-                  .suspend_overhead(0)
-                  .Build();
+  auto function_start = zx_clock_get_monotonic();
 
   if (!request->has_state_index() || request->state_index() != 0) {
     // This driver only supports one suspend state for now.
@@ -149,8 +149,12 @@ void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& com
 
   inspect_events_.CreateEntry(
       [](inspect::Node& n) { n.RecordInt("suspended", zx_clock_get_monotonic()); });
-  zx_status_t result =
-      zx_system_suspend_enter(cpu_resource_.get(), zx::deadline_after(kDebugSuspendDuration).get());
+
+  // TODO(b/347768611): The Monotonic clock is not a suitable way to measure suspend duration.
+  //                    Switch to CLOCK_BOOTTIME when that becomes available.
+  auto suspend_start = zx_clock_get_monotonic();
+  zx_status_t result = SystemSuspendEnter(zx::deadline_after(kDebugSuspendDuration).get());
+  auto suspend_return = zx_clock_get_monotonic();
 
   if (result != ZX_OK) {
     FDF_LOG(ERROR, "zx_system_suspend_enter failed: %s", zx_status_get_string(result));
@@ -160,6 +164,11 @@ void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& com
   } else {
     inspect_events_.CreateEntry(
         [](inspect::Node& n) { n.RecordInt("resumed", zx_clock_get_monotonic()); });
+    auto resp = fuchsia_hardware_suspend::wire::SuspenderSuspendResponse::Builder(arena)
+                    .suspend_duration(suspend_return - suspend_start)
+                    .suspend_overhead(suspend_start - function_start + zx_clock_get_monotonic() -
+                                      suspend_return)
+                    .Build();
     completer.ReplySuccess(resp);
   }
 }

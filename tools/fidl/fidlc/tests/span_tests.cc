@@ -537,9 +537,9 @@ const std::vector<TestCase> kTestCases = {
          R"FIDL(library x; type MyUnion = «flexible» union { 1: my_member bool; };)FIDL",
          R"FIDL(library x; type MyUnion = «strict» union { 1: my_member bool; };)FIDL",
          R"FIDL(library x; type MyUnion = «resource strict» union { 1: my_member bool; };)FIDL",
-         R"FIDL(library x; type MyEnum = @attr «flexible» enum : uint32 { MY_VALUE = 1; };)FIDL",
-         R"FIDL(library x; type MyStruct = @attr «resource» struct {};)FIDL",
-         R"FIDL(library x; type MyUnion = @attr «resource strict» union { 1: my_member bool; };)FIDL",
+         R"FIDL(library x; @attr type MyEnum = «flexible» enum : uint32 { MY_VALUE = 1; };)FIDL",
+         R"FIDL(library x; @attr type MyStruct = «resource» struct {};)FIDL",
+         R"FIDL(library x; @attr type MyUnion = «resource strict» union { 1: my_member bool; };)FIDL",
          // Note that the following 3 tests have union members named like modifiers.
          R"FIDL(library x; type MyUnion = «resource flexible» union { 1: my_member resource; };)FIDL",
          R"FIDL(library x; type MyUnion = «strict resource» union { 1: my_member flexible; };)FIDL",

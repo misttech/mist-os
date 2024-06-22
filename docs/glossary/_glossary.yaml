@@ -1639,7 +1639,7 @@
   packages can be identified using
   <a href=\"/docs/glossary#fuchsia-pkg-url\">fuchsia-pkg URL</a>. Packages can
   contain other packages (known as <a href=\"/docs/glossary#subpackage\">Subpackages</a>)."
-  see_also: [""]
+  see_also: ["<a href=\"/docs/concepts/packages/package.md\">Fuchsia packages</a>"]
   related_guides: [""]
   area: ["System", "Component Framework"]
 

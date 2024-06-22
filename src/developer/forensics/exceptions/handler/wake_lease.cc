@@ -31,8 +31,8 @@ fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Le
       /*dependency_type=*/fpb::DependencyType::kPassive,
       /*dependent_level=*/kPowerLevelActive,
       /*requires_token=*/std::move(requires_token),
-      /*requires_level=*/
-      fidl::ToUnderlying(fps::ExecutionStateLevel::kWakeHandling));
+      /*requires_level_by_preference=*/
+      std::vector<uint8_t>(1, fidl::ToUnderlying(fps::ExecutionStateLevel::kWakeHandling)));
 
   fpb::ElementSchema schema;
   schema.element_name(element_name)

@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/mmio/mmio.h>

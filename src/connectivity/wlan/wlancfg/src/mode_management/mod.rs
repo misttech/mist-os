@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::client::connection_selection::ConnectionSelectionRequester;
-use crate::client::roaming::local_roam_manager::LocalRoamManagerApi;
+use crate::client::roaming::local_roam_manager::RoamManager;
 use crate::config_management::SavedNetworksManagerApi;
 use crate::telemetry::TelemetrySender;
 use crate::util::listener;
@@ -28,8 +28,8 @@ pub fn create_iface_manager(
     ap_update_sender: listener::ApListenerMessageSender,
     dev_monitor_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
-    local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
     connection_selection_requester: ConnectionSelectionRequester,
+    roam_manager: RoamManager,
     telemetry_sender: TelemetrySender,
     recovery_receiver: recovery::RecoveryActionReceiver,
 ) -> (Arc<Mutex<iface_manager_api::IfaceManager>>, impl Future<Output = Result<Infallible, Error>>)
@@ -44,7 +44,7 @@ pub fn create_iface_manager(
         dev_monitor_proxy,
         saved_networks,
         connection_selection_requester,
-        local_roam_manager,
+        roam_manager,
         telemetry_sender,
         defect_sender,
     );

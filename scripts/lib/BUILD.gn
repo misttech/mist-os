@@ -3,5 +3,11 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = []
+  testonly = true
+  deps = [
+    "async_utils:tests",
+    "build_dir:tests",
+    "statusinfo:tests",
+    "termout:tests",
+  ]
 }

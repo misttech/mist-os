@@ -77,8 +77,6 @@ class FakeDisplayStack {
     fuchsia_hardware_sysmem::Metadata metadata;
     metadata.vid() = PDEV_VID_QEMU;
     metadata.pid() = PDEV_PID_QEMU;
-    metadata.protected_memory_size() = 0;
-    metadata.contiguous_memory_size() = 0;
     return metadata;
   }();
 

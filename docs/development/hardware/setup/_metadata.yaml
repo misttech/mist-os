@@ -24,7 +24,6 @@ methods:
   - "USB Cable"
 hosts:
   - "Linux"
-  - "macOS"
   - "N/A"
 guides:
   - type: "Custom"

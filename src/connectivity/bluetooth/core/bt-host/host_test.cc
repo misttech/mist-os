@@ -10,11 +10,11 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_hci_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_vendor_server.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 
 namespace bthost::testing {
 
-using TestingBase = ::gtest::TestLoopFixture;
+using TestingBase = ::bt::testing::TestLoopFixture;
 
 const std::string DEFAULT_DEV_PATH = "/dev/class/bt-hci/000";
 class HostComponentTest : public TestingBase {

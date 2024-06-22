@@ -37,10 +37,10 @@ class VmoInfoWriter {
 };
 
 // Similar to VmoInfoWriter, but for zx_info_maps_t
-class ProcessMapsInfoWriter {
+class VmarMapsInfoWriter {
  public:
-  ProcessMapsInfoWriter() = default;
-  virtual ~ProcessMapsInfoWriter() {}
+  VmarMapsInfoWriter() = default;
+  virtual ~VmarMapsInfoWriter() {}
   // Writes a single zx_info_maps_t at the given element offset. Return values are same as
   // user_ptr::copy_to_user
   virtual zx_status_t Write(const zx_info_maps_t& vmo, size_t offset) = 0;
@@ -58,7 +58,7 @@ class ProcessMapsInfoWriter {
 // NOTE: Code outside of the syscall layer should not typically know about
 // user_ptrs; do not use this pattern as an example.
 // |target_aspace| is the aspace that is to be enumerated.
-zx_status_t GetVmAspaceMaps(VmAspace* target_aspace, ProcessMapsInfoWriter& maps, size_t max,
+zx_status_t GetVmAspaceMaps(VmAspace* target_aspace, VmarMapsInfoWriter& maps, size_t max,
                             size_t* actual, size_t* available);
 
 // Walks the VmAspace and writes entries that describe its mapped VMOs into

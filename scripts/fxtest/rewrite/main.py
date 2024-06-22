@@ -22,6 +22,8 @@ import textwrap
 import typing
 
 import args
+import async_utils.command as command
+import async_utils.signals as signals
 import config
 import console
 import dataparse
@@ -36,8 +38,6 @@ import statusinfo
 import termout
 import test_list_file
 import tests_json_file
-import util.command as command
-import util.signals
 
 
 def main() -> None:
@@ -70,7 +70,7 @@ def main() -> None:
     fut = asyncio.ensure_future(
         async_main_wrapper(real_flags, config_file=config_file)
     )
-    util.signals.register_on_terminate_signal(fut.cancel)  # type: ignore[arg-type]
+    signals.register_on_terminate_signal(fut.cancel)  # type: ignore[arg-type]
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(fut)
@@ -266,11 +266,6 @@ async def async_main(
             output_file = gzip.open(exec_env.log_file, "wt")
         tasks.append(asyncio.create_task(log.writer(recorder, output_file)))
 
-    if flags.has_debugger():
-        recorder.emit_warning_message(
-            "🛑 Debugger integration is currently experimental, follow https://fxbug.dev/319320287 for updates 🛑"
-        )
-
     # Load the list of tests to execute.
     try:
         tests = await load_test_list(recorder, exec_env)
@@ -393,7 +388,15 @@ async def async_main(
 
     # Finally, run all selected tests.
     if not await run_all_tests(selections, recorder, flags, exec_env):
+        if not flags.has_debugger():
+            recorder.emit_instruction_message(
+                "\nTo debug with zxdb: fx test {} --break-on-failure\n".format(
+                    " ".join(sys.argv[1:])
+                )
+            )
+
         recorder.emit_end("Test failures reported")
+
         return 1
 
     recorder.emit_end()

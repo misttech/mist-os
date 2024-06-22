@@ -6,7 +6,8 @@
 
 use alloc::collections::VecDeque;
 
-use netstack3_base::WorkQueueReport;
+use netstack3_base::{ErrorAndSerializer, WorkQueueReport};
+use packet::SerializeError;
 
 use crate::internal::base::DeviceSendFrameError;
 
@@ -29,7 +30,7 @@ pub struct ReceiveQueueFullError<T>(pub T);
 pub enum TransmitQueueFrameError<S> {
     NoQueue(DeviceSendFrameError<()>),
     QueueFull(S),
-    SerializeError(S),
+    SerializeError(ErrorAndSerializer<SerializeError<()>, S>),
 }
 
 /// The state used to dequeue and handle frames from the device queue.

@@ -4,13 +4,17 @@
 
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use ::routing::capability_source::InternalCapability;
+use ::routing::component_instance::ComponentInstanceInterface;
 use async_trait::async_trait;
 use cm_util::TaskGroup;
 use errors::CapabilityProviderError;
-use fuchsia_zircon as zx;
+use fidl::handle::Channel;
 use std::sync;
+use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
+use vfs::ToObjectRequest;
+use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub type CapabilitySource = ::routing::capability_source::CapabilitySource<ComponentInstance>;
 
@@ -86,4 +90,24 @@ pub trait FrameworkCapability: Send + Sync {
         scope: WeakComponentInstance,
         target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider>;
+}
+
+/// Opens a connection to a [FrameworkCapability] with scope `instance`. Useful for opening a
+/// standalone connection to the capability outside the context of routing.
+pub async fn open_framework(
+    this: &impl FrameworkCapability,
+    instance: &Arc<ComponentInstance>,
+    server: Channel,
+) -> Result<(), CapabilityProviderError> {
+    let task_group = instance.nonblocking_task_group();
+    let weak_instance = instance.as_weak();
+    let flags = fio::OpenFlags::empty();
+    let mut object_request = flags.to_object_request(server);
+    let open_request = OpenRequest::new(
+        instance.execution_scope.clone(),
+        flags,
+        vfs::path::Path::dot(),
+        &mut object_request,
+    );
+    this.new_provider(weak_instance.clone(), weak_instance).open(task_group, open_request).await
 }

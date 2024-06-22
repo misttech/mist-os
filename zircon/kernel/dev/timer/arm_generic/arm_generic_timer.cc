@@ -330,27 +330,16 @@ zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
   return sample.*reg_procs.early_ticks + timer_get_mono_ticks_offset();
 }
 
-zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
+zx_status_t platform_set_oneshot_timer(zx_ticks_t deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   if (deadline < 0) {
     deadline = 0;
   }
 
-  // Add one to the deadline, since with very high probability the deadline
-  // straddles a counter tick. Adjust the deadline from normalized ticks to raw
-  // ticks in the process.
-  //
-  // TODO(https://fxbug.dev/42173294): If/when we start to use the raw ticks -> ticks offset to
-  // manage fixing up the timer when coming out of suspend, we need to come back
-  // here and reconsider memory order issues.
-  const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
-  const uint64_t cntpct_deadline =
-      time_to_ticks.Scale(deadline) + 1 - timer_get_mono_ticks_offset();
-
   // Even if the deadline has already passed, the ARMv8-A timer will fire the
   // interrupt.
-  write_cval(cntpct_deadline);
+  write_cval(deadline);
   write_ctl(1);
   kcounter_add(platform_timer_set_counter, 1);
 

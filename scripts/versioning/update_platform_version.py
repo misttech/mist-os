@@ -106,32 +106,15 @@ Did you run this script from the root of the source tree?""".format(
         return False
 
 
-def move_owners_file(
-    root_source_dir: str, root_build_dir: str, fuchsia_api_level: int
-) -> bool:
-    """Helper function for copying golden files. It accomplishes the following:
-    1. Overrides //sdk/history/OWNERS in //sdk/history/N/ allowing a wider set of reviewers.
-    2. Reverts //sdk/history/N-1/  back to using //sdk/history/OWNERS, now that N-1 is a
-       supported API level.
-
+def create_owners_file_for_in_development_level(level_dir_path: str) -> None:
+    """Creates an OWNERS file in `level_dir_path` that allows a wider set of
+    reviewers while the level is in development.
     """
-    root = _join_path(root_source_dir, "sdk", "history")
-    src = _join_path(root, str(fuchsia_api_level - 1), "OWNERS")
-    dst = _join_path(root, str(fuchsia_api_level))
+    owners_path = os.path.join(level_dir_path, "OWNERS")
 
-    try:
-        os.mkdir(dst)
-    except Exception as e:
-        print(f"os.mkdir({dst}) failed: {e}")
-        return False
-
-    try:
-        print(f"copying {src} to {dst}")
-        shutil.move(src, dst)
-    except Exception as e:
-        print(f"shutil.move({src}, {dst}) failed: {e}")
-        return False
-    return True
+    print(f"Creating {owners_path}")
+    with open(owners_path, "w") as f:
+        f.write("include /sdk/history/IN_DEVELOPMENT_API_LEVEL_OWNERS\n")
 
 
 def copy_compatibility_test_goldens(
@@ -150,8 +133,8 @@ def copy_compatibility_test_goldens(
 
     with open(goldens_manifest) as f:
         for entry in json.load(f):
-            src = _join_path(root_build_dir, entry["src"])
-            dst = _join_path(root_build_dir, entry["dst"])
+            src = os.path.join(root_build_dir, entry["src"])
+            dst = os.path.join(root_build_dir, entry["dst"])
             try:
                 print(f"copying {src} to {dst}")
                 shutil.copyfile(src, dst)
@@ -159,11 +142,6 @@ def copy_compatibility_test_goldens(
                 print(f"failed to copy {src} to {dst}: {e}")
                 return False
     return True
-
-
-def _join_path(root_dir: str, *paths: str) -> str:
-    """Returns absolute path"""
-    return os.path.abspath(os.path.join(root_dir, *paths))
 
 
 def main() -> int:
@@ -195,10 +173,17 @@ def main() -> int:
         return 1
 
     if args.update_goldens:
-        if not move_owners_file(
-            args.root_source_dir, args.root_build_dir, args.fuchsia_api_level
-        ):
+        level_dir_path = os.path.join(
+            args.root_source_dir, "sdk", "history", str(args.fuchsia_api_level)
+        )
+        try:
+            os.mkdir(level_dir_path)
+        except Exception as e:
+            print(f"Failed to create directory for new level: {e}")
             return 1
+
+        create_owners_file_for_in_development_level(level_dir_path)
+
         if not copy_compatibility_test_goldens(
             args.root_build_dir, args.fuchsia_api_level
         ):

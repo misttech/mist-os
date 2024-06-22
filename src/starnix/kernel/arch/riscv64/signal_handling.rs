@@ -16,8 +16,7 @@ use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{self as uapi, error, sigaction, sigaltstack, sigcontext, siginfo_t, ucontext};
 
 /// The size of the red zone.
-// TODO(https://fxbug.dev/42072654): Determine whether or not this is the correct red zone size for riscv64.
-pub const RED_ZONE_SIZE: u64 = 128;
+pub const RED_ZONE_SIZE: u64 = 0;
 
 /// The size of the syscall instruction in bytes. `ECALL` is not compressed, i.e. it always takes 4
 /// bytes.

@@ -172,6 +172,20 @@ zx_status_t sys_vmo_get_size(zx_handle_t handle, user_out_ptr<uint64_t> _size) {
   return _size.copy_to_user(size);
 }
 
+// zx_status_t zx_vmo_get_stream_size
+zx_status_t sys_vmo_get_stream_size(zx_handle_t handle, user_out_ptr<uint64_t> _size) {
+  auto up = ProcessDispatcher::GetCurrent();
+
+  // lookup the dispatcher from handle (no rights required to get stream size).
+  fbl::RefPtr<VmObjectDispatcher> vmo;
+  zx_status_t status = up->handle_table().GetDispatcher(*up, handle, &vmo);
+  if (status != ZX_OK)
+    return status;
+
+  uint64_t size = vmo->GetContentSize();
+  return _size.reinterpret<uint64_t>().copy_to_user(size);
+}
+
 // zx_status_t zx_vmo_set_size
 zx_status_t sys_vmo_set_size(zx_handle_t handle, uint64_t size) {
   LTRACEF("handle %x, size %#" PRIx64 "\n", handle, size);
@@ -194,6 +208,24 @@ zx_status_t sys_vmo_set_size(zx_handle_t handle, uint64_t size) {
   }
   // do the operation
   return vmo->SetSize(size);
+}
+
+// zx_status_t zx_vmo_set_stream_size
+zx_status_t sys_vmo_set_stream_size(zx_handle_t handle, uint64_t size) {
+  LTRACEF("handle %x, size %#" PRIx64 "\n", handle, size);
+
+  auto up = ProcessDispatcher::GetCurrent();
+
+  // lookup the dispatcher from handle
+  fbl::RefPtr<VmObjectDispatcher> vmo;
+  zx_rights_t rights;
+  zx_status_t status =
+      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &vmo, &rights);
+  if (status != ZX_OK)
+    return status;
+
+  // do the operation
+  return vmo->SetStreamSize(size);
 }
 
 // zx_status_t zx_vmo_op_range

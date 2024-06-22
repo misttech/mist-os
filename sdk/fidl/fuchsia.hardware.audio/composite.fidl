@@ -5,6 +5,9 @@ library fuchsia.hardware.audio;
 
 using fuchsia.hardware.audio.signalprocessing;
 
+alias ElementId = fuchsia.hardware.audio.signalprocessing.ElementId;
+alias TopologyId = fuchsia.hardware.audio.signalprocessing.TopologyId;
+
 @available(added=12)
 type CompositeProperties = table {
     /// Driver type is input (true) or output (false)
@@ -22,11 +25,13 @@ type CompositeProperties = table {
     1: is_input bool;
 
     /// UI string for the manufacturer name. If not set, the manufacturer is unknown.
+    /// If included, this string must be non-empty.
     ///
     /// Optional.
     2: manufacturer string:MAX_UI_STRING_SIZE;
 
     /// UI string for the product name. If not set, the product name is unknown.
+    /// If included, this string must be non-empty.
     ///
     /// Optional.
     3: product string:MAX_UI_STRING_SIZE;
@@ -109,7 +114,7 @@ closed protocol Composite {
     /// Retrieving multiple `SupportedFormats` allows for cases where exclusive combinations of
     /// the parameters in `SupportedFormats` may be supported.
     strict GetRingBufferFormats(struct {
-        processing_element_id uint64;
+        processing_element_id ElementId;
     }) -> (struct {
         ring_buffer_formats vector<SupportedFormats>:MAX_COUNT_FORMATS;
     }) error DriverError;
@@ -124,7 +129,7 @@ closed protocol Composite {
     /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
     /// `RING_BUFFER`.
     strict CreateRingBuffer(resource struct {
-        processing_element_id uint64;
+        processing_element_id ElementId;
         format Format;
         ring_buffer server_end:RingBuffer;
     }) -> () error DriverError;
@@ -141,7 +146,7 @@ closed protocol Composite {
     /// Retrieving multiple `DaiSupportedFormats` allows for cases where exclusive combinations of
     /// the parameters in SupportedFormats may be supported.
     strict GetDaiFormats(struct {
-        processing_element_id uint64;
+        processing_element_id ElementId;
     }) -> (struct {
         dai_formats vector<DaiSupportedFormats>:MAX_COUNT_FORMATS;
     }) error DriverError;
@@ -155,7 +160,7 @@ closed protocol Composite {
     /// Returns `WRONG_TYPE` if the `ElementType` of the element represented by the id is not
     /// `DAI_INTERCONNECT`.
     strict SetDaiFormat(struct {
-        processing_element_id uint64;
+        processing_element_id ElementId;
         format DaiFormat;
     }) -> () error DriverError;
 };

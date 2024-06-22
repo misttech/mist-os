@@ -22,9 +22,9 @@ use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier as _,
-    EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector, InstantContext,
-    NestedIntoCoreTimerCtx, NotFoundError, RngContext, StrongDeviceIdentifier, TimerContext,
-    TimerHandler, TracingContext,
+    ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector,
+    InstantContext, NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
+    StrongDeviceIdentifier, TimerContext, TimerHandler, TracingContext,
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
@@ -64,6 +64,9 @@ use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocket
 use crate::internal::types::{
     self, Destination, IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
 };
+
+#[cfg(test)]
+mod tests;
 
 /// Default IPv4 TTL.
 pub const DEFAULT_TTL: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
@@ -150,6 +153,25 @@ impl<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, 
         conn: ConntrackConnection<I, BT>,
     ) -> Option<ConntrackConnection<I, BT>> {
         self.conntrack_connection.replace(conn)
+    }
+}
+
+/// Send errors observed at or above the IP layer that carry a serializer.
+pub type IpSendFrameError<S> = ErrorAndSerializer<IpSendFrameErrorReason, S>;
+
+/// Send error cause for [`IpSendFrameError`].
+#[derive(Debug, PartialEq)]
+pub enum IpSendFrameErrorReason {
+    /// Error comes from the device layer.
+    Device(SendFrameErrorReason),
+    /// The frame's source or destination address is in the loopback subnet, but
+    /// the target device is not the loopback device.
+    IllegalLoopbackAddress,
+}
+
+impl From<SendFrameErrorReason> for IpSendFrameErrorReason {
+    fn from(value: SendFrameErrorReason) -> Self {
+        Self::Device(value)
     }
 }
 
@@ -831,12 +853,27 @@ fn is_local_assigned_address<
 >(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
-    local_ip: SpecifiedAddr<I::Addr>,
+    addr: SpecifiedAddr<I::Addr>,
 ) -> bool {
-    match core_ctx.address_status_for_device(local_ip, device) {
+    match core_ctx.address_status_for_device(addr, device) {
         AddressStatus::Present(status) => is_unicast_assigned::<I>(&status),
         AddressStatus::Unassigned => false,
     }
+}
+
+fn get_device_with_assigned_address<A, BC, CC>(
+    core_ctx: &mut CC,
+    addr: SpecifiedAddr<A>,
+) -> Option<CC::DeviceId>
+where
+    A: IpAddress,
+    A::Version: IpLayerIpExt,
+    BC: IpLayerBindingsContext<A::Version, CC::DeviceId>,
+    CC: IpDeviceStateContext<A::Version, BC> + IpDeviceContext<A::Version, BC>,
+{
+    core_ctx.with_address_statuses(addr, |mut it| {
+        it.find_map(|(device, status)| is_unicast_assigned::<A::Version>(&status).then_some(device))
+    })
 }
 
 // Returns the local IP address to use for sending packets from the
@@ -880,7 +917,7 @@ pub enum ResolveRouteError {
 /// If a `device` is specified, the resolved route is limited to those that
 /// egress over the device.
 ///
-/// If `local_ip` is specified the resolved route is limited to those that egress
+/// If `src_ip` is specified the resolved route is limited to those that egress
 /// over a device with the address assigned.
 pub fn resolve_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
@@ -889,11 +926,11 @@ pub fn resolve_route_to_destination<
 >(
     core_ctx: &mut CC,
     device: Option<&CC::DeviceId>,
-    local_ip: Option<IpDeviceAddr<I::Addr>>,
-    addr: Option<RoutableIpAddr<I::Addr>>,
+    src_ip: Option<IpDeviceAddr<I::Addr>>,
+    dst_ip: Option<RoutableIpAddr<I::Addr>>,
 ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
     enum LocalDelivery<A, D> {
-        WeakLoopback { addr: A, device: D },
+        WeakLoopback { dst_ip: A, device: D },
         StrongForDevice(D),
     }
 
@@ -909,118 +946,98 @@ pub fn resolve_route_to_destination<
     //
     // TODO(https://fxbug.dev/42175703): Encode the delivery of locally-
     // destined packets to loopback in the route table.
+    //
+    // TODO(https://fxbug.dev/322539434): Linux is more permissive about
+    // allowing cross-device local delivery even when SO_BINDTODEVICE or
+    // link-local addresses are involved, and this behavior may need to be
+    // emulated.
     let local_delivery_instructions: Option<LocalDelivery<RoutableIpAddr<I::Addr>, CC::DeviceId>> =
-        addr.and_then(|addr| {
-            match device {
-                Some(device) => match core_ctx.address_status_for_device(addr.into(), device) {
-                    AddressStatus::Present(status) => {
-                        // If the destination is an address assigned to the
-                        // requested egress interface, route locally via the strong
-                        // host model.
-                        is_unicast_assigned::<I>(&status)
-                            .then_some(LocalDelivery::StrongForDevice(device.clone()))
-                    }
-                    AddressStatus::Unassigned => None,
-                },
-                None => {
-                    // If the destination is an address assigned on an interface,
-                    // and an egress interface wasn't specifically selected, route
-                    // via the loopback device operating in a weak host model, with
-                    // the exception that if either the source or destination
-                    // addresses needs a zone ID, then use strong host to enforce
-                    // that the source and destination addresses are assigned to
-                    // the same interface.
-                    //
-                    // TODO(https://fxbug.dev/322539434): Linux is more permissive
-                    // about allowing cross-device local delivery even when
-                    // SO_BINDTODEVICE or link-local addresses are involved, and this
-                    // behavior may need to be emulated.
-                    core_ctx
-                        .with_address_statuses(addr.into(), |mut it| {
-                            it.find_map(|(device, status)| {
-                                is_unicast_assigned::<I>(&status).then_some(device)
-                            })
-                        })
-                        .map(|device| {
-                            if local_ip.is_some_and(|local_ip| local_ip.as_ref().must_have_zone())
-                                || addr.as_ref().must_have_zone()
-                            {
-                                LocalDelivery::StrongForDevice(device)
-                            } else {
-                                LocalDelivery::WeakLoopback { addr, device }
-                            }
-                        })
-                }
+        match (device, dst_ip) {
+            (Some(device), Some(dst_ip)) => {
+                is_local_assigned_address(core_ctx, device, dst_ip.into())
+                    .then_some(LocalDelivery::StrongForDevice(device.clone()))
             }
+            (None, Some(dst_ip)) => {
+                get_device_with_assigned_address(core_ctx, dst_ip.into()).map(|dst_device| {
+                    // If either the source or destination addresses needs
+                    // a zone ID, then use strong host to enforce that the
+                    // source and destination addresses are assigned to the
+                    // same interface.
+                    if src_ip.is_some_and(|ip| ip.as_ref().must_have_zone())
+                        || dst_ip.as_ref().must_have_zone()
+                    {
+                        LocalDelivery::StrongForDevice(dst_device)
+                    } else {
+                        LocalDelivery::WeakLoopback { dst_ip, device: dst_device }
+                    }
+                })
+            }
+            (_, None) => None,
+        };
+
+    if let Some(local_delivery) = local_delivery_instructions {
+        let loopback = core_ctx.loopback_id().ok_or(ResolveRouteError::Unreachable)?;
+
+        let (src_addr, dest_device) = match local_delivery {
+            LocalDelivery::WeakLoopback { dst_ip, device } => {
+                let src_ip = match src_ip {
+                    Some(src_ip) => {
+                        let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
+                            .ok_or(ResolveRouteError::NoSrcAddr)?;
+                        src_ip
+                    }
+                    None => dst_ip,
+                };
+                (src_ip, device)
+            }
+            LocalDelivery::StrongForDevice(device) => {
+                (get_local_addr(core_ctx, src_ip, &device, dst_ip)?, device)
+            }
+        };
+        return Ok(ResolvedRoute {
+            src_addr,
+            local_delivery_device: Some(dest_device),
+            device: loopback,
+            next_hop: NextHop::RemoteAsNeighbor,
         });
-
-    match local_delivery_instructions {
-        Some(local_delivery) => {
-            let loopback = match core_ctx.loopback_id() {
-                None => return Err(ResolveRouteError::Unreachable),
-                Some(loopback) => loopback,
-            };
-
-            let (local_ip, dest_device) = match local_delivery {
-                LocalDelivery::WeakLoopback { addr, device } => match local_ip {
-                    Some(local_ip) => core_ctx
-                        .with_address_statuses(local_ip.into(), |mut it| {
-                            it.find_map(|(device, status)| {
-                                is_unicast_assigned::<I>(&status).then_some(device)
-                            })
-                        })
-                        .map(|device| (local_ip, device))
-                        .ok_or(ResolveRouteError::NoSrcAddr)?,
-                    None => (addr, device),
-                },
-                LocalDelivery::StrongForDevice(device) => {
-                    (get_local_addr(core_ctx, local_ip, &device, addr)?, device)
-                }
-            };
-            Ok(ResolvedRoute {
-                src_addr: local_ip,
-                local_delivery_device: Some(dest_device),
-                device: loopback,
-                next_hop: NextHop::RemoteAsNeighbor,
-            })
-        }
-        None => {
-            core_ctx
-                .with_ip_routing_table(|core_ctx, table| {
-                    let mut matching_with_addr = table.lookup_filter_map(
-                        core_ctx,
-                        device,
-                        addr.map_or(I::UNSPECIFIED_ADDRESS, |a| a.addr()),
-                        |core_ctx, d| Some(get_local_addr(core_ctx, local_ip, d, addr)),
-                    );
-
-                    let first_error = match matching_with_addr.next() {
-                        Some((Destination { device, next_hop }, Ok(addr))) => {
-                            return Ok((Destination { device: device.clone(), next_hop }, addr))
-                        }
-                        Some((_, Err(e))) => e,
-                        None => return Err(ResolveRouteError::Unreachable),
-                    };
-
-                    matching_with_addr
-                        .filter_map(|(d, r)| {
-                            // Select successful routes. We ignore later errors
-                            // since we've already saved the first one.
-                            r.ok_checked::<ResolveRouteError>().map(|a| (d, a))
-                        })
-                        .next()
-                        .map_or(Err(first_error), |(Destination { device, next_hop }, addr)| {
-                            Ok((Destination { device: device.clone(), next_hop }, addr))
-                        })
-                })
-                .map(|(Destination { device, next_hop }, local_ip)| ResolvedRoute {
-                    src_addr: local_ip,
-                    device,
-                    local_delivery_device: None,
-                    next_hop,
-                })
-        }
     }
+
+    core_ctx
+        .with_ip_routing_table(|core_ctx, table| {
+            let mut matching_with_addr = table.lookup_filter_map(
+                core_ctx,
+                device,
+                dst_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.addr()),
+                |core_ctx, d| Some(get_local_addr(core_ctx, src_ip, d, dst_ip)),
+            );
+
+            let first_error = match matching_with_addr.next() {
+                Some((Destination { device, next_hop }, Ok(local_addr))) => {
+                    return Ok((Destination { device: device.clone(), next_hop }, local_addr))
+                }
+                Some((_, Err(e))) => e,
+                None => return Err(ResolveRouteError::Unreachable),
+            };
+
+            matching_with_addr
+                .filter_map(|(destination, local_addr)| {
+                    // Select successful routes. We ignore later errors
+                    // since we've already saved the first one.
+                    local_addr
+                        .ok_checked::<ResolveRouteError>()
+                        .map(|local_addr| (destination, local_addr))
+                })
+                .next()
+                .map_or(Err(first_error), |(Destination { device, next_hop }, local_addr)| {
+                    Ok((Destination { device: device.clone(), next_hop }, local_addr))
+                })
+        })
+        .map(|(Destination { device, next_hop }, local_addr)| ResolvedRoute {
+            src_addr: local_addr,
+            device,
+            local_delivery_device: None,
+            next_hop,
+        })
 }
 
 /// Enables a blanket implementation of [`IpSocketContext`].
@@ -1060,7 +1077,7 @@ impl<
         >,
         body: S,
         packet_metadata: IpLayerPacketMetadata<I, BC>,
-    ) -> Result<(), S>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
@@ -1129,6 +1146,7 @@ impl<
 pub(crate) trait IpLayerEgressContext<I, BC>:
     IpDeviceSendContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
     + FilterHandlerProvider<I, BC>
+    + CounterContext<IpCounters<I>>
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
@@ -1140,7 +1158,8 @@ where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
     CC: IpDeviceSendContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
-        + FilterHandlerProvider<I, BC>,
+        + FilterHandlerProvider<I, BC>
+        + CounterContext<IpCounters<I>>,
 {
 }
 
@@ -1339,6 +1358,9 @@ pub struct IpCounters<I: IpLayerIpExt> {
     pub unspecified_source: Counter,
     /// Count of incoming IP packets dropped.
     pub dropped: Counter,
+    /// Number of frames rejected because they'd cause illegal loopback
+    /// addresses on the wire.
+    pub tx_illegal_loopback_address: Counter,
     /// Version specific rx counters.
     pub version_rx: I::RxCounters,
 }
@@ -1792,7 +1814,7 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
     destination: IpPacketDestination<I, &CC::DeviceId>,
     mut body: S,
     mut packet_metadata: IpLayerPacketMetadata<I, BC>,
-) -> Result<(), S>
+) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
@@ -1813,9 +1835,23 @@ where
         }
         filter::Verdict::Accept => {}
     }
-
     packet_metadata.acknowledge_drop();
-    core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof)
+
+    // The filtering layer may have changed our address. Perform a last moment
+    // check to protect against sending loopback addresses on the wire for
+    // non-loopback devices, which is an RFC violation.
+    if !device.is_loopback()
+        && (I::LOOPBACK_SUBNET.contains(&body.src_addr())
+            || I::LOOPBACK_SUBNET.contains(&body.dst_addr()))
+    {
+        core_ctx.increment(|c: &IpCounters<I>| &c.tx_illegal_loopback_address);
+        return Err(IpSendFrameError {
+            serializer: body,
+            error: IpSendFrameErrorReason::IllegalLoopbackAddress,
+        });
+    }
+
+    core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof).map_err(|e| e.err_into())
 }
 
 /// Drop a packet and undo the effects of parsing it.
@@ -2188,12 +2224,20 @@ pub fn receive_ipv4_packet<
                     packet_metadata,
                 ) {
                     Ok(()) => (),
-                    Err(p) => {
-                        let _: ForwardedPacket<_, B> = p;
-                        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.mtu_exceeded);
-                        // TODO(https://fxbug.dev/42167236): Encode the MTU error
-                        // more obviously in the type system.
-                        debug!("failed to forward IPv4 packet: MTU exceeded");
+                    Err(IpSendFrameError { serializer: _, error }) => {
+                        match error {
+                            IpSendFrameErrorReason::Device(
+                                SendFrameErrorReason::SizeConstraintsViolation,
+                            ) => {
+                                core_ctx.increment(|counters: &IpCounters<Ipv4>| {
+                                    &counters.mtu_exceeded
+                                });
+                            }
+                            IpSendFrameErrorReason::Device(SendFrameErrorReason::QueueFull)
+                            | IpSendFrameErrorReason::Device(SendFrameErrorReason::Alloc)
+                            | IpSendFrameErrorReason::IllegalLoopbackAddress => (),
+                        }
+                        debug!("failed to forward IPv4 packet: {error:?}");
                     }
                 }
             } else {
@@ -2544,7 +2588,7 @@ pub fn receive_ipv6_packet<
                 let (src, dst, proto, meta) = packet.into_metadata();
                 let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
 
-                if let Err(packet) = send_ip_frame(
+                match send_ip_frame(
                     core_ctx,
                     bindings_ctx,
                     &dst_device,
@@ -2552,36 +2596,47 @@ pub fn receive_ipv6_packet<
                     packet,
                     packet_metadata,
                 ) {
-                    // TODO(https://fxbug.dev/42167236): Encode the MTU error more
-                    // obviously in the type system.
-                    core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
-                    debug!("failed to forward IPv6 packet: MTU exceeded");
-                    if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                        trace!("receive_ipv6_packet: Sending ICMPv6 Packet Too Big");
-                        // TODO(joshlf): Increment the TTL since we just
-                        // decremented it. The fact that we don't do this is
-                        // technically a violation of the ICMP spec (we're not
-                        // encapsulating the original packet that caused the
-                        // issue, but a slightly modified version of it), but
-                        // it's not that big of a deal because it won't affect
-                        // the sender's ability to figure out the minimum path
-                        // MTU. This may break other logic, though, so we should
-                        // still fix it eventually.
-                        let mtu = core_ctx.get_mtu(&device);
-                        IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
-                            core_ctx,
-                            bindings_ctx,
-                            device,
-                            frame_dst,
-                            *src_ip,
-                            dst_ip,
-                            packet.into_buffer(),
-                            Icmpv6ErrorKind::PacketTooBig {
-                                proto,
-                                header_len: meta.header_len(),
-                                mtu,
-                            },
-                        );
+                    Ok(()) => (),
+                    Err(IpSendFrameError {
+                        serializer,
+                        error:
+                            IpSendFrameErrorReason::Device(
+                                SendFrameErrorReason::SizeConstraintsViolation,
+                            ),
+                    }) => {
+                        debug!("failed to forward IPv6 packet: MTU exceeded");
+                        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
+
+                        if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
+                            trace!("receive_ipv6_packet: Sending ICMPv6 Packet Too Big");
+                            // TODO(joshlf): Increment the TTL since we just
+                            // decremented it. The fact that we don't do this is
+                            // technically a violation of the ICMP spec (we're not
+                            // encapsulating the original packet that caused the
+                            // issue, but a slightly modified version of it), but
+                            // it's not that big of a deal because it won't affect
+                            // the sender's ability to figure out the minimum path
+                            // MTU. This may break other logic, though, so we should
+                            // still fix it eventually.
+                            let mtu = core_ctx.get_mtu(&device);
+                            IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
+                                core_ctx,
+                                bindings_ctx,
+                                device,
+                                frame_dst,
+                                *src_ip,
+                                dst_ip,
+                                serializer.into_buffer(),
+                                Icmpv6ErrorKind::PacketTooBig {
+                                    proto,
+                                    header_len: meta.header_len(),
+                                    mtu,
+                                },
+                            );
+                        }
+                    }
+                    Err(IpSendFrameError { serializer: _, error }) => {
+                        debug!("failed to forward IPv6 packet: {error:?}");
                     }
                 }
             } else {
@@ -2976,7 +3031,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &Self::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
@@ -2993,7 +3048,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         device: &Self::DeviceId,
         destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut;
@@ -3010,7 +3065,7 @@ impl<
         bindings_ctx: &mut BC,
         meta: SendIpPacketMeta<I, &CC::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
@@ -3024,7 +3079,7 @@ impl<
         device: &Self::DeviceId,
         destination: IpPacketDestination<I, &Self::DeviceId>,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
@@ -3056,7 +3111,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
     >,
     body: S,
     packet_metadata: IpLayerPacketMetadata<I, BC>,
-) -> Result<(), S>
+) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
@@ -3068,10 +3123,6 @@ where
     let next_packet_id = gen_ip_packet_id(core_ctx);
     let ttl = ttl.unwrap_or_else(|| core_ctx.get_hop_limit(device)).get();
     let src_ip = src_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.get());
-    assert!(
-        (!I::LOOPBACK_SUBNET.contains(&src_ip) && !I::LOOPBACK_SUBNET.contains(&dst_ip))
-            || device.is_loopback()
-    );
     let mut builder = I::PacketBuilder::new(src_ip, dst_ip.get(), ttl, proto);
 
     #[derive(GenericOverIp)]
@@ -3096,7 +3147,7 @@ where
     if let Some(mtu) = mtu {
         let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu as usize));
         send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
-            .map_err(|ser| ser.into_inner().into_inner())
+            .map_err(|ser| ser.map_serializer(|s| s.into_inner()).into_inner())
     } else {
         send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
             .map_err(|ser| ser.into_inner())
@@ -3121,7 +3172,7 @@ pub(crate) mod testutil {
     use super::*;
 
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId};
-    use netstack3_base::{SendFrameContext, SendableFrameMeta};
+    use netstack3_base::{SendFrameContext, SendFrameError, SendableFrameMeta};
 
     /// A [`SendIpPacketMeta`] for dual stack contextx.
     #[derive(Debug, GenericOverIp)]
@@ -3155,7 +3206,7 @@ pub(crate) mod testutil {
             core_ctx: &mut FakeCoreCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>,
             bindings_ctx: &mut BC,
             frame: SS,
-        ) -> Result<(), SS>
+        ) -> Result<(), SendFrameError<SS>>
         where
             SS: Serializer,
             SS::Buffer: BufferMut,

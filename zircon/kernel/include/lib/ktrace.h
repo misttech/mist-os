@@ -254,7 +254,7 @@
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, \
                    ktrace::Unused{}, ##__VA_ARGS__)
 
-// Similar to KTRACE_CPU_INSTANT, but checks the given constexpr_condition to determine whether the
+// Similar to KTRACE_INSTANT, but checks the given constexpr_condition to determine whether the
 // event is enabled at compile time.
 #define KTRACE_INSTANT_ENABLE(constexpr_enabled, category, label, ...)                        \
   FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitInstant, category, \

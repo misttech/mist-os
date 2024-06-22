@@ -381,7 +381,8 @@ void UsbXhci::CreateDeviceInspectNode(uint32_t slot, uint16_t vendor_id, uint16_
 class EnumerationTests : public zxtest::Test {
  public:
   EnumerationTests()
-      : controller_(reinterpret_cast<zx_device_t*>(&state_), ddk_fake::CreateBufferFactory(),
+      : controller_(reinterpret_cast<zx_device_t*>(&state_),
+                    xhci_config::Config({.enable_suspend = false}), ddk_fake::CreateBufferFactory(),
                     loop_.dispatcher()) {
     controller_.InitThread();
   }

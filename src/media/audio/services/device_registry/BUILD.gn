@@ -6,12 +6,6 @@ import("//build/components.gni")
 import("//build/fidl/toolchain.gni")
 import("//build/test.gni")
 
-#import("//src/sys/core/build/core_shard.gni")
-### Shards
-#core_shard("core_shard") {
-#  shard_file = "meta/audio_device_registry.core_shard.cml"
-#}
-
 ## Groups
 group("tests") {
   testonly = true
@@ -61,6 +55,7 @@ fuchsia_component("device_registry_comp") {
 executable("device_registry_bin") {
   output_name = "audio_device_registry"
   sources = [ "main.cc" ]
+
   deps = [
     ":device_registry_lib",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -70,6 +65,7 @@ executable("device_registry_bin") {
 
 executable("device_registry_unittests_bin") {
   testonly = true
+  output_name = "audio_services_device_registry_unittests"
 
   sources = [
     "audio_device_registry_unittest.cc",
@@ -95,6 +91,7 @@ executable("device_registry_unittests_bin") {
 
 executable("device_registry_warning_unittests_bin") {
   testonly = true
+  output_name = "audio_services_device_registry_warning_unittests"
 
   sources = [
     "audio_device_registry_warning_unittest.cc",

@@ -11,9 +11,7 @@ use builtins::ioport_resource::IoportResource;
 use crate::bootfs::BootfsSvc;
 use crate::builtin::builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME};
 use crate::builtin::crash_introspect::CrashIntrospectSvc;
-use crate::builtin::fuchsia_boot_resolver::{
-    FuchsiaBootResolverBuiltinCapability, SCHEME as BOOT_SCHEME,
-};
+use crate::builtin::fuchsia_boot_resolver::{FuchsiaBootResolver, SCHEME as BOOT_SCHEME};
 use crate::builtin::log::{ReadOnlyLog, WriteOnlyLog};
 use crate::builtin::realm_builder::{
     RealmBuilderResolver, RealmBuilderRunnerFactory, RUNNER_NAME as REALM_BUILDER_RUNNER_NAME,
@@ -23,17 +21,15 @@ use crate::builtin::runner::{BuiltinRunner, BuiltinRunnerFactory};
 use crate::builtin::svc_stash_provider::SvcStashCapability;
 use crate::builtin::system_controller::SystemController;
 use crate::builtin::time::{create_utc_clock, UtcTimeMaintainer};
-use crate::capability::{BuiltinCapability, CapabilitySource, FrameworkCapability};
+use crate::capability::{self, BuiltinCapability, CapabilitySource, FrameworkCapability};
 use crate::framework::binder::BinderFrameworkCapability;
-use crate::framework::factory::{FactoryCapabilityHost, FactoryFrameworkCapability};
+use crate::framework::factory::Factory;
 use crate::framework::introspector::IntrospectorFrameworkCapability;
-use crate::framework::lifecycle_controller::{
-    LifecycleController, LifecycleControllerFrameworkCapability,
-};
-use crate::framework::namespace::NamespaceFrameworkCapability;
+use crate::framework::lifecycle_controller::LifecycleController;
+use crate::framework::namespace::Namespace;
 use crate::framework::pkg_dir::PkgDirectoryFrameworkCapability;
-use crate::framework::realm::RealmFrameworkCapability;
-use crate::framework::realm_query::{RealmQuery, RealmQueryFrameworkCapability};
+use crate::framework::realm::Realm;
+use crate::framework::realm_query::RealmQuery;
 use crate::framework::route_validator::RouteValidatorFrameworkCapability;
 use crate::inspect_sink_provider::InspectSinkProvider;
 use crate::model::component::manager::ComponentManagerInstance;
@@ -45,7 +41,7 @@ use crate::model::events::serve::serve_event_stream;
 use crate::model::events::source_factory::{EventSourceFactory, EventSourceFactoryCapability};
 use crate::model::events::stream_provider::EventStreamProvider;
 use crate::model::model::{Model, ModelParams};
-use crate::model::resolver::{box_arc_resolver, ResolverRegistry};
+use crate::model::resolver::ResolverRegistry;
 use crate::model::token::InstanceRegistry;
 use crate::root_stop_notifier::RootStopNotifier;
 use crate::sandbox_util::LaunchTaskOnReceive;
@@ -53,7 +49,7 @@ use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
 use ::diagnostics::task_metrics::ComponentTreeStats;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::capability_source::{ComponentCapability, InternalCapability};
-use ::routing::component_instance::TopInstanceInterface;
+use ::routing::component_instance::{ComponentInstanceInterface, TopInstanceInterface};
 use ::routing::environment::{DebugRegistry, RunnerRegistry};
 use ::routing::policy::GlobalPolicyChecker;
 use anyhow::{format_err, Context as _, Error};
@@ -96,7 +92,6 @@ use fuchsia_zircon::{self as zx, Clock, Resource};
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
 use hooks::EventType;
-use moniker::Moniker;
 use std::sync::Arc;
 use tracing::{info, warn};
 use vfs::directory::entry::OpenRequest;
@@ -104,8 +99,9 @@ use vfs::path::Path;
 use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime, fuchsia_async as fasync,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
+    fidl_fuchsia_kernel as fkernel, fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_time as ftime, fuchsia_async as fasync,
 };
 
 #[cfg(test)]
@@ -492,13 +488,13 @@ impl RootComponentInputBuilder {
 pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
-    pub realm_query: Option<Arc<RealmQuery>>,
-    pub lifecycle_controller: Option<Arc<LifecycleController>>,
+    pub realm_query: Option<RealmQuery>,
+    pub lifecycle_controller: Option<LifecycleController>,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
     pub event_registry: Arc<EventRegistry>,
     pub event_source_factory: Arc<EventSourceFactory>,
-    pub factory_capability_host: Arc<FactoryCapabilityHost>,
+    pub factory: Factory,
     pub stop_notifier: Arc<RootStopNotifier>,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
@@ -522,7 +518,7 @@ pub struct BuiltinEnvironment {
     pub num_threads: usize,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
-    pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
+    pub realm_builder_resolver: Option<RealmBuilderResolver>,
     pub root_component_input: ComponentInput,
     capability_passthrough: bool,
     _service_fs_task: Option<fasync::Task<()>>,
@@ -534,8 +530,8 @@ impl BuiltinEnvironment {
         runtime_config: Arc<RuntimeConfig>,
         system_resource_handle: Option<Resource>,
         builtin_runners: Vec<BuiltinRunner>,
-        boot_resolver: Option<FuchsiaBootResolverBuiltinCapability>,
-        realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
+        boot_resolver: Option<FuchsiaBootResolver>,
+        realm_builder_resolver: Option<RealmBuilderResolver>,
         utc_clock: Option<Arc<Clock>>,
         inspector: Inspector,
         crash_records: CrashRecords,
@@ -1123,19 +1119,18 @@ impl BuiltinEnvironment {
             Arc::downgrade(&event_registry),
             Arc::downgrade(&event_stream_provider),
         );
-
-        let factory_capability_host = Arc::new(FactoryCapabilityHost::new());
+        let factory = Factory::new();
 
         let mut builtin_capabilities: Vec<Box<dyn BuiltinCapability>> =
             vec![Box::new(EventSourceFactoryCapability::new(event_source_factory.clone()))];
         let mut framework_capabilities: Vec<Box<dyn FrameworkCapability>> = vec![
-            Box::new(RealmFrameworkCapability::new(Arc::downgrade(&model), runtime_config.clone())),
+            Box::new(Realm::new(Arc::downgrade(&model), runtime_config.clone())),
             Box::new(IntrospectorFrameworkCapability {
                 instance_registry: model.context().instance_registry().clone(),
             }),
             Box::new(BinderFrameworkCapability::new()),
-            Box::new(FactoryFrameworkCapability::new(factory_capability_host.clone())),
-            Box::new(NamespaceFrameworkCapability::new()),
+            Box::new(factory.clone()),
+            Box::new(Namespace::new()),
             Box::new(PkgDirectoryFrameworkCapability::new()),
             Box::new(EventSourceFactoryCapability::new(event_source_factory.clone())),
         ];
@@ -1147,7 +1142,7 @@ impl BuiltinEnvironment {
 
         // Set up the boot resolver so it is routable from "above root".
         if let Some(boot_resolver) = boot_resolver {
-            let b = boot_resolver.host().clone();
+            let b = boot_resolver.clone();
             root_input_builder.add_builtin_protocol_if_enabled::<fresolution::ResolverMarker>(
                 move |stream| {
                     let b = b.clone();
@@ -1162,18 +1157,17 @@ impl BuiltinEnvironment {
         model.root().hooks.install(stop_notifier.hooks()).await;
 
         let realm_query = if runtime_config.enable_introspection {
-            let host = RealmQuery::new(Arc::downgrade(&model));
-            framework_capabilities.push(Box::new(RealmQueryFrameworkCapability::new(host.clone())));
-            Some(host)
+            let cap = RealmQuery::new(Arc::downgrade(&model));
+            framework_capabilities.push(Box::new(cap.clone()));
+            Some(cap)
         } else {
             None
         };
 
         let lifecycle_controller = if runtime_config.enable_introspection {
-            let host = LifecycleController::new(Arc::downgrade(&model));
-            framework_capabilities
-                .push(Box::new(LifecycleControllerFrameworkCapability::new(host.clone())));
-            Some(host)
+            let cap = LifecycleController::new(Arc::downgrade(&model));
+            framework_capabilities.push(Box::new(cap.clone()));
+            Some(cap)
         } else {
             None
         };
@@ -1216,7 +1210,7 @@ impl BuiltinEnvironment {
             lifecycle_controller,
             event_registry,
             event_source_factory,
-            factory_capability_host,
+            factory,
             stop_notifier,
             inspect_sink_provider,
             event_stream_provider,
@@ -1238,49 +1232,20 @@ impl BuiltinEnvironment {
         // Create the ServiceFs
         let mut service_fs = ServiceFs::new();
 
+        self.add_exposed_framework_protocol::<_, fsys::LifecycleControllerMarker>(
+            &mut service_fs,
+            self.lifecycle_controller.as_ref(),
+        );
+        self.add_exposed_framework_protocol::<_, fsys::RealmQueryMarker>(
+            &mut service_fs,
+            self.realm_query.as_ref(),
+        );
+        self.add_exposed_framework_protocol::<_, fsandbox::FactoryMarker>(
+            &mut service_fs,
+            Some(&self.factory),
+        );
+
         let scope = self.model.top_instance().task_group().clone();
-
-        // Install the root fuchsia.sys2.LifecycleController
-        if let Some(lifecycle_controller) = &self.lifecycle_controller {
-            let lifecycle_controller = lifecycle_controller.clone();
-            let scope = scope.clone();
-            service_fs.dir("svc").add_fidl_service(move |stream| {
-                let lifecycle_controller = lifecycle_controller.clone();
-                // Spawn a short-lived task that adds the lifecycle controller serve to
-                // component manager's task scope.
-                scope.spawn(async move {
-                    lifecycle_controller.serve(Moniker::root(), stream).await;
-                });
-            });
-        }
-
-        // Install the root fuchsia.sys2.RealmQuery
-        if let Some(realm_query) = &self.realm_query {
-            let realm_query = realm_query.clone();
-            let scope = scope.clone();
-            service_fs.dir("svc").add_fidl_service(move |stream| {
-                let realm_query = realm_query.clone();
-                // Spawn a short-lived task that adds the realm query serve to
-                // component manager's task scope.
-                scope.spawn(async move {
-                    realm_query.serve(Moniker::root(), stream).await;
-                });
-            });
-        }
-
-        // Install the `fuchsia.component.sandbox.Factory` protocol.
-        let factory_capability_host = self.factory_capability_host.clone();
-        {
-            let scope = scope.clone();
-            service_fs.dir("svc").add_fidl_service(move |stream| {
-                let factory_capability_host = factory_capability_host.clone();
-                scope.spawn(async move {
-                    if let Err(err) = factory_capability_host.serve(stream).await {
-                        warn!(?err, "Failed to serve fuchsia.component.sandbox.Factory");
-                    }
-                });
-            });
-        }
 
         // If capability passthrough is enabled, add a remote directory to proxy
         // capabilities exposed by the root component.
@@ -1408,6 +1373,33 @@ impl BuiltinEnvironment {
         Ok(service_fs)
     }
 
+    fn add_exposed_framework_protocol<'a, T, M>(
+        &self,
+        service_fs: &mut ServiceFs<ServiceObj<'a, ()>>,
+        cap: Option<&T>,
+    ) where
+        T: FrameworkCapability + Clone + 'static,
+        M: DiscoverableProtocolMarker,
+    {
+        let Some(cap) = cap else {
+            return;
+        };
+        let cap = cap.clone();
+        let scope = self.model.top_instance().task_group().clone();
+        let root = self.model.root().as_weak();
+        service_fs.dir("svc").add_service_connector(move |server: ServerEnd<M>| {
+            let cap = cap.clone();
+            let root = root.clone();
+            scope.spawn(async move {
+                if let Ok(root) = root.upgrade() {
+                    if let Err(err) = capability::open_framework(&cap, &root, server.into()).await {
+                        warn!(%err, "Failed to open framework protocol from root {}", M::DEBUG_NAME);
+                    }
+                }
+            });
+        });
+    }
+
     /// Bind ServiceFs to a provided channel
     async fn bind_service_fs(
         &mut self,
@@ -1517,32 +1509,30 @@ fn register_builtin_resolver(resolvers: &mut ResolverRegistry) {
 async fn register_boot_resolver(
     resolvers: &mut ResolverRegistry,
     runtime_config: &RuntimeConfig,
-) -> Result<Option<FuchsiaBootResolverBuiltinCapability>, Error> {
+) -> Result<Option<FuchsiaBootResolver>, Error> {
     let path = match &runtime_config.builtin_boot_resolver {
         BuiltinBootResolver::Boot => "/boot",
         BuiltinBootResolver::None => return Ok(None),
     };
-    let boot_resolver = FuchsiaBootResolverBuiltinCapability::new(path)
-        .await
-        .context("Failed to create boot resolver")?;
-    match boot_resolver {
+    let resolver =
+        FuchsiaBootResolver::new(path).await.context("Failed to create boot resolver")?;
+    match resolver {
         None => {
             info!(%path, "fuchsia-boot resolver unavailable, not in namespace");
             Ok(None)
         }
-        Some(boot_resolver) => {
-            resolvers.register(BOOT_SCHEME.to_string(), box_arc_resolver(boot_resolver.host()));
-            Ok(Some(boot_resolver))
+        Some(resolver) => {
+            resolvers.register(BOOT_SCHEME.to_string(), Box::new(resolver.clone()));
+            Ok(Some(resolver))
         }
     }
 }
 
 fn register_realm_builder_resolver(
     resolvers: &mut ResolverRegistry,
-) -> Result<Arc<RealmBuilderResolver>, Error> {
-    let realm_builder_resolver =
+) -> Result<RealmBuilderResolver, Error> {
+    let resolver =
         RealmBuilderResolver::new().context("Failed to create realm builder resolver")?;
-    let resolver = Arc::new(realm_builder_resolver);
-    resolvers.register(REALM_BUILDER_SCHEME.to_string(), box_arc_resolver(&resolver));
+    resolvers.register(REALM_BUILDER_SCHEME.to_string(), Box::new(resolver.clone()));
     Ok(resolver)
 }

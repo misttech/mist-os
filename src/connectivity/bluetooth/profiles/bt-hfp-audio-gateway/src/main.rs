@@ -75,8 +75,9 @@ async fn main() -> Result<(), Error> {
     let audio_proxy =
         fuchsia_component::client::connect_to_protocol::<media::AudioDeviceEnumeratorMarker>()
             .with_context(|| format!("Error connecting to audio_core"))?;
-    let audio =
-        Box::new(audio::CodecAudioControl::setup(audio_proxy, controller_codecs.clone()).await?);
+    let audio = Box::new(
+        audio::PartialOffloadAudioControl::setup(audio_proxy, controller_codecs.clone()).await?,
+    );
     let sco_connector = ScoConnector::build(profile_svc.clone(), controller_codecs);
 
     let mut hfp = Hfp::new(

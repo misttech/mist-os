@@ -16,6 +16,10 @@
             url: "#meta/fake_crash_reporter.cm",
         },
         {
+            name: "crash_introspect",
+            url: "#meta/fake_crash_introspect.cm",
+        },
+        {
             name: "exception_handler",
             url: "#meta/exceptions.cm",
         },
@@ -49,6 +53,11 @@
         {
             protocol: "fuchsia.feedback.CrashReporter",
             from: "#crash_reporter",
+            to: "#exception_handler",
+        },
+        {
+            protocol: "fuchsia.sys2.CrashIntrospect",
+            from: "#crash_introspect",
             to: "#exception_handler",
         },
         {

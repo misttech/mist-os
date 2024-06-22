@@ -41,7 +41,7 @@ template("generate_fuchsia_bazel_sdk") {
       "//prebuilt/third_party/buildifier/${host_os}-${host_cpu}/buildifier"
   _bazel_rules_fuchsia_dir = "//build/bazel_sdk/bazel_rules_fuchsia"
   action(target_name) {
-    script = "${_bazel_rules_fuchsia_dir}/fuchsia/workspace/sdk_export/idk_to_bazel_sdk.py"
+    script = "//build/bazel/bazel_sdk/idk_to_bazel_sdk.py"
     outputs = [
       "${_output_dir}/WORKSPACE.bazel",
       "${_output_dir}/BUILD.bazel",

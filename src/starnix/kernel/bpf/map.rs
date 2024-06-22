@@ -8,6 +8,7 @@ use crate::mm::MemoryAccessor;
 use crate::task::CurrentTask;
 use dense_map::DenseMap;
 use ebpf::MapSchema;
+use starnix_lifecycle::AtomicU32Counter;
 use starnix_logging::track_stub;
 use starnix_sync::{BpfMapEntries, LockBefore, Locked, OrderedMutex};
 use starnix_uapi::errors::Errno;
@@ -36,8 +37,12 @@ use std::collections::BTreeMap;
 use std::ops::{Bound, Deref, DerefMut, Range, RangeBounds};
 use std::pin::Pin;
 
+/// Counter for map identifiers.
+static MAP_IDS: AtomicU32Counter = AtomicU32Counter::new(1);
+
 /// A BPF map. This is a hashtable that can be accessed both by BPF programs and userspace.
 pub struct Map {
+    pub id: u32,
     pub schema: MapSchema,
     pub flags: u32,
 
@@ -47,8 +52,9 @@ pub struct Map {
 
 impl Map {
     pub fn new(schema: MapSchema, flags: u32) -> Result<Self, Errno> {
+        let id = MAP_IDS.next();
         let store = MapStore::new(&schema)?;
-        Ok(Self { schema, flags, entries: OrderedMutex::new(store) })
+        Ok(Self { id, schema, flags, entries: OrderedMutex::new(store) })
     }
 
     pub fn get_raw<L>(&self, locked: &mut Locked<'_, L>, key: &Vec<u8>) -> Option<*mut u8>

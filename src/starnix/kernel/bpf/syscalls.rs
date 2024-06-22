@@ -10,7 +10,10 @@ use crate::bpf::map::Map;
 use crate::bpf::program::{Program, ProgramInfo};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::task::CurrentTask;
-use crate::vfs::{Anon, FdFlags, FdNumber, LookupContext, OutputBuffer, UserBuffersOutputBuffer};
+use crate::vfs::{
+    Anon, FdFlags, FdNumber, FileObject, LookupContext, NamespaceNode, OutputBuffer,
+    UserBuffersOutputBuffer,
+};
 use ebpf::MapSchema;
 use smallvec::smallvec;
 use starnix_logging::{log_error, log_trace, track_stub};
@@ -37,7 +40,7 @@ use starnix_uapi::{
     bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_cmd_BPF_PROG_RUN,
     bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_insn, bpf_map_info,
     bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info, errno,
-    error, BPF_F_RDONLY_PROG, PATH_MAX,
+    error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
 };
 use zerocopy::{AsBytes, FromBytes};
 
@@ -67,6 +70,18 @@ fn read_attr<Attr: FromBytes>(
     // If the struct passed is smaller than our definition of the struct, let whatever is not
     // passed be zero.
     current_task.read_object_partial(UserRef::new(attr_addr), attr_size)
+}
+
+fn reopen_bpf_fd(
+    current_task: &CurrentTask,
+    node: NamespaceNode,
+    obj: impl Into<BpfHandle>,
+    open_flags: OpenFlags,
+) -> Result<SyscallResult, Errno> {
+    let handle: BpfHandle = obj.into();
+    // All BPF FDs have the CLOEXEC flag turned on by default.
+    let file = FileObject::new(Box::new(handle), node, open_flags | OpenFlags::CLOEXEC)?;
+    Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
 }
 
 fn install_bpf_fd(
@@ -299,12 +314,19 @@ pub fn sys_bpf(
             let path_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_GET {:?}", path_attr);
             let path_addr = UserCString::new(UserAddress::from(path_attr.pathname));
+            let open_flags = match path_attr.file_flags {
+                BPF_F_RDONLY => OpenFlags::RDONLY,
+                BPF_F_WRONLY => OpenFlags::WRONLY,
+                0 => OpenFlags::RDWR,
+                _ => return error!(EINVAL),
+            };
             let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let node = current_task.lookup_path_from_root(pathname.as_ref())?;
             // TODO(tbodt): This might be the wrong error code, write a test program to find out
-            let node =
+            let object =
                 node.entry.node.downcast_ops::<BpfFsObject>().ok_or_else(|| errno!(EINVAL))?;
-            install_bpf_fd(current_task, node.handle.clone())
+            let handle = object.handle.clone();
+            reopen_bpf_fd(current_task, node, handle, open_flags)
         }
 
         // Obtain information about the eBPF object corresponding to bpf_fd.
@@ -316,19 +338,17 @@ pub fn sys_bpf(
             let object = get_bpf_object(current_task, bpf_fd)?;
 
             let mut info = match object {
-                BpfHandle::Map(map) => {
-                    bpf_map_info {
-                        type_: map.schema.map_type,
-                        id: 0, // not used by android as far as I can tell
-                        key_size: map.schema.key_size,
-                        value_size: map.schema.value_size,
-                        max_entries: map.schema.max_entries,
-                        map_flags: map.flags,
-                        ..Default::default()
-                    }
-                    .as_bytes()
-                    .to_owned()
+                BpfHandle::Map(map) => bpf_map_info {
+                    type_: map.schema.map_type,
+                    id: map.id,
+                    key_size: map.schema.key_size,
+                    value_size: map.schema.value_size,
+                    max_entries: map.schema.max_entries,
+                    map_flags: map.flags,
+                    ..Default::default()
                 }
+                .as_bytes()
+                .to_owned(),
                 BpfHandle::Program(_) => {
                     #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
                     bpf_prog_info {

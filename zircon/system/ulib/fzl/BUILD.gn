@@ -4,6 +4,7 @@
 
 import("//build/zircon/zx_library.gni")
 
+# LINT.IfChange
 zx_library("fzl") {
   sdk = "source"
   sdk_publishable = "internal"
@@ -40,6 +41,8 @@ zx_library("fzl") {
     "//zircon/system/ulib/zx",
   ]
 }
+
+# LINT.ThenChange(BUILD.bazel)
 
 group("tests") {
   testonly = true

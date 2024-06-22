@@ -5,15 +5,6 @@
 import("//build/cpp/library_headers.gni")
 import("//build/zircon/zx_library.gni")
 
-# Three copies of libtrace-engine are built:
-# 1) Shared library for use by userspace tracing.
-# 2) Static library for use by userspace tracing.
-# 3) Static library to be linked into libdriver.so for use by driver tracing.
-#
-# N.B. Please DO NOT use (2) unless you KNOW you need to. Generally you do not.
-# If in doubt, ask. (2) is for very special circumstances where
-# libtrace-engine.so is not available.
-
 trace_engine_headers = [
   # keep-sorted: begin
   "lib/trace-engine/context.h",
@@ -33,10 +24,6 @@ trace_engine_header_deps = [
 template("trace_engine_library") {
   zx_library(target_name) {
     forward_variables_from(invoker, "*")
-
-    if (defined(extra_configs)) {
-      configs += extra_configs
-    }
 
     sdk_headers = trace_engine_headers
 
@@ -82,16 +69,34 @@ sdk_source_set("trace-engine-headersonly") {
   public_configs = [ ":trace_engine_include" ]
 }
 
-# The default version for the normal case.
+# We build trace-engine in two different ways:
+#
+# 1) Shared library
+#      Most users should use this version. The trace-engine library keeps a fair amount of state:
+#    buffer management, the current state of the trace, several caches etc. If we distribute tracing
+#    only as a static library, each shared library that includes tracing will get its own copy of
+#    the tracing state. When we start a trace, only the trace-engine linked directly into the main
+#    executable would start.
+#
+#      Distributing a shared library ensures that the dynamic linker will load the library once, and
+#    each library that uses tracing will point to the same trace-engine state.
+#
+#      While most in tree components don't extensively use shared libraries that include tracing, the
+#    main exception is drivers. The driver host is capable of tracing, and multiple drivers, which
+#    are also capable of tracing, can be dynamically loaded into a single driver host. When a driver
+#    host starts tracing, we need to ensure the included drivers also start tracing.
 trace_engine_library("trace-engine") {
   sdk = "shared"
   sdk_publishable = "partner"
 }
 
-# A special version for programs and shared libraries that can't use
-# libtrace-engine.so, e.g., because it is unavailable.
-# N.B. Please verify that you really need this before using it.
-# Generally you DO NOT want to use this.
+# 2) Static library
+#       We produce a static library version of trace-engine for (currently) one special case: magma.
+#     Unlike components which get packaged and run with the shared libraries they were built with,
+#     the vulkan icds get loaded at runtime into an application with mostly-arbitrary library
+#     versions. Since there's no guarantee of the trace-engine abi in this environment, magma
+#     instead statically links against the trace-engine libraries so that it can safely trace with a
+#     known implementation of trace-engine.
 trace_engine_library("trace-engine-static") {
   sdk = "static"
   defines = [ "STATIC_LIBRARY" ]

@@ -1555,8 +1555,8 @@ std::unique_ptr<RawTypeDeclaration> Parser::ParseTypeDeclaration(
   bool layout_has_attributes =
       layout->layout_ref->kind == RawLayoutReference::Kind::kInline &&
       static_cast<RawInlineLayoutReference*>(layout->layout_ref.get())->attributes != nullptr;
-  if (attributes != nullptr && layout_has_attributes)
-    return Fail(ErrRedundantAttributePlacement, scope.GetSourceElement().span());
+  if (layout_has_attributes)
+    return Fail(ErrAttributeInsideTypeDeclaration, scope.GetSourceElement().span());
   return std::make_unique<RawTypeDeclaration>(scope.GetSourceElement(), std::move(attributes),
                                               std::move(identifier), std::move(layout));
 }

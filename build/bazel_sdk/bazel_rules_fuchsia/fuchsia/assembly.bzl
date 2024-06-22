@@ -13,6 +13,11 @@ load(
     _fuchsia_assemble_package = "fuchsia_assemble_package",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_assembly_developer_overrides.bzl",
+    _fuchsia_assembly_developer_overrides = "fuchsia_assembly_developer_overrides",
+    _fuchsia_assembly_developer_overrides_list = "fuchsia_assembly_developer_overrides_list",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_board_configuration.bzl",
     _fuchsia_board_configuration = "fuchsia_board_configuration",
     _fuchsia_prebuilt_board_configuration = "fuchsia_prebuilt_board_configuration",
@@ -121,6 +126,8 @@ load(
 )
 
 # Rules
+fuchsia_assembly_developer_overrides = _fuchsia_assembly_developer_overrides
+fuchsia_assembly_developer_overrides_list = _fuchsia_assembly_developer_overrides_list
 fuchsia_legacy_bundle = _fuchsia_legacy_bundle
 fuchsia_platform_artifacts = _fuchsia_platform_artifacts
 fuchsia_prebuilt_package = _fuchsia_prebuilt_package

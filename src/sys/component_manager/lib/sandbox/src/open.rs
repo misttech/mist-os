@@ -1,12 +1,14 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 use crate::connector::Connectable;
 use crate::fidl::registry;
-use crate::{Connector, ConversionError, RemotableCapability};
+use crate::Connector;
 use core::fmt;
 use fidl::endpoints::{create_request_stream, ClientEnd};
 use fidl::handle::{AsHandleRef, Channel, Status};
+use fidl_fuchsia_io as fio;
 use fuchsia_zircon::Koid;
 use futures::TryStreamExt;
 use std::sync::Arc;
@@ -15,7 +17,6 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::remote::remote_dir;
 use vfs::service::endpoint;
 use vfs::ToObjectRequest;
-use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
 /// a [Channel], usually treated as the server endpoint of some FIDL protocol.
@@ -45,7 +46,7 @@ use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
 /// Intuitively this is akin to mounting a remote VFS node in a directory.
 #[derive(Clone)]
 pub struct Open {
-    entry: Arc<dyn DirectoryEntry>,
+    pub(crate) entry: Arc<dyn DirectoryEntry>,
 }
 
 impl Connectable for Open {
@@ -151,12 +152,6 @@ impl fmt::Debug for Open {
     }
 }
 
-impl RemotableCapability for Open {
-    fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
-        Ok(self.entry)
-    }
-}
-
 impl From<ClientEnd<fio::OpenableMarker>> for Open {
     fn from(value: ClientEnd<fio::OpenableMarker>) -> Self {
         // Open is one-way so a synchronous proxy is not going to block.
@@ -184,12 +179,6 @@ impl From<Open> for ClientEnd<fio::OpenableMarker> {
         let (client_end, openable_stream) = create_request_stream::<fio::OpenableMarker>().unwrap();
         open.serve_and_register(openable_stream, client_end.get_koid().unwrap());
         client_end
-    }
-}
-
-impl From<Open> for fsandbox::Capability {
-    fn from(open: Open) -> Self {
-        Self::Connector(crate::Connector::new_sendable(open).into())
     }
 }
 
@@ -226,6 +215,7 @@ impl ValidatePath for &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fidl::RemotableCapability;
     use crate::{Capability, Dict, Receiver};
     use anyhow::Result;
     use assert_matches::assert_matches;

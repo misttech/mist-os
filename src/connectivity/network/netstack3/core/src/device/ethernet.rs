@@ -14,7 +14,7 @@ use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::{SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::socket::SocketIpAddr;
-use netstack3_base::{CoreTimerContext, CounterContext, DeviceIdContext};
+use netstack3_base::{CoreTimerContext, CounterContext, DeviceIdContext, SendFrameError};
 use netstack3_device::ethernet::{
     self, DynamicEthernetDeviceState, EthernetDeviceCounters, EthernetDeviceId,
     EthernetIpLinkDeviceDynamicStateContext, EthernetIpLinkDeviceStaticStateContext,
@@ -278,7 +278,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
         bindings_ctx: &mut BC,
         dst_mac: Mac,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
@@ -427,7 +427,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSocke
         bindings_ctx: &mut BC,
         dst_mac: Mac,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,

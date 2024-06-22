@@ -7,7 +7,10 @@ def _example_rule_impl(_ctx):
 
 example_rule = rule(
     implementation = _example_rule_impl,
-    doc = "The description of a basic rule",
+    doc = """The description of a basic rule
+
+    Some other text on a new line.
+    """,
     attrs = {
         "deps": attr.label_list(mandatory = False, doc = "the dependencies."),
         "src": attr.label(doc = "A source file", mandatory = True, allow_single_file = True),

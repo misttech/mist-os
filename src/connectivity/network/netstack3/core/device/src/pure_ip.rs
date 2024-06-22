@@ -14,7 +14,8 @@ use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Mtu};
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
     CoreTimerContext, Device, DeviceIdContext, ReceivableFrameMeta, RecvFrameContext,
-    RecvIpFrameMeta, ResourceCounterContext, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
+    RecvIpFrameMeta, ResourceCounterContext, SendFrameError, SendFrameErrorReason,
+    SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
 };
 use netstack3_ip::{IpPacketDestination, IpTypesIpExt};
 use packet::{Buf, BufferMut, Serializer};
@@ -210,7 +211,12 @@ where
     CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
 {
-    fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, body: S) -> Result<(), S>
+    fn send_meta<S>(
+        self,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        body: S,
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
@@ -231,7 +237,7 @@ pub fn send_ip_frame<BC, CC, I, S>(
     device_id: &CC::DeviceId,
     destination: IpPacketDestination<I, &DeviceId<BC>>,
     packet: S,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     BC: DeviceLayerTypes,
     CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
@@ -260,7 +266,7 @@ fn queue_ip_frame<BC, CC, I, S>(
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     packet: S,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
@@ -285,13 +291,13 @@ where
             warn!("device {device_id:?} not ready to send frame.");
             Ok(())
         }
-        Err(TransmitQueueFrameError::QueueFull(s)) => {
+        Err(TransmitQueueFrameError::QueueFull(serializer)) => {
             core_ctx.increment(device_id, |counters| &counters.send_queue_full);
-            Err(s)
+            Err(SendFrameError { serializer, error: SendFrameErrorReason::QueueFull })
         }
-        Err(TransmitQueueFrameError::SerializeError(s)) => {
+        Err(TransmitQueueFrameError::SerializeError(err)) => {
             core_ctx.increment(device_id, |counters| &counters.send_serialize_error);
-            Err(s)
+            Err(err.err_into())
         }
     }
 }

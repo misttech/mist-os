@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/usb/composite/cpp/banjo.h>
 #include <fuchsia/hardware/usb/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/debug.h>
 
 #include <ddktl/device.h>
 #include <fbl/array.h>

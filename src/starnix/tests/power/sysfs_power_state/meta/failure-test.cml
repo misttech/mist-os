@@ -1,0 +1,16 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "//src/starnix/tests/power/sysfs_power_state/meta/test.shard.cml" ],
+    program: {
+        binary: "data/tests/failure-test-bin",
+    },
+    children: [
+        {
+            name: "fake-suspend-controller",
+            url: "#meta/failure-fake-suspend-controller.cm",
+            startup: "eager",
+        },
+    ],
+}

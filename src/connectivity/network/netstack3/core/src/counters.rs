@@ -249,9 +249,13 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         unspecified_destination,
         unspecified_source,
         dropped,
+        tx_illegal_loopback_address,
         version_rx,
     } = counters;
-    inspector.record_counter("PacketTx", send_ip_packet);
+    inspector.record_child("PacketTx", |inspector| {
+        inspector.record_counter("Sent", send_ip_packet);
+        inspector.record_counter("IllegalLoopbackAddress", tx_illegal_loopback_address);
+    });
     inspector.record_child("PacketRx", |inspector| {
         inspector.record_counter("Received", receive_ip_packet);
         inspector.record_counter("Dispatched", dispatch_receive_ip_packet);

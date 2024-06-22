@@ -72,15 +72,11 @@ class Device final : public DdkDeviceType,
  public:
   Device(zx_device_t* parent_device, Driver* parent_driver);
 
-  // Regarding the public destructor, in production the destructor is normally called by DdkRelease,
-  // except in case of failure during Bind, in which case the destructor is called by
-  // ~unique_ptr<Device>. The destructor is also called by some tests.
-  ~Device();
-
   [[nodiscard]] zx_status_t GetContiguousGuardParameters(
       const std::optional<sysmem_config::Config>& config, uint64_t* guard_bytes_out,
-      bool* unused_pages_guarded, zx::duration* unused_page_check_cycle_period,
-      bool* internal_guard_pages_out, bool* crash_on_fail_out);
+      bool* unused_pages_guarded, int64_t* unused_guard_pattern_period_bytes,
+      zx::duration* unused_page_check_cycle_period, bool* internal_guard_pages_out,
+      bool* crash_on_fail_out);
 
   [[nodiscard]] static zx_status_t Bind(std::unique_ptr<Device> device);
   // currently public only for tests
@@ -90,16 +86,13 @@ class Device final : public DdkDeviceType,
   // The rest of the methods are only valid to call after Bind().
   //
 
-  // TODO(b/332630641): These "Common" methods are mostly left over common implementations from back
-  // when we also had a sysmem banjo protocol. However, a couple of these are called directly by
-  // tests. We can inline the ones not used from tests.
-  [[nodiscard]] zx_status_t CommonSysmemConnectV1(zx::channel allocator_request);
-  [[nodiscard]] zx_status_t CommonSysmemConnectV2(zx::channel allocator_request);
-  [[nodiscard]] zx_status_t CommonSysmemRegisterHeap(
+  [[nodiscard]] zx_status_t RegisterHeapInternal(
       fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection);
-  [[nodiscard]] zx_status_t CommonSysmemRegisterSecureMem(
+  // Also called directly by a test.
+  [[nodiscard]] zx_status_t RegisterSecureMemInternal(
       fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection);
-  [[nodiscard]] zx_status_t CommonSysmemUnregisterSecureMem();
+  // Also called directly by a test.
+  [[nodiscard]] zx_status_t UnregisterSecureMemInternal();
 
   // Ddk mixin implementations.
   void DdkUnbind(ddk::UnbindTxn txn);
@@ -302,7 +295,7 @@ class Device final : public DdkDeviceType,
 
   inspect::Node collections_node_;
 
-  fidl::SyncClient<fuchsia_hardware_platform_device::Device> pdev_;
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
   zx::bti bti_;
 
   // Initialize these to a value that won't be mistaken for a real vid or pid.

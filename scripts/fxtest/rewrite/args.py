@@ -10,7 +10,7 @@ import sys
 import typing
 
 import termout
-import util.arg_option as arg_option
+import selection_action
 
 LOG_TO_STDOUT_OPTION = "-"
 
@@ -291,7 +291,7 @@ def parse_args(
     selection.add_argument(
         "-p",
         "--package",
-        action=arg_option.InvalidAction,
+        action=selection_action.InvalidAction,
         nargs=0,
         dest="selection",
         help="Match tests against their Fuchsia package name",
@@ -299,7 +299,7 @@ def parse_args(
     selection.add_argument(
         "-c",
         "--component",
-        action=arg_option.InvalidAction,
+        action=selection_action.InvalidAction,
         nargs=0,
         dest="selection",
         help="Match tests against their Fuchsia component name",
@@ -307,14 +307,14 @@ def parse_args(
     selection.add_argument(
         "-a",
         "--and",
-        action=arg_option.InvalidAction,
+        action=selection_action.InvalidAction,
         nargs=0,
         dest="selection",
         help="Add requirements to the preceding filter",
     )
     selection.add_argument(
         "selection",
-        action=arg_option.SelectionAction,
+        action=selection_action.SelectionAction,
         nargs="*",
     )
     selection.add_argument(
@@ -442,17 +442,17 @@ def parse_args(
         "--break-on-failure",
         action="store_true",
         help="""If set, any test case failures will stop test execution and launch zxdb attached
-        to the failed test case, if the test runner supports this feature. Implies --no-status.
-        Note: this flag is experimental""",
+        to the failed test case, if the test runner supports this feature.""",
         default=False,
     )
     execution.add_argument(
         "--breakpoint",
-        nargs="*",
+        metavar="BREAKPOINT",  # This is to make the help text singular.
         dest="breakpoints",
+        action="append",
         help="""Run the test with zxdb attached and set the given breakpoint. For example,
-        --breakpoint=my_source_file.cc:37 will insert a breakpoint at line 37 of any file
-        named my_source_file.cc. Implies --no-status. Note: this flag is experimental""",
+        `--breakpoint my_source_file.cc:37` will insert a breakpoint at line 37 of any file
+        named my_source_file.cc. May be specified multiple times to add multiple breakpoints.""",
         default=[],
     )
 
@@ -557,7 +557,7 @@ def parse_args(
             if hasattr(defaults, action.dest):
                 action.default = getattr(defaults, action.dest)
 
-    cli_args = arg_option.SelectionAction.preprocess_args(cli_args)
+    cli_args = selection_action.SelectionAction.preprocess_args(cli_args)
     namespace = parser.parse_intermixed_args(cli_args)
     flags: Flags = Flags(**vars(namespace), extra_args=extra_args)
     return flags

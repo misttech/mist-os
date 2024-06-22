@@ -42,6 +42,30 @@ board_configuration("vim3") {
       # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
       enable_debug_access_port_for_soc = "amlogic-a311d"
     }
+    sysmem_defaults = {
+      # The AMlogic display engine needs contiguous physical memory for each
+      # frame buffer, because it does not have a page table walker.
+      #
+      # The maximum supported resolution is documented below.
+      # * "A311D Quick Reference Manual" revision 01, pages 2-3
+      # * "A311D Datasheet" revision 08, section 2.2 "Features", pages 4-5
+      #
+      # These pages can be loaned back to zircon for use in pager-backed VMOs,
+      # but these pages won't be used in "anonymous" VMOs (at least for now).
+      # Whether the loaned-back pages can be absorbed by pager-backed VMOs is
+      # workload dependent. The "k ppb stats_on" command can be used to
+      # determine whether all loaned pages are being used by pager-backed VMOs.
+      #
+      # This board-level default can be overridden by platform-level config.
+      contiguous_memory_size = {
+        # 200 MiB
+        fixed = 209715200
+      }
+      protected_memory_size = {
+        fixed = 0
+      }
+      contiguous_guard_pages_unused = false
+    }
   }
 
   filesystems = {
@@ -281,21 +305,6 @@ board_input_bundle("main_bundle") {
       package_target = "//src/power/fake-powersource:fake-battery"
       package_set = "base"
       driver_components = [ "meta/fake_battery.cm" ]
-    },
-  ]
-}
-
-board_input_bundle("broadcom_drivers") {
-  drivers = [
-    {
-      package_target = "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3"
-      package_set = "base"
-      driver_components = [ "meta/brcmfmac.cm" ]
-    },
-    {
-      package_target = "//src/connectivity/bluetooth/hci/vendor/broadcom"
-      package_set = "base"
-      driver_components = [ "meta/bt-hci-broadcom.cm" ]
     },
   ]
 }

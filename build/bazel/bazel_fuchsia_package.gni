@@ -92,5 +92,8 @@ template("bazel_fuchsia_package") {
       deps = []
     }
     deps += [ ":$bazel_build_target" ]
+    metadata = {
+      expect_includes_barrier = []
+    }
   }
 }

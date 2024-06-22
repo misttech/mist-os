@@ -4,6 +4,5 @@
 
 pub mod descriptor;
 pub mod events;
-pub mod log;
 pub mod matcher;
 pub mod sequence;

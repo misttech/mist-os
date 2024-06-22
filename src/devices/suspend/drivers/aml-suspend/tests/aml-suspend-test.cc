@@ -39,6 +39,11 @@ class AmlSuspendTest : public AmlSuspend {
     return zx::ok(std::move(result));
   }
 
+  zx_status_t SystemSuspendEnter(zx_time_t resume_deadline) override {
+    // No-op override for testing.
+    return ZX_OK;
+  }
+
   static DriverRegistration GetDriverRegistration() {
     // Use a custom DriverRegistration to create the DUT. Without this, the non-test implementation
     // will be used by default.
@@ -105,6 +110,16 @@ TEST_F(AmlSuspendTestFixture, TrivialGetSuspendStates) {
   // The protocol mandates that at least one suspend state is returned.
   ASSERT_TRUE(result.value()->has_suspend_states());
   EXPECT_GT(result.value()->suspend_states().count(), 0ul);
+}
+
+TEST_F(AmlSuspendTestFixture, TrivialSuspend) {
+  fidl::Arena arena;
+  auto request = fuchsia_hardware_suspend::wire::SuspenderSuspendRequest::Builder(arena)
+                     .state_index(0)
+                     .Build();
+  auto result = client()->Suspend(request);
+  EXPECT_TRUE(result.ok());
+  EXPECT_TRUE(result->is_ok());
 }
 
 }  // namespace suspend

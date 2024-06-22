@@ -199,8 +199,7 @@ class FakeComposite
   }
 
   // This returns a fidl::client_end<fuchsia_hardware_audio::Composite>. The driver will not start
-  // serving requests until Enable is called, which is why the construction/Enable separation
-  // exists.
+  // serving requests until Enable is called, which is why we separate construction and Enable().
   fidl::ClientEnd<fuchsia_hardware_audio::Composite> Enable();
   void DropComposite();
   void DropChildren();

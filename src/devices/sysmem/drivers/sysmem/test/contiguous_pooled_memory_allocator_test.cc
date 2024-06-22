@@ -242,7 +242,8 @@ TEST_F(ContiguousPooledSystem, GuardPages) {
   allocator_.SetBtiFakeForUnitTests();
   const zx::duration kUnusedPageCheckCyclePeriod = zx::sec(600);
   allocator_.InitGuardRegion(kGuardRegionSize, /*unused_pages_guarded=*/false,
-                             kUnusedPageCheckCyclePeriod, /*internal_guard_regions=*/true,
+                             /*unused_guard_pattern_period_bytes=*/-1, kUnusedPageCheckCyclePeriod,
+                             /*internal_guard_regions=*/true,
                              /*crash_on_guard_failure=*/false, loop.dispatcher());
   allocator_.SetupUnusedPages();
   allocator_.set_ready();
@@ -284,7 +285,8 @@ TEST_F(ContiguousPooledSystem, ExternalGuardPages) {
   allocator_.SetBtiFakeForUnitTests();
   const zx::duration kUnusedPageCheckCyclePeriod = zx::sec(2);
   allocator_.InitGuardRegion(kGuardRegionSize, /*unused_pages_guarded=*/true,
-                             kUnusedPageCheckCyclePeriod, /*internal_guard_regions=*/false,
+                             /*unused_guard_pattern_period_bytes=*/-1, kUnusedPageCheckCyclePeriod,
+                             /*internal_guard_regions=*/false,
                              /*crash_on_guard_failure=*/false, loop.dispatcher());
   allocator_.SetupUnusedPages();
   allocator_.set_ready();
@@ -339,8 +341,10 @@ TEST_F(ContiguousPooledSystem, UnusedGuardPages) {
                               zx_system_get_page_size()));
 
   EXPECT_OK(allocator_.Init());
-  allocator_.InitGuardRegion(0, true, unused_page_check_cycle_period, false, false,
-                             loop.dispatcher());
+  allocator_.InitGuardRegion(/*guard_region_size=*/0, /*unused_pages_guarded=*/true,
+                             /*unused_guard_pattern_period_bytes=*/-1,
+                             unused_page_check_cycle_period, /*internal_guard_regions=*/false,
+                             /*crash_on_guard_failure=*/false, loop.dispatcher());
   allocator_.SetupUnusedPages();
   allocator_.set_ready();
 

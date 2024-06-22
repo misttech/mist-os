@@ -39,7 +39,7 @@ group("test_bluetooth_avrcp_sl4f") {
 group("tests") {
   testonly = true
   public_deps = [
-    ":bluetooth_gap_test_fc",
-    ":test_bluetooth_avrcp_sl4f($host_toolchain)",
+    ":bluetooth_gap_test_fc($host_toolchain)",
+    ":test_bluetooth_avrcp_sl4f",
   ]
 }

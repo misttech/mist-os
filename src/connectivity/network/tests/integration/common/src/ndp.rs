@@ -109,8 +109,9 @@ pub type DadState = Result<
     fidl_fuchsia_net_interfaces_ext::admin::AddressStateProviderError,
 >;
 
-/// Wait for and verify a NS message transmitted by netstack for DAD.
-pub async fn expect_dad_neighbor_solicitation(fake_ep: &netemul::TestFakeEndpoint<'_>) {
+/// Wait for and verify a NS message transmitted by netstack for DAD. Returns
+/// the bytes of the NS message.
+pub async fn expect_dad_neighbor_solicitation(fake_ep: &netemul::TestFakeEndpoint<'_>) -> Vec<u8> {
     let ret = fake_ep
         .frame_stream()
         .try_filter_map(|(data, dropped)| {
@@ -133,7 +134,7 @@ pub async fn expect_dad_neighbor_solicitation(fake_ep: &netemul::TestFakeEndpoin
                             return None;
                         }
 
-                        Some((dst_mac, src_ip, dst_ip, ttl))
+                        Some((dst_mac, src_ip, dst_ip, ttl, data))
                     },
                 ),
             )
@@ -150,12 +151,14 @@ pub async fn expect_dad_neighbor_solicitation(fake_ep: &netemul::TestFakeEndpoin
         .unwrap()
         .expect("failed to get next OnData event");
 
-    let (dst_mac, src_ip, dst_ip, ttl) = ret;
+    let (dst_mac, src_ip, dst_ip, ttl, data) = ret;
     let expected_dst = constants::ipv6::LINK_LOCAL_ADDR.to_solicited_node_address();
     assert_eq!(src_ip, net_types::ip::Ipv6::UNSPECIFIED_ADDRESS);
     assert_eq!(dst_ip, expected_dst.get());
     assert_eq!(dst_mac, net_types::ethernet::Mac::from(&expected_dst));
     assert_eq!(ttl, MESSAGE_TTL);
+
+    data
 }
 
 /// Transmit a Neighbor Solicitation message simulating that a node is

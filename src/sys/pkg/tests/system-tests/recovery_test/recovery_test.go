@@ -148,6 +148,12 @@ func doTestRecovery(
 		return fmt.Errorf("unable to get repository: %w", err)
 	}
 
+	// We should use this ffx after we reboot.
+	nextFfxTool, err := build.GetFfx(ctx, ffxIsolateDir)
+	if err != nil {
+		return fmt.Errorf("failed to get ffx from build %s: %w", build, err)
+	}
+
 	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
 	if err != nil {
 		return fmt.Errorf("error opening update/0: %w", err)
@@ -178,7 +184,7 @@ func doTestRecovery(
 		return fmt.Errorf("error rebooting to recovery: %w", err)
 	}
 
-	if err := device.Reconnect(ctx); err != nil {
+	if err := device.Reconnect(ctx, nextFfxTool); err != nil {
 		return fmt.Errorf("failed to reconnect: %w", err)
 	}
 

@@ -11,6 +11,7 @@ load(
     "FuchsiaProductImageInfo",
     "FuchsiaUpdatePackageInfo",
 )
+load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _fuchsia_update_package_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -65,6 +66,7 @@ def _fuchsia_update_package_impl(ctx):
         outputs = outputs,
         command = script,
         progress_message = "Create update package for %s" % ctx.label.name,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
     return [
         DefaultInfo(files = depset(direct = outputs + inputs)),

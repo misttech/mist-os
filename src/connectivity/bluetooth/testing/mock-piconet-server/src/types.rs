@@ -22,9 +22,9 @@ pub struct ServiceFoundResponse {
 fn protocol_descriptor_to_data_elements(
     desc: &bredr::ProtocolDescriptor,
 ) -> Vec<Option<Box<bredr::DataElement>>> {
-    let identifier = Some(Box::new(Uuid::new16(desc.protocol as u16).into()));
+    let identifier = Some(Box::new(Uuid::new16(desc.protocol.unwrap().into_primitive()).into()));
     let params: Vec<Option<Box<bredr::DataElement>>> =
-        desc.params.iter().map(|elt| Some(Box::new(elt.clone()))).collect();
+        desc.params.as_ref().unwrap().iter().map(|elt| Some(Box::new(elt.clone()))).collect();
 
     // Build the list of data elements - the protocol identifier with all of the parameters.
     let mut result = vec![identifier];
@@ -36,10 +36,11 @@ fn protocol_descriptor_to_data_elements(
 fn protocol_to_attribute(protocol: &Vec<bredr::ProtocolDescriptor>) -> bredr::Attribute {
     let elements = protocol.iter().map(protocol_descriptor_to_data_elements).flatten().collect();
     bredr::Attribute {
-        id: bredr::ATTR_PROTOCOL_DESCRIPTOR_LIST,
-        element: bredr::DataElement::Sequence(vec![Some(Box::new(bredr::DataElement::Sequence(
-            elements,
-        )))]),
+        id: Some(bredr::ATTR_PROTOCOL_DESCRIPTOR_LIST),
+        element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
+            bredr::DataElement::Sequence(elements),
+        ))])),
+        ..Default::default()
     }
 }
 
@@ -192,26 +193,36 @@ impl ServiceRecord {
         let svc_ids_sequence =
             svc_ids_list.into_iter().map(|id| Some(Box::new(Uuid::from(id).into()))).collect();
         attributes.push(bredr::Attribute {
-            id: bredr::ATTR_SERVICE_CLASS_ID_LIST,
-            element: bredr::DataElement::Sequence(svc_ids_sequence),
+            id: Some(bredr::ATTR_SERVICE_CLASS_ID_LIST),
+            element: Some(bredr::DataElement::Sequence(svc_ids_sequence)),
+            ..Default::default()
         });
 
         // Profile descriptors.
         if !self.profile_descriptors.is_empty() {
             let mut prof_desc_sequence = vec![];
             for descriptor in &self.profile_descriptors {
+                let (Some(major_version), Some(minor_version)) =
+                    (descriptor.major_version, descriptor.minor_version)
+                else {
+                    return Err(format_err!("ProfileDescriptor missing major/minor version"));
+                };
+                let Some(profile_id) = descriptor.profile_id else {
+                    return Err(format_err!("ProfileDescriptor missing profile_id"));
+                };
                 let desc_list = vec![
-                    Some(Box::new(Uuid::from(descriptor.profile_id).into())),
+                    Some(Box::new(Uuid::from(profile_id).into())),
                     Some(Box::new(bredr::DataElement::Uint16(u16::from_be_bytes([
-                        descriptor.major_version,
-                        descriptor.minor_version,
+                        major_version,
+                        minor_version,
                     ])))),
                 ];
                 prof_desc_sequence.push(Some(Box::new(bredr::DataElement::Sequence(desc_list))));
             }
             attributes.push(bredr::Attribute {
-                id: bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-                element: bredr::DataElement::Sequence(prof_desc_sequence),
+                id: Some(bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST),
+                element: Some(bredr::DataElement::Sequence(prof_desc_sequence)),
+                ..Default::default()
             });
         }
 
@@ -236,36 +247,43 @@ mod tests {
     fn expected_attributes() -> Vec<bredr::Attribute> {
         vec![
             bredr::Attribute {
-                id: 4,
-                element: bredr::DataElement::Sequence(vec![Some(Box::new(
+                id: Some(4),
+                element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                     bredr::DataElement::Sequence(vec![
                         Some(Box::new(bredr::DataElement::Uuid(fidl_bt::Uuid {
                             value: [251, 52, 155, 95, 128, 0, 0, 128, 0, 16, 0, 0, 0, 1, 0, 0],
                         }))),
                         Some(Box::new(bredr::DataElement::Uint16(20))),
                     ]),
-                ))]),
+                ))])),
+                ..Default::default()
             },
             bredr::Attribute {
-                id: 1,
-                element: bredr::DataElement::Sequence(vec![Some(Box::new(
+                id: Some(1),
+                element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                     bredr::DataElement::Uuid(fidl_bt::Uuid {
                         value: [251, 52, 155, 95, 128, 0, 0, 128, 0, 16, 0, 0, 10, 17, 0, 0],
                     }),
-                ))]),
+                ))])),
+                ..Default::default()
             },
             bredr::Attribute {
-                id: 9,
-                element: bredr::DataElement::Sequence(vec![Some(Box::new(
+                id: Some(9),
+                element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                     bredr::DataElement::Sequence(vec![
                         Some(Box::new(bredr::DataElement::Uuid(fidl_bt::Uuid {
                             value: [251, 52, 155, 95, 128, 0, 0, 128, 0, 16, 0, 0, 10, 17, 0, 0],
                         }))),
                         Some(Box::new(bredr::DataElement::Uint16(258))),
                     ]),
-                ))]),
+                ))])),
+                ..Default::default()
             },
-            bredr::Attribute { id: 9216, element: bredr::DataElement::Uint8(10) },
+            bredr::Attribute {
+                id: Some(9216),
+                element: Some(bredr::DataElement::Uint8(10)),
+                ..Default::default()
+            },
         ]
     }
 
@@ -277,14 +295,18 @@ mod tests {
         let additional = vec![additional_psm].into_iter().collect();
         let ids = vec![bredr::ServiceClassProfileIdentifier::AudioSource].into_iter().collect();
         let descs = vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::AudioSource,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::AudioSource),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         }];
         let additional_attrs = vec![Attribute { id: 0x2400, element: DataElement::Uint8(10) }];
         let mut service_record = ServiceRecord::new(
             ids,
-            build_l2cap_descriptor(primary_psm).iter().map(Into::into).collect(),
+            build_l2cap_descriptor(primary_psm)
+                .iter()
+                .map(|p| ProtocolDescriptor::try_from(p).unwrap())
+                .collect(),
             additional,
             descs,
             additional_attrs,
@@ -308,8 +330,9 @@ mod tests {
         assert_eq!(
             response.protocol,
             Some(vec![bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![bredr::DataElement::Uint16(primary_psm.into())]
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![bredr::DataElement::Uint16(primary_psm.into())]),
+                ..Default::default()
             }])
         );
         assert_eq!(response.attributes, expected_attributes());
@@ -335,12 +358,14 @@ mod tests {
             response.protocol,
             Some(vec![
                 bredr::ProtocolDescriptor {
-                    protocol: bredr::ProtocolIdentifier::L2Cap,
-                    params: vec![],
+                    protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                    params: Some(vec![]),
+                    ..Default::default()
                 },
                 bredr::ProtocolDescriptor {
-                    protocol: bredr::ProtocolIdentifier::Rfcomm,
-                    params: vec![bredr::DataElement::Uint8(example_channel.into())]
+                    protocol: Some(bredr::ProtocolIdentifier::Rfcomm),
+                    params: Some(vec![bredr::DataElement::Uint8(example_channel.into())]),
+                    ..Default::default()
                 }
             ])
         );

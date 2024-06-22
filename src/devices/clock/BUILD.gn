@@ -3,11 +3,13 @@
 # found in the LICENSE file.
 
 group("drivers") {
-  deps = [
-    "drivers/amlogic-clk",
-    "drivers/clock",
-    "drivers/vim3-clk:bazel_package",
-  ]
+  deps = [ "drivers/clock" ]
+  if (target_cpu == "arm64") {
+    deps += [
+      "drivers/amlogic-clk",
+      "drivers/vim3-clk:bazel_package",
+    ]
+  }
 }
 
 group("tests") {

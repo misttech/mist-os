@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_binary.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 import("//src/developer/ffx/lib/version/build/ffx_apply_version.gni")
 import("ffx_plugin.gni")
 
@@ -43,21 +44,10 @@ template("ffx") {
     if (_large_binary_optimizations) {
       # ffx is known to be a massive, time/resource-consuming target.
 
-      # Requires RBE machine with more memory.
-      configs += [ "//build/config:big_rbe_machine" ]
-
-      _remote_only = true
-      if (!_remote_only) {
-        # When running locally (including RBE local and racing strategies),
-        # limit its concurrency with other memory-intensive jobs.
-        # See https://fxbug.dev/42062387 for context.
-        pool = "//build/config:highmem($default_toolchain)"
-
-        # Since remote workers tend to be slightly slower than the local
-        # machine, and ffx is frequently on critical path, race local against
-        # remote execution, which still lets it remotely cache.
-        configs += [ "//build/config/rust:rbe_strategy_racing" ]
-      }
+      # Remote execution requires machine with more memory.
+      _concurrent_jobs = concurrent_jobs.rust_highmem
+      configs += _concurrent_jobs.configs
+      forward_variables_from(_concurrent_jobs.vars, "*")
 
       # Use up to 16 threads for codegen
       configs += [ "//build/config/rust:codegen_units_16" ]

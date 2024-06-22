@@ -41,6 +41,7 @@ package_deps = [
   # netstack3 is under test.
   "//src/connectivity/network/netstack3:component",
   "//src/connectivity/network/netstack3:component-debug",
+  "//src/connectivity/network/netstack3:config_for_tests",
 
   # reachability monitor is under test.
   "//src/connectivity/policy/reachability:component_with_fake_time",

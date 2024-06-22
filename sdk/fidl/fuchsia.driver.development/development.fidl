@@ -14,7 +14,7 @@ const HASH_LENGTH uint8 = 64;
 
 /// Interface for the driver development manager.
 /// This interface should only be used for development and disabled in release builds.
-@discoverable
+@discoverable(server="platform")
 open protocol Manager {
     /// Returns a list of all drivers that are known to the system.
     /// If a |driver_filter| is provided, the returned list will be filtered to
@@ -60,7 +60,7 @@ open protocol Manager {
         exact_match bool;
     });
 
-    /// Returns the list of composites in the system. This includes composites 
+    /// Returns the list of composites in the system. This includes composites
     /// that are not yet assembled and added into the node topology.
     flexible GetCompositeInfo(resource struct {
         iterator server_end:CompositeInfoIterator;
@@ -113,11 +113,15 @@ open protocol Manager {
     flexible RemoveTestNode(struct {
         name string:NODE_MONIKER_MAX;
     }) -> () error zx.Status;
+
+    /// Waits for bootup to complete.
+    @available(added=21)
+    strict WaitForBootup() -> ();
 };
 
 /// Interface for watching when bootup is complete, in which there are no more bind and driver start
 /// activity.
-@available(added=20)
+@available(added=20, removed=21)
 @discoverable
 open protocol BootupWatcher {
     // Waits for bootup to complete.

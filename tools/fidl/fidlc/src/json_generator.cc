@@ -369,19 +369,20 @@ void JSONGenerator::Generate(const Protocol::MethodWithInfo& method_with_info) {
   ZX_ASSERT(method_with_info.method != nullptr);
   const auto& value = *method_with_info.method;
   GenerateObject([&]() {
-    GenerateObjectMember("ordinal", value.ordinal, Position::kFirst);
+    GenerateObjectMember("kind", NameMethodKind(value.kind), Position::kFirst);
+    GenerateObjectMember("ordinal", value.ordinal);
     GenerateObjectMember("name", value.name);
     GenerateObjectMember("strict", value.strictness);
     GenerateObjectMember("location", NameSpan(value.name));
     GenerateObjectMember("deprecated", value.availability.is_deprecated());
-    GenerateObjectMember("has_request", value.has_request);
+    GenerateObjectMember("has_request", value.kind != Protocol::Method::Kind::kEvent);
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     if (value.maybe_request) {
       GenerateTypeAndFromAlias(TypeKind::kRequestPayload, value.maybe_request.get(),
                                Position::kSubsequent);
     }
-    GenerateObjectMember("has_response", value.has_response);
+    GenerateObjectMember("has_response", value.kind != Protocol::Method::Kind::kOneWay);
     if (value.maybe_response) {
       GenerateTypeAndFromAlias(TypeKind::kResponsePayload, value.maybe_response.get(),
                                Position::kSubsequent);

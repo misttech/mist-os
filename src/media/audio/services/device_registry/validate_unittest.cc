@@ -34,55 +34,56 @@ const std::vector<std::pair<uint8_t, fha::SampleFormat>> kFormats = {
 };
 const std::vector<uint32_t> kFrameRates = {1000, 44100, 48000, 19200};
 
-// Unittest ValidateCodecProperties -- the missing, minimal and maximal possibilities
+// Unittest ValidateCodecProperties -- the missing, min and max possibilities
 TEST(ValidateTest, ValidateCodecProperties) {
   EXPECT_TRUE(ValidateCodecProperties(fha::CodecProperties{{
       // is_input missing
-      .manufacturer = " ",  // minimal value (empty is disallowed)
-      .product =            // maximal value
+      .manufacturer = " ",  // min value (empty is disallowed)
+      .product =            // max value
       "Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name extends to 321X",
       // unique_id missing
       .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
   }}));
   EXPECT_TRUE(ValidateCodecProperties(fha::CodecProperties{{
       .is_input = false,
-      .manufacturer =  // maximal value
+      .manufacturer =  // max value
       "Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long, which extends to... 321X",
       // product missing
-      .unique_id = {{}},  // minimal value
+      .unique_id = {{}},  // min value
       .plug_detect_capabilities = fha::PlugDetectCapabilities::kCanAsyncNotify,
   }}));
   EXPECT_TRUE(ValidateCodecProperties(fha::CodecProperties{{
       .is_input = true,
       // manufacturer missing
-      .product = " ",  // minimal value (empty is disallowed)
+      .product = " ",  // min value (empty is disallowed)
       .unique_id = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
                      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
       .plug_detect_capabilities = fha::PlugDetectCapabilities::kCanAsyncNotify,
   }}));
 }
 
-// Unittest ValidateCompositeProperties -- the missing, minimal and maximal possibilities
+// Unittest ValidateCompositeProperties -- the missing, min and max possibilities
 TEST(ValidateTest, ValidateCompositeProperties) {
   EXPECT_TRUE(ValidateCompositeProperties(fha::CompositeProperties{{
       // manufacturer missing
-      .product = " ",  // minimal value (empty is disallowed)
+      .product = " ",  // min value (empty is disallowed)
       .unique_id = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
                      0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
       .clock_domain = fha::kClockDomainMonotonic,
+      // power_elements missing
   }}));
   EXPECT_TRUE(ValidateCompositeProperties(fha::CompositeProperties{{
-      .manufacturer = " ",  // minimal value (empty is disallowed)
-      .product =            // maximal value
+      .manufacturer = " ",  // min value (empty is disallowed)
+      .product =            // max value
       "Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name extends to 321X",
       // unique_id missing
       .clock_domain = fha::kClockDomainExternal,
   }}));
   EXPECT_TRUE(ValidateCompositeProperties(fha::CompositeProperties{{
-      .manufacturer =  // maximal value
+      .manufacturer =  // max value
       "Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long, which extends to... 321X",
       // product missing
-      .unique_id = {{}},  // minimal value
+      .unique_id = {{}},  // min value
       .clock_domain = fha::kClockDomainExternal,
   }}));
 }
@@ -275,8 +276,8 @@ TEST(ValidateTest, ValidatePlugState) {
 TEST(ValidateTest, ValidateRingBufferFormatSets) {
   EXPECT_TRUE(ValidateRingBufferFormatSets({CompliantFormatSet()}));
 
-  fha::SupportedFormats minimal_values_format_set;
-  minimal_values_format_set.pcm_supported_formats() = {{
+  fha::SupportedFormats min_values_format_set;
+  min_values_format_set.pcm_supported_formats() = {{
       .channel_sets = {{
           {{.attributes = {{
                 {{.max_frequency = 50}},
@@ -287,10 +288,10 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
       .valid_bits_per_sample = {{1}},
       .frame_rates = {{1000}},
   }};
-  EXPECT_TRUE(ValidateRingBufferFormatSets({minimal_values_format_set}));
+  EXPECT_TRUE(ValidateRingBufferFormatSets({min_values_format_set}));
 
-  fha::SupportedFormats maximal_values_format_set;
-  maximal_values_format_set.pcm_supported_formats() = {{
+  fha::SupportedFormats max_values_format_set;
+  max_values_format_set.pcm_supported_formats() = {{
       .channel_sets = {{
           {{.attributes = {{
                 {},
@@ -302,7 +303,7 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
       .valid_bits_per_sample = {{64}},
       .frame_rates = {{192000}},
   }};
-  EXPECT_TRUE(ValidateRingBufferFormatSets({maximal_values_format_set}));
+  EXPECT_TRUE(ValidateRingBufferFormatSets({max_values_format_set}));
 
   // Probe fully-populated values, in multiple format sets.
   fha::SupportedFormats signed_format_set;
@@ -401,8 +402,8 @@ TEST(ValidateTest, ValidateRingBufferFormatSets) {
   supported_formats.push_back(signed_format_set);
   supported_formats.push_back(unsigned_format_set);
   supported_formats.push_back(float_format_set);
-  supported_formats.push_back(minimal_values_format_set);
-  supported_formats.push_back(maximal_values_format_set);
+  supported_formats.push_back(min_values_format_set);
+  supported_formats.push_back(max_values_format_set);
   EXPECT_TRUE(ValidateRingBufferFormatSets(supported_formats));
 }
 
@@ -556,7 +557,7 @@ TEST(ValidateTest, ValidateDaiFormat) {
 
 TEST(ValidateTest, ValidateCodecFormatInfo) {
   EXPECT_TRUE(ValidateCodecFormatInfo(fha::CodecFormatInfo{}));
-  // For all three fields, test missing, minimal and maximal values.
+  // For all three fields, test missing, min and max values.
   EXPECT_TRUE(ValidateCodecFormatInfo(fha::CodecFormatInfo{{
       .external_delay = 0,
       .turn_off_delay = zx::time::infinite().get(),

@@ -52,7 +52,7 @@ where
                 dependency_type: fpb::DependencyType::Passive,
                 dependent_level: POWER_ON,
                 requires_token: token,
-                requires_level: REQUIRED_LEVEL,
+                requires_level_by_preference: vec![REQUIRED_LEVEL],
             }];
 
             let (current, current_level_channel) = create_proxy::<fpb::CurrentLevelMarker>()?;

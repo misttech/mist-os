@@ -54,18 +54,21 @@ pub(crate) fn make_profile_service_definition(service_uuid: Uuid) -> bredr::Serv
         service_class_uuids: Some(vec![service_uuid.into()]),
         protocol_descriptor_list: Some(vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![bredr::DataElement::Uint16(bredr::PSM_AVDTP)],
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![bredr::DataElement::Uint16(bredr::PSM_AVDTP)]),
+                ..Default::default()
             },
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Avdtp,
-                params: vec![bredr::DataElement::Uint16(0x0103)], // Indicate v1.3
+                protocol: Some(bredr::ProtocolIdentifier::Avdtp),
+                params: Some(vec![bredr::DataElement::Uint16(0x0103)]), // Indicate v1.3
+                ..Default::default()
             },
         ]),
         profile_descriptors: Some(vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         }]),
         ..Default::default()
     }
@@ -164,13 +167,13 @@ fn find_endpoint_directions(service_classes: Vec<AssignedNumber>) -> HashSet<avd
     let mut directions = HashSet::new();
     if service_classes
         .iter()
-        .any(|an| an.number == bredr::ServiceClassProfileIdentifier::AudioSource as u16)
+        .any(|an| an.number == bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive())
     {
         let _ = directions.insert(avdtp::EndpointType::Source);
     }
     if service_classes
         .iter()
-        .any(|an| an.number == bredr::ServiceClassProfileIdentifier::AudioSink as u16)
+        .any(|an| an.number == bredr::ServiceClassProfileIdentifier::AudioSink.into_primitive())
     {
         let _ = directions.insert(avdtp::EndpointType::Sink);
     }
@@ -193,8 +196,14 @@ fn handle_services_found(
     let profile_names: Vec<String> = profiles
         .iter()
         .filter_map(|p| {
-            profile_descriptor_to_assigned(p)
-                .map(|a| format!("{} ({}.{})", a.name, p.major_version, p.minor_version))
+            profile_descriptor_to_assigned(p).map(|a| {
+                format!(
+                    "{} ({}.{})",
+                    a.name,
+                    p.major_version.map_or("X".to_string(), |v| v.to_string()),
+                    p.minor_version.map_or("X".to_string(), |v| v.to_string())
+                )
+            })
         })
         .collect();
     info!(%peer_id, "Found audio profile: {service_names:?}, profiles: {profile_names:?}");
@@ -260,12 +269,14 @@ fn setup_profiles(
 ) -> profile_client::Result<ProfileClient> {
     let mut service_defs = Vec::new();
     if config.source.is_some() {
-        let source_uuid = Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource as u16);
+        let source_uuid =
+            Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
         service_defs.push(make_profile_service_definition(source_uuid));
     }
 
     if config.enable_sink {
-        let sink_uuid = Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSink as u16);
+        let sink_uuid =
+            Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSink.into_primitive());
         service_defs.push(make_profile_service_definition(sink_uuid));
     }
 
@@ -532,15 +543,16 @@ mod tests {
 
         // Simulate getting the service found event.
         let attributes = vec![bredr::Attribute {
-            id: bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-            element: bredr::DataElement::Sequence(vec![Some(Box::new(
+            id: Some(bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST),
+            element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                 bredr::DataElement::Sequence(vec![
                     Some(Box::new(
                         Uuid::from(bredr::ServiceClassProfileIdentifier::AudioSource).into(),
                     )),
                     Some(Box::new(bredr::DataElement::Uint16(0x0103))), // Version 1.3
                 ]),
-            ))]),
+            ))])),
+            ..Default::default()
         }];
         handle_services_found(
             &peer_id,
@@ -607,15 +619,16 @@ mod tests {
 
         // Simulate getting the service found event.
         let attributes = vec![bredr::Attribute {
-            id: bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-            element: bredr::DataElement::Sequence(vec![Some(Box::new(
+            id: Some(bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST),
+            element: Some(bredr::DataElement::Sequence(vec![Some(Box::new(
                 bredr::DataElement::Sequence(vec![
                     Some(Box::new(
                         Uuid::from(bredr::ServiceClassProfileIdentifier::AudioSource).into(),
                     )),
                     Some(Box::new(bredr::DataElement::Uint16(0x0103))), // Version 1.3
                 ]),
-            ))]),
+            ))])),
+            ..Default::default()
         }];
         handle_services_found(
             &peer_id,
@@ -693,12 +706,12 @@ mod tests {
         assert_eq!(find_endpoint_directions(no_a2dp_attributes), HashSet::new());
 
         let sink_attribute = AssignedNumber {
-            number: bredr::ServiceClassProfileIdentifier::AudioSink as u16,
+            number: bredr::ServiceClassProfileIdentifier::AudioSink.into_primitive(),
             abbreviation: None,
             name: "AudioSink",
         };
         let source_attribute = AssignedNumber {
-            number: bredr::ServiceClassProfileIdentifier::AudioSource as u16,
+            number: bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive(),
             abbreviation: None,
             name: "AudioSource",
         };

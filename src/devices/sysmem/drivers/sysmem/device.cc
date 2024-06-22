@@ -251,36 +251,10 @@ Device::Device(zx_device_t* parent_device, Driver* parent_driver)
   loop_checker_.emplace(fit::thread_checker());
 }
 
-Device::~Device() {
-  if (loop_.GetState() != ASYNC_LOOP_RUNNABLE) {
-    // This is the normal case.
-    return;
-  }
-
-  // In unit tests, Device::Bind() may not have been run, so ensure the loop_checker_ has been moved
-  // to the loop_ thread before DdkUnbindInternal() below which expects to use the loop_ thread.
-  libsync::Completion completion;
-  postTask([this, &completion] {
-    ZX_ASSERT(loop_checker_.has_value());
-    // After this point, all operations must happen on the loop thread.
-    loop_checker_.emplace(fit::thread_checker());
-    completion.Signal();
-  });
-  completion.Wait();
-
-  // This may happen from tests that may not call DdkUnbind() first.
-  //
-  // TODO(b/332631101): Consider changing the tests to call DdkUnbind, DdkRelease, instead of just
-  // ~Device.
-  //
-  // Shouldn't be seen outside of tests:
-  LOG(ERROR, "Device::~Device() called without DdkUnbind() first (MockDdk test?)");
-  DdkUnbindInternal();
-}
-
 zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_config::Config>& config,
                                                  uint64_t* guard_bytes_out,
                                                  bool* unused_pages_guarded,
+                                                 int64_t* unused_guard_pattern_period_bytes,
                                                  zx::duration* unused_page_check_cycle_period,
                                                  bool* internal_guard_pages_out,
                                                  bool* crash_on_fail_out) {
@@ -293,25 +267,28 @@ zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_conf
     *unused_pages_guarded = true;
     *internal_guard_pages_out = false;
     *crash_on_fail_out = false;
+    *unused_guard_pattern_period_bytes = -1;
     return ZX_OK;
   }
 
   *crash_on_fail_out = config->contiguous_guard_pages_fatal();
   *internal_guard_pages_out = config->contiguous_guard_pages_internal();
   *unused_pages_guarded = config->contiguous_guard_pages_unused();
+  // if this value is <= 0 it'll be ignored and the default of 1/128 will stay in effect
+  *unused_guard_pattern_period_bytes =
+      config->contiguous_guard_pages_unused_fraction_denominator() * zx_system_get_page_size();
 
-  int64_t unused_page_check_cycle_seconds_override =
-      config->contiguous_guard_pages_unused_cycle_seconds_override();
-  if (unused_page_check_cycle_seconds_override > 0) {
+  int64_t unused_page_check_cycle_seconds = config->contiguous_guard_pages_unused_cycle_seconds();
+  if (unused_page_check_cycle_seconds > 0) {
     DRIVER_INFO("Overriding unused page check period to %ld seconds",
-                unused_page_check_cycle_seconds_override);
-    *unused_page_check_cycle_period = zx::sec(unused_page_check_cycle_seconds_override);
+                unused_page_check_cycle_seconds);
+    *unused_page_check_cycle_period = zx::sec(unused_page_check_cycle_seconds);
   }
 
-  int64_t guard_page_count_override = config->contiguous_guard_page_count_override();
-  if (guard_page_count_override > 0) {
-    DRIVER_INFO("Overriding guard page count to %ld", guard_page_count_override);
-    *guard_bytes_out = zx_system_get_page_size() * guard_page_count_override;
+  int64_t guard_page_count = config->contiguous_guard_page_count();
+  if (guard_page_count > 0) {
+    DRIVER_INFO("Overriding guard page count to %ld", guard_page_count);
+    *guard_bytes_out = zx_system_get_page_size() * guard_page_count;
   }
 
   return ZX_OK;
@@ -517,41 +494,42 @@ zx_status_t Device::Bind() {
     return pdev_client.status_value();
   }
 
-  pdev_ = fidl::SyncClient(std::move(*pdev_client));
+  pdev_.Bind(std::move(*pdev_client));
 
   int64_t protected_memory_size = kDefaultProtectedMemorySize;
   int64_t contiguous_memory_size = kDefaultContiguousMemorySize;
 
-  size_t metadata_size = 0;
-  zx_status_t status = DdkGetMetadataSize(fuchsia_hardware_sysmem::kMetadataType, &metadata_size);
-  if (status == ZX_OK) {
-    std::vector<uint8_t> raw_metadata(metadata_size);
-    size_t metadata_actual = 0;
-    status = DdkGetMetadata(fuchsia_hardware_sysmem::kMetadataType, raw_metadata.data(),
-                            raw_metadata.size(), &metadata_actual);
-    if (status == ZX_OK) {
-      ZX_ASSERT(metadata_actual == metadata_size);
-      auto unpersist_result =
-          fidl::Unpersist<fuchsia_hardware_sysmem::Metadata>(cpp20::span(raw_metadata));
-      if (unpersist_result.is_error()) {
-        DRIVER_ERROR("Failed fidl::Unpersist - status: %s",
-                     zx_status_get_string(unpersist_result.error_value().status()));
-        return unpersist_result.error_value().status();
-      }
-      auto& metadata = unpersist_result.value();
-
-      // Default is zero when field un-set.
-      pdev_device_info_vid_ = metadata.vid().has_value() ? *metadata.vid() : 0;
-      pdev_device_info_pid_ = metadata.pid().has_value() ? *metadata.pid() : 0;
-      protected_memory_size =
-          metadata.protected_memory_size().has_value() ? *metadata.protected_memory_size() : 0;
-      contiguous_memory_size =
-          metadata.contiguous_memory_size().has_value() ? *metadata.contiguous_memory_size() : 0;
+  fidl::WireResult raw_metadata = pdev_->GetMetadata(fuchsia_hardware_sysmem::kMetadataType);
+  if (!raw_metadata.ok()) {
+    DRIVER_ERROR("Failed to send GetMetadata request: %s", raw_metadata.status_string());
+    return raw_metadata.status();
+  }
+  if (raw_metadata->is_error()) {
+    if (raw_metadata->error_value() != ZX_ERR_NOT_FOUND) {
+      return raw_metadata->error_value();
     }
+    DRIVER_DEBUG("Metadata not found.");
+  } else {
+    auto unpersist_result =
+        fidl::Unpersist<fuchsia_hardware_sysmem::Metadata>(raw_metadata->value()->metadata.get());
+    if (unpersist_result.is_error()) {
+      DRIVER_ERROR("Failed fidl::Unpersist - status: %s",
+                   zx_status_get_string(unpersist_result.error_value().status()));
+      return unpersist_result.error_value().status();
+    }
+    auto& metadata = unpersist_result.value();
+
+    // Default is zero when field un-set.
+    pdev_device_info_vid_ = metadata.vid().has_value() ? *metadata.vid() : 0;
+    pdev_device_info_pid_ = metadata.pid().has_value() ? *metadata.pid() : 0;
+    protected_memory_size =
+        metadata.protected_memory_size().has_value() ? *metadata.protected_memory_size() : 0;
+    contiguous_memory_size =
+        metadata.contiguous_memory_size().has_value() ? *metadata.contiguous_memory_size() : 0;
   }
 
   zx_handle_t structured_config_vmo;
-  status = device_get_config_vmo(parent_, &structured_config_vmo);
+  zx_status_t status = device_get_config_vmo(parent_, &structured_config_vmo);
   if (status != ZX_OK) {
     DRIVER_ERROR("Failed to get config vmo: %s", zx_status_get_string(status));
     return status;
@@ -561,37 +539,57 @@ zx_status_t Device::Bind() {
     DRIVER_DEBUG("Skipping config: config vmo handle does not exist");
   } else {
     config.emplace(sysmem_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo)));
-    if (config->protected_memory_size_override() >= 0) {
-      protected_memory_size = config->protected_memory_size_override();
+    if (config->contiguous_memory_size() >= 0) {
+      contiguous_memory_size = config->contiguous_memory_size();
+    } else if (config->contiguous_memory_size_percent() >= 0 &&
+               config->contiguous_memory_size_percent() <= 99) {
+      // the negation is un-done below
+      contiguous_memory_size = -config->contiguous_memory_size_percent();
     }
-    if (config->protected_memory_size_override() >= 0) {
-      contiguous_memory_size = config->protected_memory_size_override();
+
+    // TODO(b/322009732): remove
+    if (config->deprecated_contiguous_memory_size_override() >= 0) {
+      contiguous_memory_size = config->deprecated_contiguous_memory_size_override();
     }
+
+    if (config->protected_memory_size() >= 0) {
+      protected_memory_size = config->protected_memory_size();
+    } else if (config->protected_memory_size_percent() >= 0 &&
+               config->protected_memory_size_percent() <= 99) {
+      // the negation is un-done below
+      protected_memory_size = -config->protected_memory_size_percent();
+    }
+
+    // TODO(b/322009732): remove
+    if (config->deprecated_protected_memory_size_override() >= 0) {
+      protected_memory_size = config->deprecated_protected_memory_size_override();
+    }
+
     protected_ranges_disable_dynamic_ = config->protected_ranges_disable_dynamic();
   }
 
   // Negative values are interpreted as a percentage of physical RAM.
-  if (protected_memory_size < 0) {
-    protected_memory_size = -protected_memory_size;
-    ZX_DEBUG_ASSERT(protected_memory_size >= 1 && protected_memory_size <= 99);
-    protected_memory_size = zx_system_get_physmem() * protected_memory_size / 100;
-  }
   if (contiguous_memory_size < 0) {
     contiguous_memory_size = -contiguous_memory_size;
     ZX_DEBUG_ASSERT(contiguous_memory_size >= 1 && contiguous_memory_size <= 99);
     contiguous_memory_size = zx_system_get_physmem() * contiguous_memory_size / 100;
   }
+  if (protected_memory_size < 0) {
+    protected_memory_size = -protected_memory_size;
+    ZX_DEBUG_ASSERT(protected_memory_size >= 1 && protected_memory_size <= 99);
+    protected_memory_size = zx_system_get_physmem() * protected_memory_size / 100;
+  }
 
   constexpr int64_t kMinProtectedAlignment = 64 * 1024;
   assert(kMinProtectedAlignment % zx_system_get_page_size() == 0);
-  protected_memory_size = AlignUp(protected_memory_size, kMinProtectedAlignment);
   contiguous_memory_size =
       AlignUp(contiguous_memory_size, safe_cast<int64_t>(zx_system_get_page_size()));
+  protected_memory_size = AlignUp(protected_memory_size, kMinProtectedAlignment);
 
   auto heap = sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0);
   allocators_[std::move(heap)] = std::make_unique<SystemRamMemoryAllocator>(this);
 
-  auto result = pdev_.wire()->GetBtiById(0);
+  auto result = pdev_->GetBtiById(0);
   if (!result.ok()) {
     DRIVER_ERROR("Transport error for PDev::GetBtiById() - status: %s", result.status_string());
     return result.status();
@@ -627,13 +625,15 @@ zx_status_t Device::Bind() {
     }
     uint64_t guard_region_size;
     bool unused_pages_guarded;
+    int64_t unused_guard_pattern_period_bytes;
     zx::duration unused_page_check_cycle_period;
     bool internal_guard_regions;
     bool crash_on_guard;
-    if (GetContiguousGuardParameters(config, &guard_region_size, &unused_pages_guarded,
-                                     &unused_page_check_cycle_period, &internal_guard_regions,
-                                     &crash_on_guard) == ZX_OK) {
+    if (GetContiguousGuardParameters(
+            config, &guard_region_size, &unused_pages_guarded, &unused_guard_pattern_period_bytes,
+            &unused_page_check_cycle_period, &internal_guard_regions, &crash_on_guard) == ZX_OK) {
       pooled_allocator->InitGuardRegion(guard_region_size, unused_pages_guarded,
+                                        unused_guard_pattern_period_bytes,
                                         unused_page_check_cycle_period, internal_guard_regions,
                                         crash_on_guard, loop_.dispatcher());
     }
@@ -731,17 +731,19 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Device::SetupOutgoingServiceD
                 .sysmem = bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
                 .allocator_v1 =
                     [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
-                      zx_status_t status = CommonSysmemConnectV1(request.TakeChannel());
-                      if (status != ZX_OK) {
-                        LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
-                      }
+                      // The Allocator is channel-owned / self-owned.
+                      postTask([this, allocator_request = request.TakeChannel()]() mutable {
+                        // The Allocator is channel-owned / self-owned.
+                        Allocator::CreateChannelOwnedV1(std::move(allocator_request), this);
+                      });
                     },
                 .allocator_v2 =
                     [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
-                      zx_status_t status = CommonSysmemConnectV2(request.TakeChannel());
-                      if (status != ZX_OK) {
-                        LOG(INFO, "Direct connect to fuchsia_sysmem2::Allocator() failed");
-                      }
+                      // The Allocator is channel-owned / self-owned.
+                      postTask([this, allocator_request = request.TakeChannel()]() mutable {
+                        // The Allocator is channel-owned / self-owned.
+                        Allocator::CreateChannelOwnedV2(std::move(allocator_request), this);
+                      });
                     },
             }));
 
@@ -805,25 +807,7 @@ void Device::SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
   });
 }
 
-zx_status_t Device::CommonSysmemConnectV1(zx::channel allocator_request) {
-  // The Allocator is channel-owned / self-owned.
-  postTask([this, allocator_request = std::move(allocator_request)]() mutable {
-    // The Allocator is channel-owned / self-owned.
-    Allocator::CreateChannelOwnedV1(std::move(allocator_request), this);
-  });
-  return ZX_OK;
-}
-
-zx_status_t Device::CommonSysmemConnectV2(zx::channel allocator_request) {
-  // The Allocator is channel-owned / self-owned.
-  postTask([this, allocator_request = std::move(allocator_request)]() mutable {
-    // The Allocator is channel-owned / self-owned.
-    Allocator::CreateChannelOwnedV2(std::move(allocator_request), this);
-  });
-  return ZX_OK;
-}
-
-zx_status_t Device::CommonSysmemRegisterHeap(
+zx_status_t Device::RegisterHeapInternal(
     fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection) {
   class EventHandler : public fidl::WireAsyncEventHandler<fuchsia_hardware_sysmem::Heap> {
    public:
@@ -883,7 +867,7 @@ zx_status_t Device::CommonSysmemRegisterHeap(
   return ZX_OK;
 }
 
-zx_status_t Device::CommonSysmemRegisterSecureMem(
+zx_status_t Device::RegisterSecureMemInternal(
     fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection) {
   LOG(DEBUG, "sysmem RegisterSecureMem begin");
 
@@ -1090,7 +1074,7 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(
 
 // This call allows us to tell the difference between expected vs. unexpected close of the tee_
 // channel.
-zx_status_t Device::CommonSysmemUnregisterSecureMem() {
+zx_status_t Device::UnregisterSecureMemInternal() {
   // By this point, the aml-securemem driver's suspend(mexec) has already prepared for mexec.
   //
   // In this path, the server end of the channel hasn't closed yet, but will be closed shortly after
@@ -1289,8 +1273,7 @@ void Device::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::S
   }
   auto& v2_heap_type = v2_heap_type_result.value();
   auto heap = sysmem::MakeHeap(std::move(v2_heap_type), 0);
-  zx_status_t status =
-      CommonSysmemRegisterHeap(std::move(heap), std::move(request.heap_connection()));
+  zx_status_t status = RegisterHeapInternal(std::move(heap), std::move(request.heap_connection()));
   if (status != ZX_OK) {
     LOG(WARNING, "CommonSysmemRegisterHeap failed");
     completer.Close(status);
@@ -1300,7 +1283,7 @@ void Device::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::S
 
 void Device::RegisterSecureMem(RegisterSecureMemRequest& request,
                                RegisterSecureMemCompleter::Sync& completer) {
-  zx_status_t status = CommonSysmemRegisterSecureMem(std::move(request.secure_mem_connection()));
+  zx_status_t status = RegisterSecureMemInternal(std::move(request.secure_mem_connection()));
   if (status != ZX_OK) {
     completer.Close(status);
     return;
@@ -1308,7 +1291,7 @@ void Device::RegisterSecureMem(RegisterSecureMemRequest& request,
 }
 
 void Device::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) {
-  zx_status_t status = CommonSysmemUnregisterSecureMem();
+  zx_status_t status = UnregisterSecureMemInternal();
   if (status == ZX_OK) {
     completer.Reply(fit::ok());
   } else {

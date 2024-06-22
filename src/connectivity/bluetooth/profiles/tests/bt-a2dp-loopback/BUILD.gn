@@ -34,7 +34,7 @@ rustc_test("bin") {
   source_root = "src/main.rs"
 
   deps = [
-    "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
+    "//sdk/fidl/fuchsia.bluetooth.bredr.test:fuchsia.bluetooth.bredr.test_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",

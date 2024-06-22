@@ -5,6 +5,7 @@
 #include "examples/drivers/simple/dfv1/simple_driver.h"
 
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
 
 namespace simple {
 

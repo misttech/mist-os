@@ -24,5 +24,19 @@
 {{- end }}
 #define ZX_SYS_COUNT {{ $count }}
 
+#ifndef __ASSEMBLER__
+
+// Indexed by syscall number.
+inline constexpr const char* kSyscallNames[] = {
+{{- range . }}
+{{- if not .IsVdsoCall }}
+    "zx_{{ LowerCaseWithUnderscores . }}",
+{{- end }}
+{{- end }}
+};
+
+#endif  // #ifndef __ASSEMBLER__
+
+
 #endif  // {{ $guard }}
 {{ end }}

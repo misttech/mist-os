@@ -56,8 +56,9 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
   async_dispatcher_t* dispatcher() { return core_->dispatcher(); }
 
  private:
-  static constexpr uint64_t kTopologyId = 1;
-  static constexpr uint64_t kHeadphoneGainPeId = 1;  // Processing element.
+  static constexpr fuchsia_hardware_audio::wire::TopologyId kTopologyId = 1;
+  static constexpr fuchsia_hardware_audio::wire::ElementId kHeadphoneGainPeId =
+      1;  // Processing element.
 
   static constexpr float kMinHeadphoneGainDb = -57.0f;
   static constexpr float kMaxHeadphoneGainDb = 6.0f;

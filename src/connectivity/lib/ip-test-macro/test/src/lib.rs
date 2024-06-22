@@ -17,7 +17,6 @@ pub(crate) mod net_types {
 
         /// Helper trait for defining an associated type on `Ip`.
         pub(crate) trait IpAddress {
-            const VERSION: usize;
             fn new() -> Self;
         }
 
@@ -40,7 +39,6 @@ pub(crate) mod net_types {
         /// Helper to implement `Ip` for `Ipv4`.
         pub(crate) struct Ipv4Addr;
         impl IpAddress for Ipv4Addr {
-            const VERSION: usize = 4;
             fn new() -> Self {
                 Self
             }
@@ -49,7 +47,6 @@ pub(crate) mod net_types {
         /// Helper to implement `Ip` for `Ipv6`.
         pub(crate) struct Ipv6Addr;
         impl IpAddress for Ipv6Addr {
-            const VERSION: usize = 6;
             fn new() -> Self {
                 Self
             }

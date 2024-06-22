@@ -257,30 +257,7 @@ zx_status_t AmlUsbPhy::Init() {
 // PHY tuning based on connection state
 void AmlUsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
                                      ConnectStatusChangedCompleter::Sync& completer) {
-  if (dwc2_connected_ == request.connected()) {
-    completer.Reply(fit::ok());
-    return;
-  }
-
-  for (auto& phy : usbphy2_) {
-    if (phy.phy_mode() != UsbMode::Peripheral) {
-      continue;
-    }
-    auto* mmio = &phy.mmio();
-
-    if (request.connected()) {
-      PHY2_R14::Get().FromValue(0).set_i_rpu_sw2_en(3).set_fs(1).set_ls(1).set_hs_out_en(1).WriteTo(
-          mmio);
-      PHY2_R13::Get()
-          .FromValue(0)
-          .set_Update_PMA_signals(1)
-          .set_minimum_count_for_sync_detection(7)
-          .WriteTo(mmio);
-    } else {
-      phy.InitPll(type_, needs_hack_);
-    }
-  }
-
+  // Handled by UTMI bus
   dwc2_connected_ = request.connected();
   completer.Reply(fit::ok());
 }

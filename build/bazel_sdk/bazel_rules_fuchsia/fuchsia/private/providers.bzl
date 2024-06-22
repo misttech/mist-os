@@ -116,6 +116,14 @@ FuchsiaUnitTestComponentInfo = provider(
     },
 )
 
+FuchsiaComponentManifestInfo = provider(
+    "Contains information about a Fuchsia component manifest",
+    fields = {
+        "component_name": "The name of the component",
+        "config_package_path": "The path to the generated cvf file",
+    },
+)
+
 FuchsiaComponentManifestShardInfo = provider(
     "Contains information about a Fuchsia component manifest shard",
     fields = {
@@ -265,26 +273,27 @@ FuchsiaRunnableInfo = provider(
 )
 
 FuchsiaDriverToolInfo = provider(
-    doc = "A provider which contains information about a driver tool",
+    doc = "A provider which contains information about a driver tool.",
     fields = {
         "tool_path": "A tool's binary package-relative path (e.g. 'bin/tool').",
     },
 )
 
 FuchsiaProductBundleInfo = provider(
-    doc = "Product Bundle Info",
+    doc = "Product Bundle Info.",
     fields = {
         "product_bundle": "The full URL for the product bundle. Can be empty.",
         "is_remote": "Whether the product bundle is a local path or a remote url.",
         "product_name": "The name of the product to be used if product_bundle is empty.",
         "product_version": "The version of the product to use.",
-        "repository": "The name of the repository to host extra packages in the product bundle",
+        "repository": "The name of the repository to host extra packages in the product bundle.",
     },
 )
 
-FuchsiaStructuredConfigCVFInfo = provider(
+FuchsiaStructuredConfigInfo = provider(
     doc = "A provider which contains the generated cvf for structured configs.",
     fields = {
-        "cvf": "The generated cvf",
+        "cvf_source": "The generated cvf",
+        "cvf_dest": "The location where the cvf is stored within a fuchsia package archive.",
     },
 )

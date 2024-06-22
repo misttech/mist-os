@@ -91,7 +91,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     /// The way "unknown" policy decisions should be handed according to the underlying binary
     /// policy.
-    pub fn handle_unknown(&self) -> &HandleUnknown {
+    pub fn handle_unknown(&self) -> HandleUnknown {
         self.config.handle_unknown()
     }
 
@@ -204,7 +204,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     ) -> Result<AccessVector, QueryError> {
         let target_class = find_class_by_name(self.classes(), target_class_name)
             .ok_or_else(|| QueryError::UnknownClass { class_name: target_class_name.to_owned() })?;
-        self.compute_explicitly_allowed(source_type_name, target_type_name, target_class)
+        Ok(self.compute_explicitly_allowed(source_type_name, target_type_name, target_class))
     }
 
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
@@ -215,7 +215,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         source_type: TypeId,
         target_type: TypeId,
         target_class: &Class<PS>,
-    ) -> Result<AccessVector, QueryError> {
+    ) -> AccessVector {
         let target_class_id = target_class.id();
 
         let mut computed_access_vector = AccessVector::NONE;
@@ -259,8 +259,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             }
         }
 
-        // Failed to find any explicit-allow access vector for this source, target, class query.
-        Ok(computed_access_vector)
+        computed_access_vector
     }
 
     /// Returns the policy entry for the specified initial Security Context.

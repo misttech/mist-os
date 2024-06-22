@@ -123,6 +123,7 @@ where
 
     pub(crate) async fn on_netstack_added_address(&self, subnet: Subnet) -> Result<(), Error> {
         debug!("Netstack added address: {:?}", subnet);
+        let subnet_addr = subnet.addr;
 
         let should_skip = {
             let driver_state = self.driver_state.lock();
@@ -137,11 +138,6 @@ where
         if !should_skip {
             let netif_addr = ot::NetifAddress::new(subnet.addr, subnet.prefix_len);
             let driver_state = self.driver_state.lock();
-            let subnet_addr = subnet.addr;
-
-            if let Some(srp_discovery_proxy) = &driver_state.srp_discovery_proxy {
-                srp_discovery_proxy.add_local_address(subnet_addr);
-            }
 
             driver_state
                 .ot_instance
@@ -156,6 +152,18 @@ where
                     self.net_if.remove_address_from_spinel_subnet(&subnet).ignore_not_found()
                 })
                 .context("on_netstack_added_address")?;
+        }
+
+        let driver_state = self.driver_state.lock();
+        if let Some(srp_discovery_proxy) = &driver_state.srp_discovery_proxy {
+            if driver_state
+                .ot_instance
+                .ip6_get_unicast_addresses()
+                .find(|entry| *entry.addr() == subnet_addr)
+                .is_some()
+            {
+                srp_discovery_proxy.add_local_address(subnet_addr);
+            }
         }
 
         Ok(())

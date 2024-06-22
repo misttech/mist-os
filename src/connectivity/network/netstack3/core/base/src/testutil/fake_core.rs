@@ -11,7 +11,7 @@ use derivative::Derivative;
 use packet::{BufferMut, Serializer};
 
 use crate::testutil::{FakeFrameCtx, WithFakeFrameContext};
-use crate::{ContextProvider, CounterContext, SendableFrameMeta};
+use crate::{ContextProvider, CounterContext, SendFrameError, SendableFrameMeta};
 
 /// A test helper used to provide an implementation of a core context.
 #[derive(Derivative)]
@@ -47,7 +47,7 @@ impl<BC, S, Meta, DeviceId> SendableFrameMeta<FakeCoreCtx<S, Meta, DeviceId>, BC
         core_ctx: &mut FakeCoreCtx<S, Meta, DeviceId>,
         bindings_ctx: &mut BC,
         frame: SS,
-    ) -> Result<(), SS>
+    ) -> Result<(), SendFrameError<SS>>
     where
         SS: Serializer,
         SS::Buffer: BufferMut,

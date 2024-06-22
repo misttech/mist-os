@@ -58,6 +58,7 @@ async fn connect_to_suspender() -> Result<fhsuspend::SuspenderProxy> {
 #[fuchsia::main]
 async fn main() -> Result<()> {
     tracing::info!("started");
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
 
     let inspector = fuchsia_inspect::component::inspector();
     let _inspect_server_task =

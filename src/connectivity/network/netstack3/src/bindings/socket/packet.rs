@@ -23,7 +23,7 @@ use netstack3_core::device::{
 use netstack3_core::device_socket::{
     DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
     EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceivedFrame,
-    SendFrameError, SentFrame, SocketId, SocketInfo, TargetDevice,
+    SendFrameErrorReason, SentFrame, SocketId, SocketInfo, TargetDevice,
 };
 use netstack3_core::sync::Mutex;
 use packet::Buf;
@@ -420,7 +420,7 @@ impl<'a> RequestHandler<'a> {
                 )
             }
         };
-        result.map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
+        result.map_err(|e| e.into_errno())
     }
 
     fn handle_request(
@@ -711,10 +711,11 @@ impl RecvMsgParams {
     }
 }
 
-impl IntoErrno for SendFrameError {
+impl IntoErrno for SendFrameErrorReason {
     fn into_errno(self) -> fposix::Errno {
         match self {
-            SendFrameError::SendFailed => fposix::Errno::Enobufs,
+            SendFrameErrorReason::Alloc | SendFrameErrorReason::QueueFull => fposix::Errno::Enobufs,
+            SendFrameErrorReason::SizeConstraintsViolation => fposix::Errno::Einval,
         }
     }
 }

@@ -82,7 +82,7 @@ async fn main() -> Result<(), Error> {
 
     // Generate link-time references to the symbols that we want to expose to
     // the TA so that the definitions will be retained by the linker.
-    let _ = std::hint::black_box(tee_internal_impl::binding_stubs::exposed_c_entry_points());
+    let _ = std::hint::black_box(api_impl::binding_stubs::exposed_c_entry_points());
 
     Ok(())
 }

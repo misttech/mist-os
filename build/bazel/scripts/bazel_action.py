@@ -881,6 +881,12 @@ def main() -> int:
         )
     # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
 
+    jobs = None
+    if "--config=remote" in args.extra_bazel_args:
+        cpus = os.cpu_count()
+        if cpus:
+            jobs = 10 * cpus
+
     def run_bazel_query(
         query_type: str, query_args: List[str], ignore_errors: bool
     ) -> "subprocess.CompletedProcess[str]":
@@ -1049,6 +1055,9 @@ def main() -> int:
     if args.fuchsia_package_copy_debug_symbols:
         # Ensure the build_id directories are produced.
         cmd += ["--output_groups=+build_id_dirs"]
+
+    if jobs:
+        cmd += [f"--jobs={jobs}"]
 
     if _DEBUG:
         debug("BUILD_CMD: " + " ".join(shlex.quote(c) for c in cmd))

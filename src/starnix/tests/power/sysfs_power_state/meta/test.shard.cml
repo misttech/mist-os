@@ -1,0 +1,39 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
+        "//src/starnix/tests/starnix_test.shard.cml",
+    ],
+    program: {
+        uid: "0",
+        test_type: "gtest",
+    },
+    children: [
+        {
+            name: "fake-suspend",
+            url: "fake-suspend-pkg#meta/fake-suspend.cm",
+        },
+    ],
+    offer: [
+        {
+            service: "fuchsia.hardware.suspend.SuspendService",
+            from: "#fake-suspend",
+            to: "#system-activity-governor",
+        },
+        {
+            protocol: "test.suspendcontrol.Device",
+            from: "#fake-suspend",
+            to: "#fake-suspend-controller",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: [
+                "#fake-suspend",
+                "#fake-suspend-controller",
+            ],
+        },
+    ],
+}

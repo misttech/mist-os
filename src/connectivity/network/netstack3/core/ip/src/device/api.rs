@@ -12,11 +12,11 @@ use net_types::ip::{
     AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpVersionMarker, Ipv4,
     Ipv4Addr, Ipv6, Ipv6Addr,
 };
-use net_types::SpecifiedAddr;
+use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::{
-    AnyDevice, ContextPair, DeviceIdContext, EventContext as _, ExistsError, Inspector, Instant,
-    InstantBindingsTypes, NotFoundError, ReferenceNotifiers, RemoveResourceResult,
-    RemoveResourceResultWithContext,
+    AnyDevice, ContextPair, DeviceIdContext, DeviceIdentifier as _, EventContext as _, ExistsError,
+    Inspector, Instant, InstantBindingsTypes, NotFoundError, ReferenceNotifiers,
+    RemoveResourceResult, RemoveResourceResultWithContext,
 };
 use thiserror::Error;
 
@@ -89,6 +89,9 @@ where
         let addr_subnet = addr_subnet
             .replace_witness::<I::AssignedWitness>()
             .ok_or(AddIpAddrSubnetError::InvalidAddr)?;
+        if !device.is_loopback() && I::LOOPBACK_SUBNET.contains(&addr_subnet.addr().get()) {
+            return Err(AddIpAddrSubnetError::InvalidAddr);
+        }
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_ip_device_configuration(device, |config, mut core_ctx| {
             device::add_ip_addr_subnet_with_config(

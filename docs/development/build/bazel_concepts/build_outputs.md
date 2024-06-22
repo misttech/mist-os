@@ -12,7 +12,6 @@ _parallel_ directory to store all outputs, called the `user_output_root`, which
 is by default:
 
 - `~/.cache/bazel/_bazel_$USER` on Linux.
-- `/private/var/tmp/_bazel_$USER` on macOS.
 - `%HOME%\_bazel_%USERNAME%` on Windows.
 
 For each workspace directory where `bazel` is run, a separate directory, named
@@ -156,7 +155,7 @@ Several things are actually stored under the `output_base`:
 The `execroot` is used to run Bazel commands that generate build artifacts,
 but how this is done depends on whether sandboxing is enabled for a specific action.
 
-- On Linux and MacOS, sandboxing is enabled by default for all actions.
+- On Linux, sandboxing is enabled by default for all actions.
   There is no sandboxing support on Windows (as of Bazel 7).
 
 - A Bazel action can disable sandboxing intentionally by using the

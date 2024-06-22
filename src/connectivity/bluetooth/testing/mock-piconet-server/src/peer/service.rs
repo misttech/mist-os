@@ -176,6 +176,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::profile::build_l2cap_descriptor;
     use crate::profile::tests::a2dp_service_definition;
+    use fuchsia_bluetooth::profile::ProtocolDescriptor;
 
     fn avrcp_service_record(psm: Psm) -> ServiceRecord {
         let service_ids = vec![
@@ -185,7 +186,10 @@ pub(crate) mod tests {
         .into_iter()
         .collect();
 
-        let protocol = build_l2cap_descriptor(psm).iter().map(Into::into).collect();
+        let protocol = build_l2cap_descriptor(psm)
+            .iter()
+            .map(|p| ProtocolDescriptor::try_from(p).unwrap())
+            .collect();
 
         ServiceRecord::new(service_ids, protocol, HashSet::new(), vec![], vec![])
     }

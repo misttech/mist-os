@@ -134,14 +134,14 @@ async fn piconet_member_discovers_di_component_advertisement() {
     let attributes = expect_di_service_found(&mut results_requests, di_component.peer_id()).await;
 
     // All the mandatory DI attributes should exist (6).
-    assert_eq!(attributes.iter().filter(|a| a.id == 0x200).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == 0x201).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == 0x202).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == 0x203).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == 0x204).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == 0x205).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x200)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x201)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x202)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x203)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x204)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x205)).count(), 1);
     // We do expect the (optional) documentation attribute.
-    assert_eq!(attributes.iter().filter(|a| a.id == 0x000A).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x000A)).count(), 1);
 
     // TODO(https://fxbug.dev/42169240): Add a service description and verify the attribute once the MPS
     // supports parsing the `information` field of a bredr.ServiceDefinition.

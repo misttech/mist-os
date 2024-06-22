@@ -915,6 +915,9 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
                 IpSockSendError::Mtu,
             )) => fposix::Errno::Emsgsize,
             core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Send(
+                IpSockSendError::IllegalLoopbackAddress,
+            )) => fposix::Errno::Einval,
+            core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Send(
                 IpSockSendError::Unroutable(err),
             )) => err.into_errno(),
             core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Create(err)) => {

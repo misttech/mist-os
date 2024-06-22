@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use selinux_policy::error::NewSecurityContextError;
 use selinux_policy::metadata::HandleUnknown;
 use selinux_policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
 
@@ -34,9 +33,9 @@ enum LocalHandleUnknown {
 impl PartialEq<HandleUnknown> for LocalHandleUnknown {
     fn eq(&self, other: &HandleUnknown) -> bool {
         match self {
-            LocalHandleUnknown::Deny => other == &HandleUnknown::Deny,
-            LocalHandleUnknown::Reject => other == &HandleUnknown::Reject,
-            LocalHandleUnknown::Allow => other == &HandleUnknown::Allow,
+            LocalHandleUnknown::Deny => *other == HandleUnknown::Deny,
+            LocalHandleUnknown::Reject => *other == HandleUnknown::Reject,
+            LocalHandleUnknown::Allow => *other == HandleUnknown::Allow,
         }
     }
 }
@@ -76,7 +75,7 @@ fn known_policies() {
             .expect("validate policy");
 
         assert_eq!(expectations.expected_policy_version, policy.policy_version());
-        assert_eq!(&expectations.expected_handle_unknown, policy.handle_unknown());
+        assert_eq!(expectations.expected_handle_unknown, policy.handle_unknown());
 
         // Returned policy bytes must be identical to input policy bytes.
         assert_eq!(policy_bytes, returned_policy_bytes);
@@ -87,7 +86,7 @@ fn known_policies() {
         let policy = policy.validate().expect("validate policy");
 
         assert_eq!(expectations.expected_policy_version, policy.policy_version());
-        assert_eq!(&expectations.expected_handle_unknown, policy.handle_unknown());
+        assert_eq!(expectations.expected_handle_unknown, policy.handle_unknown());
     }
 }
 
@@ -433,7 +432,7 @@ fn new_security_context_role_transition() {
 }
 
 #[test]
-// TODO(http://b/334968228): check role allowed separate from SID calculation.
+// TODO(http://b/334968228): Determine whether allow-role-transition check belongs in `new_file_security_context()`, or in the calling hooks, or `PermissionCheck::has_permission()`.
 #[ignore]
 fn new_file_security_context_role_transition_not_allowed() {
     let policy_path = format!(
@@ -452,18 +451,10 @@ fn new_file_security_context_role_transition_not_allowed() {
         .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
         .expect("valid target security context");
 
-    let actual =
-        policy.new_file_security_context(&source, &target, &FileClass::File).err().expect("error");
+    let actual = policy.new_file_security_context(&source, &target, &FileClass::File);
 
-    assert_eq!(
-        NewSecurityContextError::RoleTransitionNotAllowed {
-            source_security_context: source,
-            target_security_context: target,
-            source_role: "source_r".to_string(),
-            new_role: "transition_r".to_string(),
-        },
-        actual
-    );
+    // TODO(http://b/334968228): Update expectation once role validation is implemented.
+    assert!(actual.is_err());
 }
 
 #[test]

@@ -79,7 +79,9 @@ type ChannelParameters = table {
 
 /// A channel opened to a peer.
 type Channel = resource table {
+    /// Deprecated.
     /// Socket interface for sending/receiving SDUs on the channel.
+    /// The channel will be closed if both this socket and the Connection are closed.
     /// Always present.
     1: socket zx.Handle:SOCKET;
     /// Channel mode accepted by the peer.
@@ -100,6 +102,9 @@ type Channel = resource table {
     /// Audio offload extension. See `AudioOffloadExt`.
     /// Present only if supported.
     7: ext_audio_offload client_end:AudioOffloadExt;
+    /// Protocol for sending/receiving SDUs on the channel.
+    /// If present, closing this and `socket` will close the channel.
+    8: connection client_end:Connection;
 };
 
 /// A2DP packet priority used in `AudioDirectionExt`. `NORMAL` should be used whenever audio is not
@@ -131,6 +136,26 @@ open protocol L2capParametersExt {
     }) -> (struct {
         new ChannelParameters;
     });
+};
+
+type Packet = struct {
+    packet vector<byte>:MAX;
+};
+
+/// Protocol for sending/receiving SDUs on a channel. This protocol also serves as a token for
+/// keeping the connection and channel open. Closing the protocol and the socket (in `Channel`) will
+/// close the underlying channel.
+open protocol Connection {
+    /// More than one Send can be pending simultaneously.
+    /// Prefer to limit the number of pending calls to avoid overflow.
+    /// A maximum of 10 pending calls is suggested.
+    flexible Send(Packet) -> ();
+
+    /// More than one packet event can be sent before acknowledged. Each packet must be
+    /// acknowledged with `AckReceive`. Servers should limit the number of pending acknowledgements
+    /// to avoid channel overflow. A maximum of 10 unacked packets is recommended.
+    flexible -> OnReceive(Packet);
+    flexible AckReceive();
 };
 
 type AudioSbcSupport = table {};

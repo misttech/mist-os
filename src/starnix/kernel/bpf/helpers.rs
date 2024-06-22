@@ -7,11 +7,20 @@ use crate::bpf::program::ProgramType;
 use crate::task::CurrentTask;
 use ebpf::{
     new_bpf_type_identifier, BpfValue, EbpfHelper, EpbfRunContext, FieldMapping, FieldType,
-    FunctionSignature, Type,
+    FunctionSignature, MemoryId, MemoryParameterSize, Type,
 };
 use linux_uapi::{
-    __sk_buff, bpf_flow_keys, bpf_func_id_BPF_FUNC_map_delete_elem,
-    bpf_func_id_BPF_FUNC_map_lookup_elem, bpf_func_id_BPF_FUNC_map_update_elem, bpf_sock,
+    __sk_buff, bpf_flow_keys, bpf_func_id_BPF_FUNC_csum_update,
+    bpf_func_id_BPF_FUNC_get_current_uid_gid, bpf_func_id_BPF_FUNC_get_socket_cookie,
+    bpf_func_id_BPF_FUNC_get_socket_uid, bpf_func_id_BPF_FUNC_ktime_get_boot_ns,
+    bpf_func_id_BPF_FUNC_ktime_get_ns, bpf_func_id_BPF_FUNC_l3_csum_replace,
+    bpf_func_id_BPF_FUNC_l4_csum_replace, bpf_func_id_BPF_FUNC_map_delete_elem,
+    bpf_func_id_BPF_FUNC_map_lookup_elem, bpf_func_id_BPF_FUNC_map_update_elem,
+    bpf_func_id_BPF_FUNC_probe_read_str, bpf_func_id_BPF_FUNC_redirect,
+    bpf_func_id_BPF_FUNC_ringbuf_reserve, bpf_func_id_BPF_FUNC_ringbuf_submit,
+    bpf_func_id_BPF_FUNC_skb_adjust_room, bpf_func_id_BPF_FUNC_skb_change_head,
+    bpf_func_id_BPF_FUNC_skb_change_proto, bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
+    bpf_func_id_BPF_FUNC_skb_pull_data, bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_sock,
     bpf_sock_addr, bpf_user_pt_regs_t, uref, xdp_md,
 };
 use once_cell::sync::Lazy;
@@ -22,7 +31,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 pub struct HelperFunctionContext<'a> {
     pub locked: &'a mut Locked<'a, BpfHelperOps>,
-    pub _current_task: &'a CurrentTask,
+    pub current_task: &'a CurrentTask,
 }
 
 pub enum HelperFunctionContextMarker {}
@@ -83,7 +92,262 @@ fn bpf_map_delete_elem(
     u64::MAX.into()
 }
 
+const KTIME_GET_NS_NAME: &'static str = "ktime_get_ns";
+
+fn bpf_ktime_get_ns(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_ktime_get_ns");
+    42.into()
+}
+
+const GET_SOCKET_UID_NAME: &'static str = "get_socket_uid";
+
+fn bpf_get_socket_uid(
+    _context: &mut HelperFunctionContext<'_>,
+    _sk_buf: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_get_socket_uid");
+    0.into()
+}
+
+const GET_CURRENT_UID_GID_NAME: &'static str = "get_current_uid_gid";
+
+fn bpf_get_current_uid_gid(
+    context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    let creds = context.current_task.creds();
+    let uid = creds.uid as u64;
+    let gid = creds.gid as u64;
+    BpfValue::from(gid << 32 | uid)
+}
+
+const SKB_PULL_DATA_NAME: &'static str = "skb_pull_data";
+
+fn bpf_skb_pull_data(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_skb_pull_data");
+    0.into()
+}
+
+const RINGBUF_RESERVE_NAME: &'static str = "ringbuf_reserve";
+
+fn bpf_ringbuf_reserve(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_ringbuf_reserve");
+    0.into()
+}
+
+const RINGBUF_SUBMIT_NAME: &'static str = "ringbuf_submit";
+
+fn bpf_ringbuf_submit(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_ringbuf_submit");
+    0.into()
+}
+
+const SKB_CHANGE_PROTO_NAME: &'static str = "skb_change_proto";
+
+fn bpf_skb_change_proto(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_skb_change_proto");
+    0.into()
+}
+
+const CSUM_UPDATE_NAME: &'static str = "csum_update";
+
+fn bpf_csum_update(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_csum_update");
+    0.into()
+}
+
+const PROBE_READ_STR_NAME: &'static str = "probe_read_str";
+
+fn bpf_probe_read_str(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_probe_read_str");
+    0.into()
+}
+
+const GET_SOCKET_COOKIE_NAME: &'static str = "get_socket_cookie";
+
+fn bpf_get_socket_cookie(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_get_socket_cookie");
+    0.into()
+}
+
+const REDIRECT_NAME: &'static str = "redirect";
+
+fn bpf_redirect(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_redirect");
+    0.into()
+}
+
+const SKB_ADJUST_ROOM_NAME: &'static str = "skb_adjust_room";
+
+fn bpf_skb_adjust_room(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_skb_adjust_room");
+    0.into()
+}
+
+const SKB_STORE_BYTES: &'static str = "skb_store_bytes";
+
+fn bpf_skb_store_bytes(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_skb_store_bytes");
+    0.into()
+}
+
+const SKB_CHANGE_HEAD: &'static str = "skb_change_head";
+
+fn bpf_skb_change_head(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_skb_change_head");
+    0.into()
+}
+
+const L3_CSUM_REPLACE: &'static str = "l3_csum_replace";
+
+fn bpf_l3_csum_replace(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_l3_csum_replace");
+    0.into()
+}
+
+const L4_CSUM_REPLACE: &'static str = "l4_csum_replace";
+
+fn bpf_l4_csum_replace(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_l4_csum_replace");
+    0.into()
+}
+
+const SKB_LOAD_BYTES_RELATIVE_NAME: &'static str = "skb_load_bytes_relative";
+
+fn bpf_skb_load_bytes_relative(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_skb_load_bytes_relative");
+    0.into()
+}
+
+const KTIME_GET_BOOT_NS_NAME: &'static str = "ktime_get_boot_ns";
+
+fn bpf_ktime_get_boot_ns(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_ktime_get_boot_ns");
+    0.into()
+}
+
 pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Lazy::new(|| {
+    let sk_buf_id = SK_BUF_ID.clone();
     vec![
         EbpfHelper {
             index: bpf_func_id_BPF_FUNC_map_lookup_elem,
@@ -128,16 +392,260 @@ pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Laz
                 invalidate_array_bounds: false,
             },
         },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_ktime_get_ns,
+            name: KTIME_GET_NS_NAME,
+            function_pointer: Arc::new(bpf_ktime_get_ns),
+            signature: FunctionSignature {
+                args: vec![],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_get_socket_uid,
+            name: GET_SOCKET_UID_NAME,
+            function_pointer: Arc::new(bpf_get_socket_uid),
+            signature: FunctionSignature {
+                args: vec![Type::StructParameter { id: sk_buf_id.clone() }],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_get_current_uid_gid,
+            name: GET_CURRENT_UID_GID_NAME,
+            function_pointer: Arc::new(bpf_get_current_uid_gid),
+            signature: FunctionSignature {
+                args: vec![],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_skb_pull_data,
+            name: SKB_PULL_DATA_NAME,
+            function_pointer: Arc::new(bpf_skb_pull_data),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::StructParameter { id: sk_buf_id.clone() },
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: true,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_ringbuf_reserve,
+            name: RINGBUF_RESERVE_NAME,
+            function_pointer: Arc::new(bpf_ringbuf_reserve),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::ConstPtrToMapParameter,
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::NullOrParameter(Box::new(Type::MemoryParameter {
+                    size: MemoryParameterSize::Reference { index: 1 },
+                    input: false,
+                    output: false,
+                })),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_ringbuf_submit,
+            name: RINGBUF_SUBMIT_NAME,
+            function_pointer: Arc::new(bpf_ringbuf_submit),
+            signature: FunctionSignature {
+                // TODO(347257215): Implement verifier feature
+                args: vec![],
+                return_value: Type::default(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_skb_change_proto,
+            name: SKB_CHANGE_PROTO_NAME,
+            function_pointer: Arc::new(bpf_skb_change_proto),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::StructParameter { id: sk_buf_id.clone() },
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: true,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_csum_update,
+            name: CSUM_UPDATE_NAME,
+            function_pointer: Arc::new(bpf_csum_update),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::StructParameter { id: sk_buf_id.clone() },
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_probe_read_str,
+            name: PROBE_READ_STR_NAME,
+            function_pointer: Arc::new(bpf_probe_read_str),
+            signature: FunctionSignature {
+                // TODO(347257215): Implement verifier feature
+                args: vec![],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_get_socket_cookie,
+            name: GET_SOCKET_COOKIE_NAME,
+            function_pointer: Arc::new(bpf_get_socket_cookie),
+            signature: FunctionSignature {
+                args: vec![Type::StructParameter { id: sk_buf_id.clone() }],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_redirect,
+            name: REDIRECT_NAME,
+            function_pointer: Arc::new(bpf_redirect),
+            signature: FunctionSignature {
+                args: vec![Type::ScalarValueParameter, Type::ScalarValueParameter],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_skb_adjust_room,
+            name: SKB_ADJUST_ROOM_NAME,
+            function_pointer: Arc::new(bpf_skb_adjust_room),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::StructParameter { id: sk_buf_id.clone() },
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: true,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_l3_csum_replace,
+            name: L3_CSUM_REPLACE,
+            function_pointer: Arc::new(bpf_l3_csum_replace),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::StructParameter { id: sk_buf_id.clone() },
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: true,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_l4_csum_replace,
+            name: L4_CSUM_REPLACE,
+            function_pointer: Arc::new(bpf_l4_csum_replace),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::StructParameter { id: sk_buf_id.clone() },
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: true,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_skb_store_bytes,
+            name: SKB_STORE_BYTES,
+            function_pointer: Arc::new(bpf_skb_store_bytes),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::StructParameter { id: sk_buf_id.clone() },
+                    Type::ScalarValueParameter,
+                    Type::MemoryParameter {
+                        size: MemoryParameterSize::Reference { index: 3 },
+                        input: true,
+                        output: false,
+                    },
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: true,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_skb_change_head,
+            name: SKB_CHANGE_HEAD,
+            function_pointer: Arc::new(bpf_skb_change_head),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::StructParameter { id: sk_buf_id.clone() },
+                    Type::ScalarValueParameter,
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: true,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
+            name: SKB_LOAD_BYTES_RELATIVE_NAME,
+            function_pointer: Arc::new(bpf_skb_load_bytes_relative),
+            signature: FunctionSignature {
+                args: vec![
+                    Type::StructParameter { id: sk_buf_id.clone() },
+                    Type::ScalarValueParameter,
+                    Type::MemoryParameter {
+                        size: MemoryParameterSize::Reference { index: 3 },
+                        input: false,
+                        output: true,
+                    },
+                    Type::ScalarValueParameter,
+                ],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_ktime_get_boot_ns,
+            name: KTIME_GET_BOOT_NS_NAME,
+            function_pointer: Arc::new(bpf_ktime_get_boot_ns),
+            signature: FunctionSignature {
+                args: vec![],
+                return_value: Type::unknown_written_scalar_value(),
+                invalidate_array_bounds: false,
+            },
+        },
     ]
 });
 
 #[derive(Debug, Default)]
 struct ArgBuilder {
+    id: Option<MemoryId>,
     fields: Vec<FieldType>,
     mappings: Vec<FieldMapping>,
 }
 
 impl ArgBuilder {
+    fn set_id(&mut self, id: MemoryId) {
+        self.id = Some(id);
+    }
     fn add_field(&mut self, field_type: FieldType) {
         self.fields.push(field_type);
     }
@@ -148,7 +656,7 @@ impl ArgBuilder {
         let buffer_size = std::mem::size_of::<T>() as u64;
         vec![
             Type::PtrToMemory {
-                id: new_bpf_type_identifier(),
+                id: self.id.unwrap_or_else(new_bpf_type_identifier),
                 offset: 0,
                 buffer_size,
                 fields: self.fields,
@@ -204,8 +712,11 @@ struct SkBuf {
     pub data: uref<u8>,
     pub data_end: uref<u8>,
 }
+static SK_BUF_ID: Lazy<MemoryId> = Lazy::new(new_bpf_type_identifier);
 static SK_BUF_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
     let mut builder = ArgBuilder::default();
+    // Set the id of the main struct.
+    builder.set_id(SK_BUF_ID.clone());
     // Create a memory id for the data array
     let array_id = new_bpf_type_identifier();
     // Map and define the data field
@@ -267,11 +778,31 @@ static XDP_MD_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
 static BPF_USER_PT_REGS_T_ARGS: Lazy<Vec<Type>> =
     Lazy::new(|| build_bpf_args::<bpf_user_pt_regs_t>());
 
-static U64_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<u64>());
-
 static BPF_SOCK_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sock>());
 
 static BPF_SOCK_ADDR_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sock_addr>());
+
+#[repr(C)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+struct TraceEntry {
+    r#type: u16,
+    flags: u8,
+    preemp_count: u8,
+    pid: u32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+struct TraceEvent {
+    trace_entry: TraceEntry,
+    id: u64,
+    // This is defined a being big enough for all expected tracepoint. It is not clear how the
+    // verifier can know which tracepoint is targeted when the program is loaded. Instead, this
+    // array will be big enough, and will be filled with 0 when running a given program.
+    args: [u64; 16],
+}
+
+static BPF_TRACEPOINT_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<TraceEvent>());
 
 pub fn get_bpf_args(program_type: &ProgramType) -> &'static [Type] {
     match program_type {
@@ -281,7 +812,7 @@ pub fn get_bpf_args(program_type: &ProgramType) -> &'static [Type] {
         | ProgramType::SocketFilter => &SK_BUF_ARGS,
         ProgramType::Xdp => &XDP_MD_ARGS,
         ProgramType::KProbe => &BPF_USER_PT_REGS_T_ARGS,
-        ProgramType::TracePoint => &U64_ARGS,
+        ProgramType::TracePoint => &BPF_TRACEPOINT_ARGS,
         ProgramType::CgroupSock => &BPF_SOCK_ARGS,
         ProgramType::CgroupSockAddr => &BPF_SOCK_ADDR_ARGS,
         ProgramType::Unknown(_) => &[],

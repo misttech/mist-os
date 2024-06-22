@@ -105,7 +105,7 @@ Bazel originates from Google's Blaze, which only works on Linux with
 case-sensitive filesystems. Blaze only used the file name `BUILD` to store
 build directives.
 
-However, Bazel also needs to run on Windows and MacOS, which have
+However, Bazel also needs to run on Windows which has
 _case-insensitive_ filesystems, and many Google, or non-Google projects
 already use a directory named "`build`", which then collides with a file
 named "`BUILD`" on such systems.

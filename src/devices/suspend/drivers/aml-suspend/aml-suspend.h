@@ -36,6 +36,7 @@ class AmlSuspend : public fdf::DriverBase,
 
  protected:
   virtual zx::result<zx::resource> GetCpuResource();
+  virtual zx_status_t SystemSuspendEnter(zx_time_t resume_deadline);
 
  private:
   void Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> request);

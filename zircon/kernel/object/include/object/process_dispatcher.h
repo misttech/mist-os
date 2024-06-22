@@ -35,7 +35,7 @@
 #include <vm/vm_aspace.h>
 
 class JobDispatcher;
-class ProcessMapsInfoWriter;
+class VmarMapsInfoWriter;
 class VmoInfoWriter;
 
 // To allow this function to be friended by ProcessDispatcher.
@@ -196,7 +196,7 @@ class ProcessDispatcher final
   // Get the runtime of all threads that previously ran or are currently running under this process.
   TaskRuntimeStats GetTaskRuntimeStats() const TA_EXCL(get_lock());
 
-  zx_status_t GetAspaceMaps(ProcessMapsInfoWriter& maps, size_t max, size_t* actual,
+  zx_status_t GetAspaceMaps(VmarMapsInfoWriter& maps, size_t max, size_t* actual,
                             size_t* available) const;
   zx_status_t GetVmos(VmoInfoWriter& vmos, size_t max, size_t* actual, size_t* available);
   zx_status_t GetThreads(fbl::Array<zx_koid_t>* threads) const;

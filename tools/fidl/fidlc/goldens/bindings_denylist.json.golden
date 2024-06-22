@@ -277,6 +277,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 3826178105137551123,
           "name": "Denied",
           "strict": true,
@@ -460,6 +461,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 5338181991150205725,
           "name": "ShouldNeverAppearInAnyBinding",
           "strict": true,
@@ -504,6 +506,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 2957648440141224850,
           "name": "OnlyDenyCpp",
           "strict": true,
@@ -608,6 +611,7 @@
           }
         },
         {
+          "kind": "twoway",
           "ordinal": 8446571910689294295,
           "name": "OnlyDenyDart",
           "strict": true,
@@ -712,6 +716,7 @@
           }
         },
         {
+          "kind": "twoway",
           "ordinal": 7311125300308839833,
           "name": "OnlyDenyGo",
           "strict": true,
@@ -816,6 +821,7 @@
           }
         },
         {
+          "kind": "twoway",
           "ordinal": 2184115815603862302,
           "name": "OnlyDenyLibfuzzer",
           "strict": true,
@@ -920,6 +926,7 @@
           }
         },
         {
+          "kind": "twoway",
           "ordinal": 3719805222870932662,
           "name": "OnlyDenyRust",
           "strict": true,
@@ -1024,6 +1031,7 @@
           }
         },
         {
+          "kind": "twoway",
           "ordinal": 2319043834522757514,
           "name": "OnlyDenySyzkaller",
           "strict": true,
@@ -1163,6 +1171,7 @@
       ],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 6808317417318106526,
           "name": "AlwaysDenied",
           "strict": true,
@@ -1226,6 +1235,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 475191379775102607,
           "name": "Unattributed",
           "strict": true,
@@ -1242,6 +1252,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 2914965219653596920,
           "name": "AlwaysAppearsInImportingLibrary",
           "strict": true,

@@ -29,6 +29,7 @@ rustc_library("wlan-telemetry") {
     "src/processors/mod.rs",
     "src/testing/mod.rs",
     "src/util/cobalt_logger.rs",
+    "src/util/inspect_bounded_set.rs",
     "src/util/mod.rs",
     "src/util/sender.rs",
   ]
@@ -37,6 +38,7 @@ rustc_library("wlan-telemetry") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//src/connectivity/wlan/lib/ieee80211-testutils",
     "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",

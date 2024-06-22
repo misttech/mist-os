@@ -561,6 +561,21 @@ root:
   hello = world
 ```
 
+#### Print your Inspect in a testing context
+
+Use the JSON pretty printer to obtain a full listing. For example:
+
+```rust
+use diagnostics_assertions::JsonGetter;
+...
+    #[fuchsia::test]
+    fn my_test() {
+        let inspect = fuchsia_inspect::component::inspector();
+        ...
+        print!("{}", inspect.get_pretty_json());
+    }
+```
+
 ## Supported Data Types {#supported-types}
 
  Type | Description | Notes

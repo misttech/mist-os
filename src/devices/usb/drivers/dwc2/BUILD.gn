@@ -28,6 +28,7 @@ fuchsia_driver("dwc2-driver") {
   ]
   sources = [ "dwc2.cc" ]
   deps = [
+    ":dwc2-config",
     ":dwc2_bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
@@ -54,16 +55,32 @@ fuchsia_driver("dwc2-driver") {
   ]
 }
 
+fuchsia_component_manifest("dwc2-manifest") {
+  component_name = "dwc2"
+  manifest = "meta/dwc2.cml"
+}
+
 fuchsia_driver_component("dwc2") {
   info = "dwc2-info.json"
-  component_name = "dwc2"
+  cm_label = ":dwc2-manifest"
   deps = [ ":dwc2-driver" ]
-  manifest = "meta/dwc2.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("dwc2-config") {
+  cm_label = ":dwc2-manifest"
+}
+
+fuchsia_structured_config_values("dwc2-values") {
+  cm_label = ":dwc2-manifest"
+  values = {
+    enable_suspend = false
+  }
 }
 
 fuchsia_driver_package("package") {
   package_name = "dwc2"
   driver_components = [ ":dwc2" ]
+  deps = [ ":dwc2-values" ]
 }
 
 test("dwc2-test-bin") {
@@ -74,6 +91,7 @@ test("dwc2-test-bin") {
   ]
   output_name = "dwc2-test"
   deps = [
+    ":dwc2-config",
     ":dwc2_bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",

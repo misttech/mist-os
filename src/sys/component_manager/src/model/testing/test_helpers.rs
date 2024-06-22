@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use crate::builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder};
-use crate::framework::realm::RealmCapabilityHost;
+use crate::capability;
+use crate::framework::realm::Realm;
 use crate::model::component::instance::InstanceState;
-use crate::model::component::{ComponentInstance, StartReason, WeakComponentInstance};
+use crate::model::component::{ComponentInstance, StartReason};
 use crate::model::events::registry::EventSubscription;
 use crate::model::events::source::EventSource;
 use crate::model::events::stream::EventStream;
@@ -32,7 +33,7 @@ use vfs::directory::entry::DirectoryEntry;
 use vfs::service;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
 };
 
 pub const TEST_RUNNER_NAME: &str = cm_rust_testing::TEST_RUNNER_NAME;
@@ -344,26 +345,15 @@ impl TestEnvironmentBuilder {
 
         // Host framework service for `moniker`, if requested.
         let realm_proxy = if let Some(moniker) = self.realm_moniker {
-            let (realm_proxy, stream) =
-                endpoints::create_proxy_and_stream::<fcomponent::RealmMarker>().unwrap();
-            let component = WeakComponentInstance::from(
-                &model
-                    .root()
-                    .find_and_maybe_resolve(&moniker)
-                    .await
-                    .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e)),
-            );
-            let realm_capability_host = RealmCapabilityHost::new_for_test(
-                Arc::downgrade(&model),
-                model.context().runtime_config().clone(),
-            );
-            fasync::Task::spawn(async move {
-                realm_capability_host
-                    .serve(component, stream)
-                    .await
-                    .expect("failed serving realm service");
-            })
-            .detach();
+            let component = model
+                .root()
+                .find_and_maybe_resolve(&moniker)
+                .await
+                .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e));
+            let host = Realm::new(Arc::downgrade(&model), model.context().runtime_config().clone());
+            let (realm_proxy, server) =
+                endpoints::create_proxy::<fcomponent::RealmMarker>().unwrap();
+            capability::open_framework(&host, &component, server.into()).await.unwrap();
             Some(realm_proxy)
         } else {
             None

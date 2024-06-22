@@ -62,7 +62,9 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 let any = try_from_handle_in_registry(connector.token.as_handle_ref())?;
                 match &any {
                     Capability::Connector(_) => (),
-                    _ => panic!("BUG: registry has a non-Sender capability under a Sender koid"),
+                    _ => panic!(
+                        "BUG: registry has a non-Connector capability under a Connector koid"
+                    ),
                 };
                 Ok(any)
             }
@@ -74,6 +76,14 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 match &any {
                     Capability::Router(_) => (),
                     _ => panic!("BUG: registry has a non-Router capability under a Router koid"),
+                };
+                Ok(any)
+            }
+            fsandbox::Capability::Open(open) => {
+                let any = try_from_handle_in_registry(open.token.as_handle_ref())?;
+                match &any {
+                    Capability::Open(_) => (),
+                    _ => panic!("BUG: registry has a non-Open capability under an Open koid"),
                 };
                 Ok(any)
             }

@@ -144,27 +144,6 @@ impl Resolver for RemoteResolver {
     }
 }
 
-/// Given a ref-counted resolver, returns a boxed resolver that delegates to the ref-counted
-/// resolver.
-pub fn box_arc_resolver(
-    arc: &Arc<impl Resolver + Send + Sync + 'static>,
-) -> Box<dyn Resolver + Send + Sync + 'static> {
-    Box::new(InternalResolver(arc.clone()))
-}
-
-#[derive(Debug)]
-struct InternalResolver(Arc<dyn Resolver + Send + Sync + 'static>);
-
-#[async_trait]
-impl Resolver for InternalResolver {
-    async fn resolve(
-        &self,
-        component_address: &ComponentAddress,
-    ) -> Result<ResolvedComponent, ResolverError> {
-        self.0.resolve(component_address).await
-    }
-}
-
 pub fn read_and_validate_manifest(
     data: &fmem::Data,
 ) -> Result<cm_rust::ComponentDecl, ResolverError> {

@@ -39,8 +39,7 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
   auto metadata_result = fidl::Persist(sysmem_metadata_);
   ZX_ASSERT(metadata_result.is_ok());
   std::vector<uint8_t> metadata = std::move(metadata_result.value());
-  mock_root_->SetMetadata(fuchsia_hardware_sysmem::wire::kMetadataType, metadata.data(),
-                          metadata.size());
+  pdev_fidl_.set_metadata({{fuchsia_hardware_sysmem::wire::kMetadataType, metadata}});
 
   // Protocols for sysmem
   pdev_loop_.StartThread("pdev-server-thread");

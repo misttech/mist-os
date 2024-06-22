@@ -7,8 +7,10 @@
 use anyhow::{Context, Error};
 use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
+use fidl_fuchsia_tee::ReturnOrigin;
 use fuchsia_component::client::{connect_to_protocol_at, connect_to_protocol_at_path};
 use fuchsia_zircon::{self as zx};
+use tee_internal::binding::TEE_ERROR_TARGET_DEAD;
 use {fidl_fuchsia_io, fidl_fuchsia_tee, fuchsia_fs};
 
 #[fuchsia::test]
@@ -24,14 +26,22 @@ async fn connect_panic_ta() -> Result<(), Error> {
         "/ta/".to_owned() + PANIC_TA_UUID,
     )?;
     let result = panic_ta.open_session2(vec![]).await;
-    // We expect the panic TA to panic when send it the first request which will close the channel.
-    assert!(result.is_err());
-    let channel = panic_ta.as_channel();
-    let wait_result = channel.wait_handle(
-        zx::Signals::CHANNEL_PEER_CLOSED | zx::Signals::CHANNEL_READABLE,
-        zx::Time::INFINITE,
-    );
-    assert_eq!(wait_result, Ok(zx::Signals::CHANNEL_PEER_CLOSED));
+    assert!(result.is_ok());
 
+    // We expect the panic TA to panic when send it the first request.
+    if let Ok((_, op_result)) = result {
+        assert_eq!(op_result.return_code, Some(TEE_ERROR_TARGET_DEAD as u64));
+        assert_eq!(op_result.return_origin, Some(ReturnOrigin::TrustedOs));
+        assert_eq!(op_result.parameter_set, None);
+    }
+
+    // Subsequent operations on the same connection should also fail with TARGET_DEAD.
+    let result = panic_ta.invoke_command(0, 0, vec![]).await;
+    assert!(result.is_ok());
+    if let Ok(op_result) = result {
+        assert_eq!(op_result.return_code, Some(TEE_ERROR_TARGET_DEAD as u64));
+        assert_eq!(op_result.return_origin, Some(ReturnOrigin::TrustedOs));
+        assert_eq!(op_result.parameter_set, None);
+    }
     Ok(())
 }

@@ -140,11 +140,14 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
     // between shutdown-shim's new power element and system-activity-governor's
     // WakeHandling power element.
     auto requires_token = std::move(wake_handling.active_dependency_token());
+    auto requires_level_by_preference = std::vector<uint8_t>(
+        1, static_cast<uint8_t>(system_fidl::wire::WakeHandlingLevel::kActive));
     auto wake_handling_dep = broker_fidl::wire::LevelDependency{
         .dependency_type = broker_fidl::wire::DependencyType::kActive,
         .dependent_level = static_cast<uint8_t>(ShutdownControlLevel::kActive),
         .requires_token = std::move(requires_token),
-        .requires_level = static_cast<uint8_t>(system_fidl::wire::WakeHandlingLevel::kActive),
+        .requires_level_by_preference =
+            fidl::VectorView<uint8_t>::FromExternal(requires_level_by_preference),
     };
     std::vector<broker_fidl::wire::LevelDependency> dependencies;
     dependencies.push_back(std::move(wake_handling_dep));

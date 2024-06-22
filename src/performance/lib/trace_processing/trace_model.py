@@ -142,6 +142,11 @@ class DurationEvent(Event):
     (i.e. they don't have a matching end/begin event) are dropped.
     """
 
+    duration: Optional[trace_time.TimeDelta]
+    parent: Optional[Self]
+    child_durations: list[Self]
+    child_flows: list["FlowEvent"]
+
     def __init__(
         self,
         duration: Optional[trace_time.TimeDelta],
@@ -153,10 +158,10 @@ class DurationEvent(Event):
         super().__init__(
             base.category, base.name, base.start, base.pid, base.tid, base.args
         )
-        self.duration: Optional[trace_time.TimeDelta] = duration
-        self.parent: Optional[Self] = parent
-        self.child_durations: list[Self] = child_durations
-        self.child_flows: list["FlowEvent"] = child_flows
+        self.duration = duration
+        self.parent = parent
+        self.child_durations = child_durations
+        self.child_flows = child_flows
 
     @staticmethod
     def from_dict(event_dict: dict[str, Any]) -> "DurationEvent":

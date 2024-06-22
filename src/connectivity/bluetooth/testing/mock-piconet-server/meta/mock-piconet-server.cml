@@ -8,11 +8,11 @@
         binary: "bin/mock_piconet_server",
     },
     capabilities: [
-        { protocol: "fuchsia.bluetooth.bredr.ProfileTest" },
+        { protocol: "fuchsia.bluetooth.bredr.test.ProfileTest" },
     ],
     expose: [
         {
-            protocol: [ "fuchsia.bluetooth.bredr.ProfileTest" ],
+            protocol: [ "fuchsia.bluetooth.bredr.test.ProfileTest" ],
             from: "self",
         },
     ],

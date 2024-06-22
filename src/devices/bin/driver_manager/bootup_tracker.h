@@ -11,15 +11,14 @@
 
 namespace driver_manager {
 
-class BootupTracker : public fidl::WireServer<fuchsia_driver_development::BootupWatcher> {
+class BootupTracker {
  public:
   BootupTracker(BindManager* manager, async_dispatcher_t* dispatcher)
       : bind_manager_(manager), dispatcher_(dispatcher) {}
 
-  void WaitForBootup(WaitForBootupCompleter::Sync& completer) override;
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_driver_development::BootupWatcher> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override;
+  virtual ~BootupTracker() {}
+
+  void WaitForBootup(fit::callback<void()> callback);
 
   // Starts the bootup tracker timeout task.
   void Start();
@@ -32,10 +31,6 @@ class BootupTracker : public fidl::WireServer<fuchsia_driver_development::Bootup
 
   // Called when the ongoing bind state in the bind manager has changed.
   void NotifyBindingChanged();
-
-  fidl::ProtocolHandler<fuchsia_driver_development::BootupWatcher> GetHandler() {
-    return bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure);
-  }
 
  protected:
   // Exposed for testing.
@@ -65,14 +60,12 @@ class BootupTracker : public fidl::WireServer<fuchsia_driver_development::Bootup
   // updates has been exceeded. If the deadline is exceeded, the bootup tracker completes bootup.
   zx::time last_update_timestamp_;
 
-  // Stored WaitForBootup() completers. Invoked once bootup is completed.
-  std::vector<WaitForBootupCompleter::Async> completers_;
+  // Stored WaitForBootup callbacks. Invoked once bootup is completed.
+  std::vector<fit::callback<void()>> callbacks_;
 
   // Recurring task to check if bootup is complete.
   async::TaskClosureMethod<BootupTracker, &BootupTracker::OnBootupTimeout> bootup_timeout_task_{
       this};
-
-  fidl::ServerBindingGroup<fuchsia_driver_development::BootupWatcher> bindings_;
 };
 
 }  // namespace driver_manager

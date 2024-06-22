@@ -4,6 +4,4 @@
 library test.good.fi0023;
 
 @foo
-@bar
 type Foo = struct {};
-type Bar = @foo @bar struct {};

@@ -39,12 +39,16 @@ static void usage() {
       "                    `0` (LOW) or `1` (HIGH).\n"
       "  write | w         Write to <name>. <value> should be `0` (LOW) or `1` (HIGH).\n"
       "  in | i            Configure <name> as IN. <value> is the resistor pull and its value\n"
-      "                    should be `0` (GPIO_PULL_DOWN), `1` (GPIO_PULL_UP), or `2` "
-      "(GPIO_NO_PULL).\n"
+      "                    should be `up`, `down`, or `none`.\n"
       "  out | o           Configure <name> as OUT. <value> is the initial OUT\n"
       "                    state and its value should be `0` (LOW) or `1` (HIGH).\n"
       "  drive | d         Set the drive strength of <name>. <value> should be the\n"
       "                    drive strength value in microamps.\n"
+      "  interrupt | q     Get the interrupt corresponding to <name> with flags <value>. Wait for\n"
+      "                    it to trigger once, then exit. <value> should be `default`, \n"
+      "                    `edge-high`, `edge-low`, `edge-both`, `level-low`, or `level-high`.\n"
+      "  function | f      Set the function of <name> to <value>. <value> is a function number\n"
+      "                    that is specific to the GPIO controller being used.\n"
       "  help | h          Print this help text.\n\n"
       "Examples:\n"
       "  List GPIO pins:\n"
@@ -58,7 +62,7 @@ static void usage() {
       "  Write a LOW value to a GPIO pin:\n"
       "  $ gpioutil write GPIO_HW_ID_3 0\n\n"
       "  Configure a GPIO pin as IN with a pull-down resistor:\n"
-      "  $ gpioutil in GPIO_HW_ID_3 0\n\n"
+      "  $ gpioutil in GPIO_HW_ID_3 down\n\n"
       "  Configure a GPIO pin as OUT with an initial value of HIGH:\n"
       "  $ gpioutil out GPIO_HW_ID_3 1\n\n"
       "  Get the current drive strength in microamps of a GPIO pin:\n"
@@ -66,7 +70,12 @@ static void usage() {
       "  Drive Strength: 500 ua\n\n"
       "  Set the drive strength of a GPIO pin to 500 microamps:\n"
       "  $ gpioutil drive GPIO_HW_ID_3 500\n"
-      "  Set drive strength to 500\n\n");
+      "  Set drive strength to 500\n\n"
+      "  Wait for a falling edge on a GPIO:\n"
+      "  $ gpioutil interrupt GPIO_HW_ID_3 edge-low\n"
+      "  Received interrupt at time 12345\n\n"
+      "  Set a pin to function six:\n"
+      "  $ gpioutil function GPIO_HW_ID_3 6\n\n");
 }
 // LINT.ThenChange(//docs/reference/tools/hardware/gpioutil.md)
 
@@ -75,7 +84,10 @@ int main(int argc, char** argv) {
   uint8_t write_value, out_value;
   uint64_t ds_ua;
   fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  if (ParseArgs(argc, argv, &func, &write_value, &in_flag, &out_value, &ds_ua)) {
+  uint32_t interrupt_flags;
+  uint64_t alt_function;
+  if (ParseArgs(argc, argv, &func, &write_value, &in_flag, &out_value, &ds_ua, &interrupt_flags,
+                &alt_function)) {
     fprintf(stderr, "Unable to parse arguments!\n\n");
     usage();
     return -1;
@@ -103,7 +115,8 @@ int main(int argc, char** argv) {
     }
 
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(client_end.value()));
-    ret = ClientCall(std::move(client), func, write_value, in_flag, out_value, ds_ua);
+    ret = ClientCall(std::move(client), func, write_value, in_flag, out_value, ds_ua,
+                     interrupt_flags, alt_function);
   } else {
     // Access by GPIO name
     auto client = FindGpioClientByName(argv[kArgDevice]);
@@ -114,7 +127,8 @@ int main(int argc, char** argv) {
       return -1;
     }
 
-    ret = ClientCall(std::move(*client), func, write_value, in_flag, out_value, ds_ua);
+    ret = ClientCall(std::move(*client), func, write_value, in_flag, out_value, ds_ua,
+                     interrupt_flags, alt_function);
   }
 
   if (ret == -1) {

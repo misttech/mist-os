@@ -707,6 +707,7 @@
       ],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 6231434419097198905,
           "name": "Foo",
           "strict": true,

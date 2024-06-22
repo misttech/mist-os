@@ -9,8 +9,11 @@
 
 mod bindings;
 
+use std::num::NonZeroU8;
+
 use argh::FromArgs;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
+use log::info;
 
 use bindings::{InspectPublisher, NetstackSeed, Service};
 
@@ -26,10 +29,10 @@ struct Options {
 
 /// Runs Netstack3.
 pub fn main() {
-    // TODO(https://fxbug.dev/316616750): Support running with multiple threads.
-    // This is currently blocked on fixing race conditions when concurrent
-    // operations are allowed.
-    let mut executor = fuchsia_async::SendExecutor::new(1 /* num_threads */);
+    let config = ns3_config::Config::take_from_startup_handle();
+    let ns3_config::Config { num_threads } = &config;
+    let num_threads = NonZeroU8::new(*num_threads).expect("invalid 0 thread count value");
+    let mut executor = fuchsia_async::SendExecutor::new(num_threads.get().into());
 
     let Options { debug } = argh::from_env();
     let mut log_options = diagnostics_log::PublishOptions::default();
@@ -39,6 +42,8 @@ pub fn main() {
     diagnostics_log::initialize(log_options).expect("failed to initialize log");
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
+
+    info!("starting netstack3 with {config:?}");
 
     let mut fs = ServiceFs::new();
     let _: &mut ServiceFsDir<'_, _> = fs
@@ -65,6 +70,8 @@ pub fn main() {
         .add_fidl_service(Service::RoutesAdminV6)
         .add_fidl_service(Service::RouteTableProviderV4)
         .add_fidl_service(Service::RouteTableProviderV6)
+        .add_fidl_service(Service::RuleTableV4)
+        .add_fidl_service(Service::RuleTableV6)
         .add_fidl_service(Service::RootRoutesV4)
         .add_fidl_service(Service::RootRoutesV6)
         .add_fidl_service(Service::Interfaces)
@@ -80,6 +87,10 @@ pub fn main() {
     let seed = NetstackSeed::default();
 
     let inspect_publisher = InspectPublisher::new();
+    inspect_publisher
+        .inspector()
+        .root()
+        .record_child("Config", |config_node| config.record_inspect(config_node));
 
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle().expect("directory handle");
 

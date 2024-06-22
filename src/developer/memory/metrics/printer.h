@@ -15,7 +15,7 @@
 
 namespace memory {
 
-extern const size_t kMaxFormattedStringSize;
+constexpr size_t kMaxFormattedStringSize = sizeof("1023.5T");
 const char* FormatSize(uint64_t bytes, char* buf);
 
 enum Sorted : uint8_t { UNSORTED, SORTED };

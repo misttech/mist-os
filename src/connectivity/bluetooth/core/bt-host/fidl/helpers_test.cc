@@ -1055,33 +1055,37 @@ TEST(HelpersTest, ServiceDefinitionToServiceRecord) {
   info.set_name("TEST");
   def.mutable_information()->emplace_back(std::move(info));
   fuchsia::bluetooth::bredr::ProtocolDescriptor l2cap_proto;
-  l2cap_proto.protocol = fuchsia::bluetooth::bredr::ProtocolIdentifier::L2CAP;
+  l2cap_proto.set_protocol(fuchsia::bluetooth::bredr::ProtocolIdentifier::L2CAP);
   fuchsia::bluetooth::bredr::DataElement l2cap_data_el;
   l2cap_data_el.set_uint16(fuchsia::bluetooth::bredr::PSM_SDP);
-  l2cap_proto.params.emplace_back(std::move(l2cap_data_el));
+  std::vector<fuchsia::bluetooth::bredr::DataElement> l2cap_params;
+  l2cap_params.emplace_back(std::move(l2cap_data_el));
+  l2cap_proto.set_params(std::move(l2cap_params));
   def.mutable_protocol_descriptor_list()->emplace_back(std::move(l2cap_proto));
   fuchsia::bluetooth::bredr::ProtocolDescriptor avdtp_proto;
-  avdtp_proto.protocol = fuchsia::bluetooth::bredr::ProtocolIdentifier::AVDTP;
+  avdtp_proto.set_protocol(fuchsia::bluetooth::bredr::ProtocolIdentifier::AVDTP);
   fuchsia::bluetooth::bredr::DataElement avdtp_data_el;
-  avdtp_data_el.set_uint16(0x0103);  // Version 1.3
-  avdtp_proto.params.emplace_back(std::move(avdtp_data_el));
+  avdtp_data_el.set_uint16(0x0103);  // Version 1
+  std::vector<fuchsia::bluetooth::bredr::DataElement> avdtp_params;
+  avdtp_params.emplace_back(std::move(avdtp_data_el));
+  avdtp_proto.set_params(std::move(avdtp_params));
   def.mutable_protocol_descriptor_list()->emplace_back(std::move(avdtp_proto));
   fuchsia::bluetooth::bredr::ProfileDescriptor prof_desc;
-  prof_desc.profile_id =
-      fuchsia::bluetooth::bredr::ServiceClassProfileIdentifier::ADVANCED_AUDIO_DISTRIBUTION;
-  prof_desc.major_version = 1;
-  prof_desc.minor_version = 3;
-  def.mutable_profile_descriptors()->emplace_back(prof_desc);
+  prof_desc.set_profile_id(
+      fuchsia::bluetooth::bredr::ServiceClassProfileIdentifier::ADVANCED_AUDIO_DISTRIBUTION);
+  prof_desc.set_major_version(1);
+  prof_desc.set_minor_version(3);
+  def.mutable_profile_descriptors()->emplace_back(std::move(prof_desc));
   bt::sdp::AttributeId valid_att_id = 0x1111;
   fuchsia::bluetooth::bredr::Attribute valid_attribute;
-  valid_attribute.element.set_uint8(0x01);
-  valid_attribute.id = valid_att_id;
+  valid_attribute.set_element(::fuchsia::bluetooth::bredr::DataElement::WithUint8(0x01));
+  valid_attribute.set_id(valid_att_id);
   def.mutable_additional_attributes()->emplace_back(std::move(valid_attribute));
   // Add a URL attribute.
   bt::sdp::AttributeId url_attr_id = 0x1112;  // Random ID
   fuchsia::bluetooth::bredr::Attribute url_attribute;
-  url_attribute.element.set_url("foobar.dev");
-  url_attribute.id = url_attr_id;
+  url_attribute.set_element(::fuchsia::bluetooth::bredr::DataElement::WithUrl("foobar.dev"));
+  url_attribute.set_id(url_attr_id);
   def.mutable_additional_attributes()->emplace_back(std::move(url_attribute));
 
   // Confirm converted ServiceRecord fields match ServiceDefinition
@@ -1170,27 +1174,31 @@ TEST(HelpersTest, ObexServiceDefinitionToServiceRecord) {
 
   // The primary protocol contains L2CAP, RFCOMM, & OBEX.
   fuchsia::bluetooth::bredr::ProtocolDescriptor l2cap_proto;
-  l2cap_proto.protocol = fuchsia::bluetooth::bredr::ProtocolIdentifier::L2CAP;
+  l2cap_proto.set_protocol(fuchsia::bluetooth::bredr::ProtocolIdentifier::L2CAP);
+  l2cap_proto.set_params({});
   def.mutable_protocol_descriptor_list()->emplace_back(std::move(l2cap_proto));
 
   fuchsia::bluetooth::bredr::ProtocolDescriptor rfcomm_proto;
-  rfcomm_proto.protocol = fuchsia::bluetooth::bredr::ProtocolIdentifier::RFCOMM;
+  rfcomm_proto.set_protocol(fuchsia::bluetooth::bredr::ProtocolIdentifier::RFCOMM);
   fuchsia::bluetooth::bredr::DataElement rfcomm_data_el;
   rfcomm_data_el.set_uint8(10);  // Random ServerChannel number
-  rfcomm_proto.params.emplace_back(std::move(rfcomm_data_el));
+  std::vector<fuchsia::bluetooth::bredr::DataElement> rfcomm_params;
+  rfcomm_params.emplace_back(std::move(rfcomm_data_el));
+  rfcomm_proto.set_params(std::move(rfcomm_params));
   def.mutable_protocol_descriptor_list()->emplace_back(std::move(rfcomm_proto));
 
   fuchsia::bluetooth::bredr::ProtocolDescriptor obex_proto;
-  obex_proto.protocol = fuchsia::bluetooth::bredr::ProtocolIdentifier::OBEX;
+  obex_proto.set_protocol(fuchsia::bluetooth::bredr::ProtocolIdentifier::OBEX);
+  obex_proto.set_params({});
   def.mutable_protocol_descriptor_list()->emplace_back(std::move(obex_proto));
 
   // Profile version = 1.4.
   fuchsia::bluetooth::bredr::ProfileDescriptor prof_desc;
-  prof_desc.profile_id =
-      fuchsia::bluetooth::bredr::ServiceClassProfileIdentifier::MESSAGE_ACCESS_PROFILE;
-  prof_desc.major_version = 1;
-  prof_desc.minor_version = 4;
-  def.mutable_profile_descriptors()->emplace_back(prof_desc);
+  prof_desc.set_profile_id(
+      fuchsia::bluetooth::bredr::ServiceClassProfileIdentifier::MESSAGE_ACCESS_PROFILE);
+  prof_desc.set_major_version(1);
+  prof_desc.set_minor_version(4);
+  def.mutable_profile_descriptors()->emplace_back(std::move(prof_desc));
 
   // ServiceName = "MAP MAS"
   fuchsia::bluetooth::bredr::Information info;
@@ -1200,29 +1208,31 @@ TEST(HelpersTest, ObexServiceDefinitionToServiceRecord) {
 
   // GoepL2capPsm Attribute with a dynamic PSM.
   fuchsia::bluetooth::bredr::Attribute goep_l2cap_psm_attribute;
-  goep_l2cap_psm_attribute.id = bt::sdp::kGoepL2capPsm;
-  goep_l2cap_psm_attribute.element.set_uint16(fuchsia::bluetooth::bredr::PSM_DYNAMIC);
+  goep_l2cap_psm_attribute.set_id(bt::sdp::kGoepL2capPsm);
+  fuchsia::bluetooth::bredr::DataElement geop_psm;
+  geop_psm.set_uint16(fuchsia::bluetooth::bredr::PSM_DYNAMIC);
+  goep_l2cap_psm_attribute.set_element(std::move(geop_psm));
   def.mutable_additional_attributes()->emplace_back(std::move(goep_l2cap_psm_attribute));
 
   // Add MASInstanceID Attribute = 1
   fuchsia::bluetooth::bredr::Attribute instance_id_attribute;
-  instance_id_attribute.id = 0x0315;
-  instance_id_attribute.element.set_uint16(1);
+  instance_id_attribute.set_id(0x0315);
+  instance_id_attribute.set_element(fuchsia::bluetooth::bredr::DataElement::WithUint16(1));
   def.mutable_additional_attributes()->emplace_back(std::move(instance_id_attribute));
   // Add SupportedMessagesTypes Attribute = Email (0)
   fuchsia::bluetooth::bredr::Attribute message_types_attribute;
-  message_types_attribute.id = 0x0316;
-  message_types_attribute.element.set_uint16(0);
+  message_types_attribute.set_id(0x0316);
+  message_types_attribute.set_element(fuchsia::bluetooth::bredr::DataElement::WithUint16(0));
   def.mutable_additional_attributes()->emplace_back(std::move(message_types_attribute));
   // Add MapSupportedFeatures Attribute = Notification Registration only (1)
   fuchsia::bluetooth::bredr::Attribute features_attribute;
-  features_attribute.id = 0x0317;
-  features_attribute.element.set_uint16(1);
+  features_attribute.set_id(0x0317);
+  features_attribute.set_element(fuchsia::bluetooth::bredr::DataElement::WithUint16(1));
   def.mutable_additional_attributes()->emplace_back(std::move(features_attribute));
 
   // Confirm converted ServiceRecord fields match ServiceDefinition
   auto rec = ServiceDefinitionToServiceRecord(def);
-  EXPECT_TRUE(rec.is_ok());
+  ASSERT_TRUE(rec.is_ok());
 
   // Confirm UUIDs match
   std::unordered_set<bt::UUID> attribute_uuid = {bt::sdp::profile::kMessageAccessServer};

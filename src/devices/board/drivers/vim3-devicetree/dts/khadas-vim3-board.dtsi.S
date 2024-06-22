@@ -37,19 +37,6 @@
 			pid = <PDEV_PID_AMLOGIC_A311D>;
 			vid = <PDEV_VID_AMLOGIC>;
 			size = <0x00 0x00>;
-			// The AMlogic display engine needs contiguous physical memory for each
-			// frame buffer, because it does not have a page table walker. We reserve
-			// enough memory to hold 5 framebuffers (2 for virtcon, 3 for scenic) at
-			// the maximum supported resolution of 3840 x 2160 with 4 bytes per pixel
-			// (for the RGBA/BGRA 8888 pixel format).
-			//
-			// The maximum supported resolution is documented below.
-			// * "A311D Quick Reference Manual" revision 01, pages 2-3
-			// * "A311D Datasheet" revision 08, section 2.2 "Features", pages 4-5
-			//
-			// TODO(https://fxbug.dev/42072489): Reserving this much memory seems wasteful. The
-			// quantity below is 10% of RAM on a VIM3 Basic and 5% of RAM on a VIM3 Pro.
-			contiguous-size = <0x00 (200*1024*1024)>;
 		};
 	};
 

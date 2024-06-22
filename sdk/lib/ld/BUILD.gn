@@ -9,6 +9,14 @@ import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 
+# Make sure that there's no transitive deps on libzircon, so header-only
+# use of the library doesn't affect dynamic linking dependencies.
+if (zircon_toolchain == false) {
+  _headers_dep = ""
+} else {
+  _headers_dep = ":headers"
+}
+
 # This provides access to additional <lib/ld/...> headers for support code in
 # the `ld` namespace, which isn't itself part of of the passive ABI.
 library_headers("headers") {
@@ -18,6 +26,7 @@ library_headers("headers") {
     "lib/ld/diagnostics.h",
     "lib/ld/load-module.h",
     "lib/ld/load.h",
+    "lib/ld/log-posix.h",
     "lib/ld/memory.h",
     "lib/ld/tlsdesc.h",
   ]
@@ -31,6 +40,7 @@ library_headers("headers") {
 
   if (is_fuchsia) {
     headers += [
+      "lib/ld/log-zircon.h",
       "lib/ld/remote-abi-heap.h",
       "lib/ld/remote-abi-stub.h",
       "lib/ld/remote-abi-transcriber.h",
@@ -46,18 +56,35 @@ library_headers("headers") {
       "//zircon/system/ulib/fbl",
     ]
 
-    # Make sure that there's no transitive deps on libzircon, so header-only
-    # use of the library doesn't affect dynamic linking dependencies.
-    if (zircon_toolchain == false) {
-      _headers = ""
-    } else {
-      _headers = ":headers"
-    }
     public_deps += [
       "//src/zircon/lib/zircon:headers",
-      "//zircon/system/ulib/zx$_headers",
+      "//zircon/system/ulib/zx$_headers_dep",
     ]
   }
+}
+
+library_headers("ld-log-posix.headers") {
+  headers = [ "lib/ld/log-posix.h" ]
+}
+
+static_library("ld-log-posix") {
+  public_deps = [ ":ld-log-posix.headers" ]
+  sources = [ "log-posix.cc" ]
+}
+
+library_headers("ld-log-zircon.headers") {
+  headers = [ "lib/ld/log-zircon.h" ]
+  public_deps = [ "//zircon/system/ulib/zx$_headers_dep" ]
+}
+
+static_library("ld-log-zircon") {
+  public_deps = [ ":ld-log-zircon.headers" ]
+  sources = [ "log-zircon.cc" ]
+  deps = [
+    "//sdk/lib/fdio:headers",
+    "//zircon/system/ulib/zircon-internal",
+    "//zircon/system/ulib/zx",
+  ]
 }
 
 # This is the linkable target for using the passive ABI.
@@ -237,27 +264,33 @@ config("standalone.config") {
   }
 }
 
-source_set("posix-header") {
+source_set("posix.headers") {
   public = [ "posix.h" ]
   public_deps = [
+    ":ld-log-posix.headers",
     ":startup-load",
     "//src/lib/elfldltl",
   ]
 }
 
-source_set("zircon") {
+source_set("zircon.headers") {
   public = [ "zircon.h" ]
   public_deps = [
-    ":startup-diagnostics",
+    ":ld-log-zircon.headers",
     ":startup-load",
     "//sdk/lib/stdcompat",
     "//src/lib/elfldltl",
   ]
+}
+
+source_set("zircon") {
+  public_deps = [ ":zircon.headers" ]
   sources = [
     "ldsvc.cc",
     "procargs.cc",
   ]
   deps = [
+    ":startup-diagnostics",
     "//zircon/system/ulib/ldmsg",
     "//zircon/system/ulib/processargs",
     "//zircon/system/ulib/zircon-internal",
@@ -274,7 +307,7 @@ source_set("startup-load") {
     ":allocator",
     ":bootstrap",
     ":headers",
-    ":startup-diagnostics",
+    ":startup-diagnostics.headers",
     "//src/lib/elfldltl",
     "//zircon/system/ulib/fbl",
   ]
@@ -286,6 +319,7 @@ shared_library("ld-startup") {
   sources = []
   deps = [
     ":standalone",
+    ":startup-diagnostics",
     ":startup-load",
     ":tlsdesc",
   ]
@@ -297,7 +331,6 @@ shared_library("ld-startup") {
     ]
     deps += [
       ":zircon",
-      ":zircon-diagnostics",
       "//sdk/lib/stdcompat",
       "//src/lib/llvm-profdata",
       "//src/zircon/lib/zircon",
@@ -310,8 +343,7 @@ shared_library("ld-startup") {
       "posix-startup.cc",
     ]
     deps += [
-      ":posix-diagnostics",
-      ":posix-header",
+      ":posix.headers",
       "//zircon/kernel/lib/arch:headers",
     ]
 
@@ -339,44 +371,39 @@ shared_library("ld-startup") {
   }
 }
 
-source_set("startup-diagnostics") {
-  visibility = [ ":*" ]
+source_set("startup-diagnostics.headers") {
   public = [ "startup-diagnostics.h" ]
   public_deps = [
     ":headers",
     "//src/lib/elfldltl",
   ]
+}
+
+source_set("startup-diagnostics") {
+  visibility = [ ":*" ]
   sources = [ "startup-diagnostics.cc" ]
-}
-
-source_set("posix-diagnostics") {
-  visibility = [ ":*" ]
-  sources = [ "posix-diagnostics.cc" ]
   deps = [
-    ":posix-header",
-    ":startup-diagnostics",
-    "//zircon/system/ulib/c/stdio:snprintf",
+    ":startup-diagnostics.headers",
     "//zircon/system/ulib/c/stdio/printf_core:wrapper",
   ]
-}
-
-source_set("zircon-diagnostics") {
-  visibility = [ ":*" ]
-  sources = [ "zircon-diagnostics.cc" ]
-  deps = [
-    ":startup-diagnostics",
-    ":zircon",
-    "//src/lib/symbolizer-markup",
-    "//zircon/system/ulib/c/stdio/printf_core:wrapper",
-    "//zircon/system/ulib/zx",
-  ]
+  if (is_fuchsia) {
+    deps += [
+      ":ld-log-zircon",
+      ":zircon.headers",
+    ]
+  } else {
+    deps += [
+      ":ld-log-posix",
+      ":posix.headers",
+    ]
+  }
 }
 
 source_set("allocator") {
   visibility = [ ":*" ]
   public = [ "allocator.h" ]
   public_deps = [
-    ":startup-diagnostics",
+    ":startup-diagnostics.headers",
     "//src/lib/trivial-allocator",
   ]
   deps = [ "//src/lib/trivial-allocator:stub-delete" ]
@@ -386,6 +413,7 @@ source_set("linux-syscalls") {
   visibility = [ ":*" ]
   sources = [ "linux-syscalls.cc" ]
   include_dirs = [ "//third_party/linux-syscall-support/src" ]
+  deps = [ "//zircon/system/ulib/c/stdio:snprintf" ]
 }
 
 # The TLSDESC runtime assembly code is provided in library form as needed for

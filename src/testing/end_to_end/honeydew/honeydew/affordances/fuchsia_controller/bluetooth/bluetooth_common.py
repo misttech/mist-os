@@ -79,7 +79,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         self.discovery_token: fc.Channel | None = None
         self._pairing_delegate_server: asyncio.Task[None] | None = None
         self.known_devices: dict[str, Any]
-        self._loop = None
+        self.loop = None
         self._peer_update_task: asyncio.Task[None] | None = None
         self._peer_update_queue: asyncio.Queue[
             f_btsys_controller.Peer
@@ -99,7 +99,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         self._reboot_affordance.register_for_on_device_boot(fn=self.sys_init)
 
         self.sys_init()
-        self._loop = asyncio.new_event_loop()
+        self.loop = asyncio.new_event_loop()
 
     def reset_state(self) -> None:
         """Resets internal state tracking variables to correspond to an inactive
@@ -115,8 +115,8 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             )
             self._pairing_delegate_server.cancel()
             self._pairing_delegate_server = None
-        if self._loop is not None:
-            self._loop.close()
+        if self.loop is not None:
+            self.loop.close()
 
     def is_session_initialized(self) -> bool:
         """Checks if the BT session is initialized or not.
@@ -181,7 +181,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             errors.BluetoothError: On failure.
         """
         try:
-            return self._loop.run_until_complete(
+            return self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._accept_pairing(
                         input_mode=input_mode, output_mode=output_mode
@@ -236,14 +236,14 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         peer_id = f_bt.PeerId(value=identifier)
         try:
-            self._loop.run_until_complete(
+            self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._access_controller_proxy.connect(id=peer_id),
                     ASYNC_OP_TIMEOUT,
                 )
             )
             # TODO: b/342432248 - Reduce sleep values to minimum stables values
-            self._loop.run_until_complete(asyncio.sleep(10))
+            self.loop.run_until_complete(asyncio.sleep(10))
         except Exception as e:
             raise errors.BluetoothError(
                 f"Failed to complete Bluetooth connect FIDL call on {self._device_name}."
@@ -260,7 +260,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         peer_id = f_bt.PeerId(value=identifier)
         try:
-            self._loop.run_until_complete(
+            self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._access_controller_proxy.forget(id=peer_id),
                     ASYNC_OP_TIMEOUT,
@@ -283,7 +283,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             errors.BluetoothError: If no addresses were found
         """
         try:
-            return self._loop.run_until_complete(
+            return self.loop.run_until_complete(
                 asyncio.wait_for(self._get_active_address(), ASYNC_OP_TIMEOUT)
             )
         except Exception as e:
@@ -336,7 +336,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         try:
             assert self._access_controller_proxy is not None
-            results = self._loop.run_until_complete(
+            results = self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._access_controller_proxy.watch_peers(),
                     ASYNC_OP_TIMEOUT,
@@ -374,7 +374,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         peer_id = f_bt.PeerId(value=identifier)
         options = f_btsys_controller.PairingOptions()
         try:
-            self._loop.run_until_complete(
+            self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._access_controller_proxy.pair(
                         id=peer_id, options=options
@@ -383,7 +383,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
                 )
             )
             # TODO: b/342432248 - Reduce sleep values to minimum stables values
-            self._loop.run_until_complete(asyncio.sleep(10))
+            self.loop.run_until_complete(asyncio.sleep(10))
         except Exception as e:
             raise errors.BluetoothError(
                 f"Failed to complete Bluetooth pair FIDL call on {self._device_name}."
@@ -409,7 +409,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         client, server = Channel.create()
         assert self._access_controller_proxy is not None
         try:
-            self._loop.run_until_complete(
+            self.loop.run_until_complete(
                 self._access_controller_proxy.start_discovery(
                     token=server.take()
                 )
@@ -441,7 +441,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         client, server = Channel.create()
         assert self._access_controller_proxy is not None
         try:
-            self._loop.run_until_complete(
+            self.loop.run_until_complete(
                 self._access_controller_proxy.make_discoverable(
                     token=server.take()
                 )
@@ -464,7 +464,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
                 f"device: {self._device_name}"
             )
         try:
-            self._loop.run_until_complete(
+            self.loop.run_until_complete(
                 asyncio.wait_for(
                     self._pairing_delegate_server, ASYNC_OP_TIMEOUT
                 )

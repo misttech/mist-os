@@ -30,7 +30,7 @@ Together, these libraries support rapid iteration and resource lifecycle managem
 ## Cross-platform support
 
 With a few exceptions, Escher is not platform-dependent. For example, the Escher examples can also
-be run on Linux and MacOS. This provides two distinct benefits:
+be run on Linux. This provides two distinct benefits:
 
 - Faster iteration in development. Recompiling Escher and running to debug is much faster on Linux than on Fuchsia.
 - On other platforms, the Vulkan ecosystem provides a wide variety of development tools which are not available on Fuchsia. For example, the [RenderDoc graphics debugger](http://renderdoc.org) was very useful during the development of Escher.

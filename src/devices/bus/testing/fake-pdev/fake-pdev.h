@@ -68,6 +68,10 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
     return ZX_OK;
   }
 
+  void set_metadata(std::unordered_map<uint32_t, std::vector<uint8_t>> metadata) {
+    metadata_ = std::move(metadata);
+  }
+
  private:
   void GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) override;
   void GetMmioByName(GetMmioByNameRequestView request,
@@ -85,12 +89,14 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
   void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override;
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override;
+  void GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   Config config_;
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> binding_group_;
+  std::unordered_map<uint32_t, std::vector<uint8_t>> metadata_;
 };
 
 }  // namespace fake_pdev

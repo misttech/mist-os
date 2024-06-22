@@ -1115,6 +1115,8 @@ pub(crate) enum Service {
     RoutesAdminV6(fnet_routes_admin::RouteTableV6RequestStream),
     RouteTableProviderV4(fnet_routes_admin::RouteTableProviderV4RequestStream),
     RouteTableProviderV6(fnet_routes_admin::RouteTableProviderV6RequestStream),
+    RuleTableV4(fnet_routes_admin::RuleTableV4RequestStream),
+    RuleTableV6(fnet_routes_admin::RuleTableV6RequestStream),
     RootRoutesV4(fidl_fuchsia_net_root::RoutesV4RequestStream),
     RootRoutesV6(fidl_fuchsia_net_root::RoutesV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
@@ -1177,8 +1179,6 @@ impl NetstackSeed {
         services: S,
         inspect_publisher: InspectPublisher<'_>,
     ) {
-        info!("serving netstack with netstack3");
-
         let Self {
             mut netstack,
             interfaces_worker,
@@ -1443,6 +1443,28 @@ impl NetstackSeed {
                                     fnet_routes_admin::RouteTableProviderV6Marker::DEBUG_NAME
                                 );
                             })
+                        }
+                        Service::RuleTableV4(rule_table) => {
+                            rule_table
+                                .serve_with(|rs| {
+                                    routes::admin::serve_rule_table::<Ipv4>(
+                                        rs,
+                                        route_spawner.clone(),
+                                        &netstack.ctx,
+                                    )
+                                })
+                                .await
+                        }
+                        Service::RuleTableV6(rule_table) => {
+                            rule_table
+                                .serve_with(|rs| {
+                                    routes::admin::serve_rule_table::<Ipv6>(
+                                        rs,
+                                        route_spawner.clone(),
+                                        &netstack.ctx,
+                                    )
+                                })
+                                .await
                         }
                         Service::RootRoutesV4(rs) => root_fidl_worker::serve_routes_v4(
                             rs,

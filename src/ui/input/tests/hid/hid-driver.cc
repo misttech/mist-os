@@ -143,7 +143,7 @@ TEST_F(HidDriverTest, BootMouseTest) {
 
   fidl::WireSyncClient client(std::move(device));
   // Make a synchronous FIDL call to ensure the session connection is alive.
-  ASSERT_OK(client->GetBootProtocol());
+  ASSERT_OK(client->Query());
 
   // Send a single mouse report
   hid_boot_mouse_report_t mouse_report = {
@@ -156,9 +156,9 @@ TEST_F(HidDriverTest, BootMouseTest) {
   zx::event report_event;
   {
     auto result = client->GetReportsEvent();
-    ASSERT_OK(result.status());
-    ASSERT_OK(result.value().status);
-    report_event = std::move(result.value().event);
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    report_event = std::move(result.value()->event);
   }
 
   // Check that the report comes through
@@ -168,11 +168,11 @@ TEST_F(HidDriverTest, BootMouseTest) {
     hid_boot_mouse_report_t test_report = {};
 
     auto response = client->ReadReport();
-    ASSERT_OK(response.status());
-    ASSERT_OK(response.value().status);
-    ASSERT_EQ(response.value().data.count(), sizeof(test_report));
+    ASSERT_TRUE(response.ok());
+    ASSERT_TRUE(response->is_ok());
+    ASSERT_EQ(response.value()->report.buf().count(), sizeof(test_report));
 
-    memcpy(&test_report, response.value().data.data(), sizeof(test_report));
+    memcpy(&test_report, response.value()->report.buf().data(), sizeof(test_report));
     ASSERT_EQ(mouse_report.rel_x, test_report.rel_x);
     ASSERT_EQ(mouse_report.rel_y, test_report.rel_y);
   }

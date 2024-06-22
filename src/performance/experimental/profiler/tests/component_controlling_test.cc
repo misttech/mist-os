@@ -34,10 +34,11 @@ TEST(ComponentControlling, CleanUpFailedLaunch) {
 
   // Attempt to launch a component that will be created, but will fail to resolve.
   fuchsia_cpu_profiler::TargetConfig target_config =
-      fuchsia_cpu_profiler::TargetConfig::WithComponent(fuchsia_cpu_profiler::ComponentConfig{{
-          .url = "not_found#meta/not_found.cm",
-          .moniker = "./launchpad:not_found",
-      }});
+      fuchsia_cpu_profiler::TargetConfig::WithComponent(
+          fuchsia_cpu_profiler::AttachConfig::WithLaunchComponent({{
+              .url = "not_found#meta/not_found.cm",
+              .moniker = "./launchpad:not_found",
+          }}));
 
   ASSERT_TRUE(client
                   ->Configure({{.output = std::move(outgoing_socket),

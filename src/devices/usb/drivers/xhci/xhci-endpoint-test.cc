@@ -31,8 +31,8 @@ class EndpointHarness : public zxtest::Test {
 
     sync_completion_t wait;
     async::PostTask(loop_.dispatcher(), [&]() {
-      hci_ =
-          std::make_unique<UsbXhci>(nullptr, ddk_fake::CreateBufferFactory(), loop_.dispatcher());
+      hci_ = std::make_unique<UsbXhci>(nullptr, xhci_config::Config({.enable_suspend = false}),
+                                       ddk_fake::CreateBufferFactory(), loop_.dispatcher());
       sync_completion_signal(&wait);
     });
     sync_completion_wait(&wait, zx::time::infinite().get());

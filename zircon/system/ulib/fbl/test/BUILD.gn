@@ -92,9 +92,11 @@ test("fbl") {
   }
 
   if (is_lto_variant || optimize == "size_lto" || is_coverage) {
-    # LTO OOMs on RBE workers
-    # coverage mode timeout on RBE
-    configs += [ "//build/config:no_remote_link" ]
+    # LTO OOMs and coverage mode times out on RBE default workers,
+    # so use bigger workers (e.g. n2-standard-8).
+    _concurrent_jobs = concurrent_jobs.link_highmem
+    configs += _concurrent_jobs.configs
+    forward_variables_from(_concurrent_jobs.vars, "*")
   }
 }
 

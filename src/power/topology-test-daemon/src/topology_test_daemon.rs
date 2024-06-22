@@ -260,7 +260,7 @@ impl TopologyTestDaemon {
                     dependency_type: dependency.dependency_type,
                     dependent_level: dependency.dependent_level,
                     requires_token: token,
-                    requires_level: dependency.requires_level,
+                    requires_level_by_preference: vec![dependency.requires_level],
                 });
             }
             let element_name = element.element_name;
@@ -354,7 +354,7 @@ impl TopologyTestDaemon {
                     dependency_type: fbroker::DependencyType::Active,
                     dependent_level: 1,
                     requires_token: aa_token,
-                    requires_level: 1,
+                    requires_level_by_preference: vec![1],
                 }],
                 self.inspect_root.create_child(APPLICATION_ACTIVITY_CONTROLLER),
             )

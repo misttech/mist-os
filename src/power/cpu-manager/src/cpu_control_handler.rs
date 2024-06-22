@@ -7,6 +7,7 @@ use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
 use crate::types::{Farads, Hertz, OperatingPoint, ThermalLoad, Volts, Watts};
+use crate::utils::get_cpu_ctrl_proxy;
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
@@ -18,8 +19,8 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use {
-    fidl_fuchsia_hardware_cpu_ctrl as fcpuctrl, fidl_fuchsia_io as fio,
-    fidl_fuchsia_thermal as fthermal, serde_json as json,
+    fidl_fuchsia_hardware_cpu_ctrl as fcpuctrl, fidl_fuchsia_thermal as fthermal,
+    serde_json as json,
 };
 
 /// Node: CpuControlHandler
@@ -98,7 +99,8 @@ pub fn get_cpu_power(capacitance: Farads, voltage: Volts, op_completion_rate: He
 pub struct CpuControlHandlerBuilder<'a> {
     sustainable_power: Option<Watts>,
     power_gain: Option<Watts>,
-    cpu_driver_path: Option<String>,
+    total_domain_count: Option<u8>,
+    perf_rank: Option<u8>,
     cpu_stats_handler: Option<Rc<dyn Node>>,
     cpu_dev_handler: Option<Rc<dyn Node>>,
     cpu_ctrl_proxy: Option<fcpuctrl::DeviceProxy>,
@@ -116,7 +118,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
         Self {
             sustainable_power: Some(Watts(0.0)),
             power_gain: Some(Watts(0.0)),
-            cpu_driver_path: Some("TestCpuControlHandler".to_string()),
+            total_domain_count: Some(1),
+            perf_rank: Some(0),
             cpu_stats_handler: Some(create_dummy_node()),
             cpu_dev_handler: Some(create_dummy_node()),
             cpu_ctrl_proxy: None,
@@ -186,7 +189,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
         struct Config {
             sustainable_power: f64,
             power_gain: f64,
-            driver_path: String,
+            total_domain_count: u8,
+            perf_rank: u8,
             capacitance: f64,
             min_cpu_clock_speed: f64,
             logical_cpu_numbers: Vec<u32>,
@@ -208,7 +212,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
         Self {
             sustainable_power: Some(Watts(data.config.sustainable_power)),
             power_gain: Some(Watts(data.config.power_gain)),
-            cpu_driver_path: Some(data.config.driver_path),
+            total_domain_count: Some(data.config.total_domain_count),
+            perf_rank: Some(data.config.perf_rank),
             min_cpu_clock_speed: Some(Hertz(data.config.min_cpu_clock_speed)),
             cpu_stats_handler: Some(nodes[&data.dependencies.cpu_stats_handler_node].clone()),
             cpu_dev_handler: Some(nodes[&data.dependencies.cpu_dev_handler_node].clone()),
@@ -222,7 +227,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
     pub fn build(self) -> Result<Rc<CpuControlHandler>, Error> {
         let sustainable_power = ok_or_default_err!(self.sustainable_power)?;
         let power_gain = ok_or_default_err!(self.power_gain)?;
-        let cpu_driver_path = ok_or_default_err!(self.cpu_driver_path)?;
+        let total_domain_count = ok_or_default_err!(self.total_domain_count)?;
+        let perf_rank = ok_or_default_err!(self.perf_rank)?;
         let cpu_stats_handler = ok_or_default_err!(self.cpu_stats_handler)?;
         let cpu_dev_handler = ok_or_default_err!(self.cpu_dev_handler)?;
         let min_cpu_clock_speed = ok_or_default_err!(self.min_cpu_clock_speed)?;
@@ -232,7 +238,7 @@ impl<'a> CpuControlHandlerBuilder<'a> {
         // Optionally use the default inspect root node
         let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
         let inspect =
-            InspectData::new(inspect_root, format!("CpuControlHandler ({})", cpu_driver_path));
+            InspectData::new(inspect_root, format!("CpuControlHandler (perf_rank: {})", perf_rank));
 
         let mutable_inner = MutableInner {
             current_opp_index: 0,
@@ -245,14 +251,15 @@ impl<'a> CpuControlHandlerBuilder<'a> {
         };
 
         let mut hasher = DefaultHasher::new();
-        cpu_driver_path.hash(&mut hasher);
+        perf_rank.hash(&mut hasher);
         let trace_counter_id = hasher.finish();
 
         Ok(Rc::new(CpuControlHandler {
             sustainable_power,
             power_gain,
             init_done: AsyncEvent::new(),
-            cpu_driver_path,
+            total_domain_count,
+            perf_rank,
             cpu_stats_handler,
             cpu_dev_handler,
             inspect,
@@ -281,8 +288,12 @@ pub struct CpuControlHandler {
     /// its `init()` has completed.
     init_done: AsyncEvent,
 
-    /// The path to the driver that this node controls.
-    cpu_driver_path: String,
+    /// Total number of CPU devices.
+    total_domain_count: u8,
+
+    /// Performance rank of the CPU device, where rank is the position in a list of all CPU devices
+    /// sorted by relative performance from highest to lowest.
+    perf_rank: u8,
 
     /// The node which will provide CPU load information. It is expected that this node responds to
     /// the GetCpuLoads message.
@@ -317,7 +328,7 @@ impl CpuControlHandler {
         fuchsia_trace::duration!(
             c"cpu_manager",
             c"CpuControlHandler::get_load",
-            "driver" => self.cpu_driver_path.as_str()
+            "perf_rank" => self.perf_rank as u32
         );
 
         // Get load for all CPUs in the system
@@ -342,7 +353,7 @@ impl CpuControlHandler {
         fuchsia_trace::duration!(
             c"cpu_manager",
             c"CpuControlHandler::get_current_opp_index",
-            "driver" => self.cpu_driver_path.as_str()
+            "perf_rank" => self.perf_rank as u32
         );
         match self.send_message(&self.cpu_dev_handler, &Message::GetOperatingPoint).await {
             Ok(MessageReturn::GetOperatingPoint(state)) => Ok(state as usize),
@@ -411,7 +422,7 @@ impl CpuControlHandler {
         fuchsia_trace::duration!(
             c"cpu_manager",
             c"CpuControlHandler::set_max_power_consumption",
-            "driver" => self.cpu_driver_path.as_str(),
+            "perf_rank" => self.perf_rank as u32,
             "max_power" => max_power.0
         );
 
@@ -435,7 +446,7 @@ impl CpuControlHandler {
                 c"cpu_manager",
                 c"CpuControlHandler last_load",
                 self.trace_counter_id,
-                self.cpu_driver_path.as_str() => last_load
+                &self.perf_rank.to_string() => last_load
             );
 
             let last_frequency = self.cpu_control_params().opps[current_opp_index].frequency;
@@ -447,7 +458,7 @@ impl CpuControlHandler {
             c"cpu_manager",
             c"CpuControlHandler::set_max_power_consumption_data",
             fuchsia_trace::Scope::Thread,
-            "driver" => self.cpu_driver_path.as_str(),
+            "perf_rank" => self.perf_rank as u32,
             "current_opp_index" => current_opp_index as u32,
             "last_op_rate" => last_op_rate.0
         );
@@ -498,7 +509,7 @@ impl CpuControlHandler {
                 c"cpu_manager",
                 c"CpuControlHandler::updated_opp_index",
                 fuchsia_trace::Scope::Thread,
-                "driver" => self.cpu_driver_path.as_str(),
+                "perf_rank" => self.perf_rank as u32,
                 "old_index" => current_opp_index as u32,
                 "new_index" => opp_index as u32
             );
@@ -516,7 +527,7 @@ impl CpuControlHandler {
             c"cpu_manager",
             c"CpuControlHandler opp",
             self.trace_counter_id,
-            self.cpu_driver_path.as_str() => opp_index as u32
+            &self.perf_rank.to_string() => opp_index as u32
         );
         Ok(())
     }
@@ -536,7 +547,7 @@ struct MutableInner {
 #[async_trait(?Send)]
 impl Node for CpuControlHandler {
     fn name(&self) -> String {
-        format!("CpuControlHandler ({})", self.cpu_driver_path)
+        format!("CpuControlHandler (perf_rank: {})", self.perf_rank)
     }
 
     /// Initializes internal state.
@@ -548,37 +559,11 @@ impl Node for CpuControlHandler {
         // Connect to the cpu-ctrl driver. Typically this is None, but it may be set by tests.
         let cpu_ctrl_proxy = match &self.mutable_inner.borrow().cpu_ctrl_proxy {
             Some(p) => p.clone(),
-            None => {
-                const DEV_CLASS_CPUCTRL: &str = "/dev/class/cpu-ctrl/";
-
-                let dir = fuchsia_fs::directory::open_in_namespace(
-                    DEV_CLASS_CPUCTRL,
-                    fio::OpenFlags::RIGHT_READABLE,
-                )?;
-
-                // TODO(https://fxbug.dev/42065064): Remove this requirement when the configuration
-                // specifies the device more robustly than by its sequential number.
-                let path =
-                    self.cpu_driver_path.strip_prefix(DEV_CLASS_CPUCTRL).ok_or_else(|| {
-                        anyhow::anyhow!(
-                            "driver_path={} not in {}",
-                            self.cpu_driver_path,
-                            DEV_CLASS_CPUCTRL
-                        )
-                    })?;
-                device_watcher::wait_for_device_with(&dir, |info| {
-                    (info.filename == path).then(|| {
-                        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-                            fcpuctrl::DeviceMarker,
-                        >(&dir, path)
-                    })
-                })
-                .await??
-            }
+            None => get_cpu_ctrl_proxy(self.total_domain_count, self.perf_rank).await?,
         };
 
         // Query the CPU opps
-        let opps = get_opps(&self.cpu_driver_path, &cpu_ctrl_proxy, self.min_cpu_clock_speed)
+        let opps = get_opps(self.perf_rank, &cpu_ctrl_proxy, self.min_cpu_clock_speed)
             .await
             .context("Failed to get CPU opps")?;
 
@@ -658,14 +643,14 @@ impl InspectData {
 
 /// Query the CPU opps from the CpuCtrl driver.
 async fn get_opps(
-    cpu_driver_path: &str,
+    perf_rank: u8,
     cpu_ctrl_proxy: &fcpuctrl::DeviceProxy,
     min_cpu_clock_speed: Hertz,
 ) -> Result<Vec<OperatingPoint>, Error> {
     fuchsia_trace::duration!(
         c"cpu_manager",
         c"cpu_control_handler::get_opps",
-        "driver" => cpu_driver_path
+        "perf_rank" => perf_rank as u32
     );
 
     // Query opp metadata from the CpuCtrl interface. Each supported operating point has
@@ -676,10 +661,18 @@ async fn get_opps(
         .get_operating_point_count()
         .await
         .map_err(|e| {
-            format_err!("{}: get_operating_point_count IPC failed: {}", cpu_driver_path, e)
+            format_err!(
+                "CPU driver (perf_rank: {}): get_operating_point_count IPC failed: {}",
+                perf_rank,
+                e
+            )
         })?
         .map_err(|e| {
-            format_err!("{}: get_operating_point_count returned error: {}", cpu_driver_path, e)
+            format_err!(
+                "CPU driver (perf_rank: {}): get_operating_point_count returned error: {}",
+                perf_rank,
+                e
+            )
         })?;
 
     for i in 0..opp_count {
@@ -687,10 +680,18 @@ async fn get_opps(
             .get_operating_point_info(i)
             .await
             .map_err(|e| {
-                format_err!("{}: get_operating_point_info IPC failed: {}", cpu_driver_path, e)
+                format_err!(
+                    "CPU driver (perf_rank: {}): get_operating_point_info IPC failed: {}",
+                    perf_rank,
+                    e
+                )
             })?
             .map_err(|e| {
-                format_err!("{}: get_operating_point_info returned error: {}", cpu_driver_path, e)
+                format_err!(
+                    "CPU driver (perf_rank: {}): get_operating_point_info returned error: {}",
+                    perf_rank,
+                    e
+                )
             })?;
 
         let frequency = Hertz(info.frequency_hz as f64);
@@ -709,7 +710,7 @@ async fn get_opps(
         c"cpu_manager",
         c"cpu_control_handler::received_cpu_opps",
         fuchsia_trace::Scope::Thread,
-        "driver" => cpu_driver_path,
+        "perf_rank" => perf_rank as u32,
         "valid" => 1,
         "opps" => format!("{:?}", opps).as_str(),
         "skipped_opps" => format!("{:?}", skipped_opps).as_str()
@@ -1099,7 +1100,7 @@ pub mod tests {
         assert_data_tree!(
             inspector,
             root: {
-                "CpuControlHandler (TestCpuControlHandler)": contains {
+                "CpuControlHandler (perf_rank: 0)": contains {
                     cpu_control_params: {
                         "capacitance (F)": 100.0e-12,
                         logical_cpu_numbers: "[0, 1, 2, 3]",
@@ -1122,7 +1123,8 @@ pub mod tests {
             "config": {
                 "sustainable_power": 0.952,
                 "power_gain": 0.0096,
-                "driver_path": "/dev/class/cpu-ctrl/000",
+                "total_domain_count": 1,
+                "perf_rank": 0,
                 "capacitance": 1.2E-10,
                 "min_cpu_clock_speed": 1.0e9,
                 "logical_cpu_numbers": [0, 1]

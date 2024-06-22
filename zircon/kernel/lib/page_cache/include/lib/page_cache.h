@@ -275,9 +275,32 @@ class PageCache {
       // Release the cache lock while calling into the PMM to permit other
       // threads to access the cache if this thread blocks.
       cache_guard.CallUnlocked([total_pages, alloc_flags, &page_list, &status]() {
-        status = pmm_alloc_pages(total_pages, alloc_flags, &page_list);
+        size_t pages = total_pages;
+        status = pmm_alloc_pages(pages, alloc_flags, &page_list);
+        // If the alloc_flags contained PMM_ALLOC_FLAG_CAN_WAIT then could get ZX_ERR_SHOULD_WAIT as
+        // a return code. In this case, as per the documentation of pmm_alloc_pages, we must fall
+        // back to attempting to allocate single pages.
+        if (status == ZX_ERR_SHOULD_WAIT) {
+          vm_page_t* page = nullptr;
+          while (pages > 0 && (status = pmm_alloc_page(alloc_flags, &page)) == ZX_OK) {
+            list_add_tail(&page_list, &page->queue_node);
+            pages--;
+          }
+        }
       });
       if (status != ZX_OK) {
+        // Even if allocating all the pages failed, may have received a few. If so, put them into
+        // the cache and then see if we have enough for the actual requested allocation. Since this
+        // is an uncommon edge cases do not try and be too optimal with the implementation.
+        while (!list_is_empty(&page_list)) {
+          vm_page_t* page = list_remove_head_type(&page_list, vm_page_t, queue_node);
+          page->set_state(vm_page_state::CACHE);
+          list_add_tail(&entry.free_list, &page->queue_node);
+          entry.available_pages++;
+        }
+        if (requested_pages <= entry.available_pages) {
+          return zx::ok(AllocateCachePages(entry, requested_pages));
+        }
         return zx::error_result(status);
       }
 

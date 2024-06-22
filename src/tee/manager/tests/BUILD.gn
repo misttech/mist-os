@@ -27,6 +27,7 @@ ta_manager_config_test("ta-manager-connect-panic-ta-test") {
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/tee/tee_internal_api:tee_internal",
   ]
   subpackages = [ "//src/tee/ta/panic:ta-panic" ]
 }

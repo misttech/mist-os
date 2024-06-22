@@ -7,6 +7,7 @@
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
+    "FuchsiaAssemblyDeveloperOverridesListInfo",
     "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
     "FuchsiaProductAssemblyBundleInfo",
@@ -14,6 +15,7 @@ load(
     "FuchsiaProductConfigInfo",
     "FuchsiaProductImageInfo",
 )
+load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 PACKAGE_MODE = struct(
     DISK = "disk",
@@ -34,6 +36,19 @@ $FFX \
     {mode_arg} \
     --outdir $OUTDIR
 """
+
+def _match_assembly_pattern_string(label, pattern):
+    package = label.package
+    assembly_pattern = pattern.removeprefix("//")
+    if assembly_pattern.endswith("/*"):
+        # Match any target in the package or below
+        return package.startswith(assembly_pattern.removesuffix("/*"))
+    elif assembly_pattern.endswith(":*"):
+        # Match package exactly.
+        return package == assembly_pattern.removesuffix(":*")
+    else:
+        # Match label exactly.
+        return assembly_pattern == "%s:%s" % (package, label.name)
 
 def _fuchsia_product_assembly_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -124,6 +139,17 @@ def _fuchsia_product_assembly_impl(ctx):
         ffx_invocation.extend(["--legacy-bundle", legacy_bundle.root])
         ffx_inputs += legacy_bundle.files
 
+    # Add developer overrides manifest and inputs if necessary.
+    overrides_maps = ctx.attr._developer_overrides_list[FuchsiaAssemblyDeveloperOverridesListInfo].maps
+    for pattern_string, overrides_info in overrides_maps:
+        if _match_assembly_pattern_string(ctx.label, pattern_string):
+            print("Found assembly developer overrides: %s" % overrides_info)
+            ffx_inputs += overrides_info.inputs
+            ffx_invocation.extend([
+                "--developer-overrides",
+                overrides_info.manifest.path,
+            ])
+
     _ffx_invocation = []
     _ffx_invocation.extend(ffx_invocation)
     shell_src = [
@@ -158,6 +184,7 @@ def _fuchsia_product_assembly_impl(ctx):
             "--base-package-manifest-list",
             base_package_list.path,
         ],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     deps = [out_dir, ffx_isolate_dir, cache_package_list, base_package_list, platform_aibs_file] + ffx_inputs
@@ -226,6 +253,9 @@ fuchsia_product_assembly = rule(
             executable = True,
             cfg = "exec",
         ),
+        "_developer_overrides_list": attr.label(
+            default = "//fuchsia:assembly_developer_overrides_list",
+        ),
     },
 )
 
@@ -265,6 +295,7 @@ def _fuchsia_product_create_system_impl(ctx):
         command = shell_src,
         env = shell_env,
         progress_message = "Assembly Create-system for %s" % ctx.label.name,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
     return [
         DefaultInfo(files = depset(direct = [out_dir, ffx_isolate_dir] + ffx_inputs)),
@@ -308,6 +339,7 @@ def fuchsia_product(
         package_mode = None,
         platform_artifacts = None,
         legacy_bundle = None,
+        package_validation = None,
         **kwargs):
     fuchsia_product_assembly(
         name = name + "_product_assembly",
@@ -316,6 +348,7 @@ def fuchsia_product(
         platform_artifacts = platform_artifacts,
         legacy_bundle = legacy_bundle,
         package_mode = package_mode,
+        package_validation = package_validation,
     )
 
     _fuchsia_product_create_system(

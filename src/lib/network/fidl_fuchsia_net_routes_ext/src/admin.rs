@@ -41,8 +41,8 @@ pub enum RouteTableCreationError {
 
 /// Admin extension for the `fuchsia.net.routes.admin` FIDL API.
 pub trait FidlRouteAdminIpExt: Ip {
-    /// The "set provider" protocol to use for this IP version.
-    type RouteTableMarker: DiscoverableProtocolMarker;
+    /// The "route table" protocol to use for this IP version.
+    type RouteTableMarker: DiscoverableProtocolMarker<RequestStream = Self::RouteTableRequestStream>;
     /// The "root set" protocol to use for this IP version.
     type GlobalRouteTableMarker: DiscoverableProtocolMarker;
     /// The "route set" protocol to use for this IP version.
@@ -58,7 +58,7 @@ pub trait FidlRouteAdminIpExt: Ip {
     /// The responder for RemoveRoute requests.
     type RemoveRouteResponder: Responder<Payload = Result<bool, fnet_routes_admin::RouteSetError>>;
     /// The responder for AuthenticateForInterface requests.
-    type AuthenticateForInterfaceResponder: Responder<
+    type RouteSetAuthenticateForInterfaceResponder: Responder<
         Payload = Result<(), fnet_routes_admin::AuthenticateForInterfaceError>,
     >;
     /// The responder for GetTableId requests.
@@ -73,6 +73,16 @@ pub trait FidlRouteAdminIpExt: Ip {
     >;
     /// The control handle for RouteTable protocols.
     type RouteTableControlHandle: fidl::endpoints::ControlHandle;
+
+    /// Turns a FIDL route set request into the extension type.
+    fn into_route_set_request(
+        request: fidl::endpoints::Request<Self::RouteSetMarker>,
+    ) -> RouteSetRequest<Self>;
+
+    /// Turns a FIDL route table request into the extension type.
+    fn into_route_table_request(
+        request: fidl::endpoints::Request<Self::RouteTableMarker>,
+    ) -> RouteTableRequest<Self>;
 }
 
 impl FidlRouteAdminIpExt for Ipv4 {
@@ -84,13 +94,25 @@ impl FidlRouteAdminIpExt for Ipv4 {
     type RouteTableRequestStream = fnet_routes_admin::RouteTableV4RequestStream;
     type AddRouteResponder = fnet_routes_admin::RouteSetV4AddRouteResponder;
     type RemoveRouteResponder = fnet_routes_admin::RouteSetV4RemoveRouteResponder;
-    type AuthenticateForInterfaceResponder =
+    type RouteSetAuthenticateForInterfaceResponder =
         fnet_routes_admin::RouteSetV4AuthenticateForInterfaceResponder;
     type RouteTableGetTableIdResponder = fnet_routes_admin::RouteTableV4GetTableIdResponder;
     type RouteTableRemoveResponder = fnet_routes_admin::RouteTableV4RemoveResponder;
     type RouteTableGetAuthorizationResponder =
         fnet_routes_admin::RouteTableV4GetAuthorizationForRouteTableResponder;
     type RouteTableControlHandle = fnet_routes_admin::RouteTableV4ControlHandle;
+
+    fn into_route_set_request(
+        request: fidl::endpoints::Request<Self::RouteSetMarker>,
+    ) -> RouteSetRequest<Self> {
+        RouteSetRequest::from(request)
+    }
+
+    fn into_route_table_request(
+        request: fidl::endpoints::Request<Self::RouteTableMarker>,
+    ) -> RouteTableRequest<Self> {
+        RouteTableRequest::from(request)
+    }
 }
 
 impl FidlRouteAdminIpExt for Ipv6 {
@@ -102,13 +124,25 @@ impl FidlRouteAdminIpExt for Ipv6 {
     type RouteTableRequestStream = fnet_routes_admin::RouteTableV6RequestStream;
     type AddRouteResponder = fnet_routes_admin::RouteSetV6AddRouteResponder;
     type RemoveRouteResponder = fnet_routes_admin::RouteSetV6RemoveRouteResponder;
-    type AuthenticateForInterfaceResponder =
+    type RouteSetAuthenticateForInterfaceResponder =
         fnet_routes_admin::RouteSetV6AuthenticateForInterfaceResponder;
     type RouteTableGetTableIdResponder = fnet_routes_admin::RouteTableV6GetTableIdResponder;
     type RouteTableRemoveResponder = fnet_routes_admin::RouteTableV6RemoveResponder;
     type RouteTableGetAuthorizationResponder =
         fnet_routes_admin::RouteTableV6GetAuthorizationForRouteTableResponder;
     type RouteTableControlHandle = fnet_routes_admin::RouteTableV6ControlHandle;
+
+    fn into_route_set_request(
+        request: fidl::endpoints::Request<Self::RouteSetMarker>,
+    ) -> RouteSetRequest<Self> {
+        RouteSetRequest::from(request)
+    }
+
+    fn into_route_table_request(
+        request: fidl::endpoints::Request<Self::RouteTableMarker>,
+    ) -> RouteTableRequest<Self> {
+        RouteTableRequest::from(request)
+    }
 }
 
 /// Abstracts over AddRoute and RemoveRoute RouteSet method responders.
@@ -131,6 +165,7 @@ macro_rules! impl_responder {
         }
     };
 }
+pub(crate) use impl_responder;
 
 impl_responder!(
     fnet_routes_admin::RouteSetV4AddRouteResponder,
@@ -437,7 +472,7 @@ pub enum RouteSetRequest<I: FidlRouteAdminIpExt> {
         /// The credential proving authorization for this interface.
         credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
         /// The responder for this request.
-        responder: I::AuthenticateForInterfaceResponder,
+        responder: I::RouteSetAuthenticateForInterfaceResponder,
     },
 }
 

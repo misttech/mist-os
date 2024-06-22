@@ -10,7 +10,10 @@ use net_types::{BroadcastAddr, MulticastAddr};
 
 use core::convert::Infallible as Never;
 use core::fmt::Debug;
-use packet::{BufferMut, Serializer};
+use packet::{BufferMut, SerializeError, Serializer};
+use thiserror::Error;
+
+use crate::error::ErrorAndSerializer;
 
 /// A context for receiving frames.
 ///
@@ -66,6 +69,32 @@ where
     }
 }
 
+/// The error type for [`SendFrameError`].
+#[derive(Error, Debug, PartialEq)]
+pub enum SendFrameErrorReason {
+    /// Serialization failed due to failed size constraints.
+    #[error("size constraints violated")]
+    SizeConstraintsViolation,
+    /// Couldn't allocate space to serialize the frame.
+    #[error("failed to allocate")]
+    Alloc,
+    /// The transmit queue is full.
+    #[error("transmit queue is full")]
+    QueueFull,
+}
+
+impl<A> From<SerializeError<A>> for SendFrameErrorReason {
+    fn from(e: SerializeError<A>) -> Self {
+        match e {
+            SerializeError::Alloc(_) => Self::Alloc,
+            SerializeError::SizeLimitExceeded => Self::SizeConstraintsViolation,
+        }
+    }
+}
+
+/// Errors returned by [`SendFrameContext::send_frame`].
+pub type SendFrameError<S> = ErrorAndSerializer<SendFrameErrorReason, S>;
+
 /// A context for sending frames.
 pub trait SendFrameContext<BC, Meta> {
     /// Send a frame.
@@ -76,7 +105,12 @@ pub trait SendFrameContext<BC, Meta> {
     /// unmodified `Serializer` is returned.
     ///
     /// [`Serializer`]: packet::Serializer
-    fn send_frame<S>(&mut self, bindings_ctx: &mut BC, metadata: Meta, frame: S) -> Result<(), S>
+    fn send_frame<S>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        metadata: Meta,
+        frame: S,
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut;
@@ -91,7 +125,12 @@ pub trait SendFrameContext<BC, Meta> {
 /// trait implementations, while [`SendFrameContext`] is used for trait bounds.
 pub trait SendableFrameMeta<CC, BC> {
     /// Sends this frame metadata to the provided contexts.
-    fn send_meta<S>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, frame: S) -> Result<(), S>
+    fn send_meta<S>(
+        self,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        frame: S,
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut;
@@ -101,7 +140,12 @@ impl<CC, BC, Meta> SendFrameContext<BC, Meta> for CC
 where
     Meta: SendableFrameMeta<CC, BC>,
 {
-    fn send_frame<S>(&mut self, bindings_ctx: &mut BC, metadata: Meta, frame: S) -> Result<(), S>
+    fn send_frame<S>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        metadata: Meta,
+        frame: S,
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
@@ -191,13 +235,19 @@ pub(crate) mod testutil {
     /// A fake [`FrameContext`].
     pub struct FakeFrameCtx<Meta> {
         frames: Vec<(Meta, Vec<u8>)>,
-        should_error_for_frame: Option<Box<dyn FnMut(&Meta) -> bool + Send>>,
+        should_error_for_frame:
+            Option<Box<dyn FnMut(&Meta) -> Option<SendFrameErrorReason> + Send>>,
     }
 
     impl<Meta> FakeFrameCtx<Meta> {
         /// Closure which can decide to cause an error to be thrown when
         /// handling a frame, based on the metadata.
-        pub fn set_should_error_for_frame<F: Fn(&Meta) -> bool + Send + 'static>(&mut self, f: F) {
+        pub fn set_should_error_for_frame<
+            F: Fn(&Meta) -> Option<SendFrameErrorReason> + Send + 'static,
+        >(
+            &mut self,
+            f: F,
+        ) {
             self.should_error_for_frame = Some(Box::new(f));
         }
     }
@@ -231,18 +281,18 @@ pub(crate) mod testutil {
             core_ctx: &mut FakeFrameCtx<Meta>,
             _bindings_ctx: &mut BC,
             frame: S,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,
         {
-            if let Some(should_error_for_frame) = core_ctx.should_error_for_frame.as_mut() {
-                if should_error_for_frame(&self) {
-                    return Err(frame);
-                }
+            if let Some(error) = core_ctx.should_error_for_frame.as_mut().and_then(|f| f(&self)) {
+                return Err(SendFrameError { serializer: frame, error });
             }
 
-            let buffer = frame.serialize_vec_outer().map_err(|(_err, s)| s)?;
+            let buffer = frame
+                .serialize_vec_outer()
+                .map_err(|(e, serializer)| SendFrameError { error: e.into(), serializer })?;
             core_ctx.push(self, buffer.as_ref().to_vec());
             Ok(())
         }

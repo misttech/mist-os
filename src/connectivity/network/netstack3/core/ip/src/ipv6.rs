@@ -7,7 +7,7 @@
 use netstack3_base::{AnyDevice, DeviceIdContext, FrameDestination};
 use packet_formats::ipv6::ext_hdrs::{
     DestinationOptionData, ExtensionHeaderOption, FragmentData, HopByHopOptionData,
-    Ipv6ExtensionHeaderData, RoutingData,
+    Ipv6ExtensionHeaderData,
 };
 use packet_formats::ipv6::Ipv6Packet;
 use zerocopy::ByteSlice;
@@ -136,21 +136,6 @@ fn handle_hop_by_hop_options_ext_hdr<
     }
 
     Ipv6PacketAction::Continue
-}
-
-/// Handles a routing extension header for a `packet`.
-// TODO(rheacock): Remove `_` prefix when this is used.
-fn _handle_routing_ext_hdr<'a, CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
-    _bindings_ctx: &mut CC,
-    _device: &CC::DeviceId,
-    _frame_dst: Option<FrameDestination>,
-    _packet: &Ipv6Packet<B>,
-    _routing_data: &RoutingData<'a>,
-) -> Ipv6PacketAction {
-    // We should never end up here because we do not support parsing any routing
-    // header type yet. We should have errored out while parsing the extension
-    // header if there is a routing header we would normally have to act on.
-    unreachable!("We should not end up here because no routing type is supported yet");
 }
 
 /// Handles a fragment extension header for a `packet`.

@@ -78,7 +78,7 @@ void Streamer::WatchDevicesCallback(std::vector<fuchsia::camera3::WatchDevicesEv
             config_count_ = 0;
             connected_config_index_ = 0;
             configurations_ = std::move(configurations);
-            config_count_ = static_cast<uint32_t>(configurations.size());
+            config_count_ = static_cast<uint32_t>(configurations_.size());
             FX_LOGS(INFO) << "configurations available: " << config_count_;
             // Once we have the known camera configurations, default to the first configuration
             // index. This is automatically chosen in the driver, so we do not need to ask for it.

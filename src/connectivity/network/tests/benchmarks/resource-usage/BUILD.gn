@@ -62,6 +62,7 @@ fuchsia_test_component("resource-usage-benchmark-netstack3") {
 
 fuchsia_test_package("resource-usage-benchmarks-netstack3") {
   test_components = [ ":resource-usage-benchmark-netstack3" ]
+  deps = [ "//src/connectivity/network/netstack3:config_for_tests" ]
 }
 
 fuchsia_component_perf_test("resource_usage_benchmarks_netstack3") {

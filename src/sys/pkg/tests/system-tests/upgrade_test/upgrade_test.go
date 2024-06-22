@@ -274,6 +274,12 @@ func systemOTA(
 ) error {
 	var err error
 
+	// We should use this ffx after we reboot.
+	nextFfxTool, err := dstOta.build.GetFfx(ctx, ffxIsolateDir)
+	if err != nil {
+		return fmt.Errorf("failed to get ffx from build %s: %w", dstOta, err)
+	}
+
 	// Attempt an N-1 -> N OTA, up to downgradeOTAAttempts times.
 	// We optionally retry this OTA because some downgrade builds contain bugs which make them
 	// spuriously reboot. Those builds are already cut, but we still need to test them.
@@ -292,6 +298,7 @@ func systemOTA(
 
 		if err = otaToPackage(
 			ctx,
+			nextFfxTool,
 			device,
 			dstOta,
 			currentBootSlot,
@@ -320,13 +327,7 @@ func systemOTA(
 		// rebooted
 		device.Close()
 
-		// We should now be using the ffx from the new build.
-		ffx, err := dstOta.build.GetFfx(ctx, ffxIsolateDir)
-		if err != nil {
-			return fmt.Errorf("failed to get ffx from build %s: %w", dstOta, err)
-		}
-
-		newClient, err := c.deviceConfig.NewDeviceClient(ctx, ffx)
+		newClient, err := c.deviceConfig.NewDeviceClient(ctx, nextFfxTool)
 		if err != nil {
 			return fmt.Errorf("failed to create ota test client: %w", err)
 		}
@@ -344,6 +345,7 @@ func systemOTA(
 
 func otaToPackage(
 	ctx context.Context,
+	nextFfxTool *ffx.FFXTool,
 	device *device.Client,
 	ota *otaData,
 	currentBootSlot *sl4f.Configuration,
@@ -359,7 +361,7 @@ func otaToPackage(
 		return err
 	}
 
-	if err := u.Update(ctx, device, ota.updatePackage); err != nil {
+	if err := u.Update(ctx, nextFfxTool, device, ota.updatePackage); err != nil {
 		return fmt.Errorf("failed to download OTA: %w", err)
 	}
 

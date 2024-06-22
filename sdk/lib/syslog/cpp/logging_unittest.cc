@@ -134,9 +134,6 @@ static LogState SetupLogs(bool wait_for_initial_interest = true) {
   }
   LogSettingsBuilder builder;
   builder.WithLogFile(state->log_file);
-  if (!wait_for_initial_interest) {
-    builder.DisableWaitForInitialInterest();
-  }
   builder.BuildAndInitialize();
   return state;
 }
@@ -366,7 +363,6 @@ TEST(StructuredLogging, LOGS) {
 TEST(StructuredLogging, Remaining) {
   LogSettingsBuilder builder;
   std::string log_file;
-  builder.DisableInterestListener();
   files::ScopedTempDir temp_dir;
   ASSERT_TRUE(temp_dir.NewTempFile(&log_file));
   builder.WithLogFile(log_file);

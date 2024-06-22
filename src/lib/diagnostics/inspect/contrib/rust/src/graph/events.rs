@@ -117,6 +117,16 @@ where
             T::write_to_node(node, id);
         });
     }
+
+    pub fn metadata_dropped(&self, id: &T::Id, key: &str) {
+        let mut buffer = self.buffer.lock().unwrap();
+        buffer.add_entry(|node| {
+            node.record_time("@time");
+            node.record_string("event", "drop_key");
+            node.record_string("key", key);
+            T::write_to_node(node, id);
+        });
+    }
 }
 
 #[cfg(test)]
@@ -186,6 +196,32 @@ mod tests {
                     vertex_id: "10",
                     key: "foo",
                     update: 3u64,
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn vertex_metadata_drop() {
+        let inspector = inspect::Inspector::default();
+        let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 2);
+        let vertex_tracker = tracker.for_vertex::<u64>();
+        vertex_tracker.metadata_updated(&10, "foo", &MetadataValue::Uint(3));
+        vertex_tracker.metadata_dropped(&10, "foo");
+        assert_data_tree!(inspector, root: {
+            events: {
+                "0": {
+                    "@time": AnyProperty,
+                    event: "update_key",
+                    vertex_id: "10",
+                    key: "foo",
+                    update: 3u64,
+                },
+                "1": {
+                    "@time": AnyProperty,
+                    event: "drop_key",
+                    vertex_id: "10",
+                    key: "foo",
                 }
             }
         });

@@ -77,6 +77,11 @@
             ],
         },
         {
+            storage: "data",
+            from: "parent",
+            to: [ "#container" ],
+        },
+        {
             protocol: [
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",

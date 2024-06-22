@@ -95,10 +95,10 @@ class VirtualAudioComposite
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
 
  private:
-  static constexpr uint64_t kTopologyId = 789;
+  static constexpr fuchsia_hardware_audio::TopologyId kTopologyId = 789;
   static constexpr size_t kNumberOfElements = 2;
-  static constexpr uint64_t kRingBufferId = 123;
-  static constexpr uint64_t kDaiId = 456;
+  static constexpr fuchsia_hardware_audio::ElementId kRingBufferId = 123;
+  static constexpr fuchsia_hardware_audio::ElementId kDaiId = 456;
 
   void ResetRingBuffer();
   void OnRingBufferClosed(fidl::UnbindInfo info);

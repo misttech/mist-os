@@ -95,6 +95,7 @@ cc_source_library://pkg/inspect_component_cpp
 cc_source_library://pkg/magma_common
 cc_source_library://pkg/media_cpp
 cc_source_library://pkg/media_cpp_no_converters
+cc_source_library://pkg/memory_barriers (unstable)
 cc_source_library://pkg/mmio
 cc_source_library://pkg/mmio-ptr
 cc_source_library://pkg/scenic_cpp

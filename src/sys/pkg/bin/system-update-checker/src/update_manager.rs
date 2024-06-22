@@ -866,19 +866,6 @@ pub(crate) mod tests {
         }
     }
 
-    #[derive(Clone, Debug)]
-    pub struct StateChangeCollector {
-        states: Arc<Mutex<Vec<State>>>,
-    }
-    impl Notify for StateChangeCollector {
-        type Event = State;
-        type NotifyFuture = future::Ready<Result<(), ClosedClient>>;
-        fn notify(&self, state: State) -> Self::NotifyFuture {
-            self.states.lock().push(state);
-            future::ready(Ok(()))
-        }
-    }
-
     #[derive(Clone)]
     struct FakeStateNotifier {
         sender: Arc<Mutex<Sender<State>>>,

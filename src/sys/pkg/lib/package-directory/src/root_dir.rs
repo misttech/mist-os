@@ -6,13 +6,9 @@ use crate::meta_as_dir::MetaAsDir;
 use crate::meta_file::{MetaFile, MetaFileLocation};
 use crate::meta_subdir::MetaSubdir;
 use crate::non_meta_subdir::NonMetaSubdir;
-use crate::{usize_to_u64_safe, Error};
-use anyhow::Context as _;
-use async_utils::async_once::Once;
+use crate::{usize_to_u64_safe, Error, NonMetaStorageError};
 use fidl::endpoints::ServerEnd;
-use fuchsia_fs::file::AsyncReadAtExt as _;
 use fuchsia_pkg::MetaContents;
-use futures::stream::StreamExt as _;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::error;
@@ -33,12 +29,11 @@ use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 pub struct RootDir<S> {
     pub(crate) non_meta_storage: S,
     pub(crate) hash: fuchsia_hash::Hash,
-    pub(crate) meta_far: fio::FileProxy,
     // The keys are object relative path expressions.
     pub(crate) meta_files: HashMap<String, MetaFileLocation>,
     // The keys are object relative path expressions.
     pub(crate) non_meta_files: HashMap<String, fuchsia_hash::Hash>,
-    meta_far_vmo: Once<zx::Vmo>,
+    pub(crate) meta_far_vmo: zx::Vmo,
     dropper: Option<Box<dyn crate::OnRootDirDrop>>,
 }
 
@@ -69,70 +64,16 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
         hash: fuchsia_hash::Hash,
         dropper: Option<Box<dyn crate::OnRootDirDrop>>,
     ) -> Result<Self, Error> {
-        let meta_far = open_for_read(&non_meta_storage, &hash, fio::OpenFlags::DESCRIBE)
-            .map_err(Error::OpenMetaFar)?;
-
-        let mut async_reader =
-            match fuchsia_archive::AsyncReader::new(fuchsia_fs::file::BufferedAsyncReadAt::new(
-                fuchsia_fs::file::AsyncFile::from_proxy(Clone::clone(&meta_far)),
-            ))
-            .await
-            {
-                Ok(async_reader) => async_reader,
-                Err(e) => {
-                    if matches!(
-                        meta_far.take_event_stream().next().await,
-                        Some(Ok(fio::FileEvent::OnOpen_{s, ..}))
-                            if s == zx::Status::NOT_FOUND.into_raw()
-                    ) {
-                        return Err(Error::MissingMetaFar);
-                    }
-                    return Err(Error::ArchiveReader(e));
-                }
-            };
-
-        let reader_list = async_reader.list();
-
-        let mut meta_files = HashMap::with_capacity(reader_list.len());
-
-        for entry in reader_list {
-            let path = std::str::from_utf8(entry.path())
-                .map_err(|source| Error::NonUtf8MetaEntry {
-                    source,
-                    path: entry.path().to_owned(),
-                })?
-                .to_owned();
-            if path.starts_with("meta/") {
-                for (i, _) in path.match_indices('/').skip(1) {
-                    if meta_files.contains_key(&path[..i]) {
-                        return Err(Error::FileDirectoryCollision { path: path[..i].to_string() });
-                    }
-                }
-                meta_files.insert(
-                    path,
-                    MetaFileLocation { offset: entry.offset(), length: entry.length() },
-                );
+        let meta_far_vmo = non_meta_storage.get_blob_vmo(&hash).await.map_err(|e| {
+            if e.is_not_found_error() {
+                Error::MissingMetaFar
+            } else {
+                Error::OpenMetaFar(e)
             }
-        }
+        })?;
+        let (meta_files, non_meta_files) = load_package_metadata(&meta_far_vmo)?;
 
-        let meta_contents_bytes =
-            async_reader.read_file(b"meta/contents").await.map_err(Error::ReadMetaContents)?;
-
-        let non_meta_files = MetaContents::deserialize(&meta_contents_bytes[..])
-            .map_err(Error::DeserializeMetaContents)?
-            .into_contents();
-
-        let meta_far_vmo = Default::default();
-
-        Ok(RootDir {
-            non_meta_storage,
-            hash,
-            meta_far,
-            meta_files,
-            non_meta_files,
-            meta_far_vmo,
-            dropper,
-        })
+        Ok(RootDir { non_meta_storage, hash, meta_files, non_meta_files, meta_far_vmo, dropper })
     }
 
     /// Sets the dropper. If the dropper was already set, returns `dropper` in the error.
@@ -153,22 +94,14 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
     /// https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
     pub async fn read_file(&self, path: &str) -> Result<Vec<u8>, ReadFileError> {
         if let Some(hash) = self.non_meta_files.get(path) {
-            let blob = open_for_read(&self.non_meta_storage, hash, fio::OpenFlags::empty())
-                .map_err(ReadFileError::Open)?;
-            return fuchsia_fs::file::read(&blob).await.map_err(ReadFileError::Read);
+            self.non_meta_storage.read_blob(hash).await.map_err(ReadFileError::ReadBlob)
+        } else if let Some(location) = self.meta_files.get(path) {
+            self.meta_far_vmo
+                .read_to_vec(location.offset, location.length)
+                .map_err(ReadFileError::ReadMetaFile)
+        } else {
+            Err(ReadFileError::NoFileAtPath { path: path.to_string() })
         }
-
-        if let Some(location) = self.meta_files.get(path) {
-            let mut file = fuchsia_fs::file::AsyncFile::from_proxy(Clone::clone(&self.meta_far));
-            let mut contents = vec![0; crate::u64_to_usize_safe(location.length)];
-            let () = file
-                .read_at_exact(location.offset, contents.as_mut_slice())
-                .await
-                .map_err(ReadFileError::PartialBlobRead)?;
-            return Ok(contents);
-        }
-
-        Err(ReadFileError::NoFileAtPath { path: path.to_string() })
     }
 
     /// Returns `true` iff there is a file at `path`, an object relative path expression.
@@ -205,21 +138,6 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
         };
 
         Ok(fuchsia_pkg::MetaSubpackages::deserialize(&*contents)?)
-    }
-
-    pub(crate) async fn meta_far_vmo(&self) -> Result<&zx::Vmo, anyhow::Error> {
-        self.meta_far_vmo
-            .get_or_try_init(async {
-                let vmo = self
-                    .meta_far
-                    .get_backing_memory(fio::VmoFlags::READ)
-                    .await
-                    .context("meta.far .get_backing_memory() fidl error")?
-                    .map_err(zx::Status::from_raw)
-                    .context("meta.far .get_backing_memory protocol error")?;
-                Ok(vmo)
-            })
-            .await
     }
 
     /// Creates a file that contains the package's hash.
@@ -267,14 +185,11 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReadFileError {
-    #[error("opening blob")]
-    Open(#[source] fuchsia_fs::node::OpenError),
-
     #[error("reading blob")]
-    Read(#[source] fuchsia_fs::file::ReadError),
+    ReadBlob(#[source] NonMetaStorageError),
 
-    #[error("reading part of a blob")]
-    PartialBlobRead(#[source] std::io::Error),
+    #[error("reading meta file")]
+    ReadMetaFile(#[source] zx::Status),
 
     #[error("no file exists at path: {path:?}")]
     NoFileAtPath { path: String },
@@ -572,34 +487,53 @@ fn open_meta_as_file<'a>(flags_or_protocols: impl Into<FlagsOrProtocols<'a>>) ->
     }
 }
 
-// Open a non-meta file by hash with flags of `OPEN_RIGHT_READABLE | additional_flags` and return
-// the proxy.
-fn open_for_read(
-    non_meta_storage: &impl crate::NonMetaStorage,
-    blob: &fuchsia_hash::Hash,
-    additional_flags: fio::OpenFlags,
-) -> Result<fio::FileProxy, fuchsia_fs::node::OpenError> {
-    let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>()
-        .map_err(fuchsia_fs::node::OpenError::CreateProxy)?;
-    let () = non_meta_storage.open(
-        blob,
-        fio::OpenFlags::RIGHT_READABLE | additional_flags,
-        ExecutionScope::new(),
-        server_end.into_channel().into(),
-    )?;
-    Ok(file)
+fn load_package_metadata(
+    meta_far_vmo: &zx::Vmo,
+) -> Result<(HashMap<String, MetaFileLocation>, HashMap<String, fuchsia_hash::Hash>), Error> {
+    let stream =
+        zx::Stream::create(zx::StreamOptions::MODE_READ, meta_far_vmo, 0).map_err(|e| {
+            Error::OpenMetaFar(NonMetaStorageError::ReadBlob(
+                fuchsia_fs::file::ReadError::ReadError(e),
+            ))
+        })?;
+
+    let mut reader = fuchsia_archive::Reader::new(stream).map_err(Error::ArchiveReader)?;
+    let reader_list = reader.list();
+    let mut meta_files = HashMap::with_capacity(reader_list.len());
+    for entry in reader_list {
+        let path = std::str::from_utf8(entry.path())
+            .map_err(|source| Error::NonUtf8MetaEntry { source, path: entry.path().to_owned() })?
+            .to_owned();
+        if path.starts_with("meta/") {
+            for (i, _) in path.match_indices('/').skip(1) {
+                if meta_files.contains_key(&path[..i]) {
+                    return Err(Error::FileDirectoryCollision { path: path[..i].to_string() });
+                }
+            }
+            meta_files
+                .insert(path, MetaFileLocation { offset: entry.offset(), length: entry.length() });
+        }
+    }
+
+    let meta_contents_bytes =
+        reader.read_file(b"meta/contents").map_err(Error::ReadMetaContents)?;
+
+    let non_meta_files = MetaContents::deserialize(&meta_contents_bytes[..])
+        .map_err(Error::DeserializeMetaContents)?
+        .into_contents();
+
+    Ok((meta_files, non_meta_files))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::anyhow;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, Proxy as _};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
     use fuchsia_pkg_testing::PackageBuilder;
-    use futures::TryStreamExt as _;
+    use futures::{StreamExt as _, TryStreamExt as _};
     use pretty_assertions::assert_eq;
     use std::convert::TryInto as _;
     use std::io::Cursor;
@@ -1157,30 +1091,6 @@ mod tests {
                 vec![DirEntry { name: "file".to_string(), kind: DirentKind::File }]
             );
         }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn meta_far_vmo() {
-        let (_env, root_dir) = TestEnv::new().await;
-
-        // VMO is readable
-        let vmo = root_dir.meta_far_vmo().await.unwrap();
-        let mut buf = [0u8; 8];
-        vmo.read(&mut buf, 0).unwrap();
-        assert_eq!(buf, fuchsia_archive::MAGIC_INDEX_VALUE);
-
-        // Accessing the VMO caches it
-        let _: &zx::Vmo = root_dir
-            .meta_far_vmo
-            .get_or_try_init(futures::future::err(anyhow!("vmo should be cached")))
-            .await
-            .unwrap();
-
-        // Accessing the VMO through the cached path works
-        let vmo = root_dir.meta_far_vmo().await.unwrap();
-        let mut buf = [0u8; 8];
-        vmo.read(&mut buf, 0).unwrap();
-        assert_eq!(buf, fuchsia_archive::MAGIC_INDEX_VALUE);
     }
 
     fn arb_open_flags() -> impl proptest::strategy::Strategy<Value = fio::OpenFlags> {

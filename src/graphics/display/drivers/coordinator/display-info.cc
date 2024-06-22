@@ -51,13 +51,15 @@ edid::ddc_i2c_transact ddc_tx = [](void* ctx, edid::ddc_i2c_msg_t* msgs, uint32_
 };
 
 fit::result<const char*, DisplayInfo::Edid> InitEdidFromI2c(ddk::I2cImplProtocolClient& i2c) {
-  DisplayInfo::Edid edid;
   const char* last_error = nullptr;
 
   static constexpr int kMaxEdidAttempts = 3;
   for (int attempt = 1; attempt <= kMaxEdidAttempts; attempt++) {
-    fit::result<const char*> result = edid.base.Init(&i2c, ddc_tx);
+    fit::result<const char*, edid::Edid> result = edid::Edid::Create(&i2c, ddc_tx);
     if (result.is_ok()) {
+      DisplayInfo::Edid edid = {
+          .base = std::move(result).value(),
+      };
       return fit::ok(std::move(edid));
     }
     last_error = result.error_value();
@@ -72,9 +74,11 @@ fit::result<const char*, DisplayInfo::Edid> InitEdidFromI2c(ddk::I2cImplProtocol
 fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(cpp20::span<const uint8_t> bytes) {
   ZX_DEBUG_ASSERT(bytes.size() <= std::numeric_limits<uint16_t>::max());
 
-  DisplayInfo::Edid edid;
-  fit::result<const char*> result = edid.base.Init(bytes);
+  fit::result<const char*, edid::Edid> result = edid::Edid::Create(bytes);
   if (result.is_ok()) {
+    DisplayInfo::Edid edid = {
+        .base = std::move(result).value(),
+    };
     return fit::ok(std::move(edid));
   }
   return result.take_error();

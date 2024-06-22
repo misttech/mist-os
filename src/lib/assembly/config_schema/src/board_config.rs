@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
+use crate::platform_config::sysmem_config::PlatformSysmemConfig;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_images_config::BoardFilesystemConfig;
 use serde::{Deserialize, Serialize};
@@ -182,6 +183,11 @@ pub struct PlatformConfig {
     /// Configure development support related features
     #[serde(default)]
     pub development_support: DevelopmentSupportConfig,
+
+    /// Sysmem board defaults. This can be overridden field-by-field by the same
+    /// struct in platform config.
+    #[serde(default)]
+    pub sysmem_defaults: PlatformSysmemConfig,
 }
 
 /// This struct defines connectivity configurations.
@@ -319,6 +325,7 @@ mod test {
                 development_support: DevelopmentSupportConfig {
                     enable_debug_access_port_for_soc: Some(DapSoc::AmlogicT931g),
                 },
+                sysmem_defaults: PlatformSysmemConfig::default(),
             },
             ..Default::default()
         };

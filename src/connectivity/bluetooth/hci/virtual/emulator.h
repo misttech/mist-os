@@ -29,10 +29,12 @@ using ShutdownCallback = fit::function<void()>;
 class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
                        public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
                        public fidl::Server<fuchsia_hardware_bluetooth::Emulator>,
+                       public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
   explicit EmulatorDevice();
+  ~EmulatorDevice();
 
   // This error handler is called when the EmulatorDevice is shut down by DFv2. We call |Shutdown()|
   // to manually delete the heap-allocated EmulatorDevice.
@@ -77,10 +79,22 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
-  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {}
+  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // Server<HciTransport> overrides:
+  void Send(SendRequest& request, SendCompleter::Sync& completer) override;
+  void AckReceive(AckReceiveCompleter::Sync& completer) override {}
+  void ConfigureSco(
+      ConfigureScoRequest& request,
+      fidl::Server<fuchsia_hardware_bluetooth::HciTransport>::ConfigureScoCompleter::Sync&
+          completer) override;
+  void SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) override {}
+  void handle_unknown_method(
+      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
+      ::fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // fuchsia_hardware_bluetooth::Hci overrides:
   void OpenCommandChannel(OpenCommandChannelRequestView request,
@@ -90,7 +104,8 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   void OpenScoDataChannel(OpenScoDataChannelRequestView request,
                           OpenScoDataChannelCompleter::Sync& completer) override;
   void ConfigureSco(ConfigureScoRequestView request,
-                    ConfigureScoCompleter::Sync& completer) override;
+                    fidl::WireServer<fuchsia_hardware_bluetooth::Hci>::ConfigureScoCompleter::Sync&
+                        completer) override;
   void ResetSco(ResetScoCompleter::Sync& completer) override;
   void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
                           OpenIsoDataChannelCompleter::Sync& completer) override;
@@ -138,9 +153,9 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   void CloseAclDataChannel();
   void CloseIsoDataChannel();
 
-  void SendEvent(pw::span<const std::byte> buffer);
-  void SendAclPacket(pw::span<const std::byte> buffer);
-  void SendIsoPacket(pw::span<const std::byte> buffer);
+  void SendEventToHost(pw::span<const std::byte> buffer);
+  void SendAclPacketToHost(pw::span<const std::byte> buffer);
+  void SendIsoPacketToHost(pw::span<const std::byte> buffer);
 
   // Read and handle packets received over the channels
   void HandleCommandPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
@@ -175,6 +190,9 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleCommandPacket> cmd_channel_wait_{this};
   async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleAclPacket> acl_channel_wait_{this};
   async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleIsoPacket> iso_channel_wait_{this};
+
+  // HciTransport protocol
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::HciTransport> hci_transport_bindings_;
 
   // EmulatorDevice
   fidl::WireClient<fuchsia_driver_framework::Node> emulator_child_node_;

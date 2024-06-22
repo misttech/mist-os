@@ -22,6 +22,7 @@ python_library("trace_processing") {
     "metrics/input_latency.py",
     "metrics/power.py",
     "metrics/scenic.py",
+    "metrics/suspend.py",
     "trace_importing.py",
     "trace_metrics.py",
     "trace_model.py",
@@ -87,4 +88,29 @@ install_host_tools("run_power_metrics") {
   testonly = true
   deps = [ ":copy_power_metrics_pyz" ]
   outputs = [ "run_power_metrics" ]
+}
+
+python_binary("run_suspend_metrics_bin") {
+  testonly = true
+  main_source = "run_suspend_metrics.py"
+  deps = [
+    ":trace_processing",
+    "//src/performance/trace2json",
+  ]
+  enable_mypy = true
+  output_name = "run_suspend_metrics.pyz"
+}
+
+# Rename the resulting .pyz for the host tool
+copy("copy_suspend_metrics_pyz") {
+  testonly = true
+  deps = [ ":run_suspend_metrics_bin" ]
+  sources = [ "${target_out_dir}/run_suspend_metrics.pyz" ]
+  outputs = [ "${root_out_dir}/run_suspend_metrics" ]
+}
+
+install_host_tools("run_suspend_metrics") {
+  testonly = true
+  deps = [ ":copy_suspend_metrics_pyz" ]
+  outputs = [ "run_suspend_metrics" ]
 }

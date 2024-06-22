@@ -152,12 +152,10 @@ ContiguousPooledMemoryAllocator::ContiguousPooledMemoryAllocator(
   }
 }
 
-void ContiguousPooledMemoryAllocator::InitGuardRegion(size_t guard_region_size,
-                                                      bool unused_pages_guarded,
-                                                      zx::duration unused_page_check_cycle_period,
-                                                      bool internal_guard_regions,
-                                                      bool crash_on_guard_failure,
-                                                      async_dispatcher_t* dispatcher) {
+void ContiguousPooledMemoryAllocator::InitGuardRegion(
+    size_t guard_region_size, bool unused_pages_guarded, int64_t unused_guard_pattern_period_bytes,
+    zx::duration unused_page_check_cycle_period, bool internal_guard_regions,
+    bool crash_on_guard_failure, async_dispatcher_t* dispatcher) {
   ZX_DEBUG_ASSERT(!regions_.size());
   ZX_DEBUG_ASSERT(!guard_region_size_);
   ZX_DEBUG_ASSERT(!guard_region_data_.size());
@@ -169,6 +167,9 @@ void ContiguousPooledMemoryAllocator::InitGuardRegion(size_t guard_region_size,
   if (unused_pages_guarded) {
     ZX_DEBUG_ASSERT(is_ever_cpu_accessible_);
     unused_pages_guarded_ = true;
+    if (unused_guard_pattern_period_bytes > 0) {
+      unused_guard_pattern_period_bytes_ = unused_guard_pattern_period_bytes;
+    }
     unused_page_check_cycle_period_ = unused_page_check_cycle_period;
     ZX_DEBUG_ASSERT(mapping_);
     unused_checker_.PostDelayed(dispatcher,

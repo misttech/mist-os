@@ -76,7 +76,8 @@ impl BrokerSvc {
                         tracing::debug!("Lease({:?}, {:?})", &element_id, &level);
                         let resp = {
                             let mut broker = self.broker.borrow_mut();
-                            let level = broker.get_level_index(&element_id, level).unwrap().clone();
+                            let level =
+                                broker.get_level_index(&element_id, &level).unwrap().clone();
                             broker.acquire_lease(&element_id, level)
                         };
                         match resp {
@@ -513,7 +514,7 @@ impl CurrentLevelHandler {
                         );
                         let mut broker = self.broker.borrow_mut();
                         let current_level =
-                            broker.get_level_index(&element_id, current_level).unwrap().clone();
+                            broker.get_level_index(&element_id, &current_level).unwrap().clone();
                         broker.update_current_level(&element_id, current_level);
                         responder.send(Ok(())).context("send failed")
                     }

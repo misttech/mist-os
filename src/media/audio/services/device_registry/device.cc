@@ -1644,7 +1644,7 @@ fad::Info Device::CreateDeviceInfo() {
                               ? fad::PlugDetectCapabilities::kHardwired
                               : fad::PlugDetectCapabilities::kPluggable);
     // Codec properties stores unique_id as a string, so we must handle as a special case.
-    if (codec_properties_->unique_id()) {
+    if (codec_properties_->unique_id().has_value()) {
       std::array<unsigned char, fad::kUniqueInstanceIdSize> uid{};
       memcpy(uid.data(), codec_properties_->unique_id()->data(), fad::kUniqueInstanceIdSize);
       info.unique_instance_id(uid);

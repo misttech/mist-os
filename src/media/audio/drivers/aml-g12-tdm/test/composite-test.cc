@@ -33,16 +33,16 @@ namespace audio::aml_g12 {
 // support. Helper code in AmlTdmConfigDevice and //src/devices/lib/amlogic is tested in other
 // versions of this driver (StreamConfig and DAI).
 
-constexpr uint64_t kEngineARingBufferIdOutput = 4;
-constexpr uint64_t kEngineBRingBufferIdOutput = 5;
-constexpr uint64_t kEngineCRingBufferIdOutput = 6;
-constexpr uint64_t kEngineARingBufferIdInput = 7;
-constexpr uint64_t kEngineBRingBufferIdInput = 8;
-constexpr uint64_t kEngineCRingBufferIdInput = 9;
-constexpr uint64_t kInvalidBufferId0 = 3;
-constexpr uint64_t kInvalidBufferId1 = 10;
+constexpr fuchsia_hardware_audio::ElementId kEngineARingBufferIdOutput = 4;
+constexpr fuchsia_hardware_audio::ElementId kEngineBRingBufferIdOutput = 5;
+constexpr fuchsia_hardware_audio::ElementId kEngineCRingBufferIdOutput = 6;
+constexpr fuchsia_hardware_audio::ElementId kEngineARingBufferIdInput = 7;
+constexpr fuchsia_hardware_audio::ElementId kEngineBRingBufferIdInput = 8;
+constexpr fuchsia_hardware_audio::ElementId kEngineCRingBufferIdInput = 9;
+constexpr fuchsia_hardware_audio::ElementId kInvalidBufferId0 = 3;
+constexpr fuchsia_hardware_audio::ElementId kInvalidBufferId1 = 10;
 
-constexpr std::array<uint64_t, 6> kAllValidIds{
+constexpr std::array<fuchsia_hardware_audio::ElementId, 6> kAllValidIds{
     kEngineARingBufferIdOutput, kEngineBRingBufferIdOutput, kEngineCRingBufferIdOutput,
     kEngineARingBufferIdInput,  kEngineBRingBufferIdInput,  kEngineCRingBufferIdInput,
 };
@@ -132,6 +132,10 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
   }
 
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void GetMetadata(GetMetadataRequest& request, GetMetadataCompleter::Sync& completer) override {
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
@@ -569,7 +573,7 @@ class AmlG12CompositeTest : public testing::Test {
   bool IsTdmBSclkSet() { return sclk_tdm_b_server_.IsFakeGpioSetToSclk(); }
   bool IsTdmCSclkSet() { return sclk_tdm_c_server_.IsFakeGpioSetToSclk(); }
 
-  void CheckDefaultDaiFormats(uint64_t id) {
+  void CheckDefaultDaiFormats(fuchsia_hardware_audio::ElementId id) {
     auto dai_formats_result = client_->GetDaiFormats(id);
     ASSERT_TRUE(dai_formats_result.is_ok());
     ASSERT_EQ(1, dai_formats_result->dai_formats().size());
@@ -608,14 +612,15 @@ class AmlG12CompositeTest : public testing::Test {
     ASSERT_EQ(32, dai_formats.bits_per_sample()[1]);
   }
 
-  void SetDaiFormatDefault(uint64_t id) {
+  void SetDaiFormatDefault(fuchsia_hardware_audio::ElementId id) {
     auto format = GetDefaultDaiFormat();
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
     ASSERT_TRUE(dai_formats_result.is_ok());
   }
 
-  void SetDaiFormatFrameFormat(uint64_t id, fuchsia_hardware_audio::DaiFrameFormat frame_format) {
+  void SetDaiFormatFrameFormat(fuchsia_hardware_audio::ElementId id,
+                               fuchsia_hardware_audio::DaiFrameFormat frame_format) {
     auto format = GetDefaultDaiFormat();
     format.frame_format(std::move(frame_format));
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
@@ -623,7 +628,7 @@ class AmlG12CompositeTest : public testing::Test {
     ASSERT_TRUE(dai_formats_result.is_ok());
   }
 
-  void SetDaiFormatFrameRate(uint64_t id, uint32_t rate) {
+  void SetDaiFormatFrameRate(fuchsia_hardware_audio::ElementId id, uint32_t rate) {
     auto format = GetDefaultDaiFormat();
     format.frame_rate(rate);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
@@ -631,8 +636,8 @@ class AmlG12CompositeTest : public testing::Test {
     ASSERT_TRUE(dai_formats_result.is_ok());
   }
 
-  void SetDaiFormatBitePerSampleAndBitsPerSlot(uint64_t id, uint8_t bits_per_sample,
-                                               uint8_t bits_per_slot) {
+  void SetDaiFormatBitsPerSampleAndBitsPerSlot(fuchsia_hardware_audio::ElementId id,
+                                               uint8_t bits_per_sample, uint8_t bits_per_slot) {
     auto format = GetDefaultDaiFormat();
     format.bits_per_sample(bits_per_sample);
     format.bits_per_slot(bits_per_slot);
@@ -751,8 +756,8 @@ TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
   ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect,
             element8.type());
 
-  constexpr uint64_t kExpectedTopologyId = 1;
-  constexpr uint64_t kUnrecognizedTopologyId = 2;
+  constexpr fuchsia_hardware_audio::TopologyId kExpectedTopologyId = 1;
+  constexpr fuchsia_hardware_audio::TopologyId kUnrecognizedTopologyId = 2;
   auto topology_result = signal_client->GetTopologies();
   ASSERT_TRUE(topology_result.is_ok());
   ASSERT_EQ(1, topology_result->topologies().size());
@@ -1028,7 +1033,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsValid) {
   SetDaiFormatFrameRate(3, 48'000);                        // A change to id 3 does not affect id 1.
   EXPECT_EQ(0x8400'0004, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 5.
 
-  SetDaiFormatBitePerSampleAndBitsPerSlot(1, 32, 32);
+  SetDaiFormatBitsPerSampleAndBitsPerSlot(1, 32, 32);
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
   ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
   // TDM OUT CTRL1 FRDDR with 32 bits per sample.
@@ -1036,7 +1041,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsValid) {
   // SCLK CTRL, clk in/out enabled, 24 sdiv, 32 lrduty, 32 lrdiv.
   ASSERT_EQ(0xc180'7c3f, platform_device_.mmio()[0x040 / 4]);
 
-  SetDaiFormatBitePerSampleAndBitsPerSlot(1, 16, 16);
+  SetDaiFormatBitsPerSampleAndBitsPerSlot(1, 16, 16);
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot.
   ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x500 / 4]);
   // TDM OUT CTRL1 FRDDR with 16 bits per sample.
@@ -1044,7 +1049,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsValid) {
   // SCLK CTRL, clk in/out enabled, 24 sdiv, 16 lrduty, 16 lrdiv.
   ASSERT_EQ(0xc180'3c1f, platform_device_.mmio()[0x040 / 4]);
 
-  SetDaiFormatBitePerSampleAndBitsPerSlot(1, 16, 32);
+  SetDaiFormatBitsPerSampleAndBitsPerSlot(1, 16, 32);
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
   ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
   // TDM OUT CTRL1 FRDDR with 16 bits per sample.
@@ -1147,7 +1152,8 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
  protected:
   void SetUp() override { AmlG12CompositeTest::SetUp(); }
 
-  fidl::SyncClient<fuchsia_hardware_audio::RingBuffer> GetClient(uint64_t id) {
+  fidl::SyncClient<fuchsia_hardware_audio::RingBuffer> GetClient(
+      fuchsia_hardware_audio::ElementId id) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         id, GetDefaultRingBufferFormat(), std::move(endpoints->server));
@@ -1156,7 +1162,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     return fidl::SyncClient<fuchsia_hardware_audio::RingBuffer>(std::move(endpoints->client));
   }
 
-  void TestProperties(uint64_t id) {
+  void TestProperties(fuchsia_hardware_audio::ElementId id) {
     auto client = GetClient(id);
     fidl::Result result = client->GetProperties();
     ASSERT_TRUE(result.is_ok());
@@ -1165,7 +1171,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     ASSERT_TRUE(result->properties().driver_transfer_bytes().has_value());
   }
 
-  void TestGetVmo(uint64_t id) {
+  void TestGetVmo(fuchsia_hardware_audio::ElementId id) {
     auto client = GetClient(id);
     constexpr uint32_t kMinFrames = 1;
     auto get_vmo_result =
@@ -1174,7 +1180,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     ASSERT_TRUE(get_vmo_result->ring_buffer().is_valid());
   }
 
-  void TestGetVmoMultipleTimes(uint64_t id) {
+  void TestGetVmoMultipleTimes(fuchsia_hardware_audio::ElementId id) {
     auto client = GetClient(id);
     constexpr uint32_t kMinFrames = 1;
     auto get_vmo_result0 =
@@ -1187,19 +1193,19 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     ASSERT_FALSE(get_vmo_result1.is_ok());
   }
 
-  void TestStartRingBufferNoVmo(uint64_t id) {
+  void TestStartRingBufferNoVmo(fuchsia_hardware_audio::ElementId id) {
     auto client = GetClient(id);
     auto start_result = client->Start();
     ASSERT_FALSE(start_result.is_ok());  // Not ok to start a ring buffer with no VMO.
   }
 
-  void TestStopRingBufferNoVmo(uint64_t id) {
+  void TestStopRingBufferNoVmo(fuchsia_hardware_audio::ElementId id) {
     auto client = GetClient(id);
     auto stop_result = client->Stop();
     ASSERT_FALSE(stop_result.is_ok());  // Not ok to stop a ring buffer with no VMO.
   }
 
-  void TestCreationAndStartStop(uint64_t id) {
+  void TestCreationAndStartStop(fuchsia_hardware_audio::ElementId id) {
     auto client = GetClient(id);
     constexpr uint32_t kMinFrames = 8192;
     auto get_vmo_result =
@@ -1213,7 +1219,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     ASSERT_TRUE(stop_result.is_ok());
   }
 
-  void TestStartStartedRingBuffer(uint64_t id) {
+  void TestStartStartedRingBuffer(fuchsia_hardware_audio::ElementId id) {
     auto client = GetClient(id);
     constexpr uint32_t kMinFrames = 8192;
     auto get_vmo_result =
@@ -1227,7 +1233,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     ASSERT_FALSE(start_result1.is_ok());  // Not ok to start a started ring buffer.
   }
 
-  void TestStopStoppedRingBuffer(uint64_t id) {
+  void TestStopStoppedRingBuffer(fuchsia_hardware_audio::ElementId id) {
     auto client = GetClient(id);
     constexpr uint32_t kMinFrames = 8192;
     auto get_vmo_result =
@@ -1244,7 +1250,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     ASSERT_TRUE(stop_result1.is_ok());  // Ok to stop a stopped ring buffer.
   }
 
-  void TestGetDelay(uint64_t id) {
+  void TestGetDelay(fuchsia_hardware_audio::ElementId id) {
     auto client = GetClient(id);
     auto delay_result = client->WatchDelayInfo();
     ASSERT_TRUE(delay_result.is_ok());

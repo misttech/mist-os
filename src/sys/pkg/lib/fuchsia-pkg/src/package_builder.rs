@@ -427,7 +427,11 @@ impl PackageBuilder {
         if let Some(p) = self.far_contents.get(file_path) {
             std::fs::read(p).with_context(|| format!("reading {p}"))
         } else {
-            bail!("couldn't find `{}` in package", file_path);
+            bail!(
+                "couldn't find `{}` in package: {:?}",
+                file_path,
+                self.far_contents.keys().collect::<Vec<_>>()
+            );
         }
     }
 

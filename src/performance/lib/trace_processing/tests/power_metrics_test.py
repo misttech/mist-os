@@ -5,9 +5,10 @@
 """Unit tests for ../metrics/power.py."""
 
 import unittest
+import collections.abc
 from trace_processing.metrics import power
 from trace_processing import trace_metrics, trace_model, trace_time
-from typing import Iterable
+from typing import Any, Iterable
 
 # Boilerplate-busting constants:
 U = trace_metrics.Unit
@@ -16,6 +17,9 @@ TCR = trace_metrics.TestCaseResult
 
 class PowerMetricsTest(unittest.TestCase):
     """Power metrics tests."""
+
+    def assertEmpty(self, c: collections.abc.Container[Any]) -> None:
+        self.assertFalse(c)
 
     def construct_trace_model(
         self,
@@ -106,7 +110,7 @@ class PowerMetricsTest(unittest.TestCase):
 
     def test_process_metrics(self) -> None:
         """Correctly exclude power readings occurring during synchronization."""
-        threads = (1, 2)
+        threads = (1,)
         model = self.construct_trace_model(threads)
 
         records_0: list[trace_model.SchedulingRecord] = [
@@ -347,7 +351,7 @@ class PowerMetricsTest(unittest.TestCase):
         )
 
     def test_no_power_data_after_sync_signal(self) -> None:
-        """Handle 'inf' in aggregated power metrics."""
+        """Handle a lack of aggregated power metrics."""
         end_of_load = trace_time.TimePoint(1000000000)
         threads = (1, 2)
         model = self.construct_trace_model(threads, end_of_load)
@@ -387,6 +391,115 @@ class PowerMetricsTest(unittest.TestCase):
             ),
         ]
         model.scheduling_records = {0: records_0, 1: records_1}
-        self.assertEqual(
-            [], power.PowerMetricsProcessor().process_metrics(model)
+        self.assertEmpty(power.PowerMetricsProcessor().process_metrics(model))
+
+    def test_find_suspend_windows(self) -> None:
+        """Find periods during which device was suspended."""
+        threads = (1, 2)
+        model = self.construct_trace_model(threads)
+        suspender = trace_model.Process(
+            pid=5555,
+            name=f"{power._SAG}.cm",
+            threads=[
+                trace_model.Thread(
+                    tid=6666,
+                    name="initial-thread",
+                    events=[
+                        trace_model.DurationEvent.from_dict(
+                            {
+                                "cat": "power",
+                                "name": "suspend",
+                                "ts": 900000,  # µs
+                                "pid": 5555,
+                                "tid": 6666,
+                                "dur": 200000,  # µs
+                            }
+                        ),
+                        trace_model.DurationEvent.from_dict(
+                            {
+                                "cat": "power",
+                                "name": "suspend",
+                                "ts": 1150000,  # µs
+                                "pid": 5555,
+                                "tid": 6666,
+                                "dur": 200000,  # µs
+                            }
+                        ),
+                    ],
+                )
+            ],
         )
+        model.processes.append(suspender)
+        self.assertCountEqual(
+            power._find_suspend_windows(model),
+            [
+                trace_time.Window(
+                    trace_time.TimePoint(900_000_000),
+                    trace_time.TimePoint(1_100_000_000),
+                ),
+                trace_time.Window(
+                    trace_time.TimePoint(1_150_000_000),
+                    trace_time.TimePoint(1_350_000_000),
+                ),
+            ],
+        )
+
+    def test_suspended_power_metrics(self) -> None:
+        """Power measurements during a suspend are captured, aggregated."""
+        threads = (1,)
+        model = self.construct_trace_model(threads)
+
+        records_0: list[trace_model.SchedulingRecord] = [
+            # "thread-1" is active from 0 - 1000, then exits.
+            trace_model.ContextSwitch(
+                trace_time.TimePoint(0),
+                threads[0],
+                100,
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                {},
+            ),
+            trace_model.ContextSwitch(
+                trace_time.TimePoint(800_000_000),
+                70,
+                threads[0],
+                612,
+                612,
+                trace_model.ThreadState.ZX_THREAD_STATE_DEAD,
+                {},
+            ),
+        ]
+        suspender = trace_model.Process(
+            pid=5555,
+            name=f"{power._SAG}.cm",
+            threads=[
+                trace_model.Thread(
+                    tid=6666,
+                    name="initial-thread",
+                    events=[
+                        trace_model.DurationEvent.from_dict(
+                            {
+                                "cat": "power",
+                                "name": "suspend",
+                                "ts": 900000,  # µs
+                                "pid": 5555,
+                                "tid": 6666,
+                                "dur": 200000,  # µs
+                            }
+                        )
+                    ],
+                )
+            ],
+        )
+        model.scheduling_records = {0: records_0}
+        model.processes.append(suspender)
+        results = power.PowerMetricsProcessor().process_metrics(model)
+        expected_results = frozenset(
+            (
+                TCR(label="MinPower_suspend", unit=U.watts, values=[1.2]),
+                TCR(label="MeanPower_suspend", unit=U.watts, values=[1.2]),
+                TCR(label="MaxPower_suspend", unit=U.watts, values=[1.2]),
+            )
+        )
+        self.assertEmpty(expected_results - set(results))

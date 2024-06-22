@@ -175,14 +175,12 @@ pub(crate) async fn resolve_base_package(
     // Base packages must have a variant of zero, and the variant is cleared before adding the URL
     // to the base_packages map. Clients are allowed to specify or omit the variant (clients
     // generally omit so we minimize the number of allocations in that case).
-    let url_storage;
     let url = match url.variant() {
-        Some(variant) if variant.is_zero() => {
+        Some(variant) if variant.is_zero() => &{
             let mut url = url.clone();
             url.clear_variant();
-            url_storage = url;
-            &url_storage
-        }
+            url
+        },
         _ => url,
     };
     let hash = base_packages

@@ -55,8 +55,16 @@ impl MessageStream {
         let service = ServiceDefinition {
             service_class_uuids: Some(vec![FASTPAIR_SERVICE_UUID.into()]),
             protocol_descriptor_list: Some(vec![
-                ProtocolDescriptor { protocol: ProtocolIdentifier::L2Cap, params: vec![] },
-                ProtocolDescriptor { protocol: ProtocolIdentifier::Rfcomm, params: vec![] },
+                ProtocolDescriptor {
+                    protocol: Some(ProtocolIdentifier::L2Cap),
+                    params: Some(vec![]),
+                    ..Default::default()
+                },
+                ProtocolDescriptor {
+                    protocol: Some(ProtocolIdentifier::Rfcomm),
+                    params: Some(vec![]),
+                    ..Default::default()
+                },
             ]),
             ..Default::default()
         };
@@ -85,7 +93,10 @@ impl MessageStream {
             return None;
         };
 
-        if !protocol.iter().any(|descriptor| descriptor.protocol == ProtocolIdentifier::Rfcomm) {
+        if !protocol
+            .iter()
+            .any(|descriptor| descriptor.protocol == Some(ProtocolIdentifier::Rfcomm))
+        {
             warn!(%id, "Received non-RFCOMM connection. Ignoring");
             return None;
         }
@@ -187,10 +198,16 @@ mod tests {
         let id = PeerId(123);
         let (local, mut remote) = Channel::create();
         let protocol = &[
-            ProtocolDescriptor { protocol: ProtocolIdentifier::L2Cap, params: vec![] },
             ProtocolDescriptor {
-                protocol: ProtocolIdentifier::Rfcomm,
-                params: vec![DataElement::Uint8(1)],
+                protocol: Some(ProtocolIdentifier::L2Cap),
+                params: Some(vec![]),
+
+                ..Default::default()
+            },
+            ProtocolDescriptor {
+                protocol: Some(ProtocolIdentifier::Rfcomm),
+                params: Some(vec![DataElement::Uint8(1)]),
+                ..Default::default()
             },
         ];
         connect_proxy.connected(&id.into(), local.try_into().unwrap(), protocol).unwrap();

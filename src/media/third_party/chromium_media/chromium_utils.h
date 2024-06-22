@@ -200,7 +200,10 @@ class BigEndianReader {
       return false;
     }
 
-    *value = __builtin_bswap16(*reinterpret_cast<const uint16_t*>(ptr_));
+    // can be unaligned, so use memcpy
+    uint16_t tmp;
+    memcpy(&tmp, ptr_, sizeof(tmp));
+    *value = __builtin_bswap16(tmp);
     ptr_ += sizeof(uint16_t);
     return true;
   }
@@ -210,7 +213,10 @@ class BigEndianReader {
       return false;
     }
 
-    *value = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(ptr_));
+    // can be unaligned, so use memcpy
+    uint32_t tmp;
+    memcpy(&tmp, ptr_, sizeof(tmp));
+    *value = __builtin_bswap32(tmp);
     ptr_ += sizeof(uint32_t);
     return true;
   }
@@ -220,7 +226,10 @@ class BigEndianReader {
       return false;
     }
 
-    *value = __builtin_bswap64(*reinterpret_cast<const uint64_t*>(ptr_));
+    // can be unaligned, so use memcpy
+    uint64_t tmp;
+    memcpy(&tmp, ptr_, sizeof(tmp));
+    *value = __builtin_bswap64(tmp);
     ptr_ += sizeof(uint64_t);
     return true;
   }

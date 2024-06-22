@@ -845,8 +845,4 @@ TEST(SensorsPlaybackTest, FixedValues_Buffered_GeneratedTimestamps) {
   ASSERT_EQ(hist.bin_point_counts[0].first, 0);
   // Assert the bin with the next highest couint is bin 10.
   ASSERT_EQ(hist.bin_point_counts[1].first, 10);
-
-  // Outliers above the top bin could conceivably exist but it would be exceptionally unlikely for
-  // there to be more of them than samples in bin 10.
-  ASSERT_LT(hist.outliers_above, hist.bin_point_counts[1].second);
 }

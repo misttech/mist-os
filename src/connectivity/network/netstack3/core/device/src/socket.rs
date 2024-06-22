@@ -16,7 +16,7 @@ use net_types::ip::IpVersion;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc};
 use netstack3_base::{
     AnyDevice, ContextPair, Device, DeviceIdContext, FrameDestination, SendFrameContext,
-    StrongDeviceIdentifier as _, WeakDeviceIdentifier as _,
+    SendFrameErrorReason, StrongDeviceIdentifier as _, WeakDeviceIdentifier as _,
 };
 use packet::{BufferMut, ParsablePacket as _, Serializer};
 use packet_formats::error::ParseError;
@@ -302,13 +302,6 @@ pub trait DeviceSocketAccessor<BT: DeviceSocketTypes>: SocketStateAccessor<BT> {
     ) -> R;
 }
 
-/// An error encountered when sending a frame.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum SendFrameError {
-    /// The device failed to send the frame.
-    SendFailed,
-}
-
 enum MaybeUpdate<T> {
     NoChange,
     NewValue(T),
@@ -521,7 +514,7 @@ where
         _id: &ApiSocketId<C>,
         metadata: DeviceSocketMetadata<D, <C::CoreContext as DeviceIdContext<D>>::DeviceId>,
         body: S,
-    ) -> Result<(), (S, SendFrameError)>
+    ) -> Result<(), SendFrameErrorReason>
     where
         S: Serializer,
         S::Buffer: BufferMut,
@@ -534,9 +527,7 @@ where
         C::BindingsContext: DeviceLayerTypes,
     {
         let (core_ctx, bindings_ctx) = self.contexts();
-        core_ctx
-            .send_frame(bindings_ctx, metadata, body)
-            .map_err(|s| (s, SendFrameError::SendFailed))
+        core_ctx.send_frame(bindings_ctx, metadata, body).map_err(|e| e.into_err())
     }
 }
 

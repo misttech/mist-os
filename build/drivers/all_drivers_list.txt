@@ -132,9 +132,7 @@
 //src/devices/bus/drivers/platform/test:test-power-driver
 //src/devices/bus/drivers/platform/test:test-spi-driver
 //src/devices/bus/drivers/platform:platform-bus-driver
-//src/devices/clock/drivers/amlogic-clk:amlogic-clk-driver
 //src/devices/clock/drivers/clock:clock-driver
-//src/devices/clock/drivers/vim3-clk:bazel_package.bazel_build
 //src/devices/cpu/drivers/aml-cpu-legacy:aml-cpu-legacy-driver
 //src/devices/cpu/drivers/aml-cpu:aml-cpu-driver
 //src/devices/gpio/drivers/aml-gpio:bazel_package.bazel_build
@@ -279,8 +277,6 @@
 //src/devices/tpm/drivers/cr50-spi:fuchsia_driver
 //src/devices/tpm/drivers/tpm-lpc:fuchsia_driver
 //src/devices/tpm/drivers/tpm:fuchsia_driver
-//src/devices/usb/drivers/aml-usb-phy:aml-usb-phy-driver
-//src/devices/usb/drivers/aml-usb-phy:bazel_package.bazel_build
 //src/devices/usb/drivers/crg-udc:crg-udc-driver
 //src/devices/usb/drivers/dwc2:dwc2-driver
 //src/devices/usb/drivers/dwc3:dwc3-driver
@@ -317,13 +313,6 @@
 //src/graphics/drivers/msd-virtio-gpu:msd-virtio-gpu-driver
 //src/graphics/drivers/msd-vsi-vip:msd_vsi-driver
 //src/graphics/drivers/msd-vsi-vip:msd_vsi_test-driver
-//src/media/audio/drivers/aml-dsp/aml-g12-pdm-dsp:aml-g12-pdm-dsp-driver
-//src/media/audio/drivers/aml-dsp/aml-g12-tdm-dsp:aml-g12-tdm-dsp-driver
-//src/media/audio/drivers/aml-dsp:aml-dsp-driver
-//src/media/audio/drivers/aml-g12-pdm:aml-g12-pdm-driver
-//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-bazel-package.bazel_build
-//src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-dai-driver
-//src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-driver
 //src/media/audio/drivers/codecs/alc5514:alc5514-driver
 //src/media/audio/drivers/codecs/alc5663:alc5663-driver
 //src/media/audio/drivers/codecs/da7219:driver

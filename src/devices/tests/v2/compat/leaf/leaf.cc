@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.compat/cpp/wire.h>
 #include <fuchsia/hardware/compat/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <ddktl/device.h>

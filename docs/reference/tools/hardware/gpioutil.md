@@ -76,8 +76,7 @@ Configure a GPIO as IN.
 
 `<name>` should be one of the values returned from [`list`](#list).
 
-`<value>` is the resistor pull. Accepted values are `0`
-(GPIO\_PULL\_DOWN), `1` (GPIO\_PULL\_UP), or `2` (GPIO\_NO\_PULL).
+`<value>` is the resistor pull. Accepted values are `down`, `up`, or `none`.
 
 This command doesn't return a value.
 
@@ -118,6 +117,36 @@ GPIO. `<value>` should be in microamps.
 
 Aliases: `d`
 
+### interrupt
+
+```none
+gpioutil interrupt <name> <value>
+```
+
+Get the GPIO interrupt and wait for it to be triggered once.
+
+`<name>` should be one of the values returned from [`list`](#list).
+
+`<value>` is the interrupt mode to use. Accepted values are `default`,
+`edge-high`, `edge-low`, `edge-both`, `level-low`, or `level-high`.
+
+Aliases: `q`
+
+### function
+
+```none
+gpioutil function <name> <value>
+```
+
+Set the function for a pin.
+
+`<name>` should be one of the values returned from [`list`](#list).
+
+`<value>` is an function number that is specific to the GPIO controller being
+used.
+
+Aliases: `f`
+
 ### help
 
 ```none
@@ -155,7 +184,7 @@ $ gpioutil write GPIO_HW_ID_3 0
 ### Configure a GPIO as IN with a pull-down resistor
 
 ```none {:.devsite-disable-click-to-copy}
-$ gpioutil in GPIO_HW_ID_3 0
+$ gpioutil in GPIO_HW_ID_3 down
 ```
 
 ### Configure a GPIO as OUT with an initial value of HIGH
@@ -176,6 +205,19 @@ Drive Strength: 500 ua
 ```none {:.devsite-disable-click-to-copy}
 $ gpioutil drive GPIO_HW_ID_3 500
 Set drive strength to 500
+```
+
+### Wait for a falling edge on a GPIO
+
+```none {:.devsite-disable-click-to-copy}
+$ gpioutil interrupt GPIO_HW_ID_3 edge-low
+Received interrupt at time 12345
+```
+
+### Set a pin to function six
+
+```none {:.devsite-disable-click-to-copy}
+$ gpioutil function GPIO_HW_ID_3 6
 ```
 
 ## Notes

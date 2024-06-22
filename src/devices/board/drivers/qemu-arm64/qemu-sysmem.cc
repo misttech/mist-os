@@ -27,10 +27,6 @@ zx_status_t QemuArm64::SysmemInit() {
     fuchsia_hardware_sysmem::Metadata metadata;
     metadata.vid() = PDEV_VID_QEMU;
     metadata.pid() = PDEV_PID_QEMU;
-    // no protected pool
-    metadata.protected_memory_size() = 0;
-    // -5 means 5% of physical RAM
-    metadata.contiguous_memory_size() = -5;
     return metadata;
   }();
 

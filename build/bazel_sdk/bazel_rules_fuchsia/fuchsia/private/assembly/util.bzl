@@ -1,4 +1,37 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
 """Utility functions used by multiple bazel rules and macros."""
+
+# A dictionary to be expanded inside a ctx.actions.run() or
+# ctx.actions.run_shell() call to specify that the corresponding
+# action should only run locally.
+#
+# Example usage is:
+#
+#    ctx.actions.run(
+#      executable = ...,
+#      inputs = ...,
+#      outputs = ....
+#      **LOCAL_ONLY_ACTION_KWARGS
+#    )
+#
+# A good reason to use this is to avoid sending very large
+# input or outputs through the network, especially when
+# running the command locally can still be fast.
+#
+# IMPORTANT: This does NOT disable Bazel sandboxing, like
+# the Bazel "local" tag does.
+#
+# See https://bazel.build/reference/be/common-definitions#common-attributes
+#
+LOCAL_ONLY_ACTION_KWARGS = {
+    "execution_requirements": {
+        "no-remote": "1",
+        "no-cache": "1",
+    },
+}
 
 def extract_labels(json_dict):
     """Walk json_dict and return a map of all the labels found.
@@ -99,12 +132,11 @@ def _walk_json(json_dict, visit_node_funcs):
 
     _enqueue_dictionary_children(json_dict)
 
-    # Bazel doesn't support recursions, but we don't expect
-    # a json object with more than 100K nodes, so this iteration
-    # suffices.
-    max_nodes = 100000
+    # Bazel doesn't support recursion, but a json object will always have less
+    # nodes than number of serialized characters, so this iteration suffices.
+    max_nodes = len(str(json_dict))
     for _unused in range(0, max_nodes):
-        if not len(nodes_to_visit):
+        if not nodes_to_visit:
             break
         node = nodes_to_visit.pop()
         for visit_node_func in visit_node_funcs:
@@ -113,6 +145,3 @@ def _walk_json(json_dict, visit_node_funcs):
             _enqueue_dictionary_children(node.value)
         if type(node.value) == "list":
             _enqueue_array(node.value)
-
-    if nodes_to_visit:
-        fail("More than %s nodes in the input json_dict" % max_nodes)

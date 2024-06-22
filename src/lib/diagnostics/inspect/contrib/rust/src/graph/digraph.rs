@@ -226,6 +226,195 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_dynamic_metadata_on_nodes() {
+        let inspector = inspect::Inspector::default();
+
+        // Create a new graph.
+        let graph = Digraph::new(inspector.root(), DigraphOpts::default().track_events(8));
+
+        // Create a new node with no properties.
+        let mut vertex = graph.add_vertex("test-node", []);
+
+        assert_data_tree!(inspector, root: {
+            "fuchsia.inspect.Graph": {
+                topology: {
+                    "test-node": {
+                        meta: {},
+                        relationships: {}
+                    },
+                },
+                events: {
+                    "0": {
+                         "@time": AnyProperty,
+                         "event": "add_vertex",
+                         "vertex_id": "test-node",
+                         "meta": {}
+                    },
+                }
+            }
+        });
+
+        // We can dynamically set new properties and record their events.
+        vertex.meta().set_and_track("int_property", 1i64);
+        vertex.meta().set_and_track("uint_property", 3u64);
+        vertex.meta().set_and_track("double_property", 4.25);
+        vertex.meta().set_and_track("boolean_property", false);
+        vertex.meta().set_and_track("string_property", "hello world");
+        vertex.meta().set_and_track("intvec_property", vec![15i64, 31i64, 63i64]);
+        vertex.meta().set_and_track("uintvec_property", vec![15u64, 31u64, 63u64]);
+        vertex.meta().set_and_track("doublevec_property", vec![15.0, 31.0, 63.0]);
+
+        assert_data_tree!(inspector, root: {
+            "fuchsia.inspect.Graph": {
+                topology: {
+                    "test-node": {
+                        meta: {
+                            string_property: "hello world",
+                            int_property: 1i64,
+                            uint_property: 3u64,
+                            double_property: 4.25f64,
+                            boolean_property: false,
+                            intvec_property: vec![15i64, 31i64, 63i64],
+                            uintvec_property: vec![15u64, 31u64, 63u64],
+                            doublevec_property: vec![15.0, 31.0, 63.0],
+                        },
+                        relationships: {}
+                    },
+                },
+                events: {
+                    "1": {
+                        "@time": AnyProperty,
+                        event: "update_key",
+                        key: "int_property",
+                        update: 1i64,
+                        vertex_id: "test-node"
+                    },
+                    "2": {
+                        "@time": AnyProperty,
+                        event: "update_key",
+                        key: "uint_property",
+                        update: 3u64,
+                        vertex_id: "test-node"
+                    },
+                    "3": {
+                        "@time": AnyProperty,
+                        event: "update_key",
+                        key: "double_property",
+                        update: 4.25,
+                        vertex_id: "test-node"
+                    },
+                    "4": {
+                        "@time": AnyProperty,
+                        event: "update_key",
+                        key: "boolean_property",
+                        update: false,
+                        vertex_id: "test-node"
+                    },
+                    "5": {
+                        "@time": AnyProperty,
+                        event: "update_key",
+                        key: "string_property",
+                        update: "hello world",
+                        vertex_id: "test-node"
+                    },
+                    "6": {
+                        "@time": AnyProperty,
+                        event: "update_key",
+                        key: "intvec_property",
+                        update: vec![15i64, 31i64, 63i64],
+                        vertex_id: "test-node"
+                    },
+                    "7": {
+                        "@time": AnyProperty,
+                        event: "update_key",
+                        key: "uintvec_property",
+                        update: vec![15u64, 31u64, 63u64],
+                        "vertex_id": "test-node"
+                    },
+                    "8": {
+                        "@time": AnyProperty,
+                        event: "update_key",
+                        key: "doublevec_property",
+                        update: vec![15.0, 31.0, 63.0],
+                        vertex_id: "test-node"
+                    }
+                }
+            }
+        });
+
+        // Or remove them.
+        vertex.meta().remove_and_track("string_property");
+        vertex.meta().remove_and_track("int_property");
+        vertex.meta().remove_and_track("uint_property");
+        vertex.meta().remove_and_track("double_property");
+        vertex.meta().remove_and_track("boolean_property");
+        vertex.meta().remove_and_track("intvec_property");
+        vertex.meta().remove_and_track("uintvec_property");
+        vertex.meta().remove_and_track("doublevec_property");
+
+        assert_data_tree!(inspector, root: {
+            "fuchsia.inspect.Graph": {
+                topology: {
+                    "test-node": {
+                        meta: {},
+                        relationships: {}
+                    },
+                },
+                events: {
+                    "9": {
+                        "@time": AnyProperty,
+                        event: "drop_key",
+                        key: "string_property",
+                        vertex_id: "test-node"
+                    },
+                    "10": {
+                        "@time": AnyProperty,
+                        "event": "drop_key",
+                        key: "int_property",
+                        vertex_id: "test-node"
+                    },
+                    "11": {
+                        "@time": AnyProperty,
+                        event: "drop_key",
+                        key: "uint_property",
+                        vertex_id: "test-node"
+                    },
+                    "12": {
+                        "@time": AnyProperty,
+                        event: "drop_key",
+                        key: "double_property",
+                        vertex_id: "test-node"
+                    },
+                    "13": {
+                        "@time": AnyProperty,
+                        event: "drop_key",
+                        key: "boolean_property",
+                        vertex_id: "test-node"
+                    },
+                    "14": {
+                        "@time": AnyProperty,
+                        event: "drop_key",
+                        key: "intvec_property",
+                        vertex_id: "test-node"
+                    },
+                    "15": {
+                        "@time": AnyProperty,
+                        event: "drop_key",
+                        key: "uintvec_property",
+                        vertex_id: "test-node"
+                    },
+                    "16": {
+                        "@time": AnyProperty,
+                        event: "drop_key",
+                        key: "doublevec_property",
+                        vertex_id: "test-node"
+                    }
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
     fn test_all_metadata_types_on_edges() {
         let inspector = inspect::Inspector::default();
 

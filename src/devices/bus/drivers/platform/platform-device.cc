@@ -324,7 +324,6 @@ zx_status_t PlatformDevice::Start() {
       "thermistor",       // 03:0a:27
       "pll-temp-sensor",  // 05:06:39
       "sysmem",           // 00:00:1b
-      "gpio",             // 05:04:1,05:03:1,05:05:1,05:06:1
   };
 
   char name[ZX_DEVICE_NAME_MAX];
@@ -447,11 +446,22 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
         txn.Reply(ZX_ERR_INTERNAL);
         return;
       }
+
+      auto metadata_type = metadata.type();
+      ZX_ASSERT(metadata_type.has_value());
+      auto metadata_data = metadata.data();
+      ZX_ASSERT(metadata_data.has_value());
+
+      // TODO(b/341981272): Remove `DdkAddMetadata()` once all drivers bound to platform devices do
+      // not use `device_get_metadata()` to retrieve metadata. They should be using
+      // fuchsia.hardware.platform.device/Device::GetMetadata().
       zx_status_t status =
-          DdkAddMetadata(metadata.type().value(), metadata.data()->data(), metadata.data()->size());
+          DdkAddMetadata(metadata_type.value(), metadata_data->data(), metadata_data->size());
       if (status != ZX_OK) {
         return txn.Reply(status);
       }
+
+      metadata_.emplace(metadata_type.value(), metadata_data.value());
     }
 
     for (size_t i = 0; i < boot_metadata_count; i++) {
@@ -460,14 +470,24 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
         txn.Reply(ZX_ERR_INTERNAL);
         return;
       }
+
+      auto metadata_zbi_type = metadata.zbi_type();
+      ZX_ASSERT(metadata_zbi_type.has_value());
+
       zx::result data =
-          bus_->GetBootItemArray(metadata.zbi_type().value(), metadata.zbi_extra().value());
+          bus_->GetBootItemArray(metadata_zbi_type.value(), metadata.zbi_extra().value());
       zx_status_t status = data.status_value();
       if (data.is_ok()) {
-        status = DdkAddMetadata(metadata.zbi_type().value(), data->data(), data->size());
-      }
-      if (status != ZX_OK) {
-        zxlogf(WARNING, "%s failed to add metadata for new device", __func__);
+        // TODO(b/341981272): Remove `DdkAddMetadata()` once all drivers bound to platform devices
+        // do not use `device_get_metadata()` to retrieve metadata. They should be using
+        // fuchsia.hardware.platform.device/Device::GetMetadata().
+        status = DdkAddMetadata(metadata_zbi_type.value(), data->data(), data->size());
+        if (status != ZX_OK) {
+          zxlogf(WARNING, "%s failed to add metadata for new device", __func__);
+        }
+
+        metadata_.emplace(metadata_zbi_type.value(),
+                          std::vector<uint8_t>{data->begin(), data->end()});
       }
     }
   }
@@ -666,6 +686,16 @@ void PlatformDevice::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
   } else {
     completer.ReplyError(status);
   }
+}
+
+void PlatformDevice::GetMetadata(GetMetadataRequestView request,
+                                 GetMetadataCompleter::Sync& completer) {
+  auto metadata = metadata_.find(request->type);
+  if (metadata == metadata_.end()) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
+  }
+  completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
 }
 
 void PlatformDevice::handle_unknown_method(

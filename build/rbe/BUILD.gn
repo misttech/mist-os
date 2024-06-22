@@ -76,6 +76,9 @@ if (is_host) {
       [ "prebuilt_tool_remote_wrapper.py" ] + _fuchsia_sources +
       _cl_utils_sources + _remote_action_sources
 
+  # TODO(b/347995021): fix/workaround mypy test failure on os.setxattr
+  _enable_remote_action_tests = host_os != "mac"
+
   python_library("bbtool") {
     enable_mypy = true
     sources = _bbtool_sources
@@ -121,7 +124,7 @@ if (is_host) {
     sources = _cxx_link_remote_wrapper_sources
   }
   python_host_test("cxx_link_remote_wrapper_test") {
-    enable_mypy = true
+    enable_mypy = _enable_remote_action_tests
     main_source = "cxx_link_remote_wrapper_test.py"
     sources = _cxx_link_remote_wrapper_sources
   }
@@ -131,7 +134,7 @@ if (is_host) {
     sources = _cxx_remote_wrapper_sources
   }
   python_host_test("cxx_remote_wrapper_test") {
-    enable_mypy = true
+    enable_mypy = _enable_remote_action_tests
     main_source = "cxx_remote_wrapper_test.py"
     sources = _cxx_remote_wrapper_sources
   }
@@ -151,7 +154,7 @@ if (is_host) {
     sources = _dlwrap_sources
   }
   python_host_test("dlwrap_test") {
-    enable_mypy = true
+    enable_mypy = _enable_remote_action_tests
     main_source = "dlwrap_test.py"
     sources = _dlwrap_sources
   }
@@ -191,7 +194,7 @@ if (is_host) {
     sources = _prebuilt_tool_remote_wrapper_sources
   }
   python_host_test("prebuilt_tool_remote_wrapper_test") {
-    enable_mypy = true
+    enable_mypy = _enable_remote_action_tests
     main_source = "prebuilt_tool_remote_wrapper_test.py"
     sources = _prebuilt_tool_remote_wrapper_sources
   }
@@ -211,7 +214,7 @@ if (is_host) {
     sources = _remote_action_sources
   }
   python_host_test("remote_action_test") {
-    enable_mypy = true
+    enable_mypy = _enable_remote_action_tests
     main_source = "remote_action_test.py"
     sources = _remote_action_sources
   }
@@ -241,7 +244,7 @@ if (is_host) {
     sources = _rustc_remote_wrapper_sources
   }
   python_host_test("rustc_remote_wrapper_test") {
-    enable_mypy = true
+    enable_mypy = _enable_remote_action_tests
     main_source = "rustc_remote_wrapper_test.py"
     sources = _rustc_remote_wrapper_sources
   }

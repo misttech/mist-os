@@ -5,7 +5,6 @@
 #include <lib/processargs/processargs.h>
 #include <lib/stdcompat/string_view.h>
 #include <lib/zircon-internal/unique-backtrace.h>
-#include <unistd.h>
 
 #include "zircon.h"
 
@@ -26,23 +25,6 @@ constexpr bool HasLdDebug(std::string_view env) {
     debug = env.substr(found + kLdDebugPrefix.size());
   }
   return !debug.empty() && debug.front() != '\0';
-}
-
-void TakeLogHandle(StartupData& startup, zx::handle handle) {
-  zx_info_handle_basic_t info;
-  zx_status_t status = handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  if (status != ZX_OK) [[unlikely]] {
-    CRASH_WITH_UNIQUE_BACKTRACE();
-  }
-
-  switch (info.type) {
-    case ZX_OBJ_TYPE_DEBUGLOG:
-      startup.debuglog = zx::debuglog{handle.release()};
-      break;
-    case ZX_OBJ_TYPE_SOCKET:
-      startup.log_socket = zx::socket{handle.release()};
-      break;
-  }
 }
 
 }  // namespace
@@ -69,7 +51,7 @@ StartupData ReadBootstrap(zx::unowned_channel bootstrap) {
   for (uint32_t i = 0; i < nhandles; ++i) {
     // If not otherwise consumed below, the handle will be closed.
     zx::handle handle{std::exchange(handles[i], {})};
-    switch (handle_info[i]) {
+    switch (PA_HND_TYPE(handle_info[i])) {
       case PA_VMAR_ROOT:
         startup.vmar.reset(handle.release());
         break;
@@ -82,8 +64,10 @@ StartupData ReadBootstrap(zx::unowned_channel bootstrap) {
         startup.executable_vmo.reset(handle.release());
         break;
 
-      case PA_HND(PA_FD, STDERR_FILENO):
-        TakeLogHandle(startup, std::move(handle));
+      case PA_FD:
+        if (Log::IsProcessArgsLogFd(PA_HND_ARG(handle_info[i]))) {
+          startup.log.TakeLogFd(std::move(handle));
+        }
         break;
 
       case PA_LDSVC_LOADER:

@@ -837,6 +837,12 @@ def main() -> int:
             if env_value:
                 bazel_config_args += [f"{bazel_flag}=unix://{env_value}"]
 
+    jobs = None
+    if "--config=remote" in bazel_config_args:
+        cpus = os.cpu_count()
+        if cpus:
+            jobs = 10 * cpus
+
     bazel_config_args += build_metadata_flags()
 
     if args.bazel_build_events_log_json:
@@ -935,6 +941,9 @@ def main() -> int:
             + ([args.test_target] if args.command == "test" else [])
             + extra_args
         )
+
+    if jobs:
+        command_args += [f"--jobs={jobs}"]
 
     # If the test failed, exit early with a non-zero error code, (but don't
     # raise an exception, because the stack trace printed by that will just be

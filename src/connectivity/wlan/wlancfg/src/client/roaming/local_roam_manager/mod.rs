@@ -6,418 +6,225 @@ use crate::client::connection_selection::ConnectionSelectionRequester;
 use crate::client::roaming::lib::*;
 use crate::client::roaming::roam_monitor;
 use crate::client::types;
-use crate::telemetry::{TelemetryEvent, TelemetrySender, EWMA_SMOOTHING_FACTOR_FOR_METRICS};
-use crate::util::pseudo_energy::EwmaSignalData;
-use anyhow::{format_err, Error};
+use crate::telemetry::TelemetrySender;
+use anyhow::Error;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
-use futures::{select, FutureExt, StreamExt};
-use tracing::{info, warn};
+use futures::{select, StreamExt};
+use std::convert::Infallible;
+use tracing::{debug, error};
 
-const MIN_RSSI_IMPROVEMENT_TO_ROAM: f64 = 3.0;
-const MIN_SNR_IMPROVEMENT_TO_ROAM: f64 = 3.0;
-
-/// Local Roam Manager is implemented as a trait so that it can be stubbed out in unit tests.
-pub trait LocalRoamManagerApi: Send + Sync {
-    fn get_roam_monitor(
-        &mut self,
-        signal: types::Signal,
-        currently_fulfilled_connection: types::ConnectSelection,
-        roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-    ) -> Box<dyn roam_monitor::RoamMonitorApi>;
-}
-
-/// Holds long lasting channels for metrics and roam scans, and creates roam monitors for each
-/// new connection.
-pub struct LocalRoamManager {
-    /// Channel to send requests for roam searches so LocalRoamManagerService can serve
-    /// connection selection scans.
-    roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
+// Create a roam monitor implementation.
+fn create_roam_monitor(
+    currently_fulfilled_connection: types::ConnectSelection,
+    signal: types::Signal,
     telemetry_sender: TelemetrySender,
+) -> Box<dyn roam_monitor::RoamMonitorApi> {
+    Box::new(roam_monitor::stationary_monitor::StationaryMonitor::new(
+        currently_fulfilled_connection,
+        signal,
+        telemetry_sender.clone(),
+    ))
 }
 
-impl LocalRoamManager {
-    pub fn new(
-        roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
-        telemetry_sender: TelemetrySender,
-    ) -> Self {
-        Self { roam_search_sender, telemetry_sender }
-    }
-}
-
-impl LocalRoamManagerApi for LocalRoamManager {
-    // Create a RoamMonitor object that can request roam scans, initiate roams, and record metrics
-    // for a connection.
-    fn get_roam_monitor(
-        &mut self,
-        signal: types::Signal,
+// Requests that can be made to roam manager service loop.
+#[cfg_attr(test, derive(Debug))]
+pub enum RoamServiceRequest {
+    InitializeRoamMonitor {
         currently_fulfilled_connection: types::ConnectSelection,
-        roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-    ) -> Box<dyn roam_monitor::RoamMonitorApi> {
-        let connection_data = RoamingConnectionData::new(
-            currently_fulfilled_connection.clone(),
-            EwmaSignalData::new(signal.rssi_dbm, signal.snr_db, EWMA_SMOOTHING_FACTOR_FOR_METRICS),
-        );
-        Box::new(roam_monitor::RoamMonitor::new(
-            self.roam_search_sender.clone(),
-            roam_sender,
-            connection_data,
-            self.telemetry_sender.clone(),
-        ))
+        signal: types::Signal,
+        roam_sender: mpsc::Sender<types::ScannedCandidate>,
+        roam_trigger_data_receiver: mpsc::Receiver<RoamTriggerData>,
+    },
+}
+
+// Allows callers to make roam service requests.
+#[derive(Clone)]
+pub struct RoamManager {
+    sender: mpsc::Sender<RoamServiceRequest>,
+}
+
+impl RoamManager {
+    pub fn new(sender: mpsc::Sender<RoamServiceRequest>) -> Self {
+        Self { sender }
+    }
+    // Create a roam monitor and return handles for passing trigger data and roam requests .
+    pub fn initialize_roam_monitor(
+        &mut self,
+        currently_fulfilled_connection: types::ConnectSelection,
+        signal: types::Signal,
+    ) -> (roam_monitor::RoamDataSender, mpsc::Receiver<types::ScannedCandidate>) {
+        let (roam_sender, roam_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+        let (roam_trigger_data_sender, roam_trigger_data_receiver) =
+            mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
+        let _ = self
+            .sender
+            .try_send(RoamServiceRequest::InitializeRoamMonitor {
+                currently_fulfilled_connection,
+                signal,
+                roam_sender,
+                roam_trigger_data_receiver,
+            })
+            .inspect_err(|e| {
+                error!("Failed to request roam monitoring: {}. Proceeding without roaming.", e)
+            });
+        (roam_monitor::RoamDataSender::new(roam_trigger_data_sender), roam_receiver)
     }
 }
 
-/// Handles roam futures for scans, since FuturesUnordered are not Send + Sync.
-/// State machine's connected state sends updates to RoamMonitors, which may send scan requests
-/// to LocalRoamManagerService.
-pub struct LocalRoamManagerService {
-    roam_futures: FuturesUnordered<
-        BoxFuture<'static, Result<(types::ScannedCandidate, RoamSearchRequest), Error>>,
-    >,
+/// Service loop for handling roam manager requests.
+pub async fn serve_local_roam_manager_requests(
+    mut roam_service_request_receiver: mpsc::Receiver<RoamServiceRequest>,
     connection_selection_requester: ConnectionSelectionRequester,
-    // Receive requests for roam searches.
-    roam_search_receiver: mpsc::UnboundedReceiver<RoamSearchRequest>,
     telemetry_sender: TelemetrySender,
-}
+) -> Result<Infallible, Error> {
+    // Queue of created monitor futures.
+    let mut monitor_futs: FuturesUnordered<BoxFuture<'static, Result<(), anyhow::Error>>> =
+        FuturesUnordered::new();
 
-impl LocalRoamManagerService {
-    pub fn new(
-        roam_search_receiver: mpsc::UnboundedReceiver<RoamSearchRequest>,
-        telemetry_sender: TelemetrySender,
-        connection_selection_requester: ConnectionSelectionRequester,
-    ) -> Self {
-        Self {
-            roam_futures: FuturesUnordered::new(),
-            connection_selection_requester,
-            roam_search_receiver,
-            telemetry_sender,
-        }
-    }
-
-    // process any futures that complete for roam scnas.
-    pub async fn serve(mut self) {
-        // watch futures for roam scans
-        loop {
-            select! {
-                req  = self.roam_search_receiver.select_next_some() => {
-                    info!("Performing scan to find proactive local roaming candidates.");
-                    let roam_fut = get_roaming_connection_selection_future(
-                        self.connection_selection_requester.clone(),
-                        req,
-                    );
-                    self.roam_futures.push(roam_fut.boxed());
-                    self.telemetry_sender.send(TelemetryEvent::RoamingScan);
-                }
-                roam_fut_response = self.roam_futures.select_next_some() => {
-                    match roam_fut_response {
-                        Ok((candidate, request)) => {
-                            if is_roam_worthwhile(&request, &candidate) {
-                                info!("Roam would be requested to candidate: {:?}. Roaming is not enabled.", candidate.to_string_without_pii());
-                                self.telemetry_sender.send(TelemetryEvent::WouldRoamConnect);
-                            }
-                        },
-                        Err(e) => {
-                            warn!("An error occured during the roam scan: {:?}", e);
-                        }
+    loop {
+        select! {
+            // Handle requests sent to roam manager service loop.
+            req = roam_service_request_receiver.select_next_some() => {
+                match req {
+                    // Create and start a roam monitor future, passing in handles from caller. This
+                    // ensures that new data is initialized for every new called (e.g. connected_state).
+                    RoamServiceRequest::InitializeRoamMonitor { currently_fulfilled_connection, signal, roam_sender, roam_trigger_data_receiver }=> {
+                        let monitor = create_roam_monitor(currently_fulfilled_connection, signal, telemetry_sender.clone());
+                        let monitor_fut = roam_monitor::serve_roam_monitor(monitor, roam_trigger_data_receiver, connection_selection_requester.clone(), roam_sender.clone(), telemetry_sender.clone());
+                        monitor_futs.push(Box::pin(monitor_fut));
                     }
                 }
+            }
+            // Serves roam monitors. Futures return when when caller drops handle.
+            _terminated_monitor = monitor_futs.select_next_some() => {
+                debug!("Roam monitor future closed.");
             }
         }
     }
 }
 
-async fn get_roaming_connection_selection_future(
-    mut connection_selection_requester: ConnectionSelectionRequester,
-    request: RoamSearchRequest,
-) -> Result<(types::ScannedCandidate, RoamSearchRequest), Error> {
-    match connection_selection_requester
-        .do_roam_selection(
-            request.connection_data.currently_fulfilled_connection.target.network.clone(),
-            request.connection_data.currently_fulfilled_connection.target.credential.clone(),
-        )
-        .await?
-    {
-        Some(candidate) => Ok((candidate, request)),
-        None => Err(format_err!("No roam candidates found.")),
-    }
-}
-
-/// A roam is worthwhile if the selected BSS looks to be a significant improvement over the current
-/// BSS.
-fn is_roam_worthwhile(
-    request: &RoamSearchRequest,
-    roam_candidate: &types::ScannedCandidate,
-) -> bool {
-    if roam_candidate.is_same_bss_security_and_credential(
-        &request.connection_data.currently_fulfilled_connection.target,
-    ) {
-        info!("Roam search selected currently connected BSS.");
-        return false;
-    }
-    // Candidate RSSI or SNR must be significantly better in order to trigger a roam.
-    let current_rssi = request.connection_data.signal_data.ewma_rssi.get();
-    let current_snr = request.connection_data.signal_data.ewma_snr.get();
-    info!(
-        "Roam candidate BSS - RSSI: {:?}, SNR: {:?}. Current BSS - RSSI: {:?}, SNR: {:?}.",
-        roam_candidate.bss.signal.rssi_dbm,
-        roam_candidate.bss.signal.snr_db,
-        current_rssi,
-        current_snr
-    );
-    if (roam_candidate.bss.signal.rssi_dbm as f64) < current_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM
-        && (roam_candidate.bss.signal.snr_db as f64) < current_snr + MIN_SNR_IMPROVEMENT_TO_ROAM
-    {
-        info!(
-            "Selected roam candidate ({:?}) is not enough of an improvement. Ignoring.",
-            roam_candidate.to_string_without_pii()
-        );
-        return false;
-    }
-    true
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::connection_selection::ConnectionSelectionRequest;
+    use crate::telemetry::TelemetryEvent;
     use crate::util::testing::{
-        generate_connect_selection, generate_random_bss, generate_random_ewma_signal_data,
-        generate_random_scanned_candidate,
+        generate_connect_selection, generate_random_roaming_connection_data, generate_random_signal,
     };
+    use fidl_fuchsia_wlan_internal::SignalReportIndication;
     use fuchsia_async::TestExecutor;
     use futures::task::Poll;
     use std::pin::pin;
     use wlan_common::assert_variant;
 
     struct RoamManagerServiceTestValues {
-        roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
-        /// This is needed for roam search requests; normally it is how the RoamManagerService
-        /// would tell the state machine roaming decisions.
-        roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-        roam_manager_service: LocalRoamManagerService,
-        telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
-        currently_fulfilled_connection: types::ConnectSelection,
-        connection_selection_request_receiver: mpsc::Receiver<ConnectionSelectionRequest>,
+        telemetry_sender: TelemetrySender,
+        connection_selection_requester: ConnectionSelectionRequester,
+        roam_manager: RoamManager,
+        roam_service_request_receiver: mpsc::Receiver<RoamServiceRequest>,
     }
 
-    fn roam_service_test_setup() -> RoamManagerServiceTestValues {
-        let currently_fulfilled_connection = generate_connect_selection();
-        let (roam_search_sender, roam_search_receiver) = mpsc::unbounded();
-        let (roam_req_sender, _roam_req_receiver) = mpsc::unbounded();
-        let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+    fn setup_test() -> RoamManagerServiceTestValues {
+        let (telemetry_sender, _) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (connection_selection_request_sender, connection_selection_request_receiver) =
-            mpsc::channel(5);
-
+        let (connection_selection_request_sender, _) = mpsc::channel(5);
         let connection_selection_requester =
             ConnectionSelectionRequester::new(connection_selection_request_sender);
-
-        let roam_manager_service = LocalRoamManagerService::new(
-            roam_search_receiver,
+        let (roam_service_request_sender, roam_service_request_receiver) = mpsc::channel(100);
+        let roam_manager = RoamManager::new(roam_service_request_sender);
+        RoamManagerServiceTestValues {
             telemetry_sender,
             connection_selection_requester,
-        );
-
-        RoamManagerServiceTestValues {
-            roam_search_sender,
-            roam_req_sender,
-            roam_manager_service,
-            telemetry_receiver,
-            currently_fulfilled_connection,
-            connection_selection_request_receiver,
+            roam_manager,
+            roam_service_request_receiver,
         }
     }
 
-    // Test that when LocalRoamManagerService gets a roam scan request, it initiates bss selection.
-    #[fuchsia::test]
-    fn test_roam_manager_service_initiates_network_selection() {
-        let mut exec = TestExecutor::new();
-        let mut test_values = roam_service_test_setup();
-
-        let serve_fut = test_values.roam_manager_service.serve();
-        let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        let signal_data = EwmaSignalData::new(-80, 10, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-
-        let connection_data = RoamingConnectionData::new(
-            test_values.currently_fulfilled_connection.clone(),
-            signal_data,
-        );
-
-        // Send a request for the LocalRoamManagerService to initiate bss selection.
-        let req = RoamSearchRequest::new(connection_data, test_values.roam_req_sender);
-        test_values.roam_search_sender.unbounded_send(req).expect("Failed to send roam search req");
-
-        // Progress the RoamManager future to process the request for a roam search.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Verify that a metric is logged for the roam scan
-        assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::RoamingScan))
-        );
-
-        // Verify that connection selection receives request
-        assert_variant!(
-            test_values.connection_selection_request_receiver.try_next(),
-            Ok(Some(request)) => {
-                assert_variant!(request, ConnectionSelectionRequest::RoamSelection {..});
-            }
-        );
-    }
-
-    // Test that roam manager would send connect request, if it were enabled.
-    #[fuchsia::test]
-    fn test_roam_manager_service_would_initiate_roam() {
-        let mut exec = TestExecutor::new();
-        let mut test_values = roam_service_test_setup();
-
-        // Set up fake scan results of a better candidate BSS.
-        let init_rssi = -80;
-        let init_snr = 10;
-        let selected_roam_candidate = types::ScannedCandidate {
-            bss: types::Bss {
-                signal: types::Signal {
-                    rssi_dbm: init_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM as i8 + 1,
-                    snr_db: init_snr + MIN_SNR_IMPROVEMENT_TO_ROAM as i8 + 1,
-                },
-                ..generate_random_bss()
-            },
-            ..generate_random_scanned_candidate()
-        };
-
-        // Start roam manager service
-        let serve_fut = test_values.roam_manager_service.serve();
-        let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Initialize current connection data.
-        let signal_data =
-            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let connection_data = RoamingConnectionData::new(
-            test_values.currently_fulfilled_connection.clone(),
-            signal_data,
-        );
-
-        // Send a roam search request to local roam manager service
-        let req = RoamSearchRequest::new(connection_data, test_values.roam_req_sender.clone());
-        test_values.roam_search_sender.unbounded_send(req).expect("Failed to send roam search req");
-
-        // Progress the RoamManager future to process the request for a roam search.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Verify that a metric is logged for the roam scan
-        assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::RoamingScan))
-        );
-
-        // Verify that connection selection receives request
-        assert_variant!(
-            test_values.connection_selection_request_receiver.try_next(),
-            Ok(Some(request)) => {
-                assert_variant!(request, ConnectionSelectionRequest::RoamSelection {network_id, credential, responder} => {
-                    assert_eq!(network_id, test_values.currently_fulfilled_connection.target.network);
-                    assert_eq!(credential, test_values.currently_fulfilled_connection.target.credential);
-                    // Respond with barely better candidate.
-                    responder.send(Some(selected_roam_candidate)).expect("failed to send connection selection");
-                });
-            }
-        );
-
-        // Progress the RoamManager future to process the roam search response.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // A metric will be logged when a roaming connect request is sent to state machine
-        assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::WouldRoamConnect))
-        );
-        // Roaming would be requested via state machine, if it were enabled.
-    }
-
-    #[fuchsia::test]
-    fn test_roam_manager_service_doesnt_roam_for_barely_better_rssi() {
-        let mut exec = TestExecutor::new();
-        let mut test_values = roam_service_test_setup();
-
-        // Set up fake roam candidate with barely better rssi, less than the min improvement
-        // threshold.
-        let init_rssi = -80;
-        let init_snr = 10;
-        let selected_roam_candidate = types::ScannedCandidate {
-            bss: types::Bss {
-                signal: types::Signal {
-                    rssi_dbm: init_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM as i8 - 1,
-                    snr_db: init_snr + MIN_SNR_IMPROVEMENT_TO_ROAM as i8 - 1,
-                },
-                ..generate_random_bss()
-            },
-            ..generate_random_scanned_candidate()
-        };
-
-        // Start roam manager service
-        let serve_fut = test_values.roam_manager_service.serve();
-        let mut serve_fut = pin!(serve_fut);
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Initialize current connection data.
-        let signal_data =
-            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let connection_data = RoamingConnectionData::new(
-            test_values.currently_fulfilled_connection.clone(),
-            signal_data,
-        );
-
-        // Send a roam search request to local roam manager service
-        let req = RoamSearchRequest::new(connection_data, test_values.roam_req_sender.clone());
-        test_values.roam_search_sender.unbounded_send(req).expect("Failed to send roam search req");
-
-        // Progress the RoamManager future to process the request for a roam search.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-
-        // Verify that a metric is logged for the roam scan
-        assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::RoamingScan))
-        );
-
-        // Verify that connection selection receives request
-        assert_variant!(
-            test_values.connection_selection_request_receiver.try_next(),
-            Ok(Some(request)) => {
-                assert_variant!(request, ConnectionSelectionRequest::RoamSelection { network_id, credential, responder } => {
-                    assert_eq!(network_id, test_values.currently_fulfilled_connection.target.network);
-                    assert_eq!(credential, test_values.currently_fulfilled_connection.target.credential);
-                    // Respond with barely better candidate.
-                    responder.send(Some(selected_roam_candidate)).expect("failed to send connection selection");
-                });
-            }
-        );
-
-        // Progress the RoamManager future to process the roam search response. No roam connect
-        // metric will be sent, since the candidate BSS is not enough of an improvement.
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-    }
-
-    #[fuchsia::test]
-    fn is_roam_worthwhile_dedupes_current_connection() {
+    #[fuchsia::test()]
+    fn test_create_roam_monitor() {
         let _exec = TestExecutor::new();
-        let (sender, _) = mpsc::unbounded();
-        let roam_search_request = RoamSearchRequest::new(
-            RoamingConnectionData::new(
-                generate_connect_selection(),
-                generate_random_ewma_signal_data(),
-            ),
-            sender,
+        let (telemetry_sender, _) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let monitor = create_roam_monitor(
+            generate_connect_selection(),
+            generate_random_signal(),
+            telemetry_sender.clone(),
         );
-        // Should evaluate to false if the selected roam candidate is the same BSS as the current
-        // connection.
-        assert!(!is_roam_worthwhile(
-            &roam_search_request,
-            &roam_search_request.connection_data.currently_fulfilled_connection.target,
-        ))
+        let stationary_monitor: Box<dyn roam_monitor::RoamMonitorApi> =
+            Box::new(roam_monitor::stationary_monitor::StationaryMonitor::new(
+                generate_connect_selection(),
+                generate_random_signal(),
+                telemetry_sender.clone(),
+            ));
+
+        assert_eq!(stationary_monitor.type_id(), monitor.type_id());
+    }
+
+    #[fuchsia::test]
+    fn test_roam_manager_handles_get_roam_monitor_request() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = setup_test();
+        let mut serve_fut = pin!(serve_local_roam_manager_requests(
+            test_values.roam_service_request_receiver,
+            test_values.connection_selection_requester.clone(),
+            test_values.telemetry_sender.clone(),
+        ));
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Send a request to initialize a roam monitor
+        let connection_data = generate_random_roaming_connection_data();
+        let (mut roam_monitor_sender, _) = test_values.roam_manager.initialize_roam_monitor(
+            connection_data.currently_fulfilled_connection.clone(),
+            types::Signal {
+                rssi_dbm: connection_data.signal_data.ewma_rssi.get() as i8,
+                snr_db: connection_data.signal_data.ewma_snr.get() as i8,
+            },
+        );
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Send some data via one of the roam monitor. Ensure that it doesn't error out, which means
+        // a created roam monitor is holding the receiver end.
+        roam_monitor_sender
+            .send_signal_report_ind(SignalReportIndication { rssi_dbm: -60, snr_db: 30 })
+            .expect("error sending data via roam monitor sender");
+    }
+
+    #[fuchsia::test]
+    fn test_roam_manager_handles_terminated_roam_monitors() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = setup_test();
+        let mut serve_fut = pin!(serve_local_roam_manager_requests(
+            test_values.roam_service_request_receiver,
+            test_values.connection_selection_requester.clone(),
+            test_values.telemetry_sender.clone(),
+        ));
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Send a request to initialize a roam monitor
+        let connection_data = generate_random_roaming_connection_data();
+        let (mut roam_monitor_sender, _) = test_values.roam_manager.initialize_roam_monitor(
+            connection_data.currently_fulfilled_connection.clone(),
+            types::Signal {
+                rssi_dbm: connection_data.signal_data.ewma_rssi.get() as i8,
+                snr_db: connection_data.signal_data.ewma_snr.get() as i8,
+            },
+        );
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Send some trigger data over a channel. Ensure that it doesn't error out, which means
+        // a created roam monitor is holding the receiver end.
+        roam_monitor_sender
+            .send_signal_report_ind(SignalReportIndication { rssi_dbm: -60, snr_db: 30 })
+            .expect("error sending data via roam monitor sender");
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Drop the trigger data sender. This should cause the monitor to terminate?
+        std::mem::drop(roam_monitor_sender);
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
     }
 }

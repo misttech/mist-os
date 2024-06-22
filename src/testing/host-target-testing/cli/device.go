@@ -173,6 +173,7 @@ func (c *DeviceConfig) NewDeviceClient(
 		connectBackoff,
 		c.WorkaroundBrokenTimeSkip,
 		serialConn,
+		ffx,
 	)
 	if err != nil {
 		return nil, err

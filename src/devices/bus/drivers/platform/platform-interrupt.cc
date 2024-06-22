@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.interrupt/cpp/markers.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 
 #include <bind/fuchsia/cpp/bind.h>

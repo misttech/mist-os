@@ -66,17 +66,11 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
         flags: fio::OpenFlags,
         scope: package_directory::ExecutionScope,
         server_end: fidl::endpoints::ServerEnd<fio::NodeMarker>,
-    ) -> Result<(), fuchsia_fs::node::OpenError> {
+    ) -> Result<(), package_directory::NonMetaStorageError> {
         if self.0.bootfs_contents.contains(blob) {
-            self.0
-                .bootfs
-                .open(flags, fio::ModeType::empty(), &blob.to_string(), server_end)
-                .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
+            package_directory::NonMetaStorage::open(&self.0.bootfs, blob, flags, scope, server_end)
         } else {
-            self.0
-                .blobfs
-                .open_blob_for_read(blob, flags, scope, server_end)
-                .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
+            package_directory::NonMetaStorage::open(&self.0.blobfs, blob, flags, scope, server_end)
         }
     }
 
@@ -98,7 +92,35 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
                     fuchsia_zircon::Status::INTERNAL
                 })
         } else {
-            self.0.blobfs.open2_blob_for_read(blob, protocols, scope, object_request)
+            package_directory::NonMetaStorage::open2(
+                &self.0.blobfs,
+                blob,
+                protocols,
+                scope,
+                object_request,
+            )
+        }
+    }
+
+    async fn get_blob_vmo(
+        &self,
+        hash: &fuchsia_hash::Hash,
+    ) -> Result<fuchsia_zircon::Vmo, package_directory::NonMetaStorageError> {
+        if self.0.bootfs_contents.contains(hash) {
+            package_directory::NonMetaStorage::get_blob_vmo(&self.0.bootfs, hash).await
+        } else {
+            package_directory::NonMetaStorage::get_blob_vmo(&self.0.blobfs, hash).await
+        }
+    }
+
+    async fn read_blob(
+        &self,
+        hash: &fuchsia_hash::Hash,
+    ) -> Result<Vec<u8>, package_directory::NonMetaStorageError> {
+        if self.0.bootfs_contents.contains(hash) {
+            package_directory::NonMetaStorage::read_blob(&self.0.bootfs, hash).await
+        } else {
+            package_directory::NonMetaStorage::read_blob(&self.0.blobfs, hash).await
         }
     }
 }

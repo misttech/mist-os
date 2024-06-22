@@ -7,9 +7,7 @@ use super::metadata::{
     CONFIG_HANDLE_UNKNOWN_MASK, CONFIG_MLS_FLAG, POLICYDB_SIGNATURE, POLICYDB_STRING_MAX_LENGTH,
     POLICYDB_VERSION_MAX, POLICYDB_VERSION_MIN, SELINUX_MAGIC,
 };
-use super::security_context::SecurityLevel;
 use super::symbols::{ClassDefault, ClassDefaultRange};
-use super::{RoleId, SecurityContext, SecurityContextError, TypeId, UserId};
 
 use selinux_common as sc;
 use thiserror::Error;
@@ -103,44 +101,4 @@ pub enum QueryError {
     UnknownSourceType { source_type_name: String },
     #[error("the target type {target_type_name:?} does not exist")]
     UnknownTargetType { target_type_name: String },
-}
-
-/// Structured errors that may be encountered computing new security contexts based on a binary
-/// policy.
-#[derive(Debug, Error, PartialEq)]
-pub enum NewSecurityContextError {
-    #[error(
-        r#"role transition declared in policy, but not allowed by policy:
-source security context: {source_security_context:#?}
-target security context: {target_security_context:#?}
-source role: {source_role:?}
-new role: {new_role:?}"#
-    )]
-    RoleTransitionNotAllowed {
-        source_security_context: SecurityContext,
-        target_security_context: SecurityContext,
-        source_role: String,
-        new_role: String,
-    },
-    #[error(
-        r#"failed to parse security context computed for new object:
-source security context: {source_security_context:#?}
-target security context: {target_security_context:#?}
-computed user: {computed_user:?}
-computed role: {computed_role:?}
-computed user: {computed_type:?}
-computed low level: {computed_low_level:?}
-computed high level: {computed_high_level:?}
-parsing error: {error:?}"#
-    )]
-    MalformedComputedSecurityContext {
-        source_security_context: SecurityContext,
-        target_security_context: SecurityContext,
-        computed_user: UserId,
-        computed_role: RoleId,
-        computed_type: TypeId,
-        computed_low_level: SecurityLevel,
-        computed_high_level: Option<SecurityLevel>,
-        error: SecurityContextError,
-    },
 }

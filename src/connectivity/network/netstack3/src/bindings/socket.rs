@@ -289,8 +289,11 @@ fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
 pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
     /// The concrete address type for this `SockAddr`.
     type AddrType: IpAddress + ScopeableAddress;
+
     /// The socket's domain.
+    #[cfg(test)]
     const DOMAIN: psocket::Domain;
+
     /// The unspecified instance of this `SockAddr`.
     const UNSPECIFIED: Self;
 
@@ -324,6 +327,7 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
 
 impl SockAddr for fnet::Ipv6SocketAddress {
     type AddrType = Ipv6Addr;
+    #[cfg(test)]
     const DOMAIN: psocket::Domain = psocket::Domain::Ipv6;
     const UNSPECIFIED: Self = fnet::Ipv6SocketAddress {
         address: fnet::Ipv6Address { addr: [0; 16] },
@@ -366,6 +370,7 @@ impl SockAddr for fnet::Ipv6SocketAddress {
 
 impl SockAddr for fnet::Ipv4SocketAddress {
     type AddrType = Ipv4Addr;
+    #[cfg(test)]
     const DOMAIN: psocket::Domain = psocket::Domain::Ipv4;
     const UNSPECIFIED: Self =
         fnet::Ipv4SocketAddress { address: fnet::Ipv4Address { addr: [0; 4] }, port: 0 };
@@ -562,7 +567,7 @@ impl IntoErrno for IpSockCreationError {
 impl IntoErrno for IpSockSendError {
     fn into_errno(self) -> Errno {
         match self {
-            IpSockSendError::Mtu => Errno::Einval,
+            IpSockSendError::Mtu | IpSockSendError::IllegalLoopbackAddress => Errno::Einval,
             IpSockSendError::Unroutable(e) => e.into_errno(),
         }
     }
@@ -577,6 +582,7 @@ impl IntoErrno for udp::SendToError {
             // NB: Mapping MTU to EMSGSIZE is different from the impl on
             // `IpSockSendError` which maps to EINVAL instead.
             Self::Send(IpSockSendError::Mtu) => Errno::Emsgsize,
+            Self::Send(IpSockSendError::IllegalLoopbackAddress) => Errno::Einval,
             Self::Send(IpSockSendError::Unroutable(err)) => err.into_errno(),
             Self::RemotePortUnset => Errno::Einval,
             Self::RemoteUnexpectedlyMapped => Errno::Enetunreach,

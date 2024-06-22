@@ -6,6 +6,7 @@ use anyhow::{format_err, Error};
 use bt_rfcomm::profile::server_channel_from_protocol;
 use bt_rfcomm::ServerChannel;
 use derivative::Derivative;
+use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
@@ -29,23 +30,26 @@ const USER_DATA_BUFFER_SIZE: usize = 50;
 fn spp_service_definition() -> bredr::ServiceDefinition {
     bredr::ServiceDefinition {
         service_class_uuids: Some(vec![Uuid::new16(
-            bredr::ServiceClassProfileIdentifier::SerialPort as u16,
+            bredr::ServiceClassProfileIdentifier::SerialPort.into_primitive(),
         )
         .into()]),
         protocol_descriptor_list: Some(vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![],
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![]),
+                ..Default::default()
             },
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Rfcomm,
-                params: vec![],
+                protocol: Some(bredr::ProtocolIdentifier::Rfcomm),
+                params: Some(vec![]),
+                ..Default::default()
             },
         ]),
         profile_descriptors: Some(vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::SerialPort,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::SerialPort),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         }]),
         ..Default::default()
     }
@@ -281,7 +285,10 @@ impl RfcommManager {
             match request {
                 Ok(ProfileEvent::PeerConnected { id, protocol, channel, .. }) => {
                     // Received an incoming connection request for our advertised service.
-                    let protocol = protocol.iter().map(Into::into).collect();
+                    let protocol = protocol
+                        .iter()
+                        .map(|p| ProtocolDescriptor::try_from(p))
+                        .collect::<Result<Vec<_>, _>>()?;
                     let server_channel = server_channel_from_protocol(&protocol)
                         .ok_or(format_err!("Not RFCOMM protocol"))?;
 
@@ -291,8 +298,11 @@ impl RfcommManager {
                 }
                 Ok(ProfileEvent::SearchResult { id, protocol, .. }) => {
                     // Discovered a remote peer's service.
-                    let protocol =
-                        protocol.expect("Protocol should exist").iter().map(Into::into).collect();
+                    let protocol = protocol
+                        .expect("Protocol should exist")
+                        .iter()
+                        .map(|p| ProtocolDescriptor::try_from(p))
+                        .collect::<Result<Vec<_>, _>>()?;
                     let server_channel = server_channel_from_protocol(&protocol)
                         .ok_or(format_err!("Not RFCOMM protocol"))?;
                     info!("Found SPP service for {} with server channel: {:?}", id, server_channel);

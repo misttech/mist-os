@@ -661,43 +661,6 @@ impl<'a> AlignedOptionBuilder for HopByHopOption<'a> {
 }
 
 //
-// Routing
-//
-
-/// Routing Extension header data.
-#[derive(Debug)]
-pub struct RoutingData<'a> {
-    bytes: &'a [u8],
-    type_specific_data: RoutingTypeSpecificData<'a>,
-}
-
-impl<'a> RoutingData<'a> {
-    /// Returns the routing type.
-    pub fn routing_type(&self) -> u8 {
-        debug_assert!(self.bytes.len() >= 2);
-        self.bytes[0]
-    }
-
-    /// Returns the segments left.
-    pub fn segments_left(&self) -> u8 {
-        debug_assert!(self.bytes.len() >= 2);
-        self.bytes[1]
-    }
-
-    /// Returns the routing type specific data.
-    pub fn type_specific_data(&self) -> &RoutingTypeSpecificData<'a> {
-        &self.type_specific_data
-    }
-}
-
-/// Routing Type specific data.
-#[allow(missing_docs)]
-#[derive(Debug)]
-pub enum RoutingTypeSpecificData<'a> {
-    Other(&'a u8),
-}
-
-//
 // Fragment
 //
 

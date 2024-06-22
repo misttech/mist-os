@@ -13,7 +13,6 @@ cpu_manager_deps = [
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_rust",
-  "//sdk/lib/device-watcher/rust",
   "//src/lib/async-utils",
   "//src/lib/diagnostics/inspect/contrib/rust",
   "//src/lib/diagnostics/inspect/runtime/rust",
@@ -54,6 +53,7 @@ cpu_manager_sources = [
   "src/test/mock_node.rs",
   "src/test/mod.rs",
   "src/thermal_watcher.rs",
+  "src/utils.rs",
 ]
 
 rustc_binary("bin") {

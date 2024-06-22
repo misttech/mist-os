@@ -17,6 +17,7 @@ if (is_host) {
     deps = [
       "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
       "//src/lib/fidl/rust/fidl",
+      "//src/lib/fuchsia-url",
       "//src/sys/pkg/lib/far/rust:fuchsia-archive",
       "//src/sys/pkg/lib/fuchsia-pkg",
       "//third_party/rust_crates:anyhow",
@@ -26,6 +27,8 @@ if (is_host) {
       "//third_party/rust_crates:rayon",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:tracing",
+      "//third_party/rust_crates:tracing-subscriber",
     ]
     data_deps = [ "debugdump:host($host_toolchain)" ]
     inputs = [

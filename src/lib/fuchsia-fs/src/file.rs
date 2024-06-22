@@ -20,10 +20,247 @@ mod buffered_async_read_at;
 pub use buffered_async_read_at::BufferedAsyncReadAt;
 
 #[cfg(target_os = "fuchsia")]
-use {
-    crate::node::{take_on_open_event, Kind},
-    fuchsia_zircon::{self as zx},
-};
+pub use fuchsia::*;
+
+#[cfg(target_os = "fuchsia")]
+mod fuchsia {
+    use super::*;
+    use crate::node::{take_on_open_event, Kind};
+    use fuchsia_zircon::{self as zx};
+
+    /// An error encountered while reading a named file
+    #[derive(Debug, Error)]
+    #[error("error reading '{path}': {source}")]
+    pub struct ReadNamedError {
+        pub(super) path: String,
+
+        #[source]
+        pub(super) source: ReadError,
+    }
+
+    impl ReadNamedError {
+        /// Returns the path associated with this error.
+        pub fn path(&self) -> &str {
+            &self.path
+        }
+
+        /// Unwraps the inner read error, discarding the associated path.
+        pub fn into_inner(self) -> ReadError {
+            self.source
+        }
+
+        /// Returns true if the read failed because the file was no found.
+        pub fn is_not_found_error(&self) -> bool {
+            self.source.is_not_found_error()
+        }
+    }
+
+    /// An error encountered while writing a named file
+    #[derive(Debug, Error)]
+    #[error("error writing '{path}': {source}")]
+    pub struct WriteNamedError {
+        pub(super) path: String,
+
+        #[source]
+        pub(super) source: WriteError,
+    }
+
+    impl WriteNamedError {
+        /// Returns the path associated with this error.
+        pub fn path(&self) -> &str {
+            &self.path
+        }
+
+        /// Unwraps the inner write error, discarding the associated path.
+        pub fn into_inner(self) -> WriteError {
+            self.source
+        }
+    }
+
+    /// Opens the given `path` from the current namespace as a [`FileProxy`].
+    ///
+    /// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
+    /// filesystem node which doesn't implement fuchsia.io.File, use the functions in
+    /// [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
+    /// error. However, if incorrect flags are sent, or if the rest of the path sent to the
+    /// filesystem server doesn't exist, this will still return success. Instead, the returned
+    /// FileProxy channel pair will be closed with an epitaph.
+    pub fn open_in_namespace(
+        path: &str,
+        flags: fio::OpenFlags,
+    ) -> Result<fio::FileProxy, OpenError> {
+        let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
+        open_channel_in_namespace(path, flags, request)?;
+        Ok(node)
+    }
+
+    /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
+    /// over [`request`]. Once the channel is connected, any calls made prior are serviced.
+    ///
+    /// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
+    /// filesystem node which doesn't implement fuchsia.io.File, use the functions in
+    /// [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
+    /// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will
+    /// still return success. Instead, the [`request`] channel will be closed with an epitaph.
+    pub fn open_channel_in_namespace(
+        path: &str,
+        flags: fio::OpenFlags,
+        request: fidl::endpoints::ServerEnd<fio::FileMarker>,
+    ) -> Result<(), OpenError> {
+        let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
+        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+    }
+
+    /// Write the given data into a file at `path` in the current namespace. The path must be an
+    /// absolute path.
+    /// * If the file already exists, replaces existing contents.
+    /// * If the file does not exist, creates the file.
+    pub async fn write_in_namespace<D>(path: &str, data: D) -> Result<(), WriteNamedError>
+    where
+        D: AsRef<[u8]>,
+    {
+        async {
+            let flags =
+                fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::TRUNCATE;
+            let file = open_in_namespace(path, flags)?;
+
+            write(&file, data).await?;
+
+            let _ = close(file).await;
+            Ok(())
+        }
+        .await
+        .map_err(|source| WriteNamedError { path: path.to_owned(), source })
+    }
+
+    /// Write the given FIDL encoded message into a file at `path`. The path must be an absolute
+    /// path.
+    /// * If the file already exists, replaces existing contents.
+    /// * If the file does not exist, creates the file.
+    pub async fn write_fidl_in_namespace<T: Persistable>(
+        path: &str,
+        data: &mut T,
+    ) -> Result<(), WriteNamedError> {
+        let data = persist(data)
+            .map_err(|source| WriteNamedError { path: path.to_owned(), source: source.into() })?;
+        write_in_namespace(path, data).await?;
+        Ok(())
+    }
+
+    /// Reads all data from the file at `path` in the current namespace. The path must be an
+    /// absolute path.
+    pub async fn read_in_namespace(path: &str) -> Result<Vec<u8>, ReadNamedError> {
+        async {
+            let file = open_in_namespace(
+                path,
+                fio::OpenFlags::DESCRIBE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+            )?;
+            read_file_with_on_open_event(file).await
+        }
+        .await
+        .map_err(|source| ReadNamedError { path: path.to_owned(), source })
+    }
+
+    /// Reads a utf-8 encoded string from the file at `path` in the current namespace. The path must
+    /// be an absolute path.
+    pub async fn read_in_namespace_to_string(path: &str) -> Result<String, ReadNamedError> {
+        let bytes = read_in_namespace(path).await?;
+        let string = String::from_utf8(bytes)
+            .map_err(|source| ReadNamedError { path: path.to_owned(), source: source.into() })?;
+        Ok(string)
+    }
+
+    /// Read the given FIDL message from binary file at `path` in the current namespace. The path
+    /// must be an absolute path.
+    /// FIDL structure should be provided at a read time.
+    /// Incompatible data is populated as per FIDL ABI compatibility guide:
+    /// https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/abi-compat
+    pub async fn read_in_namespace_to_fidl<T: Persistable>(
+        path: &str,
+    ) -> Result<T, ReadNamedError> {
+        let bytes = read_in_namespace(path).await?;
+        unpersist(&bytes)
+            .map_err(|source| ReadNamedError { path: path.to_owned(), source: source.into() })
+    }
+
+    /// Extracts the stream from an OnOpen or OnRepresentation FileEvent.
+    pub(super) fn extract_stream_from_on_open_event(
+        event: fio::FileEvent,
+    ) -> Result<Option<zx::Stream>, OpenError> {
+        match event {
+            fio::FileEvent::OnOpen_ { s: status, info } => {
+                zx::Status::ok(status).map_err(OpenError::OpenError)?;
+                let node_info = info.ok_or(OpenError::MissingOnOpenInfo)?;
+                match *node_info {
+                    fio::NodeInfoDeprecated::File(file_info) => Ok(file_info.stream),
+                    node_info @ _ => Err(OpenError::UnexpectedNodeKind {
+                        expected: Kind::File,
+                        actual: Kind::kind_of(&node_info),
+                    }),
+                }
+            }
+            fio::FileEvent::OnRepresentation { payload } => match payload {
+                fio::Representation::File(file_info) => Ok(file_info.stream),
+                representation @ _ => Err(OpenError::UnexpectedNodeKind {
+                    expected: Kind::File,
+                    actual: Kind::kind_of2(&representation),
+                }),
+            },
+        }
+    }
+
+    /// Reads the contents of a stream into a Vec.
+    pub(super) fn read_contents_of_stream(stream: zx::Stream) -> Result<Vec<u8>, ReadError> {
+        // TODO(https://fxbug.dev/324239375): Get the file size from the OnRepresentation event.
+        let file_size =
+            stream.seek(std::io::SeekFrom::End(0)).map_err(ReadError::ReadError)? as usize;
+        let mut data = Vec::with_capacity(file_size);
+        let mut remaining = file_size;
+        while remaining > 0 {
+            // read_at is used instead of read because the seek offset was moved to the end of the
+            // file to determine the file size. Moving the seek offset back to the start of the file
+            // would require another syscall.
+            let actual = stream
+                .read_at_uninit(
+                    zx::StreamReadOptions::empty(),
+                    data.len() as u64,
+                    &mut data.spare_capacity_mut()[0..remaining],
+                )
+                .map_err(ReadError::ReadError)?;
+            // A read of 0 bytes indicates the end of the file was reached. The file may have
+            // changed size since the seek.
+            if actual == 0 {
+                break;
+            }
+            // SAFETY: read_at_uninit returns the number of bytes that were read and initialized.
+            unsafe { data.set_len(data.len() + actual) };
+            remaining -= actual;
+        }
+        Ok(data)
+    }
+
+    /// Reads the contents of `file` into a Vec. `file` must have been opened with either `DESCRIBE`
+    /// or `GET_REPRESENTATION` and the event must not have been read yet.
+    pub(crate) async fn read_file_with_on_open_event(
+        file: fio::FileProxy,
+    ) -> Result<Vec<u8>, ReadError> {
+        let event = take_on_open_event(&file).await.map_err(ReadError::Open)?;
+        let stream = extract_stream_from_on_open_event(event).map_err(ReadError::Open)?;
+
+        if let Some(stream) = stream {
+            read_contents_of_stream(stream)
+        } else {
+            // Fall back to FIDL reads if the file doesn't support streams.
+            read(&file).await
+        }
+    }
+}
 
 /// An error encountered while reading a file
 #[derive(Debug, Error)]
@@ -49,33 +286,6 @@ impl ReadError {
     }
 }
 
-/// An error encountered while reading a named file
-#[derive(Debug, Error)]
-#[error("error reading '{path}': {source}")]
-pub struct ReadNamedError {
-    path: String,
-
-    #[source]
-    source: ReadError,
-}
-
-impl ReadNamedError {
-    /// Returns the path associated with this error.
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
-    /// Unwraps the inner read error, discarding the associated path.
-    pub fn into_inner(self) -> ReadError {
-        self.source
-    }
-
-    /// Returns true if the read failed because the file was no found.
-    pub fn is_not_found_error(&self) -> bool {
-        self.source.is_not_found_error()
-    }
-}
-
 /// An error encountered while writing a file
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
@@ -93,92 +303,10 @@ pub enum WriteError {
     Overwrite,
 }
 
-/// An error encountered while writing a named file
-#[derive(Debug, Error)]
-#[error("error writing '{path}': {source}")]
-pub struct WriteNamedError {
-    path: String,
-
-    #[source]
-    source: WriteError,
-}
-
-impl WriteNamedError {
-    /// Returns the path associated with this error.
-    pub fn path(&self) -> &str {
-        &self.path
-    }
-
-    /// Unwraps the inner write error, discarding the associated path.
-    pub fn into_inner(self) -> WriteError {
-        self.source
-    }
-}
-
-/// Opens the given `path` from the current namespace as a [`FileProxy`].
-///
-/// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
-/// filesystem node which doesn't implement fuchsia.io.File, use the functions in
-/// [`fuchsia_component::client`] instead.
-///
-/// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
-/// error. However, if incorrect flags are sent, or if the rest of the path sent to the filesystem
-/// server doesn't exist, this will still return success. Instead, the returned FileProxy channel
-/// pair will be closed with an epitaph.
-#[cfg(target_os = "fuchsia")]
-pub fn open_in_namespace(path: &str, flags: fio::OpenFlags) -> Result<fio::FileProxy, OpenError> {
-    let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
-    open_channel_in_namespace(path, flags, request)?;
-    Ok(node)
-}
-
-/// Asynchronously opens the given [`path`] in the current namespace, serving the connection over
-/// [`request`]. Once the channel is connected, any calls made prior are serviced.
-///
-/// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
-/// filesystem node which doesn't implement fuchsia.io.File, use the functions in
-/// [`fuchsia_component::client`] instead.
-///
-/// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
-/// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will still
-/// return success. Instead, the [`request`] channel will be closed with an epitaph.
-#[cfg(target_os = "fuchsia")]
-pub fn open_channel_in_namespace(
-    path: &str,
-    flags: fio::OpenFlags,
-    request: fidl::endpoints::ServerEnd<fio::FileMarker>,
-) -> Result<(), OpenError> {
-    let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-    namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
-}
-
 /// Gracefully closes the file proxy from the remote end.
 pub async fn close(file: fio::FileProxy) -> Result<(), CloseError> {
     let result = file.close().await.map_err(CloseError::SendCloseRequest)?;
     result.map_err(|s| CloseError::CloseError(zx_status::Status::from_raw(s)))
-}
-
-/// Write the given data into a file at `path` in the current namespace. The path must be an
-/// absolute path.
-/// * If the file already exists, replaces existing contents.
-/// * If the file does not exist, creates the file.
-#[cfg(target_os = "fuchsia")]
-pub async fn write_in_namespace<D>(path: &str, data: D) -> Result<(), WriteNamedError>
-where
-    D: AsRef<[u8]>,
-{
-    async {
-        let flags =
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::TRUNCATE;
-        let file = open_in_namespace(path, flags)?;
-
-        write(&file, data).await?;
-
-        let _ = close(file).await;
-        Ok(())
-    }
-    .await
-    .map_err(|source| WriteNamedError { path: path.to_owned(), source })
 }
 
 /// Writes the given data into the given file.
@@ -209,20 +337,6 @@ pub async fn write_fidl<T: Persistable>(
     data: &mut T,
 ) -> Result<(), WriteError> {
     write(file, persist(data)?).await?;
-    Ok(())
-}
-
-/// Write the given FIDL encoded message into a file at `path`. The path must be an absolute path.
-/// * If the file already exists, replaces existing contents.
-/// * If the file does not exist, creates the file.
-#[cfg(target_os = "fuchsia")]
-pub async fn write_fidl_in_namespace<T: Persistable>(
-    path: &str,
-    data: &mut T,
-) -> Result<(), WriteNamedError> {
-    let data = persist(data)
-        .map_err(|source| WriteNamedError { path: path.to_owned(), source: source.into() })?;
-    write_in_namespace(path, data).await?;
     Ok(())
 }
 
@@ -275,37 +389,10 @@ pub async fn read_num_bytes(file: &fio::FileProxy, num_bytes: u64) -> Result<Vec
     Ok(data)
 }
 
-/// Reads all data from the file at `path` in the current namespace. The path must be an absolute
-/// path.
-#[cfg(target_os = "fuchsia")]
-pub async fn read_in_namespace(path: &str) -> Result<Vec<u8>, ReadNamedError> {
-    async {
-        let file = open_in_namespace(
-            path,
-            fio::OpenFlags::DESCRIBE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
-        )?;
-        read_file_with_on_open_event(file).await
-    }
-    .await
-    .map_err(|source| ReadNamedError { path: path.to_owned(), source })
-}
-
 /// Reads a utf-8 encoded string from the given file's current offset to the end of the file.
 pub async fn read_to_string(file: &fio::FileProxy) -> Result<String, ReadError> {
     let bytes = read(file).await?;
     let string = String::from_utf8(bytes)?;
-    Ok(string)
-}
-
-/// Reads a utf-8 encoded string from the file at `path` in the current namespace. The path must be
-/// an absolute path.
-#[cfg(target_os = "fuchsia")]
-pub async fn read_in_namespace_to_string(path: &str) -> Result<String, ReadNamedError> {
-    let bytes = read_in_namespace(path).await?;
-    let string = String::from_utf8(bytes)
-        .map_err(|source| ReadNamedError { path: path.to_owned(), source: source.into() })?;
     Ok(string)
 }
 
@@ -318,95 +405,10 @@ pub async fn read_fidl<T: Persistable>(file: &fio::FileProxy) -> Result<T, ReadE
     Ok(unpersist(&bytes)?)
 }
 
-/// Read the given FIDL message from binary file at `path` in the current namespace. The path
-/// must be an absolute path.
-/// FIDL structure should be provided at a read time.
-/// Incompatible data is populated as per FIDL ABI compatibility guide:
-/// https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/abi-compat
-#[cfg(target_os = "fuchsia")]
-pub async fn read_in_namespace_to_fidl<T: Persistable>(path: &str) -> Result<T, ReadNamedError> {
-    let bytes = read_in_namespace(path).await?;
-    unpersist(&bytes)
-        .map_err(|source| ReadNamedError { path: path.to_owned(), source: source.into() })
-}
-
-/// Extracts the stream from an OnOpen or OnRepresentation FileEvent.
-#[cfg(target_os = "fuchsia")]
-fn extract_stream_from_on_open_event(
-    event: fio::FileEvent,
-) -> Result<Option<zx::Stream>, OpenError> {
-    match event {
-        fio::FileEvent::OnOpen_ { s: status, info } => {
-            zx::Status::ok(status).map_err(OpenError::OpenError)?;
-            let node_info = info.ok_or(OpenError::MissingOnOpenInfo)?;
-            match *node_info {
-                fio::NodeInfoDeprecated::File(file_info) => Ok(file_info.stream),
-                node_info @ _ => Err(OpenError::UnexpectedNodeKind {
-                    expected: Kind::File,
-                    actual: Kind::kind_of(&node_info),
-                }),
-            }
-        }
-        fio::FileEvent::OnRepresentation { payload } => match payload {
-            fio::Representation::File(file_info) => Ok(file_info.stream),
-            representation @ _ => Err(OpenError::UnexpectedNodeKind {
-                expected: Kind::File,
-                actual: Kind::kind_of2(&representation),
-            }),
-        },
-    }
-}
-
-/// Reads the contents of a stream into a Vec.
-#[cfg(target_os = "fuchsia")]
-fn read_contents_of_stream(stream: zx::Stream) -> Result<Vec<u8>, ReadError> {
-    // TODO(https://fxbug.dev/324239375): Get the file size from the OnRepresentation event.
-    let file_size = stream.seek(std::io::SeekFrom::End(0)).map_err(ReadError::ReadError)? as usize;
-    let mut data = Vec::with_capacity(file_size);
-    let mut remaining = file_size;
-    while remaining > 0 {
-        // read_at is used instead of read because the seek offset was moved to the end of the file
-        // to determine the file size. Moving the seek offset back to the start of the file would
-        // require another syscall.
-        let actual = stream
-            .read_at_uninit(
-                zx::StreamReadOptions::empty(),
-                data.len() as u64,
-                &mut data.spare_capacity_mut()[0..remaining],
-            )
-            .map_err(ReadError::ReadError)?;
-        // A read of 0 bytes indicates the end of the file was reached. The file may have changed
-        // size since the seek.
-        if actual == 0 {
-            break;
-        }
-        // SAFETY: read_at_uninit returns the number of bytes that were read and initialized.
-        unsafe { data.set_len(data.len() + actual) };
-        remaining -= actual;
-    }
-    Ok(data)
-}
-
-/// Reads the contents of `file` into a Vec. `file` must have been opened with either `DESCRIBE` or
-/// `GET_REPRESENTATION` and the event must not have been read yet.
-#[cfg(target_os = "fuchsia")]
-pub(crate) async fn read_file_with_on_open_event(
-    file: fio::FileProxy,
-) -> Result<Vec<u8>, ReadError> {
-    let event = take_on_open_event(&file).await.map_err(ReadError::Open)?;
-    let stream = extract_stream_from_on_open_event(event).map_err(ReadError::Open)?;
-
-    if let Some(stream) = stream {
-        read_contents_of_stream(stream)
-    } else {
-        // Fall back to FIDL reads if the file doesn't support streams.
-        read(&file).await
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::node::{take_on_open_event, Kind};
     use crate::{directory, OpenFlags};
     use assert_matches::assert_matches;
     use fidl_fidl_test_schema::{DataTable1, DataTable2};

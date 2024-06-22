@@ -29,18 +29,20 @@ type Info = table {
     /// Required for all device types.
     2: device_type DeviceType;
 
-    /// The device's high-level name, as received from devfs or the
-    /// `Provider/AddDevice` caller.
+    /// The device's high-level name, as received from devfs or the `Provider/AddDevice` caller.
+    /// This string must be non-empty.
     ///
     /// Required for all device types.
     3: device_name string:MAX_STRING_SIZE;
 
     /// The name of the device's manufacturer.
+    /// If present, this string must be non-empty.
     ///
     /// Optional for all device types.
     4: manufacturer string:MAX_STRING_SIZE;
 
     /// The device's high-level product name.
+    /// If present, this string must be non-empty.
     ///
     /// Optional for all device types.
     5: product string:MAX_STRING_SIZE;
@@ -63,6 +65,7 @@ type Info = table {
     /// and its vector must contain exactly one entry for each relevant ENDPOINT element.
     /// If the device exposes NO RingBuffer ENDPOINT elements, this field must be omitted (entirely
     /// absent, rather than populated with an empty vector).
+    /// If present, must contain at least one element.
     ///
     /// Required for StreamConfig; optional for Composite; absent for Codec.
     8: ring_buffer_format_sets vector<ElementRingBufferFormatSet>:MAX_COUNT_PROCESSING_ELEMENTS;
@@ -73,6 +76,7 @@ type Info = table {
     /// vector must contain exactly one entry for each relevant ENDPOINT element.
     /// If the device exposes NO Dai ENDPOINT elements, this field must be omitted (entirely absent,
     /// rather than populated with an empty vector).
+    /// If present, must contain at least one element.
     ///
     /// Required for Codec; optional for Composite; absent for StreamConfig.
     9: dai_format_sets vector<ElementDaiFormatSet>:MAX_COUNT_PROCESSING_ELEMENTS;

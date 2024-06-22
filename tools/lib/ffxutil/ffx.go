@@ -344,13 +344,18 @@ func (f *FFXInstance) WaitForDaemon(ctx context.Context) error {
 	// Discard the stderr since it'll return a string caught by
 	// tefmocheck if the daemon isn't ready yet.
 	origStderr := f.stderr
-	f.stderr = io.Discard
+	var output bytes.Buffer
+	f.stderr = &output
 	defer func() {
 		f.stderr = origStderr
 	}()
-	return retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 3), func() error {
+	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 3), func() error {
 		return f.RunWithTimeout(ctx, 0, "daemon", "echo")
 	}, nil)
+	if err != nil {
+		logger.Warningf(ctx, "failed to echo daemon: %s", output.String())
+	}
+	return err
 }
 
 // Stop stops the daemon.

@@ -34,6 +34,8 @@ use packet_formats::ip::IpProto;
 use packet_formats::testutil::parse_ip_packet_in_ethernet_frame;
 use packet_formats::udp::{UdpPacket, UdpParseArgs};
 
+mod tcp;
+
 /// Spawns a loom thread with a safe stack size.
 #[track_caller]
 fn loom_spawn<F, T>(f: F) -> loom::thread::JoinHandle<T>
@@ -60,6 +62,27 @@ where
     F: Fn() + Copy + Sync + Send + 'static,
 {
     model.check(move || loom_spawn(f).join().unwrap())
+}
+
+// Per the loom docs [1], it can take a significant amount of time to
+// exhaustively check complex models. Rather than running a completely
+// exhaustive check, you can configure loom to skip executions that it deems
+// unlikely to catch more issues, by setting a "thread pre-emption bound".
+// In practice, this bound can be set quite low (2 or 3) while still
+// allowing loom to catch most bugs.
+//
+// When writing this regression test, we verified that it reproduces the
+// race condition even with a pre-emption bound of 3. On the other hand,
+// when the pre-emption bound is left unset, the IPv6 variant of this test
+// takes over 2 minutes to run when built in release mode. So we set this
+// pre-emption bound to keep the runtime within a reasonable limit while
+// still catching most possible race conditions.
+//
+// [1]: https://docs.rs/loom/0.6.0/loom/index.html#large-models
+fn low_preemption_bound_model() -> loom::model::Builder {
+    let mut model = loom::model::Builder::new();
+    model.preemption_bound = Some(3);
+    model
 }
 
 #[test]
@@ -255,25 +278,7 @@ impl TestIpExt for Ipv6 {
 #[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test(I)]
 fn neighbor_resolution_and_send_queued_packets_atomic<I: TestIpExt>() {
-    // Per the loom docs [1], it can take a significant amount of time to
-    // exhaustively check complex models. Rather than running a completely
-    // exhaustive check, you can configure loom to skip executions that it deems
-    // unlikely to catch more issues, by setting a "thread pre-emption bound".
-    // In practice, this bound can be set quite low (2 or 3) while still
-    // allowing loom to catch most bugs.
-    //
-    // When writing this regression test, we verified that it reproduces the
-    // race condition even with a pre-emption bound of 3. On the other hand,
-    // when the pre-emption bound is left unset, the IPv6 variant of this test
-    // takes over 2 minutes to run when built in release mode. So we set this
-    // pre-emption bound to keep the runtime within a reasonable limit while
-    // still catching most possible race conditions.
-    //
-    // [1]: https://docs.rs/loom/0.6.0/loom/index.html#large-models
-    let mut model = loom::model::Builder::new();
-    model.preemption_bound = Some(3);
-
-    loom_model(model, move || {
+    loom_model(low_preemption_bound_model(), move || {
         let mut builder = FakeCtxBuilder::default();
         let dev_index = builder.add_device_with_ip(
             UnicastAddr::new(DEVICE_MAC).unwrap(),
@@ -386,7 +391,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: TestIpExt>() {
         // Remove the device so that existing NUD timers get cleaned up;
         // otherwise, they would hold dangling references to the device when the
         // core context is dropped at the end of the test.
-        ctx.test_api().clear_routes_and_remove_ethernet_device(device);
+        ctx.test_api().clear_routes_and_remove_device(device);
     })
 }
 
@@ -470,6 +475,6 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: TestIpExt>() {
 
         // Remove the device so that existing references to it get cleaned up
         // before the core context is dropped at the end of the test.
-        ctx.test_api().clear_routes_and_remove_ethernet_device(device);
+        ctx.test_api().clear_routes_and_remove_device(device);
     })
 }

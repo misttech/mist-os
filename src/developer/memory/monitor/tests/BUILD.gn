@@ -34,11 +34,8 @@ executable("memory_monitor_unittests") {
     "//src/developer/memory/monitor:lib",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/storage/memfs:cpp",
+    "//zircon/system/ulib/fbl",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 fuchsia_unittest_package("memory_monitor_tests") {

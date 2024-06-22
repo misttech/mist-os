@@ -13,6 +13,7 @@ use core::sync::atomic::AtomicU16;
 
 use lock_order::lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor};
 use lock_order::relation::LockBefore;
+use log::debug;
 use net_types::ip::{
     AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
 };
@@ -46,8 +47,8 @@ use netstack3_ip::gmp::{
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::socket::SasCandidate;
 use netstack3_ip::{
-    self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt, IpStateContext,
-    Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
+    self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt,
+    IpSendFrameError, IpStateContext, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
 };
 use packet::{EmptyBuf, Serializer};
 use packet_formats::icmp::ndp::{NeighborSolicitation, RouterSolicitation};
@@ -527,6 +528,16 @@ pub struct CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC: BindingsContext> 
     pub core_ctx: CoreCtx<'a, BC, L>,
 }
 
+impl<'a, Config, L, BC: BindingsContext, T> CounterContext<T>
+    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+where
+    CoreCtx<'a, BC, L>: CounterContext<T>,
+{
+    fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O {
+        self.core_ctx.with_counters(cb)
+    }
+}
+
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<'a, I: gmp::IpExt + IpDeviceIpExt, BC: BindingsContext>
     device::WithIpDeviceConfigurationMutInner<I, BC>
@@ -788,7 +799,9 @@ impl<
             IcmpUnusedCode,
             message,
         )
-        .map_err(|EmptyBuf| ())
+        .map_err(|IpSendFrameError { serializer: EmptyBuf, error }| {
+            debug!("error sending DAD packet: {error:?}")
+        })
     }
 }
 
@@ -834,7 +847,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
         device_id: &Self::DeviceId,
         message: RouterSolicitation,
         body: F,
-    ) -> Result<(), S> {
+    ) -> Result<(), IpSendFrameError<S>> {
         let Self { config: _, core_ctx } = self;
         let dst_ip = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.into_specified();
         let src_ip = device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(

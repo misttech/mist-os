@@ -72,11 +72,13 @@ type StreamProperties = table {
     8: plug_detect_capabilities PlugDetectCapabilities;
 
     /// UI string for the manufacturer name. If not included, the manufacturer is unspecified.
+    /// If included, this string must be non-empty.
     ///
     /// Optional.
     9: manufacturer string:MAX_UI_STRING_SIZE;
 
     /// UI string for the product name. If not included, the product name is unspecified.
+    /// If included, this string must be non-empty.
     ///
     /// Optional.
     10: product string:MAX_UI_STRING_SIZE;

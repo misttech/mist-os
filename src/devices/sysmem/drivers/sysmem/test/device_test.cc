@@ -130,10 +130,10 @@ TEST_F(FakeDdkSysmem, TearDownLoop) {
 // Test that creating and tearing down a SecureMem connection works correctly.
 TEST_F(FakeDdkSysmem, DummySecureMem) {
   auto [client, server] = fidl::Endpoints<fuchsia_sysmem::SecureMem>::Create();
-  ASSERT_OK(sysmem_->CommonSysmemRegisterSecureMem(std::move(client)));
+  ASSERT_OK(sysmem_->RegisterSecureMemInternal(std::move(client)));
 
   // This shouldn't deadlock waiting for a message on the channel.
-  EXPECT_OK(sysmem_->CommonSysmemUnregisterSecureMem());
+  EXPECT_OK(sysmem_->UnregisterSecureMemInternal());
 
   // This shouldn't cause a panic due to receiving peer closed.
   client.reset();

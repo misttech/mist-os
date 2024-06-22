@@ -1055,6 +1055,14 @@ impl<A> SerializeError<A> {
             SerializeError::SizeLimitExceeded => true,
         }
     }
+
+    /// Maps the [`SerializeError::Alloc`] error type.
+    pub fn map_alloc<T, F: FnOnce(A) -> T>(self, f: F) -> SerializeError<T> {
+        match self {
+            SerializeError::Alloc(a) => SerializeError::Alloc(f(a)),
+            SerializeError::SizeLimitExceeded => SerializeError::SizeLimitExceeded,
+        }
+    }
 }
 
 impl<A> From<A> for SerializeError<A> {

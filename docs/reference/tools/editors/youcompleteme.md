@@ -10,8 +10,7 @@ integrated with other editors through [ycmd](https://github.com/Valloric/ycmd).
 
 ### \[Googlers only\]  gLinux
 
-(This applies to anyone compiling on gLinux, even if editing over SSHFS on
-MacOS) See the Google intranet specific instructions [go/ycm](http://go/ycm).
+(This applies to anyone compiling on gLinux.) See the Google intranet specific instructions [go/ycm](http://go/ycm).
 
 You'll also need to setup
 `${FUCHSIA_DIR}/scripts/youcompleteme/default_settings.json` as the default

@@ -8,14 +8,14 @@ use crate::signals::{send_standard_signal, SignalInfo};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    anon_fs, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, DirEntry, FallocMode, FileHandle,
-    FileObject, FileOps, FsNode, FsNodeInfo, FsNodeOps, FsString, MemoryXattrStorage, MountInfo,
-    NamespaceNode, MAX_LFS_FILESIZE,
+    anon_fs, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, AppendLockGuard, DirEntry,
+    FallocMode, FileHandle, FileObject, FileOps, FsNode, FsNodeInfo, FsNodeOps, FsString,
+    MemoryXattrStorage, MountInfo, NamespaceNode, MAX_LFS_FILESIZE,
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, FsNodeAllocate, LockBefore, Locked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
@@ -88,6 +88,7 @@ impl FsNodeOps for VmoFileNode {
     fn truncate(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
+        _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         _current_task: &CurrentTask,
         length: u64,
@@ -128,7 +129,8 @@ impl FsNodeOps for VmoFileNode {
 
     fn allocate(
         &self,
-        _locked: &mut Locked<'_, FsNodeAllocate>,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         _current_task: &CurrentTask,
         mode: FallocMode,

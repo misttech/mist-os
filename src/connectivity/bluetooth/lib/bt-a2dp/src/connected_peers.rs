@@ -79,6 +79,15 @@ impl DiscoveredPeers {
         descriptor: ProfileDescriptor,
         directions: HashSet<avdtp::EndpointType>,
     ) {
+        self.stats
+            .entry(id)
+            .or_insert({
+                let mut new_stats = PeerStats::new(id);
+                let _ = new_stats.iattach(&self.inspect_node, inspect::unique_name("peer_"));
+                new_stats
+            })
+            .set_descriptor(&descriptor);
+
         match self.descriptors.entry(id) {
             Entry::Occupied(mut entry) => {
                 entry.get_mut().0 = descriptor;
@@ -88,14 +97,6 @@ impl DiscoveredPeers {
                 let _ = entry.insert((descriptor, directions));
             }
         };
-        self.stats
-            .entry(id)
-            .or_insert({
-                let mut new_stats = PeerStats::new(id);
-                let _ = new_stats.iattach(&self.inspect_node, inspect::unique_name("peer_"));
-                new_stats
-            })
-            .set_descriptor(&descriptor);
     }
 
     fn connected(&mut self, id: PeerId) {
@@ -869,9 +870,10 @@ mod tests {
         // New fake peer discovered with some descriptor - the peer's SDP entry shows Sink.
         let remote = avdtp::Peer::new(remote);
         let desc = ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         };
         let preferred_direction = vec![avdtp::EndpointType::Sink];
         let delay = zx::Duration::from_seconds(1);
@@ -955,9 +957,10 @@ mod tests {
         // New fake peer discovered with separate Sink and Source entries.
         let remote = avdtp::Peer::new(remote);
         let desc = ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         };
         peers.found(
             id,

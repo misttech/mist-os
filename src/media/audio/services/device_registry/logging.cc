@@ -29,7 +29,7 @@ namespace fha = fuchsia_hardware_audio;
 namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
 std::string UidToString(std::optional<UniqueId> unique_instance_id) {
-  if (!unique_instance_id) {
+  if (!unique_instance_id.has_value()) {
     return "<none>";
   }
 
@@ -59,50 +59,53 @@ void LogStreamProperties(const fha::StreamProperties& stream_props) {
 
   FX_LOGS(INFO) << "    unique_id         " << UidToString(stream_props.unique_id());
   FX_LOGS(INFO) << "    is_input          "
-                << (stream_props.is_input() ? (*stream_props.is_input() ? "TRUE" : "FALSE")
-                                            : "<none> (non-compliant)");
+                << (stream_props.is_input().has_value()
+                        ? (*stream_props.is_input() ? "TRUE" : "FALSE")
+                        : "<none> (non-compliant)");
   FX_LOGS(INFO) << "    can_mute          "
-                << (stream_props.can_mute() ? (*stream_props.can_mute() ? "TRUE" : "FALSE")
-                                            : "<none> (cannot mute)");
+                << (stream_props.can_mute().has_value()
+                        ? (*stream_props.can_mute() ? "TRUE" : "FALSE")
+                        : "<none> (cannot mute)");
   FX_LOGS(INFO) << "    can_agc           "
-                << (stream_props.can_agc() ? (*stream_props.can_agc() ? "TRUE" : "FALSE")
-                                           : "<none> (cannot enable AGC)");
-  if (stream_props.min_gain_db()) {
+                << (stream_props.can_agc().has_value()
+                        ? (*stream_props.can_agc() ? "TRUE" : "FALSE")
+                        : "<none> (cannot enable AGC)");
+  if (stream_props.min_gain_db().has_value()) {
     FX_LOGS(INFO) << "    min_gain_db       " << *stream_props.min_gain_db() << " dB";
   } else {
     FX_LOGS(INFO) << "    min_gain_db       <none> (non-compliant)";
   }
-  if (stream_props.max_gain_db()) {
+  if (stream_props.max_gain_db().has_value()) {
     FX_LOGS(INFO) << "    max_gain_db       " << *stream_props.max_gain_db() << " dB";
   } else {
     FX_LOGS(INFO) << "    max_gain_db       <none> (non-compliant)";
   }
-  if (stream_props.gain_step_db()) {
+  if (stream_props.gain_step_db().has_value()) {
     FX_LOGS(INFO) << "    gain_step_db      " << *stream_props.gain_step_db() << " dB";
   } else {
     FX_LOGS(INFO) << "    gain_step_db      <none> (non-compliant)";
   }
-  if (stream_props.plug_detect_capabilities()) {
+  if (stream_props.plug_detect_capabilities().has_value()) {
     FX_LOGS(INFO) << "    plug_detect_caps  " << *stream_props.plug_detect_capabilities();
   } else {
     FX_LOGS(INFO) << "    plug_detect_caps  <none> (non-compliant)";
   }
   FX_LOGS(INFO) << "    manufacturer      "
-                << (stream_props.manufacturer()
+                << (stream_props.manufacturer().has_value()
                         ? ("'" +
                            std::string(stream_props.manufacturer()->data(),
                                        stream_props.manufacturer()->size()) +
                            "'")
                         : "<none>");
-  FX_LOGS(INFO) << "    product           "
-                << (stream_props.product() ? ("'" +
-                                              std::string(stream_props.product()->data(),
-                                                          stream_props.product()->size()) +
-                                              "'")
-                                           : "<none>");
+  FX_LOGS(INFO)
+      << "    product           "
+      << (stream_props.product().has_value()
+              ? ("'" + std::string(stream_props.product()->data(), stream_props.product()->size()) +
+                 "'")
+              : "<none>");
 
   std::string clock_domain_str{"   clock _domain     "};
-  if (stream_props.clock_domain()) {
+  if (stream_props.clock_domain().has_value()) {
     clock_domain_str += std::to_string(*stream_props.clock_domain());
     if (*stream_props.clock_domain() == fha::kClockDomainMonotonic) {
       clock_domain_str += "  (CLOCK_DOMAIN_MONOTONIC)";
@@ -132,12 +135,12 @@ void LogElementRingBufferFormatSet(
     return;
   }
 
-  if (element_ring_buffer_format_set.element_id()) {
+  if (element_ring_buffer_format_set.element_id().has_value()) {
     FX_LOGS(INFO) << "   .element_id  " << *element_ring_buffer_format_set.element_id();
   } else {
     FX_LOGS(INFO) << "   .element_id  <none> (non-compliant)";
   }
-  if (element_ring_buffer_format_set.format_sets()) {
+  if (element_ring_buffer_format_set.format_sets().has_value()) {
     FX_LOGS(INFO) << "   .format_set  [" << element_ring_buffer_format_set.format_sets()->size()
                   << "]";
     LogTranslatedRingBufferFormatSets(*element_ring_buffer_format_set.format_sets());
@@ -165,11 +168,11 @@ void LogTranslatedRingBufferFormatSet(const fad::PcmFormatSet& translated_ring_b
     return;
   }
 
-  if (translated_ring_buffer_format_set.channel_sets()) {
+  if (translated_ring_buffer_format_set.channel_sets().has_value()) {
     const auto& channel_sets = *translated_ring_buffer_format_set.channel_sets();
     FX_LOGS(INFO) << "            channel_sets  [" << channel_sets.size() << "]";
     for (auto idx = 0u; idx < channel_sets.size(); ++idx) {
-      if (!channel_sets[idx].attributes()) {
+      if (!channel_sets[idx].attributes().has_value()) {
         FX_LOGS(INFO) << "              [" << idx << "] <none> (non-compliant)";
         continue;
       }
@@ -178,11 +181,11 @@ void LogTranslatedRingBufferFormatSet(const fad::PcmFormatSet& translated_ring_b
       for (auto idx = 0u; idx < attribs.size(); ++idx) {
         FX_LOGS(INFO) << "                  [" << idx << "]";
         FX_LOGS(INFO) << "                     min_frequency   "
-                      << (attribs[idx].min_frequency()
+                      << (attribs[idx].min_frequency().has_value()
                               ? std::to_string(*attribs[idx].min_frequency())
                               : "<none>");
         FX_LOGS(INFO) << "                     max_frequency   "
-                      << (attribs[idx].max_frequency()
+                      << (attribs[idx].max_frequency().has_value()
                               ? std::to_string(*attribs[idx].max_frequency())
                               : "<none>");
       }
@@ -191,7 +194,7 @@ void LogTranslatedRingBufferFormatSet(const fad::PcmFormatSet& translated_ring_b
     FX_LOGS(INFO) << "            channel_sets  <none> (non-compliant)";
   }
 
-  if (translated_ring_buffer_format_set.sample_types()) {
+  if (translated_ring_buffer_format_set.sample_types().has_value()) {
     const auto& sample_types = *translated_ring_buffer_format_set.sample_types();
     FX_LOGS(INFO) << "            sample_types [" << sample_types.size() << "]";
     for (auto idx = 0u; idx < sample_types.size(); ++idx) {
@@ -201,7 +204,7 @@ void LogTranslatedRingBufferFormatSet(const fad::PcmFormatSet& translated_ring_b
     FX_LOGS(INFO) << "            sample_types <none> (non-compliant)";
   }
 
-  if (translated_ring_buffer_format_set.frame_rates()) {
+  if (translated_ring_buffer_format_set.frame_rates().has_value()) {
     const auto& frame_rates = *translated_ring_buffer_format_set.frame_rates();
     FX_LOGS(INFO) << "            frame_rates  [" << frame_rates.size() << "]";
     for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
@@ -221,17 +224,17 @@ void LogRingBufferFormatSets(const std::vector<fha::SupportedFormats>& ring_buff
   FX_LOGS(INFO) << "    ring_buffer_format_sets [" << ring_buffer_format_sets.size() << "]";
   for (auto idx = 0u; idx < ring_buffer_format_sets.size(); ++idx) {
     auto ring_buffer_format_set = ring_buffer_format_sets[idx];
-    if (!ring_buffer_format_set.pcm_supported_formats()) {
+    if (!ring_buffer_format_set.pcm_supported_formats().has_value()) {
       FX_LOGS(INFO) << "      [" << idx << "] <none> (non-compliant)";
       continue;
     }
     FX_LOGS(INFO) << "      [" << idx << "] pcm_supported_formats";
     const auto& pcm_format_set = *ring_buffer_format_set.pcm_supported_formats();
-    if (pcm_format_set.channel_sets()) {
+    if (pcm_format_set.channel_sets().has_value()) {
       const auto& channel_sets = *pcm_format_set.channel_sets();
       FX_LOGS(INFO) << "            channel_sets [" << channel_sets.size() << "]";
       for (auto idx = 0u; idx < channel_sets.size(); ++idx) {
-        if (!channel_sets[idx].attributes()) {
+        if (!channel_sets[idx].attributes().has_value()) {
           FX_LOGS(INFO) << "              [" << idx << "] <none> (non-compliant)";
           continue;
         }
@@ -240,11 +243,11 @@ void LogRingBufferFormatSets(const std::vector<fha::SupportedFormats>& ring_buff
         for (auto idx = 0u; idx < attribs.size(); ++idx) {
           FX_LOGS(INFO) << "                   [" << idx << "]";
           FX_LOGS(INFO) << "                     min_frequency   "
-                        << (attribs[idx].min_frequency()
+                        << (attribs[idx].min_frequency().has_value()
                                 ? std::to_string(*attribs[idx].min_frequency())
                                 : "<none>");
           FX_LOGS(INFO) << "                     max_frequency   "
-                        << (attribs[idx].max_frequency()
+                        << (attribs[idx].max_frequency().has_value()
                                 ? std::to_string(*attribs[idx].max_frequency())
                                 : "<none>");
         }
@@ -253,7 +256,7 @@ void LogRingBufferFormatSets(const std::vector<fha::SupportedFormats>& ring_buff
       FX_LOGS(INFO) << "            <none> (non-compliant)";
     }
 
-    if (pcm_format_set.sample_formats()) {
+    if (pcm_format_set.sample_formats().has_value()) {
       const auto& sample_formats = *pcm_format_set.sample_formats();
       FX_LOGS(INFO) << "            sample_formats [" << sample_formats.size() << "]";
       for (auto idx = 0u; idx < sample_formats.size(); ++idx) {
@@ -262,7 +265,7 @@ void LogRingBufferFormatSets(const std::vector<fha::SupportedFormats>& ring_buff
     } else {
       FX_LOGS(INFO) << "            <none> (non-compliant)";
     }
-    if (pcm_format_set.bytes_per_sample()) {
+    if (pcm_format_set.bytes_per_sample().has_value()) {
       const auto& bytes_per_sample = *pcm_format_set.bytes_per_sample();
       FX_LOGS(INFO) << "            bytes_per_sample [" << bytes_per_sample.size() << "]";
       for (auto idx = 0u; idx < bytes_per_sample.size(); ++idx) {
@@ -272,7 +275,7 @@ void LogRingBufferFormatSets(const std::vector<fha::SupportedFormats>& ring_buff
     } else {
       FX_LOGS(INFO) << "            <none> (non-compliant)";
     }
-    if (pcm_format_set.valid_bits_per_sample()) {
+    if (pcm_format_set.valid_bits_per_sample().has_value()) {
       const auto& valid_bits_per_sample = *pcm_format_set.valid_bits_per_sample();
       FX_LOGS(INFO) << "            valid_bits_per_sample [" << valid_bits_per_sample.size() << "]";
       for (auto idx = 0u; idx < valid_bits_per_sample.size(); ++idx) {
@@ -282,7 +285,7 @@ void LogRingBufferFormatSets(const std::vector<fha::SupportedFormats>& ring_buff
     } else {
       FX_LOGS(INFO) << "            <none> (non-compliant)";
     }
-    if (pcm_format_set.frame_rates()) {
+    if (pcm_format_set.frame_rates().has_value()) {
       const auto& frame_rates = *pcm_format_set.frame_rates();
       FX_LOGS(INFO) << "            frame_rates [" << frame_rates.size() << "]";
       for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
@@ -301,12 +304,13 @@ void LogGainState(const fha::GainState& gain_state) {
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/GainState";
   FX_LOGS(INFO) << "    muted            "
-                << (gain_state.muted() ? (*gain_state.muted() ? "TRUE" : "FALSE")
-                                       : "<none> (Unmuted)");
+                << (gain_state.muted().has_value() ? (*gain_state.muted() ? "TRUE" : "FALSE")
+                                                   : "<none> (Unmuted)");
   FX_LOGS(INFO) << "    agc_enabled      "
-                << (gain_state.agc_enabled() ? (*gain_state.agc_enabled() ? "TRUE" : "FALSE")
-                                             : "<none> (Disabled)");
-  if (gain_state.gain_db()) {
+                << (gain_state.agc_enabled().has_value()
+                        ? (*gain_state.agc_enabled() ? "TRUE" : "FALSE")
+                        : "<none> (Disabled)");
+  if (gain_state.gain_db().has_value()) {
     FX_LOGS(INFO) << "    gain_db          " << *gain_state.gain_db() << " dB";
   } else {
     FX_LOGS(INFO) << "    gain_db          <none> (non-compliant)";
@@ -320,11 +324,12 @@ void LogPlugState(const fha::PlugState& plug_state) {
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/PlugState";
   FX_LOGS(INFO) << "    plugged          "
-                << (plug_state.plugged() ? (*plug_state.plugged() ? "TRUE" : "FALSE")
-                                         : "<none> (non-compliant)");
+                << (plug_state.plugged().has_value() ? (*plug_state.plugged() ? "TRUE" : "FALSE")
+                                                     : "<none> (non-compliant)");
   FX_LOGS(INFO) << "    plug_state_time  "
-                << (plug_state.plug_state_time() ? std::to_string(*plug_state.plug_state_time())
-                                                 : "<none> (non-compliant)");
+                << (plug_state.plug_state_time().has_value()
+                        ? std::to_string(*plug_state.plug_state_time())
+                        : "<none> (non-compliant)");
 }
 
 void LogCodecProperties(const fha::CodecProperties& codec_props) {
@@ -335,22 +340,24 @@ void LogCodecProperties(const fha::CodecProperties& codec_props) {
   FX_LOGS(INFO) << "fuchsia_hardware_audio/CodecProperties";
 
   FX_LOGS(INFO) << "    is_input          "
-                << (codec_props.is_input() ? (*codec_props.is_input() ? "TRUE" : "FALSE")
-                                           : "<none> (non-compliant)");
+                << (codec_props.is_input().has_value()
+                        ? (*codec_props.is_input() ? "TRUE" : "FALSE")
+                        : "<none> (non-compliant)");
   FX_LOGS(INFO) << "    manufacturer      "
-                << (codec_props.manufacturer() ? ("'" +
-                                                  std::string(codec_props.manufacturer()->data(),
-                                                              codec_props.manufacturer()->size()) +
-                                                  "'")
-                                               : "<none>");
-  FX_LOGS(INFO) << "    product           "
-                << (codec_props.product() ? ("'" +
-                                             std::string(codec_props.product()->data(),
-                                                         codec_props.product()->size()) +
-                                             "'")
-                                          : "<none>");
+                << (codec_props.manufacturer().has_value()
+                        ? ("'" +
+                           std::string(codec_props.manufacturer()->data(),
+                                       codec_props.manufacturer()->size()) +
+                           "'")
+                        : "<none>");
+  FX_LOGS(INFO)
+      << "    product           "
+      << (codec_props.product().has_value()
+              ? ("'" + std::string(codec_props.product()->data(), codec_props.product()->size()) +
+                 "'")
+              : "<none>");
   FX_LOGS(INFO) << "    unique_id         " << UidToString(codec_props.unique_id());
-  if (codec_props.plug_detect_capabilities()) {
+  if (codec_props.plug_detect_capabilities().has_value()) {
     FX_LOGS(INFO) << "    plug_detect_caps  " << *codec_props.plug_detect_capabilities();
   } else {
     FX_LOGS(INFO) << "    plug_detect_caps  <none> (non-compliant)";
@@ -372,12 +379,12 @@ void LogElementDaiFormatSet(const fad::ElementDaiFormatSet& element_dai_format_s
     return;
   }
 
-  if (element_dai_format_set.element_id()) {
+  if (element_dai_format_set.element_id().has_value()) {
     FX_LOGS(INFO) << "   .element_id  " << *element_dai_format_set.element_id();
   } else {
     FX_LOGS(INFO) << "   .element_id  <none> (non-compliant)";
   }
-  if (element_dai_format_set.format_sets()) {
+  if (element_dai_format_set.format_sets().has_value()) {
     FX_LOGS(INFO) << "   .format_set  [" << element_dai_format_set.format_sets()->size() << "]";
     LogDaiFormatSets(*element_dai_format_set.format_sets());
   } else {
@@ -441,7 +448,7 @@ void LogDaiFormat(std::optional<fha::DaiFormat> dai_format) {
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/DaiFormat";
-  if (!dai_format) {
+  if (!dai_format.has_value()) {
     FX_LOGS(INFO) << "    UNSET";
     return;
   }
@@ -463,7 +470,7 @@ void LogCodecFormatInfo(std::optional<fha::CodecFormatInfo> format_info) {
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/CodecFormatInfo";
-  if (!format_info) {
+  if (!format_info.has_value()) {
     FX_LOGS(INFO) << "    UNSET";
     return;
   }
@@ -486,9 +493,9 @@ void LogCompositeProperties(const fha::CompositeProperties& composite_props) {
     return;
   }
 
-  FX_LOGS(INFO) << "fuchsia_hardware_audio/CompositeProperties";
+  FX_LOGS(INFO) << " fuchsia_hardware_audio/CompositeProperties";
 
-  FX_LOGS(INFO) << "    manufacturer      "
+  FX_LOGS(INFO) << "   manufacturer                 "
                 << (composite_props.manufacturer().has_value()
                         ? ("'" +
                            std::string(composite_props.manufacturer()->data(),
@@ -496,7 +503,7 @@ void LogCompositeProperties(const fha::CompositeProperties& composite_props) {
                            "'")
                         : "<none>");
 
-  FX_LOGS(INFO) << "    product           "
+  FX_LOGS(INFO) << "   product                      "
                 << (composite_props.product().has_value()
                         ? ("'" +
                            std::string(composite_props.product()->data(),
@@ -504,12 +511,12 @@ void LogCompositeProperties(const fha::CompositeProperties& composite_props) {
                            "'")
                         : "<none>");
 
-  FX_LOGS(INFO) << "    unique_id         " << UidToString(composite_props.unique_id());
+  FX_LOGS(INFO) << "   unique_id                    " << UidToString(composite_props.unique_id());
 
-  if (composite_props.clock_domain()) {
-    FX_LOGS(INFO) << "    clock_domain      " << *composite_props.clock_domain();
+  if (composite_props.clock_domain().has_value()) {
+    FX_LOGS(INFO) << "   clock_domain                 " << *composite_props.clock_domain();
   } else {
-    FX_LOGS(INFO) << "    clock_domain      <none> (non-compliant)";
+    FX_LOGS(INFO) << "   clock_domain                 <none> (non-compliant)";
   }
 }
 
@@ -988,14 +995,14 @@ void LogElementInternal(const fhasp::Element& element, std::string indent,
                               : "<none>");
         break;
       case fhasp::TypeSpecificElement::Tag::kVendorSpecific:
-        FX_LOGS(INFO) << indent << " type_specific   VENDOR_SPECIFIC";
+        FX_LOGS(INFO) << indent << "type_specific   VENDOR_SPECIFIC";
         break;
       default:
-        FX_LOGS(INFO) << indent << " type_specific   OTHER - unknown enum";
+        FX_LOGS(INFO) << indent << "type_specific   OTHER - unknown enum";
         break;
     }
   } else {
-    FX_LOGS(INFO) << indent << " type_specific   <none>";
+    FX_LOGS(INFO) << indent << "type_specific   <none>";
   }
 
   FX_LOGS(INFO) << indent << "description     "
@@ -1067,8 +1074,9 @@ void LogTopologyInternal(const fhasp::Topology& topology, std::string indent,
   indent.append(addl_indent);
 
   FX_LOGS(INFO) << first_indent << "id              "
-                << (topology.id() ? std::to_string(*topology.id()) : "<none> (non-compliant)");
-  if (topology.processing_elements_edge_pairs()) {
+                << (topology.id().has_value() ? std::to_string(*topology.id())
+                                              : "<none> (non-compliant)");
+  if (topology.processing_elements_edge_pairs().has_value()) {
     FX_LOGS(INFO) << indent << "processing_elements_edge_pairs ["
                   << topology.processing_elements_edge_pairs()->size() << "]";
     for (auto idx = 0u; idx < topology.processing_elements_edge_pairs()->size(); ++idx) {
@@ -1110,12 +1118,12 @@ void LogDeviceAddition(const fad::Info& device_info) {
   if constexpr (kLogDeviceAddErrorRemove) {
     FX_DCHECK(device_info.device_type().has_value());
     FX_LOGS(INFO) << device_info.device_type() << " device "
-                  << (device_info.device_name()
+                  << (device_info.device_name().has_value()
                           ? std::string("'") + *device_info.device_name() + "'"
                           : "<none>")
                   << " with token_id "
-                  << (device_info.token_id() ? std::to_string(*device_info.token_id())
-                                             : "<none> (non-compliant)")
+                  << (device_info.token_id().has_value() ? std::to_string(*device_info.token_id())
+                                                         : "<none> (non-compliant)")
                   << " has been added";
   }
 }
@@ -1127,12 +1135,13 @@ void LogDeviceRemoval(const std::optional<fad::Info>& device_info) {
     if (device_info.has_value()) {
       FX_DCHECK(device_info->device_type().has_value());
       FX_LOGS(INFO) << device_info->device_type() << " device "
-                    << (device_info->device_name()
+                    << (device_info->device_name().has_value()
                             ? std::string("'") + *device_info->device_name() + "'"
                             : "<none>")
                     << " with token_id "
-                    << (device_info->token_id() ? std::to_string(*device_info->token_id())
-                                                : "<none> (non-compliant)")
+                    << (device_info->token_id().has_value()
+                            ? std::to_string(*device_info->token_id())
+                            : "<none> (non-compliant)")
                     << " has been removed";
     } else {
       FX_LOGS(WARNING) << "UNKNOWN device has been removed before initialization could complete";
@@ -1151,8 +1160,9 @@ void LogDeviceError(const std::optional<fad::Info>& device_info) {
                                ? std::string("'") + *device_info->device_name() + "'"
                                : "<none>")
                        << " with token_id "
-                       << (device_info->token_id() ? std::to_string(*device_info->token_id())
-                                                   : "<none> (non-compliant)")
+                       << (device_info->token_id().has_value()
+                               ? std::to_string(*device_info->token_id())
+                               : "<none> (non-compliant)")
                        << " has encountered a fatal error";
     } else {
       FX_LOGS(WARNING) << "UNKNOWN device has encountered a fatal error during initialization";
@@ -1168,30 +1178,33 @@ void LogDeviceInfo(const fad::Info& device_info) {
   FX_LOGS(INFO) << "fuchsia_audio_device/Info";
 
   FX_LOGS(INFO) << "  token_id                     "
-                << (device_info.token_id() ? std::to_string(*device_info.token_id())
-                                           : "<none> (non-compliant)");
+                << (device_info.token_id().has_value() ? std::to_string(*device_info.token_id())
+                                                       : "<none> (non-compliant)");
 
   FX_LOGS(INFO) << "  device_type                  " << device_info.device_type();
 
   FX_LOGS(INFO) << "  device_name                  "
-                << (device_info.device_name() ? std::string("'") + *device_info.device_name() + "'"
-                                              : "<none>");
+                << (device_info.device_name().has_value()
+                        ? std::string("'") + *device_info.device_name() + "'"
+                        : "<none>");
 
   FX_LOGS(INFO) << "  manufacturer                 "
-                << (device_info.manufacturer() ? "'" + *device_info.manufacturer() + "'"
-                                               : "<none>");
+                << (device_info.manufacturer().has_value() ? "'" + *device_info.manufacturer() + "'"
+                                                           : "<none>");
 
   FX_LOGS(INFO) << "  product                      "
-                << (device_info.product() ? "'" + *device_info.product() + "'" : "<none>");
+                << (device_info.product().has_value() ? "'" + *device_info.product() + "'"
+                                                      : "<none>");
 
   FX_LOGS(INFO) << "  unique_instance_id           "
                 << UidToString(device_info.unique_instance_id());
 
   FX_LOGS(INFO) << "  is_input                     "
-                << (device_info.is_input() ? (*device_info.is_input() ? "TRUE" : "FALSE")
-                                           : "<none>");
+                << (device_info.is_input().has_value()
+                        ? (*device_info.is_input() ? "TRUE" : "FALSE")
+                        : "<none>");
 
-  if (device_info.ring_buffer_format_sets()) {
+  if (device_info.ring_buffer_format_sets().has_value()) {
     FX_LOGS(INFO) << "  ring_buffer_format_sets [" << device_info.ring_buffer_format_sets()->size()
                   << "]";
     for (auto i = 0u; i < device_info.ring_buffer_format_sets()->size(); ++i) {
@@ -1205,23 +1218,23 @@ void LogDeviceInfo(const fad::Info& device_info) {
                       << element_ring_buffer_format_set.format_sets()->size() << "]";
         for (auto j = 0u; j < element_ring_buffer_format_set.format_sets()->size(); ++j) {
           const auto& pcm_format_set = element_ring_buffer_format_set.format_sets()->at(j);
-          if (pcm_format_set.channel_sets()) {
+          if (pcm_format_set.channel_sets().has_value()) {
             FX_LOGS(INFO) << "        [" << j << "] channel_sets ["
                           << pcm_format_set.channel_sets()->size() << "]";
             for (auto k = 0u; k < pcm_format_set.channel_sets()->size(); ++k) {
               const auto& channel_set = pcm_format_set.channel_sets()->at(k);
-              if (channel_set.attributes()) {
+              if (channel_set.attributes().has_value()) {
                 FX_LOGS(INFO) << "             [" << k << "] attributes ["
                               << channel_set.attributes()->size() << "]";
                 for (auto idx = 0u; idx < channel_set.attributes()->size(); ++idx) {
                   const auto& attributes = channel_set.attributes()->at(idx);
-                  if (attributes.min_frequency()) {
+                  if (attributes.min_frequency().has_value()) {
                     FX_LOGS(INFO) << "                  [" << idx << "] min_freq "
                                   << *attributes.min_frequency();
                   } else {
                     FX_LOGS(INFO) << "                  [" << idx << "] min_freq <none>";
                   }
-                  if (attributes.max_frequency()) {
+                  if (attributes.max_frequency().has_value()) {
                     FX_LOGS(INFO) << "                      max_freq "
                                   << *attributes.max_frequency();
                   } else {
@@ -1237,7 +1250,7 @@ void LogDeviceInfo(const fad::Info& device_info) {
             FX_LOGS(INFO) << "        [" << j << "] channel_sets       <none> (non-compliant)";
           }
 
-          if (pcm_format_set.sample_types()) {
+          if (pcm_format_set.sample_types().has_value()) {
             FX_LOGS(INFO) << "            sample_types [" << pcm_format_set.sample_types()->size()
                           << "]";
             for (auto idx = 0u; idx < pcm_format_set.sample_types()->size(); ++idx) {
@@ -1247,7 +1260,7 @@ void LogDeviceInfo(const fad::Info& device_info) {
           } else {
             FX_LOGS(INFO) << "            sample_types       <none> (non-compliant)";
           }
-          if (pcm_format_set.frame_rates()) {
+          if (pcm_format_set.frame_rates().has_value()) {
             FX_LOGS(INFO) << "            frame_rates [" << pcm_format_set.frame_rates()->size()
                           << "]";
             for (auto idx = 0u; idx < pcm_format_set.frame_rates()->size(); ++idx) {
@@ -1271,7 +1284,7 @@ void LogDeviceInfo(const fad::Info& device_info) {
   }
 
   // dai_format_sets
-  if (device_info.dai_format_sets()) {
+  if (device_info.dai_format_sets().has_value()) {
     FX_LOGS(INFO) << "  dai_format_sets [" << device_info.dai_format_sets()->size() << "]";
     for (auto i = 0u; i < device_info.dai_format_sets()->size(); ++i) {
       auto element_dai_format_set = device_info.dai_format_sets()->at(i);
@@ -1333,31 +1346,31 @@ void LogDeviceInfo(const fad::Info& device_info) {
                                                                              : "");
   }
 
-  if (device_info.gain_caps()) {
-    if (device_info.gain_caps()->min_gain_db()) {
+  if (device_info.gain_caps().has_value()) {
+    if (device_info.gain_caps()->min_gain_db().has_value()) {
       FX_LOGS(INFO) << "  gain_caps  min_gain_db       " << *device_info.gain_caps()->min_gain_db()
                     << " dB";
     } else {
       FX_LOGS(INFO) << "  gain_caps  min_gain_db       <none> (non-compliant)";
     }
-    if (device_info.gain_caps()->max_gain_db()) {
+    if (device_info.gain_caps()->max_gain_db().has_value()) {
       FX_LOGS(INFO) << "             max_gain_db       " << *device_info.gain_caps()->max_gain_db()
                     << " dB";
     } else {
       FX_LOGS(INFO) << "             max_gain_db       <none> (non-compliant)";
     }
-    if (device_info.gain_caps()->gain_step_db()) {
+    if (device_info.gain_caps()->gain_step_db().has_value()) {
       FX_LOGS(INFO) << "             gain_step_db      " << *device_info.gain_caps()->gain_step_db()
                     << " dB";
     } else {
       FX_LOGS(INFO) << "             gain_step_db      <none> (non-compliant)";
     }
     FX_LOGS(INFO) << "             can_mute          "
-                  << (device_info.gain_caps()->can_mute()
+                  << (device_info.gain_caps()->can_mute().has_value()
                           ? (*device_info.gain_caps()->can_mute() ? "true" : "false")
                           : "<none> (false)");
     FX_LOGS(INFO) << "             can_agc           "
-                  << (device_info.gain_caps()->can_agc()
+                  << (device_info.gain_caps()->can_agc().has_value()
                           ? (*device_info.gain_caps()->can_agc() ? "true" : "false")
                           : "<none> (false)");
   } else {
@@ -1371,7 +1384,7 @@ void LogDeviceInfo(const fad::Info& device_info) {
   FX_LOGS(INFO) << "  plug_detect_caps             " << device_info.plug_detect_caps();
 
   std::string clock_domain_str{"  clock_domain                 "};
-  if (device_info.clock_domain()) {
+  if (device_info.clock_domain().has_value()) {
     clock_domain_str += std::to_string(*device_info.clock_domain());
     if (*device_info.clock_domain() == fha::kClockDomainMonotonic) {
       clock_domain_str += "  (CLOCK_DOMAIN_MONOTONIC)";
@@ -1388,7 +1401,7 @@ void LogDeviceInfo(const fad::Info& device_info) {
   }
   FX_LOGS(INFO) << clock_domain_str;
 
-  if (device_info.signal_processing_elements()) {
+  if (device_info.signal_processing_elements().has_value()) {
     FX_LOGS(INFO) << "  signal_processing_elements ["
                   << device_info.signal_processing_elements()->size() << "]"
                   << (device_info.signal_processing_elements()->empty() ? " (non-compliant)" : "");
@@ -1402,7 +1415,7 @@ void LogDeviceInfo(const fad::Info& device_info) {
                                                                                : "");
   }
 
-  if (device_info.signal_processing_topologies()) {
+  if (device_info.signal_processing_topologies().has_value()) {
     FX_LOGS(INFO) << "  signal_processing_topologies ["
                   << device_info.signal_processing_topologies()->size() << "]"
                   << (device_info.signal_processing_topologies()->empty() ? " (non-compliant)"
@@ -1425,17 +1438,17 @@ void LogRingBufferProperties(const fha::RingBufferProperties& rb_props) {
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/RingBufferProperties";
   FX_LOGS(INFO) << "    needs_cache_flush       "
-                << (rb_props.needs_cache_flush_or_invalidate()
+                << (rb_props.needs_cache_flush_or_invalidate().has_value()
                         ? (*rb_props.needs_cache_flush_or_invalidate() ? "TRUE" : "FALSE")
                         : "<none> (non-compliant)");
 
-  if (rb_props.turn_on_delay()) {
+  if (rb_props.turn_on_delay().has_value()) {
     FX_LOGS(INFO) << "    turn_on_delay           " << *rb_props.turn_on_delay() << " ns";
   } else {
     FX_LOGS(INFO) << "    turn_on_delay           <none> (0 ns)";
   }
 
-  if (rb_props.driver_transfer_bytes()) {
+  if (rb_props.driver_transfer_bytes().has_value()) {
     FX_LOGS(INFO) << "    driver_transfer_bytes   " << *rb_props.driver_transfer_bytes()
                   << " bytes";
   } else {
@@ -1449,7 +1462,7 @@ void LogRingBufferFormat(const fha::Format& ring_buffer_format) {
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/Format";
-  if (!ring_buffer_format.pcm_format()) {
+  if (!ring_buffer_format.pcm_format().has_value()) {
     FX_LOGS(INFO) << "    pcm_format           <none> (non-compliant)";
     return;
   }
@@ -1514,13 +1527,13 @@ void LogDelayInfo(const fha::DelayInfo& info) {
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/DelayInfo";
-  if (info.internal_delay()) {
+  if (info.internal_delay().has_value()) {
     FX_LOGS(INFO) << "    internal_delay           " << *info.internal_delay() << " ns";
   } else {
     FX_LOGS(INFO) << "    internal_delay           <none> (non-compliant)";
   }
 
-  if (info.external_delay()) {
+  if (info.external_delay().has_value()) {
     FX_LOGS(INFO) << "    external_delay           " << *info.external_delay() << " ns";
   } else {
     FX_LOGS(INFO) << "    external_delay           <none> (0 ns)";

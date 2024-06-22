@@ -5,7 +5,7 @@
 use anyhow::Error;
 use fidl_fuchsia_tee::{self as ftee, Buffer, Direction, ParameterUnknown, Value};
 use fuchsia_zircon::{self as zx};
-use tee_internal_impl::binding::{
+use tee_internal::binding::{
     TEE_Param, TEE_Param__bindgen_ty_1, TEE_Param__bindgen_ty_2, TEE_PARAM_TYPE_MEMREF_INOUT,
     TEE_PARAM_TYPE_MEMREF_INPUT, TEE_PARAM_TYPE_MEMREF_OUTPUT, TEE_PARAM_TYPE_NONE,
     TEE_PARAM_TYPE_VALUE_INOUT, TEE_PARAM_TYPE_VALUE_INPUT, TEE_PARAM_TYPE_VALUE_OUTPUT,

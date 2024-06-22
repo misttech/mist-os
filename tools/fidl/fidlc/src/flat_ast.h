@@ -675,27 +675,20 @@ struct Overlay final : public TypeDecl {
 
 struct Protocol final : public Decl {
   struct Method : public Element {
-    Method(std::unique_ptr<AttributeList> attributes, Strictness strictness, SourceSpan name,
-           bool has_request, std::unique_ptr<TypeConstructor> maybe_request, bool has_response,
+    enum class Kind : uint8_t { kOneWay, kTwoWay, kEvent };
+
+    Method(std::unique_ptr<AttributeList> attributes, Kind kind, Strictness strictness,
+           SourceSpan name, std::unique_ptr<TypeConstructor> maybe_request,
            std::unique_ptr<TypeConstructor> maybe_response, bool has_error)
         : Element(Element::Kind::kProtocolMethod, std::move(attributes)),
+          kind(kind),
           strictness(strictness),
           name(name),
-          has_request(has_request),
           maybe_request(std::move(maybe_request)),
-          has_response(has_response),
           maybe_response(std::move(maybe_response)),
-          has_error(has_error) {
-      ZX_ASSERT(this->has_request || this->has_response);
-    }
-    Method Clone() const;
+          has_error(has_error) {}
 
-    enum class Kind : uint8_t { kOneWay, kTwoWay, kEvent };
-    Kind kind() const {
-      if (has_request && has_response)
-        return Kind::kTwoWay;
-      return has_request ? Kind::kOneWay : Kind::kEvent;
-    }
+    Method Clone() const;
 
     enum ResultUnionOrdinal : uint64_t {
       kSuccess = 1,
@@ -703,11 +696,10 @@ struct Protocol final : public Decl {
       kFrameworkError = 3,
     };
 
+    Kind kind;
     Strictness strictness;
     SourceSpan name;
-    bool has_request;
     std::unique_ptr<TypeConstructor> maybe_request;
-    bool has_response;
     std::unique_ptr<TypeConstructor> maybe_response;
     bool has_error;
 

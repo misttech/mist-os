@@ -7,6 +7,7 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::types::{Hertz, OperatingPoint, Volts};
+use crate::utils::get_cpu_ctrl_proxy;
 use anyhow::{format_err, Context as _, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
@@ -15,7 +16,7 @@ use serde_derive::Deserialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use {fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, fidl_fuchsia_io as fio, serde_json as json};
+use {fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, serde_json as json};
 
 /// Node: CpuDeviceHandler
 ///
@@ -36,8 +37,11 @@ use {fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, fidl_fuchsia_io as fio, serde_
 
 /// Builder struct for CpuDeviceHandler.
 pub struct CpuDeviceHandlerBuilder<'a> {
-    /// Path to the CPU driver
-    driver_path: String,
+    /// Total number of CPU devices
+    total_domain_count: u8,
+    /// Performance rank of the CPU device, where rank is the position in a list of all CPU devices
+    /// sorted by relative performance from highest to lowest.
+    perf_rank: u8,
 
     cpu_ctrl_proxy: Option<fcpu_ctrl::DeviceProxy>,
     inspect_root: Option<&'a inspect::Node>,
@@ -47,7 +51,8 @@ impl<'a> CpuDeviceHandlerBuilder<'a> {
     pub fn new_from_json(json_data: json::Value, _nodes: &HashMap<String, Rc<dyn Node>>) -> Self {
         #[derive(Deserialize)]
         struct Config {
-            driver_path: String,
+            total_domain_count: u8,
+            perf_rank: u8,
         }
 
         #[derive(Deserialize)]
@@ -56,18 +61,27 @@ impl<'a> CpuDeviceHandlerBuilder<'a> {
         }
 
         let data: JsonData = json::from_value(json_data).unwrap();
-        Self::new_with_driver_path(data.config.driver_path)
+        Self::new_with_driver_config(data.config.total_domain_count, data.config.perf_rank)
     }
 
-    /// Constructs a CpuDeviceHandlerBuilder from the provided CPU driver path
-    pub fn new_with_driver_path(driver_path: String) -> Self {
-        Self { driver_path: driver_path.clone(), cpu_ctrl_proxy: None, inspect_root: None }
+    /// Constructs a CpuDeviceHandlerBuilder from the provided CPU driver config
+    pub fn new_with_driver_config(total_domain_count: u8, perf_rank: u8) -> Self {
+        Self { total_domain_count, perf_rank, cpu_ctrl_proxy: None, inspect_root: None }
     }
 
     /// Test-only interface to construct a builder with fake proxies
     #[cfg(test)]
-    fn new_with_proxies(driver_path: String, cpu_ctrl_proxy: fcpu_ctrl::DeviceProxy) -> Self {
-        Self { driver_path, cpu_ctrl_proxy: Some(cpu_ctrl_proxy), inspect_root: None }
+    fn new_with_proxies(
+        total_domain_count: u8,
+        perf_rank: u8,
+        cpu_ctrl_proxy: fcpu_ctrl::DeviceProxy,
+    ) -> Self {
+        Self {
+            total_domain_count,
+            perf_rank,
+            cpu_ctrl_proxy: Some(cpu_ctrl_proxy),
+            inspect_root: None,
+        }
     }
 
     /// Test-only interface to override the Inspect root
@@ -80,14 +94,17 @@ impl<'a> CpuDeviceHandlerBuilder<'a> {
     pub fn build(self) -> Result<Rc<CpuDeviceHandler>, Error> {
         // Optionally use the default inspect root node
         let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
-        let inspect =
-            InspectData::new(inspect_root, format!("CpuDeviceHandler ({})", self.driver_path));
+        let inspect = InspectData::new(
+            inspect_root,
+            format!("CpuDeviceHandler (perf_rank: {})", self.perf_rank),
+        );
 
         let mutable_inner = MutableInner { cpu_ctrl_proxy: self.cpu_ctrl_proxy, opps: Vec::new() };
 
         Ok(Rc::new(CpuDeviceHandler {
             init_done: AsyncEvent::new(),
-            driver_path: self.driver_path,
+            total_domain_count: self.total_domain_count,
+            perf_rank: self.perf_rank,
             inspect,
             mutable_inner: RefCell::new(mutable_inner),
         }))
@@ -106,8 +123,12 @@ pub struct CpuDeviceHandler {
     /// its `init()` has completed.
     init_done: AsyncEvent,
 
-    /// Path to the underlying CPU driver
-    driver_path: String,
+    /// Total number of CPU devices.
+    total_domain_count: u8,
+
+    /// Performance rank of the CPU device, where rank is the position in a list of all CPU devices
+    /// sorted by relative performance from highest to lowest.
+    perf_rank: u8,
 
     /// A struct for managing Component Inspection data
     inspect: InspectData,
@@ -121,7 +142,7 @@ impl CpuDeviceHandler {
         fuchsia_trace::duration!(
             c"cpu_manager",
             c"CpuDeviceHandler::handle_get_cpu_operating_points",
-            "driver" => self.driver_path.as_str()
+            "perf_rank" => self.perf_rank as u32
         );
 
         self.init_done.wait().await;
@@ -133,7 +154,7 @@ impl CpuDeviceHandler {
         fuchsia_trace::duration!(
             c"cpu_manager",
             c"CpuDeviceHandler::handle_get_operating_point",
-            "driver" => self.driver_path.as_str()
+            "perf_rank" => self.perf_rank as u32
         );
 
         self.init_done.wait().await;
@@ -144,7 +165,7 @@ impl CpuDeviceHandler {
             c"cpu_manager",
             c"CpuDeviceHandler::get_operating_point_result",
             fuchsia_trace::Scope::Thread,
-            "driver" => self.driver_path.as_str(),
+            "perf_rank" => self.perf_rank as u32,
             "result" => format!("{:?}", result).as_str()
         );
 
@@ -178,7 +199,7 @@ impl CpuDeviceHandler {
         fuchsia_trace::duration!(
             c"cpu_manager",
             c"CpuDeviceHandler::handle_set_operating_point",
-            "driver" => self.driver_path.as_str(),
+            "perf_rank" => self.perf_rank as u32,
             "opp" => in_opp
         );
 
@@ -190,7 +211,7 @@ impl CpuDeviceHandler {
             c"cpu_manager",
             c"CpuDeviceHandler::set_operating_point_result",
             fuchsia_trace::Scope::Thread,
-            "driver" => self.driver_path.as_str(),
+            "perf_rank" => self.perf_rank as u32,
             "result" => format!("{:?}", result).as_str()
         );
 
@@ -242,7 +263,7 @@ struct MutableInner {
 #[async_trait(?Send)]
 impl Node for CpuDeviceHandler {
     fn name(&self) -> String {
-        format!("CpuDeviceHandler ({})", self.driver_path)
+        format!("CpuDeviceHandler (perf_rank: {})", self.perf_rank)
     }
 
     /// Initializes internal state.
@@ -254,33 +275,12 @@ impl Node for CpuDeviceHandler {
         // Connect to the cpu-ctrl driver. Typically this is None, but it may be set by tests.
         let cpu_ctrl_proxy = match &self.mutable_inner.borrow().cpu_ctrl_proxy {
             Some(p) => p.clone(),
-            None => {
-                const DEV_CLASS_CPUCTRL: &str = "/dev/class/cpu-ctrl/";
-
-                let dir = fuchsia_fs::directory::open_in_namespace(
-                    DEV_CLASS_CPUCTRL,
-                    fio::OpenFlags::RIGHT_READABLE,
-                )?;
-
-                // TODO(https://fxbug.dev/42065064): Remove this requirement when the configuration
-                // specifies the device more robustly than by its sequential number.
-                let path = self.driver_path.strip_prefix(DEV_CLASS_CPUCTRL).ok_or_else(|| {
-                    anyhow::anyhow!("driver_path={} not in {}", self.driver_path, DEV_CLASS_CPUCTRL)
-                })?;
-                device_watcher::wait_for_device_with(&dir, |info| {
-                    (info.filename == path).then(|| {
-                        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-                            fcpu_ctrl::DeviceMarker,
-                        >(&dir, path)
-                    })
-                })
-                .await??
-            }
+            None => get_cpu_ctrl_proxy(self.total_domain_count, self.perf_rank).await?,
         };
 
         // Query the CPU opps
         let opps =
-            get_opps(&self.driver_path, &cpu_ctrl_proxy).await.context("Failed to get CPU opps")?;
+            get_opps(self.perf_rank, &cpu_ctrl_proxy).await.context("Failed to get CPU opps")?;
         validate_opps(&opps).context("Invalid CPU control params")?;
         self.inspect.record_opps(&opps);
 
@@ -307,13 +307,13 @@ impl Node for CpuDeviceHandler {
 
 /// Retrieves all opps from the provided cpu_ctrl proxy.
 async fn get_opps(
-    cpu_driver_path: &str,
+    perf_rank: u8,
     cpu_ctrl_proxy: &fcpu_ctrl::DeviceProxy,
 ) -> Result<Vec<OperatingPoint>, Error> {
     fuchsia_trace::duration!(
         c"cpu_manager",
         c"CpuDeviceHandler::get_opps",
-        "driver" => cpu_driver_path
+        "perf_rank" => perf_rank as u32
     );
 
     // Query opp metadata from the cpu_ctrl interface. Each supported operating point has
@@ -324,10 +324,18 @@ async fn get_opps(
         .get_operating_point_count()
         .await
         .map_err(|e| {
-            format_err!("{}: get_operating_point_count IPC failed: {}", cpu_driver_path, e)
+            format_err!(
+                "CPU driver (perf_rank: {}): get_operating_point_count IPC failed: {}",
+                perf_rank,
+                e
+            )
         })?
         .map_err(|e| {
-            format_err!("{}: get_operating_point_count returned error: {}", cpu_driver_path, e)
+            format_err!(
+                "CPU driver (perf_rank: {}): get_operating_point_count returned error: {}",
+                perf_rank,
+                e
+            )
         })?;
 
     for i in 0..opp_count {
@@ -335,10 +343,18 @@ async fn get_opps(
             .get_operating_point_info(i)
             .await
             .map_err(|e| {
-                format_err!("{}: get_operating_point_info IPC failed: {}", cpu_driver_path, e)
+                format_err!(
+                    "CPU driver (perf_rank: {}): get_operating_point_info IPC failed: {}",
+                    perf_rank,
+                    e
+                )
             })?
             .map_err(|e| {
-                format_err!("{}: get_operating_point_info returned error: {}", cpu_driver_path, e)
+                format_err!(
+                    "CPU driver (perf_rank: {}): get_operating_point_info returned error: {}",
+                    perf_rank,
+                    e
+                )
             })?;
 
         opps.push(OperatingPoint {
@@ -482,10 +498,8 @@ mod tests {
     }
 
     async fn setup_simple_test_node(opps: Vec<OperatingPoint>) -> Rc<CpuDeviceHandler> {
-        let builder = CpuDeviceHandlerBuilder::new_with_proxies(
-            "fake_path".to_string(),
-            setup_fake_cpu_ctrl_proxy(opps),
-        );
+        let builder =
+            CpuDeviceHandlerBuilder::new_with_proxies(1, 0, setup_fake_cpu_ctrl_proxy(opps));
         builder.build_and_init().await
     }
 
@@ -573,10 +587,8 @@ mod tests {
             OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
             OperatingPoint { frequency: Hertz(1.6e9), voltage: Volts(1.0) },
         ];
-        let builder = CpuDeviceHandlerBuilder::new_with_proxies(
-            "fake_path".to_string(),
-            setup_fake_cpu_ctrl_proxy(opps),
-        );
+        let builder =
+            CpuDeviceHandlerBuilder::new_with_proxies(1, 0, setup_fake_cpu_ctrl_proxy(opps));
         assert!(builder.build().unwrap().init().await.is_err());
 
         // Secondary sort by voltage is violated.
@@ -584,10 +596,8 @@ mod tests {
             OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
             OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.1) },
         ];
-        let builder = CpuDeviceHandlerBuilder::new_with_proxies(
-            "fake_path".to_string(),
-            setup_fake_cpu_ctrl_proxy(opps),
-        );
+        let builder =
+            CpuDeviceHandlerBuilder::new_with_proxies(1, 0, setup_fake_cpu_ctrl_proxy(opps));
         assert!(builder.build().unwrap().init().await.is_err());
 
         // Duplicated opp (detected as violation of secondary sort by voltage).
@@ -595,10 +605,8 @@ mod tests {
             OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
             OperatingPoint { frequency: Hertz(1.5e9), voltage: Volts(1.0) },
         ];
-        let builder = CpuDeviceHandlerBuilder::new_with_proxies(
-            "fake_path".to_string(),
-            setup_fake_cpu_ctrl_proxy(opps),
-        );
+        let builder =
+            CpuDeviceHandlerBuilder::new_with_proxies(1, 0, setup_fake_cpu_ctrl_proxy(opps));
         assert!(builder.build().unwrap().init().await.is_err());
     }
 
@@ -612,7 +620,8 @@ mod tests {
 
         let inspector = inspect::Inspector::default();
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
-            "fake_path".to_string(),
+            1,
+            0,
             setup_fake_cpu_ctrl_proxy(opps.clone()),
         )
         .with_inspect_root(inspector.root());
@@ -622,7 +631,7 @@ mod tests {
         assert_data_tree!(
             inspector,
             root: {
-                "CpuDeviceHandler (fake_path)": {
+                "CpuDeviceHandler (perf_rank: 0)": {
                     "opps": {
                         opp_00: {
                             "frequency (Hz)": opps[0].frequency.0,

@@ -905,6 +905,15 @@
                     "description": "Flag indicating whether method uses the error syntax. If true, `maybe_response_payload` will be a result union, and the response will be further broken down in `maybe_response_success_type` and `maybe_response_err_type`.",
                     "type": "boolean"
                 },
+                "kind": {
+                    "description": "Kind of method. Can be client-initiated without response (oneway) or with response (twoway), or server initiated without response (event).",
+                    "enum": [
+                        "oneway",
+                        "twoway",
+                        "event"
+                    ],
+                    "type": "string"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"

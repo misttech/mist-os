@@ -201,11 +201,13 @@ Symbols:
   - { Name: _zx_vmo_create_contiguous, Type: Func }
   - { Name: _zx_vmo_create_physical, Type: Func }
   - { Name: _zx_vmo_get_size, Type: Func }
+  - { Name: _zx_vmo_get_stream_size, Type: Func }
   - { Name: _zx_vmo_op_range, Type: Func }
   - { Name: _zx_vmo_read, Type: Func }
   - { Name: _zx_vmo_replace_as_executable, Type: Func }
   - { Name: _zx_vmo_set_cache_policy, Type: Func }
   - { Name: _zx_vmo_set_size, Type: Func }
+  - { Name: _zx_vmo_set_stream_size, Type: Func }
   - { Name: _zx_vmo_transfer_data, Type: Func }
   - { Name: _zx_vmo_write, Type: Func }
   - { Name: zx_bti_create, Type: Func, Weak: true }
@@ -407,11 +409,13 @@ Symbols:
   - { Name: zx_vmo_create_contiguous, Type: Func, Weak: true }
   - { Name: zx_vmo_create_physical, Type: Func, Weak: true }
   - { Name: zx_vmo_get_size, Type: Func, Weak: true }
+  - { Name: zx_vmo_get_stream_size, Type: Func, Weak: true }
   - { Name: zx_vmo_op_range, Type: Func, Weak: true }
   - { Name: zx_vmo_read, Type: Func, Weak: true }
   - { Name: zx_vmo_replace_as_executable, Type: Func, Weak: true }
   - { Name: zx_vmo_set_cache_policy, Type: Func, Weak: true }
   - { Name: zx_vmo_set_size, Type: Func, Weak: true }
+  - { Name: zx_vmo_set_stream_size, Type: Func, Weak: true }
   - { Name: zx_vmo_transfer_data, Type: Func, Weak: true }
   - { Name: zx_vmo_write, Type: Func, Weak: true }
 ...

@@ -43,8 +43,11 @@ pub mod update;
 #[derive(Debug)]
 pub enum PeerRequest {
     Profile(ProfileEvent),
+    #[allow(dead_code)]
     Handle(PeerHandlerProxy),
-    ManagerConnected { id: hfp::ManagerConnectionId },
+    ManagerConnected {
+        id: hfp::ManagerConnectionId,
+    },
     BatteryLevel(u8),
     Behavior(ConnectionBehavior),
 }

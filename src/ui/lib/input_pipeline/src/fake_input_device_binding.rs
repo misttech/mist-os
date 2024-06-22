@@ -1,6 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#![cfg(test)]
 
 use crate::{input_device, keyboard_binding};
 use async_trait::async_trait;
@@ -12,7 +13,6 @@ pub struct FakeInputDeviceBinding {
     event_sender: UnboundedSender<input_device::InputEvent>,
 }
 
-#[cfg(test)]
 impl FakeInputDeviceBinding {
     pub fn new(input_event_sender: UnboundedSender<input_device::InputEvent>) -> Self {
         FakeInputDeviceBinding { event_sender: input_event_sender }

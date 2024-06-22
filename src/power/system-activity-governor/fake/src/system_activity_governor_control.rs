@@ -77,7 +77,7 @@ impl SystemActivityGovernorControl {
                     dependency_type: fbroker::DependencyType::Active,
                     dependent_level: 1,
                     requires_token: wh_token,
-                    requires_level: 1,
+                    requires_level_by_preference: vec![1],
                 }])
                 .build()
                 .await
@@ -91,7 +91,7 @@ impl SystemActivityGovernorControl {
                     dependency_type: fbroker::DependencyType::Active,
                     dependent_level: 1,
                     requires_token: fwh_token,
-                    requires_level: 1,
+                    requires_level_by_preference: vec![1],
                 }])
                 .build()
                 .await
@@ -105,7 +105,7 @@ impl SystemActivityGovernorControl {
                     dependency_type: fbroker::DependencyType::Active,
                     dependent_level: 1,
                     requires_token: aa_token,
-                    requires_level: 1,
+                    requires_level_by_preference: vec![1],
                 }])
                 .build()
                 .await

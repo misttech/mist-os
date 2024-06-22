@@ -63,6 +63,6 @@ impl FileOps for PowerWakeupCountFile {
         let wakeup_count =
             current_task.kernel().suspend_resume_manager.suspend_stats().wakeup_count;
         let content = format!("{}\n", wakeup_count);
-        data.write(content[offset..].as_bytes())
+        data.write(content.get(offset..).ok_or(errno!(EINVAL))?.as_bytes())
     }
 }

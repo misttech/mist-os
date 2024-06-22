@@ -318,6 +318,10 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
   }
 
   bool free_list_had_fill_pattern = false;
+  // Holds the pages that we pull out of the PMMs free list. These pages may still need to have
+  // their pattern checked (based on the bool above) before being appended to |list| and returned to
+  // the caller.
+  list_node_t alloc_list = LIST_INITIAL_VALUE(alloc_list);
 
   {
     AutoPreemptDisabler preempt_disable;
@@ -329,6 +333,8 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
         !((alloc_flags & PMM_ALLOC_FLAG_LOANED) && (alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT)));
     const bool use_loaned_list = pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
                                  (alloc_flags & PMM_ALLOC_FLAG_LOANED);
+    // based on whether allocated loaned pages or not, setup which_list to point directly to the
+    // appropriate free list to simplify later allocation code that operates on either list.
     list_node* const which_list = use_loaned_list ? &free_loaned_list_ : &free_list_;
     uint64_t free_count = use_loaned_list ? free_loaned_count_.load(ktl::memory_order_relaxed)
                                           : free_count_.load(ktl::memory_order_relaxed);
@@ -362,7 +368,7 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
       return ZX_ERR_SHOULD_WAIT;
     }
 
-    auto node = which_list;
+    list_node_t* node = which_list;
     while (count > 0) {
       node = list_next(which_list, node);
       DEBUG_ASSERT(use_loaned_list || !containerof(node, vm_page, queue_node)->is_loaned());
@@ -370,21 +376,29 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
       --count;
     }
 
-    list_node tmp_list = LIST_INITIAL_VALUE(tmp_list);
-    list_split_after(which_list, node, &tmp_list);
-    if (list_is_empty(list)) {
-      list_move(which_list, list);
-    } else {
-      list_splice_after(which_list, list_peek_tail(list));
-    }
-    list_move(&tmp_list, which_list);
+    // Want to take the pages ranging from the start of the list (identified by which_list) up to
+    // node, and place them in alloc_list. Due to how the listnode operations work, it's easier to
+    // move the entire list into alloc_list, then split the pages that we are not allocating back
+    // into which_list.
+    list_move(which_list, &alloc_list);
+    list_split_after(&alloc_list, node, which_list);
   }
 
+  // Check the pages we are allocating before appending them into the user's allocation list. Do
+  // this check before since we must not existing pages in the user's allocation list, as they are
+  // completely arbitrary pages and there's no reason to expect a fill pattern in them.
   if (free_list_had_fill_pattern) {
     vm_page* page;
-    list_for_every_entry (list, page, vm_page, queue_node) {
+    list_for_every_entry (&alloc_list, page, vm_page, queue_node) {
       checker_.AssertPattern(page);
     }
+  }
+
+  // Append the checked list onto the user provided list.
+  if (list_is_empty(list)) {
+    list_move(&alloc_list, list);
+  } else {
+    list_splice_after(&alloc_list, list_peek_tail(list));
   }
 
   return ZX_OK;

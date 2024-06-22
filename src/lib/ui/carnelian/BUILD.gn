@@ -210,6 +210,7 @@ rustc_binary("ink") {
   source_root = "examples/ink.rs"
   sources = [ "examples/ink.rs" ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_rust",
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/trace/rust:trace",

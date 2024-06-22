@@ -19,11 +19,11 @@
 use std::collections::{HashMap, HashSet};
 
 use assert_matches::assert_matches;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
+use fidl_fuchsia_net_routes_ext::rules::RuleSetPriority;
 use futures::channel::{mpsc, oneshot};
-use futures::{
-    stream, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
-};
+use futures::{stream, Future, FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
 use net_types::ip::{
     GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
@@ -35,9 +35,12 @@ use crate::bindings::util::{EntryAndTableId, TryIntoFidlWithContext};
 use crate::bindings::{BindingsCtx, Ctx, IpExt};
 
 pub(crate) mod admin;
+pub(crate) mod rules_admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
+use rules_admin::{NewRuleSet, RuleOp, RuleTable, RuleWorkItem, SetPriorityConflict};
 
 pub(crate) mod state;
+pub(crate) mod watcher;
 mod witness;
 pub(crate) use witness::{main_table_id, TableId};
 
@@ -114,14 +117,9 @@ pub(crate) enum ChangeError {
     SetRemoved,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 
-enum TableError {
-    #[error("table ID overflows")]
-    TableIdOverflows,
-    #[error("table worker is shutting down")]
-    ShuttingDown,
-}
+struct TableIdOverflowsError;
 
 #[derive(Debug)]
 pub(crate) struct RouteWorkItem<A: IpAddress> {
@@ -134,9 +132,9 @@ enum TableOpOutcome<I: Ip> {
     Added { table_id: TableId<I>, route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>> },
 }
 
-struct TableWorkItem<I: Ip> {
+struct NewTable<I: Ip> {
     op: TableOp<I>,
-    responder: oneshot::Sender<Result<TableOpOutcome<I>, TableError>>,
+    responder: oneshot::Sender<Result<TableOpOutcome<I>, TableIdOverflowsError>>,
 }
 
 /// The routing table from the perspective of bindings.
@@ -394,17 +392,29 @@ type RouteWorkReceivers<A> =
 
 pub(crate) struct State<I: Ip> {
     last_table_id: TableId<I>,
-    table_work_receiver: mpsc::UnboundedReceiver<TableWorkItem<I>>,
+    new_table_receiver: mpsc::UnboundedReceiver<NewTable<I>>,
     route_work_receivers: RouteWorkReceivers<I::Addr>,
+    new_rule_set_receiver: mpsc::UnboundedReceiver<NewRuleSet<I>>,
     tables: HashMap<TableId<I>, Table<I::Addr>>,
-    update_dispatcher: crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+    rules: RuleTable<I>,
+    update_dispatcher: state::RouteUpdateDispatcher<I>,
 }
 
 #[derive(derivative::Derivative)]
 #[derivative(Clone(bound = ""))]
 pub(crate) struct Changes<A: IpAddress> {
-    table_work_sink: mpsc::UnboundedSender<TableWorkItem<A::Version>>,
+    new_table_sink: mpsc::UnboundedSender<NewTable<A::Version>>,
     main_table_route_work_sink: mpsc::UnboundedSender<RouteWorkItem<A>>,
+    new_rule_set_sink: mpsc::UnboundedSender<NewRuleSet<A::Version>>,
+}
+
+impl<A: IpAddress> Changes<A> {
+    fn close_senders(&self) {
+        let Self { new_table_sink, main_table_route_work_sink, new_rule_set_sink } = self;
+        new_table_sink.close_channel();
+        main_table_route_work_sink.close_channel();
+        new_rule_set_sink.close_channel();
+    }
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
@@ -414,12 +424,15 @@ where
 {
     pub(crate) async fn run_changes(&mut self, mut ctx: Ctx) {
         let State {
-            table_work_receiver,
+            new_table_receiver,
             route_work_receivers,
+            new_rule_set_receiver,
             tables,
+            rules,
             update_dispatcher,
             last_table_id,
         } = self;
+        let mut rule_set_work_receivers = stream::FuturesUnordered::new();
         loop {
             futures::select_biased!(
                 route_work_item = route_work_receivers.next() => {
@@ -434,8 +447,7 @@ where
                     if removing {
                         rest.close();
                     }
-                    Self::handle_route_change(&mut ctx, tables, update_dispatcher, route_work_item)
-                        .await;
+                    Self::handle_route_change(&mut ctx, tables, update_dispatcher, route_work_item);
                     if removing {
                         rest.filter_map(|RouteWorkItem {
                             change: _,
@@ -450,29 +462,62 @@ where
                         route_work_receivers.push(rest.into_future());
                     }
                 },
-                table_work_item = table_work_receiver.next() => {
-                    let Some(table_work_item) = table_work_item else {
+                new_table = new_table_receiver.next() => {
+                    let Some(new_table) = new_table else {
                         continue;
                     };
                     Self::handle_table_op(
                         last_table_id,
                         tables,
-                        table_work_item,
+                        new_table,
                         route_work_receivers
                     )
                 },
+                new_rule_set = new_rule_set_receiver.next() => {
+                    let Some(NewRuleSet {
+                        priority,
+                        rule_set_work_receiver,
+                        responder
+                    }) = new_rule_set else {
+                        continue;
+                    };
+                    let result = rules.new_rule_set(priority);
+                    rule_set_work_receivers.push(
+                        rule_set_work_receiver.into_future());
+                    responder.send(result).expect("failed to send result");
+                }
+                rule_set_work_item = rule_set_work_receivers.next() => {
+                    let Some((Some(RuleWorkItem {
+                        op,
+                        responder
+                    }), mut rest)) = rule_set_work_item else {
+                        continue;
+                    };
+                    let is_removal = matches!(op, RuleOp::RemoveSet { .. });
+                    let result = Self::handle_rule_op(rules, op);
+                    if is_removal {
+                        // We must close the channel so that the rule set
+                        // can no longer send RuleOps. Note that we make
+                        // sure no more operations will be sent once
+                        // `RemoveSet` is sent.
+                        rest.close();
+                    } else {
+                        rule_set_work_receivers.push(rest.into_future());
+                    }
+                    responder.send(result).expect("the receiver is dropped");
+                }
                 complete => break,
             )
         }
     }
 
-    async fn handle_route_change(
+    fn handle_route_change(
         ctx: &mut Ctx,
         tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
-        update_dispatcher: &mut crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+        update_dispatcher: &mut state::RouteUpdateDispatcher<I>,
         RouteWorkItem { change, responder }: RouteWorkItem<I::Addr>,
     ) {
-        let result = handle_route_change::<I>(tables, ctx, change, update_dispatcher).await;
+        let result = handle_route_change::<I>(tables, ctx, change, update_dispatcher);
         if let Some(responder) = responder {
             match responder.send(result) {
                 Ok(()) => (),
@@ -499,7 +544,7 @@ where
     fn handle_table_op(
         last_table_id: &mut TableId<I>,
         tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
-        TableWorkItem { op, responder }: TableWorkItem<I>,
+        NewTable { op, responder }: NewTable<I>,
         route_work_receivers: &mut RouteWorkReceivers<I::Addr>,
     ) {
         match op {
@@ -508,7 +553,7 @@ where
                     match last_table_id.next() {
                         // Never reuse table IDs, so the table IDs can only be
                         // increasing.
-                        None => Err(TableError::TableIdOverflows),
+                        None => Err(TableIdOverflowsError),
                         Some(table_id) => {
                             assert_matches!(
                                 tables.insert(
@@ -528,6 +573,21 @@ where
             }
         }
     }
+
+    fn handle_rule_op(
+        table: &mut RuleTable<I>,
+        op: RuleOp<I>,
+    ) -> Result<(), fnet_routes_admin::RuleSetError> {
+        match op {
+            RuleOp::RemoveSet { priority } => {
+                return Ok(table.remove_rule_set(priority));
+            }
+            RuleOp::Add { priority, index, selector, action } => {
+                table.add_rule(priority, index, selector, action)
+            }
+            RuleOp::Remove { priority, index } => table.remove_rule(priority, index),
+        }
+    }
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
@@ -540,12 +600,12 @@ fn to_entry<I: netstack3_core::IpExt>(
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-async fn handle_single_table_route_change<I>(
+fn handle_single_table_route_change<I>(
     table: &mut Table<I::Addr>,
     table_id: TableId<I>,
-    mut ctx: Ctx,
+    ctx: &mut Ctx,
     change: Change<I::Addr>,
-    route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+    route_update_dispatcher: &state::RouteUpdateDispatcher<I>,
 ) -> Result<ChangeOutcome, ChangeError>
 where
     I: IpExt + FidlRouteAdminIpExt,
@@ -564,7 +624,7 @@ where
                 TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
                 TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
                 TableModifyResult::TableChanged((addable_entry, _generation)) => {
-                    TableChange::Add(to_entry::<I>(&mut ctx, addable_entry))
+                    TableChange::Add(to_entry::<I>(ctx, addable_entry))
                 }
             }
         }
@@ -676,10 +736,7 @@ where
                 .try_into_fidl_with_ctx(ctx.bindings_ctx())
                 .expect("failed to convert route to FIDL");
             route_update_dispatcher
-                .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteAdded(
-                    installed_route,
-                ))
-                .await
+                .notify(watcher::Update::Added(installed_route))
                 .expect("failed to notify route update dispatcher");
         }
         TableChange::Remove(removed) => {
@@ -690,8 +747,7 @@ where
                 entry: to_entry::<I>(&mut ctx_clone, entry),
                 table_id,
             });
-            notify_removed_routes::<I>(ctx.bindings_ctx(), route_update_dispatcher, removed, table)
-                .await;
+            notify_removed_routes::<I>(ctx.bindings_ctx(), route_update_dispatcher, removed, table);
         }
     };
 
@@ -699,11 +755,11 @@ where
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
-async fn handle_route_change<I>(
+fn handle_route_change<I>(
     tables: &mut HashMap<TableId<I>, Table<I::Addr>>,
     ctx: &mut Ctx,
     change: Change<I::Addr>,
-    route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+    route_update_dispatcher: &state::RouteUpdateDispatcher<I>,
 ) -> Result<ChangeOutcome, ChangeError>
 where
     I: IpExt + FidlRouteAdminIpExt,
@@ -718,7 +774,7 @@ where
         std::iter::once((table_id, table))
     }
 
-    let tables = match &change {
+    let mut tables = match &change {
         Change::RouteOp(_, SetMembership::User(weak_set)) | Change::RemoveSet(weak_set) => {
             itertools::Either::Left(one_table(
                 tables,
@@ -740,35 +796,24 @@ where
         Change::RemoveTable(table_id) => itertools::Either::Left(one_table(tables, *table_id)),
     };
 
-    stream::iter(tables)
-        .map(Ok)
-        .try_fold(ChangeOutcome::NoChange, {
-            move |change_so_far, (table_id, table)| {
-                handle_single_table_route_change(
-                    table,
-                    table_id,
-                    ctx.clone(),
-                    change.clone(),
-                    route_update_dispatcher,
-                )
-                .map_ok(move |current_change| {
-                    match (change_so_far, current_change) {
-                        (ChangeOutcome::NoChange, ChangeOutcome::NoChange) => {
-                            ChangeOutcome::NoChange
-                        }
-                        (ChangeOutcome::Changed, _) | (_, ChangeOutcome::Changed) => {
-                            ChangeOutcome::Changed
-                        }
-                    }
-                })
-            }
+    tables.try_fold(ChangeOutcome::NoChange, |change_so_far, (table_id, table)| {
+        let change_outcome = handle_single_table_route_change(
+            table,
+            table_id,
+            ctx,
+            change.clone(),
+            route_update_dispatcher,
+        )?;
+        Ok(match (change_so_far, change_outcome) {
+            (ChangeOutcome::NoChange, ChangeOutcome::NoChange) => ChangeOutcome::NoChange,
+            (ChangeOutcome::Changed, _) | (_, ChangeOutcome::Changed) => ChangeOutcome::Changed,
         })
-        .await
+    })
 }
 
-async fn notify_removed_routes<I: Ip>(
+fn notify_removed_routes<I: Ip>(
     bindings_ctx: &crate::bindings::BindingsCtx,
-    dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
+    dispatcher: &state::RouteUpdateDispatcher<I>,
     removed_routes: impl IntoIterator<Item = EntryAndTableId<I>>,
     table: &Table<I::Addr>,
 ) {
@@ -805,10 +850,7 @@ async fn notify_removed_routes<I: Ip>(
             .try_into_fidl_with_ctx(bindings_ctx)
             .expect("failed to convert route to FIDL");
         dispatcher
-            .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteRemoved(
-                installed_route,
-            ))
-            .await
+            .notify(watcher::Update::Removed(installed_route))
             .expect("failed to notify route update dispatcher");
     }
 }
@@ -828,10 +870,7 @@ pub(crate) struct ChangeRunner {
 impl ChangeRunner {
     pub(crate) fn route_update_dispatchers(
         &self,
-    ) -> (
-        crate::bindings::routes::state::RouteUpdateDispatcher<Ipv4>,
-        crate::bindings::routes::state::RouteUpdateDispatcher<Ipv6>,
-    ) {
+    ) -> (state::RouteUpdateDispatcher<Ipv4>, state::RouteUpdateDispatcher<Ipv6>) {
         let Self { v4, v6 } = self;
         (v4.update_dispatcher.clone(), v6.update_dispatcher.clone())
     }
@@ -846,7 +885,7 @@ impl ChangeRunner {
 
 pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
     fn create<I: FidlRouteAdminIpExt>() -> (Changes<I::Addr>, State<I>) {
-        let (table_work_sink, table_work_receiver) = mpsc::unbounded();
+        let (new_table_sink, new_table_receiver) = mpsc::unbounded();
         let mut tables = HashMap::new();
         let main_table_id = main_table_id::<I>();
 
@@ -858,15 +897,18 @@ pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
         let (main_table_route_work_sink, main_table_route_work_receiver) = mpsc::unbounded();
         let route_work_receivers =
             RouteWorkReceivers::new(main_table_route_work_receiver.into_future());
+        let (new_rule_set_sink, new_rule_set_receiver) = mpsc::unbounded();
 
         let state = State {
-            table_work_receiver,
+            new_table_receiver,
             tables,
+            rules: Default::default(),
             update_dispatcher: Default::default(),
             route_work_receivers,
+            new_rule_set_receiver,
             last_table_id: main_table_id,
         };
-        (Changes { table_work_sink, main_table_route_work_sink }, state)
+        (Changes { new_table_sink, main_table_route_work_sink, new_rule_set_sink }, state)
     }
     let (v4, v4_state) = create::<Ipv4>();
     let (v6, v6_state) = create::<Ipv6>();
@@ -878,10 +920,8 @@ impl ChangeSink {
     /// [`ChangeRunner::run`] to exit.
     pub(crate) fn close_senders(&self) {
         let Self { v4, v6 } = self;
-        v4.table_work_sink.close_channel();
-        v4.main_table_route_work_sink.close_channel();
-        v6.table_work_sink.close_channel();
-        v6.main_table_route_work_sink.close_channel();
+        v4.close_senders();
+        v6.close_senders();
     }
 
     pub(crate) fn fire_main_table_route_change_and_forget<A: IpAddress>(&self, change: Change<A>) {
@@ -912,27 +952,15 @@ impl ChangeSink {
         }
     }
 
-    #[must_use = "the returned future must be polled to avoid panics from the ChangeRunner"]
-    fn send_table_op<I: Ip>(
-        &self,
-        op: TableOp<I>,
-    ) -> impl Future<Output = Result<TableOpOutcome<I>, TableError>> {
-        let sender = self.table_work_sink::<I>();
-        let (responder, receiver) = oneshot::channel();
-        let item = TableWorkItem { op, responder };
-        match sender.unbounded_send(item) {
-            Ok(()) => receiver.map(|r| r.expect("responder should not be dropped")).left_future(),
-            Err(e) => {
-                warn!("failed to send an table op to ChangeRunner: {e:?}");
-                futures::future::ready(Err(TableError::ShuttingDown)).right_future()
-            }
-        }
-    }
-
     async fn add_table<I: Ip>(
         &self,
-    ) -> Result<(TableId<I>, mpsc::UnboundedSender<RouteWorkItem<I::Addr>>), TableError> {
-        self.send_table_op(TableOp::AddTable(IpVersionMarker::new())).await.map(|outcome| {
+    ) -> Result<(TableId<I>, mpsc::UnboundedSender<RouteWorkItem<I::Addr>>), TableIdOverflowsError>
+    {
+        let sender = &self.changes::<I>().new_table_sink;
+        let (responder, receiver) = oneshot::channel();
+        let item = NewTable { op: TableOp::AddTable(IpVersionMarker::new()), responder };
+        sender.unbounded_send(item).expect("change runner shut down before services are shut down");
+        receiver.map(|r| r.expect("responder should not be dropped")).await.map(|outcome| {
             assert_matches!(
                 outcome,
                 TableOpOutcome::Added{
@@ -943,35 +971,37 @@ impl ChangeSink {
         })
     }
 
-    fn table_work_sink<I: Ip>(&self) -> &mpsc::UnboundedSender<TableWorkItem<I>> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct ChangeSender<'a, I: Ip> {
-            sender: &'a mpsc::UnboundedSender<TableWorkItem<I>>,
-        }
-
-        let ChangeSender { sender } = I::map_ip_out(
-            self,
-            |ChangeSink { v4, v6: _ }| ChangeSender { sender: &v4.table_work_sink },
-            |ChangeSink { v4: _, v6 }| ChangeSender { sender: &v6.table_work_sink },
-        );
+    async fn new_rule_set<I: Ip>(
+        &self,
+        priority: RuleSetPriority,
+        rule_set_work_receiver: mpsc::UnboundedReceiver<RuleWorkItem<I>>,
+    ) -> Result<(), SetPriorityConflict> {
+        let sender = &self.changes::<I>().new_rule_set_sink;
+        let (responder, receiver) = oneshot::channel();
         sender
+            .unbounded_send(NewRuleSet { priority, rule_set_work_receiver, responder })
+            .expect("change runner shut down before the services are shut down");
+        receiver.await.expect("responder should not be dropped")
     }
 
     pub(crate) fn main_table_route_work_sink<I: Ip>(
         &self,
     ) -> &mpsc::UnboundedSender<RouteWorkItem<I::Addr>> {
+        &self.changes::<I>().main_table_route_work_sink
+    }
+
+    fn changes<I: Ip>(&self) -> &Changes<I::Addr> {
         #[derive(GenericOverIp)]
-        #[generic_over_ip(A, IpAddress)]
-        struct ChangeSender<'a, A: IpAddress> {
-            sender: &'a mpsc::UnboundedSender<RouteWorkItem<A>>,
+        #[generic_over_ip(I, Ip)]
+        struct ChangesOutput<'a, I: Ip> {
+            changes: &'a Changes<I::Addr>,
         }
 
-        let ChangeSender { sender } = I::map_ip_out(
+        let ChangesOutput { changes } = I::map_ip_out(
             self,
-            |ChangeSink { v4, v6: _ }| ChangeSender { sender: &v4.main_table_route_work_sink },
-            |ChangeSink { v4: _, v6 }| ChangeSender { sender: &v6.main_table_route_work_sink },
+            |ChangeSink { v4, v6: _ }| ChangesOutput { changes: &v4 },
+            |ChangeSink { v4: _, v6 }| ChangesOutput { changes: &v6 },
         );
-        sender
+        changes
     }
 }

@@ -103,11 +103,6 @@ impl File for VmoBlob {
     }
 
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, zx::Status> {
-        let vmo_size = self.get_size().await?;
-        if vmo_size == 0 {
-            // Mimics c++ blobfs behavior.
-            return Err(zx::Status::BAD_STATE);
-        }
         // We do not support exact/duplicate sharing mode.
         if flags.contains(fio::VmoFlags::SHARED_BUFFER) {
             error!("get_backing_memory does not support exact sharing mode!");
@@ -126,7 +121,8 @@ impl File for VmoBlob {
         if !flags.contains(fio::VmoFlags::WRITE) {
             child_options |= zx::VmoChildOptions::NO_WRITE
         }
-        let mut child_vmo = self.vmo.create_child(child_options, 0, vmo_size)?;
+        let mut child_vmo =
+            self.vmo.create_child(child_options, 0, self.vmo.get_content_size()?)?;
 
         if flags.contains(fio::VmoFlags::EXECUTE) {
             // TODO(https://fxbug.dev/293606235): Filter out other flags.

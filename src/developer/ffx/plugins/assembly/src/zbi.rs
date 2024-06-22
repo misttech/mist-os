@@ -14,6 +14,7 @@ use assembly_util::{BootfsDestination, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use std::collections::BTreeMap;
+use std::fs::copy;
 use utf8_path::path_relative_from_current_dir;
 use zbi::ZbiBuilder;
 
@@ -121,6 +122,7 @@ pub fn construct_zbi(
     zbi_builder.set_compression(match zbi_config.compression {
         ZbiCompression::ZStd => "zstd",
         ZbiCompression::ZStdMax => "zstd.max",
+        ZbiCompression::None => "none",
     });
 
     // Create an output manifest that describes the contents of the built ZBI.
@@ -170,8 +172,18 @@ pub fn vendor_sign_zbi(
 
     // Run the tool.
     signing_tool.run(&args)?;
-    assembly_manifest.images.push(Image::ZBI { path: signed_path.clone(), signed: true });
-    Ok(signed_path)
+
+    // It is intended to copy the signed zbi to foo.zbi and move the unsigned
+    // to a new location (foo.zbi.unsigned).
+    let output_zbi_path = outdir.as_ref().join(format!("{}.zbi", zbi_config.name));
+    if signed_path.is_file() {
+        let unsigned_zbi_path = outdir.as_ref().join(format!("{}.zbi.unsigned", zbi_config.name));
+        copy(&output_zbi_path, &unsigned_zbi_path).context("Copy unsigned zbi")?;
+        copy(&signed_path, &output_zbi_path).context("Copy signed zbi")?;
+    }
+
+    assembly_manifest.images.push(Image::ZBI { path: output_zbi_path.clone(), signed: true });
+    Ok(output_zbi_path)
 }
 
 #[cfg(test)]
@@ -321,7 +333,7 @@ mod tests {
     fn vendor_sign() {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
-        let expected_output = dir.join("fuchsia.zbi.signed");
+        let expected_output = dir.join("fuchsia.zbi");
 
         // Create a fake zbi.
         let zbi_path = dir.join("fuchsia.zbi");
@@ -356,7 +368,7 @@ mod tests {
                         "-z",
                         zbi_path.as_str(),
                         "-o",
-                        expected_output.as_str(),
+                        expected_output.as_str().to_owned() + ".signed",
                     ]
                 }
             ]

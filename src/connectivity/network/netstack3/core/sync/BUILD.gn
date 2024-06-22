@@ -39,7 +39,7 @@ rustc_library_with_features("netstack3-sync") {
     feature_sets += [
       {
         target_name = "netstack3-sync-loom"
-        features = []
+        features = [ "rc-debug-names" ]
         deps += [ "//third_party/rust_crates:loom" ]
         testonly = true
         configs += [ "//src/connectivity/network/netstack3/core:loom" ]

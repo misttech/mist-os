@@ -64,6 +64,6 @@ impl FileOps for PowerSyncOnSuspendFile {
                 "0"
             }
         );
-        data.write(content[offset..].as_bytes())
+        data.write(content.get(offset..).ok_or(errno!(EINVAL))?.as_bytes())
     }
 }

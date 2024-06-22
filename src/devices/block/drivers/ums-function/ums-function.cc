@@ -638,7 +638,7 @@ void UmsFunction::DdkInit(ddk::InitTxn txn) {
 zx_status_t UmsFunction::Init() {
   data_state_ = DATA_STATE_NONE;
   active_ = true;
-  atomic_init(&pending_request_count_, 0);
+  pending_request_count_ = 0;
   zx_status_t status = ZX_OK;
 
   parent_req_size_ = function_.GetRequestSize();

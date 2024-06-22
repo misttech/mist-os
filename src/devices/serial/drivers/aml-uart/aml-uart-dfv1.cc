@@ -5,6 +5,7 @@
 #include "src/devices/serial/drivers/aml-uart/aml-uart-dfv1.h"
 
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
 

@@ -18,10 +18,15 @@ use argh::FromArgs;
 use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_archive::Reader as FARReader;
 use fuchsia_pkg::PackageManifest;
-use handlebars::{Handlebars, Helper, HelperResult, Output, RenderContext, RenderError};
+use fuchsia_url::UnpinnedAbsolutePackageUrl;
+use handlebars::{
+    handlebars_helper, Handlebars, Helper, HelperResult, Output, RenderContext, RenderError,
+};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
+use rayon::ThreadPoolBuilder;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, span, Level};
 
 #[derive(FromArgs)]
 /// collect and generate stats on Fuchsia packages
@@ -48,6 +53,18 @@ struct ProcessArgs {
     /// the path to save the output json file
     #[argh(option)]
     out: Option<PathBuf>,
+
+    /// if set, process manifests one at a time, for debugging.
+    #[argh(switch)]
+    debug_no_parallel: bool,
+
+    /// process only this many manifests.
+    #[argh(option)]
+    debug_manifest_limit: Option<usize>,
+
+    /// process only manifests containing this substring.
+    #[argh(option)]
+    debug_manifest_filter: Option<String>,
 }
 
 #[derive(FromArgs)]
@@ -64,6 +81,7 @@ struct HtmlArgs {
 }
 
 fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
     let args: Args = argh::from_env();
 
     match args.cmd {
@@ -88,6 +106,25 @@ fn do_html_command(args: HtmlArgs) -> Result<()> {
     let mut hb = Handlebars::new();
     hb.set_strict_mode(true);
 
+    handlebars_helper!(capability_str: |capability: Capability| {
+        capability.to_string()
+    });
+    handlebars_helper!(capability_target_list: |capability: Capability, map: ProtocolToClientMap| {
+        let Capability::Protocol(protocol_name) = capability;
+        let mut result = Vec::new();
+        write!(&mut result, r#"<ul class="capability-targets">"#).unwrap();
+        if let Some(url_to_coverage)  = map.get(&protocol_name) {
+            for (package_url, component_to_coverage) in url_to_coverage.iter() {
+                for component in component_to_coverage.iter() {
+                    let uri = package_page_url(package_url.to_string());
+                    write!(&mut result, "<li><a href='{uri}'>{package_url}#meta/{component}</a></li>").unwrap();
+                }
+            }
+        }
+        write!(&mut result, "</ul>").unwrap();
+        String::from_utf8(result).unwrap()
+    });
+
     hb.register_template_string("base", include_str!("../templates/base_template.html.hbs"))?;
     hb.register_template_string("index", include_str!("../templates/index.html.hbs"))?;
     hb.register_template_string("package", include_str!("../templates/package.html.hbs"))?;
@@ -95,6 +132,8 @@ fn do_html_command(args: HtmlArgs) -> Result<()> {
 
     hb.register_helper("package_link", Box::new(package_link_helper));
     hb.register_helper("content_link", Box::new(content_link_helper));
+    hb.register_helper("capability_str", Box::new(capability_str));
+    hb.register_helper("capability_target_list", Box::new(capability_target_list));
 
     render_page(
         &hb,
@@ -109,49 +148,61 @@ fn do_html_command(args: HtmlArgs) -> Result<()> {
 
     *RENDER_PATH.lock().unwrap() = "../".to_string();
     std::fs::create_dir_all(args.output.join("packages"))?;
-    for item in input.packages.iter() {
-        let body_content = hb.render("package", &item).context("rendering package")?;
+    input
+        .packages
+        .par_iter()
+        .map(|(package_name, package)| -> Result<()> {
+            let data = (package_name, package, &input.protocol_to_client);
+            let body_content = hb.render("package", &data).context("rendering package")?;
 
-        render_page(
-            &hb,
-            BaseTemplateArgs {
-                page_title: &format!("Package: {}", item.0),
-                css_path: "../style.css",
-                root_link: "../",
-                body_content: &body_content,
-            },
-            args.output
-                .join("packages")
-                .join(format!("{}.html", simplify_name_for_linking(item.0))),
-        )?;
-    }
+            render_page(
+                &hb,
+                BaseTemplateArgs {
+                    page_title: &format!("Package: {package_name}"),
+                    css_path: "../style.css",
+                    root_link: "../",
+                    body_content: &body_content,
+                },
+                args.output
+                    .join("packages")
+                    .join(format!("{}.html", simplify_name_for_linking(&package_name.to_string()))),
+            )?;
+            Ok(())
+        })
+        .collect::<Result<Vec<_>>>()?;
     std::fs::create_dir_all(args.output.join("contents"))?;
-    for item in input.contents.iter() {
-        let mut file_names = match item.1 {
-            FileInfo::Elf(elf) => elf
-                .source_file_references
-                .iter()
-                .map(|idx| input.file_names[idx].as_str())
-                .collect::<Vec<&str>>(),
-            _ => vec![],
-        };
-        file_names.sort();
+    input
+        .contents
+        .par_iter()
+        .map(|item| -> Result<()> {
+            let mut files = match item.1 {
+                FileInfo::Elf(elf) => elf
+                    .source_file_references
+                    .iter()
+                    .map(|idx| input.files[idx].source_path.clone())
+                    .collect::<Vec<_>>(),
+                _ => vec![],
+            };
+            files.sort();
 
-        let with_files = (item.0, item.1, file_names);
-        let body_content = hb.render("content", &with_files).context("rendering content")?;
-        render_page(
-            &hb,
-            BaseTemplateArgs {
-                page_title: &format!("File content: {}", item.0),
-                css_path: "../style.css",
-                root_link: "../",
-                body_content: &body_content,
-            },
-            args.output
-                .join("contents")
-                .join(format!("{}.html", simplify_name_for_linking(item.0))),
-        )?;
-    }
+            let with_files = (item.0, item.1, files);
+            let body_content = hb.render("content", &with_files).context("rendering content")?;
+            render_page(
+                &hb,
+                BaseTemplateArgs {
+                    page_title: &format!("File content: {}", item.0),
+                    css_path: "../style.css",
+                    root_link: "../",
+                    body_content: &body_content,
+                },
+                args.output
+                    .join("contents")
+                    .join(format!("{}.html", simplify_name_for_linking(item.0))),
+            )?;
+            Ok(())
+        })
+        .collect::<Result<Vec<_>>>()?;
+
     *RENDER_PATH.lock().unwrap() = "".to_string();
 
     File::create(args.output.join("style.css"))
@@ -225,13 +276,16 @@ fn package_link_helper(
     } else {
         return Err(RenderError::new("Helper requires one param"));
     };
+    out.write(&package_page_url(input_name))?;
+    Ok(())
+}
 
-    out.write(&format!(
+fn package_page_url(package_name: impl AsRef<str>) -> String {
+    format!(
         "{}packages/{}.html",
         *RENDER_PATH.lock().unwrap(),
-        simplify_name_for_linking(input_name)
-    ))?;
-    Ok(())
+        simplify_name_for_linking(package_name.as_ref())
+    )
 }
 
 fn content_link_helper(
@@ -303,6 +357,23 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         duration
     );
 
+    let mut debug_mode = false;
+    if let Some(search) = args.debug_manifest_filter {
+        debug_mode = true;
+        manifests =
+            manifests.into_iter().filter(|v| v.to_string_lossy().contains(&search)).collect();
+    }
+    if let Some(limit) = args.debug_manifest_limit {
+        debug_mode = true;
+        manifests = manifests.into_iter().take(limit).collect();
+    }
+    if args.debug_no_parallel {
+        ThreadPoolBuilder::new().num_threads(1).build_global().expect("make thread pool");
+    }
+    if debug_mode {
+        println!("Filtered down to {} manifests", manifests.len());
+    }
+
     let get_content_file_path = |relative_path: &str, source_file_path: &Path| {
         let filepath = path.join(relative_path);
         if filepath.exists() {
@@ -332,7 +403,15 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     let names = Mutex::new(HashMap::new());
     let content_hash_to_path = Mutex::new(HashMap::new());
     let start = Instant::now();
+
     manifests.par_iter().for_each(|manifest_path| {
+        let span = span!(
+            Level::DEBUG,
+            "processing manifest",
+            path = manifest_path.to_string_lossy().to_string()
+        );
+        let _enter = span.enter();
+        debug!("Starting");
         manifest_count.fetch_add(1, Ordering::Relaxed);
         macro_rules! do_on_error {
             ($val:expr, $step:expr, $error_counter:expr, $do:expr) => {
@@ -340,6 +419,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                     Ok(v) => v,
                     Err(e) => {
                         $error_counter.fetch_add(1, Ordering::Relaxed);
+                        debug!(status = "Failed", step = $step);
                         eprintln!(
                             "[{}] Failed {}: {:?}",
                             manifest_path.to_string_lossy(),
@@ -355,6 +435,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                     Ok(v) => v,
                     Err(e) => {
                         $error_counter.fetch_add(1, Ordering::Relaxed);
+                        debug!(status = "Failed", step = $step);
                         eprintln!(
                             "[{}] Failed {} for {}: {:?}",
                             manifest_path.to_string_lossy(),
@@ -387,7 +468,11 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                 }
             };
 
+        debug!("Loaded");
+
         let mut contents = PackageContents::default();
+
+        debug!("Have {} blobs", manifest.blobs().len());
 
         for blob in manifest.blobs() {
             if blob.path == "meta/" {
@@ -408,14 +493,23 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                 );
 
                 let mut manifest_paths = vec![];
+                debug!("Loaded manifest, have {} entries", reader.list().len());
                 for entry in reader.list() {
                     let path = String::from_utf8_lossy(entry.path());
                     if path.ends_with(".cm") {
+                        debug!("Found a component manifest, {}", path);
                         manifest_paths.push(entry.path().to_owned());
                     }
                 }
 
                 for manifest_path in manifest_paths {
+                    let span = span!(
+                        Level::DEBUG,
+                        "processing component",
+                        path = String::from_utf8_lossy(&manifest_path).to_string()
+                    );
+                    let _entry = span.enter();
+                    debug!("Starting");
                     let data = do_on_error!(
                         reader.read_file(&manifest_path),
                         "reading component manifest",
@@ -437,7 +531,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                             fdecl::Use::Protocol(p) => {
                                 let (name, from) = match (p.source_name, p.source) {
                                     (Some(s), Some(r)) => (s, r),
-                                    _ => break,
+                                    _ => continue,
                                 };
                                 match from {
                                     fdecl::Ref::Parent(_) => {
@@ -450,10 +544,15 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                                             .used_from_child
                                             .insert((Capability::Protocol(name), c.name));
                                     }
-                                    _ => break,
+                                    // TODO(fxbug.dev/347290357): Handle different types of refs
+                                    e => {
+                                        debug!("Unknown use from ref: {:?}", e);
+                                    }
                                 }
                             }
-                            _ => {
+                            // TODO(fxbug.dev/347290357): Handle different types of entries
+                            e => {
+                                debug!("Unknown use entry: {:?}", e)
                                 // Skip all else for now
                             }
                         }
@@ -463,7 +562,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                             fdecl::Expose::Protocol(p) => {
                                 let (name, from) = match (p.source_name, p.source) {
                                     (Some(s), Some(r)) => (s, r),
-                                    _ => break,
+                                    _ => continue,
                                 };
                                 match from {
                                     fdecl::Ref::Self_(_) => {
@@ -476,11 +575,35 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                                             .exposed_from_child
                                             .insert((Capability::Protocol(name), c.name));
                                     }
-                                    _ => break,
+                                    e => {
+                                        // TODO(fxbug.dev/347290357): Handle different types of refs
+                                        debug!("Unknown expose from ref: {:?}", e);
+                                    }
                                 }
                             }
-                            _ => {
+                            // TODO(fxbug.dev/347290357): Handle different types of entries
+                            e => {
+                                debug!("Unknown exposes entry: {:?}", e)
                                 // Skip all else for now
+                            }
+                        }
+                    }
+                    for cap in manifest.offers.into_iter().flatten() {
+                        if let fdecl::Offer::Protocol(p) = cap {
+                            if let (Some(name), Some(from)) = (p.source_name, p.source) {
+                                match from {
+                                    fdecl::Ref::Self_(_) => {
+                                        component
+                                            .offered_from_self
+                                            .insert(Capability::Protocol(name));
+                                    }
+                                    fdecl::Ref::Child(_) => {
+                                        // Do not handle yet
+                                    }
+                                    e => {
+                                        debug!("Unknown offer from ref: {:?}", e);
+                                    }
+                                }
                             }
                         }
                     }
@@ -510,7 +633,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                 });
             }
         }
-        names.lock().unwrap().insert(url.to_string(), contents);
+        names.lock().unwrap().insert(url, contents);
     });
     let file_infos = Mutex::new(HashMap::new());
     let elf_count = AtomicUsize::new(0);
@@ -523,9 +646,13 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     }
 
     content_hash_to_path.lock().unwrap().par_iter().for_each(|(hash, path)| {
+        let span = span!(Level::DEBUG, "processing blob", hash = hash, path = path);
+        let _entry = span.enter();
         if path.is_empty() {
+            debug!("Skipping, no path");
             return;
         }
+
         let path = PathBuf::from(path);
         let alt_path = path
             .parent()
@@ -540,8 +667,11 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             path
         };
 
+        debug!("Found canonical path at {}", path.to_string_lossy().to_string());
+
         let f = File::open(&path);
         if f.is_err() {
+            debug!("Path found");
             eprintln!("Failed to open {}, skipping: {:?}", path.to_string_lossy(), f.unwrap_err());
             return;
         }
@@ -551,6 +681,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         if f.read_exact(&mut header_buf).is_ok() && header_buf == [0x7fu8, 0x45u8, 0x4cu8, 0x46u8] {
             // process
             elf_count.fetch_add(1, Ordering::Relaxed);
+            debug!("Looks like ELF, dumping headers");
 
             let mut elf_contents = ElfContents::new(path.to_string_lossy().to_string());
             let proc = std::process::Command::new(&debugdump_path)
@@ -562,9 +693,11 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             let files = match output {
                 Ok(output) => {
                     if output.status != "OK".to_string() {
+                        debug!("Dumping failed, {}", output.error);
                         eprintln!("Debug info error: {}", output.error);
                         vec![]
                     } else {
+                        debug!("Dumping succeeded, found {} files", output.files.len());
                         output.files
                     }
                 }
@@ -578,6 +711,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             }
             file_infos.lock().unwrap().insert(hash.clone(), FileInfo::Elf(elf_contents));
         } else {
+            debug!("Looks like some other kind of file");
             file_infos.lock().unwrap().insert(
                 hash.clone(),
                 FileInfo::Other(OtherContents { source_path: path.to_string_lossy().to_string() }),
@@ -602,17 +736,33 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
 
     let start = Instant::now();
 
-    let packages = names.lock().unwrap().drain().collect::<BTreeMap<_, _>>();
+    let mut packages = names.lock().unwrap().drain().collect::<BTreeMap<_, _>>();
     let contents = file_infos.lock().unwrap().drain().collect::<BTreeMap<_, _>>();
-    let file_names = interner
+    let files = interner
         .intern_set
         .lock()
         .unwrap()
         .drain()
-        .map(|(k, v)| (v, k))
+        .map(|(k, v)| (v, FileMetadata { source_path: k }))
         .collect::<BTreeMap<_, _>>();
 
-    let output = OutputSummary { packages, contents, file_names };
+    // Populate a Protocol->(Package, component) client mapping.
+    let mut protocol_to_client: ProtocolToClientMap = HashMap::new();
+    for (url, package) in packages.iter_mut() {
+        for (component_name, component) in package.components.iter_mut() {
+            for Capability::Protocol(protocol) in component
+                .used_from_parent
+                .iter()
+                .chain(component.used_from_child.iter().map(|(c, _)| c))
+            {
+                let protocol_to_packages = protocol_to_client.entry(protocol.clone()).or_default();
+                let package_to_components = protocol_to_packages.entry(url.clone()).or_default();
+                package_to_components.insert(component_name.clone());
+            }
+        }
+    }
+
+    let output = OutputSummary { packages, contents, files, protocol_to_client };
 
     if let Some(out) = &args.out {
         let mut file = std::fs::File::create(out)?;
@@ -624,11 +774,19 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     Ok(())
 }
 
+type ProtocolToClientMap = HashMap<String, HashMap<UnpinnedAbsolutePackageUrl, HashSet<String>>>;
+
 #[derive(Serialize, Deserialize)]
 struct OutputSummary {
-    packages: BTreeMap<String, PackageContents>,
+    packages: BTreeMap<UnpinnedAbsolutePackageUrl, PackageContents>,
     contents: BTreeMap<String, FileInfo>,
-    file_names: BTreeMap<u32, String>,
+    files: BTreeMap<u32, FileMetadata>,
+    protocol_to_client: ProtocolToClientMap,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct FileMetadata {
+    source_path: String,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -651,6 +809,7 @@ struct PackageFile {
 struct ComponentContents {
     used_from_parent: HashSet<Capability>,
     used_from_child: HashSet<(Capability, String)>,
+    offered_from_self: HashSet<Capability>,
     exposed_from_self: HashSet<Capability>,
     exposed_from_child: HashSet<(Capability, String)>,
 }
@@ -659,8 +818,14 @@ struct ComponentContents {
 enum Capability {
     #[serde(rename = "protocol")]
     Protocol(String),
-    #[serde(rename = "directory")]
-    Directory(String),
+}
+
+impl std::fmt::Display for Capability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Protocol(s) => write!(f, "{s}"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

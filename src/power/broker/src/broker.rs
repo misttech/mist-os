@@ -22,9 +22,6 @@ use uuid::Uuid;
 use crate::credentials::*;
 use crate::topology::*;
 
-/// If true, use non-random IDs for ease of debugging.
-const ID_DEBUG_MODE: bool = false;
-
 /// Max value for inspect event history.
 const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 512;
 
@@ -111,7 +108,7 @@ impl Broker {
         }
     }
 
-    fn lookup_credentials(&self, token: Token) -> Option<Credential> {
+    fn lookup_credentials(&self, token: &Token) -> Option<Credential> {
         self.credentials.lookup(token)
     }
 
@@ -161,7 +158,7 @@ impl Broker {
         element_id: &ElementID,
         token: Token,
     ) -> Result<(), UnregisterDependencyTokenError> {
-        let Some(credential) = self.lookup_credentials(token) else {
+        let Some(credential) = self.lookup_credentials(&token) else {
             tracing::debug!("unregister_dependency_token: token not found");
             return Err(UnregisterDependencyTokenError::NotFound);
         };
@@ -192,6 +189,9 @@ impl Broker {
         if prev_level.is_none() || prev_level.unwrap() < level {
             // The level was increased, look for activated assertive or pending
             // opportunistic claims that are newly satisfied by the new current level:
+            tracing::debug!(
+                "update_current_level({element_id}): level increased from {prev_level:?} to {level:?}"
+            );
             let claims_for_required_element: Vec<Claim> = self
                 .catalog
                 .assertive_claims
@@ -268,22 +268,25 @@ impl Broker {
             // become contingent or dropped and see if any of these claims no
             // longer have any dependents and thus can be deactivated or
             // dropped.
-            let assertive_claims_to_deactivate = self
+            tracing::debug!(
+                "update_current_level({element_id}): level decreased from {prev_level:?} to {level:?}"
+            );
+            let assertive_claims_marked_to_deactivate = self
                 .catalog
                 .assertive_claims
                 .activated
                 .marked_to_deactivate_for_element(element_id);
-            let assertive_claims_to_drop =
-                self.find_claims_with_no_dependents(&assertive_claims_to_deactivate);
-            let opportunistic_claims_to_deactivate = self
+            let assertive_claims_with_no_dependents =
+                self.find_claims_with_no_dependents(&assertive_claims_marked_to_deactivate);
+            let opportunistic_claims_marked_to_deactivate = self
                 .catalog
                 .opportunistic_claims
                 .activated
                 .marked_to_deactivate_for_element(element_id);
-            let opportunistic_claims_to_drop =
-                self.find_claims_with_no_dependents(&opportunistic_claims_to_deactivate);
-            self.drop_or_deactivate_assertive_claims(&assertive_claims_to_drop);
-            self.drop_or_deactivate_opportunistic_claims(&opportunistic_claims_to_drop);
+            let opportunistic_claims_with_no_dependents =
+                self.find_claims_with_no_dependents(&opportunistic_claims_marked_to_deactivate);
+            self.drop_or_deactivate_assertive_claims(&assertive_claims_with_no_dependents);
+            self.drop_or_deactivate_opportunistic_claims(&opportunistic_claims_with_no_dependents);
         }
     }
 
@@ -401,21 +404,24 @@ impl Broker {
                 "check if assertive claim {assertive_claim} would satisfy opportunistic claims"
             );
             let assertive_claim_requires = &assertive_claim.requires().clone();
-            let opportunistic_claims_for_req_element = self
+            let opportunistic_pending_claims_for_req_element = self
                 .catalog
                 .opportunistic_claims
                 .pending
                 .for_required_element(&assertive_claim_requires.element_id);
-            tracing::debug!(
-                "opportunistic_claims_for_req_element[{}]",
-                opportunistic_claims_for_req_element.iter().join(", ")
-            );
-            let opportunistic_claims_possibly_affected = opportunistic_claims_for_req_element
-                .iter()
-                // Only consider claims for leases other than assertive_claim's
-                .filter(|c| c.lease_id != lease.id)
-                // Only consider opportunistic claims that would be satisfied by assertive_claim
-                .filter(|c| assertive_claim_requires.level.satisfies(c.requires().level));
+            let opportunistic_activated_claims_for_req_element = self
+                .catalog
+                .opportunistic_claims
+                .activated
+                .for_required_element(&assertive_claim_requires.element_id);
+            let opportunistic_claims_possibly_affected =
+                opportunistic_pending_claims_for_req_element
+                    .iter()
+                    .chain(opportunistic_activated_claims_for_req_element.iter())
+                    // Only consider claims for leases other than active_claim's
+                    .filter(|c| c.lease_id != lease.id)
+                    // Only consider opportunistic claims that would be satisfied by assertive_claim
+                    .filter(|c| assertive_claim_requires.level.satisfies(c.requires().level));
             for opportunistic_claim in opportunistic_claims_possibly_affected {
                 tracing::debug!(
                     "assertive claim {assertive_claim} may have changed status of lease {}",
@@ -435,6 +441,7 @@ impl Broker {
 
     /// Runs when a lease becomes no longer contingent.
     fn on_lease_transition_to_noncontingent(&mut self, lease_id: &LeaseID) {
+        tracing::debug!("on_lease_transition_to_noncontingent({lease_id})");
         // Reset any assertive or opportunistic claims that were previously marked to
         // deactivate. Since they weren't already deactivated, they must
         // already be currently satisfied.
@@ -561,14 +568,23 @@ impl Broker {
             // LeaseStatus was not changed.
             return None;
         };
-        // The lease_status changed, update the required level of the leased
-        // element.
+
+        // The lease_status changed, update the required level of the leased element.
         if let Some(lease) = self.catalog.leases.get(lease_id) {
-            self.update_required_levels(&vec![&lease.element_id.clone()]);
+            let elem_id = lease.element_id.clone();
+            let lease_id = lease.id.clone();
+            self.update_required_levels(&vec![&elem_id]);
+            if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(&elem_id) {
+                elem_inspect
+                    .borrow_mut()
+                    .meta()
+                    .set_and_track(format!("lease_status_{lease_id}"), format!("{status:?}"));
+            }
         } else {
             tracing::warn!("update_lease_status: lease {lease_id} not found");
         }
         tracing::debug!("update_lease_status({lease_id}) to {status:?}");
+
         // Lease has transitioned from satisfied to pending and contingent.
         if prev_status.as_ref() == Some(&LeaseStatus::Satisfied)
             && status == LeaseStatus::Pending
@@ -577,7 +593,7 @@ impl Broker {
             // Mark all activated claims of this lease to be deactivated once
             // they are no longer in use.
             tracing::debug!(
-                "drop(lease:{lease_id}): marking activated assertive claims to deactivate"
+                "update_lease_status({lease_id}): marking activated assertive claims to deactivate"
             );
             let assertive_claims_to_deactivate =
                 self.catalog.assertive_claims.activated.mark_to_deactivate(&lease_id);
@@ -585,7 +601,7 @@ impl Broker {
                 &assertive_claims_to_deactivate,
             ));
             tracing::debug!(
-                "drop(lease:{lease_id}): marking activated opportunistic claims to deactivate"
+                "update_lease_status({lease_id}): marking activated opportunistic claims to deactivate"
             );
             let opportunistic_claims_to_deactivate =
                 self.catalog.opportunistic_claims.activated.mark_to_deactivate(&lease_id);
@@ -816,18 +832,30 @@ impl Broker {
         let initial_current_level = self
             .catalog
             .topology
-            .get_level_index(&id, initial_current_level)
+            .get_level_index(&id, &initial_current_level)
             .ok_or(AddElementError::Invalid)?;
         self.update_current_level_internal(&id, *initial_current_level);
         let minimum_level = self.catalog.topology.minimum_level(&id);
         self.update_required_level(&id, minimum_level);
         for dependency in level_dependencies {
+            let requires_token = dependency.requires_token.into();
+            let Some(requires_cred) = self.lookup_credentials(&requires_token) else {
+                // Clean up by removing the element we just added.
+                self.remove_element(&id);
+                return Err(AddElementError::NotAuthorized);
+            };
+            let requires_element_id = requires_cred.get_element();
+            let requires_level = dependency
+                .requires_level_by_preference
+                .iter()
+                .find_map(|l| self.get_level_index(&requires_element_id, &l))
+                .ok_or(AddElementError::Invalid)?;
             if let Err(err) = self.add_dependency(
                 &id,
                 dependency.dependency_type,
                 dependency.dependent_level,
-                dependency.requires_token.into(),
-                dependency.requires_level,
+                requires_token,
+                requires_level.level,
             ) {
                 // Clean up by removing the element we just added.
                 self.remove_element(&id);
@@ -885,7 +913,7 @@ impl Broker {
     pub fn get_level_index(
         &self,
         element_id: &ElementID,
-        level: fpb::PowerLevel,
+        level: &fpb::PowerLevel,
     ) -> Option<&IndexedPowerLevel> {
         self.catalog.topology.get_level_index(element_id, level)
     }
@@ -900,18 +928,18 @@ impl Broker {
         requires_token: Token,
         requires_level: fpb::PowerLevel,
     ) -> Result<(), ModifyDependencyError> {
-        let Some(requires_cred) = self.lookup_credentials(requires_token) else {
+        let Some(requires_cred) = self.lookup_credentials(&requires_token) else {
             return Err(ModifyDependencyError::NotAuthorized);
         };
         let dependent_level = self
             .catalog
             .topology
-            .get_level_index(&element_id, dependent_level)
+            .get_level_index(&element_id, &dependent_level)
             .ok_or(ModifyDependencyError::Invalid)?;
         let requires_level = self
             .catalog
             .topology
-            .get_level_index(requires_cred.get_element(), requires_level)
+            .get_level_index(requires_cred.get_element(), &requires_level)
             .ok_or(ModifyDependencyError::Invalid)?;
         let dependency = Dependency {
             dependent: ElementLevel { element_id: element_id.clone(), level: *dependent_level },
@@ -1150,10 +1178,11 @@ impl Catalog {
         // TODO: Add lease validation and control.
         let lease = Lease::new(&element_id, level);
         if let Ok(elem_inspect) = self.topology.inspect_for_element(element_id) {
-            elem_inspect
-                .borrow_mut()
-                .meta()
-                .set(format!("lease_{}", lease.id.clone()), format!("level_{}", level));
+            let elem_readable_name = self.topology.element_name(element_id);
+            elem_inspect.borrow_mut().meta().set_and_track(
+                format!("lease_{}", lease.id),
+                format!("level_{level}@{elem_readable_name}"), // for example, level_1@elem_name
+            );
         }
         self.leases.insert(lease.id.clone(), lease.clone());
         let element_level = ElementLevel { element_id: element_id.clone(), level: level.clone() };
@@ -1189,7 +1218,13 @@ impl Catalog {
         let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
         self.lease_status.remove(lease_id);
         if let Ok(elem_inspect) = self.topology.inspect_for_element(&lease.element_id) {
-            elem_inspect.borrow_mut().meta().remove(format!("lease_{}", lease.id.clone()).as_str());
+            elem_inspect
+                .borrow_mut()
+                .meta()
+                .remove_and_track(format!("lease_{}", lease.id).as_str());
+            elem_inspect.borrow_mut().meta().remove(format!("lease_status_{}", lease.id).as_str());
+            // lease_ drop events are useful as part of understanding lifecycle.
+            // lease_status_ drop events are redundant with lease_ drops, so we don't record them.
         }
         tracing::debug!("dropping lease({:?})", &lease);
         // Pending claims should be dropped immediately.
@@ -1335,9 +1370,10 @@ impl ClaimLookup {
     }
 
     fn remove_from_claims_to_deactivate(&mut self, id: &ClaimID) {
-        let Some(claim) = self.claims.remove(id) else {
+        let Some(claim) = self.claims.get(id) else {
             return;
         };
+        tracing::debug!("remove_from_claims_to_deactivate: {claim}");
         if let Some(claim_ids) =
             self.claims_to_deactivate_by_element_id.get_mut(&claim.dependent().element_id)
         {
@@ -1540,12 +1576,31 @@ mod tests {
 
     #[track_caller]
     fn assert_lease_cleaned_up(catalog: &Catalog, lease_id: &LeaseID) {
-        assert!(!catalog.leases.contains_key(lease_id));
-        assert!(catalog.lease_status.get(lease_id).is_none());
-        assert!(catalog.assertive_claims.activated.for_lease(lease_id).is_empty());
-        assert!(catalog.assertive_claims.pending.for_lease(lease_id).is_empty());
-        assert!(catalog.opportunistic_claims.activated.for_lease(lease_id).is_empty());
-        assert!(catalog.opportunistic_claims.pending.for_lease(lease_id).is_empty());
+        assert!(!catalog.leases.contains_key(lease_id), "{lease_id} still in catalog.leases");
+        assert!(
+            catalog.lease_status.get(lease_id).is_none(),
+            "{lease_id} still in catalog.lease_status"
+        );
+        assert_eq!(
+            catalog.assertive_claims.activated.for_lease(lease_id),
+            vec![],
+            "assertive_claims.activated not empty"
+        );
+        assert_eq!(
+            catalog.assertive_claims.pending.for_lease(lease_id),
+            vec![],
+            "assertive_claims.pending not empty"
+        );
+        assert_eq!(
+            catalog.opportunistic_claims.activated.for_lease(lease_id),
+            vec![],
+            "opportunistic_claims.activated not empty"
+        );
+        assert_eq!(
+            catalog.opportunistic_claims.pending.for_lease(lease_id),
+            vec![],
+            "opportunistic_claims.pending not empty"
+        );
     }
 
     #[fuchsia::test]
@@ -1870,38 +1925,38 @@ mod tests {
                                 relationships: {},
                             },
                         },
-                        "events": {
+                        events: {
                             "0": {
                                 "@time": AnyProperty,
-                                "vertex_id": broker.get_unsatisfiable_element_id().to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "1": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: latinum.to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "2": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": 7u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: 7u64,
                             },
                             "3": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": 5u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: 5u64,
                             },
                         },
         }}}});
@@ -1955,52 +2010,52 @@ mod tests {
                                 relationships: {},
                             },
                         },
-                        "events": {
+                        events: {
                             "0": {
                                 "@time": AnyProperty,
-                                "vertex_id": broker.get_unsatisfiable_element_id().to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "1": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: latinum.to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "2": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": 2u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: 2u64,
                             },
                             "3": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": 0u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: 0u64,
                             },
                             "4": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": 1u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: 1u64,
                             },
                             "5": {
                                 "@time": AnyProperty,
-                                "vertex_id": latinum.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": 1u64,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: 1u64,
                             },
                         },
         }}}});
@@ -2068,7 +2123,7 @@ mod tests {
                 requires_token: never_registered_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed"),
-                requires_level: ON.level,
+                requires_level_by_preference: vec![ON.level],
             }],
             vec![],
             vec![],
@@ -2087,7 +2142,7 @@ mod tests {
                     requires_token: token_mithril
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -2154,7 +2209,7 @@ mod tests {
                     requires_token: token_mithril
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -2204,38 +2259,38 @@ mod tests {
                                 relationships: {},
                             },
                         },
-                        "events": {
+                        events: {
                             "0": {
                                 "@time": AnyProperty,
-                                "vertex_id": broker.get_unsatisfiable_element_id().to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "1": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: unobtanium.to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "2": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": OFF.level as u64,
+                                vertex_id: unobtanium.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: OFF.level as u64,
                             },
                             "3": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": OFF.level as u64,
+                                vertex_id: unobtanium.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: OFF.level as u64,
                             },
                         },
                     },
@@ -2259,43 +2314,43 @@ mod tests {
                                 relationships: {}
                             },
                         },
-                        "events": {
+                        events: {
                             "0": {
                                 "@time": AnyProperty,
-                                "vertex_id": broker.get_unsatisfiable_element_id().to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: broker.get_unsatisfiable_element_id().to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "1": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "add_vertex",
-                                "meta": {
-                                    "current_level": "unset",
-                                    "required_level": "unset",
+                                vertex_id: unobtanium.to_string(),
+                                event: "add_vertex",
+                                meta: {
+                                    current_level: "unset",
+                                    required_level: "unset",
                                 },
                             },
                             "2": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "update_key",
-                                "key": "current_level",
-                                "update": OFF.level as u64,
+                                vertex_id: unobtanium.to_string(),
+                                event: "update_key",
+                                key: "current_level",
+                                update: OFF.level as u64,
                             },
                             "3": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "update_key",
-                                "key": "required_level",
-                                "update": OFF.level as u64,
+                                vertex_id: unobtanium.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: OFF.level as u64,
                             },
                             "4": {
                                 "@time": AnyProperty,
-                                "vertex_id": unobtanium.to_string(),
-                                "event": "remove_vertex",
+                                vertex_id: unobtanium.to_string(),
+                                event: "remove_vertex",
                             },
                         },
         }}}});
@@ -2421,7 +2476,7 @@ mod tests {
                         requires_token: parent1_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: ON.level,
+                        requires_level_by_preference: vec![ON.level],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -2429,7 +2484,7 @@ mod tests {
                         requires_token: parent2_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: ON.level,
+                        requires_level_by_preference: vec![ON.level],
                     },
                 ],
                 vec![],
@@ -2498,7 +2553,7 @@ mod tests {
                                 },
                             },
                         },
-                        "events": contains {},
+                        events: contains {},
                     },
         }}});
 
@@ -2567,7 +2622,8 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}", lease.id.clone()) => "level_1",
+                                    format!("lease_{}", lease.id) => "level_1@C",
+                                    format!("lease_status_{}", lease.id) => "Satisfied",
                                 },
                                 relationships: {
                                     parent1.to_string() => {
@@ -2581,8 +2637,31 @@ mod tests {
                                 },
                             },
                         },
-                        "events": contains {},
-        }}}});
+                        events: contains {
+                            "14": {
+                                "@time": AnyProperty,
+                                event: "update_key",
+                                key: format!("lease_{}", lease.id),
+                                update: "level_1@C",
+                                vertex_id: child.to_string()
+                            },
+                            "17": {
+                                "@time": AnyProperty,
+                                event: "update_key",
+                                key: format!("lease_status_{}", lease.id),
+                                update: "Pending",
+                                vertex_id: child.to_string()
+                            },
+                            "21": {
+                                "@time": AnyProperty,
+                                event: "update_key",
+                                key: format!("lease_status_{}", lease.id),
+                                update: "Satisfied",
+                                vertex_id: child.to_string()
+                            }
+                        },
+                    },
+        }}});
 
         // Update Child's current level to ON.
         broker.update_current_level(&child, ON);
@@ -2654,7 +2733,7 @@ mod tests {
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -2778,7 +2857,7 @@ mod tests {
                         requires_token: grandparent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: 200,
+                        requires_level_by_preference: vec![200],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -2786,7 +2865,7 @@ mod tests {
                         requires_token: grandparent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: 90,
+                        requires_level_by_preference: vec![90],
                     },
                 ],
                 vec![parent_token
@@ -2807,7 +2886,7 @@ mod tests {
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: 50,
+                    requires_level_by_preference: vec![50],
                 }],
                 vec![],
                 vec![],
@@ -2824,7 +2903,7 @@ mod tests {
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: 30,
+                    requires_level_by_preference: vec![30],
                 }],
                 vec![],
                 vec![],
@@ -3099,7 +3178,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -3117,7 +3196,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -3210,7 +3289,8 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}", lease_b_id.clone()) => "level_1",
+                                    format!("lease_{}", lease_b_id) => "level_1@B",
+                                    format!("lease_status_{}", lease_b_id) => "Satisfied",
                                 },
                                 relationships: {
                                     element_a.to_string() => {
@@ -3225,7 +3305,8 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: OFF.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}", lease_c_id.clone()) => "level_1",
+                                    format!("lease_{}", lease_c_id) => "level_1@C",
+                                    format!("lease_status_{}", lease_c_id) => "Satisfied",
                                 },
                                 relationships: {
                                     element_a.to_string() => {
@@ -3368,7 +3449,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -3386,7 +3467,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -3493,7 +3574,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -3511,7 +3592,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -3648,7 +3729,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -3685,7 +3766,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: ON.level,
+                        requires_level_by_preference: vec![ON.level],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Passive,
@@ -3694,7 +3775,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: ON.level,
+                        requires_level_by_preference: vec![ON.level],
                     },
                 ],
                 vec![],
@@ -3713,7 +3794,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -3896,7 +3977,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -3914,7 +3995,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -4071,7 +4152,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -4089,7 +4170,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -4310,7 +4391,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: 3,
+                    requires_level_by_preference: vec![3],
                 }],
                 vec![],
                 vec![],
@@ -4328,7 +4409,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: 2,
+                    requires_level_by_preference: vec![2],
                 }],
                 vec![],
                 vec![],
@@ -4346,7 +4427,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: 1,
+                    requires_level_by_preference: vec![1],
                 }],
                 vec![],
                 vec![],
@@ -4557,7 +4638,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 1,
+                        requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -4566,7 +4647,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 2,
+                        requires_level_by_preference: vec![2],
                     },
                 ],
                 vec![],
@@ -4585,7 +4666,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: 2,
+                    requires_level_by_preference: vec![2],
                 }],
                 vec![],
                 vec![],
@@ -4784,7 +4865,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -4817,7 +4898,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: ON.level,
+                        requires_level_by_preference: vec![ON.level],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -4826,7 +4907,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: ON.level,
+                        requires_level_by_preference: vec![ON.level],
                     },
                 ],
                 vec![],
@@ -5015,7 +5096,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![token_b_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5037,7 +5118,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: ON.level,
+                        requires_level_by_preference: vec![ON.level],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Passive,
@@ -5046,7 +5127,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: ON.level,
+                        requires_level_by_preference: vec![ON.level],
                     },
                 ],
                 vec![],
@@ -5065,7 +5146,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -5249,7 +5330,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![token_b_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5274,7 +5355,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![token_c_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5295,7 +5376,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -5313,7 +5394,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -5516,7 +5597,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 1,
+                        requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -5525,7 +5606,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 1,
+                        requires_level_by_preference: vec![1],
                     },
                 ],
                 vec![],
@@ -5665,7 +5746,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 1,
+                        requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Passive,
@@ -5674,7 +5755,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 1,
+                        requires_level_by_preference: vec![1],
                     },
                 ],
                 vec![token_d_assertive
@@ -5712,7 +5793,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: 1,
+                    requires_level_by_preference: vec![1],
                 }],
                 vec![],
                 vec![],
@@ -5731,7 +5812,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 1,
+                        requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Passive,
@@ -5740,7 +5821,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 1,
+                        requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -5749,7 +5830,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 2,
+                        requires_level_by_preference: vec![2],
                     },
                 ],
                 vec![],
@@ -5981,7 +6062,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: 1,
+                    requires_level_by_preference: vec![1],
                 }],
                 vec![token_b_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6006,7 +6087,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 1,
+                        requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -6015,7 +6096,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 2,
+                        requires_level_by_preference: vec![2],
                     },
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -6024,7 +6105,7 @@ mod tests {
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed")
                             .into(),
-                        requires_level: 2,
+                        requires_level_by_preference: vec![2],
                     },
                 ],
                 vec![],
@@ -6103,6 +6184,231 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_lease_noncontingent_to_contingent() {
+        // Tests that when a supportive lease is dropped, a lease that
+        // was noncontingent is correctly identified and made contingent.
+        // Found in https://fxbug.dev/342205990 as an interaction between
+        // Storage's Hardware (HW) and Wake-on-request (WOR) elements, and
+        // System Activity Governor's Wake Handling (WH) and Execution State
+        // elements.
+        // HW has a passive dep on Execution State: Wake Handling (1)
+        // WOR has an active dep on Wake Handling: Active, which has an active dep on ES: WH
+        // A persistent lease is held on HW that should be activated whenever ES is at WH or higher.
+        // HW -> ES(WH)
+        // WOR => WH(A)
+        // WH(A) => ES(WH)
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+        let token_sag_es_active = DependencyToken::create();
+        let token_sag_es_passive = DependencyToken::create();
+        let sag_es = broker
+            .add_element(
+                "SAG Execution State",
+                OFF.level,
+                vec![0, 1, 2],
+                vec![],
+                vec![token_sag_es_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_sag_es_passive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let token_sag_wh_active = DependencyToken::create();
+        let sag_wh = broker
+            .add_element(
+                "SAG Wake Handling",
+                OFF.level,
+                vec![0, 1],
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: ON.level,
+                    requires_token: token_sag_es_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level_by_preference: vec![ON.level],
+                }],
+                vec![token_sag_wh_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![],
+            )
+            .expect("add_element failed");
+        let storage_hw = broker
+            .add_element(
+                "Storage Hardware",
+                OFF.level,
+                vec![0, 1],
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Passive,
+                    dependent_level: ON.level,
+                    requires_token: token_sag_es_passive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level_by_preference: vec![ON.level],
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let storage_wor = broker
+            .add_element(
+                "Storage Wake on Request",
+                OFF.level,
+                vec![0, 1],
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: ON.level,
+                    requires_token: token_sag_wh_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level_by_preference: vec![ON.level],
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let mut required_levels = RequiredLevelMatcher::new();
+
+        // Initial required level for all elements should be OFF.
+        // Set all current levels to OFF.
+        required_levels.update(&sag_es, OFF);
+        required_levels.update(&sag_wh, OFF);
+        required_levels.update(&storage_hw, OFF);
+        required_levels.update(&storage_wor, OFF);
+        required_levels.assert_matches(&broker);
+        broker.update_current_level(&sag_es, OFF);
+        broker.update_current_level(&sag_wh, OFF);
+        broker.update_current_level(&storage_hw, OFF);
+        broker.update_current_level(&storage_wor, OFF);
+
+        // Create Persistent Lease for HW.
+        let lease_hw = broker.acquire_lease(&storage_hw, ON).expect("acquire failed");
+        let lease_hw_id = lease_hw.id.clone();
+        // Required levels should not have changed.
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        // Lease is contingent on the opportunistic dependency on ES(WH).
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Create Lease for WOR.
+        let lease_wor1 = broker.acquire_lease(&storage_wor, ON).expect("acquire failed");
+        let lease_wor1_id = lease_wor1.id.clone();
+        required_levels.update(&sag_es, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        // Lease is no longer contingent because the opportunistic dependency
+        // on ES(WH) is supported by WH's assertive dependency.
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), false);
+        assert_eq!(broker.get_lease_status(&lease_wor1.id), Some(LeaseStatus::Pending));
+
+        // Update Execution State to ON
+        // Persistent Lease for HW should become satisfied.
+        broker.update_current_level(&sag_es, ON);
+        required_levels.update(&sag_wh, ON);
+        required_levels.update(&storage_hw, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), false);
+        assert_eq!(broker.get_lease_status(&lease_wor1.id), Some(LeaseStatus::Pending));
+
+        // Update SAG: Wake Handling to ON
+        // Lease WOR should become satisfied.
+        broker.update_current_level(&sag_wh, ON);
+        required_levels.update(&storage_wor, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_wor1.id), Some(LeaseStatus::Satisfied));
+
+        // Drop Lease on WOR.
+        broker.drop_lease(&lease_wor1.id).expect("drop_lease failed");
+        required_levels.update(&storage_wor, OFF);
+        required_levels.update(&sag_wh, OFF);
+        // TODO(b/346331940): Storage HW should have RL OFF here
+        // required_levels.update(&storage_hw, OFF);
+        required_levels.assert_matches(&broker);
+        // TODO(b/346331940): Lease on HW should become Pending and Contingent here
+        // assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        // assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Power down Storage WOR.
+        broker.update_current_level(&storage_wor, OFF);
+        required_levels.assert_matches(&broker);
+
+        broker.update_current_level(&sag_wh, OFF);
+        // TODO(b/346331940): Storage HW should have become OFF above.
+        required_levels.update(&storage_hw, OFF);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Create new Lease for WOR.
+        // Persistent lease for Storage should immediately become satisfied
+        // since Execution State was already on.
+        let lease_wor2 = broker.acquire_lease(&storage_wor, ON).expect("acquire failed");
+        let lease_wor2_id = lease_wor2.id.clone();
+        required_levels.update(&sag_es, ON);
+        required_levels.update(&sag_wh, ON);
+        required_levels.update(&storage_hw, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), false);
+        assert_eq!(broker.get_lease_status(&lease_wor2.id), Some(LeaseStatus::Pending));
+
+        // Power up SAG: Wake Handling.
+        broker.update_current_level(&sag_wh, ON);
+        required_levels.update(&storage_wor, ON);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), false);
+        assert_eq!(broker.get_lease_status(&lease_wor2.id), Some(LeaseStatus::Satisfied));
+
+        // Drop second Lease on WOR.
+        broker.drop_lease(&lease_wor2.id).expect("drop_lease failed");
+        required_levels.update(&storage_wor, OFF);
+        required_levels.update(&sag_wh, OFF);
+        // TODO(b/346331940): Storage HW should have RL OFF here
+        // required_levels.update(&storage_hw, OFF);
+        required_levels.assert_matches(&broker);
+        // TODO(b/346331940): Lease on HW should become Pending and Contingent here
+        // assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        // assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Power down Storage WOR.
+        broker.update_current_level(&storage_wor, OFF);
+        required_levels.assert_matches(&broker);
+
+        broker.update_current_level(&sag_wh, OFF);
+        // TODO(b/346331940): Storage HW should have become OFF above.
+        required_levels.update(&storage_hw, OFF);
+        required_levels.assert_matches(&broker);
+        assert_eq!(broker.get_lease_status(&lease_hw.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.is_lease_contingent(&lease_hw.id), true);
+
+        // Drop lease on Storage HW
+        broker.drop_lease(&lease_hw.id).expect("drop_lease failed");
+        // TODO(b/346331940): SAG ES's RL should have become OFF above.
+        required_levels.update(&sag_es, OFF);
+        required_levels.assert_matches(&broker);
+
+        // Power down Execution State.
+        broker.update_current_level(&sag_es, OFF);
+        required_levels.assert_matches(&broker);
+
+        // Leases should be cleaned up.
+        assert_lease_cleaned_up(&broker.catalog, &lease_hw_id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_wor1_id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_wor2_id);
+    }
+
+    #[fuchsia::test]
     fn test_removing_element_permanently_prevents_lease_satisfaction() {
         // Tests that if element A depends on element B, and element B is removed, that new leases
         // on element A will never be satisfied.
@@ -6145,7 +6451,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -6163,7 +6469,7 @@ mod tests {
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
-                    requires_level: ON.level,
+                    requires_level_by_preference: vec![ON.level],
                 }],
                 vec![],
                 vec![],
@@ -6246,5 +6552,89 @@ mod tests {
         broker.drop_lease(&lease.id).expect("drop failed");
         broker_status.required_level.update(&element, ZERO);
         broker_status.assert_matches(&broker);
+    }
+
+    #[fuchsia::test]
+    fn test_add_element_dependency_list_of_levels() {
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+        let token_mithril = DependencyToken::create();
+        let mithril = broker
+            .add_element(
+                "Mithril",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![],
+                vec![token_mithril
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![],
+            )
+            .expect("add_element failed");
+        let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
+
+        // Add an element with a dependency with a list of requires_level_by_preference.
+        // The dependency should be taken on ON, because the other levels do not
+        // exist.
+        let silver = broker
+            .add_element(
+                "Silver",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: ON.level,
+                    requires_token: token_mithril
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    requires_level_by_preference: vec![40, 30, ON.level, 20],
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        assert_data_tree!(inspect, root: {
+            test: {
+                leases: {},
+                topology: {
+                    "fuchsia.inspect.Graph": {
+                        topology: {
+                            broker.get_unsatisfiable_element_id().to_string() => {
+                                meta: {
+                                    name: broker.get_unsatisfiable_element_name(),
+                                    valid_levels: broker.get_unsatisfiable_element_levels(),
+                                    required_level: "unset",
+                                    current_level: "unset",
+                                },
+                                relationships: {}
+                            },
+                            mithril.to_string() => {
+                                meta: {
+                                    name: "Mithril",
+                                    valid_levels: v01.clone(),
+                                    current_level: OFF.level as u64,
+                                    required_level: OFF.level as u64,
+                                },
+                                relationships: {},
+                            },
+                            silver.to_string() => {
+                                meta: {
+                                    name: "Silver",
+                                    valid_levels: v01.clone(),
+                                    current_level: OFF.level as u64,
+                                    required_level: OFF.level as u64,
+                                },
+                                relationships: {
+                                    mithril.to_string() => {
+                                        edge_id: AnyProperty,
+                                        meta: { "1": "1" },
+                                    },
+                                },
+                            },
+                        },
+                        "events": contains {},
+        }}}});
     }
 }

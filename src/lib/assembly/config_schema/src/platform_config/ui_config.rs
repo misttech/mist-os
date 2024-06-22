@@ -75,6 +75,10 @@ pub struct PlatformUiConfig {
     /// The constraints on the display mode refresh rate, in millihertz (10^-3 Hz).
     #[serde(default)]
     pub display_mode_refresh_rate_millihertz_range: UnsignedIntegerRangeInclusive,
+
+    // The constraints on the display mode
+    #[serde(default)]
+    pub display_mode: DisplayModeConfig,
 }
 
 impl Default for PlatformUiConfig {
@@ -95,6 +99,7 @@ impl Default for PlatformUiConfig {
             display_mode_horizontal_resolution_px_range: Default::default(),
             display_mode_vertical_resolution_px_range: Default::default(),
             display_mode_refresh_rate_millihertz_range: Default::default(),
+            display_mode: Default::default(),
         }
     }
 }
@@ -148,6 +153,22 @@ impl AsRef<str> for ViewingDistance {
             Self::Unknown => "unknown",
         }
     }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DisplayModeConfig {
+    /// The constraints on the display mode horizontal resolution, in pixels.
+    #[serde(default)]
+    pub horizontal_resolution_px_range: UnsignedIntegerRangeInclusive,
+
+    /// The constraints on the display mode vertical resolution, in pixels.
+    #[serde(default)]
+    pub vertical_resolution_px_range: UnsignedIntegerRangeInclusive,
+
+    /// The constraints on the display mode refresh rate, in millihertz (10^-3 Hz).
+    #[serde(default)]
+    pub refresh_rate_millihertz_range: UnsignedIntegerRangeInclusive,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]

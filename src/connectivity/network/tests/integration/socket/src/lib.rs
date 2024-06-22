@@ -1181,7 +1181,7 @@ async fn udp_send_msg_preflight_dad_failure<N: Netstack>(name: &str) {
 
     // Expect the netstack to send a DAD message, and simulate another node already
     // owning the address. Expect DAD to fail as a result.
-    ndp::expect_dad_neighbor_solicitation(&fake_ep).await;
+    let _: Vec<u8> = ndp::expect_dad_neighbor_solicitation(&fake_ep).await;
     ndp::fail_dad_with_na(&fake_ep).await;
     ndp::assert_dad_failed(state_stream).await;
 
@@ -3801,7 +3801,10 @@ impl MulticastTestIpExt for Ipv4 {
 impl MulticastTestIpExt for Ipv6 {
     const NETWORKS: [fnet::Subnet; 2] =
         [fidl_subnet!("2001:db8::1/64"), fidl_subnet!("2001:ac::1/64")];
-    const MCAST_ADDR: std::net::SocketAddr = std_socket_addr!("[FF00::1:2]:3513");
+
+    // Use site-local address to ensure that a global address is picked for
+    // the connection and not a link-local one.
+    const MCAST_ADDR: std::net::SocketAddr = std_socket_addr!("[FF05::1:2]:3513");
 }
 
 struct MulticastTestNetwork<'a> {
@@ -3940,14 +3943,6 @@ async fn multicast_loop<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
         )
         .await
         .expect("failed to create UDP socket");
-    if I::VERSION == IpVersion::V6 {
-        // TODO(https://fxbug.dev//346622422): NS3 may bind the socket to a
-        // link-local address. Bind the socket explicitly to workaround that
-        // issue. Remove when the bug is fixed.
-        send_socket
-            .bind(&std::net::SocketAddr::new(I::iface_ip(target_interface), 0).into())
-            .expect("failed to bind UDP socket");
-    }
 
     match I::VERSION {
         IpVersion::V4 => {

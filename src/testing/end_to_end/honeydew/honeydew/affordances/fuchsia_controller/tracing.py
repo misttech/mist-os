@@ -292,8 +292,9 @@ class Tracing(tracing.Tracing):
             for p in provider_stats:
                 if p.records_dropped < 0:
                     _LOGGER.warning(
-                        "%s records were dropped for %s!"
-                        % (p.records_dropped, p.name)
+                        "%s records were dropped for %s!",
+                        p.records_dropped,
+                        p.name,
                     )
 
         if drain_task is not None:

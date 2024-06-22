@@ -21,7 +21,7 @@ use net_types::ip::{
     GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
 use netemul::{InStack, InterfaceConfig};
-use netstack_testing_common::interfaces;
+use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::realms::{
     Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
 };
@@ -144,7 +144,6 @@ async fn resolve_route<N: Netstack>(name: &str) {
     let host_stack = &host_stack;
 
     let do_test = |gateway: fidl_fuchsia_net::IpAddress,
-                   unreachable_peer: fidl_fuchsia_net::IpAddress,
                    unspecified: fidl_fuchsia_net::IpAddress,
                    public_ip: fidl_fuchsia_net::IpAddress,
                    source_address: fidl_fuchsia_net::IpAddress| async move {
@@ -160,8 +159,6 @@ async fn resolve_route<N: Netstack>(name: &str) {
         // network.
         let resolved = resolve(routes, gateway).await;
         assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Direct(gateway_node.clone()));
-        // Fails if MAC unreachable.
-        resolve_fails(unreachable_peer).await;
         // Fails if route unreachable.
         resolve_fails(public_ip).await;
 
@@ -185,23 +182,19 @@ async fn resolve_route<N: Netstack>(name: &str) {
         assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Gateway(gateway_node));
     };
 
-    do_test(
-        GATEWAY_IP_V4.addr,
-        fidl_ip!("192.168.0.3"),
-        fidl_ip!("0.0.0.0"),
-        fidl_ip!("8.8.8.8"),
-        HOST_IP_V4.addr,
-    )
-    .await;
+    // Test the peer unreachable case before we apply NUD flake workaround.
+    resolve_fails(fidl_ip!("192.168.0.3")).await;
+    resolve_fails(fidl_ip!("3080::3")).await;
 
-    do_test(
-        GATEWAY_IP_V6.addr,
-        fidl_ip!("3080::3"),
-        fidl_ip!("::"),
-        fidl_ip!("2001:4860:4860::8888"),
-        HOST_IP_V6.addr,
-    )
-    .await;
+    // Apply NUD flake workaround to both nodes since we'll be resolving
+    // neighbors now.
+    gateway_ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
+    host_ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
+
+    do_test(GATEWAY_IP_V4.addr, fidl_ip!("0.0.0.0"), fidl_ip!("8.8.8.8"), HOST_IP_V4.addr).await;
+
+    do_test(GATEWAY_IP_V6.addr, fidl_ip!("::"), fidl_ip!("2001:4860:4860::8888"), HOST_IP_V6.addr)
+        .await;
 }
 
 #[netstack_test]

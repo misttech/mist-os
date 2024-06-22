@@ -27,7 +27,7 @@ zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
   return sample.time + timer_get_mono_ticks_offset();
 }
 
-zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
+zx_status_t platform_set_oneshot_timer(zx_ticks_t deadline) {
   return timer_set_oneshot_timer(deadline);
 }
 

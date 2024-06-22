@@ -104,7 +104,7 @@ type ExampleUnion = union {
   ASSERT_NE(example_child_protocol, nullptr);
   EXPECT_TRUE(example_child_protocol->attributes->Get("on_protocol"));
   EXPECT_TRUE(example_child_protocol->methods.front().attributes->Get("on_method"));
-  ASSERT_NE(example_child_protocol->methods.front().maybe_request.get(), nullptr);
+  ASSERT_NE(example_child_protocol->methods.front().maybe_request, nullptr);
 
   auto id = static_cast<const IdentifierType*>(
       example_child_protocol->methods.front().maybe_request->type);
@@ -692,10 +692,10 @@ protocol ExampleProtocol {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(AttributesTests, BadDuplicateAttributePlacement) {
+TEST(AttributesTests, BadAttributeOnTopLevelLayout) {
   TestLibrary library;
   library.AddFile("bad/fi-0023.noformat.test.fidl");
-  library.ExpectFail(ErrRedundantAttributePlacement);
+  library.ExpectFail(ErrAttributeInsideTypeDeclaration);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -705,8 +705,6 @@ library fidl.test;
 
 @foo
 type Foo = struct {};
-
-type Bar = @bar struct {};
 
 protocol MyProtocol {
   MyMethod(@baz struct {
@@ -719,10 +717,6 @@ protocol MyProtocol {
   auto foo = library.LookupStruct("Foo");
   ASSERT_NE(foo, nullptr);
   EXPECT_TRUE(foo->attributes->Get("foo"));
-
-  auto bar = library.LookupStruct("Bar");
-  ASSERT_NE(bar, nullptr);
-  EXPECT_TRUE(bar->attributes->Get("bar"));
 
   auto req = library.LookupStruct("MyProtocolMyMethodRequest");
   ASSERT_NE(req, nullptr);

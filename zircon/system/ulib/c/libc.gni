@@ -32,6 +32,51 @@ libc_testonly_configs = libc_configs + [ "$libc:testonly.config" ]
 # These additional configs are needed when compiling for the real libc.
 libc_configs += [ "$libc:llvm-libc-export.config" ]
 
+# These symbols are always allowed as undefined references in a
+# libc_source_set() using `basic_abi = true`.  The compiler generates calls to
+# some of these and they are defined in string/ using the basic ABI.
+libc_hermetic_undefs = [
+  "__unsanitized_memcpy",
+  "__unsanitized_memmove",
+  "__unsanitized_memset",
+  "memchr",
+  "memcmp",
+  "memcpy",
+  "memmove",
+  "memset",
+  "strlen",
+]
+if (is_ubsan) {
+  # The usual toolchain-provided ubsan runtime requires the compiler ABI, but
+  # these should never be called without a fatal error anyway.
+  libc_hermetic_undefs += [
+    "__ubsan_handle_add_overflow",
+    "__ubsan_handle_alignment_assumption",
+    "__ubsan_handle_builtin_unreachable",
+    "__ubsan_handle_cfi_bad_type",
+    "__ubsan_handle_cfi_check_fail",
+    "__ubsan_handle_divrem_overflow",
+    "__ubsan_handle_float_cast_overflow",
+    "__ubsan_handle_function_type_mismatch",
+    "__ubsan_handle_implicit_conversion",
+    "__ubsan_handle_invalid_builtin",
+    "__ubsan_handle_load_invalid_value",
+    "__ubsan_handle_missing_return",
+    "__ubsan_handle_mul_overflow",
+    "__ubsan_handle_negate_overflow",
+    "__ubsan_handle_nonnull_arg",
+    "__ubsan_handle_nonnull_return_v1",
+    "__ubsan_handle_nullability_arg",
+    "__ubsan_handle_nullability_return_v1",
+    "__ubsan_handle_out_of_bounds",
+    "__ubsan_handle_pointer_overflow",
+    "__ubsan_handle_shift_out_of_bounds",
+    "__ubsan_handle_sub_overflow",
+    "__ubsan_handle_type_mismatch_v1",
+    "__ubsan_handle_vla_bound_not_positive",
+  ]
+}
+
 # Define source_set() targets for some libc code.
 #
 # This defines two source_set() targets, one with the main target name and one
@@ -53,6 +98,15 @@ libc_configs += [ "$libc:llvm-libc-export.config" ]
 #   * global_symbols
 #     - Optional: Required if $basic_abi is true, as for hermetic_source_set().
 #     - Type: list(string)
+#
+#   * undefined_symbols
+#     - Optional: As for hermetic_source_set().
+#     - Type: list(string) or true
+#
+#   * allow_fini, allow_init
+#     - Optional: As for hermetic_source_set().
+#     - Type: bool
+#     - Default: false
 #
 #   * configs
 #     - Optional: Extra configs to append.  Unlike source_set(), configs
@@ -118,6 +172,8 @@ template("libc_source_set") {
     forward_variables_from(invoker,
                            "*",
                            [
+                             "allow_fini",
+                             "allow_init",
                              "basic_abi",
                              "configs",
                              "dir",
@@ -129,6 +185,7 @@ template("libc_source_set") {
                              "remove_configs",
                              "sources",
                              "testonly_deps",
+                             "undefined_symbols",
                              "visibility",
                            ])
 
@@ -193,7 +250,13 @@ template("libc_source_set") {
         public_deps = [ ":$target_name.basic" ]
       }
     }
-    not_needed(invoker, [ "global_symbols" ])
+    not_needed(invoker,
+               [
+                 "allow_fini",
+                 "allow_init",
+                 "global_symbols",
+                 "undefined_symbols",
+               ])
   } else {
     if (basic_abi) {
       assert(defined(invoker.global_symbols),
@@ -205,7 +268,18 @@ template("libc_source_set") {
     }
     foreach(suffix, compile_targets) {
       target(compile_target_type, target_name + suffix) {
-        forward_variables_from(invoker, [ "global_symbols" ])
+        if (basic_abi) {
+          forward_variables_from(invoker,
+                                 [
+                                   "allow_fini",
+                                   "allow_init",
+                                   "global_symbols",
+                                 ])
+          undefined_symbols = libc_hermetic_undefs
+          if (defined(invoker.undefined_symbols)) {
+            undefined_symbols += invoker.undefined_symbols
+          }
+        }
         if (defined(invoker.remove_configs)) {
           configs += invoker.remove_configs
           configs -= invoker.remove_configs
@@ -384,7 +458,7 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #     the code requires but that aren't also llvm_libc_source_set() targets.
 #     - Type: list(label)
 #
-#   * basic_abi, configs, global_symbols, non_test_deps, testonly_deps
+#   * allow_fini, allow_init, basic_abi, configs, global_symbols, non_test_deps, testonly_deps, undefined_symbols
 #     - Optional: See libc_source_set().
 #
 #   * sources, public
@@ -437,6 +511,8 @@ template("llvm_libc_source_set") {
   libc_source_set(main_target) {
     forward_variables_from(invoker,
                            [
+                             "allow_fini",
+                             "allow_init",
                              "basic_abi",
                              "configs",
                              "defines",
@@ -447,6 +523,7 @@ template("llvm_libc_source_set") {
                              "public",
                              "sources",
                              "testonly_deps",
+                             "undefined_symbols",
                              "visibility",
                            ])
 

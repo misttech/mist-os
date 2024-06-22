@@ -636,8 +636,8 @@ Overlay::Member Overlay::Member::Clone() const {
 }
 
 Protocol::Method Protocol::Method::Clone() const {
-  return Method(attributes->Clone(), strictness, name, has_request,
-                maybe_request ? maybe_request->Clone() : nullptr, has_response,
+  return Method(attributes->Clone(), kind, strictness, name,
+                maybe_request ? maybe_request->Clone() : nullptr,
                 maybe_response ? maybe_response->Clone() : nullptr, has_error);
 }
 

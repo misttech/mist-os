@@ -15,16 +15,14 @@ fidl("test.suspendcontrol") {
 
 source_set("cpp") {
   sources = [
-    "control_server.cc",
-    "control_server.h",
     "device_server.cc",
     "device_server.h",
-    "interfaces.h",
   ]
   public_deps = [
     ":test.suspendcontrol_cpp",
     "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
     "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
   ]
 }
 

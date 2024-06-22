@@ -5,6 +5,7 @@
 #include "src/graphics/display/lib/edid/edid.h"
 
 #include <lib/fit/result.h>
+#include <zircon/assert.h>
 
 #include <cmath>
 #include <cstddef>
@@ -214,30 +215,66 @@ ReadEdidResult ReadEdidFromDdcForTesting(void* ctx, ddc_i2c_transact transact) {
   return fit::ok(std::move(edid));
 }
 
-fit::result<const char*> Edid::Init(void* ctx, ddc_i2c_transact transact) {
+// static
+fit::result<const char*, Edid> Edid::Create(void* ctx, ddc_i2c_transact transact) {
   auto read_edid_result = ReadEdidFromDdcForTesting(ctx, transact);
   if (read_edid_result.is_error()) {
     return read_edid_result.take_error();
   }
-  bytes_ = std::move(read_edid_result).value();
-  return Validate();
-}
+  fbl::Vector<uint8_t> bytes = std::move(read_edid_result).value();
 
-fit::result<const char*> Edid::Init(cpp20::span<const uint8_t> bytes) {
-  if (bytes.empty() || bytes.size() % kBlockSize != 0) {
-    return fit::error("Invalid edid length");
+  if (bytes.is_empty()) {
+    return fit::error("EDID is empty");
+  }
+  if (bytes.size() % kBlockSize != 0) {
+    return fit::error("EDID size is not a multiple of block size");
+  }
+  static constexpr int kMaxAllowedEdidBytesSize = kBlockSize * kMaxEdidBlockCount;
+  if (bytes.size() > kMaxAllowedEdidBytesSize) {
+    return fit::error("EDID size exceeds the maximum allowed size");
   }
 
-  bytes_ = fbl::Vector<uint8_t>();
+  Edid edid(std::move(bytes));
+  fit::result<const char*> validate_result = edid.Validate();
+  if (validate_result.is_error()) {
+    return validate_result.take_error();
+  }
+  return fit::ok(std::move(edid));
+}
 
+// static
+fit::result<const char*, Edid> Edid::Create(cpp20::span<const uint8_t> bytes) {
+  if (bytes.empty()) {
+    return fit::error("EDID is empty");
+  }
+  if (bytes.size() % kBlockSize != 0) {
+    return fit::error("EDID size is not a multiple of block size");
+  }
+  static constexpr int kMaxAllowedEdidBytesSize = kBlockSize * kMaxEdidBlockCount;
+  if (bytes.size() > kMaxAllowedEdidBytesSize) {
+    return fit::error("EDID size exceeds the maximum allowed size");
+  }
+
+  fbl::Vector<uint8_t> bytes_vec;
   fbl::AllocChecker alloc_checker;
-  bytes_.resize(bytes.size(), 0, &alloc_checker);
+  bytes_vec.resize(bytes.size(), 0, &alloc_checker);
   if (!alloc_checker.check()) {
     return fit::error("Failed to allocate memory for EDID");
   }
-  std::copy(bytes.begin(), bytes.end(), bytes_.begin());
+  std::copy(bytes.begin(), bytes.end(), bytes_vec.begin());
 
-  return Validate();
+  Edid edid(std::move(bytes_vec));
+  fit::result<const char*> validate_result = edid.Validate();
+  if (validate_result.is_error()) {
+    return validate_result.take_error();
+  }
+  return fit::ok(std::move(edid));
+}
+
+Edid::Edid(fbl::Vector<uint8_t> bytes) : bytes_(std::move(bytes)) {
+  ZX_DEBUG_ASSERT(!bytes_.is_empty());
+  ZX_DEBUG_ASSERT(bytes_.size() % kBlockSize == 0);
+  ZX_DEBUG_ASSERT(bytes_.size() <= size_t{kBlockSize} * kMaxEdidBlockCount);
 }
 
 std::string Edid::GetManufacturerId() const {

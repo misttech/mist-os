@@ -815,7 +815,7 @@ mod tests {
         };
 
         let trace_id = ftrace::Id::random();
-        let static_selectors_matchers = pipeline.read().static_selectors_matchers();
+        let static_selectors_matchers = pipeline.static_selectors_matchers();
         let reader_server = ReaderServer::stream(
             inspect_repo.fetch_inspect_data(&None, static_selectors_matchers),
             test_performance_config,

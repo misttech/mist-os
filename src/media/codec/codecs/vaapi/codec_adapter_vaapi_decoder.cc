@@ -1526,5 +1526,6 @@ bool CodecAdapterVaApiDecoder::ProcessOutput(scoped_refptr<VASurface> va_surface
 }
 
 scoped_refptr<VASurface> CodecAdapterVaApiDecoder::GetVASurface() {
+  ZX_ASSERT(surface_buffer_manager_);
   return surface_buffer_manager_->GetDPBSurface();
 }

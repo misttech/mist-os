@@ -4,44 +4,26 @@
 
 import("//build/zircon/zx_library.gni")
 
-# Four copies of libtrace-provider are built:
-# (1) trace-provider: Main version that is used by non-drivers.
+# Three copies of libtrace-provider are built:
+# (1) trace-provider: Main version that is used by in tree components and drivers
 #     This copy uses libtrace-engine.so.
 # (2) trace-provider-so: Same as trace-provider, but exported to SDK
 #     as a shared library. This copy uses libtrace-engine.so.
-# (3) trace-provider-with-static-engine: For cases where a statically linked
-#     trace-engine is needed. This is for very special cases. Please DO NOT
-#     use this unless you KNOW you need to. Generally you do not. If in doubt,
-#     ask.
-
+# (3) trace-provider-with-static-engine: A special stripped down
+#     static version for magma
 template("trace_provider_library") {
   zx_library(target_name) {
     sdk = "source"
-    sdk_headers = [
-      "lib/trace-provider/fdio_connect.h",
-      "lib/trace-provider/handler.h",
-      "lib/trace-provider/provider.h",
-    ]
+    public_deps = []
+    sources = []
+    deps = []
     forward_variables_from(invoker, "*")
 
-    if (defined(extra_configs)) {
-      configs += extra_configs
-    }
-
-    # Not including fdio_connect.h.
-    if (!defined(sdk_headers)) {
-      sdk_headers = []
-    }
-    sdk_headers += [
+    sdk_headers = [
       "lib/trace-provider/handler.h",
       "lib/trace-provider/provider.h",
     ]
 
-    # Header dependencies, not including the trace engine.
-    # <trace-provider/handler.h> has #include <trace-engine/handler.h>.
-    if (!defined(public_deps)) {
-      public_deps = []
-    }
     public_deps += [
       # <trace-provider/provider.h> has #include <lib/async/dispatcher.h>.
       "//zircon/system/ulib/async",
@@ -50,9 +32,6 @@ template("trace_provider_library") {
       "//zircon/system/ulib/zx",
     ]
 
-    if (!defined(sources)) {
-      sources = []
-    }
     sources += [
       "export.h",
       "fnv1hash.h",
@@ -66,9 +45,6 @@ template("trace_provider_library") {
     ]
 
     # Source dependencies, not including the trace engine.
-    if (!defined(deps)) {
-      deps = []
-    }
     deps += [
       "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp",
       "//sdk/lib/fidl",
@@ -76,75 +52,74 @@ template("trace_provider_library") {
       "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/zx",
     ]
+
+    if (enable_fdio_support) {
+      sdk_headers += [ "lib/trace-provider/fdio_connect.h" ]
+      sources += [
+        "fdio_connect.cc",
+        "provider_with_fdio.cc",
+      ]
+      deps += [ "//sdk/lib/fdio" ]
+    }
   }
 }
-
-trace_provider_fdio_sources = [
-  "fdio_connect.cc",
-  "provider_with_fdio.cc",
-]
-
-trace_provider_fdio_connect_source_deps = [
-  "//sdk/lib/fdio",
-  "//zircon/system/ulib/zx",
-]
-
-trace_provider_fdio_connect_headers = [ "lib/trace-provider/fdio_connect.h" ]
 
 # The default version for the normal case.
 trace_provider_library("trace-provider") {
   sdk = "source"
-  sdk_headers = trace_provider_fdio_connect_headers
-  public_deps = [ "//zircon/system/ulib/trace-engine" ]
-  sources = trace_provider_fdio_sources
-  sources += [ "start.cc" ]
-  deps = trace_provider_fdio_connect_source_deps
-  deps += [
+  enable_fdio_support = true
+  sources = [ "start.cc" ]
+  deps = [
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-engine",
   ]
+  public_deps = [ "//zircon/system/ulib/trace-engine" ]
 }
 
 # Shared version for the SDK.
-# The issue is that the SDK doesn't (yet) support generating C FIDL bindings at
-# build time, which we need if we export as "source", and since we're
-# implemented in C++ we can't export as "static".
-# TODO(https://fxbug.dev/42097127): The name here is temporary, pending being able to build
-# the library as "libtrace-provider.so".
+#
+# Unlike trace-engine which keeps a large amount of state that needs to be merged between libraries,
+# trace-provider, as the controlling layer on top of trace engine, doesn't keep state that needs to
+# be shared. Only the main binary, not any of the libraries, need to link against trace-provider.
+#
+# Trace-provider was originally added to the sdk as a shared object due to limitations of the fidl
+# build system which are no longer relevant. It should be possible to include the source version
+# directly in the sdk -- modulo the migration required to do so.
 #
 # TODO(https://fxbug.dev/42096938): Add start.cc to this library in order to match the
 # non-shared version of the library.
 trace_provider_library("trace-provider-so") {
+  # We've got a wonky name here because zx_library forces us to use the target name as the
+  # output and trace-provider is already taken above. We could fix this by directly calling into
+  # `sdk_shared_library` and defining an output_name, ensuring that all the arguments are passed the
+  # same, and then migrating all the out of tree usages of `trace-provider-so.so`. Alternatively, as
+  # mentioned above, we may be able to drop the shared version entirely.
   sdk_publishable = "partner"
   sdk = "shared"
-
+  enable_fdio_support = true
   defines = [ "SHARED_LIBRARY" ]
-  sdk_headers = trace_provider_fdio_connect_headers
   public_deps = [ "//zircon/system/ulib/trace-engine" ]
-  sources = trace_provider_fdio_sources
-  deps = trace_provider_fdio_connect_source_deps
-  deps += [ "//zircon/system/ulib/trace-engine" ]
   runtime_deps = [ "//sdk/lib/fdio:fdio_sdk" ]
 }
 
-# A special version for programs and shared libraries that can't use
-# libtrace-engine.so, e.g., because it is unavailable.
-# N.B. Please verify that you really need this before using it.
-# Generally you DO NOT want to use this.
+# We produce a static library version of tracing for (currently) one special case: magma.
+# Unlike components which get packaged and run with the shared libraries they were built with,
+# the vulkan icds get loaded at runtime into an application with mostly-arbitrary library
+# versions. Since there's no guarantee of the trace library abi in this environment, magma
+# instead statically links against the trace libraries so that it can safely trace with a known
+# implementation.
+# In addition, magma has a very limited set of allowable dependencies, fdio not being one of them.
+# We exclude fdio_connect support in this version.
 trace_provider_library("trace-provider-with-static-engine") {
   sdk = "static"
-  sdk_headers = trace_provider_fdio_connect_headers
   public_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
-  sources = []
-  deps = []
-  deps += [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 
   # This is used by magma client drivers, so it can't depend on fdio (or other shared libraries
   # besides libc).
+  enable_fdio_support = false
   assert_no_deps = [
     "//sdk/lib/fdio",
     "//zircon/system/ulib/async-default",

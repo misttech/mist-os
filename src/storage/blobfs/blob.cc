@@ -108,9 +108,6 @@ zx_status_t Blob::CloneDataVmo(zx_rights_t rights, zx::vmo* out_vmo) {
   if (state_ != BlobState::kReadable) {
     return ZX_ERR_BAD_STATE;
   }
-  if (blob_size_ == 0) {
-    return ZX_ERR_BAD_STATE;
-  }
 
   if (zx_status_t status = LoadVmosFromDisk(); status != ZX_OK) {
     return status;
@@ -125,7 +122,7 @@ zx_status_t Blob::CloneDataVmo(zx_rights_t rights, zx::vmo* out_vmo) {
   }
   DidClonePagedVmo();
 
-  // Only add exec right to VMO if explictly requested.  (Saves a syscall if we're just going to
+  // Only add exec right to VMO if explicitly requested.  (Saves a syscall if we're just going to
   // drop the right back again in replace() call below.)
   if (rights & ZX_RIGHT_EXECUTE) {
     // Check if the VMEX resource held by Blobfs is valid and fail if it isn't. We do this to make
@@ -236,12 +233,17 @@ zx_status_t Blob::LoadVmosFromDisk() {
   if (IsDataLoaded())
     return ZX_OK;
 
+  zx_status_t status;
   if (blob_size_ == 0) {
     // Null blobs don't need any loading, just verification that they're correct.
-    return VerifyNullBlob(blobfs_, digest()).status_value();
+    status = VerifyNullBlob(blobfs_, digest()).status_value();
+    if (status == ZX_OK) {
+      status = EnsureCreatePagedVmo(0).status_value();
+    }
+  } else {
+    status = LoadPagedVmosFromDisk();
   }
 
-  zx_status_t status = LoadPagedVmosFromDisk();
   if (status == ZX_OK)
     SetPagedVmoName(true);
 

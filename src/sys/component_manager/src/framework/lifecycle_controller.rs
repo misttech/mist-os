@@ -15,7 +15,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use moniker::{ChildName, Moniker, MonikerError};
-use std::sync::{Arc, Weak};
+use std::sync::Weak;
 use tracing::warn;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -27,15 +27,12 @@ lazy_static! {
         fsys::LifecycleControllerMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
-pub struct LifecycleController {
+struct LifecycleControllerCapabilityProvider {
     model: Weak<Model>,
+    scope_moniker: Moniker,
 }
 
-impl LifecycleController {
-    pub fn new(model: Weak<Model>) -> Arc<Self> {
-        Arc::new(Self { model })
-    }
-
+impl LifecycleControllerCapabilityProvider {
     async fn resolve_instance(
         model: &Model,
         scope_moniker: &Moniker,
@@ -163,7 +160,7 @@ impl LifecycleController {
         })
     }
 
-    pub async fn serve(
+    async fn serve(
         &self,
         scope_moniker: Moniker,
         mut stream: fsys::LifecycleControllerRequestStream,
@@ -233,17 +230,18 @@ impl LifecycleController {
     }
 }
 
-pub struct LifecycleControllerFrameworkCapability {
-    host: Arc<LifecycleController>,
+#[derive(Clone)]
+pub struct LifecycleController {
+    model: Weak<Model>,
 }
 
-impl LifecycleControllerFrameworkCapability {
-    pub fn new(host: Arc<LifecycleController>) -> Self {
-        Self { host }
+impl LifecycleController {
+    pub fn new(model: Weak<Model>) -> Self {
+        Self { model }
     }
 }
 
-impl FrameworkCapability for LifecycleControllerFrameworkCapability {
+impl FrameworkCapability for LifecycleController {
     fn matches(&self, capability: &InternalCapability) -> bool {
         capability.matches_protocol(&CAPABILITY_NAME)
     }
@@ -253,21 +251,10 @@ impl FrameworkCapability for LifecycleControllerFrameworkCapability {
         scope: WeakComponentInstance,
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
-        Box::new(LifecycleControllerCapabilityProvider::new(
-            self.host.clone(),
-            scope.moniker.clone(),
-        ))
-    }
-}
-
-pub struct LifecycleControllerCapabilityProvider {
-    control: Arc<LifecycleController>,
-    scope_moniker: Moniker,
-}
-
-impl LifecycleControllerCapabilityProvider {
-    pub fn new(control: Arc<LifecycleController>, scope_moniker: Moniker) -> Self {
-        Self { control, scope_moniker }
+        Box::new(LifecycleControllerCapabilityProvider {
+            model: self.model.clone(),
+            scope_moniker: scope.moniker.clone(),
+        })
     }
 }
 
@@ -275,7 +262,7 @@ impl LifecycleControllerCapabilityProvider {
 impl InternalCapabilityProvider for LifecycleControllerCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fsys::LifecycleControllerMarker>::new(server_end);
-        self.control.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
+        self.serve(self.scope_moniker.clone(), server_end.into_stream().unwrap()).await;
     }
 }
 
@@ -289,15 +276,23 @@ fn join_monikers(scope_moniker: &Moniker, moniker_str: &str) -> Result<Moniker, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capability;
     use crate::model::actions::test_utils::{is_discovered, is_resolved, is_shutdown};
-    use crate::model::testing::test_helpers::TestEnvironmentBuilder;
+    use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
     use cm_rust_testing::ComponentDeclBuilder;
-    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::endpoints;
     use fidl_fuchsia_component_decl::{ChildRef, CollectionRef};
-    use {
-        fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-        fuchsia_async as fasync,
-    };
+    use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl};
+
+    async fn lifecycle_controller(test: &TestModelResult) -> fsys::LifecycleControllerProxy {
+        let host = {
+            let env = test.builtin_environment.lock().await;
+            env.lifecycle_controller.clone().unwrap()
+        };
+        let (proxy, server) = endpoints::create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
+        capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
+        proxy
+    }
 
     #[fuchsia::test]
     async fn lifecycle_controller_test() {
@@ -341,19 +336,7 @@ mod tests {
 
         let test_model_result =
             TestEnvironmentBuilder::new().set_components(components).build().await;
-
-        let lifecycle_controller = {
-            let env = test_model_result.builtin_environment.lock().await;
-            env.lifecycle_controller.clone().unwrap()
-        };
-
-        let (lifecycle_proxy, lifecycle_request_stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
-
-        // async move {} is used here because we want this to own the lifecycle_controller
-        let _lifecycle_server_task = fasync::Task::local(async move {
-            lifecycle_controller.serve(Moniker::root(), lifecycle_request_stream).await
-        });
+        let lifecycle_proxy = lifecycle_controller(&test_model_result).await;
 
         assert_eq!(lifecycle_proxy.resolve_instance(".").await.unwrap(), Ok(()));
 
@@ -410,19 +393,7 @@ mod tests {
         let test_model_result =
             TestEnvironmentBuilder::new().set_components(components).build().await;
         let root = test_model_result.model.root();
-
-        let lifecycle_controller = {
-            let env = test_model_result.builtin_environment.lock().await;
-            env.lifecycle_controller.clone().unwrap()
-        };
-
-        let (lifecycle_proxy, lifecycle_request_stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
-
-        // async move {} is used here because we want this to own the lifecycle_controller
-        let _lifecycle_server_task = fasync::Task::local(async move {
-            lifecycle_controller.serve(Moniker::root(), lifecycle_request_stream).await
-        });
+        let lifecycle_proxy = lifecycle_controller(&test_model_result).await;
 
         lifecycle_proxy.resolve_instance(".").await.unwrap().unwrap();
         let component_a =
@@ -464,19 +435,7 @@ mod tests {
 
         let test_model_result =
             TestEnvironmentBuilder::new().set_components(components).build().await;
-
-        let lifecycle_controller = {
-            let env = test_model_result.builtin_environment.lock().await;
-            env.lifecycle_controller.clone().unwrap()
-        };
-
-        let (lifecycle_proxy, lifecycle_request_stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
-
-        // async move {} is used here because we want this to own the lifecycle_controller
-        let _lifecycle_server_task = fasync::Task::local(async move {
-            lifecycle_controller.serve(Moniker::root(), lifecycle_request_stream).await
-        });
+        let lifecycle_proxy = lifecycle_controller(&test_model_result).await;
 
         assert_eq!(
             lifecycle_proxy
@@ -535,19 +494,7 @@ mod tests {
 
         let test_model_result =
             TestEnvironmentBuilder::new().set_components(components).build().await;
-
-        let lifecycle_controller = {
-            let env = test_model_result.builtin_environment.lock().await;
-            env.lifecycle_controller.clone().unwrap()
-        };
-
-        let (lifecycle_proxy, lifecycle_request_stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
-
-        // async move {} is used here because we want this to own the lifecycle_controller
-        let _lifecycle_server_task = fasync::Task::local(async move {
-            lifecycle_controller.serve(Moniker::root(), lifecycle_request_stream).await
-        });
+        let lifecycle_proxy = lifecycle_controller(&test_model_result).await;
 
         assert_eq!(
             lifecycle_proxy

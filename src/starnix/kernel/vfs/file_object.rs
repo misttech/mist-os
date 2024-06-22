@@ -20,7 +20,7 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_sync::{
-    FileOpsCore, FileOpsToHandle, FsNodeAllocate, LockBefore, LockEqualOrBefore, Locked, Mutex,
+    BeforeFsNodeAppend, FileOpsCore, FileOpsToHandle, LockBefore, LockEqualOrBefore, Locked, Mutex,
     Unlocked, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -1369,15 +1369,19 @@ impl FileObject {
             if !self.ops().has_persistent_offsets() {
                 return self.write_common(locked, current_task, 0, data);
             }
-
+            // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
+            // but WriteOps must be after FsNodeAppend
+            let mut locked = Unlocked::new();
             let mut offset = self.offset.lock();
             let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
-                let _guard = self.node().append_lock.write(current_task)?;
+                let (_guard, mut locked) =
+                    self.node().append_lock.write_and(&mut locked, current_task)?;
                 *offset = self.ops().seek(self, current_task, *offset, SeekTarget::End(0))?;
-                self.write_common(locked, current_task, *offset as usize, data)
+                self.write_common(&mut locked, current_task, *offset as usize, data)
             } else {
-                let _guard = self.node().append_lock.read(current_task)?;
-                self.write_common(locked, current_task, *offset as usize, data)
+                let (_guard, mut locked) =
+                    self.node().append_lock.read_and(&mut locked, current_task)?;
+                self.write_common(&mut locked, current_task, *offset as usize, data)
             }?;
             *offset += bytes_written as off_t;
             Ok(bytes_written)
@@ -1397,8 +1401,12 @@ impl FileObject {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
-        self.write_fn(locked, current_task, |locked| {
-            let _guard = self.node().append_lock.read(current_task)?;
+        self.write_fn(locked, current_task, |_locked| {
+            // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
+            // but WriteOps must be after FsNodeAppend
+            let mut locked = Unlocked::new();
+            let (_guard, mut locked) =
+                self.node().append_lock.read_and(&mut locked, current_task)?;
 
             // According to LTP test pwrite04:
             //
@@ -1410,7 +1418,7 @@ impl FileObject {
                 offset = default_eof_offset(self, current_task)? as usize;
             }
 
-            self.write_common(locked, current_task, offset, data)
+            self.write_common(&mut locked, current_task, offset, data)
         })
     }
 
@@ -1522,7 +1530,7 @@ impl FileObject {
         length: u64,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         // The file must be opened with write permissions. Otherwise
         // truncating it is forbidden.
@@ -1541,7 +1549,7 @@ impl FileObject {
         length: u64,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FsNodeAllocate>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         // If the file is a pipe or FIFO, ESPIPE is returned.
         // See https://man7.org/linux/man-pages/man2/fallocate.2.html#ERRORS

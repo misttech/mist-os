@@ -90,6 +90,9 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
   }
 
   if (options & ZX_INTERRUPT_WAKE_VECTOR) {
+    // TODO(https://fxbug.dev/348668110): Revisit this logging.  Still needed?
+    dprintf(INFO, "creating interrupt wake vector with vector %u, koid %" PRIu64 "\n", vector,
+            disp->get_koid());
     interrupt_flags |= INTERRUPT_WAKE_VECTOR;
   }
 

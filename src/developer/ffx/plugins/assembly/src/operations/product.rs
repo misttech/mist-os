@@ -40,6 +40,17 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     info!("Reading configuration files.");
     info!("  product: {}", product);
 
+    if package_validation == PackageValidationHandling::Warning {
+        eprintln!(
+            "
+*=========================================*
+* PACKAGE VALIDATION DISABLED FOR PRODUCT *
+*=========================================*
+Resulting product is not supported and may misbehave!
+"
+        );
+    }
+
     let product_path = product;
 
     let (platform, product, developer_overrides, file_relative_paths) =

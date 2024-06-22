@@ -420,7 +420,10 @@ mod tests {
         assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
         FakeWeakDeviceId,
     };
-    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext};
+    use netstack3_base::{
+        CounterContext, CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext,
+        SendFrameError,
+    };
     use netstack3_filter::ProofOfEgressCheck;
     use packet::{BufferMut, ParseBuffer};
     use packet_formats::icmp::mld::MulticastListenerQuery;
@@ -428,7 +431,8 @@ mod tests {
 
     use super::*;
     use crate::internal::base::{
-        self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta,
+        self, IpCounters, IpLayerPacketMetadata, IpPacketDestination, IpSendFrameError,
+        SendIpPacketMeta,
     };
     use crate::internal::gmp::{
         GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
@@ -456,6 +460,13 @@ mod tests {
         gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
         mld_enabled: bool,
         ipv6_link_local: Option<LinkLocalUnicastAddr<Ipv6Addr>>,
+        ip_counters: IpCounters<Ipv6>,
+    }
+
+    impl CounterContext<IpCounters<Ipv6>> for FakeMldCtx {
+        fn with_counters<O, F: FnOnce(&IpCounters<Ipv6>) -> O>(&self, cb: F) -> O {
+            cb(&self.ip_counters)
+        }
     }
 
     fn new_context() -> FakeCtxImpl {
@@ -468,6 +479,7 @@ mod tests {
                 ),
                 mld_enabled: true,
                 ipv6_link_local: None,
+                ip_counters: Default::default(),
             })
         })
     }
@@ -529,7 +541,7 @@ mod tests {
                 Option<SpecifiedAddr<<Ipv6 as Ip>::Addr>>,
             >,
             _body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), IpSendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,
@@ -543,7 +555,7 @@ mod tests {
             device: &Self::DeviceId,
             destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), IpSendFrameError<S>>
         where
             S: Serializer + netstack3_filter::IpPacket<Ipv6>,
             S::Buffer: BufferMut,
@@ -567,7 +579,7 @@ mod tests {
             destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
             body: S,
             ProofOfEgressCheck { .. }: ProofOfEgressCheck,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,

@@ -140,7 +140,13 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
   }
 
   if (irq.is_valid()) {
-    irq.ack();
+    zx_status_t status = irq.ack();
+    if (status != ZX_OK) {
+      FDF_LOG(ERROR, "IRQ timer id: %zu IRQ error: %s", properties.id,
+              zx_status_get_string(status));
+    }
+  } else {
+    FDF_LOG(ERROR, "IRQ timer id: %zu invalid IRQ", properties.id);
   }
 }
 

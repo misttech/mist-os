@@ -49,6 +49,7 @@ fuchsia_library_fuzzer("sysmem_fuzzer") {
   deps = [
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/devices/testing/mock-ddk",
   ]

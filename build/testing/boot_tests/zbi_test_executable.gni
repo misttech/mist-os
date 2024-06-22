@@ -101,7 +101,7 @@ set_defaults("zbi_test_executable") {
   }
 
   assert_no_deps = [
-    "//sdk/lib/fdio/*",
+    "//sdk/lib/fdio",
     "//sdk/lib/syslog/*",
   ]
 

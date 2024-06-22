@@ -29,13 +29,6 @@ static const std::vector<uint8_t> sysmem_metadata = [] {
   fuchsia_hardware_sysmem::Metadata metadata;
   metadata.vid() = PDEV_VID_GENERIC;
   metadata.pid() = PDEV_PID_GENERIC;
-  // no protected pool
-  metadata.protected_memory_size() = 0;
-  // -5 means 5% of physical RAM
-  // we allocate a small amount of contiguous RAM to keep the sysmem tests from flaking,
-  // see https://fxbug.dev/42146647.
-  metadata.contiguous_memory_size() = -5;
-
   auto persist_result = fidl::Persist(metadata);
   ZX_ASSERT(persist_result.is_ok());
   return std::move(persist_result.value());

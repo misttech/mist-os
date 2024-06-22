@@ -417,10 +417,17 @@ void ConsumeStep::ConsumeProtocolDeclaration(
         maybe_response = std::move(response_payload);
       }
     }
-    ZX_ASSERT(has_request || has_response);
-    methods.emplace_back(std::move(attributes), strictness, method_name, has_request,
-                         std::move(maybe_request), has_response, std::move(maybe_response),
-                         has_error);
+    Protocol::Method::Kind kind;
+    if (has_request && has_response) {
+      kind = Protocol::Method::Kind::kTwoWay;
+    } else if (has_request) {
+      kind = Protocol::Method::Kind::kOneWay;
+    } else {
+      ZX_ASSERT(has_response);
+      kind = Protocol::Method::Kind::kEvent;
+    }
+    methods.emplace_back(std::move(attributes), kind, strictness, method_name,
+                         std::move(maybe_request), std::move(maybe_response), has_error);
   }
 
   std::unique_ptr<AttributeList> attributes;

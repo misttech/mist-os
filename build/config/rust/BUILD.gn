@@ -229,6 +229,18 @@ config("output_dir_sensitive") {
   }
 }
 
+# Force local compilation for Rust.
+# This could be suitable for actions that run OOM on RBE workers.
+# See also options for running on bigger remote workers
+# in //build/toolchain/concurrent_jobs.gni.
+config("rbe_disable") {
+  if (rust_rbe_enable) {
+    # --remote-disable is a pseudo flag intercepted by
+    # build/rbe/rustc_remote_wrapper.py, and never exposed to rustc.
+    rustflags = [ "--remote-disable" ]
+  }
+}
+
 # On remote-cache miss, execute locally.
 # This mode will not attempt any remote execution, and thus,
 # not warm the remote cache.

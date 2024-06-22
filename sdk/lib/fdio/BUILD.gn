@@ -76,6 +76,8 @@ if (is_fuzzer) {
 } else if (is_fuchsia || is_mistos) {
   zx_library("fdio") {
     configs += [ "//build/config:all_source" ]
+
+    # Note symbols_api is implicit in zx_library() with sdk set.
     sdk = "shared"
     sdk_publishable = "partner"
 
@@ -143,7 +145,6 @@ if (is_fuzzer) {
     ]
 
     fdio_version_script = "fdio.ld"
-    symbols_api = "fdio.ifs"
     inputs = [ fdio_version_script ]
     ldflags = [ "-Wl,--version-script=" +
                 rebase_path(fdio_version_script, root_build_dir) ]

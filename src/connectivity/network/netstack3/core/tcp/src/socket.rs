@@ -3011,13 +3011,30 @@ where
                                 }
                             }
                         };
-                        let pending = match maybe_listener {
-                            MaybeListener::Bound(_) => None,
-                            MaybeListener::Listener(listener) => {
-                                let (pending, _socket_extra) = listener.accept_queue.close();
-                                Some(pending)
-                            }
-                        };
+                        // Move the listener down to a `Bound` state so it won't
+                        // accept any more connections and close the accept
+                        // queue.
+                        let pending =
+                            replace_with::replace_with_and(maybe_listener, |maybe_listener| {
+                                match maybe_listener {
+                                    MaybeListener::Bound(b) => (MaybeListener::Bound(b), None),
+                                    MaybeListener::Listener(listener) => {
+                                        let Listener {
+                                            backlog: _,
+                                            accept_queue,
+                                            buffer_sizes,
+                                            socket_options,
+                                        } = listener;
+                                        let (pending, socket_extra) = accept_queue.close();
+                                        let bound_state = BoundState {
+                                            buffer_sizes,
+                                            socket_options,
+                                            socket_extra,
+                                        };
+                                        (MaybeListener::Bound(bound_state), Some(pending))
+                                    }
+                                }
+                            });
                         (true, pending)
                     }
                     TcpSocketStateInner::Bound(BoundSocketState::Connected {
@@ -4346,6 +4363,8 @@ fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsConte
     bindings_ctx: &mut BC,
     id: TcpSocketId<I, CC::WeakDeviceId, BC>,
 ) {
+    let weak = id.downgrade();
+
     core_ctx.with_all_sockets_mut(move |all_sockets| {
         let TcpSocketId(rc) = &id;
         let debug_refs = StrongRc::debug_references(rc);
@@ -4393,7 +4412,6 @@ fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsConte
             return;
         };
 
-        let weak = PrimaryRc::downgrade(&primary);
         let remove_result =
             BC::unwrap_or_notify_with_new_reference_notifier(primary, |state| state);
         match remove_result {

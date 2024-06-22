@@ -404,10 +404,13 @@ bool NewAddProtocolDescriptorList(
     const std::vector<fuchsia_bluetooth_bredr::ProtocolDescriptor>& descriptor_list) {
   bt_log(TRACE, "fidl", "ProtocolDescriptorList %d", id);
   for (auto& descriptor : descriptor_list) {
+    if (!descriptor.params().has_value() || !descriptor.protocol().has_value()) {
+      return false;
+    }
     bt::sdp::DataElement protocol_params;
-    if (descriptor.params().size() > 1) {
+    if (descriptor.params()->size() > 1) {
       std::vector<bt::sdp::DataElement> params;
-      for (auto& fidl_param : descriptor.params()) {
+      for (auto& fidl_param : *descriptor.params()) {
         auto bt_param = NewFidlToDataElement(fidl_param);
         if (bt_param) {
           params.emplace_back(std::move(bt_param.value()));
@@ -416,19 +419,19 @@ bool NewAddProtocolDescriptorList(
         }
       }
       protocol_params.Set(std::move(params));
-    } else if (descriptor.params().size() == 1) {
-      auto param = NewFidlToDataElement(descriptor.params().front());
+    } else if (descriptor.params()->size() == 1) {
+      auto param = NewFidlToDataElement(descriptor.params()->front());
       if (param) {
         protocol_params = std::move(param).value();
       } else {
         return false;
       }
-      protocol_params = NewFidlToDataElement(descriptor.params().front()).value();
+      protocol_params = NewFidlToDataElement(descriptor.params()->front()).value();
     }
 
     bt_log(TRACE, "fidl", "Adding protocol descriptor: {%d : %s}",
-           fidl::ToUnderlying(descriptor.protocol()), protocol_params.ToString().c_str());
-    rec->AddProtocolDescriptor(id, bt::UUID(static_cast<uint16_t>(descriptor.protocol())),
+           fidl::ToUnderlying(*descriptor.protocol()), protocol_params.ToString().c_str());
+    rec->AddProtocolDescriptor(id, bt::UUID(static_cast<uint16_t>(*descriptor.protocol())),
                                std::move(protocol_params));
   }
   return true;
@@ -440,9 +443,13 @@ bool AddProtocolDescriptorList(bt::sdp::ServiceRecord* rec,
   bt_log(TRACE, "fidl", "ProtocolDescriptorList %d", id);
   for (auto& descriptor : descriptor_list) {
     bt::sdp::DataElement protocol_params;
-    if (descriptor.params.size() > 1) {
+    if (!descriptor.has_params() || !descriptor.has_protocol()) {
+      bt_log(WARN, "fidl", "ProtocolDescriptor missing params/protocol field");
+      return false;
+    }
+    if (descriptor.params().size() > 1) {
       std::vector<bt::sdp::DataElement> params;
-      for (auto& fidl_param : descriptor.params) {
+      for (auto& fidl_param : descriptor.params()) {
         auto bt_param = FidlToDataElement(fidl_param);
         if (bt_param) {
           params.emplace_back(std::move(bt_param.value()));
@@ -451,19 +458,19 @@ bool AddProtocolDescriptorList(bt::sdp::ServiceRecord* rec,
         }
       }
       protocol_params.Set(std::move(params));
-    } else if (descriptor.params.size() == 1) {
-      auto param = FidlToDataElement(descriptor.params.front());
+    } else if (descriptor.params().size() == 1) {
+      auto param = FidlToDataElement(descriptor.params().front());
       if (param) {
         protocol_params = std::move(param).value();
       } else {
         return false;
       }
-      protocol_params = FidlToDataElement(descriptor.params.front()).value();
+      protocol_params = FidlToDataElement(descriptor.params().front()).value();
     }
 
-    bt_log(TRACE, "fidl", "Adding protocol descriptor: {%d : %s}",
-           fidl::ToUnderlying(descriptor.protocol), protocol_params.ToString().c_str());
-    rec->AddProtocolDescriptor(id, bt::UUID(static_cast<uint16_t>(descriptor.protocol)),
+    bt_log(TRACE, "fidl", "Adding protocol descriptor: {%d : %s}", uint16_t(descriptor.protocol()),
+           bt_str(protocol_params));
+    rec->AddProtocolDescriptor(id, bt::UUID(static_cast<uint16_t>(descriptor.protocol())),
                                std::move(protocol_params));
   }
   return true;
@@ -1447,11 +1454,16 @@ ServiceDefinitionToServiceRecord(const fuchsia_bluetooth_bredr::ServiceDefinitio
 
   if (definition.profile_descriptors().has_value()) {
     for (const auto& profile : definition.profile_descriptors().value()) {
+      if (!profile.profile_id().has_value() || !profile.major_version().has_value() ||
+          !profile.minor_version().has_value()) {
+        bt_log(WARN, "fidl", "ProfileDescriptor missing required fields");
+        return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+      }
       bt_log(TRACE, "fidl", "Adding Profile %#hx v%d.%d",
-             static_cast<unsigned short>(profile.profile_id()), profile.major_version(),
-             profile.minor_version());
-      rec.AddProfile(bt::UUID(static_cast<uint16_t>(profile.profile_id())), profile.major_version(),
-                     profile.minor_version());
+             static_cast<unsigned short>(*profile.profile_id()), *profile.major_version(),
+             *profile.minor_version());
+      rec.AddProfile(bt::UUID(static_cast<uint16_t>(*profile.profile_id())),
+                     *profile.major_version(), *profile.minor_version());
     }
   }
 
@@ -1480,11 +1492,15 @@ ServiceDefinitionToServiceRecord(const fuchsia_bluetooth_bredr::ServiceDefinitio
 
   if (definition.additional_attributes().has_value()) {
     for (const auto& attribute : definition.additional_attributes().value()) {
-      auto elem = NewFidlToDataElement(attribute.element());
+      if (!attribute.element() || !attribute.id()) {
+        bt_log(WARN, "fidl", "Attribute missing required fields");
+        return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+      }
+      auto elem = NewFidlToDataElement(*attribute.element());
       if (elem) {
-        bt_log(TRACE, "fidl", "Adding attribute %#x : %s", attribute.id(),
+        bt_log(TRACE, "fidl", "Adding attribute %#x : %s", *attribute.id(),
                elem.value().ToString().c_str());
-        rec.SetAttribute(attribute.id(), std::move(elem.value()));
+        rec.SetAttribute(*attribute.id(), std::move(elem.value()));
       }
     }
   }
@@ -1535,11 +1551,16 @@ ServiceDefinitionToServiceRecord(const fuchsia::bluetooth::bredr::ServiceDefinit
 
   if (definition.has_profile_descriptors()) {
     for (const auto& profile : definition.profile_descriptors()) {
+      if (!profile.has_profile_id() || !profile.has_major_version() ||
+          !profile.has_minor_version()) {
+        bt_log(ERROR, "fidl", "ProfileDescriptor missing required fields");
+        return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+      }
       bt_log(TRACE, "fidl", "Adding Profile %#hx v%d.%d",
-             static_cast<unsigned short>(profile.profile_id), profile.major_version,
-             profile.minor_version);
-      rec.AddProfile(bt::UUID(static_cast<uint16_t>(profile.profile_id)), profile.major_version,
-                     profile.minor_version);
+             static_cast<unsigned short>(profile.profile_id()), profile.major_version(),
+             profile.minor_version());
+      rec.AddProfile(bt::UUID(static_cast<uint16_t>(profile.profile_id())), profile.major_version(),
+                     profile.minor_version());
     }
   }
 
@@ -1567,11 +1588,15 @@ ServiceDefinitionToServiceRecord(const fuchsia::bluetooth::bredr::ServiceDefinit
 
   if (definition.has_additional_attributes()) {
     for (const auto& attribute : definition.additional_attributes()) {
-      auto elem = FidlToDataElement(attribute.element);
+      if (!attribute.has_element() || !attribute.has_id()) {
+        bt_log(WARN, "fidl", "Attribute missing required fields");
+        return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+      }
+      auto elem = FidlToDataElement(attribute.element());
       if (elem) {
-        bt_log(TRACE, "fidl", "Adding attribute %#x : %s", attribute.id,
+        bt_log(TRACE, "fidl", "Adding attribute %#x : %s", attribute.id(),
                elem.value().ToString().c_str());
-        rec.SetAttribute(attribute.id, std::move(elem.value()));
+        rec.SetAttribute(attribute.id(), std::move(elem.value()));
       }
     }
   }

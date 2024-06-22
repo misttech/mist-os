@@ -258,18 +258,21 @@ mod tests {
             service_class_uuids: Some(vec![service_uuid.into()]),
             protocol_descriptor_list: Some(vec![
                 bredr::ProtocolDescriptor {
-                    protocol: bredr::ProtocolIdentifier::L2Cap,
-                    params: vec![bredr::DataElement::Uint16(bredr::PSM_AVDTP)],
+                    protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                    params: Some(vec![bredr::DataElement::Uint16(bredr::PSM_AVDTP)]),
+                    ..Default::default()
                 },
                 bredr::ProtocolDescriptor {
-                    protocol: bredr::ProtocolIdentifier::Avdtp,
-                    params: vec![bredr::DataElement::Uint16(0x0103)], // Indicate v1.3
+                    protocol: Some(bredr::ProtocolIdentifier::Avdtp),
+                    params: Some(vec![bredr::DataElement::Uint16(0x0103)]), // Indicate v1.3
+                    ..Default::default()
                 },
             ]),
             profile_descriptors: Some(vec![bredr::ProfileDescriptor {
-                profile_id: bredr::ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-                major_version: 1,
-                minor_version: 2,
+                profile_id: Some(bredr::ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+                major_version: Some(1),
+                minor_version: Some(2),
+                ..Default::default()
             }]),
             ..Default::default()
         }
@@ -281,7 +284,8 @@ mod tests {
         let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
             .expect("Profile proxy should be created");
 
-        let source_uuid = Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource as u16);
+        let source_uuid =
+            Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
         let defs = vec![make_profile_service_definition(source_uuid)];
         let channel_params = bredr::ChannelParameters {
             channel_mode: Some(bredr::ChannelMode::Basic),
@@ -324,7 +328,8 @@ mod tests {
         let (proxy, mut profile_stream) = create_proxy_and_stream::<bredr::ProfileMarker>()
             .expect("Profile proxy should be created");
 
-        let source_uuid = Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource as u16);
+        let source_uuid =
+            Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
         let defs = vec![make_profile_service_definition(source_uuid)];
         let channel_params = bredr::ChannelParameters {
             channel_mode: Some(bredr::ChannelMode::Basic),

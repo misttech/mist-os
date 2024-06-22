@@ -114,7 +114,7 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
             dependency_type: fbroker::DependencyType::Passive,
             dependent_level: 1,
             requires_token: es_token,
-            requires_level: 2,
+            requires_level_by_preference: vec![2],
         }])
         .build()
         .await?;
@@ -126,7 +126,7 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
                 dependency_type: fbroker::DependencyType::Active,
                 dependent_level: 1,
                 requires_token: test_driver.active_dependency_token(),
-                requires_level: 1,
+                requires_level_by_preference: vec![1],
             }])
             .build()
             .await?;

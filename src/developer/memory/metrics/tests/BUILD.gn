@@ -47,9 +47,6 @@ executable("memory_metrics_unittests") {
     "//third_party/rapidjson",
     "//zircon/system/public:public",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_unittest_component("memory_metrics_unittests_component") {

@@ -425,7 +425,10 @@ fn convert_method(method: &ir::ProtocolMethod, context: Context) -> Result<compa
     })
 }
 
-fn convert_protocol(p: &ir::ProtocolDeclaration, context: Context) -> Result<compare::Protocol> {
+pub fn convert_protocol(
+    p: &ir::ProtocolDeclaration,
+    context: Context,
+) -> Result<compare::Protocol> {
     let mut methods = BTreeMap::new();
 
     let context = context.nest_member(&p.name, Some(FlyStr::new(&p.name)));
@@ -479,15 +482,6 @@ fn convert_protocol(p: &ir::ProtocolDeclaration, context: Context) -> Result<com
             server: impl_locs("server"),
         }
     });
-
-    let added = ir::get_attribute(&p.maybe_attributes, "available")
-        .expect("All protocols should have \"available\" attributes by this point")
-        .get_argument("added")
-        .expect(
-            "All protocol available attributes should have an \"added\" argument by this point.",
-        )
-        .value()
-        .to_string();
 
     Ok(compare::Protocol {
         name: FlyStr::new(&p.name),

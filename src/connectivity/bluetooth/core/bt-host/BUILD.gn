@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_fuchsia_package.gni")
+import("//build/bazel/bazel_fuchsia_test_package.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/fuzz.gni")
@@ -45,15 +46,6 @@ source_set("sources") {
   ]
 }
 
-executable("bin") {
-  output_name = "bt_host"
-  sources = [ "main.cc" ]
-  deps = [
-    ":sources",
-    "//third_party/pigweed/backends/pw_log:syslog",
-  ]
-}
-
 config("config_enable_inspect") {
   defines = [ "PW_BLUETOOTH_SAPPHIRE_INSPECT_ENABLED" ]
 }
@@ -78,18 +70,6 @@ fuchsia_structured_config_cpp_elf_lib("bt_host_config") {
   cm_label = ":manifest"
 }
 
-fuchsia_structured_config_values("default_config_values") {
-  cm_label = ":manifest"
-  values = {
-    device_path = "/dev/class/bt-hci/000"
-  }
-}
-
-fuchsia_component("component") {
-  cm_label = ":manifest"
-  deps = [ ":bin" ]
-}
-
 # This is the OOT built bt-host component.
 # See https://pigweed.dev/pw_bluetooth_sapphire/.
 # TODO(https://fxbug.dev/324107025): Rename this target to "bt-host" and update
@@ -100,15 +80,7 @@ prebuilt_package("bt-host-oot") {
   archive = "//prebuilt/connectivity/bluetooth/bt-host/$target_cpu/bt-host"
 }
 
-fuchsia_package("bt-host") {
-  deps = [
-    # component-url: fuchsia-pkg://fuchsia.com/bt-host#meta/bt-host.cm
-    ":component",
-    ":default_config_values",
-  ]
-}
-
-bazel_fuchsia_package("bt-host-bazel") {
+bazel_fuchsia_package("bt-host") {
   package_name = "bt-host"
 }
 
@@ -212,35 +184,9 @@ fuchsia_fuzzer_package("fuzzers") {
   ]
 }
 
-source_set("device_tests") {
-  testonly = true
-
-  sources = [ "host_test.cc" ]
-
-  deps = [
-    ":sources",
-    "//src/connectivity/bluetooth/core/bt-host/testing",
-    "//src/lib/testing/loop_fixture",
-    "//third_party/googletest:gtest",
-  ]
-}
-
-source_set("component_tests") {
-  testonly = true
-
-  sources = [ "host_test.cc" ]
-
-  deps = [
-    ":sources",
-    "//src/connectivity/bluetooth/core/bt-host/fidl:fake_hci_test_fixture",
-    "//src/connectivity/bluetooth/core/bt-host/testing",
-    "//src/lib/testing/loop_fixture",
-    "//third_party/googletest:gtest",
-  ]
-}
-
-bt_gtest_package("bt-host-tests") {
-  deps = [ ":component_tests" ]
+bazel_fuchsia_test_package("test_pkg") {
+  test_package_name = "host_tests"
+  test_component_names = [ "host_test_autogen_cml" ]
 }
 
 bt_gtest_package("bt-host-transport-tests") {
@@ -302,7 +248,7 @@ bt_gtest_package("bt-host-testing-tests") {
   deps = [ "testing:tests.lib" ]
 }
 
-group("tests") {
+group("gn_tests") {
   testonly = true
   deps = [
     ":bt-host-att-tests",
@@ -317,7 +263,6 @@ group("tests") {
     ":bt-host-sdp-tests",
     ":bt-host-sm-tests",
     ":bt-host-testing-tests",
-    ":bt-host-tests",
     ":bt-host-transport-tests",
     ":fuzzers",
     "controllers:bt-host-controllers-tests",
@@ -329,6 +274,7 @@ group("tests") {
 group("bazel_tests") {
   testonly = true
   deps = [
+    ":test_pkg",
     "att:test_pkg",
     "common:test_pkg",
     "fidl:test_pkg",
@@ -344,5 +290,13 @@ group("bazel_tests") {
     "socket:test_pkg",
     "testing:test_pkg",
     "transport:test_pkg",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":bazel_tests",
+    ":gn_tests",
   ]
 }

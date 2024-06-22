@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::error::NewSecurityContextError;
 use super::extensible_bitmap::ExtensibleBitmapSpan;
+use super::metadata::HandleUnknown;
 use super::parser::ParseStrategy;
-use super::security_context::{self, SecurityLevel};
+use super::security_context::{Category, SecurityContext, SecurityContextError, SecurityLevel};
 use super::symbols::{
     Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
     Permission,
 };
-use super::{CategoryId, ParsedPolicy, RoleId, SecurityContext, TypeId};
+use super::{CategoryId, ParsedPolicy, RoleId, TypeId};
 
 use selinux_common::{self as sc, ClassPermission as _};
 use std::collections::HashMap;
@@ -38,39 +38,35 @@ pub(crate) struct PolicyIndex<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> PolicyIndex<PS> {
-    /// Constructs a [`PolicyIndex`] that indexes over well-known policy fragment names. For
-    /// example, the "process" class and its "fork" permission have prescribed meanings in an
-    /// SELinux system, so the respective [`Class`] and [`Permission`] are indexed by this
-    /// constructor. This operation fails if any well-known names are not found in `parsed_policy`.
+    /// Constructs a [`PolicyIndex`] that indexes over well-known policy elements.
+    ///
+    /// [`Class`]es and [`Permission`]s used by the kernel are amongst the indexed elements.
+    /// The policy's `handle_unknown()` configuration determines whether the policy can be loaded even
+    /// if it omits classes or permissions expected by the kernel, and whether to allow or deny those
+    /// permissions if so.
     pub fn new(parsed_policy: ParsedPolicy<PS>) -> Result<Self, anyhow::Error> {
         let policy_classes = parsed_policy.classes();
         let common_symbols = parsed_policy.common_symbols();
 
-        // Accumulate classes indexed by `selinux_common::ObjectClass`. If a class cannot be found
-        // by name, add it to `missed_classes` for thorough error reporting.
+        // Accumulate classes indexed by `selinux_common::ObjectClass`. If the policy defines that unknown
+        // classes should cause rejection then return an error describing the missing element.
         let mut classes = HashMap::new();
-        let mut missed_classes = vec![];
         for known_class in sc::ObjectClass::all_variants().into_iter() {
             match get_class_index_by_name(policy_classes, known_class.name()) {
                 Some(class_index) => {
                     classes.insert(known_class, class_index);
                 }
                 None => {
-                    missed_classes.push(known_class);
+                    if parsed_policy.handle_unknown() == HandleUnknown::Reject {
+                        return Err(anyhow::anyhow!("missing object class {:?}", known_class,));
+                    }
                 }
             }
         }
-        if missed_classes.len() > 0 {
-            return Err(anyhow::anyhow!(
-                "failed to locate well-known SELinux object classes {:?} in SELinux binary policy",
-                missed_classes.iter().map(sc::ObjectClass::name).collect::<Vec<_>>()
-            ));
-        }
 
-        // Accumulate permissions indexed by `selinux_common::Permission`. If a permission cannot be
-        // found by name, add it to `missed_permissions` for thorough error reporting.
+        // Accumulate permissions indexed by `selinux_common::Permission`. If the policy defines that unknown
+        // classes should cause rejection then return an error describing the missing element.
         let mut permissions = HashMap::new();
-        let mut missed_permissions = vec![];
         for known_permission in sc::Permission::all_variants().into_iter() {
             let object_class = known_permission.class();
             if let Some(class_index) = classes.get(&object_class) {
@@ -79,32 +75,20 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                     get_permission_index_by_name(common_symbols, class, known_permission.name())
                 {
                     permissions.insert(known_permission, permission_index);
-                } else {
-                    missed_permissions.push(known_permission);
+                } else if parsed_policy.handle_unknown() == HandleUnknown::Reject {
+                    return Err(anyhow::anyhow!(
+                        "missing permission {:?}:{:?}",
+                        object_class.name(),
+                        known_permission.name(),
+                    ));
                 }
-            } else {
-                missed_permissions.push(known_permission);
             }
-        }
-        if missed_permissions.len() > 0 {
-            return Err(anyhow::anyhow!(
-                "failed to locate well-known SELinux object permissions {:?} in SELinux binary policy",
-                missed_permissions
-                    .iter()
-                    .map(|permission| {
-                        let object_class = permission.class();
-                        (object_class.name(), permission.name())
-                    })
-                    .collect::<Vec<_>>()
-            ));
         }
 
         // Locate the "object_r" role.
         let cached_object_r_role = parsed_policy
             .role_by_name("object_r")
-            .ok_or(anyhow::anyhow!(
-                "failed to locate well-known 'object_r' role in SELinux binary policy"
-            ))?
+            .ok_or(anyhow::anyhow!("missing 'object_r' role"))?
             .id();
 
         let index = Self { classes, permissions, parsed_policy, cached_object_r_role };
@@ -117,23 +101,21 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         Ok(index)
     }
 
-    pub fn class<'a>(&'a self, object_class: &sc::ObjectClass) -> &'a Class<PS> {
-        let class_offset =
-            *self.classes.get(object_class).expect("policy class index is exhaustive");
-        &self.parsed_policy.classes()[class_offset]
+    pub fn class<'a>(&'a self, object_class: &sc::ObjectClass) -> Option<&'a Class<PS>> {
+        self.classes.get(object_class).map(|offset| &self.parsed_policy.classes()[*offset])
     }
 
-    pub fn permission<'a>(&'a self, permission: &sc::Permission) -> &'a Permission<PS> {
-        let target_class = self.class(&permission.class());
-        match *self.permissions.get(permission).expect("policy permission index is exhaustive") {
+    pub fn permission<'a>(&'a self, permission: &sc::Permission) -> Option<&'a Permission<PS>> {
+        let target_class = self.class(&permission.class())?;
+        self.permissions.get(permission).map(|p| match p {
             PermissionIndex::Class { permission_index } => {
-                &target_class.permissions()[permission_index]
+                &target_class.permissions()[*permission_index]
             }
             PermissionIndex::Common { common_symbol_index, permission_index } => {
-                let common_symbol = &self.parsed_policy().common_symbols()[common_symbol_index];
-                &common_symbol.permissions()[permission_index]
+                let common_symbol = &self.parsed_policy().common_symbols()[*common_symbol_index];
+                &common_symbol.permissions()[*permission_index]
             }
-        }
+        })
     }
 
     pub fn new_file_security_context(
@@ -141,7 +123,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         source: &SecurityContext,
         target: &SecurityContext,
         class: &sc::FileClass,
-    ) -> Result<SecurityContext, NewSecurityContextError> {
+    ) -> Result<SecurityContext, SecurityContextError> {
         let object_class = sc::ObjectClass::from(class.clone());
         self.new_security_context(
             source,
@@ -187,70 +169,78 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         default_type: TypeId,
         default_low_level: &SecurityLevel,
         default_high_level: Option<&SecurityLevel>,
-    ) -> Result<SecurityContext, NewSecurityContextError> {
-        let policy_class = self.class(&class);
-        let class_defaults = policy_class.defaults();
-
-        let user = match class_defaults.user() {
-            ClassDefault::Source => source.user(),
-            ClassDefault::Target => target.user(),
-            _ => source.user(),
-        };
-
-        let role = match self.role_transition_new_role(source.role(), target.type_(), policy_class)
+    ) -> Result<SecurityContext, SecurityContextError> {
+        let (user, role, type_, low_level, high_level) = if let Some(policy_class) =
+            self.class(&class)
         {
-            Some(new_role) => new_role,
-            None => match class_defaults.role() {
-                ClassDefault::Source => source.role(),
-                ClassDefault::Target => target.role(),
-                _ => default_role,
-            },
+            let class_defaults = policy_class.defaults();
+
+            let user = match class_defaults.user() {
+                ClassDefault::Source => source.user(),
+                ClassDefault::Target => target.user(),
+                _ => source.user(),
+            };
+
+            let role =
+                match self.role_transition_new_role(source.role(), target.type_(), policy_class) {
+                    Some(new_role) => new_role,
+                    None => match class_defaults.role() {
+                        ClassDefault::Source => source.role(),
+                        ClassDefault::Target => target.role(),
+                        _ => default_role,
+                    },
+                };
+
+            let type_ =
+                match self.type_transition_new_type(source.type_(), target.type_(), policy_class) {
+                    Some(new_type) => new_type,
+                    None => match class_defaults.type_() {
+                        ClassDefault::Source => source.type_(),
+                        ClassDefault::Target => target.type_(),
+                        _ => default_type,
+                    },
+                };
+
+            let (low_level, high_level) =
+                match self.range_transition_new_range(source.type_(), target.type_(), policy_class)
+                {
+                    Some((low_level, high_level)) => (low_level, high_level),
+                    None => match class_defaults.range() {
+                        ClassDefaultRange::SourceLow => (source.low_level().clone(), None),
+                        ClassDefaultRange::SourceHigh => {
+                            (source.high_level().unwrap_or(source.low_level()).clone(), None)
+                        }
+                        ClassDefaultRange::SourceLowHigh => {
+                            (source.low_level().clone(), source.high_level().map(Clone::clone))
+                        }
+                        ClassDefaultRange::TargetLow => (target.low_level().clone(), None),
+                        ClassDefaultRange::TargetHigh => {
+                            (target.high_level().unwrap_or(target.low_level()).clone(), None)
+                        }
+                        ClassDefaultRange::TargetLowHigh => {
+                            (target.low_level().clone(), target.high_level().map(Clone::clone))
+                        }
+                        _ => (default_low_level.clone(), default_high_level.map(Clone::clone)),
+                    },
+                };
+
+            (user, role, type_, low_level, high_level)
+        } else {
+            // If the class is not defined in the policy then there can be no transitions, nor class-defined choice of
+            // defaults, so the caller-supplied defaults (effectively "unspecified") should be used.
+            (
+                source.user(),
+                default_role,
+                default_type,
+                default_low_level.clone(),
+                default_high_level.map(Clone::clone),
+            )
         };
 
-        let type_ =
-            match self.type_transition_new_type(source.type_(), target.type_(), policy_class) {
-                Some(new_type) => new_type,
-                None => match class_defaults.type_() {
-                    ClassDefault::Source => source.type_(),
-                    ClassDefault::Target => target.type_(),
-                    _ => default_type,
-                },
-            };
+        // `new()` may fail if the resulting combination of user, role etc is not permitted by the policy.
+        SecurityContext::new(self, user, role, type_, low_level, high_level)
 
-        let (low_level, high_level) =
-            match self.range_transition_new_range(source.type_(), target.type_(), policy_class) {
-                Some((low_level, high_level)) => (low_level, high_level),
-                None => match class_defaults.range() {
-                    ClassDefaultRange::SourceLow => (source.low_level().clone(), None),
-                    ClassDefaultRange::SourceHigh => {
-                        (source.high_level().unwrap_or(source.low_level()).clone(), None)
-                    }
-                    ClassDefaultRange::SourceLowHigh => {
-                        (source.low_level().clone(), source.high_level().map(Clone::clone))
-                    }
-                    ClassDefaultRange::TargetLow => (target.low_level().clone(), None),
-                    ClassDefaultRange::TargetHigh => {
-                        (target.high_level().unwrap_or(target.low_level()).clone(), None)
-                    }
-                    ClassDefaultRange::TargetLowHigh => {
-                        (target.low_level().clone(), target.high_level().map(Clone::clone))
-                    }
-                    _ => (default_low_level.clone(), default_high_level.map(Clone::clone)),
-                },
-            };
-
-        // TODO(b/319232900): Ensure that the generated Context has e.g. valid security range.
-        SecurityContext::new(self, user, role, type_, low_level.clone(), high_level.clone())
-            .map_err(|err| NewSecurityContextError::MalformedComputedSecurityContext {
-                source_security_context: source.clone(),
-                target_security_context: target.clone(),
-                computed_user: user,
-                computed_role: role,
-                computed_type: type_,
-                computed_low_level: low_level,
-                computed_high_level: high_level,
-                error: err,
-            })
+        // TODO(http://b/334968228): Validate domain & role transitions are allowed?
     }
 
     /// Returns the Id of the "object_r" role within the `parsed_policy`, for use when validating
@@ -265,7 +255,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
     /// Returns the [`SecurityContext`] defined by this policy for the specified
     /// well-known (or "initial") Id.
-    pub(super) fn initial_context(&self, id: sc::InitialSid) -> security_context::SecurityContext {
+    pub(super) fn initial_context(&self, id: sc::InitialSid) -> SecurityContext {
         // All [`InitialSid`] have already been verified as resolvable, by `new()`.
         self.resolve_initial_context(id).unwrap()
     }
@@ -274,14 +264,14 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     fn resolve_initial_context(
         &self,
         id: sc::InitialSid,
-    ) -> Result<security_context::SecurityContext, security_context::SecurityContextError> {
+    ) -> Result<SecurityContext, SecurityContextError> {
         let context = self.parsed_policy().initial_context(id);
         let low_level = self.security_level(context.low_level());
         let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
 
         // Creation of the new [`SecurityContext`] will fail if the fields are inconsistent
         // with the policy-defined constraints (e.g. on user roles, etc).
-        security_context::SecurityContext::new(
+        SecurityContext::new(
             &self,
             context.user_id(),
             context.role_id(),
@@ -293,20 +283,20 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
     /// Helper used by `initial_context()` to create a [`sc::SecurityLevel`] instance from
     /// the policy fields.
-    fn security_level(&self, level: &MlsLevel<PS>) -> security_context::SecurityLevel {
-        security_context::SecurityLevel::new(
+    fn security_level(&self, level: &MlsLevel<PS>) -> SecurityLevel {
+        SecurityLevel::new(
             level.sensitivity(),
             level.categories().spans().map(|span| self.security_context_category(span)).collect(),
         )
     }
 
     /// Helper used by `security_level()` to create a `Category` instance from policy fields.
-    fn security_context_category(&self, span: ExtensibleBitmapSpan) -> security_context::Category {
+    fn security_context_category(&self, span: ExtensibleBitmapSpan) -> Category {
         // Spans describe zero-based bit indexes, corresponding to 1-based category Ids.
         if span.low == span.high {
-            security_context::Category::Single(CategoryId(NonZeroU32::new(span.low + 1).unwrap()))
+            Category::Single(CategoryId(NonZeroU32::new(span.low + 1).unwrap()))
         } else {
-            security_context::Category::Range {
+            Category::Range {
                 low: CategoryId(NonZeroU32::new(span.low + 1).unwrap()),
                 high: CategoryId(NonZeroU32::new(span.high + 1).unwrap()),
             }
@@ -368,7 +358,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         source_type: TypeId,
         target_type: TypeId,
         class: &Class<PS>,
-    ) -> Option<(security_context::SecurityLevel, Option<security_context::SecurityLevel>)> {
+    ) -> Option<(SecurityLevel, Option<SecurityLevel>)> {
         for range_transition in self.parsed_policy.range_transitions() {
             if range_transition.source_type() == source_type
                 && range_transition.target_type() == target_type

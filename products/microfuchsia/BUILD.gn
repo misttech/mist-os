@@ -20,7 +20,6 @@ bazel_product_bundle("microfuchsia_eng.${target_cpu}") {
   bazel_product_image_target =
       "//products/microfuchsia:microfuchsia_eng.${target_cpu}"
   bazel_recovery_image_target = "//products/zedboot:${target_cpu}"
-  bazel_elf_sizes_target = "//products/microfuchsia:elf_sizes.${target_cpu}"
   bazel_inputs_from_gn = [
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",

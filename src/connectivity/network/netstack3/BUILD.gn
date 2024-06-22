@@ -14,6 +14,7 @@ import("//build/rust/rustc_binary.gni")
 import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 
 common_deps = [
+  ":config_lib",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
   "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
   "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
@@ -111,7 +112,9 @@ common_sources = [
   "src/bindings/root_fidl_worker.rs",
   "src/bindings/routes.rs",
   "src/bindings/routes/admin.rs",
+  "src/bindings/routes/rules_admin.rs",
   "src/bindings/routes/state.rs",
+  "src/bindings/routes/watcher.rs",
   "src/bindings/routes/witness.rs",
   "src/bindings/socket.rs",
   "src/bindings/socket/datagram.rs",
@@ -197,32 +200,80 @@ rustc_binary("bin-instrumented") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-network_unified_binary_regular_and_gub_components("component") {
+fuchsia_component_manifest("component_manifest") {
   component_name = "netstack3"
   manifest = "meta/netstack3.cml"
+}
+
+network_unified_binary_regular_and_gub_components("component") {
+  cm_label = ":component_manifest"
+  component_name = "netstack3"
   gub_deps = [ ":bin" ]
+}
+
+fuchsia_structured_config_rust_lib("config_lib") {
+  name = "ns3_config"
+  cm_label = ":component_manifest"
+}
+
+fuchsia_structured_config_values("config_for_tests") {
+  cm_label = ":component_manifest"
+  values_source = "config/test.json5"
+}
+
+template("ns3_test_component") {
+  _manifest_target = "${target_name}_manifest"
+  _config_target = "${target_name}_config"
+  fuchsia_component_manifest(_manifest_target) {
+    forward_variables_from(invoker,
+                           [
+                             "component_name",
+                             "manifest",
+                           ])
+    visibility = [ ":*" ]
+  }
+
+  fuchsia_structured_config_values(_config_target) {
+    cm_label = ":${_manifest_target}"
+    values_source = invoker.config_values_source
+    visibility = [ ":*" ]
+  }
+
+  fuchsia_component(target_name) {
+    forward_variables_from(invoker, [ "deps" ])
+    cm_label = ":${_manifest_target}"
+    testonly = true
+
+    # For ease of using embedded test component, we mark the configuration
+    # values as a component dependency directly. This suits the current needs
+    # with very basic configuration. If structured config grows to be used more
+    # richly this should be revisited.
+    deps += [ ":${_config_target}" ]
+  }
 }
 
 # Component with debugging instrumentation enabled. This should be used for
 # tests but not benchmarks.
-fuchsia_component("component-debug") {
+ns3_test_component("component-debug") {
   component_name = "netstack3-debug"
   manifest = "meta/netstack3_debug.cml"
+  config_values_source = "config/test.json5"
   deps = [ ":bin-instrumented" ]
-  testonly = true
 }
 
 # Drop-in component with the name "netstack" rather than "netstack3."
-fuchsia_component("component-dropin") {
+ns3_test_component("component-dropin") {
   component_name = "netstack"
   manifest = "meta/netstack3.cml"
+  config_values_source = "config/test.json5"
   deps = [ ":bin" ]
 }
-fuchsia_component("component-debug-dropin") {
+
+ns3_test_component("component-debug-dropin") {
   component_name = "netstack-debug"
   manifest = "meta/netstack3_debug.cml"
+  config_values_source = "config/test.json5"
   deps = [ ":bin-instrumented" ]
-  testonly = true
 }
 
 fuchsia_unittest_component("netstack3-bin_test") {

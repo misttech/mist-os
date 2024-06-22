@@ -73,8 +73,10 @@ func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) 
 		return nil, err
 	}
 
+	// json formatting:
+	// https://fuchsia.dev/reference/tools/fx/cmd/format-code
 	json_output := filepath.Join(outputDir, "libzircon.json")
-	json_bytes, err := json.MarshalIndent(syscall_names, "", "  ")
+	json_bytes, err := json.MarshalIndent(syscall_names, "", "    ")
 	if err != nil {
 		return nil, err
 	}

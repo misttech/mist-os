@@ -108,6 +108,7 @@ class PlatformDevice : public PlatformDeviceType,
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override;
   void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override;
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
+  void GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -136,6 +137,7 @@ class PlatformDevice : public PlatformDeviceType,
   fdf::OutgoingDirectory outgoing_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bus_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> device_bindings_;
+  std::unordered_map<uint32_t, std::vector<uint8_t>> metadata_;
 };
 
 }  // namespace platform_bus

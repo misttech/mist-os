@@ -11,7 +11,7 @@ import("//build/testing/host_test_data.gni")
 
 declare_args() {
   # Enforce ABI compatibility checks for stable API levels.
-  enforce_abi_compat = false
+  enforce_abi_compat = true
 }
 
 # These API levels have known ABI incomaptibilities with the platform that we don't plan to fix.
@@ -60,6 +60,7 @@ if (is_host) {
     edition = "2021"
     deps = abi_compat_deps + [ "//third_party/rust_crates:tempfile" ]
     sources = abi_compat_sources + [
+                "src/compare/protocol_tests.rs",
                 "src/compare/test.rs",
                 "src/compare/types_tests.rs",
               ]
@@ -130,4 +131,8 @@ group("abi-compat") {
 group("tests") {
   deps = [ ":abi_compat_test($host_toolchain)" ]
   testonly = true
+}
+
+group("check-compatibility") {
+  deps = [ ":generate-reports($host_toolchain)" ]
 }

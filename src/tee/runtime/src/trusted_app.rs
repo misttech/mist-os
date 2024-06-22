@@ -9,7 +9,7 @@ use crate::params::ParamAdapter;
 use crate::ta_loader::{SessionContext, TAInterface};
 use anyhow::Error;
 use fidl_fuchsia_tee::{OpResult, Parameter, ReturnOrigin};
-use tee_internal_impl::binding::TEE_SUCCESS;
+use tee_internal::binding::TEE_SUCCESS;
 
 // This structure stores the entry points to the TA and application-specific
 // state like sessions.

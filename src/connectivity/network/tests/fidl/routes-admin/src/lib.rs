@@ -7,6 +7,8 @@
 
 #![cfg(test)]
 
+mod rules;
+
 use std::collections::HashSet;
 
 use assert_matches::assert_matches;
@@ -1526,11 +1528,9 @@ fn route_set_err_stream<I: FidlRouteAdminIpExt>(
         IpInvariant(
             route_set
                 .take_event_stream()
-                .filter_map(|result| async {
-                    match result {
-                        Err(err) => Some(err),
-                        Ok(event) => match event {},
-                    }
+                .map(|result| match result {
+                    Err(err) => err,
+                    Ok(event) => match event {},
                 })
                 .boxed(),
         )

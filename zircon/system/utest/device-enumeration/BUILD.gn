@@ -17,6 +17,7 @@ source_set("common") {
     "common.h",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fsl",
@@ -24,7 +25,6 @@ source_set("common") {
   ]
   deps = [
     ":device-enumeration-shard",
-    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

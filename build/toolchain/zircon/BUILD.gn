@@ -20,6 +20,7 @@ if (current_toolchain == default_toolchain) {
 
       configs = [
         "//build/config/zircon:user",
+        "//build/config/zircon:user-link",
         "//build/config:no-compiler-abi",
       ]
 

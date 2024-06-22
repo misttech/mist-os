@@ -11,6 +11,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 
+#include <cstddef>
+
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
@@ -74,7 +76,7 @@ class PressureNotifierUnitTest : public fuchsia::memory::debug::MemoryPressure,
     return provider;
   }
 
-  int GetWatcherCount() { return notifier_->watchers_.size(); }
+  size_t GetWatcherCount() { return notifier_->watchers_.size(); }
 
   void ReleaseWatchers() {
     for (auto& w : notifier_->watchers_) {
@@ -164,7 +166,7 @@ TEST_F(PressureNotifierUnitTest, Watcher) {
     // Registering the watcher should call OnLevelChanged().
     watcher.Register(Provider());
     RunLoopUntilIdle();
-    ASSERT_EQ(GetWatcherCount(), 1);
+    ASSERT_EQ(GetWatcherCount(), 1ul);
     ASSERT_EQ(watcher.NumChanges(), 1);
 
     // Trigger a pressure level change, causing another call to OnLevelChanged().
@@ -174,7 +176,7 @@ TEST_F(PressureNotifierUnitTest, Watcher) {
   }
 
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 0);
+  ASSERT_EQ(GetWatcherCount(), 0ul);
 }
 
 TEST_F(PressureNotifierUnitTest, NotifyCb) {
@@ -189,7 +191,7 @@ TEST_F(PressureNotifierUnitTest, NoResponse) {
 
   watcher.Register(Provider());
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 1);
+  ASSERT_EQ(GetWatcherCount(), 1ul);
   ASSERT_EQ(watcher.NumChanges(), 1);
 
   // This should not trigger a new notification as the watcher has not responded to the last one.
@@ -207,7 +209,7 @@ TEST_F(PressureNotifierUnitTest, DelayedResponse) {
   TriggerLevelChange(Level::kNormal);
   watcher.Register(Provider());
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 1);
+  ASSERT_EQ(GetWatcherCount(), 1ul);
   ASSERT_EQ(watcher.NumChanges(), 1);
 
   // This should not trigger a new notification as the watcher has not responded to the last one.
@@ -232,7 +234,7 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchers) {
     watcher1.Register(Provider());
     watcher2.Register(Provider());
     RunLoopUntilIdle();
-    ASSERT_EQ(GetWatcherCount(), 2);
+    ASSERT_EQ(GetWatcherCount(), 2ul);
     ASSERT_EQ(watcher1.NumChanges(), 1);
     ASSERT_EQ(watcher2.NumChanges(), 1);
 
@@ -244,7 +246,7 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchers) {
   }
 
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 0);
+  ASSERT_EQ(GetWatcherCount(), 0ul);
 }
 
 TEST_F(PressureNotifierUnitTest, MultipleWatchersNoResponse) {
@@ -254,7 +256,7 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchersNoResponse) {
   watcher1.Register(Provider());
   watcher2.Register(Provider());
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 2);
+  ASSERT_EQ(GetWatcherCount(), 2ul);
   ASSERT_EQ(watcher1.NumChanges(), 1);
   ASSERT_EQ(watcher2.NumChanges(), 1);
 
@@ -277,7 +279,7 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchersDelayedResponse) {
   watcher1.Register(Provider());
   watcher2.Register(Provider());
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 2);
+  ASSERT_EQ(GetWatcherCount(), 2ul);
   ASSERT_EQ(watcher1.NumChanges(), 1);
   ASSERT_EQ(watcher2.NumChanges(), 1);
 
@@ -308,7 +310,7 @@ TEST_F(PressureNotifierUnitTest, MultipleWatchersMixedResponse) {
   watcher1.Register(Provider());
   watcher2.Register(Provider());
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 2);
+  ASSERT_EQ(GetWatcherCount(), 2ul);
   ASSERT_EQ(watcher1.NumChanges(), 1);
   ASSERT_EQ(watcher2.NumChanges(), 1);
 
@@ -333,7 +335,7 @@ TEST_F(PressureNotifierUnitTest, ReleaseWatcherNoPendingCallback) {
 
   watcher.Register(Provider());
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 1);
+  ASSERT_EQ(GetWatcherCount(), 1ul);
   ASSERT_EQ(watcher.NumChanges(), 1);
 
   // Trigger pressure level change, causing another call to OnLevelChanged().
@@ -345,7 +347,7 @@ TEST_F(PressureNotifierUnitTest, ReleaseWatcherNoPendingCallback) {
   ReleaseWatchers();
   RunLoopUntilIdle();
   // There were no outstanding callbacks, so ReleaseWatchers() sould have freed all watchers.
-  ASSERT_EQ(GetWatcherCount(), 0);
+  ASSERT_EQ(GetWatcherCount(), 0ul);
 }
 
 TEST_F(PressureNotifierUnitTest, ReleaseWatcherPendingCallback) {
@@ -353,7 +355,7 @@ TEST_F(PressureNotifierUnitTest, ReleaseWatcherPendingCallback) {
 
   watcher.Register(Provider());
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 1);
+  ASSERT_EQ(GetWatcherCount(), 1ul);
   ASSERT_EQ(watcher.NumChanges(), 1);
 
   // This should not trigger a new notification as the watcher has not responded to the last one.
@@ -365,13 +367,13 @@ TEST_F(PressureNotifierUnitTest, ReleaseWatcherPendingCallback) {
   ReleaseWatchers();
   RunLoopUntilIdle();
   // Verify that the watcher has not been freed yet, since a callback is outstanding.
-  ASSERT_EQ(GetWatcherCount(), 1);
+  ASSERT_EQ(GetWatcherCount(), 1ul);
 
   // Respond now. This should free the watcher as well.
   watcher.Respond();
   RunLoopUntilIdle();
   // Verify that the watcher has been freed.
-  ASSERT_EQ(GetWatcherCount(), 0);
+  ASSERT_EQ(GetWatcherCount(), 0ul);
 }
 
 TEST_F(PressureNotifierUnitTest, WatcherDoesNotSeeImminentOOM) {
@@ -380,7 +382,7 @@ TEST_F(PressureNotifierUnitTest, WatcherDoesNotSeeImminentOOM) {
   TriggerLevelChange(Level::kImminentOOM);
   watcher.Register(Provider());
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 1);
+  ASSERT_EQ(GetWatcherCount(), 1ul);
   ASSERT_EQ(watcher.NumChanges(), 1);
   // Watcher sees the initial level as Critical even though it was Imminent-OOM.
   ASSERT_EQ(watcher.LastLevel(), fmp::Level::CRITICAL);
@@ -405,7 +407,7 @@ TEST_F(PressureNotifierUnitTest, DelayedWatcherDoesNotSeeImminentOOM) {
   TriggerLevelChange(Level::kNormal);
   watcher.Register(Provider());
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 1);
+  ASSERT_EQ(GetWatcherCount(), 1ul);
   ASSERT_EQ(watcher.NumChanges(), 1);
   ASSERT_EQ(watcher.LastLevel(), fmp::Level::NORMAL);
 
@@ -607,7 +609,7 @@ TEST_F(PressureNotifierUnitTest, SimulatePressure) {
     watcher1.Register(Provider());
     watcher2.Register(Provider());
     RunLoopUntilIdle();
-    ASSERT_EQ(GetWatcherCount(), 2);
+    ASSERT_EQ(GetWatcherCount(), 2ul);
     ASSERT_EQ(watcher1.NumChanges(), 1);
     ASSERT_EQ(watcher2.NumChanges(), 1);
 
@@ -645,7 +647,7 @@ TEST_F(PressureNotifierUnitTest, SimulatePressure) {
   }
 
   RunLoopUntilIdle();
-  ASSERT_EQ(GetWatcherCount(), 0);
+  ASSERT_EQ(GetWatcherCount(), 0ul);
 }
 
 }  // namespace test

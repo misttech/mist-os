@@ -12,6 +12,9 @@ from typing import Sequence
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+_EVENT_CATEGORY = "power"
+_LOAD_GEN = "load_generator"
+_SAG = "system-activity-governor"
 
 
 @dataclasses.dataclass
@@ -118,57 +121,6 @@ class AggregatePowerMetrics:
 class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
     """Computes power consumption metrics."""
 
-    def find_test_start(
-        self, model: trace_model.Model
-    ) -> trace_time.TimePoint | None:
-        """Identify the point at which the test workload began.
-
-        In order to sync power measurements with a system trace, our test harness
-        runs a process on-device that generates structured CPU load. This process
-        is named `load_generator.cm`. The first TimePoint after all the threads of
-        this process exit is the first moment that data should be used for metrics
-        calculation.
-
-        Args:
-            model: In-memory representation of a merged power and system trace.
-
-        Returns:
-            The first TimePoint after power/system trace sync signals complete.
-        """
-        load_generator: trace_model.Process | None = None
-        for proc in model.processes:
-            if proc.name and proc.name.startswith("load_generator"):
-                load_generator = proc
-                break
-
-        if not load_generator:
-            return None
-
-        load_generator_threads = [t.tid for t in load_generator.threads]
-
-        def is_last_generator_thread_record(
-            r: trace_model.ContextSwitch,
-        ) -> bool:
-            return (
-                r.outgoing_tid in load_generator_threads
-                and r.outgoing_state
-                == trace_model.ThreadState.ZX_THREAD_STATE_DEAD
-            )
-
-        records = sorted(
-            filter(
-                is_last_generator_thread_record,
-                trace_utils.filter_records(
-                    itertools.chain.from_iterable(
-                        model.scheduling_records.values()
-                    ),
-                    trace_model.ContextSwitch,
-                ),
-            ),
-            key=lambda r: r.start,
-        )
-        return records[-1].start if records else None
-
     def process_metrics(
         self, model: trace_model.Model
     ) -> Sequence[trace_metrics.TestCaseResult]:
@@ -184,7 +136,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
         Returns:
             Set of metrics results for this test case.
         """
-        test_start = self.find_test_start(model)
+        test_start = _find_test_start(model)
         if test_start is None:
             _LOGGER.info(
                 "No load_generator scheduling records present. Power data may not have been "
@@ -199,7 +151,12 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
             name="Metrics",
             type=trace_model.CounterEvent,
         )
+
+        suspend_windows = _find_suspend_windows(post_sync_model)
+        _LOGGER.info(f"Identified suspend windows: {suspend_windows}")
+
         power_metrics = AggregatePowerMetrics()
+        suspend_power_metrics = AggregatePowerMetrics()
         for me in metrics_events:
             # These args are set in append_power_data()
             # found in //src/tests/end_to_end/power/power_test_utils.py
@@ -213,6 +170,8 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
                     else None,
                 )
                 power_metrics.process_sample(sample)
+                if any(me.start in window for window in suspend_windows):
+                    suspend_power_metrics.process_sample(sample)
 
         if power_metrics.is_uninitialized:
             _LOGGER.warning(
@@ -221,4 +180,107 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
             )
             return []
 
-        return power_metrics.to_fuchsiaperf_results(tag="_by_model")
+        suspend_results = (
+            []
+            if suspend_power_metrics.is_uninitialized
+            else suspend_power_metrics.to_fuchsiaperf_results(tag="_suspend")
+        )
+
+        return (
+            power_metrics.to_fuchsiaperf_results(tag="_by_model")
+            + suspend_results
+        )
+
+
+def _find_test_start(model: trace_model.Model) -> trace_time.TimePoint | None:
+    """Identify the point at which the test workload began.
+
+    In order to sync power measurements with a system trace, our test harness
+    runs a process on-device that generates structured CPU load. This process
+    is named `load_generator.cm`. The first TimePoint after all the threads of
+    this process exit is the first moment that data should be used for metrics
+    calculation.
+
+    Args:
+        model: In-memory representation of a merged power and system trace.
+
+    Returns:
+        The first TimePoint after power/system trace sync signals complete.
+    """
+    load_generator: trace_model.Process | None = None
+    for proc in model.processes:
+        if proc.name and proc.name.startswith(_LOAD_GEN):
+            load_generator = proc
+            break
+
+    if not load_generator:
+        return None
+
+    load_generator_threads = [t.tid for t in load_generator.threads]
+
+    def is_last_generator_thread_record(
+        r: trace_model.ContextSwitch,
+    ) -> bool:
+        return (
+            r.outgoing_tid in load_generator_threads
+            and r.outgoing_state == trace_model.ThreadState.ZX_THREAD_STATE_DEAD
+        )
+
+    records = sorted(
+        filter(
+            is_last_generator_thread_record,
+            trace_utils.filter_records(
+                itertools.chain.from_iterable(
+                    model.scheduling_records.values()
+                ),
+                trace_model.ContextSwitch,
+            ),
+        ),
+        key=lambda r: r.start,
+    )
+    return records[-1].start if records else None
+
+
+def _find_suspend_windows(
+    model: trace_model.Model,
+) -> Sequence[trace_time.Window]:
+    """Identify periods of suspension in model.
+
+    Inspect scheduling records in TimePoint order across all CPUs to identify periods of
+    suspension.
+
+        Args:
+            model: In-memory representation of a system trace.
+
+        Returns:
+            Windows of time during which the device was suspended.
+    """
+    system_activity_governor: trace_model.Process | None = None
+    for proc in model.processes:
+        if proc.name and proc.name.startswith(_SAG):
+            system_activity_governor = proc
+            break
+
+    if not system_activity_governor:
+        _LOGGER.info(f"No {_SAG} process; skipping suspend metrics")
+        return []
+
+    suspend_windows: list[trace_time.Window] = []
+    events = filter(
+        lambda e: e.pid == system_activity_governor.pid,
+        trace_utils.filter_events(
+            model.all_events(),
+            category=_EVENT_CATEGORY,
+            name="suspend",
+            type=trace_model.DurationEvent,
+        ),
+    )
+    for suspend in events:
+        if suspend.duration is None:
+            _LOGGER.warning("Skipping suspend event with empty duration")
+            continue
+        suspend_windows.append(
+            trace_time.Window(suspend.start, suspend.start + suspend.duration)
+        )
+
+    return suspend_windows

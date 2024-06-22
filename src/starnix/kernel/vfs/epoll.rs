@@ -211,7 +211,7 @@ impl EpollFileObject {
                     events: epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR,
                     data: epoll_event.data(),
                     wait_canceler: None,
-                    wake_lease: Default::default(),
+                    wake_lease: WakeLease::new("epoll"),
                 });
                 self.wait_on_file(current_task, key, wait_object)
             }

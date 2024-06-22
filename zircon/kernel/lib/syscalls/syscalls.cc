@@ -34,7 +34,7 @@
 
 namespace {
 
-struct SyscallNameEntry {
+struct SyscallNameRefEntry {
   fxt::StringRef<fxt::RefType::kId> name{"[unknown]"_intern};
 };
 
@@ -48,7 +48,7 @@ struct SyscallNameEntry {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wc99-designator"
 #endif
-SyscallNameEntry kSyscallNames[] = {
+SyscallNameRefEntry kSyscallNameRefs[] = {
 #include <lib/syscalls/kernel.inc>
 };
 #if defined(__clang__)
@@ -68,8 +68,8 @@ struct syscall_pre_out {
 };
 
 inline fxt::StringRef<fxt::RefType::kId> syscall_name_ref(uint64_t syscall_num) {
-  if (syscall_num < ktl::size(kSyscallNames)) {
-    return kSyscallNames[syscall_num].name;
+  if (syscall_num < ktl::size(kSyscallNameRefs)) {
+    return kSyscallNameRefs[syscall_num].name;
   }
   return "[out of range]"_intern;
 }
@@ -90,8 +90,8 @@ __NO_INLINE syscall_pre_out do_syscall_pre(uint64_t syscall_num, uint64_t pc) {
      above CPU_STATS_INC call as it also calls arch_curr_cpu_num. */
   arch_enable_ints();
 
-  LTRACEF_LEVEL(2, "t %p syscall num %" PRIu64 " ip/pc %#" PRIx64 "\n", Thread::Current::Get(),
-                syscall_num, pc);
+  LTRACEF_LEVEL(2, "t %p syscall %s ip/pc %#" PRIx64 "\n", Thread::Current::Get(),
+                kSyscallNames[syscall_num], pc);
 
   ProcessDispatcher* current_process = ProcessDispatcher::GetCurrent();
   uintptr_t vdso_code_address = current_process->vdso_code_address();

@@ -557,7 +557,7 @@ where
     // the `StackState`s are dropped at the end of the test.
     for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
         net.with_context(ctx, |ctx| {
-            ctx.test_api().clear_routes_and_remove_ethernet_device(device);
+            ctx.test_api().clear_routes_and_remove_device(device);
         });
     }
 }
@@ -620,7 +620,7 @@ where
     // the `StackState`s are dropped at the end of the test.
     for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
         net.with_context(ctx, |ctx| {
-            ctx.test_api().clear_routes_and_remove_ethernet_device(device);
+            ctx.test_api().clear_routes_and_remove_device(device);
         });
     }
 }

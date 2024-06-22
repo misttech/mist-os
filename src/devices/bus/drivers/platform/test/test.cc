@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
 
 #include "test-resources.h"

@@ -665,6 +665,27 @@ TEST_P(BlobTest, WriteBlobChunked) {
   }
 }
 
+TEST_P(BlobTest, GetVmoOnNullBlobIsSupported) {
+  std::unique_ptr<BlobInfo> info = GenerateRandomBlob("", 0);
+  auto root = OpenRoot();
+
+  zx::result blob = root->Create(info->path, fs::CreationType::kFile);
+  ASSERT_TRUE(blob.is_ok()) << blob.status_string();
+  ASSERT_EQ(blob->Truncate(0), ZX_OK);
+  // Make sure the async part of the write finishes.
+  loop().RunUntilIdle();
+  ASSERT_EQ(blob->Close(), ZX_OK);
+  ASSERT_EQ(blob->Open(nullptr), ZX_OK);
+  zx::vmo vmo;
+  ASSERT_EQ(blob->GetVmo(fio::wire::VmoFlags::kRead, &vmo), ZX_OK);
+
+  ASSERT_EQ(blob->Close(), ZX_OK);
+
+  uint64_t content_size = 123456;
+  ASSERT_EQ(vmo.get_prop_content_size(&content_size), ZX_OK);
+  ASSERT_EQ(content_size, 0ul);
+}
+
 std::string GetTestParamName(
     const ::testing::TestParamInfo<std::tuple<BlobLayoutFormat, CompressionAlgorithm>>& param) {
   const auto& [layout, compression_algorithm] = param.param;

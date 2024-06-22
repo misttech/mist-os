@@ -901,7 +901,7 @@ void CompileStep::CompileResource(Resource* resource_declaration) {
 }
 
 static void SetResultUnionFields(Protocol::Method* method) {
-  bool has_framework_error = method->kind() == Protocol::Method::Kind::kTwoWay &&
+  bool has_framework_error = method->kind == Protocol::Method::Kind::kTwoWay &&
                              method->strictness == Strictness::kFlexible;
   if (!method->has_error && !has_framework_error)
     return;
@@ -1013,13 +1013,12 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       ValidatePayload(type_ctor);
     if (auto* type_ctor = method.result_domain_error_type_ctor)
       ValidateDomainError(type_ctor);
-    auto kind = method.kind();
     bool flexible = method.strictness == Strictness::kFlexible;
-    bool two_way = kind == Protocol::Method::Kind::kTwoWay;
+    bool two_way = method.kind == Protocol::Method::Kind::kTwoWay;
     if (flexible && two_way && openness != Openness::kOpen) {
       reporter()->Fail(ErrFlexibleTwoWayMethodRequiresOpenProtocol, method.name, openness);
     } else if (flexible && !two_way && openness == Openness::kClosed) {
-      reporter()->Fail(ErrFlexibleOneWayMethodInClosedProtocol, method.name, kind);
+      reporter()->Fail(ErrFlexibleOneWayMethodInClosedProtocol, method.name, method.kind);
     }
   }
 

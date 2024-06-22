@@ -5,7 +5,7 @@
 #![recursion_limit = "1024"]
 
 use anyhow::{format_err, Context, Error};
-use fuchsia_bluetooth::profile::{psm_from_protocol, Psm};
+use fuchsia_bluetooth::profile::{psm_from_protocol, ProtocolDescriptor, Psm};
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect as inspect;
@@ -113,7 +113,16 @@ async fn main() -> Result<(), Error> {
                 match request {
                     ProfileEvent::PeerConnected { id, protocol, channel } => {
                         info!("Incoming connection request from {id} with protocol: {protocol:?}");
-                        let protocol = protocol.iter().map(Into::into).collect();
+
+                        let protocol = protocol
+                            .iter()
+                            .map(|proto| ProtocolDescriptor::try_from(proto))
+                            .collect::<Result<Vec<_>, _>>();
+                        let Ok(protocol) = protocol else {
+                            warn!("Invalid ProtocolDescriptor from PeerConnected: {protocol:?}");
+                            continue;
+                        };
+
                         match psm_from_protocol(&protocol) {
                             Some(Psm::AVCTP) => {
                                 peer_manager.new_control_connection(&id, channel);

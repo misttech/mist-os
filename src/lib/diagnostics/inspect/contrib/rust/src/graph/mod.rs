@@ -123,6 +123,13 @@
 //! - `event`: the name of the event: `"remove_edge"`.
 //! - `id`: the internally generated Edge ID.
 //!
+//! ## Overview of type structure
+//!
+//! GraphMetadata is the key-value storage per inspect Node; the value's type is MetadataProperty.
+//! VertexGraphMetadata and EdgeGraphMetadata each contain a field, inner, of type GraphMetadata.
+//!
+//! Metadata is used as input specification but not storage. It holds key and value;
+//! the value is an InnerMetadata enum with internal types MetadataValue and boolean, or Nested.
 
 mod digraph;
 mod edge;

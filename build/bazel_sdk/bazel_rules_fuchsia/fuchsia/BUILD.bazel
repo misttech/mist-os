@@ -5,6 +5,10 @@
 # Public Fuchsia rules.
 
 load("//fuchsia/private:fuchsia_api_level.bzl", "fuchsia_api_level")
+load(
+    "//fuchsia/private/assembly:fuchsia_assembly_developer_overrides.bzl",
+    "fuchsia_assembly_developer_overrides_list",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -69,6 +73,17 @@ fuchsia_api_level(
     name = "repository_default_fuchsia_api_level",
     # LINT.ThenChange(private/fuchsia_transition.bzl)
     build_setting_default = "",
+)
+
+# Set --@fuchsia_sdk//:assembly_developer_overrides_list=<label>
+# to point to a fuchsia_assembly_developer_overrides_list() target.
+label_flag(
+    name = "assembly_developer_overrides_list",
+    build_setting_default = ":empty_assembly_developer_overrides_list",
+)
+
+fuchsia_assembly_developer_overrides_list(
+    name = "empty_assembly_developer_overrides_list",
 )
 
 # Toolchain type for the Fuchsia toolchain.

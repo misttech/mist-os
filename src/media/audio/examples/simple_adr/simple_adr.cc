@@ -4,27 +4,19 @@
 
 #include "src/media/audio/examples/simple_adr/simple_adr.h"
 
-#include <fidl/fuchsia.audio.device/cpp/common_types.h>
-#include <fidl/fuchsia.audio.device/cpp/markers.h>
-#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
-#include <fidl/fuchsia.audio/cpp/common_types.h>
-#include <lib/async-loop/cpp/loop.h>
+#include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fidl/cpp/unified_messaging.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fzl/vmar-manager.h>
-#include <lib/fzl/vmo-mapper.h>
-#include <lib/syslog/cpp/log_settings.h>
-#include <lib/syslog/cpp/macros.h>
+#include <lib/sys/cpp/component_context.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
-#include <math.h>
 
+#include <cassert>
 #include <cmath>
 #include <cstdlib>
-#include <ctime>
 #include <iomanip>
 #include <iostream>
 #include <ostream>
@@ -38,7 +30,7 @@ namespace examples {
 inline std::ostream& operator<<(
     std::ostream& out,
     const std::optional<fuchsia_audio_device::PlugDetectCapabilities>& plug_caps) {
-  if (plug_caps) {
+  if (plug_caps.has_value()) {
     switch (*plug_caps) {
       case fuchsia_audio_device::PlugDetectCapabilities::kHardwired:
         return (out << "kHardwired");
@@ -48,12 +40,12 @@ inline std::ostream& operator<<(
         return (out << "unknown PlugDetectCapabilities enum");
     }
   }
-  return (out << "NONE (non-compliant)");
+  return (out << "NONE");
 }
 
 inline std::ostream& operator<<(std::ostream& out,
                                 const std::optional<fuchsia_audio_device::PlugState>& plug_state) {
-  if (plug_state) {
+  if (plug_state.has_value()) {
     switch (*plug_state) {
       case fuchsia_audio_device::PlugState::kPlugged:
         return (out << "kPlugged");
@@ -68,7 +60,7 @@ inline std::ostream& operator<<(std::ostream& out,
 
 inline std::ostream& operator<<(std::ostream& out,
                                 const std::optional<fuchsia_audio::SampleType>& sample_type) {
-  if (sample_type) {
+  if (sample_type.has_value()) {
     switch (*sample_type) {
       case fuchsia_audio::SampleType::kUint8:
         return (out << "kUint8");
@@ -89,7 +81,7 @@ inline std::ostream& operator<<(std::ostream& out,
 
 inline std::ostream& operator<<(std::ostream& out,
                                 const std::optional<fuchsia_audio::ChannelLayout>& channel_layout) {
-  if (channel_layout) {
+  if (channel_layout.has_value()) {
     switch (channel_layout->config().value()) {
       case fuchsia_audio::ChannelConfig::kMono:
         return (out << "kMono");
@@ -110,254 +102,315 @@ inline std::ostream& operator<<(std::ostream& out,
   return (out << "NONE");
 }
 
-template <typename ProtocolT>
-FidlHandler<ProtocolT>::FidlHandler(MediaApp* parent, std::string_view name)
-    : parent_(parent), name_(name) {}
+inline std::ostream& operator<<(std::ostream& out,
+                                const fuchsia_audio_device::DeviceType& device_type) {
+  switch (device_type) {
+    case fuchsia_audio_device::DeviceType::kCodec:
+      return (out << "kCodec");
+    case fuchsia_audio_device::DeviceType::kComposite:
+      return (out << "kComposite");
+    case fuchsia_audio_device::DeviceType::kDai:
+      return (out << "kDai");
+    case fuchsia_audio_device::DeviceType::kInput:
+      return (out << "kInput");
+    case fuchsia_audio_device::DeviceType::kOutput:
+      return (out << "kOutput");
+    default:
+      return (out << "unknown DeviceType enum");
+  }
+}
 
 // fidl::AsyncEventHandler<> implementation, called when the server disconnects its channel.
 template <typename ProtocolT>
 void FidlHandler<ProtocolT>::on_fidl_error(fidl::UnbindInfo error) {
-  // fidl::AsyncEventHandler<> implementation, called when the server disconnects its channel.
-  std::cerr << name_ << ":" << __func__ << ", shutting down... " << error << '\n';
+  if (!error.is_user_initiated() && !error.is_peer_closed() && !error.is_dispatcher_shutdown()) {
+    std::cout << name_ << ":" << __func__ << ", shutting down... " << error << '\n';
+  }
   parent_->Shutdown();
 }
 
+// static
+std::optional<fidl::Client<fuchsia_audio_device::Registry>> MediaApp::registry_client_ =
+    std::nullopt;
+std::optional<fidl::SyncClient<fuchsia_audio_device::ControlCreator>>
+    MediaApp::control_creator_client_ = std::nullopt;
+
 MediaApp::MediaApp(async::Loop& loop, fit::closure quit_callback)
     : loop_(loop), quit_callback_(std::move(quit_callback)) {
-  FX_CHECK(quit_callback_);
+  assert(quit_callback_);
 }
 
 void MediaApp::Run() {
-  std::cout << __func__ << '\n';
-
   ConnectToRegistry();
-  WaitForFirstAudioOutput();
+  WaitForFirstAudioDevice();
 }
 
 void MediaApp::ConnectToRegistry() {
-  std::cout << __func__ << '\n';
-
-  zx::result client_end = component::Connect<fuchsia_audio_device::Registry>();
-  registry_client_ = fidl::Client<fuchsia_audio_device::Registry>(
-      std::move(*client_end), loop_.dispatcher(), &reg_handler_);
+  if (!registry_client_.has_value()) {
+    zx::result client_end = component::Connect<fuchsia_audio_device::Registry>();
+    registry_client_ = fidl::Client<fuchsia_audio_device::Registry>(
+        std::move(*client_end), loop_.dispatcher(), &reg_handler_);
+  }
 }
 
-void MediaApp::WaitForFirstAudioOutput() {
-  std::cout << __func__ << '\n';
-
-  registry_client_->WatchDevicesAdded().Then([this](fidl::Result<fuchsia_audio_device::Registry::
-                                                                     WatchDevicesAdded>& result) {
-    std::cout << "Registry/WatchDevicesAdded callback" << '\n';
-    if (result.is_error()) {
-      std::cerr << "Registry/WatchDevicesAdded error: " << result.error_value().FormatDescription()
-                << '\n';
-      Shutdown();
-      return;
-    }
-
-    // Now that we have been notified of a device, log its information and configure the first
-    // ring_buffer with the first supported ring_buffer_format.
-    for (const auto& device : *result->devices()) {
-      if (*device.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
-        device_token_id_ = *device.token_id();
-        std::cout << "Connecting to audio device:" << '\n';
-        std::cout << "    token_id                  " << device_token_id_ << '\n';
-        std::cout << "    device_type               kOutput" << '\n';
-        std::cout << "    device_name               " << *device.device_name() << '\n';
-        std::cout << "    manufacturer              " << device.manufacturer().value_or("NONE")
-                  << '\n';
-        std::cout << "    product                   " << device.product().value_or("NONE") << '\n';
-
-        std::string uid_str;
-        if (!device.unique_instance_id()) {
-          uid_str = "NONE";
-        } else {
-          uid_str = fxl::StringPrintf(
-              "0x%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
-              (*device.unique_instance_id())[0], (*device.unique_instance_id())[1],
-              (*device.unique_instance_id())[2], (*device.unique_instance_id())[3],
-              (*device.unique_instance_id())[4], (*device.unique_instance_id())[5],
-              (*device.unique_instance_id())[6], (*device.unique_instance_id())[7],
-              (*device.unique_instance_id())[8], (*device.unique_instance_id())[9],
-              (*device.unique_instance_id())[10], (*device.unique_instance_id())[11],
-              (*device.unique_instance_id())[12], (*device.unique_instance_id())[13],
-              (*device.unique_instance_id())[14], (*device.unique_instance_id())[15]);
-        }
-        std::cout << "    unique_instance_id        " << uid_str << '\n';
-
-        // Log ring_buffer_format_sets details
-        std::cout << "    ring_buffer_format_sets[" << device.ring_buffer_format_sets()->size()
-                  << "]" << '\n';
-        for (auto idx = 0u; idx < device.ring_buffer_format_sets()->size(); ++idx) {
-          auto element_ring_buffer_format_set = device.ring_buffer_format_sets()->at(idx);
-          std::cout << "        [" << idx << "]   element_id  "
-                    << *element_ring_buffer_format_set.element_id() << '\n';
-          std::cout << "              format_set ["
-                    << element_ring_buffer_format_set.format_sets()->size() << "]" << '\n';
-          for (auto idx = 0u; idx < element_ring_buffer_format_set.format_sets()->size(); ++idx) {
-            auto ring_buffer_format_set = element_ring_buffer_format_set.format_sets()->at(idx);
-            std::cout << "                  [" << idx << "]  channel_sets ["
-                      << ring_buffer_format_set.channel_sets()->size() << "]" << '\n';
-            for (auto cs = 0u; cs < ring_buffer_format_set.channel_sets()->size(); ++cs) {
-              auto channel_set = (*ring_buffer_format_set.channel_sets())[cs];
-              std::cout << "                [" << cs << "]   attributes["
-                        << channel_set.attributes()->size() << "]" << '\n';
-              for (auto a = 0u; a < channel_set.attributes()->size(); ++a) {
-                auto attribs = (*channel_set.attributes())[a];
-                std::cout << "                        [" << a << "]   min_frequency  "
-                          << (attribs.min_frequency().has_value()
-                                  ? std::to_string(*attribs.min_frequency())
-                                  : "NONE")
-                          << '\n';
-                std::cout << "                              max_frequency  "
-                          << (attribs.max_frequency().has_value()
-                                  ? std::to_string(*attribs.max_frequency())
-                                  : "NONE")
-                          << '\n';
-              }
-            }
-            std::cout << "            sample_types["
-                      << ring_buffer_format_set.sample_types()->size() << "]" << '\n';
-            for (auto st = 0u; st < ring_buffer_format_set.sample_types()->size(); ++st) {
-              std::cout << "                [" << st << "]     "
-                        << (*ring_buffer_format_set.sample_types())[st] << '\n';
-            }
-            std::cout << "            frame_rates [" << ring_buffer_format_set.frame_rates()->size()
-                      << "]" << '\n';
-            for (auto fr = 0u; fr < ring_buffer_format_set.frame_rates()->size(); ++fr) {
-              std::cout << "                [" << fr << "]     "
-                        << (*ring_buffer_format_set.frame_rates())[fr] << '\n';
-            }
-          }
-        }
-
-        // Include `dai_format_sets` here too.
-
-        std::cout << "    is_input                  "
-                  << (device.is_input() ? (*device.is_input() ? "true" : "false") : "UNSPECIFIED")
-                  << '\n';
-
-        std::cout << "    gain_caps" << '\n';
-        std::cout << "        min_gain_db           "
-                  << (device.gain_caps()->min_gain_db()
-                          ? std::to_string(*device.gain_caps()->min_gain_db()) + " dB"
-                          : "NONE (non-compliant)")
-                  << '\n';
-        std::cout << "        max_gain_db           "
-                  << (device.gain_caps()->max_gain_db()
-                          ? std::to_string(*device.gain_caps()->max_gain_db()) + " dB"
-                          : "NONE (non-compliant)")
-                  << '\n';
-        std::cout << "        gain_step_db          "
-                  << (device.gain_caps()->gain_step_db()
-                          ? std::to_string(*device.gain_caps()->gain_step_db()) + " dB"
-                          : "NONE (non-compliant)")
-                  << '\n';
-        std::cout << "        can_mute              "
-                  << (device.gain_caps()->can_mute()
-                          ? (*device.gain_caps()->can_mute() ? "TRUE" : "FALSE")
-                          : "NONE (FALSE)")
-                  << '\n';
-        std::cout << "        can_agc               "
-                  << (device.gain_caps()->can_agc()
-                          ? (*device.gain_caps()->can_agc() ? "TRUE" : "FALSE")
-                          : "NONE (FALSE)")
-                  << '\n';
-        max_gain_db_ = *device.gain_caps()->max_gain_db();  // This example chooses
-        max_gain_db_ = std::min(max_gain_db_, 0.0f);        // not to exceed 0 dB.
-        min_gain_db_ = *device.gain_caps()->min_gain_db();
-
-        std::cout << "    plug_caps                 " << device.plug_detect_caps() << '\n';
-
-        std::string clk_domain_str;
-        if (!device.clock_domain()) {
-          clk_domain_str = "unspecified (CLOCK_DOMAIN_EXTERNAL)";
-        } else if (*device.clock_domain() == 0xFFFFFFFF) {
-          clk_domain_str = "CLOCK_DOMAIN_EXTERNAL";
-        } else if (*device.clock_domain() == 0) {
-          clk_domain_str = "CLOCK_DOMAIN_MONOTONIC";
-        } else {
-          clk_domain_str = std::to_string(*device.clock_domain()) + " (not MONOTONIC)";
-        }
-        std::cout << "    clock_domain              " << clk_domain_str << '\n';
-
-        // Include `signal_processing_elements` here too.
-
-        // Include `signal_processing_topologies` here too.
-
-        // Now determine the format we will use, and connect more deeply to the device.
-        if (!device.ring_buffer_format_sets() || device.ring_buffer_format_sets()->empty() ||
-            !device.ring_buffer_format_sets()->front().format_sets() ||
-            device.ring_buffer_format_sets()->front().format_sets()->empty() ||
-            !device.ring_buffer_format_sets()->front().format_sets()->front().channel_sets() ||
-            device.ring_buffer_format_sets()
-                ->front()
-                .format_sets()
-                ->front()
-                .channel_sets()
-                ->empty() ||
-            !device.ring_buffer_format_sets()
-                 ->front()
-                 .format_sets()
-                 ->front()
-                 .channel_sets()
-                 ->front()
-                 .attributes() ||
-            device.ring_buffer_format_sets()
-                ->front()
-                .format_sets()
-                ->front()
-                .channel_sets()
-                ->front()
-                .attributes()
-                ->empty()) {
-          std::cout
-              << "Cannot determine a channel-count from ring_buffer_format_sets (missing/empty)";
+void MediaApp::WaitForFirstAudioDevice() {
+  if (!registry_client_.has_value()) {
+    Shutdown();
+    return;
+  }
+  (*registry_client_)
+      ->WatchDevicesAdded()
+      .Then([this](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) {
+        if (result.is_error()) {
+          std::cout << "Registry/WatchDevicesAdded error: "
+                    << result.error_value().FormatDescription() << '\n';
           Shutdown();
           return;
         }
-        // For convenience, just use the first channel configuration that the device listed.
-        channels_per_frame_ = device.ring_buffer_format_sets()
-                                  ->front()
-                                  .format_sets()
-                                  ->front()
-                                  .channel_sets()
-                                  ->front()
-                                  .attributes()
-                                  ->size();
 
-        // If we didn't get a valid overall format, then we shouldn't continue onward.
-        if (!channels_per_frame_) {
-          return;
+        // Now that we have been notified of a device, log its information and configure the first
+        // ring_buffer with the first supported ring_buffer_format.
+        for (const auto& device : *result->devices()) {
+          device_token_id_ = *device.token_id();
+          if (device.gain_caps().has_value()) {
+            if (device.gain_caps()->max_gain_db().has_value()) {
+              max_gain_db_ = *device.gain_caps()->max_gain_db();  // This example chooses
+              max_gain_db_ = std::min(max_gain_db_, 0.0f);        // not to exceed 0 dB.
+            }
+            if (device.gain_caps()->min_gain_db().has_value()) {
+              min_gain_db_ = *device.gain_caps()->min_gain_db();
+            }
+          }
+
+          if constexpr (kLogDeviceInfo) {
+            std::cout << "Connecting to audio device:" << '\n';
+            std::cout << "    token_id                  " << device_token_id_ << '\n';
+            std::cout << "    device_type               " << *device.device_type() << '\n';
+            std::cout << "    device_name               " << *device.device_name() << '\n';
+            std::cout << "    manufacturer              " << device.manufacturer().value_or("NONE")
+                      << '\n';
+            std::cout << "    product                   " << device.product().value_or("NONE")
+                      << '\n';
+
+            std::string uid_str;
+            if (!device.unique_instance_id()) {
+              uid_str = "NONE";
+            } else {
+              uid_str = fxl::StringPrintf(
+                  "0x%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+                  (*device.unique_instance_id())[0], (*device.unique_instance_id())[1],
+                  (*device.unique_instance_id())[2], (*device.unique_instance_id())[3],
+                  (*device.unique_instance_id())[4], (*device.unique_instance_id())[5],
+                  (*device.unique_instance_id())[6], (*device.unique_instance_id())[7],
+                  (*device.unique_instance_id())[8], (*device.unique_instance_id())[9],
+                  (*device.unique_instance_id())[10], (*device.unique_instance_id())[11],
+                  (*device.unique_instance_id())[12], (*device.unique_instance_id())[13],
+                  (*device.unique_instance_id())[14], (*device.unique_instance_id())[15]);
+            }
+            std::cout << "    unique_instance_id        " << uid_str << '\n';
+
+            // Log ring_buffer_format_sets details
+            std::cout << "    ring_buffer_format_sets[" << device.ring_buffer_format_sets()->size()
+                      << "]" << '\n';
+            for (auto idx = 0u; idx < device.ring_buffer_format_sets()->size(); ++idx) {
+              auto element_ring_buffer_format_set = device.ring_buffer_format_sets()->at(idx);
+              std::cout << "        [" << idx << "]   element_id  "
+                        << *element_ring_buffer_format_set.element_id() << '\n';
+              std::cout << "              format_set ["
+                        << element_ring_buffer_format_set.format_sets()->size() << "]" << '\n';
+              for (auto idx = 0u; idx < element_ring_buffer_format_set.format_sets()->size();
+                   ++idx) {
+                auto ring_buffer_format_set = element_ring_buffer_format_set.format_sets()->at(idx);
+                std::cout << "                  [" << idx << "]  channel_sets ["
+                          << ring_buffer_format_set.channel_sets()->size() << "]" << '\n';
+                for (auto cs = 0u; cs < ring_buffer_format_set.channel_sets()->size(); ++cs) {
+                  auto channel_set = (*ring_buffer_format_set.channel_sets())[cs];
+                  std::cout << "                [" << cs << "]   attributes["
+                            << channel_set.attributes()->size() << "]" << '\n';
+                  for (auto a = 0u; a < channel_set.attributes()->size(); ++a) {
+                    auto attribs = (*channel_set.attributes())[a];
+                    std::cout << "                        [" << a << "]   min_frequency  "
+                              << (attribs.min_frequency().has_value()
+                                      ? std::to_string(*attribs.min_frequency())
+                                      : "NONE")
+                              << '\n';
+                    std::cout << "                              max_frequency  "
+                              << (attribs.max_frequency().has_value()
+                                      ? std::to_string(*attribs.max_frequency())
+                                      : "NONE")
+                              << '\n';
+                  }
+                }
+                std::cout << "            sample_types["
+                          << ring_buffer_format_set.sample_types()->size() << "]" << '\n';
+                for (auto st = 0u; st < ring_buffer_format_set.sample_types()->size(); ++st) {
+                  std::cout << "                [" << st << "]     "
+                            << (*ring_buffer_format_set.sample_types())[st] << '\n';
+                }
+                std::cout << "            frame_rates ["
+                          << ring_buffer_format_set.frame_rates()->size() << "]" << '\n';
+                for (auto fr = 0u; fr < ring_buffer_format_set.frame_rates()->size(); ++fr) {
+                  std::cout << "                [" << fr << "]     "
+                            << (*ring_buffer_format_set.frame_rates())[fr] << '\n';
+                }
+              }
+            }
+
+            if (device.dai_format_sets().has_value()) {
+              std::cout << "    dai_format_sets           [" << device.dai_format_sets()->size()
+                        << "]" << '\n';
+              // Include more `dai_format_sets` info here.
+            } else {
+              std::cout << "    dai_format_sets           NONE" << '\n';
+            }
+
+            std::cout << "    is_input                  "
+                      << (device.is_input() ? (*device.is_input() ? "true" : "false")
+                                            : "UNSPECIFIED")
+                      << '\n';
+
+            if (device.gain_caps().has_value()) {
+              std::cout << "    gain_caps" << '\n';
+              std::cout << "        min_gain_db           "
+                        << (device.gain_caps()->min_gain_db()
+                                ? std::to_string(*device.gain_caps()->min_gain_db()) + " dB"
+                                : "NONE (non-compliant)")
+                        << '\n';
+              std::cout << "        max_gain_db           "
+                        << (device.gain_caps()->max_gain_db()
+                                ? std::to_string(*device.gain_caps()->max_gain_db()) + " dB"
+                                : "NONE (non-compliant)")
+                        << '\n';
+              std::cout << "        gain_step_db          "
+                        << (device.gain_caps()->gain_step_db()
+                                ? std::to_string(*device.gain_caps()->gain_step_db()) + " dB"
+                                : "NONE (non-compliant)")
+                        << '\n';
+              std::cout << "        can_mute              "
+                        << (device.gain_caps()->can_mute()
+                                ? (*device.gain_caps()->can_mute() ? "TRUE" : "FALSE")
+                                : "NONE (FALSE)")
+                        << '\n';
+              std::cout << "        can_agc               "
+                        << (device.gain_caps()->can_agc()
+                                ? (*device.gain_caps()->can_agc() ? "TRUE" : "FALSE")
+                                : "NONE (FALSE)")
+                        << '\n';
+            } else {
+              std::cout << "    gain_caps                 NONE" << '\n';
+            }
+
+            std::cout << "    plug_caps                 " << device.plug_detect_caps() << '\n';
+
+            std::string clk_domain_str;
+            if (!device.clock_domain()) {
+              clk_domain_str = "unspecified (CLOCK_DOMAIN_EXTERNAL)";
+            } else if (*device.clock_domain() == 0xFFFFFFFF) {
+              clk_domain_str = "CLOCK_DOMAIN_EXTERNAL";
+            } else if (*device.clock_domain() == 0) {
+              clk_domain_str = "CLOCK_DOMAIN_MONOTONIC";
+            } else {
+              clk_domain_str = std::to_string(*device.clock_domain()) + " (not MONOTONIC)";
+            }
+            std::cout << "    clock_domain              " << clk_domain_str << '\n';
+
+            if (device.signal_processing_elements().has_value()) {
+              std::cout << "    signal_processing_elements ["
+                        << device.signal_processing_elements()->size() << "]" << '\n';
+              // Include more `signal_processing_elements` info here.
+            } else {
+              std::cout << "    signal_processing_elements NONE" << '\n';
+            }
+
+            if (device.signal_processing_topologies().has_value()) {
+              std::cout << "    signal_processing_topologies ["
+                        << device.signal_processing_topologies()->size() << "]" << '\n';
+              // Include more `signal_processing_topologies` info here.
+            } else {
+              std::cout << "    signal_processing_topologies NONE" << '\n';
+            }
+          }
+
+          if (*device.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
+            // Now determine the format we will use, and connect more deeply to the device.
+            if (!device.ring_buffer_format_sets() || device.ring_buffer_format_sets()->empty() ||
+                !device.ring_buffer_format_sets()->front().format_sets() ||
+                device.ring_buffer_format_sets()->front().format_sets()->empty() ||
+                !device.ring_buffer_format_sets()->front().format_sets()->front().channel_sets() ||
+                device.ring_buffer_format_sets()
+                    ->front()
+                    .format_sets()
+                    ->front()
+                    .channel_sets()
+                    ->empty() ||
+                !device.ring_buffer_format_sets()
+                     ->front()
+                     .format_sets()
+                     ->front()
+                     .channel_sets()
+                     ->front()
+                     .attributes() ||
+                device.ring_buffer_format_sets()
+                    ->front()
+                    .format_sets()
+                    ->front()
+                    .channel_sets()
+                    ->front()
+                    .attributes()
+                    ->empty()) {
+              std::cout
+                  << "Cannot determine a channel-count from ring_buffer_format_sets (missing/empty)"
+                  << '\n';
+              Shutdown();
+              return;
+            }
+            // For convenience, just use the first channel configuration that the device listed.
+            channels_per_frame_ = device.ring_buffer_format_sets()
+                                      ->front()
+                                      .format_sets()
+                                      ->front()
+                                      .channel_sets()
+                                      ->front()
+                                      .attributes()
+                                      ->size();
+
+            // If we didn't get a valid overall format, then we shouldn't continue onward.
+            if (!channels_per_frame_) {
+              return;
+            }
+
+            ObserveStreamOutput();
+            ConnectToControlCreator();
+            if (ConnectToControl()) {
+              ConnectToRingBuffer();
+            }
+            break;  // Only do this for the first device found.
+          }
+
+          // If the device is not one of these types, keep looking....
         }
-
-        ObserveDevice();
-        ConnectToControlCreator();
-        // Create a RingBuffer and play a tone in that format to that RingBuffer.
-        ControlDevice();
-      }
-    }
-  });
+      });
 }
 
-void MediaApp::ObserveDevice() {
-  std::cout << __func__ << '\n';
-
+void MediaApp::ObserveStreamOutput() {
+  if (!registry_client_.has_value()) {
+    Shutdown();
+    return;
+  }
   zx::channel server_end, client_end;
   zx::channel::create(0, &server_end, &client_end);
   observer_client_ = fidl::Client<fuchsia_audio_device::Observer>(
       fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(client_end)), loop_.dispatcher(),
       &obs_handler_);
 
-  registry_client_
+  (*registry_client_)
       ->CreateObserver({{
           .token_id = device_token_id_,
           .observer_server = fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(server_end)),
       }})
       .Then([this](fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
-        std::cout << "Registry/CreateObserver callback" << '\n';
         if (!result.is_ok()) {
-          std::cerr << "Registry/CreateObserver error: " << result.error_value().FormatDescription()
+          std::cout << "Registry/CreateObserver error: " << result.error_value().FormatDescription()
                     << '\n';
           Shutdown();
           return;
@@ -365,9 +418,8 @@ void MediaApp::ObserveDevice() {
 
         observer_client_->WatchGainState().Then(
             [this](fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) {
-              std::cout << "Observer/WatchGainState callback" << '\n';
               if (!result.is_ok()) {
-                std::cerr << "Observer/WatchGainState error: "
+                std::cout << "Observer/WatchGainState error: "
                           << result.error_value().FormatDescription() << '\n';
                 Shutdown();
               }
@@ -391,9 +443,8 @@ void MediaApp::ObserveDevice() {
             });
         observer_client_->WatchPlugState().Then(
             [this](fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) {
-              std::cout << "Observer/WatchPlugState callback" << '\n';
               if (!result.is_ok()) {
-                std::cerr << "Observer/WatchPlugState error: "
+                std::cout << "Observer/WatchPlugState error: "
                           << result.error_value().FormatDescription() << '\n';
                 Shutdown();
               }
@@ -409,43 +460,42 @@ void MediaApp::ObserveDevice() {
 }
 
 void MediaApp::ConnectToControlCreator() {
-  std::cout << __func__ << '\n';
-
-  zx::result client_end = component::Connect<fuchsia_audio_device::ControlCreator>();
-  control_creator_client_ = fidl::Client<fuchsia_audio_device::ControlCreator>(
-      std::move(*client_end), loop_.dispatcher(), &ctl_crtr_handler_);
+  if (!control_creator_client_.has_value()) {
+    zx::result client_end = component::Connect<fuchsia_audio_device::ControlCreator>();
+    control_creator_client_ =
+        fidl::SyncClient<fuchsia_audio_device::ControlCreator>(std::move(*client_end));
+  }
 }
 
-void MediaApp::ControlDevice() {
-  std::cout << __func__ << '\n';
-
+bool MediaApp::ConnectToControl() {
+  if (!control_creator_client_.has_value()) {
+    Shutdown();
+    return false;
+  }
   zx::channel server_end, client_end;
   zx::channel::create(0, &server_end, &client_end);
   control_client_ = fidl::Client<fuchsia_audio_device::Control>(
       fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), loop_.dispatcher(),
       &ctl_handler_);
 
-  control_creator_client_
-      ->Create({{
-          .token_id = device_token_id_,
-          .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),
-      }})
-      .Then([this](fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) {
-        std::cout << "ControlCreator/Create callback" << '\n';
-        if (!result.is_ok()) {
-          std::cerr << "ControlCreator/Create error: " << result.error_value().FormatDescription()
-                    << '\n';
-          Shutdown();
-          return;
-        }
+  auto result = (*control_creator_client_)
+                    ->Create({{
+                        .token_id = device_token_id_,
+                        .control_server =
+                            fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),
+                    }});
+  if (!result.is_ok()) {
+    std::cout << "ControlCreator/Create error: " << result.error_value().FormatDescription()
+              << '\n';
+    Shutdown();
+    return false;
+  }
 
-        CreateRingBufferConnection();
-      });
+  return true;
 }
 
-void MediaApp::CreateRingBufferConnection() {
-  std::cout << __func__ << '\n';
-
+// Create a RingBuffer and play a tone in that format to that RingBuffer.
+void MediaApp::ConnectToRingBuffer() {
   zx::channel server_end, client_end;
   zx::channel::create(0, &server_end, &client_end);
   ring_buffer_client_ = fidl::Client<fuchsia_audio_device::RingBuffer>(
@@ -466,22 +516,18 @@ void MediaApp::CreateRingBufferConnection() {
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(server_end)),
       }})
       .Then([this](fidl::Result<fuchsia_audio_device::Control::CreateRingBuffer>& result) {
-        std::cout << "Control/CreateRingBuffer callback" << '\n';
         if (!result.is_ok()) {
-          std::cerr << "Control/CreateRingBuffer error: "
+          std::cout << "Control/CreateRingBuffer error: "
                     << result.error_value().FormatDescription() << '\n';
           Shutdown();
           return;
         }
-        FX_CHECK(result->properties() && result->ring_buffer());
-        FX_CHECK(result->properties()->valid_bits_per_sample() &&
-                 result->properties()->turn_on_delay());
-        FX_CHECK(result->ring_buffer()->buffer() && result->ring_buffer()->format() &&
-                 result->ring_buffer()->producer_bytes() &&
-                 result->ring_buffer()->consumer_bytes() &&
-                 result->ring_buffer()->reference_clock());
-
-        std::cout << "Control/CreateRingBuffer is_ok" << '\n';
+        assert(result->properties() && result->ring_buffer());
+        assert(result->properties()->valid_bits_per_sample() &&
+               result->properties()->turn_on_delay());
+        assert(result->ring_buffer()->buffer() && result->ring_buffer()->format() &&
+               result->ring_buffer()->producer_bytes() && result->ring_buffer()->consumer_bytes() &&
+               result->ring_buffer()->reference_clock());
 
         ring_buffer_ = std::move(*result->ring_buffer());
         const auto fmt = ring_buffer_.format();
@@ -522,7 +568,9 @@ void MediaApp::CreateRingBufferConnection() {
           Shutdown();
           return;
         }
-        WriteAudioToVmo();
+        if constexpr (kAutoplaySinusoid) {
+          WriteAudioToVmo();
+        }
         StartRingBuffer();
       });
 }
@@ -544,8 +592,6 @@ const fbl::RefPtr<fzl::VmarManager>* const vmar_manager = CreateVmarManager();
 
 // Validate and map the VMO.
 bool MediaApp::MapRingBufferVmo() {
-  std::cout << __func__ << '\n';
-
   auto buffer = std::move(*ring_buffer_.buffer());
   ring_buffer_size_ = buffer.size();
 
@@ -613,20 +659,17 @@ void MediaApp::WriteAudioToVmo() {
 }
 
 void MediaApp::StartRingBuffer() {
-  std::cout << __func__ << '\n';
-
   ring_buffer_client_->Start({}).Then(
       [this](fidl::Result<fuchsia_audio_device::RingBuffer::Start>& result) {
-        std::cout << "RingBuffer/Start callback" << '\n';
         if (!result.is_ok()) {
-          std::cerr << "RingBuffer/Start error: " << result.error_value().FormatDescription()
+          std::cout << "RingBuffer/Start error: " << result.error_value().FormatDescription()
                     << '\n';
           Shutdown();
           return;
         }
         std::cout << "RingBuffer/Start is_ok, playback has begun" << '\n';
-        // Over 3 seconds, stair-step the device gain from -15 dB to 0 dB.
-        ChangeGainByDbAfter(5.0f, zx::sec(1), 3);
+        // Stair-step the device gain from -15 dB to 0 dB, over 30 iterations of 0.1s.
+        ChangeGainByDbAfter(1.0f, zx::msec(200), 15);
       });
 }
 
@@ -651,13 +694,10 @@ void MediaApp::ChangeGainByDbAfter(float change_db, zx::duration wait_duration,
 }
 
 void MediaApp::StopRingBuffer() {
-  std::cout << __func__ << '\n';
-
   ring_buffer_client_->Stop({}).Then(
       [this](fidl::Result<fuchsia_audio_device::RingBuffer::Stop>& result) {
-        std::cout << "RingBuffer/Stop callback" << '\n';
         if (!result.is_ok()) {
-          std::cerr << "RingBuffer/Stop error: " << result.error_value().FormatDescription()
+          std::cout << "RingBuffer/Stop error: " << result.error_value().FormatDescription()
                     << '\n';
         } else {
           std::cout << "RingBuffer/Stop is_ok: success!" << '\n';
@@ -668,23 +708,16 @@ void MediaApp::StopRingBuffer() {
 }
 
 // Unmap memory, quit message loop (FIDL interfaces auto-delete upon ~MediaApp).
-void MediaApp::Shutdown() {
-  std::cout << __func__ << '\n';
-
-  quit_callback_();
-}
+void MediaApp::Shutdown() { quit_callback_(); }
 
 }  // namespace examples
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"simple_adr"});
-
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto startup_context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
   examples::MediaApp media_app(
       loop, [&loop]() { async::PostTask(loop.dispatcher(), [&loop]() { loop.Quit(); }); });
-
   media_app.Run();
 
   loop.Run();  // Now wait for the message loop to return...

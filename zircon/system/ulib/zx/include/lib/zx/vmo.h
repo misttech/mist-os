@@ -54,8 +54,16 @@ class vmo final : public object<vmo> {
     return zx_vmo_get_size(get(), size);
   }
 
+  zx_status_t get_stream_size(uint64_t* size) const ZX_AVAILABLE_SINCE(7) {
+    return zx_vmo_get_stream_size(get(), size);
+  }
+
   zx_status_t set_size(uint64_t size) const ZX_AVAILABLE_SINCE(7) {
     return zx_vmo_set_size(get(), size);
+  }
+
+  zx_status_t set_stream_size(uint64_t size) const ZX_AVAILABLE_SINCE(7) {
+    return zx_vmo_set_stream_size(get(), size);
   }
 
   zx_status_t set_prop_content_size(uint64_t size) const ZX_AVAILABLE_SINCE(7) {

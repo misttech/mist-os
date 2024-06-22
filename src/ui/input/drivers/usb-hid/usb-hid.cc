@@ -56,10 +56,13 @@ void UsbHidbus::UsbInterruptCallback(usb_request_t* req) {
       break;
     case ZX_OK:
       if (started_ && binding_) {
+        fidl::Arena arena;
         auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
-            fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(buffer),
-                                                    req->response.actual),
-            zx_clock_get_monotonic());
+            fhidbus::wire::Report::Builder(arena)
+                .buf(fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(buffer),
+                                                             req->response.actual))
+                .timestamp(zx_clock_get_monotonic())
+                .Build());
         if (!result.ok()) {
           zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
         }
@@ -321,8 +324,9 @@ zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid) {
   usb_device_descriptor_t device_desc;
   usb_.GetDeviceDescriptor(&device_desc);
   auto info_builder = fhidbus::wire::HidInfo::Builder(arena_);
-  info_builder.vendor_id(le16toh(device_desc.id_vendor));
-  info_builder.product_id(le16toh(device_desc.id_product));
+  info_builder.vendor_id(le16toh(device_desc.id_vendor))
+      .product_id(le16toh(device_desc.id_product))
+      .version(0);
 
   parent_req_size_ = usb_.GetRequestSize();
   status = usb::InterfaceList::Create(usb_, true, &usb_interface_list_);
@@ -388,7 +392,6 @@ zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid) {
   } else {
     info_builder.boot_protocol(fhidbus::wire::HidBootProtocol::kNone);
   }
-  info_builder.version(0);
   info_ = info_builder.Build();
 
   status = usb_request_alloc(&req_, usb_ep_max_packet(endptin), endptin->b_endpoint_address,

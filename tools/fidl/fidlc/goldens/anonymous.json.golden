@@ -316,6 +316,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 2515914517457749720,
           "name": "SomeMethod",
           "strict": true,

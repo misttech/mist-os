@@ -62,21 +62,7 @@ struct DirentHeader64 {
     padding: [u8; DIRENT64_PADDING_SIZE],
 }
 
-const DIRENT32_PADDING_SIZE: usize = 6;
-
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
-struct DirentHeader32 {
-    d_ino: u64,
-    d_off: i64,
-    d_reclen: u16,
-    padding: [u8; DIRENT32_PADDING_SIZE],
-    // pad: u8, // Zero padding byte
-    // d_type: u8, // File type
-}
-
 const DIRENT64_HEADER_SIZE: usize = mem::size_of::<DirentHeader64>() - DIRENT64_PADDING_SIZE;
-const DIRENT32_HEADER_SIZE: usize = mem::size_of::<DirentHeader32>() - DIRENT32_PADDING_SIZE;
 
 pub trait DirentSink {
     /// Add the given directory entry to this buffer.
@@ -202,60 +188,95 @@ impl DirentSink for DirentSink64<'_> {
     }
 }
 
-pub struct DirentSink32<'a> {
-    base: BaseDirentSink<'a>,
-}
+#[cfg(target_arch = "x86_64")]
+pub use x86_64::*;
 
-impl<'a> DirentSink32<'a> {
-    #[cfg(target_arch = "x86_64")]
-    pub fn new(
-        current_task: &'a CurrentTask,
-        offset: &'a mut off_t,
-        user_buffer: UserAddress,
-        user_capacity: usize,
-    ) -> Self {
-        Self {
-            base: BaseDirentSink { current_task, offset, user_buffer, user_capacity, actual: 0 },
+#[cfg(target_arch = "x86_64")]
+mod x86_64 {
+    use super::{BaseDirentSink, DirectoryEntryType, DirentSink};
+    use crate::mm::vmo::round_up_to_increment;
+    use crate::task::CurrentTask;
+    use crate::vfs::FsStr;
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::user_address::UserAddress;
+    use starnix_uapi::{ino_t, off_t};
+    use std::mem;
+    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+
+    const DIRENT32_PADDING_SIZE: usize = 6;
+    const DIRENT32_HEADER_SIZE: usize = mem::size_of::<DirentHeader32>() - DIRENT32_PADDING_SIZE;
+
+    #[repr(C)]
+    #[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
+    struct DirentHeader32 {
+        d_ino: u64,
+        d_off: i64,
+        d_reclen: u16,
+        padding: [u8; DIRENT32_PADDING_SIZE],
+        // pad: u8, // Zero padding byte
+        // d_type: u8, // File type
+    }
+
+    pub struct DirentSink32<'a> {
+        base: BaseDirentSink<'a>,
+    }
+
+    impl<'a> DirentSink32<'a> {
+        pub fn new(
+            current_task: &'a CurrentTask,
+            offset: &'a mut off_t,
+            user_buffer: UserAddress,
+            user_capacity: usize,
+        ) -> Self {
+            Self {
+                base: BaseDirentSink {
+                    current_task,
+                    offset,
+                    user_buffer,
+                    user_capacity,
+                    actual: 0,
+                },
+            }
+        }
+
+        pub fn map_result_with_actual(&self, result: Result<(), Errno>) -> Result<usize, Errno> {
+            self.base.map_result_with_actual(result)
         }
     }
 
-    #[cfg(target_arch = "x86_64")]
-    pub fn map_result_with_actual(&self, result: Result<(), Errno>) -> Result<usize, Errno> {
-        self.base.map_result_with_actual(result)
-    }
-}
+    impl DirentSink for DirentSink32<'_> {
+        fn add(
+            &mut self,
+            inode_num: ino_t,
+            offset: off_t,
+            entry_type: DirectoryEntryType,
+            name: &FsStr,
+        ) -> Result<(), Errno> {
+            let content_size = DIRENT32_HEADER_SIZE + name.len();
+            // +1 for the null terminator, +1 for the type.
+            let entry_size = round_up_to_increment(content_size + 2, 8)?;
+            let mut buffer = Vec::with_capacity(entry_size);
+            let header = DirentHeader32 {
+                d_ino: inode_num,
+                d_off: offset,
+                d_reclen: entry_size as u16,
+                ..DirentHeader32::default()
+            };
+            let header_bytes = header.as_bytes();
+            buffer.extend_from_slice(&header_bytes[..DIRENT32_HEADER_SIZE]);
+            buffer.extend_from_slice(name);
+            buffer.resize(buffer.len() + (entry_size - content_size - 1), b'\0');
+            buffer.push(entry_type.bits()); // Include the type.
+            assert_eq!(buffer.len(), entry_size);
+            self.base.add(offset, &buffer)
+        }
 
-impl DirentSink for DirentSink32<'_> {
-    fn add(
-        &mut self,
-        inode_num: ino_t,
-        offset: off_t,
-        entry_type: DirectoryEntryType,
-        name: &FsStr,
-    ) -> Result<(), Errno> {
-        let content_size = DIRENT32_HEADER_SIZE + name.len();
-        let entry_size = round_up_to_increment(content_size + 2, 8)?; // +1 for the null terminator, +1 for the type.
-        let mut buffer = Vec::with_capacity(entry_size);
-        let header = DirentHeader32 {
-            d_ino: inode_num,
-            d_off: offset,
-            d_reclen: entry_size as u16,
-            ..DirentHeader32::default()
-        };
-        let header_bytes = header.as_bytes();
-        buffer.extend_from_slice(&header_bytes[..DIRENT32_HEADER_SIZE]);
-        buffer.extend_from_slice(name);
-        buffer.resize(buffer.len() + (entry_size - content_size - 1), b'\0');
-        buffer.push(entry_type.bits()); // Include the type.
-        assert_eq!(buffer.len(), entry_size);
-        self.base.add(offset, &buffer)
-    }
+        fn offset(&self) -> off_t {
+            self.base.offset()
+        }
 
-    fn offset(&self) -> off_t {
-        self.base.offset()
-    }
-
-    fn user_capacity(&self) -> Option<usize> {
-        Some(self.base.user_capacity)
+        fn user_capacity(&self) -> Option<usize> {
+            Some(self.base.user_capacity)
+        }
     }
 }

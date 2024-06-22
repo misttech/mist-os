@@ -18,7 +18,7 @@ import logging
 import pathlib
 from typing import Any, Iterable, Sequence
 
-import trace_processing.trace_model as trace_model
+from trace_processing import trace_model
 
 
 _LOGGER: logging.Logger = logging.getLogger("Performance")
@@ -58,14 +58,20 @@ class TestCaseResult:
 
     label: str
     unit: Unit
-    values: list[float]
+    values: tuple[float, ...]
+
+    def __init__(self, label: str, unit: Unit, values: Sequence[float]):
+        """Allows any Sequence to be used for values while staying hashable."""
+        object.__setattr__(self, "label", label)
+        object.__setattr__(self, "unit", unit)
+        object.__setattr__(self, "values", tuple(values))
 
     def to_json(self, test_suite: str) -> dict[str, Any]:
         return {
             "label": self.label,
             "test_suite": test_suite,
             "unit": str(self.unit),
-            "values": self.values,
+            "values": list(self.values),
         }
 
     @staticmethod

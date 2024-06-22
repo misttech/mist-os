@@ -147,10 +147,10 @@ impl SecurityServerState {
     }
 
     fn deny_unknown(&self) -> bool {
-        self.policy.as_ref().map_or(true, |p| *p.parsed.handle_unknown() != HandleUnknown::Allow)
+        self.policy.as_ref().map_or(true, |p| p.parsed.handle_unknown() != HandleUnknown::Allow)
     }
     fn reject_unknown(&self) -> bool {
-        self.policy.as_ref().map_or(false, |p| *p.parsed.handle_unknown() == HandleUnknown::Reject)
+        self.policy.as_ref().map_or(false, |p| p.parsed.handle_unknown() == HandleUnknown::Reject)
     }
 }
 
@@ -363,14 +363,11 @@ impl SecurityServer {
         let target_context = state.sid_to_security_context(target_sid);
 
         match target_class {
-            AbstractObjectClass::System(target_class) => policy
-                .parsed
-                .compute_explicitly_allowed(
-                    source_context.type_(),
-                    target_context.type_(),
-                    target_class,
-                )
-                .unwrap_or(AccessVector::NONE),
+            AbstractObjectClass::System(target_class) => policy.parsed.compute_explicitly_allowed(
+                source_context.type_(),
+                target_context.type_(),
+                target_class,
+            ),
             AbstractObjectClass::Custom(target_class) => policy
                 .parsed
                 .compute_explicitly_allowed_custom(
@@ -488,10 +485,10 @@ impl AccessVectorComputer for SecurityServer {
     fn access_vector_from_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
         &self,
         permissions: &[P],
-    ) -> AccessVector {
+    ) -> Option<AccessVector> {
         match &self.state.lock().policy {
             Some(policy) => policy.parsed.access_vector_from_permissions(permissions),
-            None => AccessVector::NONE,
+            None => Some(AccessVector::NONE),
         }
     }
 }

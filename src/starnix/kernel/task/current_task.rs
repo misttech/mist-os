@@ -27,8 +27,8 @@ use fuchsia_zircon::sys::zx_thread_state_general_regs_t;
 use fuchsia_zircon::{self as zx};
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
-    DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable, RwLock,
-    RwLockWriteGuard, TaskRelease, WakeReason,
+    BeforeFsNodeAppend, DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable,
+    RwLock, RwLockWriteGuard, TaskRelease, WakeReason,
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
@@ -593,6 +593,7 @@ impl CurrentTask {
         resolve_flags: ResolveFlags,
     ) -> Result<FileHandle, Errno>
     where
+        L: LockBefore<BeforeFsNodeAppend>,
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
     {
@@ -615,6 +616,7 @@ impl CurrentTask {
     ) -> Result<FileHandle, Errno>
     where
         L: LockBefore<FileOpsCore>,
+        L: LockBefore<BeforeFsNodeAppend>,
         L: LockBefore<DeviceOpen>,
     {
         // 64-bit kernels force the O_LARGEFILE flag to be on.

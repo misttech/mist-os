@@ -17,7 +17,7 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path as pfsPath;
 use vfs::{pseudo_directory, service};
 use {
-    fidl_fuchsia_hardware_input as finput,
+    fidl_fuchsia_hardware_hidbus as fhidbus, fidl_fuchsia_hardware_input as finput,
     fidl_fuchsia_hardware_power_statecontrol as statecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_test_pwrbtn as test_pwrbtn, fuchsia_async as fasync,
 };
@@ -146,17 +146,16 @@ async fn main() -> Result<(), Error> {
                                                 finput::DeviceRequest::GetReportsEvent { responder } => {
                                                     info!("sending reports event and signalling the event");
                                                     let event_dup = event.duplicate_handle(event_handle_rights())?;
-                                                    responder.send(zx::Status::OK.into_raw(), event_dup)
+                                                    responder.send(Ok(event_dup))
                                                         .expect("failed sending reports event");
                                                     event.signal_handle(zx::Signals::NONE, zx::Signals::USER_0)?;
                                                 }
                                                 finput::DeviceRequest::ReadReport { responder } => {
                                                     info!("sending report");
                                                     let msg = &[1]; // 1 means "power off", 0 would mean "don't power off"
-                                                    responder.send(
-                                                        zx::Status::OK.into_raw(),
-                                                        msg,
-                                                        zx::Time::get_monotonic().into_nanos(),
+                                                    responder.send(Ok(&fhidbus::Report {buf: Some(msg.to_vec()),
+                                                         timestamp: Some(zx::Time::get_monotonic().into_nanos()),
+                                                         ..Default::default()})
                                                     ).unwrap_or_else(|e| {
                                                         warn!("failed sending response to ReadReport: {:?}", e);
                                                     });

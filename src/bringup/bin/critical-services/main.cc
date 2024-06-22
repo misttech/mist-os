@@ -187,11 +187,11 @@ zx_status_t GetButtonReportEvent(zx::event* event_out, PowerButtonInfo* info_out
     printf("critical-services: failed to get report event: %d\n", result.status());
     return result.status();
   }
-  if (result->status != ZX_OK) {
-    printf("critical-services: failed to get report event: %d\n", result->status);
-    return result->status;
+  if (result->is_error()) {
+    printf("critical-services: failed to get report event: %d\n", result->error_value());
+    return result->error_value();
   }
-  *event_out = std::move(result->event);
+  *event_out = std::move(result.value()->event);
   return ZX_OK;
 }
 
@@ -208,14 +208,14 @@ void ProcessPowerEvent(zx::event* report_event, pwrbtn::PowerButtonMonitor* moni
     loop->Quit();
     return;
   }
-  if (result->status != ZX_OK) {
-    printf("critical-services: failed to read report: %d\n", result->status);
+  if (result->is_error()) {
+    printf("critical-services: failed to read report: %d\n", result->error_value());
     loop->Quit();
     return;
   }
 
   // Ignore reports from different report IDs
-  const fidl::VectorView<uint8_t>& report = result->data;
+  const fidl::VectorView<uint8_t>& report = result.value()->report.buf();
   if (info->has_report_id_byte && report[0] != info->report_id) {
     printf("critical-services: input-watcher: wrong id\n");
     return;

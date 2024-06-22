@@ -89,7 +89,7 @@ impl InspectRepository {
 
                     for pipeline_weak in &this.pipelines {
                         if let Some(pipeline) = pipeline_weak.upgrade() {
-                            pipeline.write().remove(&identity_clone.moniker);
+                            pipeline.remove_component(&identity_clone.moniker);
                         }
                     }
                 }
@@ -100,8 +100,8 @@ impl InspectRepository {
         // to eagerly bucket static selectors based on that component's moniker.
         for pipeline_weak in self.pipelines.iter() {
             if let Some(pipeline) = pipeline_weak.upgrade() {
-                pipeline.write().add_inspect_artifacts(&identity.moniker).unwrap_or_else(|e| {
-                    warn!(%identity, ?e,
+                pipeline.add_component(&identity.moniker).unwrap_or_else(|err| {
+                    warn!(%identity, ?err,
                                 "Failed to add inspect artifacts to pipeline wrapper");
                 });
             }
@@ -317,7 +317,7 @@ mod tests {
             InspectHandle::from_named_tree_proxy(proxy, Some("test".into())),
         );
         assert!(data_repo.inner.read().get(&identity).is_some());
-        assert!(pipeline.read().static_selectors_matchers().unwrap().contains_key(&moniker));
+        assert!(pipeline.static_selectors_matchers().unwrap().contains_key(&moniker));
 
         // When the directory disconnects, both the pipeline matchers and the repo are cleaned
         drop(server_end);
@@ -325,7 +325,7 @@ mod tests {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         }
 
-        assert!(!pipeline.read().static_selectors_matchers().unwrap().contains_key(&moniker));
+        assert!(!pipeline.static_selectors_matchers().unwrap().contains_key(&moniker));
     }
 
     #[fuchsia::test]

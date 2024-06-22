@@ -46,7 +46,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     auto key = provider.ConsumeRandomLengthString();
     switch (op) {
       case OP::kDoubleField:
-        syslog_runtime::WriteKeyValue(&buffer, key.data(), provider.ConsumeFloatingPoint<double>());
+        buffer.WriteKeyValue(key, provider.ConsumeFloatingPoint<double>());
         break;
       case OP::kSignedIntField: {
         int64_t value;
@@ -54,7 +54,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
           return 0;
         }
         value = provider.ConsumeIntegral<int64_t>();
-        syslog_runtime::WriteKeyValue(&buffer, key.data(), value);
+        buffer.WriteKeyValue(key, value);
       } break;
       case OP::kUnsignedIntField: {
         uint64_t value;
@@ -62,14 +62,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
           return 0;
         }
         value = provider.ConsumeIntegral<uint64_t>();
-        syslog_runtime::WriteKeyValue(&buffer, key.data(), value);
+        buffer.WriteKeyValue(key, value);
       } break;
       case OP::kStringField: {
         auto value = provider.ConsumeRandomLengthString();
-        syslog_runtime::WriteKeyValue(&buffer, key.data(), value.data());
+        buffer.WriteKeyValue(key, value);
       } break;
       case OP::kBooleanField: {
-        syslog_runtime::WriteKeyValue(&buffer, key.data(), provider.ConsumeBool());
+        buffer.WriteKeyValue(key, provider.ConsumeBool());
       } break;
     }
   }

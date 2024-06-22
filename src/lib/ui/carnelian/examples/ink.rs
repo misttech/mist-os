@@ -12,7 +12,6 @@ use carnelian::{
 };
 use euclid::default::{Rect, Transform2D, Vector2D};
 use euclid::{point2, size2, vec2, Angle};
-use fidl_fuchsia_hardware_input as hid;
 use fuchsia_trace::duration;
 use fuchsia_zircon::{self as zx, AsHandleRef, Event, Signals, Time};
 use itertools::izip;
@@ -21,6 +20,7 @@ use std::collections::{BTreeMap, VecDeque};
 use std::ops::Range;
 use std::time::Duration;
 use std::{f32, fs};
+use {fidl_fuchsia_hardware_hidbus as hidbus, fidl_fuchsia_hardware_input as hid};
 
 const BACKGROUND_COLOR: Color = Color { r: 255, g: 255, b: 255, a: 255 };
 
@@ -888,8 +888,11 @@ impl StylusDevice {
             let entry_path = entry.path();
             let path = entry_path.to_str().expect("bad path");
             let device = Self::open_input_device(path)?;
-            if let Ok(hid::DeviceIds { vendor_id: 0x00002d1f, product_id, .. }) =
-                device.get_device_ids(zx::Time::INFINITE)
+            if let Ok(Ok(hidbus::HidInfo {
+                vendor_id: Some(0x00002d1f),
+                product_id: Some(product_id),
+                ..
+            })) = device.query(zx::Time::INFINITE)
             {
                 // Paradise
                 if product_id == 0x00005143 {
@@ -921,7 +924,7 @@ impl StylusDevice {
     fn get_events(&mut self) -> Result<Vec<Stylus>, Error> {
         let mut stylus_events = Vec::<Stylus>::new();
         let reports = self.device.read_reports(zx::Time::INFINITE)?;
-        let reports = reports.1;
+        let reports = reports.map_err(zx::Status::from_raw)?;
         let mut report_index = 0;
         while report_index < reports.len() {
             let report = &reports[report_index..];

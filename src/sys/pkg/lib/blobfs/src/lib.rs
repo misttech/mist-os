@@ -53,9 +53,6 @@ pub enum BlobfsError {
     #[error("while connecting to fuchsia.fxfs/BlobReader")]
     ConnectToBlobReader(#[source] anyhow::Error),
 
-    #[error("while connecting to fuchsia.kernel/VmexResource")]
-    ConnectToVmexResource(#[source] anyhow::Error),
-
     #[error("while setting the VmexResource")]
     InitVmexResource(#[source] anyhow::Error),
 }
@@ -249,6 +246,29 @@ impl Client {
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
 
         (Self { dir, creator: None, reader: None }, mock::Mock { stream })
+    }
+
+    /// Returns the read-only VMO backing the blob.
+    pub async fn get_blob_vmo(&self, hash: &Hash) -> Result<zx::Vmo, GetBlobVmoError> {
+        if let Some(reader) = &self.reader {
+            reader
+                .get_vmo(hash)
+                .await
+                .map_err(GetBlobVmoError::Fidl)?
+                .map_err(|s| GetBlobVmoError::GetVmo(Status::from_raw(s)))
+        } else {
+            let blob = fuchsia_fs::directory::open_file(
+                &self.dir,
+                &hash.to_string(),
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .await
+            .map_err(GetBlobVmoError::OpenBlob)?;
+            blob.get_backing_memory(fio::VmoFlags::READ)
+                .await
+                .map_err(GetBlobVmoError::Fidl)?
+                .map_err(|s| GetBlobVmoError::GetVmo(Status::from_raw(s)))
+        }
     }
 
     /// Open a blob for read. `scope` will only be used if the client was configured to use
@@ -506,6 +526,19 @@ fn open_blob_with_reader<P: ProtocolsExt + Send>(
             object_request.create_connection(scope, vmo_blob, protocols, StreamIoConnection::create)
         })
     });
+}
+
+#[derive(thiserror::Error, Debug)]
+#[allow(missing_docs)]
+pub enum GetBlobVmoError {
+    #[error("getting the vmo")]
+    GetVmo(#[source] Status),
+
+    #[error("opening the blob")]
+    OpenBlob(#[source] fuchsia_fs::node::OpenError),
+
+    #[error("making a fidl request")]
+    Fidl(#[source] fidl::Error),
 }
 
 #[cfg(test)]

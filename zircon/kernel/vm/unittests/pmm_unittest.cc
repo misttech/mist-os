@@ -36,6 +36,10 @@ class ManagedPmmNode {
     }
     node_.AddFreePages(&list);
 
+    // Test node always has checking enabled.
+    ASSERT(node_.EnableFreePageFilling(PAGE_SIZE, CheckFailAction::kPanic));
+    node_.FillFreePagesAndArm();
+
     bool result = ResetDefaultMemEvent();
     ASSERT(result);
   }
@@ -766,6 +770,34 @@ static bool pmm_arena_find_free_contiguous_test() {
   END_TEST;
 }
 
+// Check that when AllocPages appends to an existing list it does not run the checker on the pages
+// already in the list.
+static bool pmm_alloc_append_test() {
+  BEGIN_TEST;
+
+  ManagedPmmNode node;
+
+  list_node_t alloc_list = LIST_INITIAL_VALUE(alloc_list);
+  auto cleanup = fit::defer([&]() {
+    if (!list_is_empty(&alloc_list)) {
+      node.node().FreeList(&alloc_list);
+    }
+  });
+
+  // Allocate a single page into the list first.
+  ASSERT_OK(node.node().AllocPages(1, 0u, &alloc_list));
+
+  // Zero the page as a modification.
+  memset(paddr_to_physmap(list_peek_head_type(&alloc_list, vm_page_t, queue_node)->paddr()), 0,
+         PAGE_SIZE);
+
+  // Now append more pages to the list. If this runs the checker on the page already in the list
+  // that we modified then it will panic.
+  EXPECT_OK(node.node().AllocPages(node.kNumPages / 2, 0, &alloc_list));
+
+  END_TEST;
+}
+
 static bool pq_add_remove() {
   BEGIN_TEST;
 
@@ -1302,6 +1334,7 @@ VM_UNITTEST(pmm_checker_test)
 VM_UNITTEST(pmm_checker_is_valid_fill_size_test)
 VM_UNITTEST(pmm_get_arena_info_test)
 VM_UNITTEST(pmm_arena_find_free_contiguous_test)
+VM_UNITTEST(pmm_alloc_append_test)
 UNITTEST_END_TESTCASE(pmm_tests, "pmm", "Physical memory manager tests")
 
 UNITTEST_START_TESTCASE(page_queues_tests)

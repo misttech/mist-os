@@ -199,8 +199,11 @@ impl ProfileServerFacade {
                 params.push(DataElement::Uint16(data as u16));
             }
 
-            protocol_descriptor_list
-                .push(ProtocolDescriptor { protocol: protocol, params: params });
+            protocol_descriptor_list.push(ProtocolDescriptor {
+                protocol: Some(protocol),
+                params: Some(params),
+                ..Default::default()
+            });
         }
         Ok(protocol_descriptor_list)
     }
@@ -255,9 +258,10 @@ impl ProfileServerFacade {
             };
 
             profile_descriptor_list.push(ProfileDescriptor {
-                profile_id,
-                minor_version,
-                major_version,
+                profile_id: Some(profile_id),
+                minor_version: Some(minor_version),
+                major_version: Some(major_version),
+                ..Default::default()
             });
         }
         Ok(profile_descriptor_list)
@@ -355,7 +359,11 @@ impl ProfileServerFacade {
                 fx_err_and_bail!(&with_line!(tag), "Value 'data' not found.")
             };
 
-            attribute_list.push(Attribute { id: id, element: data_element })
+            attribute_list.push(Attribute {
+                id: Some(id),
+                element: Some(data_element),
+                ..Default::default()
+            })
         }
         Ok(attribute_list)
     }

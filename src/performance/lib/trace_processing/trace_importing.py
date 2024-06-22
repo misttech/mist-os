@@ -375,14 +375,10 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
         pid: int = trace_event["pid"]
         tid: int = int(trace_event["tid"])
         track_key: Tuple[int, int] = (pid, tid)
-        duration_stack: List[trace_model.DurationEvent] = duration_stacks[
-            track_key
-        ]
+        duration_stack = duration_stacks[track_key]
 
         if phase in ("X", "B"):
-            duration_event: trace_model.DurationEvent = (
-                trace_model.DurationEvent.from_dict(trace_event)
-            )
+            duration_event = trace_model.DurationEvent.from_dict(trace_event)
             if track_key in unbound_flow_events:
                 for unbound_flow_event in unbound_flow_events[track_key]:
                     unbound_flow_event.enclosing_duration = duration_event

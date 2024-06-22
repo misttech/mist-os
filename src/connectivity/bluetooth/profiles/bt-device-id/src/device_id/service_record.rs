@@ -125,46 +125,54 @@ impl From<&DIRecord> for bredr::ServiceDefinition {
 
         // Indicate support for DI v1.3.
         attributes.push(bredr::Attribute {
-            id: ATTR_SPECIFICATION_ID,
-            element: bredr::DataElement::Uint16(DEVICE_IDENTIFICATION_PROFILE_VERSION),
+            id: Some(ATTR_SPECIFICATION_ID),
+            element: Some(bredr::DataElement::Uint16(DEVICE_IDENTIFICATION_PROFILE_VERSION)),
+            ..Default::default()
         });
 
         attributes.push(bredr::Attribute {
-            id: ATTR_VENDOR_ID,
-            element: bredr::DataElement::Uint16(src.vendor_id()),
+            id: Some(ATTR_VENDOR_ID),
+            element: Some(bredr::DataElement::Uint16(src.vendor_id())),
+            ..Default::default()
         });
 
         attributes.push(bredr::Attribute {
-            id: ATTR_PRODUCT_ID,
-            element: bredr::DataElement::Uint16(src.product_id),
+            id: Some(ATTR_PRODUCT_ID),
+            element: Some(bredr::DataElement::Uint16(src.product_id)),
+            ..Default::default()
         });
 
         attributes.push(bredr::Attribute {
-            id: ATTR_VERSION,
-            element: bredr::DataElement::Uint16(src.version()),
+            id: Some(ATTR_VERSION),
+            element: Some(bredr::DataElement::Uint16(src.version())),
+            ..Default::default()
         });
 
         attributes.push(bredr::Attribute {
-            id: ATTR_PRIMARY_RECORD,
-            element: bredr::DataElement::B(src.primary),
+            id: Some(ATTR_PRIMARY_RECORD),
+            element: Some(bredr::DataElement::B(src.primary)),
+            ..Default::default()
         });
 
         attributes.push(bredr::Attribute {
-            id: ATTR_VENDOR_ID_SOURCE,
-            element: bredr::DataElement::Uint16(src.vendor_id_source()),
+            id: Some(ATTR_VENDOR_ID_SOURCE),
+            element: Some(bredr::DataElement::Uint16(src.vendor_id_source())),
+            ..Default::default()
         });
 
         // Specify the generic landing page for Fuchsia documentation.
         attributes.push(bredr::Attribute {
-            id: ATTR_DOCUMENTATION_URL,
-            element: bredr::DataElement::Url(FUCHSIA_DOCUMENTATION_URL.to_string()),
+            id: Some(ATTR_DOCUMENTATION_URL),
+            element: Some(bredr::DataElement::Url(FUCHSIA_DOCUMENTATION_URL.to_string())),
+            ..Default::default()
         });
 
         // A description of the service is optional, and must be built to indicate the right
         // language.
         let information = src.service_description.as_ref().map(service_information);
 
-        let service_uuid = Uuid::new16(bredr::ServiceClassProfileIdentifier::PnpInformation as u16);
+        let service_uuid =
+            Uuid::new16(bredr::ServiceClassProfileIdentifier::PnpInformation.into_primitive());
         bredr::ServiceDefinition {
             service_class_uuids: Some(vec![service_uuid.into()]),
             additional_attributes: Some(attributes),

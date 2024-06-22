@@ -494,6 +494,7 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
       if (!output_buffer_format_modifier_ || (output_buffer_format_modifier_.value() ==
                                               fuchsia_images2::PixelFormatModifier::kLinear)) {
         auto& linear_constraints = constraints.image_format_constraints()->emplace_back();
+        linear_constraints.pixel_format_modifier() = fuchsia_images2::PixelFormatModifier::kLinear;
         linear_constraints.bytes_per_row_divisor() = kLinearSurfaceWidthAlignment;
         linear_constraints.max_bytes_per_row() =
             fbl::round_up(max_picture_width_, kLinearSurfaceWidthAlignment);

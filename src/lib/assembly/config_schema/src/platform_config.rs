@@ -29,6 +29,7 @@ pub mod setui_config;
 pub mod starnix_config;
 pub mod storage_config;
 pub mod swd_config;
+pub mod sysmem_config;
 pub mod timekeeper_config;
 pub mod ui_config;
 pub mod usb_config;
@@ -131,6 +132,11 @@ pub struct PlatformConfig {
     #[serde(default)]
     #[file_relative_paths]
     pub storage: storage_config::StorageConfig,
+
+    /// Platform configuration options for sysmem (contiguous/protected memory support). These
+    /// override (field-by-field) any values set in sysmem_defaults in the board config.
+    #[serde(default)]
+    pub sysmem: sysmem_config::PlatformSysmemConfig,
 
     /// Platform configuration options for the UI area.
     #[serde(default)]

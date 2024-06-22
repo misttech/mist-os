@@ -178,17 +178,18 @@ zx_status_t Device::InitDevice(fdf::OutgoingDirectory& outgoing) {
   }
   netdev_dispatcher_ = std::move(netdev_dispatcher.value());
 
-  zx_status_t status = network_device_.Initialize(GetParentNode(), netdev_dispatcher_.get(),
-                                                  outgoing, kNetDevDriverName);
-  if (status != ZX_OK) {
-    BRCMF_ERR("Failed to initialize network device %s", zx_status_get_string(status));
-    return status;
-  }
-  status = BusInit();
+  zx_status_t status = BusInit();
   if (status != ZX_OK) {
     BRCMF_ERR("Init failed: %s", zx_status_get_string(status));
     return status;
   }
+  status = network_device_.Initialize(GetParentNode(), netdev_dispatcher_.get(), outgoing,
+                                      kNetDevDriverName);
+  if (status != ZX_OK) {
+    BRCMF_ERR("Failed to initialize network device %s", zx_status_get_string(status));
+    return status;
+  }
+
   return ZX_OK;
 }
 

@@ -31,6 +31,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
 	"go.fuchsia.dev/fuchsia/tools/lib/environment"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
+	ffxutilconstants "go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
@@ -647,6 +648,15 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 	return err
 }
 
+func containsError(output string, errMsgs []string) (bool, string) {
+	for _, msg := range errMsgs {
+		if strings.Contains(output, msg) {
+			return true, msg
+		}
+	}
+	return false, ""
+}
+
 func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, outDir string, testResult *TestResult, err error) (*TestResult, error) {
 	if !t.EnabledForTesting() {
 		return t.sshTester.ProcessResult(ctx, test, outDir, testResult, err)
@@ -670,11 +680,14 @@ func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, ou
 	for i, testCase := range finalTestResult.Cases {
 		finalTestResult.Cases[i].Tags = append(testCase.Tags, ffxTag)
 	}
-	if finalTestResult.Result != runtests.TestSuccess && strings.Contains(testRun.output, sshutilconstants.ProcessTerminatedMsg) {
-		if err == nil {
-			err = errors.New(sshutilconstants.ProcessTerminatedMsg)
+	if finalTestResult.Result != runtests.TestSuccess {
+		if ok, errMsg := containsError(testRun.output, []string{
+			sshutilconstants.ProcessTerminatedMsg, ffxutilconstants.TimeoutReachingTargetMsg}); ok {
+			if err == nil {
+				err = errors.New(errMsg)
+			}
+			return finalTestResult, connectionError{err}
 		}
-		return finalTestResult, connectionError{err}
 	}
 	return finalTestResult, nil
 }

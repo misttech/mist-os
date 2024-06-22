@@ -903,6 +903,8 @@ static_assert(sizeof(SendDiagnosticCDB) == 6, "Send Diagnostic CDB must be 6 byt
 struct DiskOp;
 struct DiskOptions;
 
+class Disk;
+
 using LuCallback =
     fit::function<zx::result<>(uint16_t lun, size_t block_size, uint64_t block_count)>;
 
@@ -999,6 +1001,18 @@ class Controller {
   zx::result<uint32_t> ScanAndBindLogicalUnits(uint8_t target, uint32_t max_transfer_bytes,
                                                uint16_t max_lun, LuCallback lu_callback,
                                                DiskOptions disk_options);
+
+  // Logical units that were bound using ScanAndBindLogicalUnits().
+  const std::unordered_map<uint8_t /*target*/,
+                           std::unordered_map<uint16_t /*lun*/, std::unique_ptr<Disk>>>&
+  block_devs() const {
+    return block_devs_;
+  }
+
+ protected:
+  std::unordered_map<uint8_t /*target*/,
+                     std::unordered_map<uint16_t /*lun*/, std::unique_ptr<Disk>>>
+      block_devs_;
 };
 
 }  // namespace scsi

@@ -139,18 +139,11 @@ def main():
 
     dependencies = [args.current, args.golden]
 
-    if not os.path.exists(args.golden):
-        if os.path.getsize(args.current) > 0:
-            err = golden_not_found_error(args.golden)
-        else:
-            # Don't depend on files that don't exist.
-            dependencies.remove(args.golden)
-
-            # Skip testing if current is empty and golden is missing.
-            # This prevents us from asking users to create empty golden files.
-            err = None
-    elif args.policy == Policy.update_golden:
+    if args.policy == Policy.update_golden:
         err = update_golden(args)
+    elif not os.path.exists(args.golden):
+        # In all remaining cases, the golden must exist.
+        err = golden_not_found_error(args.golden)
     elif args.policy == Policy.no_breaking_changes:
         err = fail_on_breaking_changes(args)
     elif args.policy == Policy.no_changes:
@@ -235,10 +228,13 @@ def fail_on_changes(args):
     return None
 
 
+# Updates `golden` if it does not exist or is different from `current`.
 def update_cmd(current, golden):
     # Disable shallow comparison which doesn't prevent unnecessary writes. It
     # ignores file contents and only compares file type, size and mod time.
-    if not filecmp.cmp(current, golden, shallow=False):
+    if not os.path.exists(golden) or not filecmp.cmp(
+        current, golden, shallow=False
+    ):
         return "cp {} {}".format(
             os.path.abspath(current), os.path.abspath(golden)
         )

@@ -10,9 +10,9 @@
 use crate::task::{CurrentTask, Task};
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::{
-    fileops_impl_delegate_read_and_seek, fs_node_impl_not_dir, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    MemoryDirectoryFile,
+    fileops_impl_delegate_read_and_seek, fs_node_impl_not_dir, AppendLockGuard, DynamicFile,
+    DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, MemoryDirectoryFile,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use starnix_uapi::auth::FsCred;
@@ -160,6 +160,7 @@ impl FsNodeOps for ControlGroupNode {
     fn truncate(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
+        _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _length: u64,

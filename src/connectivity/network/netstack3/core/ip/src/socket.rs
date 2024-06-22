@@ -10,11 +10,12 @@ use core::num::{NonZeroU32, NonZeroU8};
 
 use log::error;
 use net_types::ip::{Ip, IpVersionMarker, Ipv6Addr, Ipv6SourceAddr, Mtu};
-use net_types::{MulticastAddress, SpecifiedAddr};
+use net_types::{MulticastAddress, ScopeableAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
-    InstantContext, StrongDeviceIdentifier, TracingContext, WeakDeviceIdentifier as _,
+    InstantContext, SendFrameErrorReason, StrongDeviceIdentifier, TracingContext,
+    WeakDeviceIdentifier as _,
 };
 use netstack3_filter::{
     self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties, RawIpBody,
@@ -25,7 +26,8 @@ use thiserror::Error;
 
 use crate::internal::base::{
     FilterHandlerProvider, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata,
-    IpPacketDestination, ResolveRouteError, SendIpPacketMeta,
+    IpPacketDestination, IpSendFrameError, IpSendFrameErrorReason, ResolveRouteError,
+    SendIpPacketMeta,
 };
 use crate::internal::device::state::IpDeviceStateIpExt;
 use crate::internal::device::IpDeviceAddr;
@@ -177,6 +179,10 @@ pub enum IpSockSendError {
     /// The socket is currently unroutable.
     #[error("the socket is currently unroutable: {}", _0)]
     Unroutable(#[from] ResolveRouteError),
+    /// The socket operation would've resulted in illegal loopback addresses on
+    /// a non-loopback device.
+    #[error("illegal loopback address")]
+    IllegalLoopbackAddress,
 }
 
 impl From<SerializeError<Infallible>> for IpSockSendError {
@@ -184,6 +190,30 @@ impl From<SerializeError<Infallible>> for IpSockSendError {
         match err {
             SerializeError::Alloc(err) => match err {},
             SerializeError::SizeLimitExceeded => IpSockSendError::Mtu,
+        }
+    }
+}
+
+impl IpSockSendError {
+    /// Constructs a `Result` from an [`IpSendFrameErrorReason`] with
+    /// application-visible [`IpSockSendError`]s in the `Err` variant.
+    ///
+    /// Errors that are not bubbled up to applications are dropped.
+    fn from_ip_send_frame(e: IpSendFrameErrorReason) -> Result<(), Self> {
+        match e {
+            IpSendFrameErrorReason::Device(d) => Self::from_send_frame(d),
+            IpSendFrameErrorReason::IllegalLoopbackAddress => Err(Self::IllegalLoopbackAddress),
+        }
+    }
+
+    /// Constructs a `Result` from a [`SendFrameErrorReason`] with
+    /// application-visible [`IpSockSendError`]s in the `Err` variant.
+    ///
+    /// Errors that are not bubbled up to applications are dropped.
+    fn from_send_frame(e: SendFrameErrorReason) -> Result<(), Self> {
+        match e {
+            SendFrameErrorReason::Alloc | SendFrameErrorReason::QueueFull => Ok(()),
+            SendFrameErrorReason::SizeConstraintsViolation => Err(Self::Mtu),
         }
     }
 }
@@ -362,7 +392,7 @@ where
         meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
         body: S,
         packet_metadata: IpLayerPacketMetadata<I, BC>,
-    ) -> Result<(), S>
+    ) -> Result<(), IpSendFrameError<S>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut;
@@ -591,7 +621,7 @@ where
         src_addr: local_ip,
         device: mut egress_device,
         mut next_hop,
-        local_delivery_device: _,
+        mut local_delivery_device,
     } = resolve(core_ctx, bindings_ctx, socket_device, *local_ip, *remote_ip)?;
 
     let previous_dst = remote_ip.addr();
@@ -626,7 +656,7 @@ where
             src_addr: new_local_ip,
             device: new_device,
             next_hop: new_next_hop,
-            local_delivery_device: _,
+            local_delivery_device: new_local_delivery_device,
         } = resolve(core_ctx, bindings_ctx, socket_device, local_ip, remote_ip).inspect_err(
             |_| {
                 packet_metadata.acknowledge_drop();
@@ -635,6 +665,7 @@ where
         local_ip = new_local_ip;
         egress_device = new_device;
         next_hop = new_next_hop;
+        local_delivery_device = new_local_delivery_device;
     }
 
     let loopback_packet = (options.multicast_loop()
@@ -644,18 +675,23 @@ where
     .transpose()?
     .map(|buf| RawIpBody::new(*proto, local_ip.addr(), remote_ip.addr(), buf));
 
+    let destination = match &local_delivery_device {
+        Some(d) => IpPacketDestination::Loopback(d),
+        None => IpPacketDestination::from_next_hop(next_hop, remote_ip.into()),
+    };
     let ttl = options.hop_limit(&remote_ip.into());
     let meta = SendIpPacketMeta {
         device: &egress_device,
         src_ip: local_ip.into(),
         dst_ip: remote_ip.into(),
-        destination: IpPacketDestination::from_next_hop(next_hop, remote_ip.into()),
+        destination,
         ttl,
         proto: *proto,
         mtu,
     };
-    IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata)
-        .map_err(|_s| IpSockSendError::Mtu)?;
+    IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata).or_else(
+        |IpSendFrameError { serializer: _, error }| IpSockSendError::from_ip_send_frame(error),
+    )?;
 
     match (loopback_packet, core_ctx.get_loopback_device()) {
         (Some(loopback_packet), Some(loopback_device)) => {
@@ -679,7 +715,9 @@ where
                 loopback_packet,
                 packet_metadata,
             )
-            .unwrap_or_else(|_s| error!("Failed to send multicast loopback packet"));
+            .unwrap_or_else(|IpSendFrameError { serializer: _, error }| {
+                error!("failed to send multicast loopback packet: {error:?}")
+            });
         }
         (Some(_loopback_packet), None) => {
             error!("can't send multicast loopback packet without the loopback device")
@@ -789,7 +827,7 @@ pub(crate) mod ipv6_source_address_selection {
         a: &SasCandidate<D>,
         b: &SasCandidate<D>,
     ) -> Ordering {
-        // TODO(https://fxbug.dev/42123500): Implement rules 2, 4, 5.5, 6, and 7.
+        // TODO(https://fxbug.dev/42123500): Implement rules 4, 5.5, 6, and 7.
 
         let a_addr = a.addr_sub.addr().into_specified();
         let b_addr = b.addr_sub.addr().into_specified();
@@ -807,6 +845,7 @@ pub(crate) mod ipv6_source_address_selection {
         debug_assert!(b.flags.assigned);
 
         rule_1(remote_ip, a_addr, b_addr)
+            .then_with(|| rule_2(remote_ip, a_addr, b_addr))
             .then_with(|| rule_3(a.flags.deprecated, b.flags.deprecated))
             .then_with(|| rule_5(outbound_device, &a.device, &b.device))
             .then_with(|| rule_8(remote_ip, a.addr_sub, b.addr_sub))
@@ -835,6 +874,36 @@ pub(crate) mod ipv6_source_address_selection {
             // and in the second case, the rule doesn't apply. In either case,
             // we move onto the next rule.
             if a == remote_ip {
+                Ordering::Greater
+            } else {
+                Ordering::Less
+            }
+        } else {
+            Ordering::Equal
+        }
+    }
+
+    fn rule_2(
+        remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
+        a: SpecifiedAddr<Ipv6Addr>,
+        b: SpecifiedAddr<Ipv6Addr>,
+    ) -> Ordering {
+        // Scope ordering is defined by the Multicast Scope ID, see
+        // https://datatracker.ietf.org/doc/html/rfc6724#section-3.1 .
+        let remote_scope = match remote_ip {
+            Some(remote_ip) => remote_ip.scope().multicast_scope_id(),
+            None => return Ordering::Equal,
+        };
+        let a_scope = a.scope().multicast_scope_id();
+        let b_scope = b.scope().multicast_scope_id();
+        if a_scope < b_scope {
+            if a_scope < remote_scope {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        } else if a_scope > b_scope {
+            if b_scope < remote_scope {
                 Ordering::Greater
             } else {
                 Ordering::Less
@@ -918,6 +987,8 @@ pub(crate) mod ipv6_source_address_selection {
             let remote = SpecifiedAddr::new(net_ip_v6!("2001:0db8:1::")).unwrap();
             let local0 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:2::")).unwrap();
             let local1 = SpecifiedAddr::new(net_ip_v6!("2001:0db8:3::")).unwrap();
+            let link_local_remote = SpecifiedAddr::new(net_ip_v6!("fe80::1:2:42")).unwrap();
+            let link_local = SpecifiedAddr::new(net_ip_v6!("fe80::1:2:4")).unwrap();
             let dev0 = &0;
             let dev1 = &1;
             let dev2 = &2;
@@ -927,6 +998,15 @@ pub(crate) mod ipv6_source_address_selection {
             assert_eq!(rule_1(Some(remote), local0, remote), Ordering::Less);
             assert_eq!(rule_1(Some(remote), local0, local1), Ordering::Equal);
             assert_eq!(rule_1(None, local0, local1), Ordering::Equal);
+
+            // Rule 2: Prefer appropriate scope
+            assert_eq!(rule_2(Some(remote), local0, local1), Ordering::Equal);
+            assert_eq!(rule_2(Some(remote), local1, local0), Ordering::Equal);
+            assert_eq!(rule_2(Some(remote), local0, link_local), Ordering::Greater);
+            assert_eq!(rule_2(Some(remote), link_local, local0), Ordering::Less);
+            assert_eq!(rule_2(Some(link_local_remote), local0, link_local), Ordering::Less);
+            assert_eq!(rule_2(Some(link_local_remote), link_local, local0), Ordering::Greater);
+            assert_eq!(rule_1(None, local0, link_local), Ordering::Equal);
 
             // Rule 3: Avoid deprecated states
             assert_eq!(rule_3(false, true), Ordering::Greater);
@@ -1050,7 +1130,7 @@ pub(crate) mod testutil {
     use net_types::ip::{GenericOverIp, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Subnet};
     use net_types::{MulticastAddr, Witness as _};
     use netstack3_base::testutil::{FakeCoreCtx, FakeStrongDeviceId, FakeWeakDeviceId};
-    use netstack3_base::SendFrameContext;
+    use netstack3_base::{SendFrameContext, SendFrameError};
     use netstack3_filter::Tuple;
 
     use super::*;
@@ -1155,7 +1235,9 @@ pub(crate) mod testutil {
         {
             let meta =
                 self.state.fake_ip_socket_ctx_mut().resolve_send_meta(socket, mtu, options)?;
-            self.send_frame(bindings_ctx, meta, body).map_err(|_s| IpSockSendError::Mtu)
+            self.send_frame(bindings_ctx, meta, body).or_else(
+                |SendFrameError { serializer: _, error }| IpSockSendError::from_send_frame(error),
+            )
         }
     }
 

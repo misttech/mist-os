@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/power/cpp/power-support.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -243,15 +244,13 @@ class SdmmcBlockDevice {
   bool shutdown_ TA_GUARDED(lock_) = false;
   trace_async_id_t trace_async_id_;
 
-  std::vector<zx::event> active_power_dep_tokens_;
-  std::vector<zx::event> passive_power_dep_tokens_;
-
-  fidl::ClientEnd<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_end_;
+  fidl::WireSyncClient<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
 
-  fidl::ClientEnd<fuchsia_power_broker::ElementControl> wake_on_request_element_control_client_end_;
+  fidl::WireSyncClient<fuchsia_power_broker::ElementControl>
+      wake_on_request_element_control_client_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> wake_on_request_lessor_client_;
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> wake_on_request_current_level_client_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;

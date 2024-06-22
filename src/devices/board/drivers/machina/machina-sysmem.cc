@@ -25,8 +25,6 @@ static const std::vector<uint8_t> sysmem_metadata = [] {
   fuchsia_hardware_sysmem::Metadata metadata;
   metadata.vid() = PDEV_VID_GOOGLE;
   metadata.pid() = PDEV_PID_MACHINA;
-  metadata.protected_memory_size() = 0;
-
   auto persist_result = fidl::Persist(metadata);
   // Given permitted values set above, we won't see failure here. An OOM would fail before getting
   // here.

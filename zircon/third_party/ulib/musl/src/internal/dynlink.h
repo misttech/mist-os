@@ -73,6 +73,8 @@ extern ElfW(Dyn) _DYNAMIC[] ATTR_LIBC_VISIBILITY;
 
 void _dl_log_unlogged(void) ATTR_LIBC_VISIBILITY;
 void _dl_log_write(const char* buffer, size_t len) ATTR_LIBC_VISIBILITY;
+void _dl_log_write_init(zx_handle_t handle, uint32_t info) ATTR_LIBC_VISIBILITY;
+void _dl_log_write_init_fallback(void) ATTR_LIBC_VISIBILITY;
 
 void _dl_rdlock(void) ATTR_LIBC_VISIBILITY;
 void _dl_unlock(void) ATTR_LIBC_VISIBILITY;
@@ -84,7 +86,7 @@ void _dl_phdr_report_globals(sanitizer_memory_snapshot_callback_t* callback, voi
                              size_t load_bias, const Phdr* phdrs,
                              size_t phnum) ATTR_LIBC_VISIBILITY;
 
-__attribute__((__visibility__("hidden"))) void _dl_iterate_loaded_libs(void);
+void _dl_iterate_loaded_libs(void) ATTR_LIBC_VISIBILITY;
 
 __END_CDECLS
 

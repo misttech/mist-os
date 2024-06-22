@@ -14,7 +14,7 @@
 // These correspond directly to the timer interface in dev/timer.h.
 struct pdev_timer_ops {
   zx_ticks_t (*current_ticks)();
-  zx_status_t (*set_oneshot_timer)(zx_time_t deadline);
+  zx_status_t (*set_oneshot_timer)(zx_ticks_t deadline);
   zx_status_t (*stop)();
   zx_status_t (*shutdown)();
 };

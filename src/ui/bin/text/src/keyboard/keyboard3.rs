@@ -259,7 +259,7 @@ impl KeyboardService {
                 ))?;
                 Ok(())
             })
-            .collect::<Result<_, Error>>()?;
+            .collect::<Result<(), Error>>()?;
         Ok(())
     }
 

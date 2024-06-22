@@ -14,7 +14,6 @@ use lazy_static::lazy_static;
 use namespace::NamespaceError;
 use sandbox::Capability;
 use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
-use std::sync::Arc;
 use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
 use {fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx};
@@ -24,20 +23,14 @@ lazy_static! {
 }
 
 struct NamespaceCapabilityProvider {
-    host: Arc<NamespaceCapabilityHost>,
-}
-
-impl NamespaceCapabilityProvider {
-    pub fn new(host: Arc<NamespaceCapabilityHost>) -> Self {
-        Self { host }
-    }
+    namespace_scope: ExecutionScope,
 }
 
 #[async_trait]
 impl InternalCapabilityProvider for NamespaceCapabilityProvider {
     async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let server_end = ServerEnd::<fcomponent::NamespaceMarker>::new(server_end);
-        let serve_result = self.host.serve(server_end.into_stream().unwrap()).await;
+        let serve_result = self.serve(server_end.into_stream().unwrap()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.
             warn!(%error, "serve failed");
@@ -45,22 +38,14 @@ impl InternalCapabilityProvider for NamespaceCapabilityProvider {
     }
 }
 
-pub struct NamespaceCapabilityHost {
-    namespace_scope: ExecutionScope,
-}
-
-impl Drop for NamespaceCapabilityHost {
+impl Drop for Namespace {
     fn drop(&mut self) {
         self.namespace_scope.shutdown();
     }
 }
 
-impl NamespaceCapabilityHost {
-    pub fn new() -> Self {
-        Self { namespace_scope: ExecutionScope::new() }
-    }
-
-    pub async fn serve(
+impl NamespaceCapabilityProvider {
+    async fn serve(
         &self,
         mut stream: fcomponent::NamespaceRequestStream,
     ) -> Result<(), fidl::Error> {
@@ -146,17 +131,17 @@ impl NamespaceCapabilityHost {
     }
 }
 
-pub struct NamespaceFrameworkCapability {
-    host: Arc<NamespaceCapabilityHost>,
+pub struct Namespace {
+    namespace_scope: ExecutionScope,
 }
 
-impl NamespaceFrameworkCapability {
+impl Namespace {
     pub fn new() -> Self {
-        Self { host: Arc::new(NamespaceCapabilityHost::new()) }
+        Self { namespace_scope: ExecutionScope::new() }
     }
 }
 
-impl FrameworkCapability for NamespaceFrameworkCapability {
+impl FrameworkCapability for Namespace {
     fn matches(&self, capability: &InternalCapability) -> bool {
         capability.matches_protocol(&CAPABILITY_NAME)
     }
@@ -166,18 +151,23 @@ impl FrameworkCapability for NamespaceFrameworkCapability {
         _scope: WeakComponentInstance,
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
-        Box::new(NamespaceCapabilityProvider::new(self.host.clone()))
+        Box::new(NamespaceCapabilityProvider { namespace_scope: self.namespace_scope.clone() })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capability;
+    use crate::model::component::ComponentInstance;
+    use crate::model::context::ModelContext;
+    use crate::model::environment::Environment;
     use assert_matches::assert_matches;
     use fidl::endpoints::{ProtocolMarker, Proxy};
     use fuchsia_component::client;
     use futures::TryStreamExt;
     use sandbox::{Dict, Receiver};
+    use std::sync::{Arc, Weak};
     use {
         fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
         fuchsia_async as fasync,
@@ -193,16 +183,30 @@ mod tests {
         }
     }
 
+    async fn new_root() -> Arc<ComponentInstance> {
+        ComponentInstance::new_root(
+            Environment::empty(),
+            Arc::new(ModelContext::new_for_test()),
+            Weak::new(),
+            "test:///root".parse().unwrap(),
+        )
+        .await
+    }
+
+    async fn namespace(
+        instance: &Arc<ComponentInstance>,
+    ) -> (fcomponent::NamespaceProxy, Namespace) {
+        let host = Namespace::new();
+        let (proxy, server) = endpoints::create_proxy::<fcomponent::NamespaceMarker>().unwrap();
+        capability::open_framework(&host, instance, server.into()).await.unwrap();
+        (proxy, host)
+    }
+
     #[fuchsia::test]
     async fn namespace_create() {
         let mut tasks = fasync::TaskGroup::new();
-
-        let host = NamespaceCapabilityHost::new();
-        let (namespace_proxy, stream) =
-            endpoints::create_proxy_and_stream::<fcomponent::NamespaceMarker>().unwrap();
-        tasks.add(fasync::Task::spawn(async move {
-            host.serve(stream).await.unwrap();
-        }));
+        let root = new_root().await;
+        let (namespace_proxy, _host) = namespace(&root).await;
 
         let mut namespace_pairs = vec![];
         for (path, response) in [("/svc", "first"), ("/zzz/svc", "second")] {
@@ -263,13 +267,8 @@ mod tests {
     #[fuchsia::test]
     async fn namespace_create_err_shadow() {
         let mut tasks = fasync::TaskGroup::new();
-
-        let host = NamespaceCapabilityHost::new();
-        let (namespace_proxy, stream) =
-            endpoints::create_proxy_and_stream::<fcomponent::NamespaceMarker>().unwrap();
-        tasks.add(fasync::Task::spawn(async move {
-            host.serve(stream).await.unwrap();
-        }));
+        let root = new_root().await;
+        let (namespace_proxy, _host) = namespace(&root).await;
 
         // Two entries with a shadowing path.
         let mut namespace_pairs = vec![];
@@ -314,14 +313,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn namespace_create_err_dict_read() {
-        let mut tasks = fasync::TaskGroup::new();
-
-        let host = NamespaceCapabilityHost::new();
-        let (namespace_proxy, stream) =
-            endpoints::create_proxy_and_stream::<fcomponent::NamespaceMarker>().unwrap();
-        tasks.add(fasync::Task::spawn(async move {
-            host.serve(stream).await.unwrap();
-        }));
+        let root = new_root().await;
+        let (namespace_proxy, _host) = namespace(&root).await;
 
         // Create a dictionary and close the server end.
         let (dict_proxy, stream) =

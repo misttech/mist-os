@@ -203,7 +203,9 @@ impl Hfp {
             if classes
                 .iter()
                 .find(|an| {
-                    an.number == bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway as u16
+                    an.number
+                        == bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway
+                            .into_primitive()
                 })
                 .is_some()
             {
@@ -618,16 +620,23 @@ mod tests {
 
         // Send an AudioGateway service found
         let audio_gateway_service_class_attrs = &[bredr::Attribute {
-            id: bredr::ATTR_SERVICE_CLASS_ID_LIST,
-            element: bredr::DataElement::Sequence(vec![
+            id: Some(bredr::ATTR_SERVICE_CLASS_ID_LIST),
+            element: Some(bredr::DataElement::Sequence(vec![
                 Some(Box::new(bredr::DataElement::Uuid(
-                    Uuid::new16(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway as u16)
-                        .into(),
+                    Uuid::new16(
+                        bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway
+                            .into_primitive(),
+                    )
+                    .into(),
                 ))),
                 Some(Box::new(bredr::DataElement::Uuid(
-                    Uuid::new16(bredr::ServiceClassProfileIdentifier::GenericAudio as u16).into(),
+                    Uuid::new16(
+                        bredr::ServiceClassProfileIdentifier::GenericAudio.into_primitive(),
+                    )
+                    .into(),
                 ))),
-            ]),
+            ])),
+            ..Default::default()
         }];
 
         let service_found_fut = server.results.as_ref().unwrap().service_found(

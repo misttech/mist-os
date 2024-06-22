@@ -22,7 +22,7 @@ use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, CounterContext, DeviceIdContext, ExistsError, NotFoundError, ReceivableFrameMeta,
     RecvIpFrameMeta, ReferenceNotifiersExt, RemoveResourceResultWithContext,
-    ResourceCounterContext,
+    ResourceCounterContext, SendFrameError,
 };
 use netstack3_device::ethernet::{
     self, EthernetDeviceCounters, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
@@ -192,7 +192,7 @@ impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::F
         destination: IpPacketDestination<I, &DeviceId<BC>>,
         body: S,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
@@ -216,7 +216,7 @@ impl<
         destination: IpPacketDestination<I, &DeviceId<BC>>,
         body: S,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
@@ -911,7 +911,7 @@ fn send_ip_frame<BC, S, I, L>(
     device: &DeviceId<BC>,
     destination: IpPacketDestination<I, &DeviceId<BC>>,
     body: S,
-) -> Result<(), S>
+) -> Result<(), SendFrameError<S>>
 where
     BC: BindingsContext,
     S: Serializer,

@@ -34,7 +34,7 @@ lazy_static! {
 /// [`pipeline::Pipeline`]s in a given Archivist instance.
 pub struct LogsRepository {
     log_sender: RwLock<mpsc::UnboundedSender<fasync::Task<()>>>,
-    mutable_state: RwLock<LogsRepositoryState>,
+    mutable_state: Mutex<LogsRepositoryState>,
     /// Processes removal of components emitted by the budget handler. This is done to prevent a
     /// deadlock. It's behind a mutex, but it's only set once. Holds an Arc<Self>.
     component_removal_task: Mutex<Option<fasync::Task<()>>>,
@@ -46,7 +46,7 @@ impl LogsRepository {
         let logs_budget = BudgetManager::new(logs_max_cached_original_bytes as usize, remover_snd);
         let (log_sender, log_receiver) = mpsc::unbounded();
         let this = Arc::new(LogsRepository {
-            mutable_state: RwLock::new(LogsRepositoryState::new(logs_budget, log_receiver, parent)),
+            mutable_state: Mutex::new(LogsRepositoryState::new(logs_budget, log_receiver, parent)),
             log_sender: RwLock::new(log_sender),
             component_removal_task: Mutex::new(None),
         });
@@ -62,7 +62,7 @@ impl LogsRepository {
     where
         K: DebugLog + Send + Sync + 'static,
     {
-        let mut mutable_state = self.mutable_state.write();
+        let mut mutable_state = self.mutable_state.lock();
         // We can only have one klog reader, if this is already set, it means we are already
         // draining klog.
         if mutable_state.drain_klog_task.is_some() {
@@ -105,7 +105,7 @@ impl LogsRepository {
         selectors: Option<Vec<Selector>>,
         parent_trace_id: ftrace::Id,
     ) -> impl Stream<Item = Arc<LogsData>> + Send + 'static {
-        let mut repo = self.mutable_state.write();
+        let mut repo = self.mutable_state.lock();
         let substreams = repo.logs_data_store.iter().map(|(identity, c)| {
             let cursor = c.cursor(mode, parent_trace_id);
             (Arc::clone(identity), cursor)
@@ -120,17 +120,17 @@ impl LogsRepository {
         &self,
         identity: Arc<ComponentIdentity>,
     ) -> Arc<LogsArtifactsContainer> {
-        self.mutable_state.write().get_log_container(identity)
+        self.mutable_state.lock().get_log_container(identity)
     }
 
     /// Stop accepting new messages, ensuring that pending Cursors return Poll::Ready(None) after
     /// consuming any messages received before this call.
     pub async fn wait_for_termination(&self) {
-        let receiver = self.mutable_state.write().log_receiver.take().unwrap();
+        let receiver = self.mutable_state.lock().log_receiver.take().unwrap();
         receiver.for_each_concurrent(None, |rx| rx).await;
         // Process messages from log sink.
         debug!("Log ingestion stopped.");
-        let mut repo = self.mutable_state.write();
+        let mut repo = self.mutable_state.lock();
         for container in repo.logs_data_store.values() {
             container.terminate();
         }
@@ -154,12 +154,12 @@ impl LogsRepository {
 
     /// Updates log selectors associated with an interest connection.
     pub fn update_logs_interest(&self, connection_id: usize, selectors: Vec<LogInterestSelector>) {
-        self.mutable_state.write().update_logs_interest(connection_id, selectors);
+        self.mutable_state.lock().update_logs_interest(connection_id, selectors);
     }
 
     /// Indicates that the connection associated with the given ID is now done.
     pub fn finish_interest_connection(&self, connection_id: usize) {
-        self.mutable_state.write().finish_interest_connection(connection_id);
+        self.mutable_state.lock().finish_interest_connection(connection_id);
     }
 
     async fn process_removal_of_components(
@@ -167,7 +167,7 @@ impl LogsRepository {
         logs_repo: Arc<LogsRepository>,
     ) {
         while let Some(identity) = removal_requests.next().await {
-            let mut repo = logs_repo.mutable_state.write();
+            let mut repo = logs_repo.mutable_state.lock();
             if !repo.is_live(&identity) {
                 debug!(%identity, "Removing component from repository.");
                 repo.remove(&identity);
@@ -287,10 +287,10 @@ impl LogsRepositoryState {
                 .min_by_key(|selector| selector.interest.min_severity.unwrap_or(Severity::Info));
             if let Some(selector) = lowest_selector {
                 if clear_interest {
-                    *publisher.min_severity.write() = Severity::Info;
+                    publisher.set_severity(Severity::Info);
                 } else {
-                    *publisher.min_severity.write() =
-                        selector.interest.min_severity.unwrap_or(Severity::Info);
+                    publisher
+                        .set_severity(selector.interest.min_severity.unwrap_or(Severity::Info));
                 }
             }
         });
@@ -432,13 +432,13 @@ mod tests {
         let stream =
             repo.logs_cursor(StreamMode::SnapshotThenSubscribe, None, ftrace::Id::random());
 
-        assert_eq!(repo.mutable_state.read().logs_multiplexers.live_iterators.lock().len(), 1);
+        assert_eq!(repo.mutable_state.lock().logs_multiplexers.live_iterators.lock().len(), 1);
 
         // When the multiplexer goes away it must be forgotten by the broker.
         drop(stream);
         loop {
             fasync::Timer::new(Duration::from_millis(100)).await;
-            if repo.mutable_state.read().logs_multiplexers.live_iterators.lock().len() == 0 {
+            if repo.mutable_state.lock().logs_multiplexers.live_iterators.lock().len() == 0 {
                 break;
             }
         }

@@ -27,15 +27,33 @@ driver_bind_rules("sysmem_bind") {
   ]
 }
 
+# These build args are not the correct place to configure sysmem (outside of
+# local experiments). Instead, use PlatformSysmemConfig via the assembly tool.
+# PlatformSysmemConfig fields can be set at board info level (if/when it makes
+# sense for a board definition to provide sysmem defaults) or at platform config
+# level (when configuring sysmem for a product / when configuring fuchsia via
+# fuchsia SDK).
+#
+# TODO(b/347090887): Remove these when developer overrides are wired up for
+# bazel-based builds.
 declare_args() {
-  driver_sysmem_protected_memory_size_override = -1
-  driver_sysmem_contiguous_memory_size_override = -1
+  driver_sysmem_contiguous_memory_size = -1
+  driver_sysmem_contiguous_memory_size_percent = 5
+  driver_sysmem_protected_memory_size = 0
+  driver_sysmem_protected_memory_size_percent = -1
   driver_sysmem_contiguous_guard_pages_fatal = false
   driver_sysmem_contiguous_guard_pages_internal = false
-  driver_sysmem_contiguous_guard_pages_unused = true
-  driver_sysmem_contiguous_guard_pages_unused_cycle_seconds_override = -1
-  driver_sysmem_contiguous_guard_page_count_override = -1
+  driver_sysmem_contiguous_guard_page_count = -1
+  driver_sysmem_contiguous_guard_pages_unused = false
+  driver_sysmem_contiguous_guard_pages_unused_fraction_denominator = 128
+  driver_sysmem_contiguous_guard_pages_unused_cycle_seconds = 600
   driver_sysmem_protected_ranges_disable_dynamic = false
+
+  # TODO(b/322009732): remove
+  driver_sysmem_contiguous_memory_size_override = -1
+
+  # TODO(b/322009732): remove
+  driver_sysmem_protected_memory_size_override = -1
 }
 
 fuchsia_component_manifest("manifest") {
@@ -148,20 +166,30 @@ fuchsia_driver_component("sysmem") {
 fuchsia_structured_config_values("config_values") {
   cm_label = ":manifest"
   values = {
-    protected_memory_size_override =
-        driver_sysmem_protected_memory_size_override
-    contiguous_memory_size_override =
-        driver_sysmem_contiguous_memory_size_override
+    contiguous_memory_size = driver_sysmem_contiguous_memory_size
+    contiguous_memory_size_percent =
+        driver_sysmem_contiguous_memory_size_percent
+    protected_memory_size = driver_sysmem_protected_memory_size
+    protected_memory_size_percent = driver_sysmem_protected_memory_size_percent
     contiguous_guard_pages_fatal = driver_sysmem_contiguous_guard_pages_fatal
     contiguous_guard_pages_internal =
         driver_sysmem_contiguous_guard_pages_internal
+    contiguous_guard_page_count = driver_sysmem_contiguous_guard_page_count
     contiguous_guard_pages_unused = driver_sysmem_contiguous_guard_pages_unused
-    contiguous_guard_pages_unused_cycle_seconds_override =
-        driver_sysmem_contiguous_guard_pages_unused_cycle_seconds_override
-    contiguous_guard_page_count_override =
-        driver_sysmem_contiguous_guard_page_count_override
+    contiguous_guard_pages_unused_fraction_denominator =
+        driver_sysmem_contiguous_guard_pages_unused_fraction_denominator
+    contiguous_guard_pages_unused_cycle_seconds =
+        driver_sysmem_contiguous_guard_pages_unused_cycle_seconds
     protected_ranges_disable_dynamic =
         driver_sysmem_protected_ranges_disable_dynamic
+
+    # TODO(b/322009732): remove
+    deprecated_contiguous_memory_size_override =
+        driver_sysmem_contiguous_memory_size_override
+
+    # TODO(b/322009732): remove
+    deprecated_protected_memory_size_override =
+        driver_sysmem_protected_memory_size_override
   }
 }
 

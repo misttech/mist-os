@@ -87,6 +87,24 @@ This repository rule depends on the following environment variables:
 {{end}}
 `
 
+const READMETemplate = `
+[TOC]
+<div>
+<devsite-filter>
+<input type="text" placeholder="Type a keyword here to filter results">
+<table>
+<thead><tr><th>Name</th><th>Description</th></tr></thead>
+<tbody class="list">
+{{range . }}<tr>
+    <td><a href="{{ .Path }}">{{ .Title }}</a></td>
+    <td>{{ .Description }}</td>
+</tr>{{end}}
+</tbody>
+</table>
+</devsite-filter>
+</div>
+`
+
 var (
 	attributeTypeURLMap = map[pb.AttributeType]string{
 		pb.AttributeType_INT:               "int",
@@ -188,6 +206,10 @@ func NewStarlarkFunctionTemplate() (*template.Template, error) {
 
 func NewRepositoryRuleTemplate() (*template.Template, error) {
 	return makeTemplate("repository_rule", repositoryRuleTemplate)
+}
+
+func NewREADMETemplate() (*template.Template, error) {
+	return makeTemplate("readme", READMETemplate)
 }
 
 func makeTemplate(name string, templateString string) (*template.Template, error) {

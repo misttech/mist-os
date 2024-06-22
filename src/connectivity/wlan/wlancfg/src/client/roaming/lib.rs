@@ -4,9 +4,10 @@
 
 use crate::client::types;
 use crate::util::pseudo_energy::{EwmaSignalData, RssiVelocity};
-use fuchsia_async as fasync;
-use futures::channel::mpsc;
 use tracing::error;
+use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
+
+pub const ROAMING_CHANNEL_BUFFER_SIZE: usize = 100;
 
 #[derive(Clone, Copy)]
 pub enum RoamingProfile {
@@ -27,6 +28,7 @@ impl From<String> for RoamingProfile {
     }
 }
 
+/// Data tracked about a connection used to make roaming decisions.
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct RoamingConnectionData {
@@ -71,21 +73,11 @@ impl PreviousRoamScanData {
     }
 }
 
-// Requests to execute BSS selection, searching for a roam candidate.
-#[cfg_attr(test, derive(Debug))]
-pub struct RoamSearchRequest {
-    pub connection_data: RoamingConnectionData,
-    _roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-}
-impl RoamSearchRequest {
-    pub fn new(
-        connection_data: RoamingConnectionData,
-        // Sender to tell state machine to roam. State machine should drop the receiver end if the
-        // connection has changed.
-        _roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-    ) -> Self {
-        RoamSearchRequest { connection_data, _roam_req_sender }
-    }
+// Data that could trigger roaming actions to occur. Roam monitor implementations
+// MUST read all trigger data types from the channel, even if they ignore/drop it.
+#[derive(Clone, Debug)]
+pub enum RoamTriggerData {
+    SignalReportInd(fidl_internal::SignalReportIndication),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

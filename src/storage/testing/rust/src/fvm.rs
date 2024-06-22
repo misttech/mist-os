@@ -17,7 +17,6 @@ use fuchsia_zircon::{self as zx, zx_status_t, AsHandleRef};
 
 const FVM_DRIVER_PATH: &str = "fvm.cm";
 
-#[link(name = "fvm")]
 extern "C" {
     // This function initializes FVM on a fuchsia.hardware.block.Block device
     // with a given slice size.

@@ -6,18 +6,18 @@ toc:
   - title: Rules
     section:
     - title: example_rule
-      path: /some/path/rule_example_rule.md
+      path: /some/path/example_rule.md
+    - title: some_function
+      path: /some/path/some_function.md
   - title: Providers
     section:
     - title: FooInfo
-      path: /some/path/provider_FooInfo.md
+      path: /some/path/FooInfo.md
   - title: Starlark Functions
     section:
     - title: empty_function
-      path: /some/path/func_empty_function.md
-    - title: some_function
-      path: /some/path/func_some_function.md
+      path: /some/path/empty_function.md
   - title: Repository Rules
     section:
     - title: empty_repo
-      path: /some/path/repo_rule_empty_repo.md
+      path: /some/path/empty_repo.md

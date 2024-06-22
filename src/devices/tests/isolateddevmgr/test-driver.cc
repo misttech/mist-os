@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.device.manager.test/cpp/wire.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -24,34 +25,35 @@ class IsolatedDevMgrTestDriver : public DeviceType {
   void DdkRelease() { delete this; }
 
   void GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer);
+
+ private:
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
 };
 
 void IsolatedDevMgrTestDriver::GetMetadata(GetMetadataRequestView request,
                                            GetMetadataCompleter::Sync& completer) {
-  size_t size;
-  zx_status_t status = DdkGetMetadataSize(request->type, &size);
-  if (status != ZX_OK) {
-    completer.Close(status);
-    return;
+  fidl::WireResult result = pdev_->GetMetadata(request->type);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send GetMetadata request: %s", result.status_string());
+    completer.Close(result.status());
   }
-
-  std::vector<uint8_t> metadata;
-  metadata.resize(size);
-
-  status = DdkGetMetadata(request->type, metadata.data(), metadata.size(), &size);
-  if (status != ZX_OK) {
-    completer.Close(status);
-    return;
+  if (result->is_error()) {
+    completer.Close(result->error_value());
   }
-  if (size != metadata.size()) {
-    completer.Close(ZX_ERR_INTERNAL);
-    return;
-  }
-
-  completer.Reply(fidl::VectorView<uint8_t>::FromExternal(metadata));
+  const auto& metadata = result.value()->metadata;
+  completer.Reply(fidl::VectorView<uint8_t>::FromExternal(metadata.data(), metadata.count()));
 }
 
-zx_status_t IsolatedDevMgrTestDriver::Bind() { return DdkAdd("metadata-test"); }
+zx_status_t IsolatedDevMgrTestDriver::Bind() {
+  auto pdev_client = DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev_client.is_error()) {
+    zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client.status_string());
+    return pdev_client.status_value();
+  }
+  pdev_.Bind(std::move(pdev_client.value()));
+
+  return DdkAdd("metadata-test");
+}
 
 zx_status_t isolateddevmgr_test_bind(void* ctx, zx_device_t* device) {
   fbl::AllocChecker ac;

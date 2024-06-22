@@ -1250,7 +1250,7 @@ pub fn sys_prlimit64(
     let resource = Resource::from_raw(user_resource)?;
 
     let maybe_new_limit = if !user_new_limit.is_null() {
-        let new_limit = target_task.read_object(user_new_limit)?;
+        let new_limit = current_task.read_object(user_new_limit)?;
         if new_limit.rlim_cur > new_limit.rlim_max {
             return error!(EINVAL);
         }

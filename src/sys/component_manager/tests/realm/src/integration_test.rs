@@ -4,8 +4,13 @@
 
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fidl_examples_routing_echo::EchoMarker;
+use fuchsia_async::DurationExt;
 use fuchsia_component::client::*;
-use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys};
+use fuchsia_zircon::DurationNum;
+use {
+    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fuchsia_async as fasync,
+};
 
 async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {
     let iterator = query.get_resolved_declaration(moniker).await.unwrap().unwrap();
@@ -30,8 +35,12 @@ pub async fn get_instance_self() {
 
     let instance = query.get_instance("./").await.unwrap().unwrap();
     let url = instance.url.unwrap();
-    assert!(url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_test"));
-    assert!(url.ends_with("#meta/realm_integration_test.cm"));
+    assert!(
+        url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_tests")
+            || url.starts_with("realm_integration_tests-ctf"),
+        "{url}"
+    );
+    assert!(url.ends_with("#meta/realm_integration_test.cm"), "{url}");
 
     let resolved = instance.resolved_info.unwrap();
     let execution = resolved.execution_info.unwrap();
@@ -49,7 +58,8 @@ pub async fn get_manifest_self() {
 
     let uses = decl.uses.unwrap();
     let exposes = decl.exposes.unwrap();
-    assert_eq!(uses.len(), 3);
+    // Extra use (for debugdata) is possible on coverage builds.
+    assert!(uses.len() == 3 || uses.len() == 4, "{uses:?}");
     assert_eq!(exposes.len(), 1);
 }
 
@@ -100,8 +110,12 @@ pub async fn echo_server() {
     let instance = query.get_instance("./echo_server").await.unwrap().unwrap();
     let resolved = instance.resolved_info.unwrap();
     let resolved_url = resolved.resolved_url.unwrap();
-    assert!(resolved_url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_test"));
-    assert!(resolved_url.ends_with("#meta/echo_server.cm"));
+    assert!(
+        resolved_url.starts_with("fuchsia-pkg://fuchsia.com/realm_integration_test")
+            || resolved_url.starts_with("realm_integration_tests-ctf"),
+        "{resolved_url}"
+    );
+    assert!(resolved_url.ends_with("#meta/echo_server.cm"), "{resolved_url}");
 
     let execution = resolved.execution_info.unwrap();
     execution.start_reason.unwrap();
@@ -112,7 +126,8 @@ pub async fn echo_server() {
 
     let uses = decl.uses.unwrap();
     let exposes = decl.exposes.unwrap();
-    assert_eq!(uses.len(), 1);
+    // Extra use (for debugdata) is possible on coverage builds.
+    assert!(uses.len() == 1 || uses.len() == 2, "{uses:?}");
     assert_eq!(exposes.len(), 2);
 
     let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -226,12 +241,15 @@ pub async fn echo_server() {
         .unwrap()
         .unwrap();
     let entries = fuchsia_fs::directory::readdir(&svc_dir).await.unwrap();
-    assert_eq!(
-        entries,
-        vec![fuchsia_fs::directory::DirEntry {
-            name: "fuchsia.logger.LogSink".to_string(),
-            kind: fuchsia_fs::directory::DirentKind::Service,
-        }]
+    // Extra entry (for debugdata) is possible on coverage builds.
+    assert!(entries.len() == 1 || entries.len() == 2, "{entries:?}");
+    assert!(
+        entries.iter().any(|e| *e
+            == fuchsia_fs::directory::DirEntry {
+                name: "fuchsia.logger.LogSink".to_string(),
+                kind: fuchsia_fs::directory::DirentKind::Service,
+            }),
+        "{entries:?}"
     );
 
     let (echo, server_end) = create_proxy::<EchoMarker>().unwrap();
@@ -265,31 +283,36 @@ pub async fn echo_server() {
         .await
         .unwrap()
         .unwrap();
-    let mut entries = fuchsia_fs::directory::readdir(&elf_dir).await.unwrap();
 
-    // TODO(https://fxbug.dev/42182309): The existence of "process_start_time_utc_estimate" is flaky.
-    if let Some(position) = entries.iter().position(|e| e.name == "process_start_time_utc_estimate")
-    {
-        entries.remove(position);
+    // ELF runner doesn't doesn't fully populate the runtime_dir before it begins serving it, so
+    // poll in a loop.
+    let expected_entries = vec![
+        fuchsia_fs::directory::DirEntry {
+            name: "job_id".to_string(),
+            kind: fuchsia_fs::directory::DirentKind::File,
+        },
+        fuchsia_fs::directory::DirEntry {
+            name: "process_id".to_string(),
+            kind: fuchsia_fs::directory::DirentKind::File,
+        },
+        fuchsia_fs::directory::DirEntry {
+            name: "process_start_time".to_string(),
+            kind: fuchsia_fs::directory::DirentKind::File,
+        },
+    ];
+    loop {
+        let mut entries = fuchsia_fs::directory::readdir(&elf_dir).await.unwrap();
+        if let Some(position) =
+            entries.iter().position(|e| e.name == "process_start_time_utc_estimate")
+        {
+            entries.remove(position);
+        }
+        if entries.len() >= expected_entries.len() {
+            assert_eq!(entries, expected_entries);
+            break;
+        }
+        fasync::Timer::new(100.millis().after_now()).await;
     }
-
-    assert_eq!(
-        entries,
-        vec![
-            fuchsia_fs::directory::DirEntry {
-                name: "job_id".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::File,
-            },
-            fuchsia_fs::directory::DirEntry {
-                name: "process_id".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::File,
-            },
-            fuchsia_fs::directory::DirEntry {
-                name: "process_start_time".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::File,
-            },
-        ]
-    );
 }
 
 #[fuchsia::test]

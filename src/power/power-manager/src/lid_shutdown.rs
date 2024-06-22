@@ -23,7 +23,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use tracing::*;
-use {fuchsia_async as fasync, fuchsia_zircon as zx, serde_json as json};
+use {
+    fidl_fuchsia_hardware_hidbus as fhidbus, fuchsia_async as fasync, fuchsia_zircon as zx,
+    serde_json as json,
+};
 
 /// Node: LidShutdown
 ///
@@ -201,27 +204,31 @@ impl LidShutdown {
             .or_debug_panic()?
             .clone();
 
-        let (status, report, _time) = driver_proxy.read_report().await?;
-        let status = zx::Status::from_raw(status);
-        if status != zx::Status::OK {
-            return Err(format_err!("Error reading report {}", status));
-        }
-        if report.len() != 1 {
-            return Err(format_err!("Expected single byte report, found {:?}", report));
-        }
-        self.inspect.log_lid_report(format!("{:?}", report));
-        let report = report[0];
+        match driver_proxy.read_report().await? {
+            Err(status) => {
+                return Err(format_err!("Error reading report {}", status));
+            }
+            Ok(fhidbus::Report { buf, .. }) => {
+                let report = buf.expect("Error, expecting a report");
 
-        if report == LID_CLOSED {
-            info!("Lid closed. Shutting down...");
-            self.send_message(
-                &self.system_shutdown_node,
-                &Message::SystemShutdown(ShutdownRequest::PowerOff),
-            )
-            .await
-            .map_err(|e| format_err!("Failed to shut down the system: {:?}", e))?;
+                if report.len() != 1 {
+                    return Err(format_err!("Expected single byte report, found {:?}", report));
+                }
+                self.inspect.log_lid_report(format!("{:?}", report));
+                let report = report[0];
+
+                if report == LID_CLOSED {
+                    info!("Lid closed. Shutting down...");
+                    self.send_message(
+                        &self.system_shutdown_node,
+                        &Message::SystemShutdown(ShutdownRequest::PowerOff),
+                    )
+                    .await
+                    .map_err(|e| format_err!("Failed to shut down the system: {:?}", e))?;
+                }
+                Ok(())
+            }
         }
-        Ok(())
     }
 }
 
@@ -260,18 +267,21 @@ impl Node for LidShutdown {
             None => find_lid_sensor().await?,
         };
 
-        let report_event = driver_proxy
+        match driver_proxy
             .get_reports_event()
             .await
             .map_err(|_| format_err!("Could not get report event"))?
-            .1;
+        {
+            Ok(report_event) => {
+                // Send `report_event` to be used by `watch_lid_task`
+                self.mutable_inner.borrow_mut().report_event_sender.try_send(report_event)?;
 
-        // Send `report_event` to be used by `watch_lid_task`
-        self.mutable_inner.borrow_mut().report_event_sender.try_send(report_event)?;
+                self.mutable_inner.borrow_mut().driver_proxy = Some(driver_proxy);
 
-        self.mutable_inner.borrow_mut().driver_proxy = Some(driver_proxy);
-
-        Ok(())
+                Ok(())
+            }
+            Err(status) => Err(format_err!("Could not get report event {}", status)),
+        }
     }
 
     async fn handle_message(&self, _msg: &Message) -> Result<MessageReturn, PowerManagerError> {
@@ -459,17 +469,16 @@ mod tests {
                             report_event_clone
                                 .signal_handle(zx::Signals::USER_0, zx::Signals::NONE)
                                 .expect("Failed to clear event signal");
-                            let _ = responder.send(
-                                zx::Status::OK.into_raw(),
-                                &[lid_state_clone.get()],
-                                0 as i64,
-                            );
+                            let _ = responder.send(Ok(&fhidbus::Report {
+                                buf: Some((&[lid_state_clone.get()]).to_vec()),
+                                timestamp: Some(0),
+                                ..Default::default()
+                            }));
                         }
                         Some(finput::DeviceRequest::GetReportsEvent { responder }) => {
-                            let _ = responder.send(
-                                zx::Status::OK.into_raw(),
-                                report_event_clone.duplicate_handle(zx::Rights::BASIC).unwrap(),
-                            );
+                            let _ = responder.send(Ok(report_event_clone
+                                .duplicate_handle(zx::Rights::BASIC)
+                                .unwrap()));
                         }
                         _ => assert!(false),
                     }

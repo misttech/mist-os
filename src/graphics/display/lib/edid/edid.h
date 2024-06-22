@@ -38,6 +38,12 @@ namespace edid {
 // The size of an EDID block;
 static constexpr uint32_t kBlockSize = 128;
 
+// The maximum number of blocks in an E-EDID.
+//
+// E-EDID standard, Section 2.2.1 "EDID Extensions: Order of the Blocks",
+// page 16.
+static constexpr int kMaxEdidBlockCount = 256;
+
 // Definitions for parsing EDID data.
 
 // EDID 18-byte detailed timing descriptor.
@@ -329,18 +335,34 @@ class timing_iterator;
 
 class Edid {
  public:
-  // Reads the EDID bytes from the EdidDdcSource and creates an Edid object
-  // from them.
+  // Factory function preferred for production use.
+  //
+  // Reads the EDID bytes from the EdidDdcSource; then creates and validates
+  // an Edid object from the bytes read.
   //
   // On error, returns a `const char*` string of static storage duration
   // containing the error message.
-  fit::result<const char*> Init(void* ctx, ddc_i2c_transact edid_source);
+  static fit::result<const char*, Edid> Create(void* ctx, ddc_i2c_transact edid_source);
 
-  // Creates an Edid from raw bytes.
+  // Factory function preferred for production use.
+  //
+  // Creates and validates an Edid from raw bytes.
   //
   // On error, returns a `const char*` string of static storage duration
   // containing the error message.
-  fit::result<const char*> Init(cpp20::span<const uint8_t> bytes);
+  static fit::result<const char*, Edid> Create(cpp20::span<const uint8_t> bytes);
+
+  // Production code must use the factory method `Create()`.
+  //
+  // `bytes` must not be empty.
+  // The size of `bytes` must be divisible by kBlockSize.
+  // The size of `bytes` must not exceed kMaxEdidBlockCount * kBlockSize.
+  explicit Edid(fbl::Vector<uint8_t> bytes);
+
+  Edid(const Edid&) = delete;
+  Edid& operator=(const Edid&) = delete;
+  Edid(Edid&&) = default;
+  Edid& operator=(Edid&&) = default;
 
   void Print(void (*print_fn)(const char* str)) const;
 

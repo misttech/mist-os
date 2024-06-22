@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Rules used to manage IDK -> SDK convertions."""
+"""Rules used to manage IDK -> SDK conversions."""
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 
@@ -41,7 +41,7 @@ def _generate_bazel_sdk(ctx):
             "no-sandbox": "1",
 
             # Similarly, a full IDK is currently about 4.7 GiB, and this
-            # action runs very rapidly, so avoid remoting it.
+            # action runs in a few seconds, so avoid remoting it.
             "no-remote": "1",
             "no-cache": "1",
         },
@@ -59,7 +59,7 @@ generate_bazel_sdk = rule(
             allow_files = True,
         ),
         "_idk_to_bazel_script": attr.label(
-            default = "@fuchsia_sdk//fuchsia/workspace/sdk_export:idk_to_bazel_sdk",
+            default = "//build/bazel/bazel_sdk:idk_to_bazel_sdk",
             executable = True,
             cfg = "exec",
         ),

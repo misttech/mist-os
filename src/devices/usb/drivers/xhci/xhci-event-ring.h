@@ -231,7 +231,6 @@ class EventRing {
   std::optional<inspect::UintProperty> port_status_change_event_;
   std::optional<inspect::LinearUintHistogram> command_completion_event_;
   std::optional<inspect::LinearUintHistogram> transfer_event_;
-  std::optional<inspect::UintProperty> mf_index_wrap_event_;
   std::optional<inspect::UintProperty> host_controller_event_;
   std::optional<inspect::LinearUintHistogram> unhandled_events_;
 

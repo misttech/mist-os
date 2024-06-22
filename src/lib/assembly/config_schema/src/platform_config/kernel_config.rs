@@ -6,6 +6,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Amount of memory.
+///
+/// TODO(b/322009732): remove
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MemorySize {
@@ -61,10 +63,9 @@ pub struct PlatformKernelConfig {
     /// address space and uses more memory for page tables. Valid values range
     /// from 0-36. Default value is 30.
     pub aslr_entropy_bits: Option<u8>,
-    /// Overrides the board-driver-specified size for sysmem's contiguous memory
-    /// pool. Default value is 0.
+
+    /// TODO(b/322009732): remove; this currently doesn't do anything
     pub sysmem_contiguous_memory_size: Option<MemorySize>,
-    /// Overrides the board-driver-specified size for sysmem's default protected
-    /// memory pool. Default value is 5%.
+    /// TODO(b/322009732): remove; this currently doesn't do anything
     pub sysmem_protected_memory_size: Option<MemorySize>,
 }

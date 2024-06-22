@@ -71,7 +71,12 @@ pub fn elem_to_profile_descriptor(elem: &fidl_bredr::DataElement) -> Option<Prof
             fidl_bredr::DataElement::Uint16(val) => val.to_be_bytes(),
             _ => return None,
         };
-        return Some(ProfileDescriptor { profile_id, major_version, minor_version });
+        return Some(ProfileDescriptor {
+            profile_id: Some(profile_id),
+            major_version: Some(major_version),
+            minor_version: Some(minor_version),
+            ..Default::default()
+        });
     }
     None
 }
@@ -85,10 +90,10 @@ pub fn find_profile_descriptors(
 ) -> Result<Vec<ProfileDescriptor>, Error> {
     let attr = attributes
         .iter()
-        .find(|a| a.id == ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST)
+        .find(|a| a.id == Some(ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST))
         .ok_or(Error::profile("missing profile descriptor"))?;
 
-    let fidl_bredr::DataElement::Sequence(profiles) = &attr.element else {
+    let Some(fidl_bredr::DataElement::Sequence(profiles)) = &attr.element else {
         return Err(Error::profile("attribute element is invalidly formatted"));
     };
     let mut result = Vec::new();
@@ -107,7 +112,10 @@ pub fn find_profile_descriptors(
 }
 
 pub fn profile_descriptor_to_assigned(profile_desc: &ProfileDescriptor) -> Option<AssignedNumber> {
-    SERVICE_CLASS_UUIDS.iter().find(|scn| profile_desc.profile_id as u16 == scn.number).cloned()
+    let Some(id) = profile_desc.profile_id else {
+        return None;
+    };
+    SERVICE_CLASS_UUIDS.iter().find(|scn| id.into_primitive() == scn.number).cloned()
 }
 
 /// Returns the PSM from the provided `protocol`. Returns None if the protocol
@@ -132,11 +140,11 @@ pub fn psm_from_protocol(protocol: &Vec<ProtocolDescriptor>) -> Option<Psm> {
 pub fn find_service_classes(
     attributes: &[fidl_fuchsia_bluetooth_bredr::Attribute],
 ) -> Vec<AssignedNumber> {
-    let attr = match attributes.iter().find(|a| a.id == ATTR_SERVICE_CLASS_ID_LIST) {
+    let attr = match attributes.iter().find(|a| a.id == Some(ATTR_SERVICE_CLASS_ID_LIST)) {
         None => return vec![],
         Some(attr) => attr,
     };
-    if let fidl_fuchsia_bluetooth_bredr::DataElement::Sequence(elems) = &attr.element {
+    if let Some(fidl_fuchsia_bluetooth_bredr::DataElement::Sequence(elems)) = &attr.element {
         let uuids: Vec<Uuid> = elems
             .iter()
             .filter_map(|e| {
@@ -234,10 +242,12 @@ pub enum DataElement {
     Alternatives(Vec<Box<DataElement>>),
 }
 
-impl From<&fidl_bredr::DataElement> for DataElement {
-    fn from(src: &fidl_bredr::DataElement) -> DataElement {
+impl TryFrom<&fidl_bredr::DataElement> for DataElement {
+    type Error = Error;
+
+    fn try_from(src: &fidl_bredr::DataElement) -> Result<DataElement, Error> {
         use fidl_bredr::DataElement as fDataElement;
-        match src {
+        let element = match src {
             fDataElement::Int8(x) => DataElement::Int8(*x),
             fDataElement::Int16(x) => DataElement::Int16(*x),
             fDataElement::Int32(x) => DataElement::Int32(*x),
@@ -254,18 +264,30 @@ impl From<&fidl_bredr::DataElement> for DataElement {
             fDataElement::Sequence(x) => {
                 let mapped = x
                     .into_iter()
-                    .filter_map(|opt| opt.as_ref().map(|t| Box::new(DataElement::from(&**t))))
-                    .collect::<Vec<_>>();
+                    .filter_map(|opt| {
+                        opt.as_ref().map(|t| match DataElement::try_from(&**t) {
+                            Ok(elem) => Ok(Box::new(elem)),
+                            Err(err) => Err(err),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
                 DataElement::Sequence(mapped)
             }
             fDataElement::Alternatives(x) => {
                 let mapped = x
                     .into_iter()
-                    .filter_map(|opt| opt.as_ref().map(|t| Box::new(DataElement::from(&**t))))
-                    .collect::<Vec<_>>();
+                    .filter_map(|opt| {
+                        opt.as_ref().map(|t| match DataElement::try_from(&**t) {
+                            Ok(elem) => Ok(Box::new(elem)),
+                            Err(err) => Err(err),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, Error>>()?;
                 DataElement::Alternatives(mapped)
             }
-        }
+            _ => return Err(Error::conversion("Unknown DataElement type")),
+        };
+        Ok(element)
     }
 }
 
@@ -354,17 +376,31 @@ pub struct ProtocolDescriptor {
     pub params: Vec<DataElement>,
 }
 
-impl From<&fidl_bredr::ProtocolDescriptor> for ProtocolDescriptor {
-    fn from(src: &fidl_bredr::ProtocolDescriptor) -> ProtocolDescriptor {
-        let params = src.params.iter().map(|elem| DataElement::from(elem)).collect();
-        ProtocolDescriptor { protocol: src.protocol, params }
+impl TryFrom<&fidl_bredr::ProtocolDescriptor> for ProtocolDescriptor {
+    type Error = Error;
+
+    fn try_from(src: &fidl_bredr::ProtocolDescriptor) -> Result<ProtocolDescriptor, Self::Error> {
+        let Some(protocol) = src.protocol else {
+            return Err(Error::missing("Missing ProtocolDescriptor.protocol"));
+        };
+        let params = src.params.as_ref().map_or(Ok(vec![]), |elems| {
+            elems
+                .into_iter()
+                .map(|elem| DataElement::try_from(elem))
+                .collect::<Result<Vec<DataElement>, Error>>()
+        })?;
+        Ok(ProtocolDescriptor { protocol, params })
     }
 }
 
 impl From<&ProtocolDescriptor> for fidl_bredr::ProtocolDescriptor {
     fn from(src: &ProtocolDescriptor) -> fidl_bredr::ProtocolDescriptor {
         let params = src.params.iter().map(|elem| fidl_bredr::DataElement::from(elem)).collect();
-        fidl_bredr::ProtocolDescriptor { protocol: src.protocol, params }
+        fidl_bredr::ProtocolDescriptor {
+            protocol: Some(src.protocol),
+            params: Some(params),
+            ..Default::default()
+        }
     }
 }
 
@@ -392,15 +428,28 @@ pub struct Attribute {
     pub element: DataElement,
 }
 
-impl From<&fidl_bredr::Attribute> for Attribute {
-    fn from(src: &fidl_bredr::Attribute) -> Attribute {
-        Attribute { id: src.id, element: DataElement::from(&src.element) }
+impl TryFrom<&fidl_bredr::Attribute> for Attribute {
+    type Error = Error;
+
+    fn try_from(src: &fidl_bredr::Attribute) -> Result<Attribute, Self::Error> {
+        let Some(id) = src.id else {
+            return Err(Error::missing("Attribute.id"));
+        };
+        let Some(element) = src.element.as_ref() else {
+            return Err(Error::missing("Attribute.element"));
+        };
+        let element = DataElement::try_from(element)?;
+        Ok(Attribute { id, element })
     }
 }
 
 impl From<&Attribute> for fidl_bredr::Attribute {
     fn from(src: &Attribute) -> fidl_bredr::Attribute {
-        fidl_bredr::Attribute { id: src.id, element: fidl_bredr::DataElement::from(&src.element) }
+        fidl_bredr::Attribute {
+            id: Some(src.id),
+            element: Some(fidl_bredr::DataElement::from(&src.element)),
+            ..Default::default()
+        }
     }
 }
 
@@ -526,29 +575,37 @@ impl TryFrom<&fidl_bredr::ServiceDefinition> for ServiceDefinition {
             }
         };
 
-        let protocol_descriptor_list: Vec<ProtocolDescriptor> = src
-            .protocol_descriptor_list
-            .as_ref()
-            .map_or(vec![], |p| p.into_iter().map(|d| ProtocolDescriptor::from(d)).collect());
+        let protocol_descriptor_list: Vec<ProtocolDescriptor> =
+            src.protocol_descriptor_list.as_ref().map_or(Ok(vec![]), |p| {
+                p.into_iter()
+                    .map(|d| ProtocolDescriptor::try_from(d))
+                    .collect::<Result<Vec<ProtocolDescriptor>, Error>>()
+            })?;
         let additional_protocol_descriptor_lists: Vec<Vec<ProtocolDescriptor>> =
-            src.additional_protocol_descriptor_lists.as_ref().map_or(vec![], |desc_lists| {
+            src.additional_protocol_descriptor_lists.as_ref().map_or(Ok(vec![]), |desc_lists| {
                 desc_lists
                     .into_iter()
                     .map(|desc_list| {
-                        desc_list.into_iter().map(|d| ProtocolDescriptor::from(d)).collect()
+                        desc_list
+                            .into_iter()
+                            .map(|d| ProtocolDescriptor::try_from(d))
+                            .collect::<Result<Vec<ProtocolDescriptor>, Error>>()
                     })
-                    .collect()
-            });
+                    .collect::<Result<Vec<Vec<ProtocolDescriptor>>, Error>>()
+            })?;
         let profile_descriptors: Vec<fidl_bredr::ProfileDescriptor> =
             src.profile_descriptors.clone().unwrap_or(vec![]);
         let information: Result<Vec<Information>, Error> =
             src.information.as_ref().map_or(Ok(vec![]), |infos| {
                 infos.into_iter().map(|i| Information::try_from(i)).collect()
             });
-        let additional_attributes: Vec<Attribute> = src
-            .additional_attributes
-            .as_ref()
-            .map_or(vec![], |attrs| attrs.into_iter().map(|a| Attribute::from(a)).collect());
+        let additional_attributes: Vec<Attribute> =
+            src.additional_attributes.as_ref().map_or(Ok(vec![]), |attrs| {
+                attrs
+                    .into_iter()
+                    .map(|a| Attribute::try_from(a))
+                    .collect::<Result<Vec<Attribute>, Error>>()
+            })?;
 
         Ok(ServiceDefinition {
             service_class_uuids,
@@ -755,22 +812,24 @@ mod tests {
         assert!(find_profile_descriptors(&[]).is_err());
 
         let mut attributes = vec![fidl_bredr::Attribute {
-            id: 0x3001,
-            element: fidl_bredr::DataElement::Uint32(0xF00FC0DE),
+            id: Some(0x3001),
+            element: Some(fidl_bredr::DataElement::Uint32(0xF00FC0DE)),
+            ..Default::default()
         }];
 
         assert!(find_profile_descriptors(&attributes).is_err());
 
         // Wrong element type
         attributes.push(fidl_bredr::Attribute {
-            id: fidl_bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-            element: fidl_bredr::DataElement::Uint32(0xABADC0DE),
+            id: Some(fidl_bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST),
+            element: Some(fidl_bredr::DataElement::Uint32(0xABADC0DE)),
+            ..Default::default()
         });
 
         assert!(find_profile_descriptors(&attributes).is_err());
 
         // Empty sequence
-        attributes[1].element = fidl_bredr::DataElement::Sequence(vec![]);
+        attributes[1].element = Some(fidl_bredr::DataElement::Sequence(vec![]));
 
         assert!(find_profile_descriptors(&attributes).is_err());
     }
@@ -778,8 +837,8 @@ mod tests {
     #[test]
     fn test_find_descriptors_returns_descriptors() {
         let attributes = vec![fidl_bredr::Attribute {
-            id: fidl_bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-            element: fidl_bredr::DataElement::Sequence(vec![
+            id: Some(fidl_bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST),
+            element: Some(fidl_bredr::DataElement::Sequence(vec![
                 Some(Box::new(fidl_bredr::DataElement::Sequence(vec![
                     Some(Box::new(fidl_bredr::DataElement::Uuid(Uuid::new16(0x1101).into()))),
                     Some(Box::new(fidl_bredr::DataElement::Uint16(0x0103))),
@@ -788,7 +847,8 @@ mod tests {
                     Some(Box::new(fidl_bredr::DataElement::Uuid(Uuid::new16(0x113A).into()))),
                     Some(Box::new(fidl_bredr::DataElement::Uint16(0x0302))),
                 ]))),
-            ]),
+            ])),
+            ..Default::default()
         }];
 
         let result = find_profile_descriptors(&attributes);
@@ -796,17 +856,20 @@ mod tests {
         let result = result.expect("result");
         assert_eq!(2, result.len());
 
-        assert_eq!(fidl_bredr::ServiceClassProfileIdentifier::SerialPort, result[0].profile_id);
-        assert_eq!(1, result[0].major_version);
-        assert_eq!(3, result[0].minor_version);
+        assert_eq!(
+            fidl_bredr::ServiceClassProfileIdentifier::SerialPort,
+            result[0].profile_id.unwrap()
+        );
+        assert_eq!(1, result[0].major_version.unwrap());
+        assert_eq!(3, result[0].minor_version.unwrap());
     }
 
     #[test]
     fn test_find_service_classes_attribute_missing() {
         assert_eq!(find_service_classes(&[]), Vec::new());
         let attributes = vec![fidl_bredr::Attribute {
-            id: fidl_bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST,
-            element: fidl_bredr::DataElement::Sequence(vec![
+            id: Some(fidl_bredr::ATTR_BLUETOOTH_PROFILE_DESCRIPTOR_LIST),
+            element: Some(fidl_bredr::DataElement::Sequence(vec![
                 Some(Box::new(fidl_bredr::DataElement::Sequence(vec![
                     Some(Box::new(fidl_bredr::DataElement::Uuid(Uuid::new16(0x1101).into()))),
                     Some(Box::new(fidl_bredr::DataElement::Uint16(0x0103))),
@@ -815,7 +878,8 @@ mod tests {
                     Some(Box::new(fidl_bredr::DataElement::Uuid(Uuid::new16(0x113A).into()))),
                     Some(Box::new(fidl_bredr::DataElement::Uint16(0x0302))),
                 ]))),
-            ]),
+            ])),
+            ..Default::default()
         }];
         assert_eq!(find_service_classes(&attributes), Vec::new());
     }
@@ -823,8 +887,9 @@ mod tests {
     #[test]
     fn test_find_service_classes_wrong_type() {
         let attributes = vec![fidl_bredr::Attribute {
-            id: fidl_bredr::ATTR_SERVICE_CLASS_ID_LIST,
-            element: fidl_bredr::DataElement::Uint32(0xc0defae5u32),
+            id: Some(fidl_bredr::ATTR_SERVICE_CLASS_ID_LIST),
+            element: Some(fidl_bredr::DataElement::Uint32(0xc0defae5u32)),
+            ..Default::default()
         }];
         assert_eq!(find_service_classes(&attributes), Vec::new());
     }
@@ -832,10 +897,11 @@ mod tests {
     #[test]
     fn test_find_service_classes_returns_known_classes() {
         let attribute = fidl_bredr::Attribute {
-            id: fidl_bredr::ATTR_SERVICE_CLASS_ID_LIST,
-            element: fidl_bredr::DataElement::Sequence(vec![Some(Box::new(
+            id: Some(fidl_bredr::ATTR_SERVICE_CLASS_ID_LIST),
+            element: Some(fidl_bredr::DataElement::Sequence(vec![Some(Box::new(
                 fidl_bredr::DataElement::Uuid(Uuid::new16(0x1101).into()),
-            ))]),
+            ))])),
+            ..Default::default()
         };
 
         let result = find_service_classes(&[attribute]);
@@ -845,11 +911,12 @@ mod tests {
         assert_eq!("SerialPort", assigned_num.name);
 
         let unknown_uuids = fidl_bredr::Attribute {
-            id: fidl_bredr::ATTR_SERVICE_CLASS_ID_LIST,
-            element: fidl_bredr::DataElement::Sequence(vec![
+            id: Some(fidl_bredr::ATTR_SERVICE_CLASS_ID_LIST),
+            element: Some(fidl_bredr::DataElement::Sequence(vec![
                 Some(Box::new(fidl_bredr::DataElement::Uuid(Uuid::new16(0x1101).into()))),
                 Some(Box::new(fidl_bredr::DataElement::Uuid(Uuid::new16(0xc0de).into()))),
-            ]),
+            ])),
+            ..Default::default()
         };
 
         // Discards unknown UUIDs
@@ -901,9 +968,12 @@ mod tests {
         let descriptor =
             elem_to_profile_descriptor(&element).expect("descriptor should be returned");
 
-        assert_eq!(fidl_bredr::ServiceClassProfileIdentifier::SerialPort, descriptor.profile_id);
-        assert_eq!(1, descriptor.major_version);
-        assert_eq!(3, descriptor.minor_version);
+        assert_eq!(
+            fidl_bredr::ServiceClassProfileIdentifier::SerialPort,
+            descriptor.profile_id.unwrap()
+        );
+        assert_eq!(1, descriptor.major_version.unwrap());
+        assert_eq!(3, descriptor.minor_version.unwrap());
     }
 
     #[test]
@@ -1023,9 +1093,10 @@ mod tests {
     fn test_service_definition_conversions() {
         let uuid = fidl_bt::Uuid { value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] };
         let prof_descs = vec![ProfileDescriptor {
-            profile_id: fidl_bredr::ServiceClassProfileIdentifier::AvRemoteControl,
-            major_version: 1,
-            minor_version: 6,
+            profile_id: Some(fidl_bredr::ServiceClassProfileIdentifier::AvRemoteControl),
+            major_version: Some(1),
+            minor_version: Some(6),
+            ..Default::default()
         }];
         let language = "en".to_string();
         let name = "foobar".to_string();
@@ -1068,17 +1139,20 @@ mod tests {
         let fidl = fidl_bredr::ServiceDefinition {
             service_class_uuids: Some(vec![uuid]),
             protocol_descriptor_list: Some(vec![fidl_bredr::ProtocolDescriptor {
-                protocol: fidl_bredr::ProtocolIdentifier::L2Cap,
-                params: vec![fidl_bredr::DataElement::Uint16(10)],
+                protocol: Some(fidl_bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![fidl_bredr::DataElement::Uint16(10)]),
+                ..Default::default()
             }]),
             additional_protocol_descriptor_lists: Some(vec![
                 vec![fidl_bredr::ProtocolDescriptor {
-                    protocol: fidl_bredr::ProtocolIdentifier::L2Cap,
-                    params: vec![fidl_bredr::DataElement::Uint16(12)],
+                    protocol: Some(fidl_bredr::ProtocolIdentifier::L2Cap),
+                    params: Some(vec![fidl_bredr::DataElement::Uint16(12)]),
+                    ..Default::default()
                 }],
                 vec![fidl_bredr::ProtocolDescriptor {
-                    protocol: fidl_bredr::ProtocolIdentifier::Avdtp,
-                    params: vec![fidl_bredr::DataElement::Uint16(3)],
+                    protocol: Some(fidl_bredr::ProtocolIdentifier::Avdtp),
+                    params: Some(vec![fidl_bredr::DataElement::Uint16(3)]),
+                    ..Default::default()
                 }],
             ]),
             profile_descriptors: Some(prof_descs.clone()),
@@ -1090,10 +1164,11 @@ mod tests {
                 ..Default::default()
             }]),
             additional_attributes: Some(vec![fidl_bredr::Attribute {
-                id: attribute_id,
-                element: fidl_bredr::DataElement::Sequence(vec![Some(Box::new(
+                id: Some(attribute_id),
+                element: Some(fidl_bredr::DataElement::Sequence(vec![Some(Box::new(
                     fidl_bredr::DataElement::Uint32(attribute_value),
-                ))]),
+                ))])),
+                ..Default::default()
             }]),
             ..Default::default()
         };

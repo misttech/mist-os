@@ -40,6 +40,7 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   // internal_guard_regions is not set, there will be only guard regions at the
   // begin and end of the buffer.
   void InitGuardRegion(size_t guard_region_size, bool unused_pages_guarded,
+                       int64_t unused_guard_pattern_period_bytes,
                        zx::duration unused_page_check_cycle_period, bool internal_guard_regions,
                        bool crash_on_guard_failure, async_dispatcher_t* dispatcher);
   void FillUnusedRangeWithGuard(uint64_t start_offset, uint64_t size);
@@ -121,6 +122,8 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
 
   // Keep < 1% of pages aside for being unused page guard pattern.  The rest get loaned back to
   // Zircon.
+  //
+  // This is effectively the default value of contiguous_guard_pages_unused_fraction_denominator.
   static constexpr uint64_t kUnusedGuardPatternPeriodPages = 128;
 
  private:
@@ -369,7 +372,7 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   // get the % we want, being able to vary this might potentially help catch a suspected problem
   // faster; in any case it's simple enough to allow this to be adjusted.
   static constexpr uint64_t kUnusedToPatternPages = 1;
-  const uint64_t unused_guard_pattern_period_bytes_ =
+  uint64_t unused_guard_pattern_period_bytes_ =
       kUnusedGuardPatternPeriodPages * zx_system_get_page_size();
   const uint64_t unused_to_pattern_bytes_ = kUnusedToPatternPages * zx_system_get_page_size();
 

@@ -14,7 +14,7 @@ use cm_config::RuntimeConfig;
 use cm_rust::FidlIntoNative;
 use cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS};
 use errors::OpenExposedDirError;
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use moniker::{ChildName, Moniker};
@@ -30,18 +30,13 @@ use {
 };
 
 lazy_static! {
-    static ref REALM_SERVICE: Name = "fuchsia.component.Realm".parse().unwrap();
+    static ref CAPABILITY_NAME: Name = fcomponent::RealmMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
 struct RealmCapabilityProvider {
     scope_moniker: Moniker,
-    host: Arc<RealmCapabilityHost>,
-}
-
-impl RealmCapabilityProvider {
-    pub fn new(scope_moniker: Moniker, host: Arc<RealmCapabilityHost>) -> Self {
-        Self { scope_moniker, host }
-    }
+    model: Weak<Model>,
+    config: Arc<RuntimeConfig>,
 }
 
 #[async_trait]
@@ -50,38 +45,37 @@ impl InternalCapabilityProvider for RealmCapabilityProvider {
         let server_end = ServerEnd::<fcomponent::RealmMarker>::new(server_end);
         // We only need to look up the component matching this scope.
         // These operations should all work, even if the component is not running.
-        if let Some(model) = self.host.model.upgrade() {
-            if let Ok(component) = model.root().find_and_maybe_resolve(&self.scope_moniker).await {
-                let weak = WeakComponentInstance::new(&component);
-                drop(component);
-                let serve_result = self.host.serve(weak, server_end.into_stream().unwrap()).await;
-                if let Err(error) = serve_result {
-                    // TODO: Set an epitaph to indicate this was an unexpected error.
-                    warn!(%error, "serve failed");
-                }
-            }
+        let Some(model) = self.model.upgrade() else {
+            return;
+        };
+        let Ok(component) = model.root().find_and_maybe_resolve(&self.scope_moniker).await else {
+            return;
+        };
+        drop(model);
+        let weak = WeakComponentInstance::new(&component);
+        drop(component);
+        let serve_result = self.serve(weak, server_end.into_stream().unwrap()).await;
+        if let Err(error) = serve_result {
+            // TODO: Set an epitaph to indicate this was an unexpected error.
+            warn!(%error, "serve failed");
         }
     }
 }
 
-pub struct RealmFrameworkCapability {
-    host: Arc<RealmCapabilityHost>,
-}
-
-pub struct RealmCapabilityHost {
+pub struct Realm {
     model: Weak<Model>,
     config: Arc<RuntimeConfig>,
 }
 
-impl RealmFrameworkCapability {
+impl Realm {
     pub fn new(model: Weak<Model>, config: Arc<RuntimeConfig>) -> Self {
-        Self { host: Arc::new(RealmCapabilityHost::new(model, config)) }
+        Self { model, config }
     }
 }
 
-impl FrameworkCapability for RealmFrameworkCapability {
+impl FrameworkCapability for Realm {
     fn matches(&self, capability: &InternalCapability) -> bool {
-        capability.matches_protocol(&REALM_SERVICE)
+        capability.matches_protocol(&CAPABILITY_NAME)
     }
 
     fn new_provider(
@@ -89,22 +83,16 @@ impl FrameworkCapability for RealmFrameworkCapability {
         scope: WeakComponentInstance,
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
-        Box::new(RealmCapabilityProvider::new(scope.moniker.clone(), self.host.clone()))
+        Box::new(RealmCapabilityProvider {
+            scope_moniker: scope.moniker.clone(),
+            model: self.model.clone(),
+            config: self.config.clone(),
+        })
     }
 }
 
-// `RealmCapabilityHost` is a `Hook` that serves the `Realm` FIDL protocol.
-impl RealmCapabilityHost {
-    fn new(model: Weak<Model>, config: Arc<RuntimeConfig>) -> Self {
-        Self { model, config }
-    }
-
-    #[cfg(test)]
-    pub fn new_for_test(model: Weak<Model>, config: Arc<RuntimeConfig>) -> Self {
-        Self::new(model, config)
-    }
-
-    pub async fn serve(
+impl RealmCapabilityProvider {
+    async fn serve(
         &self,
         component: WeakComponentInstance,
         mut stream: fcomponent::RealmRequestStream,
@@ -161,13 +149,13 @@ impl RealmCapabilityHost {
         Ok(())
     }
 
-    pub async fn create_child(
-        component: &WeakComponentInstance,
+    async fn create_child(
+        weak: &WeakComponentInstance,
         collection: fdecl::CollectionRef,
         child_decl: fdecl::Child,
         child_args: fcomponent::CreateChildArgs,
     ) -> Result<(), fcomponent::Error> {
-        let component = component.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
+        let component = weak.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
 
         cm_fidl_validator::validate_dynamic_child(&child_decl).map_err(|error| {
             warn!(%error, "failed to create dynamic child. child decl is invalid");
@@ -181,6 +169,7 @@ impl RealmCapabilityHost {
                     "Failed to create child \"{}\" in collection \"{}\" of component \"{}\": {}",
                     child_decl.name, collection.name, component.moniker, err
                 );
+
                 err.into()
             },
         )
@@ -251,7 +240,7 @@ impl RealmCapabilityHost {
         Ok(())
     }
 
-    pub async fn destroy_child(
+    async fn destroy_child(
         component: &WeakComponentInstance,
         child: fdecl::ChildRef,
     ) -> Result<(), fcomponent::Error> {
@@ -352,6 +341,7 @@ impl RealmCapabilityHost {
 mod tests {
     use super::*;
     use crate::builtin_environment::BuiltinEnvironment;
+    use crate::capability;
     use crate::model::component::StartReason;
     use crate::model::events::source::EventSource;
     use crate::model::events::stream::EventStream;
@@ -377,6 +367,7 @@ mod tests {
         builtin_environment: Option<Arc<Mutex<BuiltinEnvironment>>>,
         mock_runner: Arc<MockRunner>,
         component: Option<Arc<ComponentInstance>>,
+        _host: Realm,
         realm_proxy: fcomponent::RealmProxy,
         hook: Arc<TestHook>,
     }
@@ -407,26 +398,15 @@ mod tests {
                 .expect("failed to start component");
 
             // Host framework service.
-            let (realm_proxy, stream) =
-                endpoints::create_proxy_and_stream::<fcomponent::RealmMarker>().unwrap();
-            {
-                let component = WeakComponentInstance::from(&component);
-                let realm_capability_host = RealmCapabilityHost::new(
-                    Arc::downgrade(&model),
-                    model.context().runtime_config().clone(),
-                );
-                fasync::Task::spawn(async move {
-                    realm_capability_host
-                        .serve(component, stream)
-                        .await
-                        .expect("failed serving realm service");
-                })
-                .detach();
-            }
+            let host = Realm::new(Arc::downgrade(&model), model.context().runtime_config().clone());
+            let (realm_proxy, server) =
+                endpoints::create_proxy::<fcomponent::RealmMarker>().unwrap();
+            capability::open_framework(&host, &component, server.into()).await.unwrap();
             Self {
                 builtin_environment: Some(builtin_environment),
                 mock_runner,
                 component: Some(component),
+                _host: host,
                 realm_proxy,
                 hook,
             }
@@ -562,7 +542,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_dynamic_child_errors() {
-        let mut test = RealmCapabilityTest::new(
+        let test = RealmCapabilityTest::new(
             vec![
                 ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 (
@@ -901,26 +881,28 @@ mod tests {
                 .expect_err("unexpected success");
             assert_eq!(err, fcomponent::Error::InvalidArguments);
         }
+    }
 
-        // Instance died.
-        {
-            test.drop_component();
-            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
-            let child_decl = fdecl::Child {
-                name: Some("b".to_string()),
-                url: Some("test:///b".to_string()),
-                startup: Some(fdecl::StartupMode::Lazy),
-                environment: None,
-                ..Default::default()
-            };
-            let err = test
-                .realm_proxy
-                .create_child(&collection_ref, &child_decl, fcomponent::CreateChildArgs::default())
-                .await
-                .expect("fidl call failed")
-                .expect_err("unexpected success");
-            assert_eq!(err, fcomponent::Error::InstanceDied);
-        }
+    #[fuchsia::test]
+    async fn realm_instance_died() {
+        let mut test = RealmCapabilityTest::new(
+            vec![
+                ("root", ComponentDeclBuilder::new().child_default("system").build()),
+                ("system", ComponentDeclBuilder::new().collection_default("coll").build()),
+            ],
+            vec!["system"].try_into().unwrap(),
+        )
+        .await;
+        let collection_ref = fdecl::CollectionRef { name: "coll".into() };
+        test.realm_proxy
+            .create_child(&collection_ref, &child_decl("a"), fcomponent::CreateChildArgs::default())
+            .await
+            .unwrap()
+            .unwrap();
+
+        // If the component is dropped, this should cancel the server task and close the channel.
+        test.drop_component();
+        assert_matches!(test.realm_proxy.take_event_stream().next().await, None);
     }
 
     #[fuchsia::test]
@@ -1032,7 +1014,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn destroy_dynamic_child_errors() {
-        let mut test = RealmCapabilityTest::new(
+        let test = RealmCapabilityTest::new(
             vec![
                 ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 ("system", ComponentDeclBuilder::new().collection_default("coll").build()),
@@ -1072,20 +1054,6 @@ mod tests {
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
             assert_eq!(err, fcomponent::Error::InstanceNotFound);
-        }
-
-        // Instance died.
-        {
-            test.drop_component();
-            let child_ref =
-                fdecl::ChildRef { name: "a".to_string(), collection: Some("coll".to_string()) };
-            let err = test
-                .realm_proxy
-                .destroy_child(&child_ref)
-                .await
-                .expect("fidl call failed")
-                .expect_err("unexpected success");
-            assert_eq!(err, fcomponent::Error::InstanceDied);
         }
     }
 
@@ -1153,7 +1121,7 @@ mod tests {
     #[fuchsia::test]
     async fn list_children_errors() {
         // Create a root component with a collection.
-        let mut test = RealmCapabilityTest::new(
+        let test = RealmCapabilityTest::new(
             vec![("root", ComponentDeclBuilder::new().collection_default("coll").build())],
             Moniker::root(),
         )
@@ -1170,20 +1138,6 @@ mod tests {
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
             assert_eq!(err, fcomponent::Error::CollectionNotFound);
-        }
-
-        // Instance died.
-        {
-            test.drop_component();
-            let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
-            let (_, server_end) = endpoints::create_proxy().unwrap();
-            let err = test
-                .realm_proxy
-                .list_children(&collection_ref, server_end)
-                .await
-                .expect("fidl call failed")
-                .expect_err("unexpected success");
-            assert_eq!(err, fcomponent::Error::InstanceDied);
         }
     }
 
@@ -1348,7 +1302,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn open_exposed_dir_errors() {
-        let mut test = RealmCapabilityTest::new(
+        let test = RealmCapabilityTest::new(
             vec![
                 (
                     "root",
@@ -1406,25 +1360,11 @@ mod tests {
             let res = echo_proxy.echo_string(Some("hippos")).await;
             assert!(res.is_err());
         }
-
-        // Instance died.
-        {
-            test.drop_component();
-            let child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
-            let (_, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            let err = test
-                .realm_proxy
-                .open_exposed_dir(&child_ref, server_end)
-                .await
-                .expect("fidl call failed")
-                .expect_err("unexpected success");
-            assert_eq!(err, fcomponent::Error::InstanceDied);
-        }
     }
 
     #[fuchsia::test]
     async fn open_controller() {
-        let mut test = RealmCapabilityTest::new(
+        let test = RealmCapabilityTest::new(
             vec![
                 ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 ("system", component_decl_with_test_runner()),
@@ -1473,21 +1413,6 @@ mod tests {
                 .expect("fidl call failed")
                 .expect_err("unexpected success");
             assert_eq!(err, fcomponent::Error::InstanceNotFound);
-        }
-
-        // Instance died.
-        {
-            test.drop_component();
-            let child_ref = fdecl::ChildRef { name: "system".to_string(), collection: None };
-            let (_, server_end) =
-                endpoints::create_proxy::<fcomponent::ControllerMarker>().unwrap();
-            let err = test
-                .realm_proxy
-                .open_controller(&child_ref, server_end)
-                .await
-                .expect("fidl call failed")
-                .expect_err("unexpected success");
-            assert_eq!(err, fcomponent::Error::InstanceDied);
         }
     }
 }

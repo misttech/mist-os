@@ -21,6 +21,11 @@
     ],
     use: [
         {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
+        {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
         { service: "fuchsia.hardware.platform.device.Service" },

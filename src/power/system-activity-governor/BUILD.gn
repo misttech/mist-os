@@ -26,6 +26,8 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
+    "//src/lib/trace/rust:trace",
+    "//src/lib/trace/rust:trace-provider",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/power/broker/client",
     "//third_party/rust_crates:anyhow",

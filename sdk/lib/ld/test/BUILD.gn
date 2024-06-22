@@ -96,7 +96,7 @@ source_set("load-tests") {
     ":load-test-modules-info",
     "..:abi-headers",
     "..:headers",
-    "..:posix-header",
+    "..:posix.headers",
     "//src/lib/elfldltl",
     "//src/lib/elfldltl/testing",
     "//third_party/googletest:gtest",

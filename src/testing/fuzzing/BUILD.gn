@@ -7,6 +7,7 @@ group("fuzzing") {
   deps = [
     ":tests",
     "go",
+    "syzkaller/starnix:syzkaller_starnix",
 
     # TODO(https://fxbug.dev/42151900): syzkaller needs to update ddk include paths.
     # "syzkaller",

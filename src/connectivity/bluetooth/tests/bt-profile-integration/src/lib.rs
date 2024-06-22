@@ -27,8 +27,9 @@ fn service_definition_for_testing() -> ServiceDefinition {
     ServiceDefinition {
         service_class_uuids: Some(vec![test_uuid.into()]),
         protocol_descriptor_list: Some(vec![ProtocolDescriptor {
-            protocol: ProtocolIdentifier::L2Cap,
-            params: vec![DataElement::Uint16(0x100f)], // In the "dynamically-assigned" range
+            protocol: Some(ProtocolIdentifier::L2Cap),
+            params: Some(vec![DataElement::Uint16(0x100f)]), // In the "dynamically-assigned" range
+            ..Default::default()
         }]),
         ..Default::default()
     }
@@ -39,18 +40,21 @@ pub fn a2dp_sink_service_definition() -> ServiceDefinition {
         service_class_uuids: Some(vec![Uuid::new16(0x110B).into()]), // Audio Sink UUID
         protocol_descriptor_list: Some(vec![
             ProtocolDescriptor {
-                protocol: ProtocolIdentifier::L2Cap,
-                params: vec![DataElement::Uint16(PSM_AVDTP)],
+                protocol: Some(ProtocolIdentifier::L2Cap),
+                params: Some(vec![DataElement::Uint16(PSM_AVDTP)]),
+                ..Default::default()
             },
             ProtocolDescriptor {
-                protocol: ProtocolIdentifier::Avdtp,
-                params: vec![DataElement::Uint16(0x0103)], // Indicate v1.3
+                protocol: Some(ProtocolIdentifier::Avdtp),
+                params: Some(vec![DataElement::Uint16(0x0103)]), // Indicate v1.3
+                ..Default::default()
             },
         ]),
         profile_descriptors: Some(vec![ProfileDescriptor {
-            profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
-            major_version: 1,
-            minor_version: 2,
+            profile_id: Some(ServiceClassProfileIdentifier::AdvancedAudioDistribution),
+            major_version: Some(1),
+            minor_version: Some(2),
+            ..Default::default()
         }]),
         ..Default::default()
     }

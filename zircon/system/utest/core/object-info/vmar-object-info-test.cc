@@ -85,7 +85,7 @@ TEST(VmarGetInfoTest, InfoHandleBasicZeroSizedBufferFails) {
       (CheckZeroSizeBufferFails<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, vmar_provider)));
 }
 
-TEST(VmarGetInfoTest, InfoVmarOnSelfFails) {
+TEST(VmarGetInfoTest, InfoVmarOnSelfSucceeds) {
   ASSERT_NO_FATAL_FAILURE((CheckSelfInfoSuceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider())));
 }
 

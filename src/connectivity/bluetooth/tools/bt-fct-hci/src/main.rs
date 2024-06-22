@@ -9,6 +9,7 @@ mod types;
 
 use anyhow::{Context, Error};
 use argh::FromArgs;
+use fidl as _;
 use fuchsia_async as fasync;
 use futures::StreamExt;
 use hci::CommandChannel;
@@ -152,7 +153,8 @@ async fn raw_command(
         }
 
         command_channel
-            .send_command_packet(&payload[command.range.start..command.range.end])
+            .send_command_packet(payload[command.range.start..command.range.end].to_vec())
+            .await
             .context("Error sending HCI packet")?;
 
         if verbose {
@@ -189,7 +191,8 @@ async fn basic_command(
         }
 
         command_channel
-            .send_command_packet(&payload[command.range.start..command.range.end])
+            .send_command_packet(payload[command.range.start..command.range.end].to_vec())
+            .await
             .context("Error sending HCI packet")?;
 
         print_response_loop(verbose, &mut command_channel, out_opcode, false).await?;
@@ -293,7 +296,7 @@ async fn main() -> Result<(), Error> {
         }
         HciSubcommand::BrEdrScan(scan) => {
             let payload = InquiryCommand::new(scan.timeout, scan.max_results).encode();
-            command_channel.send_command_packet(&payload[..]).context("Error sending inquiry")?;
+            command_channel.send_command_packet(payload).await.context("Error sending inquiry")?;
             scan_command(args.verbose, scan.filter, command_channel).await
         }
     }

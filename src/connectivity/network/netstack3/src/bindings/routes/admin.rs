@@ -18,9 +18,9 @@ use fnet_routes_ext::admin::{
 use fnet_routes_ext::FidlRouteIpExt;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased as _};
 use futures::channel::{mpsc, oneshot};
-use futures::{Future, FutureExt as _, StreamExt as _, TryStream, TryStreamExt as _};
+use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use log::{debug, error, warn};
-use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_core::device::DeviceId;
 use netstack3_core::routes::AddableEntry;
 use {
@@ -30,11 +30,11 @@ use {
 
 use crate::bindings::devices::StaticCommonInfo;
 use crate::bindings::routes::witness::TableId;
-use crate::bindings::routes::{self};
+use crate::bindings::routes::{self, RouteWorkItem, WeakDeviceId};
 use crate::bindings::util::{TaskWaitGroupSpawner, TryFromFidlWithContext};
 use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt};
 
-use super::{RouteWorkItem, WeakDeviceId};
+pub(crate) use crate::bindings::routes::rules_admin::serve_rule_table;
 
 pub(crate) async fn serve_route_set<
     I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
@@ -53,19 +53,7 @@ pub(crate) async fn serve_route_set<
 
     let mut cancel_token = pin!(cancel_token.fuse());
     let control_handle = stream.control_handle();
-    let mut stream = stream
-        .map_ok(|request| {
-            #[derive(GenericOverIp)]
-            #[generic_over_ip(I, Ip)]
-            struct In<I: fnet_routes_ext::admin::FidlRouteAdminIpExt>(
-                <I::RouteSetRequestStream as TryStream>::Ok,
-            );
-            net_types::map_ip_twice!(I, In(request), |In(request)| {
-                fnet_routes_ext::admin::RouteSetRequest::<I>::from(request)
-            })
-        })
-        .into_stream()
-        .fuse();
+    let mut stream = stream.map_ok(I::into_route_set_request).into_stream().fuse();
 
     loop {
         futures::select_biased! {
@@ -111,12 +99,8 @@ pub(crate) async fn serve_route_table_provider_v4(
                     Ok((table_id, route_work_sink)) => {
                         UserRouteTable::new(ctx.clone(), name, table_id, route_work_sink)
                     }
-                    Err(routes::TableError::TableIdOverflows) => {
+                    Err(routes::TableIdOverflowsError) => {
                         control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
-                        break;
-                    }
-                    Err(routes::TableError::ShuttingDown) => {
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_STATE);
                         break;
                     }
                 };
@@ -150,12 +134,8 @@ pub(crate) async fn serve_route_table_provider_v6(
                     Ok((table_id, route_work_sink)) => {
                         UserRouteTable::new(ctx.clone(), name, table_id, route_work_sink)
                     }
-                    Err(routes::TableError::TableIdOverflows) => {
+                    Err(routes::TableIdOverflowsError) => {
                         control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
-                        break;
-                    }
-                    Err(routes::TableError::ShuttingDown) => {
-                        control_handle.shutdown_with_epitaph(zx::Status::BAD_STATE);
                         break;
                     }
                 };
@@ -196,17 +176,8 @@ async fn serve_route_table_inner<
     spawner: TaskWaitGroupSpawner,
     mut route_table: B,
 ) -> Result<(), fidl::Error> {
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct In<I: fnet_routes_ext::admin::FidlRouteAdminIpExt>(
-        <I::RouteTableRequestStream as TryStream>::Ok,
-    );
-
     while let Some(request) = stream.try_next().await? {
-        let request = net_types::map_ip_twice!(I, In(request), |In(request)| {
-            fnet_routes_ext::admin::RouteTableRequest::<I>::from(request)
-        });
-        match request {
+        match I::into_route_table_request(request) {
             RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
                 let set_request_stream = route_set.into_stream()?;
                 route_table.borrow().serve_user_route_set(spawner.clone(), set_request_stream);

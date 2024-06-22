@@ -8,6 +8,52 @@ use futures::prelude::*;
 use thiserror::Error;
 use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status};
 
+#[cfg(target_os = "fuchsia")]
+pub use fuchsia::*;
+
+#[cfg(target_os = "fuchsia")]
+mod fuchsia {
+    use super::*;
+
+    /// Opens the given `path` from the current namespace as a [`NodeProxy`].
+    ///
+    /// The target is assumed to implement fuchsia.io.Node but this isn't verified. To connect to a
+    /// filesystem node which doesn't implement fuchsia.io.Node, use the functions in
+    /// [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
+    /// error. However, if incorrect flags are sent, or if the rest of the path sent to the
+    /// filesystem server doesn't exist, this will still return success. Instead, the returned
+    /// NodeProxy channel pair will be closed with an epitaph.
+    pub fn open_in_namespace(
+        path: &str,
+        flags: fio::OpenFlags,
+    ) -> Result<fio::NodeProxy, OpenError> {
+        let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
+        open_channel_in_namespace(path, flags, request)?;
+        Ok(node)
+    }
+
+    /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
+    /// over [`request`]. Once the channel is connected, any calls made prior are serviced.
+    ///
+    /// The target is assumed to implement fuchsia.io.Node but this isn't verified. To connect to a
+    /// filesystem node which doesn't implement fuchsia.io.Node, use the functions in
+    /// [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
+    /// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will
+    /// still return success. Instead, the [`request`] channel will be closed with an epitaph.
+    pub fn open_channel_in_namespace(
+        path: &str,
+        flags: fio::OpenFlags,
+        request: fidl::endpoints::ServerEnd<fio::NodeMarker>,
+    ) -> Result<(), OpenError> {
+        let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
+        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+    }
+}
+
 /// An error encountered while opening a node
 #[derive(Debug, Clone, Error)]
 #[allow(missing_docs)]
@@ -151,43 +197,6 @@ impl Kind {
             other => Err(Kind::kind_of2(other)),
         }
     }
-}
-
-/// Opens the given `path` from the current namespace as a [`NodeProxy`].
-///
-/// The target is assumed to implement fuchsia.io.Node but this isn't verified. To connect to a
-/// filesystem node which doesn't implement fuchsia.io.Node, use the functions in
-/// [`fuchsia_component::client`] instead.
-///
-/// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
-/// error. However, if incorrect flags are sent, or if the rest of the path sent to the filesystem
-/// server doesn't exist, this will still return success. Instead, the returned NodeProxy channel
-/// pair will be closed with an epitaph.
-#[cfg(target_os = "fuchsia")]
-pub fn open_in_namespace(path: &str, flags: fio::OpenFlags) -> Result<fio::NodeProxy, OpenError> {
-    let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
-    open_channel_in_namespace(path, flags, request)?;
-    Ok(node)
-}
-
-/// Asynchronously opens the given [`path`] in the current namespace, serving the connection over
-/// [`request`]. Once the channel is connected, any calls made prior are serviced.
-///
-/// The target is assumed to implement fuchsia.io.Node but this isn't verified. To connect to a
-/// filesystem node which doesn't implement fuchsia.io.Node, use the functions in
-/// [`fuchsia_component::client`] instead.
-///
-/// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
-/// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will still
-/// return success. Instead, the [`request`] channel will be closed with an epitaph.
-#[cfg(target_os = "fuchsia")]
-pub fn open_channel_in_namespace(
-    path: &str,
-    flags: fio::OpenFlags,
-    request: fidl::endpoints::ServerEnd<fio::NodeMarker>,
-) -> Result<(), OpenError> {
-    let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-    namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
 }
 
 /// Gracefully closes the node proxy from the remote end.

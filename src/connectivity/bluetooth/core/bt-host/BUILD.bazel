@@ -5,11 +5,13 @@
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_cc_binary",
+    "fuchsia_cc_test",
     "fuchsia_component",
     "fuchsia_component_manifest",
     "fuchsia_package",
     "fuchsia_structured_config_cpp_elf_lib",
     "fuchsia_structured_config_values",
+    "fuchsia_unittest_package",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -72,6 +74,7 @@ cc_library(
 fuchsia_cc_binary(
     name = "bt_host_bin",
     srcs = ["main.cc"],
+    bin_name = "bt_host",
     deps = [
         ":sources",
         "//third_party/pigweed/backends/pw_log:syslog",
@@ -81,7 +84,6 @@ fuchsia_cc_binary(
 fuchsia_component_manifest(
     name = "manifest",
     src = "meta/bt-host.cml",
-    component_name = "bt-host",
 )
 
 fuchsia_structured_config_cpp_elf_lib(
@@ -92,6 +94,7 @@ fuchsia_structured_config_cpp_elf_lib(
 fuchsia_structured_config_values(
     name = "default_config_values",
     cm_label = ":manifest",
+    cvf_output_name = "bt-host",
     values = {
         "device_path": "/dev/class/bt-hci/000",
     },
@@ -352,4 +355,30 @@ cc_library(
     includes = [
         "public",
     ],
+)
+
+fuchsia_cc_test(
+    name = "host_test",
+    testonly = True,
+    srcs = ["host_test.cc"],
+    death_unittest = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":sources",
+        "//src/connectivity/bluetooth/core/bt-host/fidl:fake_hci_test_fixture",
+        "//src/connectivity/bluetooth/core/bt-host/testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+        "//src/connectivity/bluetooth/core/bt-host/testing:loop_fixture",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "host_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":host_test",
+    ],
+    visibility = ["//visibility:public"],
 )

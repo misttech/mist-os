@@ -5,6 +5,7 @@
 """Rule for creating a ELF sizes summary file for a Fuchsia image."""
 
 load(":providers.bzl", "FuchsiaProductImageInfo")
+load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _fuchsia_elf_sizes_impl(ctx):
     images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out
@@ -30,6 +31,7 @@ def _fuchsia_elf_sizes_impl(ctx):
             images_out.path + "/fuchsia.zbi",
         ]),
         progress_message = "Extracting bootfs for %s" % ctx.label.name,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     elf_sizes_json = ctx.actions.declare_file(ctx.label.name + "_elf_sizes.json")
@@ -53,6 +55,7 @@ def _fuchsia_elf_sizes_impl(ctx):
             "--bootfs-dir",
             extracted_zbi_bootfs_dir.path,
         ],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     return [

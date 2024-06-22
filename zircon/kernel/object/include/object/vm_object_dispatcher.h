@@ -97,6 +97,7 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   zx_info_vmo_t GetVmoInfo(zx_rights_t rights);
 
   zx_status_t SetContentSize(uint64_t);
+  zx_status_t SetStreamSize(uint64_t);
   uint64_t GetContentSize() const;
 
   // Tries to expand the VMO to a requested (byte-aligned) size, if the VMO is smaller than that

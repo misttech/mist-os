@@ -10,7 +10,8 @@ use core::task::{Context, Poll};
 use fidl::endpoints::{create_request_stream, RequestStream};
 use fidl_fuchsia_bluetooth::ErrorCode;
 use fuchsia_bluetooth::profile::{
-    l2cap_connect_parameters, psm_from_protocol, ChannelParameters, Psm, ServiceDefinition,
+    l2cap_connect_parameters, psm_from_protocol, ChannelParameters, ProtocolDescriptor, Psm,
+    ServiceDefinition,
 };
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect_derive::Inspect;
@@ -217,7 +218,10 @@ impl ProfileRegistrar {
         protocol: Vec<bredr::ProtocolDescriptor>,
     ) -> Result<(), Error> {
         trace!(%peer_id, ?protocol, "Incoming L2CAP connection request");
-        let local = protocol.iter().map(|p| p.into()).collect();
+        let local = protocol
+            .iter()
+            .map(|p| ProtocolDescriptor::try_from(p))
+            .collect::<Result<Vec<_>, _>>()?;
         // TODO(https://fxbug.dev/327758656): Support forwarding dynamic L2CAP connections to the
         // correct client.
         match psm_from_protocol(&local).ok_or(format_err!("No PSM provided"))? {
@@ -648,12 +652,15 @@ mod tests {
     fn service_def_has_assigned_server_channel(service: &bredr::ServiceDefinition) -> bool {
         if let Some(protocol) = &service.protocol_descriptor_list {
             for descriptor in protocol {
-                if descriptor.protocol == bredr::ProtocolIdentifier::Rfcomm {
-                    if descriptor.params.is_empty() {
+                if descriptor.protocol == Some(bredr::ProtocolIdentifier::Rfcomm) {
+                    let Some(params) = descriptor.params.as_ref() else {
+                        return false;
+                    };
+                    if params.is_empty() {
                         return false;
                     }
                     // The server channel should be the first element.
-                    if let bredr::DataElement::Uint8(_) = descriptor.params[0] {
+                    if let bredr::DataElement::Uint8(_) = params[0] {
                         return true;
                     }
                 }
@@ -1323,8 +1330,9 @@ mod tests {
         // Simulate an incoming L2CAP connection over the L2CAP PSM of the OBEX service.
         let id = PeerId(123);
         let l2cap_protocol = [bredr::ProtocolDescriptor {
-            protocol: bredr::ProtocolIdentifier::L2Cap,
-            params: vec![bredr::DataElement::Uint16(obex_psm.into())],
+            protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+            params: Some(vec![bredr::DataElement::Uint16(obex_psm.into())]),
+            ..Default::default()
         }];
         receiver
             .connected(&id.into(), bredr::Channel::default(), &l2cap_protocol)

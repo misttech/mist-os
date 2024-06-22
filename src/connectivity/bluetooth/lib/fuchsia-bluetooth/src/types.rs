@@ -5,28 +5,37 @@
 use fidl_fuchsia_bluetooth_sys as sys;
 use std::fmt;
 
-pub use self::uuid::*;
-pub use address::*;
-pub use bonding_data::*;
-pub use channel::*;
-pub use host_info::*;
-pub use id::*;
-pub use peer::*;
-
 mod address;
+pub use address::*;
+
 /// Types related to bonding data. This module defines helper functions for unit tests that utilize
 /// proptest.
 pub mod bonding_data;
+pub use bonding_data::*;
+
 /// Channel type
 mod channel;
+pub use channel::*;
+
 pub mod host_info;
+pub use host_info::*;
+
 mod id;
+pub use id::*;
+
 pub mod io_capabilities;
-/// Bluetooth LowEnergy types
+
+/// Bluetooth Low Energy types
 pub mod le;
+
+/// Options for pairing commands
 pub mod pairing_options;
+
 mod peer;
+pub use peer::*;
+
 mod uuid;
+pub use uuid::*;
 
 macro_rules! bt_fidl_wrap {
     ($outer:ident) => {

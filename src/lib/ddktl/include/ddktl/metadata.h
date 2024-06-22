@@ -5,7 +5,6 @@
 #ifndef SRC_LIB_DDKTL_INCLUDE_DDKTL_METADATA_H_
 #define SRC_LIB_DDKTL_INCLUDE_DDKTL_METADATA_H_
 
-#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fidl/cpp/wire/message.h>
@@ -39,8 +38,6 @@ zx::result<std::unique_ptr<T>> GetMetadata(zx_device_t* dev, uint32_t type) {
     return metadata.take_error();
   }
   if (metadata->size() != sizeof(T)) {
-    zxlogf(ERROR, "Metadata size retrieved [%lu] does not match size of metadata struct [%lu]",
-           metadata->size(), sizeof(T));
     return zx::error(ZX_ERR_INTERNAL);
   }
   return zx::ok(std::make_unique<T>(*reinterpret_cast<T*>(metadata->data())));
@@ -55,9 +52,6 @@ zx::result<std::vector<T>> GetMetadataArray(zx_device_t* dev, uint32_t type) {
     return metadata.take_error();
   }
   if ((metadata->size() % sizeof(T)) != 0) {
-    zxlogf(ERROR,
-           "Metadata size retrieved [%lu] was not an integer multiple of metadata struct [%lu]",
-           metadata->size(), sizeof(T));
     return zx::error(ZX_ERR_INTERNAL);
   }
   auto mstart = reinterpret_cast<T*>(metadata->data());
@@ -96,8 +90,6 @@ zx::result<DecodedMetadata<T>> GetEncodedMetadata(zx_device_t* dev, uint32_t typ
   std::vector<uint8_t> metadata_blob = std::move(metadata.value());
   fit::result decoded = fidl::InplaceUnpersist<T>(cpp20::span(metadata_blob));
   if (!decoded.is_ok()) {
-    zxlogf(ERROR, "Failed to deserialize metadata: %s",
-           decoded.error_value().FormatDescription().c_str());
     return zx::error(ZX_ERR_INTERNAL);
   }
   // Note: take care to move the |metadata_blob|, as |decoded| borrows the

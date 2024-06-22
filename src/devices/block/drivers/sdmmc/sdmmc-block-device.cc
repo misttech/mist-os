@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
-#include <lib/driver/power/cpp/power-support.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <threads.h>
@@ -52,12 +51,24 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> GetBufferRegion(zx_h
   buffer_region.size = size;
   return zx::ok(std::move(buffer_region));
 }
-
 // TODO(b/329588116): Relocate this power config.
-// This power element represents the SDMMC controller hardware. Its passive dependency on SAG's
-// (Execution State, wake handling) allows for orderly power down of the hardware before the CPU
-// suspends scheduling.
-fuchsia_hardware_power::PowerElementConfiguration GetHardwarePowerConfig() {
+// This power element represents the SDMMC controller hardware.
+fuchsia_hardware_power::PowerElementConfiguration GetHardwarePowerConfig(
+    const fuchsia_hardware_power::ParentElement& parent_element) {
+  // Add active dependency on parent driver's power element.
+  fuchsia_hardware_power::LevelTuple on_to_parent_on = {{
+      .child_level = SdmmcBlockDevice::kPowerLevelOn,
+      .parent_level = SdmmcBlockDevice::kPowerLevelOn,
+  }};
+  fuchsia_hardware_power::PowerDependency active_on_parent = {{
+      .child = SdmmcBlockDevice::kHardwarePowerElementName,
+      .parent = parent_element,
+      .level_deps = {{on_to_parent_on}},
+      .strength = fuchsia_hardware_power::RequirementType::kActive,
+  }};
+
+  // Add passive dependency on SAG's (Execution State, wake handling) which allows for orderly
+  // power down of the hardware before the CPU suspends scheduling.
   auto transitions_from_off =
       std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
           .target_level = SdmmcBlockDevice::kPowerLevelOn,
@@ -92,7 +103,8 @@ fuchsia_hardware_power::PowerElementConfiguration GetHardwarePowerConfig() {
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration hardware_power_config = {
-      {.element = hardware_power, .dependencies = {{passive_on_exec_state_wake_handling}}}};
+      {.element = hardware_power,
+       .dependencies = {{passive_on_exec_state_wake_handling, active_on_parent}}}};
   return hardware_power_config;
 }
 
@@ -140,11 +152,11 @@ fuchsia_hardware_power::PowerElementConfiguration GetSystemWakeOnRequestPowerCon
 }
 
 // TODO(b/329588116): Relocate this power config.
-std::vector<fuchsia_hardware_power::PowerElementConfiguration> GetAllPowerConfigs() {
+std::vector<fuchsia_hardware_power::PowerElementConfiguration> GetAllPowerConfigs(
+    const fuchsia_hardware_power::ParentElement& parent_element) {
   return std::vector<fuchsia_hardware_power::PowerElementConfiguration>{
-      GetHardwarePowerConfig(), GetSystemWakeOnRequestPowerConfig()};
+      GetHardwarePowerConfig(parent_element), GetSystemWakeOnRequestPowerConfig()};
 }
-
 }  // namespace
 
 zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> SdmmcBlockDevice::AcquireLease(
@@ -368,8 +380,29 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
 }
 
 zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
+  // Find out parent element.
+  auto power_token_provider =
+      parent_->driver_incoming()
+          ->Connect<fuchsia_hardware_power::PowerTokenService::TokenProvider>();
+  if (power_token_provider.is_error() || !power_token_provider->is_valid()) {
+    FDF_LOGL(ERROR, logger(), "Failed to connect to power token provider: %s",
+             power_token_provider.status_string());
+    return power_token_provider.take_error();
+  }
+  auto get_token = fidl::WireCall(power_token_provider.value())->GetToken();
+  if (!get_token.ok()) {
+    FDF_LOGL(ERROR, logger(), "Call to GetToken failed: %s", get_token.status_string());
+    return zx::error(get_token.status());
+  } else if (get_token->is_error()) {
+    FDF_LOGL(ERROR, logger(), "GetToken returned failure: %s",
+             zx_status_get_string(get_token->error_value()));
+    return zx::error(get_token->error_value());
+  }
+  fuchsia_hardware_power::ParentElement parent_element =
+      fuchsia_hardware_power::ParentElement::WithName(std::string(get_token.value()->name.data()));
+
   fidl::Arena<> arena;
-  const auto power_configs = fidl::ToWire(arena, GetAllPowerConfigs());
+  const auto power_configs = fidl::ToWire(arena, GetAllPowerConfigs(parent_element));
   if (power_configs.count() == 0) {
     FDF_LOGL(INFO, logger(), "No power configs found.");
     return zx::error(ZX_ERR_NOT_FOUND);
@@ -400,12 +433,10 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    active_power_dep_tokens_.push_back(std::move(description.active_token_));
-    passive_power_dep_tokens_.push_back(std::move(description.passive_token_));
-
     if (config.element().name().get() == kHardwarePowerElementName) {
-      hardware_power_element_control_client_end_ =
-          std::move(result.value().element_control_channel());
+      hardware_power_element_control_client_ =
+          fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
+              std::move(result.value().element_control_channel()));
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       hardware_power_current_level_client_ =
@@ -415,8 +446,9 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
           std::move(description.required_level_client_.value()),
           parent_->driver_async_dispatcher());
     } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_element_control_client_end_ =
-          std::move(result.value().element_control_channel());
+      wake_on_request_element_control_client_ =
+          fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
+              std::move(result.value().element_control_channel()));
       wake_on_request_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       wake_on_request_current_level_client_ =

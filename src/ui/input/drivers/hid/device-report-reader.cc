@@ -10,6 +10,8 @@
 
 namespace hid_driver {
 
+namespace fhidbus = fuchsia_hardware_hidbus;
+
 static constexpr uint64_t hid_report_trace_id(uint32_t instance_id, uint64_t report_id) {
   return (report_id << 32) | instance_id;
 }
@@ -21,8 +23,7 @@ zx_status_t DeviceReportsReader::ReadReportFromFifo(uint8_t* buf, size_t buf_siz
   }
   uint8_t report_id = data_fifo_.front();
 
-  size_t report_size =
-      base_->GetReportSizeById(report_id, fuchsia_hardware_input::ReportType::kInput);
+  size_t report_size = base_->GetReportSizeById(report_id, fhidbus::ReportType::kInput);
   if (report_size == 0) {
     zxlogf(ERROR, "error reading hid device: unknown report id (%u)!", report_id);
     return ZX_ERR_BAD_STATE;
@@ -76,11 +77,11 @@ zx_status_t DeviceReportsReader::SendReports() {
     return ZX_ERR_SHOULD_WAIT;
   }
 
-  std::array<uint8_t, fuchsia_hardware_input::wire::kMaxReportData> buf;
+  fidl::Arena arena;
+  std::array<uint8_t, fhidbus::wire::kMaxReportData> buf;
   size_t buf_index = 0;
 
-  std::array<fuchsia_hardware_input::wire::Report, fuchsia_hardware_input::wire::kMaxReportsCount>
-      reports;
+  std::array<fhidbus::wire::Report, fuchsia_hardware_input::wire::kMaxReportsCount> reports;
   size_t reports_size = 0;
   zx_status_t status = ZX_OK;
 
@@ -91,9 +92,11 @@ zx_status_t DeviceReportsReader::SendReports() {
       status =
           ReadReportFromFifo(buf.data() + buf_index, buf.size() - buf_index, &time, &report_size);
       if (status == ZX_OK) {
-        reports[reports_size].time = time;
-        reports[reports_size].data =
-            fidl::VectorView<uint8_t>::FromExternal(buf.data() + buf_index, report_size);
+        reports[reports_size] =
+            fhidbus::wire::Report::Builder(arena)
+                .timestamp(time)
+                .buf(fidl::VectorView<uint8_t>::FromExternal(buf.data() + buf_index, report_size))
+                .Build();
         reports_size++;
         buf_index += report_size;
       }
@@ -111,8 +114,7 @@ zx_status_t DeviceReportsReader::SendReports() {
   }
 
   waiting_read_->ReplySuccess(
-      ::fidl::VectorView<fuchsia_hardware_input::wire::Report>::FromExternal(reports.data(),
-                                                                             reports_size));
+      ::fidl::VectorView<fhidbus::wire::Report>::FromExternal(reports.data(), reports_size));
   waiting_read_.reset();
 
   return ZX_OK;

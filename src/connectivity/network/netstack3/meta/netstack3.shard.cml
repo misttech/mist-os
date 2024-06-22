@@ -4,6 +4,7 @@
 {
     include: [
         "//src/connectivity/network/meta/netstack-common.shard.cml",
+        "//src/connectivity/network/netstack3/meta/config_schema.cml",
         "inspect/offer.shard.cml",
         "inspect/use.shard.cml",
         "trace/client.shard.cml",
@@ -18,6 +19,8 @@
                 "fuchsia.net.filter.State",
                 "fuchsia.net.routes.admin.RouteTableProviderV4",
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
+                "fuchsia.net.routes.admin.RuleTableV4",
+                "fuchsia.net.routes.admin.RuleTableV6",
             ],
         },
     ],
@@ -28,6 +31,8 @@
                 "fuchsia.net.filter.State",
                 "fuchsia.net.routes.admin.RouteTableProviderV4",
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
+                "fuchsia.net.routes.admin.RuleTableV4",
+                "fuchsia.net.routes.admin.RuleTableV6",
             ],
             from: "self",
         },

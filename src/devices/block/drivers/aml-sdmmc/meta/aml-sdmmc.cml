@@ -16,6 +16,7 @@
         fallback: "false",
     },
     capabilities: [
+        { service: "fuchsia.hardware.power.PowerTokenService" },
         { service: "fuchsia.hardware.sdmmc.SdmmcService" },
     ],
     use: [
@@ -33,6 +34,10 @@
         { service: "fuchsia.hardware.clock.Service" },
     ],
     expose: [
+        {
+            service: "fuchsia.hardware.power.PowerTokenService",
+            from: "self",
+        },
         {
             service: "fuchsia.hardware.sdmmc.SdmmcService",
             from: "self",

@@ -2608,7 +2608,9 @@ mod tests {
         set_logger_for_test, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeReferencyDeviceId,
         FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt as _,
     };
-    use netstack3_base::{CtxPair, RemoteAddressError, UninstantiableWrapper};
+    use netstack3_base::{
+        CtxPair, RemoteAddressError, SendFrameErrorReason, UninstantiableWrapper,
+    };
     use netstack3_datagram::MulticastInterfaceSelector;
     use netstack3_ip::device::IpDeviceStateIpExt;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
@@ -3828,11 +3830,9 @@ mod tests {
             .expect("connect failed");
 
         // Instruct the fake frame context to throw errors.
-        api.core_ctx()
-            .bound_sockets
-            .ip_socket_ctx
-            .frames
-            .set_should_error_for_frame(|_frame_meta| true);
+        api.core_ctx().bound_sockets.ip_socket_ctx.frames.set_should_error_for_frame(
+            |_frame_meta| Some(SendFrameErrorReason::SizeConstraintsViolation),
+        );
 
         // Now try to send something over this new connection:
         let send_err = api.send(&socket, Buf::new(Vec::new(), ..)).unwrap_err();

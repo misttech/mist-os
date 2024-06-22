@@ -94,13 +94,25 @@ type TestConfig = table {
 };
 
 /// A component to optionally launch and attach to
-type ComponentConfig = table {
-    /// The url of the component to launch
-    1: url fuchsia.url.Url;
+type AttachConfig = flexible union {
+    /// Launch a component with the given url and moniker then attach to it when
+    /// it's launched
+    1: launch_component table {
+        /// The url of the component to launch (required)
+        1: url fuchsia.url.Url;
+        /// The location to launch the component. If not specified, a default
+        /// location will be used.
+        2: moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    };
 
-    /// If a component exists with the given moniker, attach to it, else launch
-    /// the component specified by the given url at the moniker
-    2: moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    /// Attach to an existing component by moniker. If a component doesn't exist
+    /// at that moniker, wait for it to appear and attach to it when it does.
+    2: attach_to_component_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+
+    /// Attach to an existing component by url. If the component doesn't
+    /// exist with the specified url, wait for it to appear and attach to it when
+    /// it does.
+    3: attach_to_component_url string:fuchsia.url.MAX_URL_LENGTH;
 };
 
 /// A target may be an adhoc set of tasks, or one defined by a component/test
@@ -108,7 +120,7 @@ type TargetConfig = flexible union {
     /// An adhoc set of threads/processes/jobs
     1: tasks vector<Task>:64;
     /// Profile a component and all tasks it launches
-    2: component ComponentConfig;
+    2: component AttachConfig;
     /// Profile a test and all tasks it launches
     3: test TestConfig;
 };
@@ -143,6 +155,7 @@ closed protocol Session {
         INVALID_CONFIGURATION = 3;
         MISSING_SAMPLE_CONFIGS = 4;
         MISSING_TARGET_CONFIGS = 5;
+        MISSING_COMPONENT_URL = 6;
     };
 
     /// Begin profiling and optionally begin writing data to the configured

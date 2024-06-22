@@ -238,6 +238,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 3155008840945527714,
           "name": "MethodA",
           "strict": true,
@@ -268,6 +269,7 @@
           "has_error": false
         },
         {
+          "kind": "event",
           "ordinal": 2220452875311597006,
           "name": "EventA",
           "strict": true,
@@ -298,6 +300,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 8903004957800778182,
           "name": "MethodB",
           "strict": true,
@@ -342,6 +345,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 591935489944717925,
           "name": "TakeHandle",
           "strict": true,
@@ -372,6 +376,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 7411742788430590287,
           "name": "MutateSocket",
           "strict": true,
@@ -442,6 +447,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 3455873048082739435,
           "name": "Method",
           "strict": true,
@@ -472,6 +478,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 1155044649514904573,
           "name": "NoResponseMethod",
           "strict": true,
@@ -502,6 +509,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 5956276128041940295,
           "name": "ResponseMethod",
           "strict": true,
@@ -546,6 +554,7 @@
           "has_error": false
         },
         {
+          "kind": "event",
           "ordinal": 476727631355490611,
           "name": "AnEvent",
           "strict": true,
@@ -590,6 +599,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 6423043252952467815,
           "name": "Fifteen",
           "strict": true,
@@ -634,6 +644,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 4124874338266649112,
           "name": "UnionMethod",
           "strict": true,
@@ -780,6 +791,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 1468025868259603279,
           "name": "MethodC",
           "strict": true,
@@ -824,6 +836,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "oneway",
           "ordinal": 5413654872775949227,
           "name": "NoRequestNoResponse",
           "strict": true,
@@ -840,6 +853,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 1631193469798418024,
           "name": "NoRequestEmptyResponse",
           "strict": true,
@@ -856,6 +870,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 9037369643591427517,
           "name": "NoRequestWithResponse",
           "strict": true,
@@ -886,6 +901,7 @@
           "has_error": false
         },
         {
+          "kind": "oneway",
           "ordinal": 7326057319832554103,
           "name": "WithRequestNoResponse",
           "strict": true,
@@ -916,6 +932,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 2877322062572412767,
           "name": "WithRequestEmptyResponse",
           "strict": true,
@@ -946,6 +963,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 6417226585456833969,
           "name": "WithRequestWithResponse",
           "strict": true,
@@ -990,6 +1008,7 @@
           "has_error": false
         },
         {
+          "kind": "event",
           "ordinal": 5397663296507358806,
           "name": "OnEmptyResponse",
           "strict": true,
@@ -1006,6 +1025,7 @@
           "has_error": false
         },
         {
+          "kind": "event",
           "ordinal": 5811598563493228968,
           "name": "OnWithResponse",
           "strict": true,
@@ -1050,6 +1070,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 268248568430741139,
           "name": "ResponseAsStruct",
           "strict": true,
@@ -1107,6 +1128,7 @@
           }
         },
         {
+          "kind": "twoway",
           "ordinal": 6930994461233198567,
           "name": "ErrorAsPrimitive",
           "strict": true,
@@ -1164,6 +1186,7 @@
           }
         },
         {
+          "kind": "twoway",
           "ordinal": 5491891352371277635,
           "name": "ErrorAsEnum",
           "strict": true,
@@ -1222,6 +1245,7 @@
           }
         },
         {
+          "kind": "twoway",
           "ordinal": 1371676333068455103,
           "name": "HandleInResult",
           "strict": true,
@@ -1293,6 +1317,7 @@
       "composed_protocols": [],
       "methods": [
         {
+          "kind": "twoway",
           "ordinal": 5870448041025163330,
           "name": "ClientEnds",
           "strict": true,
@@ -1337,6 +1362,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 8115535094437022259,
           "name": "ServerEnds",
           "strict": true,
@@ -1381,6 +1407,7 @@
           "has_error": false
         },
         {
+          "kind": "twoway",
           "ordinal": 4076866772260025813,
           "name": "StructContainingEnds",
           "strict": true,

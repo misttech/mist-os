@@ -119,7 +119,11 @@ void TimerQueue::UpdatePlatformTimer(zx_time_t new_deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
   if (new_deadline < next_timer_deadline_) {
     LTRACEF("rescheduling timer for %" PRIi64 " nsecs\n", new_deadline);
-    platform_set_oneshot_timer(new_deadline);
+    // Convert the new_deadline to a raw ticks value.
+    zx_ticks_t deadline_ticks =
+        timer_get_ticks_to_time_ratio().Inverse().Scale<affine::Ratio::Round::Up>(new_deadline);
+    zx_ticks_t deadline_raw_ticks = deadline_ticks - timer_get_mono_ticks_offset();
+    platform_set_oneshot_timer(deadline_raw_ticks);
     next_timer_deadline_ = new_deadline;
   }
 }

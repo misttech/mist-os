@@ -865,10 +865,7 @@ function fx-choose-build-concurrency {
   # If any remote execution is enabled (e.g. via RBE),
   # allow ninja to launch many more concurrent actions than what local
   # resources can support.
-  # This covers GN args: cxx_rbe_enable, rust_rbe_enable, link_rbe_enable.
-  # Kludge: grep-ing the args.gn like this is admittedly brittle, and prone
-  # to error when we enable remote execution on new tools.
-  if grep -q -e "_rbe_enable = true" "${FUCHSIA_BUILD_DIR}/args.gn"; then
+  if fx-rbe-enabled ; then
     # The recommendation from the Goma team is to use 10*cpu-count for C++.
     local cpus
     cpus="$(fx-cpu-count)"

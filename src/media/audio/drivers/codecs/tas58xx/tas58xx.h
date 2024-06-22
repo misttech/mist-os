@@ -51,12 +51,12 @@ class Tas58xx : public SimpleCodecServer,
   void GetElements(fuchsia::hardware::audio::signalprocessing::SignalProcessing::GetElementsCallback
                        callback) override;
   void SetElementState(
-      uint64_t processing_element_id,
+      fuchsia::hardware::audio::signalprocessing::ElementId processing_element_id,
       fuchsia::hardware::audio::signalprocessing::SettableElementState state,
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::SetElementStateCallback
           callback) override;
   void WatchElementState(
-      uint64_t processing_element_id,
+      fuchsia::hardware::audio::signalprocessing::ElementId processing_element_id,
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchElementStateCallback
           callback) override;
   void GetTopologies(
@@ -65,7 +65,7 @@ class Tas58xx : public SimpleCodecServer,
   void WatchTopology(
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchTopologyCallback callback)
       override;
-  void SetTopology(uint64_t topology_id,
+  void SetTopology(fuchsia::hardware::audio::signalprocessing::TopologyId topology_id,
                    fuchsia::hardware::audio::signalprocessing::SignalProcessing::SetTopologyCallback
                        callback) override;
   void SignalProcessingConnect(
@@ -75,11 +75,11 @@ class Tas58xx : public SimpleCodecServer,
 
   // Protected for unit tests.
   zx_status_t SetBand(bool enabled, size_t index, uint32_t frequency, float Q, float gain_db);
-  static uint64_t GetTopologyId() { return kTopologyId; }
-  static uint64_t GetAglPeId() { return kAglPeId; }
-  static uint64_t GetEqPeId() { return kEqPeId; }
-  static uint64_t GetGainPeId() { return kGainPeId; }
-  static uint64_t GetMutePeId() { return kMutePeId; }
+  static fuchsia_hardware_audio::wire::TopologyId GetTopologyId() { return kTopologyId; }
+  static fuchsia_hardware_audio::wire::ElementId GetAglPeId() { return kAglPeId; }
+  static fuchsia_hardware_audio::wire::ElementId GetEqPeId() { return kEqPeId; }
+  static fuchsia_hardware_audio::wire::ElementId GetGainPeId() { return kGainPeId; }
+  static fuchsia_hardware_audio::wire::ElementId GetMutePeId() { return kMutePeId; }
   virtual bool BackgroundFaultPollingIsEnabled() {
     return true;  // Unit test can override to disable.
   }
@@ -89,11 +89,11 @@ class Tas58xx : public SimpleCodecServer,
   static constexpr float kMaxGain = 24.0;
   static constexpr float kMinGain = -103.0;
   static constexpr float kGainStep = 0.5;
-  static constexpr uint64_t kAglPeId = 1;
-  static constexpr uint64_t kEqPeId = 2;
-  static constexpr uint64_t kGainPeId = 3;
-  static constexpr uint64_t kMutePeId = 4;
-  static constexpr uint64_t kTopologyId = 1;
+  static constexpr fuchsia_hardware_audio::wire::ElementId kAglPeId = 1;
+  static constexpr fuchsia_hardware_audio::wire::ElementId kEqPeId = 2;
+  static constexpr fuchsia_hardware_audio::wire::ElementId kGainPeId = 3;
+  static constexpr fuchsia_hardware_audio::wire::ElementId kMutePeId = 4;
+  static constexpr fuchsia_hardware_audio::wire::TopologyId kTopologyId = 1;
   static constexpr size_t kEqualizerNumberOfBands = 5;
   static constexpr uint32_t kEqualizerMinFrequency = 100;
   static constexpr uint32_t kEqualizerMaxFrequency = 20'000;

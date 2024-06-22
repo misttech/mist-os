@@ -373,8 +373,7 @@ device on the host machine. This has the same effect as the emulator instance
 being directly connected to the physical network of the host machine. Therefore,
 the `--net tap` mode delivers the fastest performance among all networking options.
 However, this mode’s setup requires superuser access (`sudo`) on the host machine,
-and it is only supported on Linux hosts (though there exist open-source extensions
-that enable this setup on macOS hosts as well).
+and it is only supported on Linux hosts.
 
 To start the emulator in the Tun/Tap networking mode,
 run the following command:
@@ -423,9 +422,7 @@ $ ffx config set emu.upscript /home/alice/my-fuchsia-project/my-upscript.sh
 
 ## Start the Fuchsia emulator in user networking mode {:#start-the-fuchsia-emulator-in-user-networking-mode}
 
-If you don't have superuser access (`sudo`) on the host machine or don't want to
-adjust your macOS setup to use Tun/Tap (see the
-[`--net tap`](#start-the-fuchsia-emulator-in-tun-tap-networking-mode) mode), you can
+If you don't have superuser access (`sudo`) on the host machine, you can
 configure the network using the `--net user` mode. In this mode, the emulator acts
 as a firewall (through [SLiRP][slirp]{:.external}). Traffic coming out of an emulator
 instance is unrestricted. However, sending traffic to an emulator instance requires

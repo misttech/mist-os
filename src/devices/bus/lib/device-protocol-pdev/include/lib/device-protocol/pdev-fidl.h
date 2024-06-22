@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/device-protocol/pdev.h>
+#include <lib/fidl/cpp/natural_types.h>
 
 namespace ddk {
 
@@ -39,6 +40,24 @@ class PDevFidl {
                       uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE);
   zx_status_t GetInterrupt(uint32_t index, zx::interrupt* out) {
     return GetInterrupt(index, 0, out);
+  }
+
+  template <typename FidlType, typename = std::enable_if_t<fidl::IsFidlObject<FidlType>::value>>
+  zx::result<FidlType> GetMetadata(int32_t metadata_type) const {
+    fidl::WireResult raw_metadata = pdev_->GetMetadata(metadata_type);
+    if (!raw_metadata.ok()) {
+      return zx::error(raw_metadata.status());
+    }
+    if (raw_metadata->is_error()) {
+      return raw_metadata->take_error();
+    }
+
+    auto result = fidl::Unpersist<FidlType>(raw_metadata.value()->metadata.get());
+    if (result.is_error()) {
+      return zx::error(result.error_value().status());
+    }
+
+    return zx::ok(result.value());
   }
 
   // The functions below get their signature from fuchsia.hardware.platform.device Banjo.

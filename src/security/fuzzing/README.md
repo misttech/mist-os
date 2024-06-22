@@ -23,8 +23,8 @@ These locations include:
   and its engines.
 * [//src/sys/test_runners/fuzz](/src/sys/test_runners/fuzz): Fuzz test runner for the
   [Test Runner Framework](/docs/development/testing/components/test_runner_framework.md).
-* [//src/testing/fuzzing](/src/testing/fuzzing): Deprecated fuzzing utilities.
-  and its supported fuzzing engines.
+* [//src/testing/fuzzing](/src/testing/fuzzing): Utilities for fuzzing tools that are mainly
+  external to Fuchsia, including [syzkaller](https://github.com/google/syzkaller).
 * [//tools/fuzz](/tools/fuzz): Undercoat tool for [ClusterFuzz][clusterfuzz] integration.
 
 [clusterfuzz]: https://google.github.io/clusterfuzz/

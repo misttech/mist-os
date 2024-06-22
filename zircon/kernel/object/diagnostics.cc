@@ -927,7 +927,7 @@ class VmMapBuilder final : public RestartableVmEnumerator<zx_info_maps_t, VmMapB
  public:
   // NOTE: Code outside of the syscall layer should not typically know about
   // user_ptrs; do not use this pattern as an example.
-  VmMapBuilder(ProcessMapsInfoWriter& maps, size_t max)
+  VmMapBuilder(VmarMapsInfoWriter& maps, size_t max)
       : RestartableVmEnumerator(max), entries_(maps) {}
 
   static void MakeVmarEntry(const VmAddressRegion* vmar, uint depth, zx_info_maps_t* entry) {
@@ -969,14 +969,14 @@ class VmMapBuilder final : public RestartableVmEnumerator<zx_info_maps_t, VmMapB
   UserCopyCaptureFaultsResult WriteEntryCaptureFaults(const zx_info_maps_t& entry, size_t offset) {
     return entries_.WriteCaptureFaults(entry, offset);
   }
-  ProcessMapsInfoWriter& entries_;
+  VmarMapsInfoWriter& entries_;
 };
 
 }  // namespace
 
 // NOTE: Code outside of the syscall layer should not typically know about
 // user_ptrs; do not use this pattern as an example.
-zx_status_t GetVmAspaceMaps(VmAspace* target_aspace, ProcessMapsInfoWriter& maps, size_t max,
+zx_status_t GetVmAspaceMaps(VmAspace* target_aspace, VmarMapsInfoWriter& maps, size_t max,
                             size_t* actual, size_t* available) {
   DEBUG_ASSERT(target_aspace != nullptr);
   *actual = 0;

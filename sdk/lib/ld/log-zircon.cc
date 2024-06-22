@@ -1,0 +1,104 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "lib/ld/log-zircon.h"
+
+#include <lib/fdio/io.h>
+#include <lib/zircon-internal/unique-backtrace.h>
+#include <lib/zx/debuglog.h>
+#include <lib/zx/result.h>
+#include <lib/zx/socket.h>
+#include <zircon/processargs.h>
+#include <zircon/syscalls/object.h>
+
+namespace ld {
+namespace {
+
+constexpr zx_signals_t kSocketWait = ZX_SOCKET_WRITABLE | ZX_SOCKET_PEER_CLOSED;
+
+void DebuglogWrite(const zx::debuglog& debuglog, std::string_view str) {
+  if (size_t chars = str.size() - (str.back() == '\n' ? 1 : 0); chars > 0) {
+    debuglog.write(0, str.data(), chars);
+  }
+}
+
+zx::result<size_t> SocketWrite(const zx::socket& socket, std::string_view str) {
+  zx_status_t status;
+  do {
+    size_t wrote = 0;
+    status = socket.write(0, str.data(), str.size(), &wrote);
+    if (status == ZX_OK) {
+      return zx::ok(wrote);
+    }
+    if (status == ZX_ERR_SHOULD_WAIT) {
+      zx_signals_t pending = 0;
+      status = socket.wait_one(kSocketWait, zx::time::infinite(), &pending);
+    }
+  } while (status == ZX_OK);
+  return zx::error(status);
+}
+
+int SocketWriteAll(const zx::socket& socket, std::string_view str) {
+  int wrote = 0;
+  while (!str.empty()) {
+    auto result = SocketWrite(socket, str);
+    if (result.is_error()) {
+      return wrote == 0 ? -1 : wrote;
+    }
+    str.remove_prefix(result.value());
+    wrote += static_cast<int>(result.value());
+  }
+  return wrote;
+}
+
+}  // namespace
+
+// The formatted message from elfldltl::PrintfDiagnosticsReport should be a
+// single line with no newline, but we tell Printf to add one (see below).
+// If the whole line fits in the buffer, then this callback will only be made
+// once.
+int Log::operator()(std::string_view str) const {
+  if (str.empty()) {
+    return 0;
+  }
+
+  // If we have a debuglog handle, use that.  It's packet-oriented with each
+  // message expected to be a single line without newlines.  So remove the
+  // newline that was added.  If the line was too long, it will look like two
+  // separate log lines.
+  if (debuglog_) {
+    DebuglogWrite(debuglog_, str);
+  }
+
+  if (socket_) {
+    // We might instead (or also?) have a socket, where the messages are
+    // easier to capture at the other end.  This is a stream-oriented socket
+    // (aka an fdio pipe), where newlines are expected.
+    return SocketWriteAll(socket_, str);
+  }
+
+  // If there's no socket, always report full success if anything got out.
+  return debuglog_ ? static_cast<int>(str.size()) : -1;
+}
+
+bool Log::IsProcessArgsLogFd(uint32_t arg) { return (arg & FDIO_FLAG_USE_FOR_STDIO) || arg == 2; }
+
+void Log::TakeLogFd(zx::handle handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status = handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  if (status != ZX_OK) [[unlikely]] {
+    CRASH_WITH_UNIQUE_BACKTRACE();
+  }
+
+  switch (info.type) {
+    case ZX_OBJ_TYPE_DEBUGLOG:
+      debuglog_ = zx::debuglog{handle.release()};
+      break;
+    case ZX_OBJ_TYPE_SOCKET:
+      socket_ = zx::socket{handle.release()};
+      break;
+  }
+}
+
+}  // namespace ld

@@ -2745,6 +2745,7 @@ bool LogicalBufferCollection::CheckSanitizeBufferMemoryConstraints(
     LogError(FROM_HERE, "secure memory required but not permitted");
     return false;
   }
+
   return true;
 }
 
@@ -3093,7 +3094,7 @@ bool LogicalBufferCollection::AccumulateConstraintPermittedHeaps(
   }
 
   if (acc->empty()) {
-    LogError(FROM_HERE, "Zero heap permitted overlap");
+    LogError(FROM_HERE, "Zero permitted heap overlap");
     return false;
   }
 

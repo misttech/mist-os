@@ -20,13 +20,11 @@ group("tests") {
     ":execution_test($host_toolchain)",
     ":log_test($host_toolchain)",
     ":main_test($host_toolchain)",
+    ":selection_action_test($host_toolchain)",
     ":selection_test($host_toolchain)",
     ":test_list_file_test($host_toolchain)",
     ":tests_json_file_test($host_toolchain)",
     "dataparse:tests",
-    "statusinfo:tests",
-    "termout:tests",
-    "util:tests",
   ]
 }
 
@@ -42,6 +40,7 @@ if (is_host) {
     "log.py",
     "package_repository.py",
     "selection.py",
+    "selection_action.py",
     "selection_types.py",
     "test_list_file.py",
     "tests_json_file.py",
@@ -49,9 +48,9 @@ if (is_host) {
 
   binary_deps = [
     "dataparse",
-    "statusinfo",
-    "termout",
-    "util",
+    "//scripts/lib/async_utils",
+    "//scripts/lib/statusinfo",
+    "//scripts/lib/termout",
     "//third_party/colorama",
     "//third_party/jellyfish",
   ]
@@ -80,6 +79,7 @@ if (is_host) {
     "log",
     "main",
     "selection",
+    "selection_action",
     "test_list_file",
     "tests_json_file",
   ]

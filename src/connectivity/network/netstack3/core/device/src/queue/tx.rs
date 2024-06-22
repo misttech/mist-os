@@ -10,7 +10,7 @@ use core::convert::Infallible as Never;
 use derivative::Derivative;
 use log::trace;
 use netstack3_base::sync::Mutex;
-use netstack3_base::{Device, DeviceIdContext};
+use netstack3_base::{Device, DeviceIdContext, ErrorAndSerializer};
 use packet::{
     new_buf_vec, Buf, BufferAlloc, ContiguousBuffer, GrowBufferMut, NoReuseBufferProvider,
     ReusableBuffer, Serializer,
@@ -263,9 +263,14 @@ where
                         None => return Err(TransmitQueueFrameError::QueueFull(body)),
                     },
                 };
-                let body = body
-                    .serialize_outer(NoReuseBufferProvider(allocator))
-                    .map_err(|(_e, s)| TransmitQueueFrameError::SerializeError(s))?;
+                let body = body.serialize_outer(NoReuseBufferProvider(allocator)).map_err(
+                    |(e, serializer)| {
+                        TransmitQueueFrameError::SerializeError(ErrorAndSerializer {
+                            serializer,
+                            error: e.map_alloc(|_| ()),
+                        })
+                    },
+                )?;
                 Ok(insert_and_notify::<_, _, CC>(bindings_ctx, device_id, inserter, meta, body))
             })?;
 

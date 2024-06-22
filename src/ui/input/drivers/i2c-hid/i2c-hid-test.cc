@@ -328,7 +328,7 @@ class I2cHidTest : public zxtest::Test {
       ASSERT_FALSE(expected_reports_.empty());
       auto expected = std::move(expected_reports_.front());
       expected_reports_.pop();
-      auto report = event->buf;
+      auto report = event->report.buf();
       ASSERT_EQ(report.count(), expected.size());
       for (size_t i = 0; i < report.count(); i++) {
         EXPECT_EQ(report[i], expected[i]);
@@ -597,14 +597,14 @@ TEST_F(I2cHidTest, HidTestSetReport) {
 
     {
       auto result = hidbus->SetReport(
-          fuchsia_hardware_input::wire::ReportType::kFeature, 0x1,
+          fhidbus::wire::ReportType::kFeature, 0x1,
           fidl::VectorView<uint8_t>::FromExternal(report_data, sizeof(report_data)));
       ASSERT_TRUE(result.ok());
       ASSERT_TRUE(result->is_ok());
     }
 
     {
-      auto result = hidbus->GetReport(fuchsia_hardware_input::wire::ReportType::kFeature, 0x1, 4);
+      auto result = hidbus->GetReport(fhidbus::wire::ReportType::kFeature, 0x1, 4);
       ASSERT_TRUE(result.ok());
       ASSERT_TRUE(result->is_ok());
       auto report = result->value()->data;

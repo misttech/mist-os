@@ -26,6 +26,7 @@ fuchsia_driver("isolateddevmgr-test-driver-driver") {
   deps = [
     ":fuchsia.device.manager.test_cpp",
     ":metadata-test-bind",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/lib/fdio",
     "//src/devices/lib/driver",
     "//src/lib/ddk",

@@ -80,9 +80,6 @@ template("bazel_driver_package") {
       blobs_to_ignore = [
         # These libraries are getting pulled in transitively in the Bazel SDK. We need
         # to figure out why they are included an not include them
-        "lib/libasync-default.so",
-        "lib/libsyslog.so",
-        "lib/libbackend_fuchsia_globals.so",
         "lib/libtrace-engine.so",
       ]
     }

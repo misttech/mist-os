@@ -87,7 +87,7 @@ mod tests {
                         requires_token: parent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: child_current_server,
@@ -301,7 +301,7 @@ mod tests {
                         requires_token: element_a_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
                     active_dependency_tokens_to_register: Some(vec![element_b_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -337,7 +337,7 @@ mod tests {
                         requires_token: element_b_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
@@ -604,7 +604,7 @@ mod tests {
                             requires_token: grandparent_token
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                                 .expect("dup failed"),
-                            requires_level: 200,
+                            requires_level_by_preference: vec![200],
                         },
                         LevelDependency {
                             dependency_type: DependencyType::Active,
@@ -612,7 +612,7 @@ mod tests {
                             requires_token: grandparent_token
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                                 .expect("dup failed"),
-                            requires_level: 90,
+                            requires_level_by_preference: vec![90],
                         },
                     ]),
                     active_dependency_tokens_to_register: Some(vec![parent_token
@@ -643,7 +643,7 @@ mod tests {
                         requires_token: parent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: 50,
+                        requires_level_by_preference: vec![50],
                     }]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
@@ -671,7 +671,7 @@ mod tests {
                         requires_token: parent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: 30,
+                        requires_level_by_preference: vec![30],
                     }]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
@@ -949,7 +949,7 @@ mod tests {
                         dependency_type: DependencyType::Active,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
                     active_dependency_tokens_to_register: Some(vec![token_b_active
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1005,7 +1005,9 @@ mod tests {
                             requires_token: token_b_passive
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                                 .unwrap(),
-                            requires_level: BinaryPowerLevel::On.into_primitive(),
+                            requires_level_by_preference: vec![
+                                BinaryPowerLevel::On.into_primitive()
+                            ],
                         },
                         LevelDependency {
                             dependency_type: DependencyType::Active,
@@ -1013,7 +1015,9 @@ mod tests {
                             requires_token: token_e_active
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                                 .unwrap(),
-                            requires_level: BinaryPowerLevel::On.into_primitive(),
+                            requires_level_by_preference: vec![
+                                BinaryPowerLevel::On.into_primitive()
+                            ],
                         },
                     ]),
                     level_control_channels: Some(fpb::LevelControlChannels {
@@ -1042,7 +1046,7 @@ mod tests {
                         requires_token: token_b_active
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .unwrap(),
-                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
@@ -1351,7 +1355,7 @@ mod tests {
                         dependency_type: DependencyType::Active,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: zx::Event::create(),
-                        requires_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
                     active_dependency_tokens_to_register: Some(vec![
                         water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
@@ -1375,7 +1379,7 @@ mod tests {
                         requires_token: earth_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: 2,
+                        requires_level_by_preference: vec![2],
                     }]),
                     active_dependency_tokens_to_register: Some(vec![
                         water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
@@ -1398,7 +1402,7 @@ mod tests {
                     requires_token: earth_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                 }]),
                 active_dependency_tokens_to_register: Some(vec![
                     water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?

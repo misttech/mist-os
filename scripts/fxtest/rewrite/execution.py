@@ -7,12 +7,12 @@ import re
 import tempfile
 
 import args
+import async_utils.command as command
 import environment
 import event
 import package_repository
 import statusinfo
 import test_list_file
-import util.command as command
 
 
 class TestExecutionError(Exception):

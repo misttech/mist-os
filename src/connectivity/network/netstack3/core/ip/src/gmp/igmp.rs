@@ -554,7 +554,10 @@ mod tests {
         assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
         FakeWeakDeviceId,
     };
-    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _};
+    use netstack3_base::{
+        CounterContext, CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _,
+        SendFrameError,
+    };
     use netstack3_filter::ProofOfEgressCheck;
     use packet::serialize::Buf;
     use packet::ParsablePacket as _;
@@ -564,7 +567,8 @@ mod tests {
 
     use super::*;
     use crate::internal::base::{
-        self, IpLayerPacketMetadata, IpPacketDestination, SendIpPacketMeta,
+        self, IpCounters, IpLayerPacketMetadata, IpPacketDestination, IpSendFrameError,
+        SendIpPacketMeta,
     };
     use crate::internal::gmp::{
         GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
@@ -593,6 +597,13 @@ mod tests {
         igmp_state: IgmpState<FakeBindingsCtx>,
         igmp_enabled: bool,
         addr_subnet: Option<AddrSubnet<Ipv4Addr>>,
+        ip_counters: IpCounters<Ipv4>,
+    }
+
+    impl CounterContext<IpCounters<Ipv4>> for FakeIgmpCtx {
+        fn with_counters<O, F: FnOnce(&IpCounters<Ipv4>) -> O>(&self, cb: F) -> O {
+            cb(&self.ip_counters)
+        }
     }
 
     type FakeCtx = CtxPair<FakeCoreCtx, FakeBindingsCtx>;
@@ -654,7 +665,7 @@ mod tests {
                 Option<SpecifiedAddr<<Ipv4 as Ip>::Addr>>,
             >,
             _body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), IpSendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,
@@ -668,7 +679,7 @@ mod tests {
             device: &Self::DeviceId,
             destination: IpPacketDestination<Ipv4, &Self::DeviceId>,
             body: S,
-        ) -> Result<(), S>
+        ) -> Result<(), IpSendFrameError<S>>
         where
             S: Serializer + netstack3_filter::IpPacket<Ipv4>,
             S::Buffer: BufferMut,
@@ -692,7 +703,7 @@ mod tests {
             destination: IpPacketDestination<Ipv4, &Self::DeviceId>,
             body: S,
             ProofOfEgressCheck { .. }: ProofOfEgressCheck,
-        ) -> Result<(), S>
+        ) -> Result<(), SendFrameError<S>>
         where
             S: Serializer,
             S::Buffer: BufferMut,
@@ -844,6 +855,7 @@ mod tests {
                 ),
                 igmp_enabled: true,
                 addr_subnet: None,
+                ip_counters: Default::default(),
             })
         });
         ctx.bindings_ctx.seed_rng(seed);

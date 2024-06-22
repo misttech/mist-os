@@ -53,7 +53,15 @@ type LevelDependency = resource struct {
     /// Must supply a token registered via the RegisterDependencyToken call of
     /// the required element's ElementControl protocol.
     requires_token DependencyToken;
-    requires_level PowerLevel;
+    /// A list of levels in decreasing preferential order that power broker
+    /// should attempt to make required for this dependency to be satisfied.
+    /// The first level in list that is a valid level will become the required
+    /// level.
+    ///
+    /// Platform clients can use this list to keep backwards compatibility with
+    /// dependencies by providing multiple levels that the dependency may have
+    /// implemented in older API levels.
+    requires_level_by_preference vector<PowerLevel>:MAX_VALID_POWER_LEVELS;
 };
 
 /// This is the primary initial protocol used by Power Element Owners to

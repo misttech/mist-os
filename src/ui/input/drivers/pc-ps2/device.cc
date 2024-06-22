@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <fidl/fuchsia.hardware.input/cpp/wire_types.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/hid/boot.h>
 #include <zircon/syscalls.h>
@@ -25,6 +26,7 @@ extern zx::interrupt GetInterrupt(uint32_t irq);
 
 namespace i8042 {
 
+namespace fhidbus = fuchsia_hardware_hidbus;
 namespace finput = fuchsia_hardware_input::wire;
 
 namespace {
@@ -68,7 +70,7 @@ struct PortInfo {
 void PS2InputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
     fidl::AnyArena& allocator) {
-  if (type == fuchsia_hardware_input::BootProtocol::kKbd) {
+  if (type == fhidbus::HidBootProtocol::kKbd) {
     ZX_ASSERT(std::holds_alternative<PS2KbdInputReport>(report));
     auto kbd = std::get<PS2KbdInputReport>(report);
     fidl::VectorView<fuchsia_input::wire::Key> keys3(allocator, kbd.num_pressed_keys_3);
@@ -81,7 +83,7 @@ void PS2InputReport::ToFidlInputReport(
     kbd_input_rpt.pressed_keys3(keys3);
 
     input_report.keyboard(kbd_input_rpt.Build());
-  } else if (type == fuchsia_hardware_input::BootProtocol::kMouse) {
+  } else if (type == fhidbus::HidBootProtocol::kPointer) {
     ZX_ASSERT(std::holds_alternative<PS2MouseInputReport>(report));
     auto mouse = std::get<PS2MouseInputReport>(report);
     std::vector<uint8_t> pressed_buttons;
@@ -126,9 +128,9 @@ zx_status_t I8042Device::Bind() {
   }
 
   protocol_ = *identity;
-  if (protocol_ == fuchsia_hardware_input::BootProtocol::kKbd) {
+  if (protocol_ == fhidbus::HidBootProtocol::kKbd) {
     report_.report = PS2KbdInputReport{};
-  } else if (protocol_ == fuchsia_hardware_input::BootProtocol::kMouse) {
+  } else if (protocol_ == fhidbus::HidBootProtocol::kPointer) {
     report_.report = PS2MouseInputReport{};
   }
 
@@ -165,7 +167,7 @@ void I8042Device::DdkUnbind(ddk::UnbindTxn txn) {
   txn.Reply();
 }
 
-zx::result<finput::BootProtocol> I8042Device::Identify() {
+zx::result<fhidbus::wire::HidBootProtocol> I8042Device::Identify() {
   // Before sending IDENTIFY, disable scanning.
   // Otherwise a keyboard button pressed by the user could interfere with the value returned by
   // IDENTIFY.
@@ -204,11 +206,11 @@ zx::result<finput::BootProtocol> I8042Device::Identify() {
   auto str = buf.str();
   zxlogf(INFO, "Identify: %s", str.empty() ? "(no response)" : str.data());
 
-  finput::BootProtocol proto = finput::BootProtocol::kNone;
+  fhidbus::wire::HidBootProtocol proto = fhidbus::wire::HidBootProtocol::kNone;
   if (ident[1] == 0xab) {
-    proto = finput::BootProtocol::kKbd;
+    proto = fhidbus::wire::HidBootProtocol::kKbd;
   } else {
-    proto = finput::BootProtocol::kMouse;
+    proto = fhidbus::wire::HidBootProtocol::kPointer;
   }
 
   // Re-enable the device.
@@ -240,7 +242,7 @@ void I8042Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   auto device_info = fuchsia_input_report::wire::DeviceInformation::Builder(allocator);
   device_info.vendor_id(static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
 
-  if (protocol_ == fuchsia_hardware_input::BootProtocol::kKbd) {
+  if (protocol_ == fhidbus::HidBootProtocol::kKbd) {
     device_info.product_id(
         static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kPcPs2Keyboard));
     std::vector<fuchsia_input::wire::Key> keys3;
@@ -301,7 +303,7 @@ void I8042Device::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
     kbd_descriptor.input(kbd_in_desc.Build());
     kbd_descriptor.output(kbd_out_desc.Build());
     descriptor.keyboard(kbd_descriptor.Build());
-  } else if (protocol_ == fuchsia_hardware_input::BootProtocol::kMouse) {
+  } else if (protocol_ == fhidbus::wire::HidBootProtocol::kPointer) {
     device_info.product_id(
         static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kPcPs2Mouse));
     fidl::VectorView<uint8_t> buttons(allocator, kMouseButtonCount);
@@ -347,9 +349,9 @@ void I8042Device::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq,
     if (status.obf()) {
       retry = true;
       uint8_t data = controller_->ReadData();
-      if (protocol_ == finput::BootProtocol::kKbd) {
+      if (protocol_ == fhidbus::wire::HidBootProtocol::kKbd) {
         ProcessScancode(timestamp, data);
-      } else if (protocol_ == finput::BootProtocol::kMouse) {
+      } else if (protocol_ == fhidbus::wire::HidBootProtocol::kPointer) {
         ProcessMouse(timestamp, data);
       }
     }
@@ -365,7 +367,7 @@ void I8042Device::Shutdown() {
 
 void I8042Device::ProcessScancode(zx::time timestamp, uint8_t code) {
   report_.event_time = timestamp;
-  report_.type = fuchsia_hardware_input::wire::BootProtocol::kKbd;
+  report_.type = fhidbus::wire::HidBootProtocol::kKbd;
 
   bool multi = (last_code_ == kExtendedScancode);
   last_code_ = code;
@@ -430,7 +432,7 @@ KeyStatus I8042Device::RemoveKey(fuchsia_input::wire::Key key) {
 }
 
 void I8042Device::ProcessMouse(zx::time timestamp, uint8_t code) {
-  report_.type = fuchsia_hardware_input::wire::BootProtocol::kMouse;
+  report_.type = fhidbus::wire::HidBootProtocol::kPointer;
   report_.event_time = timestamp;
   // PS/2 mouse reports span 3 bytes. last_code_ tracks which byte we're up to.
   switch (last_code_) {

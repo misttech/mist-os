@@ -12,7 +12,8 @@ load(":fuchsia_fidl_bind_library.bzl", "fuchsia_fidl_bind_library")
 load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library")
 load(":fuchsia_fidl_library.bzl", "fuchsia_fidl_library")
 load(":fuchsia_package_resource.bzl", "fuchsia_package_resource")
-load(":providers.bzl", "FuchsiaStructuredConfigCVFInfo")
+load(":providers.bzl", "FuchsiaComponentManifestInfo", "FuchsiaPackageResourcesInfo", "FuchsiaStructuredConfigInfo")
+load(":utils.bzl", "make_resource_struct")
 
 #####
 # cvf
@@ -35,9 +36,21 @@ def _cvf_impl(ctx):
         inputs = [ctx.file.cm_label, ctx.file.value_file],
         outputs = [compiled_output],
     )
+
+    resources = [
+        make_resource_struct(
+            src = compiled_output,
+            dest = ctx.attr.cm_label[FuchsiaComponentManifestInfo].config_package_path,
+        ),
+    ]
+
     return [
+        FuchsiaPackageResourcesInfo(resources = resources),
         DefaultInfo(files = depset([compiled_output])),
-        FuchsiaStructuredConfigCVFInfo(cvf = compiled_output),
+        FuchsiaStructuredConfigInfo(
+            cvf_source = compiled_output,
+            cvf_dest = ctx.attr.cm_label[FuchsiaComponentManifestInfo].config_package_path,
+        ),
     ]
 
 _cvf = rule(
@@ -221,20 +234,10 @@ def fuchsia_structured_config_values(
         _cvf_output_name = cvf_output_name
 
     # compile the value file
-    cvf_target = "%s_cvf" % name
     _cvf(
-        name = cvf_target,
+        name = name,
         cm_label = cm_label,
         value_file = _value_file,
-    )
-
-    # package the value file
-    fuchsia_package_resource(
-        name = name,
-        src = ":" + cvf_target,
-        # LINT.IfChange
-        dest = "meta/%s.cvf" % _cvf_output_name,
-        # LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/fuchsia_component_manifest.bzl)
     )
 
 #######################################

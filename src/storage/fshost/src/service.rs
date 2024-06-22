@@ -205,7 +205,6 @@ async fn wipe_storage_fxblob(
     Ok(())
 }
 
-#[link(name = "fvm")]
 extern "C" {
     // This function initializes FVM on a fuchsia.hardware.block.Block device
     // with a given slice size.

@@ -40,13 +40,13 @@ pub use device::{
     StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
 pub use error::{
-    AddressResolutionFailed, ExistsError, LocalAddressError, NotFoundError, NotSupportedError,
-    RemoteAddressError, SocketError, ZonedAddressError,
+    AddressResolutionFailed, ErrorAndSerializer, ExistsError, LocalAddressError, NotFoundError,
+    NotSupportedError, RemoteAddressError, SocketError, ZonedAddressError,
 };
 pub use event::{CoreEventContext, EventContext};
 pub use frame::{
     FrameDestination, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta, SendFrameContext,
-    SendableFrameMeta,
+    SendFrameError, SendFrameErrorReason, SendableFrameMeta,
 };
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};

@@ -12,8 +12,8 @@ use net_types::ip::{Ipv4, Ipv4Addr};
 use net_types::{SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
     CoreTimerContext, Counter, CounterContext, DeviceIdContext, EventContext, FrameDestination,
-    InstantBindingsTypes, LinkDevice, SendFrameContext, TimerContext, TracingContext,
-    WeakDeviceIdentifier,
+    InstantBindingsTypes, LinkDevice, SendFrameContext, SendFrameError, TimerContext,
+    TracingContext, WeakDeviceIdentifier,
 };
 use netstack3_ip::nud::{
     self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext, NudBindingsTypes,
@@ -78,7 +78,7 @@ pub trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceI
         bindings_ctx: &mut BC,
         dst_link_address: D::Address,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut;
@@ -287,7 +287,7 @@ impl<D: ArpDevice, BC: ArpBindingsContext<D, CC::DeviceId>, CC: ArpSenderContext
         bindings_ctx: &mut BC,
         dst_mac: D::Address,
         body: S,
-    ) -> Result<(), S>
+    ) -> Result<(), SendFrameError<S>>
     where
         S: Serializer,
         S::Buffer: BufferMut,
@@ -855,7 +855,7 @@ mod tests {
             _bindings_ctx: &mut FakeBindingsCtxImpl,
             _dst_link_address: Mac,
             _body: S,
-        ) -> Result<(), S> {
+        ) -> Result<(), SendFrameError<S>> {
             Ok(())
         }
     }

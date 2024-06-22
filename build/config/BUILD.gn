@@ -357,18 +357,28 @@ config("default_include_dirs") {
 }
 
 variant("linker_gc") {
+  configs = [ ":linker_gc.compiler" ]
+
+  # These are the link-time flags to take advantage of the code generation
+  # flags in config("linker_gc.compiler").
+  if (current_os == "mac") {
+    ldflags = [ "-Wl,-dead_strip" ]
+  } else if (current_os == "win") {
+    ldflags = [ "-Wl,/opt:ref" ]
+  } else {
+    ldflags = [ "-Wl,--gc-sections" ]
+  }
+}
+
+# These are the code-generation flags.
+config("linker_gc.compiler") {
   cflags = [
     "-fdata-sections",
     "-ffunction-sections",
   ]
+
+  # Just to be safe, pass them to the linker too.
   ldflags = cflags
-  if (current_os == "mac") {
-    ldflags += [ "-Wl,-dead_strip" ]
-  } else if (current_os == "win") {
-    ldflags += [ "-Wl,/opt:ref" ]
-  } else {
-    ldflags += [ "-Wl,--gc-sections" ]
-  }
 }
 
 config("default_linker_gc") {
@@ -1305,9 +1315,6 @@ config("werror") {
     "-Dinvalid-value",
     "-Dunused-must-use",
   ]
-
-  # TODO(https://fxbug.dev/42069541): Remove blanket allow once lint is actionable.
-  rustflags += [ "-Awhere_clauses_object_safety" ]
 
   # TODO(https://fxbug.dev/327271893) Remove blanket allow once lint is actionable.
   rustflags += [

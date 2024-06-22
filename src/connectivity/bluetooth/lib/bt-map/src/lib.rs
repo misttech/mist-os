@@ -27,6 +27,9 @@ pub enum Error {
 
     #[error("Service is not GOEP interoperable")]
     NotGoepInteroperable,
+
+    #[error("Invalid parameters")]
+    InvalidParameters,
 }
 
 /// Service record item expected from MAP related SDP.

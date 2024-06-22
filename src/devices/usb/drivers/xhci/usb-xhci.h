@@ -45,6 +45,7 @@
 #include "src/devices/usb/drivers/xhci/xhci-interrupter.h"
 #include "src/devices/usb/drivers/xhci/xhci-port-state.h"
 #include "src/devices/usb/drivers/xhci/xhci-transfer-ring.h"
+#include "src/devices/usb/drivers/xhci/xhci_config.h"
 #include "src/devices/usb/lib/usb-phy/include/usb-phy/usb-phy.h"
 
 namespace usb_xhci {
@@ -77,9 +78,11 @@ class UsbXhci : public UsbXhciType,
                 public ddk::UsbHciProtocol<UsbXhci, ddk::base_protocol>,
                 public fidl::Server<fuchsia_hardware_usb_hci::UsbHci> {
  public:
-  explicit UsbXhci(zx_device_t* parent, std::unique_ptr<dma_buffer::BufferFactory> buffer_factory,
+  explicit UsbXhci(zx_device_t* parent, const xhci_config::Config& config,
+                   std::unique_ptr<dma_buffer::BufferFactory> buffer_factory,
                    async_dispatcher_t* dispatcher)
       : UsbXhciType(parent),
+        config_(config),
         pci_(parent),
         pdev_(parent),
         buffer_factory_(std::move(buffer_factory)),
@@ -202,14 +205,6 @@ class UsbXhci : public UsbXhciType,
   static uint8_t SlotIdToDeviceId(uint8_t slot_id) { return static_cast<uint8_t>(slot_id - 1); }
 
   void SetDeviceInformation(uint8_t slot, uint8_t port, const std::optional<HubInfo>& hub);
-
-  // MfIndex wrapper handler. The previous driver used this to increment
-  // the mfindex wrap value. This caused race conditions that resulted
-  // in incorrect values for the mfindex wrap value.
-  // This function is left empty as a placeholder
-  // for future use of the MFIndex wrap event. It is unclear at the moment
-  // what, if anything this callback should be used for.
-  void MfIndexWrapped() {}
 
   uint8_t GetPortCount() { return static_cast<uint8_t>(params_.MaxPorts()); }
 
@@ -345,6 +340,8 @@ class UsbXhci : public UsbXhciType,
   // InterrupterMapping: finds an interrupter. Currently finds the interrupter with the least
   // pressure.
   uint16_t InterrupterMapping();
+
+  const xhci_config::Config config_ = {};
 
   // Global scheduler lock. This should be held when adding or removing
   // interrupters, and; eventually dynamically assigning transfer rings

@@ -24,7 +24,8 @@ rustc_binary("runtime") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/tee/tee_internal_api:tee_internal_impl",
+    "//src/tee/runtime/api_impl",
+    "//src/tee/tee_internal_api:tee_internal",
     "//src/tee/tee_internal_api:tee_internal_stub_so",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
@@ -71,5 +72,8 @@ fuchsia_test_package("tee-runtime-tests-package") {
 
 group("tests") {
   testonly = true
-  deps = [ ":tee-runtime-tests-package" ]
+  deps = [
+    ":tee-runtime-tests-package",
+    "api_impl:tests",
+  ]
 }

@@ -49,7 +49,9 @@ class PerfTestTraceEventsTest(fuchsia_base_test.FuchsiaBaseTest):
         event_names = [
             event.name
             for event in trace_utils.filter_events(
-                model.all_events(), category="perftest"
+                model.all_events(),
+                category="perftest",
+                type=trace_model.Event,
             )
         ]
         asserts.assert_equal(

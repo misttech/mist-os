@@ -9,6 +9,7 @@ use fuchsia_inspect_contrib::graph::{
     Digraph as IGraph, DigraphOpts as IGraphOpts, Edge as IGraphEdge, Metadata as IGraphMeta,
     Vertex as IGraphVertex,
 };
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -52,7 +53,7 @@ impl std::cmp::Ord for IndexedPowerLevel {
 }
 
 /// If true, use non-random IDs for ease of debugging.
-const ID_DEBUG_MODE: bool = false;
+pub const ID_DEBUG_MODE: bool = false;
 
 // This may be a token later, but using a String for now for simplicity.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
@@ -280,6 +281,12 @@ impl Topology {
         self.elements.contains_key(element_id)
     }
 
+    pub fn element_name(&self, element_id: &ElementID) -> Cow<'_, str> {
+        Cow::from(
+            self.elements.get(element_id).and_then(|e| Some(e.name.as_str())).unwrap_or_default(),
+        )
+    }
+
     pub fn remove_element(&mut self, element_id: &ElementID) {
         if self.unsatisfiable_element_id != *element_id {
             self.invalidate_dependent_elements(element_id);
@@ -307,12 +314,12 @@ impl Topology {
     pub fn get_level_index(
         &self,
         element_id: &ElementID,
-        level: fpb::PowerLevel,
+        level: &fpb::PowerLevel,
     ) -> Option<&IndexedPowerLevel> {
         let Some(elem) = self.elements.get(element_id) else {
             return Some(&IndexedPowerLevel::MIN);
         };
-        elem.valid_levels.iter().find(|l| l.level == level)
+        elem.valid_levels.iter().find(|l| &l.level == level)
     }
 
     fn decrement_element_level_index(
@@ -838,11 +845,23 @@ mod tests {
         assert!(matches!(extra_remove_dep_res, Err(ModifyDependencyError::NotFound { .. })));
 
         assert_eq!(t.element_exists(&fire), true);
+        t.add_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: fire.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+        })
+        .expect("add_assertive_dependency failed");
         t.remove_element(&fire);
         assert_eq!(t.element_exists(&fire), false);
+        let removed_element_dep_res = t.remove_assertive_dependency(&Dependency {
+            dependent: ElementLevel { element_id: fire.clone(), level: BINARY_POWER_LEVEL_ON },
+            requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
+        });
+        assert!(matches!(removed_element_dep_res, Err(ModifyDependencyError::NotFound { .. })));
+
         assert_eq!(t.element_exists(&air), true);
         t.remove_element(&air);
         assert_eq!(t.element_exists(&air), false);
+
         assert_data_tree!(inspect, root: {
            test: {
                 "fuchsia.inspect.Graph": {

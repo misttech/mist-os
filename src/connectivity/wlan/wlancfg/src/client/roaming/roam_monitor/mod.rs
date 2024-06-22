@@ -2,391 +2,320 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::client::connection_selection::scoring_functions;
-use crate::client::roaming::lib::*;
+use crate::client::connection_selection::ConnectionSelectionRequester;
+use crate::client::roaming::lib::{RoamTriggerData, RoamingConnectionData};
 use crate::client::types;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
-use crate::util::pseudo_energy::EwmaSignalData;
+use anyhow::{format_err, Error};
+use fidl_fuchsia_wlan_internal as fidl_internal;
 use futures::channel::mpsc;
-use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, fuchsia_zircon as zx};
+use futures::future::BoxFuture;
+use futures::stream::{FuturesUnordered, StreamExt};
+use futures::{select, FutureExt};
+use std::any::Any;
+use tracing::{error, info, warn};
 
-/// If there isn't a change in reasons to roam or significant change in RSSI, wait a while between
-/// scans. If there isn't a change, it is unlikely that there would be a reason to roam now.
-const TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::Duration = zx::Duration::from_minutes(15);
-const MIN_TIME_BETWEEN_ROAM_SCANS: zx::Duration = zx::Duration::from_minutes(1);
-const MIN_RSSI_CHANGE_TO_ROAM_SCAN: f64 = 5.0;
+pub mod stationary_monitor;
 
-const LOCAL_ROAM_THRESHOLD_RSSI_2G: f64 = -72.0;
-const LOCAL_ROAM_THRESHOLD_RSSI_5G: f64 = -75.0;
-const LOCAL_ROAM_THRESHOLD_SNR_2G: f64 = 20.0;
-const LOCAL_ROAM_THRESHOLD_SNR_5G: f64 = 17.0;
-
-/// Trait so that RoamMonitor can be mocked in tests.
-pub trait RoamMonitorApi: Send + Sync {
-    fn handle_connection_stats(
+// Struct to expose methods for state machine to send roam data, regardless of roam profile.
+pub struct RoamDataSender {
+    sender: mpsc::Sender<RoamTriggerData>,
+}
+impl RoamDataSender {
+    pub fn new(trigger_data_sender: mpsc::Sender<RoamTriggerData>) -> Self {
+        Self { sender: trigger_data_sender }
+    }
+    pub fn send_signal_report_ind(
         &mut self,
-        stats: fidl_internal::SignalReportIndication,
-    ) -> Result<u8, anyhow::Error>;
-
-    fn get_signal_data(&self) -> EwmaSignalData;
-}
-
-/// Keeps record of connection data and a valid roam sender, and can trigger roam search requests,
-/// which may lead to roaming.
-pub struct RoamMonitor {
-    /// Channel to send requests for roam searches so LocalRoamManagerService can serve
-    /// connection selection scans.
-    roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
-    /// Channel to send roam requests to a state machine.
-    roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-    connection_data: RoamingConnectionData,
-    telemetry_sender: TelemetrySender,
-}
-
-impl RoamMonitor {
-    pub fn new(
-        roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
-        roam_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
-        connection_data: RoamingConnectionData,
-        telemetry_sender: TelemetrySender,
-    ) -> Self {
-        Self { roam_search_sender, roam_sender, connection_data, telemetry_sender }
+        ind: fidl_internal::SignalReportIndication,
+    ) -> Result<(), anyhow::Error> {
+        Ok(self.sender.try_send(RoamTriggerData::SignalReportInd(ind))?)
     }
 }
 
-impl RoamMonitorApi for RoamMonitor {
-    fn handle_connection_stats(
-        &mut self,
-        stats: fidl_internal::SignalReportIndication,
-    ) -> Result<u8, anyhow::Error> {
-        self.connection_data.signal_data.update_with_new_measurement(stats.rssi_dbm, stats.snr_db);
+/// Trait for creating different roam monitors based on roaming profiles.
+pub trait RoamMonitorApi: Send + Sync + Any {
+    // Handles trigger data and evaluates current state. Returns true if roam
+    // search is warranted. All roam monitors MUST handle all trigger data types, even if they take
+    // no action.
+    fn should_roam_search(&mut self, data: RoamTriggerData) -> Result<bool, anyhow::Error>;
+    // Determines if the selected roam candidate is still relevant and provides enough potential
+    // improvement to warrant a roam. Returns true if roam request should be sent to state machine.
+    fn should_send_roam_request(
+        &self,
+        candidate: types::ScannedCandidate,
+    ) -> Result<bool, anyhow::Error>;
+    // Returns tracked roam data, or error if data is not tracked by roam monitor.
+    fn get_roam_data(&self) -> Result<RoamingConnectionData, anyhow::Error>;
+}
 
-        // Update velocity with EWMA signal, to smooth out noise.
-        self.connection_data.rssi_velocity.update(self.connection_data.signal_data.ewma_rssi.get());
+// Service loop that orchestrates interaction between state machine (incoming roam data and outgoing
+// roam requests), roam monitor implementation, and roam manager (roam search requests and results).
+pub async fn serve_roam_monitor(
+    mut roam_monitor: Box<dyn RoamMonitorApi>,
+    mut trigger_data_receiver: mpsc::Receiver<RoamTriggerData>,
+    connection_selection_requester: ConnectionSelectionRequester,
+    mut roam_sender: mpsc::Sender<types::ScannedCandidate>,
+    telemetry_sender: TelemetrySender,
+) -> Result<(), anyhow::Error> {
+    // Queue of initialized roam searches.
+    let mut roam_search_result_futs: FuturesUnordered<
+        BoxFuture<'static, Result<types::ScannedCandidate, Error>>,
+    > = FuturesUnordered::new();
 
-        self.telemetry_sender.send(TelemetryEvent::OnSignalVelocityUpdate {
-            rssi_velocity: self.connection_data.rssi_velocity.get(),
-        });
+    loop {
+        select! {
+            // Handle incoming trigger data, queueing a roam search request if necessary.
+            trigger_data = trigger_data_receiver.next() => match trigger_data {
+                Some(data) => {
+                    if roam_monitor.should_roam_search(data).unwrap_or_else(|e| {
+                        error!("error handling roam trigger data: {}", e);
+                        false
+                    }) {
+                        if let Ok(roam_data) = roam_monitor.get_roam_data() {
+                            telemetry_sender.send(TelemetryEvent::RoamingScan);
+                            info!("Performing scan to find proactive local roaming candidates.");
+                            let roam_search_fut = get_roaming_connection_selection_future(
+                                connection_selection_requester.clone(),
+                                roam_data
+                            );
+                            roam_search_result_futs.push(roam_search_fut.boxed());
+                        } else {
+                            error!("Unexpected error getting roam data");
+                        }
+                    }
+                }
+                _ => {}
+            },
+            // Handle the result of a completed roam search, sending recommentation to roam if
+            // necessary.
+            roam_search_result = roam_search_result_futs.select_next_some() => match roam_search_result {
+                Ok(candidate) => {
+                    if roam_monitor.should_send_roam_request(candidate.clone()).unwrap_or_else(|e| {
+                            error!("Error validating selected roam candidate: {}", e);
+                            false
+                        }) {
+                            info!("Requesting roam to candidate: {:?}", candidate.to_string_without_pii());
+                            if roam_sender.try_send(candidate).is_err() {
+                                warn!("Failed to send roam request, exiting monitor service loop.");
+                                break
+                            }
 
-        // Evaluate current BSS, and determine if roaming future should be triggered.
-        let (roam_reasons, bss_score) = check_signal_thresholds(
-            self.connection_data.signal_data,
-            self.connection_data.rssi_velocity.get(),
-            self.connection_data.currently_fulfilled_connection.target.bss.channel,
-        );
-        if !roam_reasons.is_empty() {
-            let now = fasync::Time::now();
-            if now
-                < self.connection_data.previous_roam_scan_data.time_prev_roam_scan
-                    + MIN_TIME_BETWEEN_ROAM_SCANS
-            {
-                return Ok(bss_score);
-            }
-            // If there isn't a new reason to roam and the previous scan
-            // happened recently, do not scan again.
-            let is_scan_old = now
-                > self.connection_data.previous_roam_scan_data.time_prev_roam_scan
-                    + TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE;
-            let has_new_reason = roam_reasons.iter().any(|r| {
-                !self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan.contains(r)
-            });
-            let rssi = self.connection_data.signal_data.ewma_rssi.get();
-            let is_rssi_different =
-                (self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan - rssi).abs()
-                    > MIN_RSSI_CHANGE_TO_ROAM_SCAN;
-            if is_scan_old || has_new_reason || is_rssi_different {
-                // Initiate roam scan.
-                let req =
-                    RoamSearchRequest::new(self.connection_data.clone(), self.roam_sender.clone());
-                let _ = self.roam_search_sender.unbounded_send(req);
-
-                // Updated fields for tracking roam scan decisions
-                self.connection_data.previous_roam_scan_data.time_prev_roam_scan =
-                    fasync::Time::now();
-                self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan = roam_reasons;
-                self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
+                    }
+                }
+                Err(e) => {
+                    error!("Error occured during roam search: {:?}", e);
+                }
+            },
+            complete => {
+                warn!("Roam monitor channels dropped, exiting monitor service loop.");
+                break
             }
         }
-        // return score for metrics purposes
-        return Ok(bss_score);
     }
-
-    // Return the signal data for the tracked connection.
-    fn get_signal_data(&self) -> EwmaSignalData {
-        self.connection_data.signal_data
-    }
+    Ok(())
 }
 
-// Return roam reasons if the signal measurements fall below given thresholds.
-fn check_signal_thresholds(
-    signal_data: EwmaSignalData,
-    rssi_velocity: impl Into<f64> + std::cmp::PartialOrd<f64>,
-    channel: types::WlanChan,
-) -> (Vec<RoamReason>, u8) {
-    let mut roam_reasons = vec![];
-    let (rssi_threshold, snr_threshold) = if channel.is_5ghz() {
-        (LOCAL_ROAM_THRESHOLD_RSSI_5G, LOCAL_ROAM_THRESHOLD_SNR_5G)
-    } else {
-        (LOCAL_ROAM_THRESHOLD_RSSI_2G, LOCAL_ROAM_THRESHOLD_SNR_2G)
-    };
-    if signal_data.ewma_rssi.get() <= rssi_threshold {
-        roam_reasons.push(RoamReason::RssiBelowThreshold)
+// Request a roam selection from the connection selection module, bundle the receiver into a future
+// to be queued and that can also return the initiating request.
+async fn get_roaming_connection_selection_future(
+    mut connection_selection_requester: ConnectionSelectionRequester,
+    roaming_connection_data: RoamingConnectionData,
+) -> Result<types::ScannedCandidate, Error> {
+    match connection_selection_requester
+        .do_roam_selection(
+            roaming_connection_data.currently_fulfilled_connection.target.network.clone(),
+            roaming_connection_data.currently_fulfilled_connection.target.credential.clone(),
+        )
+        .await?
+    {
+        Some(candidate) => Ok(candidate),
+        None => Err(format_err!("No roam candidates found.")),
     }
-    if signal_data.ewma_snr.get() <= snr_threshold {
-        roam_reasons.push(RoamReason::SnrBelowThreshold)
-    }
-
-    let signal_score =
-        scoring_functions::score_current_connection_signal_data(signal_data, rssi_velocity);
-    return (roam_reasons, signal_score);
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::telemetry::EWMA_SMOOTHING_FACTOR_FOR_METRICS;
-    use crate::util::pseudo_energy::RssiVelocity;
-    use crate::util::testing::generate_connect_selection;
+    use crate::client::connection_selection::ConnectionSelectionRequest;
+    use crate::telemetry::TelemetryEvent;
+    use crate::util::testing::fakes::FakeRoamMonitor;
+    use crate::util::testing::generate_random_scanned_candidate;
     use fidl_fuchsia_wlan_internal as fidl_internal;
-    use test_util::{assert_gt, assert_lt};
-    use wlan_common::{assert_variant, channel};
+    use fuchsia_async::TestExecutor;
+    use futures::pin_mut;
+    use futures::task::Poll;
+    use test_case::test_case;
+    use wlan_common::assert_variant;
 
-    #[fuchsia::test]
-    fn test_check_signal_thresholds_2g() {
-        let (roam_reasons, _) = check_signal_thresholds(
-            EwmaSignalData::new(
-                LOCAL_ROAM_THRESHOLD_RSSI_2G - 1.0,
-                LOCAL_ROAM_THRESHOLD_SNR_2G - 1.0,
-                EWMA_SMOOTHING_FACTOR_FOR_METRICS,
-            ),
-            0.0,
-            channel::Channel::new(11, channel::Cbw::Cbw20),
-        );
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
-
-        let (roam_reasons, _) = check_signal_thresholds(
-            EwmaSignalData::new(
-                LOCAL_ROAM_THRESHOLD_RSSI_2G + 1.0,
-                LOCAL_ROAM_THRESHOLD_SNR_2G + 1.0,
-                EWMA_SMOOTHING_FACTOR_FOR_METRICS,
-            ),
-            0.0,
-            channel::Channel::new(11, channel::Cbw::Cbw20),
-        );
-        assert!(roam_reasons.is_empty());
-    }
-
-    #[fuchsia::test]
-    fn test_check_signal_thresholds_5g() {
-        let (roam_reasons, _) = check_signal_thresholds(
-            EwmaSignalData::new(
-                LOCAL_ROAM_THRESHOLD_RSSI_5G - 1.0,
-                LOCAL_ROAM_THRESHOLD_SNR_5G - 1.0,
-                EWMA_SMOOTHING_FACTOR_FOR_METRICS,
-            ),
-            0.0,
-            channel::Channel::new(36, channel::Cbw::Cbw80),
-        );
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
-
-        let (roam_reasons, _) = check_signal_thresholds(
-            EwmaSignalData::new(
-                LOCAL_ROAM_THRESHOLD_RSSI_5G + 1.0,
-                LOCAL_ROAM_THRESHOLD_SNR_5G + 1.0,
-                EWMA_SMOOTHING_FACTOR_FOR_METRICS,
-            ),
-            0.0,
-            channel::Channel::new(36, channel::Cbw::Cbw80),
-        );
-        assert!(roam_reasons.is_empty());
-    }
-
-    struct RoamMonitorTestValues {
-        roam_search_sender: mpsc::UnboundedSender<RoamSearchRequest>,
-        roam_search_receiver: mpsc::UnboundedReceiver<RoamSearchRequest>,
-        roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
+    struct TestValues {
+        trigger_data_sender: mpsc::Sender<RoamTriggerData>,
+        trigger_data_receiver: mpsc::Receiver<RoamTriggerData>,
+        roam_sender: mpsc::Sender<types::ScannedCandidate>,
+        roam_receiver: mpsc::Receiver<types::ScannedCandidate>,
+        connection_selection_requester: ConnectionSelectionRequester,
+        connection_selection_request_receiver: mpsc::Receiver<ConnectionSelectionRequest>,
         telemetry_sender: TelemetrySender,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
-        currently_fulfilled_connection: types::ConnectSelection,
     }
 
-    fn roam_monitor_test_setup() -> RoamMonitorTestValues {
-        let (roam_search_sender, roam_search_receiver) = mpsc::unbounded();
+    fn setup_test() -> TestValues {
+        let (trigger_data_sender, trigger_data_receiver) = mpsc::channel(100);
+        let (roam_sender, roam_receiver) = mpsc::channel(100);
+        let (connection_selection_request_sender, connection_selection_request_receiver) =
+            mpsc::channel(5);
+        let connection_selection_requester =
+            ConnectionSelectionRequester::new(connection_selection_request_sender);
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (roam_req_sender, _roam_req_receiver) = mpsc::unbounded();
-        let currently_fulfilled_connection = generate_connect_selection();
-
-        RoamMonitorTestValues {
-            roam_search_sender,
-            roam_search_receiver,
-            roam_req_sender,
+        TestValues {
+            trigger_data_sender,
+            trigger_data_receiver,
+            roam_sender,
+            roam_receiver,
+            connection_selection_requester,
+            connection_selection_request_receiver,
             telemetry_sender,
             telemetry_receiver,
-            currently_fulfilled_connection,
         }
     }
 
     #[fuchsia::test]
-    fn test_roam_monitor_should_queue_scan() {
-        // Test that if connection quality data comes in indicating that a roam should be
-        // considered, the roam monitor will send out a scan request.
-        let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
-        let mut test_values = roam_monitor_test_setup();
+    fn test_roam_data_sender_send_signal_report_ind() {
+        let _exec = TestExecutor::new();
+        let (sender, mut receiver) = mpsc::channel(100);
+        let mut roam_data_sender = RoamDataSender::new(sender);
+        let ind = fidl_internal::SignalReportIndication { rssi_dbm: -60, snr_db: 30 };
 
-        let init_rssi = -75;
-        let init_snr = 15;
-        let previous_roam_scan_data = PreviousRoamScanData::new(init_rssi);
-        let mut signal_data =
-            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let rssi_velocity = RssiVelocity::new(init_rssi);
-        let connection_data = RoamingConnectionData {
-            currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
-            signal_data,
-            rssi_velocity,
-            previous_roam_scan_data,
-        };
+        roam_data_sender.send_signal_report_ind(ind).expect("error sending signal report");
 
-        let mut roam_monitor = RoamMonitor::new(
-            test_values.roam_search_sender.clone(),
-            test_values.roam_req_sender.clone(),
-            connection_data.clone(),
-            test_values.telemetry_sender.clone(),
-        );
-
-        // Advance the time so that we allow roam scanning
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_hours(1)));
-
-        let rssi_dbm = -85;
-        let snr_db = 5;
-        let signal_report = fidl_internal::SignalReportIndication { rssi_dbm, snr_db };
-        // Send some periodic stats to the RoamMonitor for a connection with poor signal.
-        let _score = roam_monitor
-            .handle_connection_stats(signal_report)
-            .expect("Failed to get connection stats");
-        signal_data.update_with_new_measurement(rssi_dbm, snr_db);
-
-        // Check that a scan request is sent to the Roam Manager Service.
-        let received_roam_req = test_values.roam_search_receiver.try_next();
-        assert_variant!(received_roam_req, Ok(Some(req)) => {
-            assert_eq!(req.connection_data.currently_fulfilled_connection, test_values.currently_fulfilled_connection);
-            assert_eq!(req.connection_data.signal_data, signal_data);
-        });
-
-        // Verify that a telemetry event is sent for the RSSI velocity
-        assert_variant!(
-            test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::OnSignalVelocityUpdate { .. }))
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_roam_monitor_sends_velocity_telemetry_events() {
-        let mut _exec = fasync::TestExecutor::new();
-        let mut test_values = roam_monitor_test_setup();
-
-        let init_rssi = -40;
-        let init_snr = 50;
-        let roam_data = PreviousRoamScanData::new(init_rssi as f64);
-        let signal_data = EwmaSignalData::new(init_rssi, init_snr, 1);
-
-        let connection_data = RoamingConnectionData {
-            currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
-            signal_data,
-            rssi_velocity: RssiVelocity::new(-40),
-            previous_roam_scan_data: roam_data,
-        };
-        let mut roam_monitor = RoamMonitor::new(
-            test_values.roam_search_sender.clone(),
-            test_values.roam_req_sender.clone(),
-            connection_data.clone(),
-            test_values.telemetry_sender.clone(),
-        );
-
-        // Send some stats with RSSI and SNR getting worse to the RoamMonitor.
-        let rssi_dbm_1 = -80;
-        let snr_db_1 = 10;
-        let signal_report_1 =
-            fidl_internal::SignalReportIndication { rssi_dbm: rssi_dbm_1, snr_db: snr_db_1 };
-        let _score = roam_monitor
-            .handle_connection_stats(signal_report_1)
-            .expect("Failed to get connection stats");
-
-        // Verify that a telemetry event is sent for the RSSI velocity
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalVelocityUpdate {rssi_velocity})) => {
-            // verify that RSSI velocity is negative since the signal report RSSI is lower.
-            assert_lt!(rssi_velocity, 0.0);
-        });
-
-        // Send some stats with RSSI and SNR getting getting better and check that RSSI velocity
-        // is positive.
-        let rssi_dbm_2 = -60;
-        let snr_db_2 = 30;
-        let signal_report_2 =
-            fidl_internal::SignalReportIndication { rssi_dbm: rssi_dbm_2, snr_db: snr_db_2 };
-        let _score = roam_monitor
-            .handle_connection_stats(signal_report_2)
-            .expect("Failed to get connection stats");
-
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalVelocityUpdate {rssi_velocity})) => {
-            // verify that RSSI velocity is negative since the signal report RSSI is lower.
-            assert_gt!(rssi_velocity, 0.0);
+        // Verify that roam sender packages trigger data and sends to roam monitor receiver.
+        assert_variant!(receiver.try_next(), Ok(Some(RoamTriggerData::SignalReportInd(data))) => {
+            assert_eq!(ind, data);
         });
     }
 
-    #[fuchsia::test]
-    fn test_roam_monitor_should_not_roam_scan_frequently() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::now());
-        // Test that if the connection continues to be bad, the RoamMonitor does not scan too
-        // often.
-        let mut test_values = roam_monitor_test_setup();
+    #[test_case(false; "should not queue roam search")]
+    #[test_case(true; "should queue roam search")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_serve_loop_handles_trigger_data(response_to_should_roam_scan: bool) {
+        let mut exec = TestExecutor::new();
+        let mut test_values = setup_test();
 
-        let init_rssi = -80;
-        let init_snr = 10;
-        let previous_roam_scan_data = PreviousRoamScanData::new(init_rssi);
-        let signal_data =
-            EwmaSignalData::new(init_rssi, init_snr, EWMA_SMOOTHING_FACTOR_FOR_METRICS);
-        let rssi_velocity = RssiVelocity::new(init_rssi);
-        let connection_data = RoamingConnectionData {
-            currently_fulfilled_connection: test_values.currently_fulfilled_connection.clone(),
-            signal_data,
-            rssi_velocity,
-            previous_roam_scan_data,
-        };
-        let mut roam_monitor = RoamMonitor::new(
-            test_values.roam_search_sender.clone(),
-            test_values.roam_req_sender.clone(),
-            connection_data.clone(),
-            test_values.telemetry_sender.clone(),
+        // Create a fake roam monitor. Set the should_roam_scan response, so we can verify that the
+        // serve loop forwarded the data and that the correct action was taken.
+        let mut roam_monitor = FakeRoamMonitor::new();
+        roam_monitor.response_to_should_roam_scan = response_to_should_roam_scan;
+
+        // Start a serve loop with the fake roam monitor
+        let serve_fut = serve_roam_monitor(
+            Box::new(roam_monitor),
+            test_values.trigger_data_receiver,
+            test_values.connection_selection_requester,
+            // test_values.roam_search_sender,
+            test_values.roam_sender,
+            test_values.telemetry_sender,
         );
+        pin_mut!(serve_fut);
 
-        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_hours(1)));
-        let signal_report =
-            fidl_internal::SignalReportIndication { rssi_dbm: init_rssi, snr_db: init_snr };
-        // Send some periodic stats to the RoamMonitor for a connection with poor signal.
-        let _score = roam_monitor
-            .handle_connection_stats(signal_report)
-            .expect("Failed to get connection stats");
+        // Run loop forward
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        // Check that a scan request is sent to the Roam Manager Service.
-        let received_roam_req = test_values.roam_search_receiver.try_next();
-        assert_variant!(received_roam_req, Ok(Some(req)) => {
-            assert_eq!(req.connection_data.currently_fulfilled_connection, test_values.currently_fulfilled_connection);
-            assert_eq!(req.connection_data.signal_data, signal_data.clone());
+        // Send some trigger data to kick off the handling sequence. The actual values here are
+        // irrelevant.
+        test_values
+            .trigger_data_sender
+            .try_send(RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
+                rssi_dbm: -40,
+                snr_db: 40,
+            }))
+            .expect("failed to send");
+
+        // Run loop forward.
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        if response_to_should_roam_scan {
+            // Verify metric was sent for upcoming roam scan
+            assert_variant!(
+                test_values.telemetry_receiver.try_next(),
+                Ok(Some(TelemetryEvent::RoamingScan))
+            );
+            // Verify that a roam search request was sent after monitor responded true.
+            assert_variant!(
+                test_values.connection_selection_request_receiver.try_next(),
+                Ok(Some(_))
+            );
+        } else {
+            // Verify that no roam search was triggered after monitor responded false.
+            assert_variant!(test_values.connection_selection_request_receiver.try_next(), Err(_));
+        }
+    }
+
+    #[test_case(false; "should not send roam request")]
+    #[test_case(true; "should send roam request")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_serve_loop_handles_roam_search_results(response_to_should_send_roam_request: bool) {
+        let mut exec = TestExecutor::new();
+        let mut test_values = setup_test();
+
+        // Create a fake roam monitor. Set should_roam_scan to true to ensure roam searches get
+        // queued. Conditionally set the should_send_roam_request response.
+        let mut roam_monitor = FakeRoamMonitor::new();
+        roam_monitor.response_to_should_roam_scan = true;
+        roam_monitor.response_to_should_send_roam_request = response_to_should_send_roam_request;
+
+        // Start a serve loop with the fake roam monitor
+        let serve_fut = serve_roam_monitor(
+            Box::new(roam_monitor),
+            test_values.trigger_data_receiver,
+            // test_values.roam_search_sender,
+            test_values.connection_selection_requester,
+            test_values.roam_sender,
+            test_values.telemetry_sender,
+        );
+        pin_mut!(serve_fut);
+
+        // Run loop forward
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Send some trigger data to kick off the handling sequence. The actual values here are
+        // irrelevant.
+        test_values
+            .trigger_data_sender
+            .try_send(RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
+                rssi_dbm: -40,
+                snr_db: 40,
+            }))
+            .expect("failed to send");
+
+        // Run loop forward
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Respond via the connection selection requester
+        let candidate = generate_random_scanned_candidate();
+        assert_variant!(test_values.connection_selection_request_receiver.try_next(), Ok(Some(ConnectionSelectionRequest::RoamSelection { responder, .. })) => {
+            // Respond with a roam candidate
+            responder.send(Some(candidate.clone())).expect("failed to send");
         });
 
-        // Send stats with a worse RSSI and check that a roam scan is not initiated
-        let init_rssi = -85;
-        let init_snr = 5;
-        let signal_report =
-            fidl_internal::SignalReportIndication { rssi_dbm: init_rssi, snr_db: init_snr };
+        // Run loop forward
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        let _score = roam_monitor
-            .handle_connection_stats(signal_report)
-            .expect("Failed to get connection stats");
+        if response_to_should_send_roam_request {
+            // Verify metric was sent for upcoming roam scan
+            assert_variant!(
+                test_values.telemetry_receiver.try_next(),
+                Ok(Some(TelemetryEvent::RoamingScan))
+            );
+            // Verify that a roam request is sent if the should_send_roam_request method returns
+            // true.
+            assert_variant!(test_values.roam_receiver.try_next(), Ok(Some(roam_request)) => {
+                assert_eq!(roam_request, candidate);
+            });
+        } else {
+            // Veriify that no roam request is sent if the should_send_roam_request method returns
+            // false.
+            assert_variant!(test_values.roam_receiver.try_next(), Err(_));
+        }
     }
 }

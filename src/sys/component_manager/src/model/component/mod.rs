@@ -494,7 +494,7 @@ impl ComponentInstance {
                 // ChildArgs.dict may contain capabilities created by an external client.
                 //
                 // Currently there is no way to create a Rotuer externally, so assume these
-                // are Sender capabilities and convert them to Router here.
+                // are Connector capabilities and convert them to Router here.
                 //
                 // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once
                 // it exists

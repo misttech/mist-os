@@ -16,7 +16,10 @@ use fuchsia_component_test::Capability;
 use futures::stream::StreamExt;
 use futures::{join, TryFutureExt};
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
-use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 /// AVRCP component URL.
 const AVRCP_URL: &str = "fuchsia-pkg://fuchsia.com/bt-avrcp-integration-tests#meta/bt-avrcp.cm";
@@ -66,22 +69,26 @@ fn avrcp_controller_service_definition() -> bredr::ServiceDefinition {
         service_class_uuids: Some(vec![Uuid::new16(0x110E).into(), Uuid::new16(0x110F).into()]),
         protocol_descriptor_list: Some(vec![
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::L2Cap,
-                params: vec![bredr::DataElement::Uint16(bredr::PSM_AVCTP as u16)],
+                protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+                params: Some(vec![bredr::DataElement::Uint16(bredr::PSM_AVCTP as u16)]),
+                ..Default::default()
             },
             bredr::ProtocolDescriptor {
-                protocol: bredr::ProtocolIdentifier::Avctp,
-                params: vec![bredr::DataElement::Uint16(0x0103)], // Indicate v1.3
+                protocol: Some(bredr::ProtocolIdentifier::Avctp),
+                params: Some(vec![bredr::DataElement::Uint16(0x0103)]), // Indicate v1.3
+                ..Default::default()
             },
         ]),
         profile_descriptors: Some(vec![bredr::ProfileDescriptor {
-            profile_id: bredr::ServiceClassProfileIdentifier::AvRemoteControl,
-            major_version: 1,
-            minor_version: 6,
+            profile_id: Some(bredr::ServiceClassProfileIdentifier::AvRemoteControl),
+            major_version: Some(1),
+            minor_version: Some(6),
+            ..Default::default()
         }]),
         additional_attributes: Some(vec![bredr::Attribute {
-            id: SDP_SUPPORTED_FEATURES, // SDP Attribute "SUPPORTED FEATURES"
-            element: bredr::DataElement::Uint16(0x0003), // CATEGORY 1 and 2.
+            id: Some(SDP_SUPPORTED_FEATURES), // SDP Attribute "SUPPORTED FEATURES"
+            element: Some(bredr::DataElement::Uint16(0x0003)), // CATEGORY 1 and 2.
+            ..Default::default()
         }]),
         ..Default::default()
     }
@@ -213,7 +220,7 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
 
     // The observer of bt-avrcp.cm should be notified of the connection attempt.
     match tf.avrcp_observer.expect_observer_request().await.unwrap() {
-        bredr::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
+        bredr_test::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
             assert_eq!(tf.mock_peer.peer_id(), peer_id.into());
             responder.send().unwrap();
         }
@@ -280,7 +287,7 @@ async fn remote_initiates_browse_channel_before_control(mut tf: AvrcpIntegration
 
     // The observer of bt-avrcp.cm should be notified of the connection attempt.
     match tf.avrcp_observer.expect_observer_request().await.unwrap() {
-        bredr::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
+        bredr_test::PeerObserverRequest::PeerConnected { peer_id, responder, .. } => {
             assert_eq!(tf.mock_peer.peer_id(), peer_id.into());
             responder.send().unwrap();
         }

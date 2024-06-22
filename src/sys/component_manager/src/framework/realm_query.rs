@@ -50,22 +50,12 @@ const FIDL_HEADER_BYTES: usize = 16;
 const FIDL_MANIFEST_MAX_MSG_BYTES: usize =
     (ZX_CHANNEL_MAX_MSG_BYTES as usize) - (FIDL_HEADER_BYTES + FIDL_VECTOR_HEADER_BYTES);
 
-// Serves the fuchsia.sys2.RealmQuery protocol.
-pub struct RealmQuery {
-    model: Weak<Model>,
-}
-
 impl RealmQuery {
-    pub fn new(model: Weak<Model>) -> Arc<Self> {
-        Arc::new(Self { model })
+    pub fn new(model: Weak<Model>) -> Self {
+        Self { model }
     }
 
-    /// Serve the fuchsia.sys2.RealmQuery protocol for a given scope on a given stream
-    pub async fn serve(
-        self: Arc<Self>,
-        scope_moniker: Moniker,
-        mut stream: fsys::RealmQueryRequestStream,
-    ) {
+    async fn serve(self, scope_moniker: Moniker, mut stream: fsys::RealmQueryRequestStream) {
         loop {
             let request = match stream.next().await {
                 Some(Ok(request)) => request,
@@ -161,17 +151,12 @@ impl RealmQuery {
     }
 }
 
-pub struct RealmQueryFrameworkCapability {
-    host: Arc<RealmQuery>,
+#[derive(Clone)]
+pub struct RealmQuery {
+    model: Weak<Model>,
 }
 
-impl RealmQueryFrameworkCapability {
-    pub fn new(host: Arc<RealmQuery>) -> Self {
-        Self { host }
-    }
-}
-
-impl FrameworkCapability for RealmQueryFrameworkCapability {
+impl FrameworkCapability for RealmQuery {
     fn matches(&self, capability: &InternalCapability) -> bool {
         capability.matches_protocol(&CAPABILITY_NAME)
     }
@@ -181,19 +166,16 @@ impl FrameworkCapability for RealmQueryFrameworkCapability {
         scope: WeakComponentInstance,
         _target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
-        Box::new(RealmQueryCapabilityProvider::new(self.host.clone(), scope.moniker.clone()))
+        Box::new(RealmQueryCapabilityProvider {
+            query: self.clone(),
+            scope_moniker: scope.moniker.clone(),
+        })
     }
 }
 
-pub struct RealmQueryCapabilityProvider {
-    query: Arc<RealmQuery>,
+struct RealmQueryCapabilityProvider {
+    query: RealmQuery,
     scope_moniker: Moniker,
-}
-
-impl RealmQueryCapabilityProvider {
-    fn new(query: Arc<RealmQuery>, scope_moniker: Moniker) -> Self {
-        Self { query, scope_moniker }
-    }
 }
 
 #[async_trait]
@@ -205,7 +187,7 @@ impl InternalCapabilityProvider for RealmQueryCapabilityProvider {
 }
 
 /// Create the state matching the given moniker string in this scope
-pub async fn get_instance(
+async fn get_instance(
     model: &Arc<Model>,
     scope_moniker: &Moniker,
     moniker_str: &str,
@@ -246,7 +228,7 @@ pub async fn get_instance(
 }
 
 /// Encode the component manifest of an instance into a standalone persistable FIDL format.
-pub async fn get_resolved_declaration(
+async fn get_resolved_declaration(
     model: &Arc<Model>,
     scope_moniker: &Moniker,
     moniker_str: &str,
@@ -367,7 +349,7 @@ async fn resolve_declaration(
 }
 
 /// Get the structured config of an instance
-pub async fn get_structured_config(
+async fn get_structured_config(
     model: &Arc<Model>,
     scope_moniker: &Moniker,
     moniker_str: &str,
@@ -718,22 +700,31 @@ async fn serve_manifest_bytes_iterator(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capability;
     use crate::model::component::StartReason;
     use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
     use assert_matches::assert_matches;
     use cm_rust::*;
     use cm_rust_testing::*;
     use component_id_index::InstanceId;
-    use fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream};
+    use fidl::endpoints;
+    use fidl::endpoints::{create_endpoints, create_proxy};
     use routing::bedrock::structured_dict::ComponentInput;
     use routing_test_helpers::component_id_index::make_index_file;
-    use {
-        fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
-    };
+    use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     fn is_closed(handle: impl fidl::AsHandleRef) -> bool {
         handle.wait_handle(zx::Signals::OBJECT_PEER_CLOSED, zx::Time::from_nanos(0)).is_ok()
+    }
+
+    async fn realm_query(test: &TestModelResult) -> (fsys::RealmQueryProxy, RealmQuery) {
+        let host = {
+            let env = test.builtin_environment.lock().await;
+            env.realm_query.clone().unwrap()
+        };
+        let (proxy, server) = endpoints::create_proxy::<fsys::RealmQueryMarker>().unwrap();
+        capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
+        (proxy, host)
     }
 
     #[fuchsia::test]
@@ -749,25 +740,14 @@ mod tests {
 
         let components = vec![("root", ComponentDeclBuilder::new().build())];
 
-        let TestModelResult { model, builtin_environment, .. } = TestEnvironmentBuilder::new()
+        let test = TestEnvironmentBuilder::new()
             .set_components(components)
             .set_component_id_index_path(index_file.path().to_owned().try_into().unwrap())
             .build()
             .await;
+        let (query, _host) = realm_query(&test).await;
 
-        let realm_query = {
-            let env = builtin_environment.lock().await;
-            env.realm_query.clone().unwrap()
-        };
-
-        let (query, query_request_stream) =
-            create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
-
-        let _query_task = fasync::Task::local(async move {
-            realm_query.serve(Moniker::root(), query_request_stream).await
-        });
-
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         let instance = query.get_instance(".").await.unwrap().unwrap();
 
@@ -805,22 +785,10 @@ mod tests {
 
         let components = vec![("root", manifest.build())];
 
-        let TestModelResult { model, builtin_environment, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (query, _host) = realm_query(&test).await;
 
-        let realm_query = {
-            let env = builtin_environment.lock().await;
-            env.realm_query.clone().unwrap()
-        };
-
-        let (query, query_request_stream) =
-            create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
-
-        let _query_task = fasync::Task::local(async move {
-            realm_query.serve(Moniker::root(), query_request_stream).await
-        });
-
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         let iterator = query.get_resolved_declaration("./").await.unwrap().unwrap();
         let iterator = iterator.into_proxy().unwrap();
@@ -883,25 +851,14 @@ mod tests {
 
         let components = vec![("root", ComponentDeclBuilder::new().config(config).build())];
 
-        let TestModelResult { model, builtin_environment, .. } = TestEnvironmentBuilder::new()
+        let test = TestEnvironmentBuilder::new()
             .set_components(components)
             .set_config_values(vec![("meta/root.cvf", config_values)])
             .build()
             .await;
+        let (query, _host) = realm_query(&test).await;
 
-        let realm_query = {
-            let env = builtin_environment.lock().await;
-            env.realm_query.clone().unwrap()
-        };
-
-        let (query, query_request_stream) =
-            create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
-
-        let _query_task = fasync::Task::local(async move {
-            realm_query.serve(Moniker::root(), query_request_stream).await
-        });
-
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         let config = query.get_structured_config("./").await.unwrap().unwrap();
 
@@ -930,22 +887,10 @@ mod tests {
                 .build(),
         )];
 
-        let TestModelResult { model, builtin_environment, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (query, _host) = realm_query(&test).await;
 
-        let realm_query = {
-            let env = builtin_environment.lock().await;
-            env.realm_query.clone().unwrap()
-        };
-
-        let (query, query_request_stream) =
-            create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
-
-        let _query_task = fasync::Task::local(async move {
-            realm_query.serve(Moniker::root(), query_request_stream).await
-        });
-
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         let (outgoing_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
@@ -1065,22 +1010,10 @@ mod tests {
 
         let components = vec![("root", ComponentDeclBuilder::new().use_(use_decl.clone()).build())];
 
-        let TestModelResult { model, builtin_environment, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (query, _host) = realm_query(&test).await;
 
-        let realm_query = {
-            let env = builtin_environment.lock().await;
-            env.realm_query.clone().unwrap()
-        };
-
-        let (query, query_request_stream) =
-            create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
-
-        let _query_task = fasync::Task::local(async move {
-            realm_query.serve(Moniker::root(), query_request_stream).await
-        });
-
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         let mut ns = query.construct_namespace("./").await.unwrap().unwrap();
 
@@ -1146,22 +1079,10 @@ mod tests {
             ),
         ];
 
-        let TestModelResult { model, builtin_environment, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
+        let test = TestEnvironmentBuilder::new().set_components(components).build().await;
+        let (query, _host) = realm_query(&test).await;
 
-        let realm_query = {
-            let env = builtin_environment.lock().await;
-            env.realm_query.clone().unwrap()
-        };
-
-        let (query, query_request_stream) =
-            create_proxy_and_stream::<fsys::RealmQueryMarker>().unwrap();
-
-        let _query_task = fasync::Task::local(async move {
-            realm_query.serve(Moniker::root(), query_request_stream).await
-        });
-
-        model.start(ComponentInput::default()).await;
+        test.model.start(ComponentInput::default()).await;
 
         let (storage_admin, server_end) = create_proxy::<fsys::StorageAdminMarker>().unwrap();
 

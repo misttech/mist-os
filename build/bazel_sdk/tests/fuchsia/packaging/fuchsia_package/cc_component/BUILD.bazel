@@ -10,6 +10,8 @@ load(
     "fuchsia_component_manifest",
     "fuchsia_package",
     "fuchsia_package_resource",
+    "fuchsia_structured_config_cpp_elf_lib",
+    "fuchsia_structured_config_values",
     "fuchsia_test_component",
     "fuchsia_test_package",
 )
@@ -23,7 +25,10 @@ fuchsia_package(
         ":empty_component",
     ],
     fuchsia_api_level = "HEAD",
-    resources = [":simple_file_resource"],
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -77,7 +82,22 @@ fuchsia_cc_binary(
 fuchsia_component_manifest(
     name = "manifest",
     component_name = "cc_component",
-    content = "{}",
+    content = """{
+    use: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
+    ],
+    config: {
+        device_path: {
+            type: "string",
+            max_size: 512,
+            mutability: [ "parent" ],
+        },
+    },
+}""",
 )
 
 fuchsia_component(
@@ -86,6 +106,21 @@ fuchsia_component(
     deps = [
         ":cc_bin",
     ],
+)
+
+fuchsia_structured_config_cpp_elf_lib(
+    name = "component-config",
+    cm_label = ":manifest",
+)
+
+fuchsia_structured_config_values(
+    name = "sc-values",
+    cm_label = ":manifest",
+    cvf_output_name = "component-config",
+    values = {
+        "enable_suspend": False,
+        "device_path": "/dev/class/bt-hci/000",
+    },
 )
 
 # Note: the test package contains a fuchsia_cc_test()

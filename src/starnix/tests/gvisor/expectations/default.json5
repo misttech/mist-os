@@ -814,6 +814,7 @@
                 // TODO(https://issuetracker.google.com/290605547): support
                 // replacing addresses.
                 "NetlinkRouteTest.AddAndRemoveAddr",
+                "NetlinkRouteTest.LinkedToNetns",
                 "NetlinkRouteTest.SpliceFromPipe",
 
                 // socket_netlink_uevent

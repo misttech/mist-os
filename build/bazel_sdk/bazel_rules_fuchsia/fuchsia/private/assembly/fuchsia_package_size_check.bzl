@@ -7,6 +7,7 @@
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaSizeCheckerInfo")
+load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _fuchsia_package_size_check_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -70,6 +71,7 @@ def _fuchsia_package_size_check_impl(ctx):
         outputs = outputs,
         command = script,
         progress_message = "Size checking for %s" % ctx.label.name,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     return [

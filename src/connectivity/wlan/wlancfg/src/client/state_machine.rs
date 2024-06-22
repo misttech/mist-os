@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::client::roaming::local_roam_manager::LocalRoamManagerApi;
+use crate::client::roaming::local_roam_manager::RoamManager;
 use crate::client::types;
 use crate::config_management::{PastConnectionData, SavedNetworksManagerApi};
 use crate::mode_management::{Defect, IfaceFailure};
@@ -19,7 +19,6 @@ use fidl::endpoints::create_proxy;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use futures::channel::{mpsc, oneshot};
 use futures::future::FutureExt;
-use futures::lock::Mutex;
 use futures::select;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use std::convert::Infallible;
@@ -119,7 +118,7 @@ pub async fn serve(
     connect_selection: Option<types::ConnectSelection>,
     telemetry_sender: TelemetrySender,
     defect_sender: mpsc::UnboundedSender<Defect>,
-    roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
+    roam_manager: RoamManager,
 ) {
     let next_network = connect_selection
         .map(|selection| ConnectingOptions { connect_selection: selection, attempt_counter: 0 });
@@ -173,7 +172,7 @@ struct CommonStateOptions {
     telemetry_sender: TelemetrySender,
     iface_id: u16,
     defect_sender: mpsc::UnboundedSender<Defect>,
-    roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
+    roam_manager: RoamManager,
 }
 
 pub type ConnectionStatsSender = mpsc::UnboundedSender<fidl_internal::SignalReportIndication>;
@@ -546,13 +545,12 @@ async fn connected_state(
 
     let initial_signal = options.ap_state.tracked.signal;
 
-    // Used to receive roam requests. The sender is cloned to send to the RoamManager.
-    let (roam_sender, mut roam_receiver) = mpsc::unbounded::<types::ScannedCandidate>();
-    let mut roam_monitor = common_options.roam_manager.lock().await.get_roam_monitor(
-        options.ap_state.tracked.signal,
-        options.currently_fulfilled_connection.clone(),
-        roam_sender,
-    );
+    // Initialize roam monitor with roam manager service.
+    let (mut roam_monitor_sender, mut roam_receiver) =
+        common_options.roam_manager.initialize_roam_monitor(
+            options.currently_fulfilled_connection.clone(),
+            options.ap_state.tracked.signal,
+        );
 
     // Timer to log post-connection scores metrics.
     let mut post_connect_metric_timer =
@@ -629,9 +627,8 @@ async fn connected_state(
                                 ind
                             });
 
-                            // Send indication to roam_monitor
-                            let _ = roam_monitor.handle_connection_stats(ind);
-
+                            // Forward signal report data to roam monitor.
+                            let _ = roam_monitor_sender.send_signal_report_ind(ind).inspect_err(|e| error!("Error handling signal report: {}", e));
                             false
                         }
                         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
@@ -704,8 +701,6 @@ async fn connected_state(
                                 disconnect_reason,
                                 options.ap_state.tracked.signal,
                             ).await;
-
-
                             let next_connecting_options = ConnectingOptions {
                                 connect_selection: new_connect_selection.clone(),
                                 attempt_counter: 0,
@@ -744,8 +739,10 @@ async fn connected_state(
                     TelemetryEvent::LongDurationSignals{ signals: past_signals.get_before(fasync::Time::now()) }
                 );
             }
-            _roam_request = roam_receiver.next() => {
+            roam_request = roam_receiver.select_next_some() => {
                 // TODO(nmccracken) Roam to this network once we have decided proactive roaming is ready to enable.
+                debug!("Roam request to candidate {:?} received, not yet implemented.", roam_request.to_string_without_pii());
+                common_options.telemetry_sender.send(TelemetryEvent::WouldRoamConnect);
             }
         }
     }
@@ -801,14 +798,15 @@ pub fn convert_manual_connect_to_disconnect_reason(
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+    use crate::client::roaming::lib::RoamTriggerData;
+    use crate::client::roaming::local_roam_manager::RoamServiceRequest;
     use crate::config_management::network_config::{self, Credential};
     use crate::config_management::PastConnectionList;
     use crate::util::listener;
     use crate::util::testing::{
         generate_connect_selection, generate_disconnect_info, poll_sme_req, random_connection_data,
-        ConnectResultRecord, ConnectionRecord, FakeLocalRoamManager, FakeSavedNetworksManager,
+        ConnectResultRecord, ConnectionRecord, FakeSavedNetworksManager,
     };
     use fidl::endpoints::create_proxy_and_stream;
     use fidl::prelude::*;
@@ -834,7 +832,7 @@ mod tests {
         update_receiver: mpsc::UnboundedReceiver<listener::ClientListenerMessage>,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         defect_receiver: mpsc::UnboundedReceiver<Defect>,
-        stats_receiver: mpsc::UnboundedReceiver<fidl_internal::SignalReportIndication>,
+        roam_service_request_receiver: mpsc::Receiver<RoamServiceRequest>,
     }
 
     fn test_setup() -> TestValues {
@@ -848,9 +846,8 @@ mod tests {
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let (defect_sender, defect_receiver) = mpsc::unbounded();
-        let (stats_sender, stats_receiver) = mpsc::unbounded();
-        let roam_manager = FakeLocalRoamManager::new_with_roam_monitor_stats_sender(stats_sender);
-        let roam_manager = Arc::new(Mutex::new(roam_manager));
+        let (roam_service_request_sender, roam_service_request_receiver) = mpsc::channel(100);
+        let roam_manager = RoamManager::new(roam_service_request_sender);
 
         TestValues {
             common_options: CommonStateOptions {
@@ -869,7 +866,7 @@ mod tests {
             update_receiver,
             telemetry_receiver,
             defect_receiver,
-            stats_receiver,
+            roam_service_request_receiver,
         }
     }
 
@@ -1236,6 +1233,14 @@ mod tests {
         connect_txn_handle
             .send_on_disconnect(&fidl_disconnect_info)
             .expect("failed to send disconnection event");
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let expected_recorded_connection = ConnectionRecord {
@@ -1752,6 +1757,14 @@ mod tests {
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
         // Run forward to get post connection signals metrics
         exec.set_fake_time(fasync::Time::after(AVERAGE_SCORE_DELTA_MINIMUM_DURATION + 1.second()));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1850,7 +1863,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
-        let test_values = test_setup();
+        let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
         let connect_selection = generate_connect_selection();
@@ -1887,6 +1900,14 @@ mod tests {
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let disconnect_time = fasync::Time::after(12.hours());
@@ -1942,7 +1963,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
-        let test_values = test_setup();
+        let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
         let connect_selection = generate_connect_selection();
@@ -1969,6 +1990,14 @@ mod tests {
         let mut fut = pin!(fut);
 
         let disconnect_time = fasync::Time::after(12.hours());
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2042,7 +2071,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let connection_attempt_time = fasync::Time::from_nanos(0);
         exec.set_fake_time(connection_attempt_time);
-        let test_values = test_setup();
+        let mut test_values = test_setup();
 
         let connect_selection = generate_connect_selection();
         let bss_description =
@@ -2064,6 +2093,9 @@ mod tests {
         let mut state_fut = pin!(state_fut);
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
@@ -2095,6 +2127,12 @@ mod tests {
             .expect("failed to send disconnection event");
         assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
         // The connection data should have been recorded at disconnect.
         let expected_recorded_connection = ConnectionRecord {
             id: connect_selection.target.network.clone(),
@@ -2202,6 +2240,14 @@ mod tests {
         let mut sme_fut = pin!(sme_fut);
 
         let disconnect_time = fasync::Time::after(12.hours());
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2359,7 +2405,7 @@ mod tests {
     #[fuchsia::test]
     fn connected_state_notified_of_network_disconnect_no_sme_reconnect_short_uptime_no_retry() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let test_values = test_setup();
+        let mut test_values = test_setup();
 
         let connect_selection = generate_connect_selection();
         let bss_description =
@@ -2385,6 +2431,14 @@ mod tests {
         let mut fut = pin!(fut);
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2500,6 +2554,14 @@ mod tests {
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
         // Set time to indicate a decent uptime before the disconnect so the AP is retried
         exec.set_fake_time(start_time + fasync::Duration::from_hours(24));
 
@@ -2605,39 +2667,56 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        // Send the first signal report from SME
-        let rssi_1 = -50;
-        let snr_1 = 25;
-        let fidl_signal_report =
-            fidl_internal::SignalReportIndication { rssi_dbm: rssi_1, snr_db: snr_1 };
-        connect_txn_handle
-            .send_on_signal_report(&fidl_signal_report)
-            .expect("failed to send signal report");
+        // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Do a quick check that state machine does not exist and there's no disconnect to SME
-        assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
+        let request = test_values
+            .roam_service_request_receiver
+            .try_next()
+            .expect("error receiving roam service request")
+            .expect("received None roam service request");
+        assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor{ mut roam_trigger_data_receiver, .. } => {
+            // Run the state machine
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Verify that connection stats are sent out
-        assert_variant!(test_values.stats_receiver.try_next(), Ok(Some(stats)) => {
-            assert_eq!(stats.rssi_dbm, rssi_1);
-            assert_eq!(stats.snr_db, snr_1);
-        });
+            // Send the first signal report from SME
+            let rssi_1 = -50;
+            let snr_1 = 25;
+            let fidl_signal_report =
+                fidl_internal::SignalReportIndication { rssi_dbm: rssi_1, snr_db: snr_1 };
+            connect_txn_handle
+                .send_on_signal_report(&fidl_signal_report)
+                .expect("failed to send signal report");
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Send a second signal report with higher RSSI and SNR than the previous reports.
-        let rssi_2 = -30;
-        let snr_2 = 35;
-        let fidl_signal_report =
-            fidl_internal::SignalReportIndication { rssi_dbm: rssi_2, snr_db: snr_2 };
-        connect_txn_handle
-            .send_on_signal_report(&fidl_signal_report)
-            .expect("failed to send signal report");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            // Do a quick check that state machine does not exist and there's no disconnect to SME
+            assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
 
-        // Verify that another connection stats is sent out with new signal data.
-        assert_variant!(test_values.stats_receiver.try_next(), Ok(Some(stats)) => {
-            assert_eq!(stats.rssi_dbm, rssi_2);
-            assert_eq!(stats.snr_db, snr_2);
+            // Verify telemetry event
+            assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+                assert_variant!(event, TelemetryEvent::OnSignalReport { .. });
+            });
+
+            // Verify that signal report is sent to the roam monitor
+            assert_variant!(roam_trigger_data_receiver.try_next(), Ok(Some(RoamTriggerData::SignalReportInd(_))));
+
+            // Send a second signal report with higher RSSI and SNR than the previous reports.
+            let rssi_2 = -30;
+            let snr_2 = 35;
+            let fidl_signal_report =
+                fidl_internal::SignalReportIndication { rssi_dbm: rssi_2, snr_db: snr_2 };
+            connect_txn_handle
+                .send_on_signal_report(&fidl_signal_report)
+                .expect("failed to send signal report");
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+            // Verify telemetry events;
+            assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
+                assert_variant!(event, TelemetryEvent::OnSignalReport { .. });
+            });
+
+            // Verify that signal report is sent to the roam monitor
+            assert_variant!(roam_trigger_data_receiver.try_next(), Ok(Some(RoamTriggerData::SignalReportInd(_))));
         });
     }
 
@@ -2646,7 +2725,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
-        let test_values = test_setup();
+        let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
         let connect_selection = generate_connect_selection();
@@ -2673,6 +2752,14 @@ mod tests {
         let connect_txn_handle = connect_txn_stream.control_handle();
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2954,7 +3041,7 @@ mod tests {
     #[fuchsia::test]
     fn serve_loop_handles_disconnect() {
         let mut exec = fasync::TestExecutor::new();
-        let test_values = test_setup();
+        let mut test_values = test_setup();
         let sme_proxy = test_values.common_options.proxy;
         let sme_event_stream = sme_proxy.take_event_stream();
         let (client_req_sender, client_req_stream) = mpsc::channel(1);
@@ -3002,6 +3089,14 @@ mod tests {
         connect_txn_handle
             .send_on_connect_result(&fake_successful_connect_result())
             .expect("failed to send connection completion");
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Send a disconnect request

@@ -238,7 +238,7 @@ library fidl.test;
 
 type Foo = @generated_name("Bad") struct {};
 )FIDL");
-  library.ExpectFail(ErrInvalidAttributePlacement, "generated_name");
+  library.ExpectFail(ErrAttributeInsideTypeDeclaration);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

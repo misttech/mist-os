@@ -122,18 +122,15 @@ meta/amlogic-display.cm` will be the DFv2 version of the driver component
 (`:amlogic-display-dfv2`). Otherwise, it will be the DFv1 version of the
 driver component (`:amlogic-display-dfv1`).
 
-TODO(https://fxbug.dev/323061435): Enable the DFv2 amlogic-display driver
-by default.
+**Current value (from the default):** `true`
 
-**Current value (from the default):** `false`
-
-From //src/graphics/display/drivers/amlogic-display/BUILD.gn:19
+From //src/graphics/display/drivers/amlogic-display/BUILD.gn:16
 
 ### api_compatibility_testing
 
 **Current value (from the default):** `true`
 
-From //build/config/fuchsia/platform_version.gni:37
+From //build/config/fuchsia/platform_version.gni:39
 
 ### archivist_max_cached_logs_bytes
 
@@ -863,11 +860,13 @@ From //build/images/args.gni:35
 ### bump_api_level
 
 If true, build for N+1 api level, where N is
-platform_version.in_development_api_level.
+platform_version.deprecated_highest_numbered_api_level.
+TODO(https://fxbug.dev/326277078): Update this comment and potentially
+redefine these args when switching the in-development level to "NEXT".
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:25
+From //build/config/fuchsia/platform_version.gni:27
 
 ### cache_package_labels
 
@@ -2728,53 +2727,87 @@ These take precedence over `profile_source_files`.
 
 From //build/config/profile/config.gni:15
 
-### driver_sysmem_contiguous_guard_page_count_override
+### driver_sysmem_contiguous_guard_page_count
 
 **Current value (from the default):** `-1`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:37
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:46
 
 ### driver_sysmem_contiguous_guard_pages_fatal
 
 **Current value (from the default):** `false`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:33
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:44
 
 ### driver_sysmem_contiguous_guard_pages_internal
 
 **Current value (from the default):** `false`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:34
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:45
 
 ### driver_sysmem_contiguous_guard_pages_unused
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:35
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:47
 
-### driver_sysmem_contiguous_guard_pages_unused_cycle_seconds_override
+### driver_sysmem_contiguous_guard_pages_unused_cycle_seconds
+
+**Current value (from the default):** `600`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:49
+
+### driver_sysmem_contiguous_guard_pages_unused_fraction_denominator
+
+**Current value (from the default):** `128`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:48
+
+### driver_sysmem_contiguous_memory_size
 
 **Current value (from the default):** `-1`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:36
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:40
 
 ### driver_sysmem_contiguous_memory_size_override
 
+TODO(b/322009732): remove
+
 **Current value (from the default):** `-1`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:32
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:53
+
+### driver_sysmem_contiguous_memory_size_percent
+
+**Current value (from the default):** `5`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:41
+
+### driver_sysmem_protected_memory_size
+
+**Current value (from the default):** `0`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:42
 
 ### driver_sysmem_protected_memory_size_override
 
+TODO(b/322009732): remove
+
 **Current value (from the default):** `-1`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:31
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:56
+
+### driver_sysmem_protected_memory_size_percent
+
+**Current value (from the default):** `-1`
+
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:43
 
 ### driver_sysmem_protected_ranges_disable_dynamic
 
 **Current value (from the default):** `false`
 
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:38
+From //src/devices/sysmem/drivers/sysmem/BUILD.gn:50
 
 ### dwarf_version
 
@@ -3113,7 +3146,7 @@ From //third_party/perfetto/gn/perfetto.gni:310
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:137
+From //src/power/power-manager/BUILD.gn:138
 
 ### enable_recovery_ui_v2
 
@@ -3155,7 +3188,7 @@ From //zircon/kernel/params.gni:116
 
 Enforce ABI compatibility checks for stable API levels.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //tools/fidl/abi-compat/BUILD.gn:14
 
@@ -3441,7 +3474,7 @@ From //src/fonts/build/font_args.gni:12
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:27
+From //build/config/fuchsia/platform_version.gni:29
 
 ### fuchsia_async_trace_level_logging
 
@@ -4030,7 +4063,7 @@ platform-version-roller when the API level is incremented.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:36
+From //build/config/fuchsia/platform_version.gni:38
 
 ### include_shell_commands_package
 
@@ -5360,7 +5393,7 @@ To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:50
+From //build/config/fuchsia/platform_version.gni:52
 
 ### override_idk_target_cpus
 

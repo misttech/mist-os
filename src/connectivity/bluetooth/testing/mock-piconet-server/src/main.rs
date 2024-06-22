@@ -23,7 +23,10 @@ use std::collections::{HashMap, HashSet};
 use std::pin::pin;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 mod peer;
 mod profile;
@@ -57,7 +60,7 @@ impl MockPiconetServer {
     fn register_peer(
         &self,
         id: PeerId,
-        observer: ClientEnd<bredr::PeerObserverMarker>,
+        observer: ClientEnd<bredr_test::PeerObserverMarker>,
         sender: mpsc::Sender<(PeerId, bredr::ProfileRequestStream)>,
     ) -> Result<(), Error> {
         if self.contains_peer(&id) {
@@ -186,14 +189,14 @@ impl MockPiconetServer {
     fn handle_mock_peer_request(
         &self,
         id: PeerId,
-        request: bredr::MockPeerRequest,
+        request: bredr_test::MockPeerRequest,
         profile_requests: &mut SelectAll<
             StreamWithEpitaph<Tagged<PeerId, bredr::ProfileRequestStream>, PeerId>,
         >,
     ) {
         info!("Received mock peer request for peer {:?}: {:?}", id, request.method_name());
         match request {
-            bredr::MockPeerRequest::ConnectProxy_ { interface, responder, .. } => {
+            bredr_test::MockPeerRequest::ConnectProxy_ { interface, responder, .. } => {
                 match interface.into_stream() {
                     Ok(stream) => {
                         profile_requests.push(stream.tagged(id).with_epitaph(id));
@@ -222,7 +225,7 @@ impl MockPiconetServer {
     ///      that is created when a sandboxed instance of a Bluetooth Profile is started.
     async fn handle_fidl_requests(
         &self,
-        mut profile_test_requests: mpsc::Receiver<bredr::ProfileTestRequest>,
+        mut profile_test_requests: mpsc::Receiver<bredr_test::ProfileTestRequest>,
     ) {
         // A combined stream of all the active peers' MockPeerRequestStreams.
         // Each MockPeerRequest is tagged with its corresponding PeerId.
@@ -239,7 +242,7 @@ impl MockPiconetServer {
             select! {
                 // A request from the `ProfileTest` FIDL request stream has been received.
                 test_request = profile_test_requests.select_next_some() => {
-                    let bredr::ProfileTestRequest::RegisterPeer { peer_id, peer, observer, responder, .. } = test_request;
+                    let bredr_test::ProfileTestRequest::RegisterPeer { peer_id, peer, observer, responder, .. } = test_request;
                     let id = peer_id.into();
                     info!("Received ProfileTest request to register peer: {:?}", id);
                     let request_stream = match peer.into_stream() {
@@ -490,10 +493,10 @@ impl MockPiconetServerInner {
     }
 }
 
-/// Forward requests from the `fuchsia.bluetooth.bredr.ProfileTest` service to the request handler.
+/// Forward requests from the `fuchsia.bluetooth.bredr.test.ProfileTest` service to the request handler.
 async fn handle_test_client_connection(
-    mut sender: mpsc::Sender<bredr::ProfileTestRequest>,
-    mut stream: bredr::ProfileTestRequestStream,
+    mut sender: mpsc::Sender<bredr_test::ProfileTestRequest>,
+    mut stream: bredr_test::ProfileTestRequestStream,
 ) {
     while let Some(request) = stream.next().await {
         match request {
@@ -531,6 +534,7 @@ mod tests {
     use async_utils::PollExt;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
     use fidl_fuchsia_bluetooth_bredr::*;
+    use fidl_fuchsia_bluetooth_bredr_test::*;
     use futures::task::Poll;
     use std::pin::pin;
 
