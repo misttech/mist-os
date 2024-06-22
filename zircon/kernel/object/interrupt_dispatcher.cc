@@ -15,7 +15,8 @@
 #include <object/port_dispatcher.h>
 #include <object/process_dispatcher.h>
 
-InterruptDispatcher::InterruptDispatcher() : timestamp_(0), state_(InterruptState::IDLE) {}
+InterruptDispatcher::InterruptDispatcher()
+    : timestamp_(0), state_(InterruptState::IDLE), wake_event_(get_koid()) {}
 
 zx_status_t InterruptDispatcher::WaitForInterrupt(zx_time_t* out_timestamp) {
   bool defer_unmask = false;

@@ -124,7 +124,10 @@ class IdlePowerThread final {
   //
   class WakeEvent {
    public:
-    WakeEvent() = default;
+    // Construct a WakeEvent owned by |koid|.
+    //
+    // |koid| is used for logging.
+    explicit WakeEvent(zx_koid_t koid) : owner_koid_(koid) {}
     ~WakeEvent() { Acknowledge(); }
 
     // Triggers a wakeup that resumes the system, or aborts an incomplete suspend sequence, and
@@ -143,7 +146,7 @@ class IdlePowerThread final {
       DEBUG_ASSERT(Thread::Current::Get()->preemption_state().PreemptIsEnabled() == false);
       if (!pending_) {
         pending_ = true;
-        return TriggerSystemWakeEvent();
+        return TriggerSystemWakeEvent(owner_koid_);
       }
       return WakeResult::BadState;
     }
@@ -153,11 +156,12 @@ class IdlePowerThread final {
     void Acknowledge() {
       if (pending_) {
         pending_ = false;
-        AcknowledgeSystemWakeEvent();
+        AcknowledgeSystemWakeEvent(owner_koid_);
       }
     }
 
    private:
+    const zx_koid_t owner_koid_;
     bool pending_{false};
   };
 
@@ -208,8 +212,8 @@ class IdlePowerThread final {
       TA_REQ(TransitionLock::Get());
 
   static WakeResult WakeBootCpu();
-  static WakeResult TriggerSystemWakeEvent();
-  static void AcknowledgeSystemWakeEvent();
+  static WakeResult TriggerSystemWakeEvent(zx_koid_t koid);
+  static void AcknowledgeSystemWakeEvent(zx_koid_t koid);
 
   ktl::atomic<StateMachine> state_{};
   AutounsignalMpUnplugEvent complete_;

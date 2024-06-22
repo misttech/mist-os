@@ -263,7 +263,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
             // Verify this handler is running in the correct context.
             DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
 
-            WakeEvent wake_event;
+            WakeEvent wake_event(Thread::Current::Get()->tid());
             const WakeResult wake_result = wake_event.Trigger();
             const char* message_prefix = wake_result == WakeResult::SuspendAborted
                                              ? "Wakeup before suspend completed. Aborting suspend"
@@ -386,7 +386,7 @@ IdlePowerThread::WakeResult IdlePowerThread::WakeBootCpu() {
   return WakeResult::Resumed;
 }
 
-IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWakeEvent() {
+IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWakeEvent(zx_koid_t koid) {
   DEBUG_ASSERT(arch_ints_disabled());
   DEBUG_ASSERT(Thread::Current::Get()->preemption_state().PreemptIsEnabled() == false);
 
@@ -397,6 +397,10 @@ IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWakeEvent() {
   DEBUG_ASSERT_MSG(previous_pending_wake_events != SystemSuspendStateWakeEventPendingMask,
                    "Pending wake event count overflow!");
 
+  // TODO(https://fxbug.dev/348668110): Revisit this logging.  Still needed?
+  dprintf(INFO, "triggered system wake event, koid %" PRIu64 " suspend state %" PRIx64 "\n", koid,
+          previous + 1);
+
   // Wake the boot CPU if the system is suspended and this is the first pending wake event.
   if (suspended && previous_pending_wake_events == 0) {
     return WakeBootCpu();
@@ -404,10 +408,14 @@ IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWakeEvent() {
   return suspended ? WakeResult::Resumed : WakeResult::Active;
 }
 
-void IdlePowerThread::AcknowledgeSystemWakeEvent() {
+void IdlePowerThread::AcknowledgeSystemWakeEvent(zx_koid_t koid) {
   const uint64_t previous = system_suspend_state_.fetch_add(-1, ktl::memory_order_relaxed);
   const uint64_t previous_pending_wake_events = previous & SystemSuspendStateWakeEventPendingMask;
   DEBUG_ASSERT_MSG(previous_pending_wake_events != 0, "Pending wake event count underflow!");
+
+  // TODO(https://fxbug.dev/348668110): Revisit this logging.  Still needed?
+  dprintf(INFO, "acknowledged system wake event, koid %" PRIu64 " suspend state %" PRIx64 "\n",
+          koid, previous - 1);
 }
 
 #include <lib/console.h>
