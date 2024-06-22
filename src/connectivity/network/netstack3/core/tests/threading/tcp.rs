@@ -13,13 +13,22 @@ use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx};
 use netstack3_core::types::WorkQueueReport;
 use netstack3_core::{CtxPair, IpExt};
 use netstack3_tcp::testutil::{ProvidedBuffers, WriteBackClientBuffers};
+use test_case::test_case;
 
 use super::{loom_model, loom_spawn, low_preemption_bound_model};
 
+#[derive(Debug, Copy, Clone)]
+enum ServerOrClient {
+    Server,
+    Client,
+}
+
 #[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test(I)]
-fn race_connect_close<I: IpExt>() {
-    loom_model(low_preemption_bound_model(), || {
+#[test_case(ServerOrClient::Server; "server")]
+#[test_case(ServerOrClient::Client; "client")]
+fn race_connect_close<I: IpExt>(close_which: ServerOrClient) {
+    loom_model(low_preemption_bound_model(), move || {
         const SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
         const BACKLOG: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
         let FakeCtx { core_ctx, bindings_ctx } = FakeCtx::default();
@@ -35,17 +44,23 @@ fn race_connect_close<I: IpExt>() {
             .connect(&client, ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS).into(), SERVER_PORT)
             .unwrap();
 
-        // Race two operations:
-        // 1. Closing the client socket, which has already sent out its initial
-        //    SYN.
-        // 2. Operating the loopback queue, which will advance the server
-        //    state-machine and send a SYN-ACK back, finding the client in the
-        //    middle of its close operation.
+        let (close_socket, keep_socket) = match close_which {
+            ServerOrClient::Server => (server, client),
+            ServerOrClient::Client => (client, server),
+        };
 
-        let thread_vars = (ctx.clone(), client);
+        // The client's initial SYN is sitting in the loopback rx queue.
+        //
+        // Race two operations:
+        //
+        // 1. Closing the one of the sockets.
+        // 2. Operating the loopback queue, which will advance the server
+        //    state-machine and potentially send a SYN-ACK back.
+
+        let thread_vars = (ctx.clone(), close_socket);
         let t_close = loom_spawn(move || {
-            let (mut ctx, client) = thread_vars;
-            ctx.core_api().tcp::<I>().close(client);
+            let (mut ctx, close_socket) = thread_vars;
+            ctx.core_api().tcp::<I>().close(close_socket);
         });
         let thread_vars = (ctx.clone(), lo.clone());
         let t_recv = loom_spawn(move || {
@@ -65,7 +80,7 @@ fn race_connect_close<I: IpExt>() {
         t_recv.join().unwrap();
 
         // Clean up all resources.
-        ctx.core_api().tcp::<I>().close(server);
+        ctx.core_api().tcp::<I>().close(keep_socket);
         ctx.bindings_ctx.state_mut().rx_available.clear();
         ctx.test_api().clear_routes_and_remove_device(lo);
     })
