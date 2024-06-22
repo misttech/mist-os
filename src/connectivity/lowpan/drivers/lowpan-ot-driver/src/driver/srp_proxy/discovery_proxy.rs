@@ -666,8 +666,9 @@ impl DiscoveryProxy {
     }
 
     pub fn add_local_address(&self, addr: std::net::Ipv6Addr) {
-        if !ipv6addr_is_unicast_link_local(&addr) {
-            self.local_addresses.lock().push(addr);
+        let mut local_addresses = self.local_addresses.lock();
+        if !ipv6addr_is_unicast_link_local(&addr) && !local_addresses.contains(&addr) {
+            local_addresses.push(addr);
         }
     }
 
