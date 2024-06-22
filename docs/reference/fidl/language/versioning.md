@@ -50,14 +50,15 @@ version chosen for `B`.
 ## Target versions {#target-versions}
 
 When you target a single version, the bindings include all elements that are
-available in that version as specified by `@available` arguments.
+available in that version as specified by `@available` arguments in the FIDL
+files.
 
-When you target a set of multiple versions, the bindings include all elements
-that are available in any of the versions in the set. For elements that are
-[`replaced`](#replacing), they only include the latest definition.
+When you target a set of versions, the bindings include all elements that are
+available in any of the versions in the set. For elements that are
+[`replaced`](#replacing), the bindings only include the latest definition.
 
-No matter what set of versions you target, if compilation succeeds, then it is
-also guaranteed to succeed for all subsets of that set, and for all possible
+No matter what set of versions you target, if FIDL compilation succeeds, then it
+is also guaranteed to succeed for all subsets of that set, and for all possible
 singleton sets.
 
 ## Syntax
@@ -65,15 +66,15 @@ singleton sets.
 The `@available` attribute is allowed on any [FIDL element][element]. It takes
 the following arguments:
 
-| Argument     | Type      | Note                              |
-| ------------ | --------- | --------------------------------- |
-| `platform`   | `string`  | Only allowed on `library`         |
-| `added`      | `uint64`  | Integer, `NEXT`, or `HEAD`        |
-| `deprecated` | `uint64`  | Integer, `NEXT`, or `HEAD`        |
-| `removed`    | `uint64`  | Integer, `NEXT`, or `HEAD`        |
-| `replaced`   | `uint64`  | Integer, `NEXT`, or `HEAD`        |
-| `note`       | `string`  | Goes with `deprecated`            |
-| `renamed`    | `string`  | Goes with `removed` or `replaced` |
+| Argument     | Type      | Note                                                       |
+| ------------ | --------- | ---------------------------------------------------------- |
+| `platform`   | `string`  | Only allowed on `library`                                  |
+| `added`      | `uint64`  | Integer, `NEXT`, or `HEAD`                                 |
+| `deprecated` | `uint64`  | Integer, `NEXT`, or `HEAD`                                 |
+| `removed`    | `uint64`  | Integer, `NEXT`, or `HEAD`                                 |
+| `replaced`   | `uint64`  | Integer, `NEXT`, or `HEAD`                                 |
+| `note`       | `string`  | Goes with `deprecated`                                     |
+| `renamed`    | `string`  | Goes with `removed` or `replaced`; only allowed on members |
 
 There are some restrictions on the arguments:
 
@@ -196,11 +197,16 @@ declaration, simply remove the old definition in favor of a new one:
 
 ### After removal
 
-Normally the `renamed` argument is used with `replaced`, but you can also use it
-with `removed`. This renames the member post-removal. The new name will only
-appear in bindings that [target multiple versions](#target-versions), since that
-is the only way to include the element while also targeting a version after its
-removal.
+Normally the `renamed` argument is used with `replaced=N`, but you can also use
+it with `removed=N`. This gives a new name to refer to the member after its
+removal. How it works is based on the set of [target
+versions](#target-versions):
+
+* If you only target versions less than `N`, the bindings will use the old name.
+* If you only target versions equal to or greater than `N`, the bindings won't
+  include the member at all.
+* If you target a set containing versions less than `N` _and_ containing
+  versions greater than or equal to `N`, the bindings will use the new name.
 
 One reason to do this is to discourage new usage of an API while continuing to
 support its implementation. For example:
@@ -212,7 +218,7 @@ support its implementation. For example:
 If the `Door` server is implemented in a codebase that targets the version set
 {4, 5}, then the method will be named `DeprecatedOpen`, discouraging developers
 from adding new uses of the method. If another codebase targets version 4 or
-below, then the method will be named `Open`. If it targets version 6, the method
+below, then the method will be named `Open`. If it targets version 5, the method
 will not appear at all.
 
 Another reason to use this feature is to reuse a name for a new ABI. For

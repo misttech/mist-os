@@ -115,25 +115,27 @@ added. For example:
 Note that you should always [deprecate](#deprecating) an API before removing it.
 
 To remove an API that was added in a stable level, use the `@available`
-attribute's `removed` argument. For example, to remove a method at level 12:
+attribute's `removed` argument. For example, to remove a method at level 18 that
+was deprecated at level 12:
 
 ```
 protocol Example {
-    @available(added=10, removed=12)
+    @available(added=10, deprecated=12, removed=18, note="Use Go() instead")
     Run() -> ();
 };
 ```
 
-In this example, an end developer targeting levels 10 or 11 would see client
-bindings for the `Run` method, but a developer targeting level 12 or greater
-would not. Developers working on the Fuchsia platform would see bindings for the
-`Run` method as long as 10 or 11 remain supported API levels, since the platform
-build targets the set of all supported API levels.
+In this example, an end developer targeting any level between 10 and 17
+(inclusive) would see client bindings for the `Run` method, but a developer
+targeting level 18 or greater would not. Developers working on the Fuchsia
+platform would see bindings for the `Run` method as long as the platform
+supports any level between 10 and 17, since the platform build targets the set
+of all supported API levels.
 
-Once the platform drops support for levels 10 and 11, you can delete the `Run`
-method from the FIDL file if you wish. If you delete it while levels 10 or 11
-are still supported, static compatibility tests will fail and special approval
-from //sdk/history/OWNERS will be required to submit the change.
+Once the platform drops support for all levels between 10 and 17, you can delete
+the `Run` method from the FIDL file if you wish. If you delete it before that
+happens, static compatibility tests will fail and special approval from
+//sdk/history/OWNERS will be required to submit the change.
 
 To remove an API that was added at an unstable level such as `NEXT` or `HEAD`,
 you can simply delete it from the FIDL file.
