@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -23,6 +24,8 @@ use crate::task::{
     HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
     StopState, Syslog, UtsNamespace, UtsNamespaceHandle,
 };
+
+#[cfg(not(feature = "starnix_lite"))]
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::fuse::FuseCtlFs;
 use crate::vfs::socket::{
@@ -184,6 +187,7 @@ pub struct Kernel {
     pub root_uts_ns: UtsNamespaceHandle,
 
     /// A struct containing a VMO with a vDSO implementation, if implemented for a given architecture, and possibly an offset for a sigreturn function.
+    #[cfg(not(feature = "starnix_lite"))]
     pub vdso: Vdso,
 
     /// The table of devices installed on the netstack and their associated
@@ -369,6 +373,7 @@ impl Kernel {
             iptables: OrderedRwLock::new(IpTables::new()),
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
+            #[cfg(not(feature = "starnix_lite"))]
             vdso: Vdso::new(),
             netstack_devices: Arc::default(),
             swap_files: Default::default(),
