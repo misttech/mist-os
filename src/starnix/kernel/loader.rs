@@ -12,7 +12,7 @@ use crate::mm::{
 #[cfg(not(feature = "starnix_lite"))]
 use crate::mm::{
     DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryManager, ProtectionFlags,
-    PAGE_SIZE, VMEX_RESOURCE,
+    PAGE_SIZE,
 };
 use crate::security;
 use crate::task::CurrentTask;
