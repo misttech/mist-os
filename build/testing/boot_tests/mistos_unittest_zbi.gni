@@ -26,6 +26,7 @@ template("mistos_unittest_zbi") {
     deps += [
       "//build/info/bootfs:minimum_utc_stamp",
       "//src/sys/mistos/elf_runner:bin",
+      "//src/sys/mistos/elf_runner:mistos_elf_meta",
       "//src/sys/mistos/elf_runner:mistos_elf_runner_process_builder_config",
     ]
   }
@@ -39,8 +40,6 @@ template("mistos_unittest_zbi") {
 
     args = [
       "userboot.root=$userboot_prefix",
-
-      #"userboot.next=bin/mistos_elf_runner+${executable_path}+-Z+unstable-options+--force-run-in-process",
       "userboot.next=bin/mistos_elf_runner+${executable_path}",
     ]
   }

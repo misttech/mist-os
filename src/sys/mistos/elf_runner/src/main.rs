@@ -3,21 +3,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO Follow 2018 idioms
+#![allow(elided_lifetimes_in_paths)]
+// This is needed for the pseudo_directory nesting in crate::model::tests
+#![recursion_limit = "256"]
+// Printing to stdout and stderr directly is discouraged for component_manager.
+// Instead, the tracing library, e.g. through macros like `info!`, and `error!`,
+// should be used.
+#![cfg_attr(not(test), deny(clippy::print_stdout, clippy::print_stderr,))]
+
+use crate::bootfs::BootfsSvc;
 use crate::builtin::log::{ReadOnlyLog, WriteOnlyLog};
 use crate::builtin::log_sink::LogSink;
 use crate::builtin::svc_controller::SvcController;
-use process_builder::{NamespaceEntry, ProcessBuilder, StartupHandle};
-
+use crate::builtin::time::create_utc_clock;
+use ::cm_logger::klog;
+use builtins::vmex_resource::VmexResource;
 use elf_runner::process_launcher::ProcessLauncher;
 use elf_runner::vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fidl::HandleBased;
 use fuchsia_component::server::*;
-use fuchsia_runtime::{job_default, take_startup_handle, HandleInfo, HandleType};
+use fuchsia_runtime::{job_default, process_self, take_startup_handle, HandleInfo, HandleType};
+use fuchsia_zircon::JobCriticalOptions;
 use futures::channel::oneshot;
 use futures::prelude::*;
-use mistos_bootfs::bootfs::BootfsSvc;
-use mistos_logger::klog;
+use process_builder::{NamespaceEntry, ProcessBuilder, StartupHandle};
 use std::ffi::CString;
 use std::io::{self, Write};
 use std::process::{self, Command};
@@ -29,6 +40,7 @@ use {
     fuchsia_zircon as zx,
 };
 
+mod bootfs;
 mod builtin;
 
 extern "C" {
@@ -65,7 +77,7 @@ fn boot_dir_namespace_entry() -> NamespaceEntry {
     namespace_entry("/boot", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)
 }
 
-fn pdk_dir_namespace_entry() -> NamespaceEntry {
+fn pkg_dir_namespace_entry() -> NamespaceEntry {
     // Create a kind of link with /boot to programs that use /pkg
     let mut pkg = boot_dir_namespace_entry();
     pkg.path = CString::new("/pkg").expect("Failed to allocate CString");
@@ -77,10 +89,13 @@ fn svc_dir_namespace_entry() -> NamespaceEntry {
 }
 
 fn main() {
-    klog::KernelLogger::init();
-    info!("started");
-
-    let (sender, receiver) = oneshot::channel::<i32>();
+    // Set ourselves as critical to our job. If we do not fail gracefully, our
+    // job will be killed.
+    if let Err(err) =
+        job_default().set_critical(JobCriticalOptions::RETCODE_NONZERO, &process_self())
+    {
+        panic!("Component manager failed to set itself as critical: {}", err);
+    }
 
     // Close any loader service passed. If userboot invoked component manager directly,
     // this service was the only reason userboot
@@ -92,6 +107,11 @@ fn main() {
     };
     drop(ldsvc);
 
+    klog::KernelLogger::init();
+    info!("started");
+
+    let (sender, receiver) = oneshot::channel::<zx::Handle>();
+
     let system_resource_handle =
         take_startup_handle(HandleType::SystemResource.into()).map(zx::Resource::from);
 
@@ -99,22 +119,27 @@ fn main() {
         .map(zx::Channel::from)
         .expect("Failed to get svc server channel");
 
-    let bootfs_svc = BootfsSvc::new().expect("Failed to create Rust bootfs");
-    let service = bootfs_svc
-        .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
-        .expect("Failed to ingest bootfs")
-        .publish_kernel_vmo(get_stable_vdso_vmo().unwrap())
-        .expect("Failed to publish vdso/stable")
-        .publish_kernel_vmo(get_next_vdso_vmo().unwrap())
-        .expect("Failed to publish vdso/next")
-        .publish_kernel_vmos(HandleType::KernelFileVmo, 0)
-        .expect("Failed to publish KernelFileVmo");
-
-    let _ = service.create_and_bind_vfs();
-
     let mut executor = fasync::SendExecutor::new(1);
 
     let run_root_fut = async move {
+        let bootfs_svc = BootfsSvc::new().expect("Failed to create Rust bootfs");
+
+        let bootfs_svc = Some(bootfs_svc);
+        let utc = create_utc_clock(&bootfs_svc).await.expect("failed to create UTC clock");
+
+        let service = bootfs_svc
+            .unwrap()
+            .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
+            .expect("Failed to ingest bootfs")
+            .publish_kernel_vmo(get_stable_vdso_vmo().unwrap())
+            .expect("Failed to publish vdso/stable")
+            .publish_kernel_vmo(get_next_vdso_vmo().unwrap())
+            .expect("Failed to publish vdso/next")
+            .publish_kernel_vmos(HandleType::KernelFileVmo, 0)
+            .expect("Failed to publish KernelFileVmo");
+
+        let _ = service.create_and_bind_vfs();
+
         let boot_dir = fuchsia_fs::directory::open_in_namespace(
             "/boot",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -232,13 +257,42 @@ fn main() {
             .detach();
         });
 
+        // Set up the VmexResource service.
+        let vmex_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_VMEX_BASE,
+                        1,
+                        b"vmex",
+                    )
+                    .ok()
+            })
+            .map(VmexResource::new)
+            .and_then(Result::ok)
+            .unwrap();
+
+        service_fs.add_fidl_service(move |stream| {
+            let vmex = vmex_resource.clone();
+            fasync::Task::spawn(async move {
+                let result = vmex.serve(stream).await;
+                if let Err(error) = result {
+                    warn!(%error, "ProcessLauncher.serve failed");
+                }
+            })
+            .detach();
+        });
+
         // Bind to the channel
         service_fs
             .serve_connection(svc_stash.svc_endpoint().lock().take().expect("No svc channel found"))
             .expect("Failed to serve connection");
 
         // Dispatch the execution thread.
-        sender.send(42).unwrap();
+        sender.send(utc.into_handle()).unwrap();
 
         // Start up ServiceFs
         service_fs.collect::<()>().await;
@@ -247,9 +301,12 @@ fn main() {
     thread::spawn(|| {
         let use_process_builder = true;
 
+        let mut utc_handle = zx::Handle::invalid();
+
         // Wait until services are up
         futures::executor::block_on(async {
-            assert_eq!(receiver.await, Ok(42));
+            utc_handle = receiver.await.expect("Failed to get UTC handle.");
+            //assert_eq!(receiver.await, Ok(42));
         });
 
         let args: Vec<String> = env::args().collect();
@@ -315,6 +372,10 @@ fn main() {
                                 0 | 32768, /*USE_FOR_STDIO */
                             ),
                         },
+                        StartupHandle {
+                            handle: utc_handle.into(),
+                            info: HandleInfo::new(HandleType::ClockUtc, 0),
+                        },
                     ])
                     .expect("");
 
@@ -331,7 +392,7 @@ fn main() {
                 let entries = vec![
                     svc_dir_namespace_entry(),
                     boot_dir_namespace_entry(),
-                    pdk_dir_namespace_entry(),
+                    pkg_dir_namespace_entry(),
                 ];
                 builder.add_namespace_entries(entries).expect("");
 

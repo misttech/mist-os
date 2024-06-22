@@ -200,7 +200,7 @@ impl ProcessLauncher {
         let mut b = ProcessBuilder::new(
             &proc_name,
             &info.job,
-            state.options,
+            zx::ProcessOptions::SHARED,
             info.executable,
             stable_vdso_vmo,
         )?;
