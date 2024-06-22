@@ -388,7 +388,15 @@ async def async_main(
 
     # Finally, run all selected tests.
     if not await run_all_tests(selections, recorder, flags, exec_env):
+        if not flags.has_debugger():
+            recorder.emit_instruction_message(
+                "\nTo debug with zxdb: fx test {} --break-on-failure\n".format(
+                    " ".join(sys.argv[1:])
+                )
+            )
+
         recorder.emit_end("Test failures reported")
+
         return 1
 
     recorder.emit_end()
