@@ -22,7 +22,6 @@ pub mod signals;
 pub mod syscalls;
 pub mod task;
 pub mod time;
-pub mod vdso;
 pub mod vfs;
 
 pub mod testing;
