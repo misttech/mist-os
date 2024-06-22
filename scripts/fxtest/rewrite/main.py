@@ -266,11 +266,6 @@ async def async_main(
             output_file = gzip.open(exec_env.log_file, "wt")
         tasks.append(asyncio.create_task(log.writer(recorder, output_file)))
 
-    if flags.has_debugger():
-        recorder.emit_warning_message(
-            "🛑 Debugger integration is currently experimental, follow https://fxbug.dev/319320287 for updates 🛑"
-        )
-
     # Load the list of tests to execute.
     try:
         tests = await load_test_list(recorder, exec_env)

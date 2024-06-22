@@ -442,8 +442,7 @@ def parse_args(
         "--break-on-failure",
         action="store_true",
         help="""If set, any test case failures will stop test execution and launch zxdb attached
-        to the failed test case, if the test runner supports this feature. Implies --no-status.
-        Note: this flag is experimental""",
+        to the failed test case, if the test runner supports this feature.""",
         default=False,
     )
     execution.add_argument(
@@ -453,8 +452,7 @@ def parse_args(
         action="append",
         help="""Run the test with zxdb attached and set the given breakpoint. For example,
         `--breakpoint my_source_file.cc:37` will insert a breakpoint at line 37 of any file
-        named my_source_file.cc. May be specified multiple times to add multiple breakpoints.
-        Implies --no-status. Note: this flag is experimental""",
+        named my_source_file.cc. May be specified multiple times to add multiple breakpoints.""",
         default=[],
     )
 
