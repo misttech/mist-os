@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
+#include <sys/uio.h>
+
 #include <string>
 
 #include <gmock/gmock.h>
@@ -14,6 +17,25 @@
 using testing::ContainsRegex;
 using testing::IsSupersetOf;
 using testing::MatchesRegex;
+
+namespace {
+
+void VerifyReadOutOfBound(const std::string& path) {
+  constexpr int kOffset = 100;
+  constexpr int kSize = 10;
+  char read_buffer[kSize];
+  struct iovec iov[] = {
+      {
+          .iov_base = &read_buffer[0],
+          .iov_len = kSize,
+      },
+  };
+  int fd = openat(AT_FDCWD, path.c_str(), O_RDONLY);
+  EXPECT_NE(-1, fd);
+  EXPECT_EQ(-1, preadv(fd, iov, std::size(iov), kOffset));
+}
+
+}  // namespace
 
 class SysfsPowerTest : public ::testing::Test {
  public:
@@ -77,6 +99,10 @@ TEST_F(SysfsPowerTest, WakeupCountFileContainsExpectedContents) {
   EXPECT_THAT(wakeup_count_str, ContainsRegex("^[0-9]+\n"));
 }
 
+TEST_F(SysfsPowerTest, WakeupCountFileReadOutofBound) {
+  VerifyReadOutOfBound("/sys/power/wakeup_count");
+}
+
 TEST_F(SysfsPowerTest, WakeupCountFileWrite) {
   EXPECT_FALSE(files::WriteFile("/sys/power/wakeup_count", "test"));
   EXPECT_FALSE(files::WriteFile("/sys/power/wakeup_count", std::to_string(INT_MAX)));
@@ -91,6 +117,8 @@ TEST_F(SysfsPowerTest, SuspendStateFileContainsExpectedContents) {
   EXPECT_TRUE(files::ReadFileToString("/sys/power/state", &states_str));
   EXPECT_THAT(states_str, MatchesRegex("([mem|freeze|disk|standby]\\s?)*\n"));
 }
+
+TEST_F(SysfsPowerTest, SuspendStateFileReadOutOfBound) { VerifyReadOutOfBound("/sys/power/state"); }
 
 TEST_F(SysfsPowerTest, SuspendStateFileWrite) {
   ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem"));
@@ -110,6 +138,10 @@ TEST_F(SysfsPowerTest, SyncOnSuspendFileContainsExpectedContents) {
   std::string sync_on_suspend_str;
   EXPECT_TRUE(files::ReadFileToString("/sys/power/sync_on_suspend", &sync_on_suspend_str));
   EXPECT_THAT(sync_on_suspend_str, ContainsRegex("(0|1)\n"));
+}
+
+TEST_F(SysfsPowerTest, SyncOnSuspendFileReadOutOfBound) {
+  VerifyReadOutOfBound("/sys/power/sync_on_suspend");
 }
 
 TEST_F(SysfsPowerTest, SyncOnSuspendFileWrite) {

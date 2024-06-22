@@ -13,9 +13,9 @@ use crate::vfs::{
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::{errno, error};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
 
@@ -329,7 +329,7 @@ impl FileOps for UEventFile {
             self.device.metadata.device_type.minor(),
             self.device.kobject().name(),
         );
-        data.write(content[offset..].as_bytes())
+        data.write(content.get(offset..).ok_or(errno!(EINVAL))?.as_bytes())
     }
 
     fn write(
