@@ -63,7 +63,7 @@ LogMessage::~LogMessage() {
   auto str = stream_.str();
   syslog_runtime::BeginRecord(buffer.get(), severity_, file_, line_, str.data(), condition_);
   if (tag_) {
-    syslog_runtime::WriteKeyValue(buffer.get(), "tag", tag_);
+    buffer->WriteKeyValue("tag", tag_);
   }
   buffer->Flush();
   if (severity_ >= LOG_FATAL)

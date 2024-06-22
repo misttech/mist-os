@@ -48,27 +48,6 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 static zx_koid_t pid = GetKoid(zx_process_self());
 static thread_local zx_koid_t tid = FuchsiaLogGetCurrentThreadKoid();
 
-struct RecordState {
-  // Message string -- valid if severity is FATAL. For FATAL
-  // logs the caller is responsible for ensuring the string
-  // is valid for the duration of the call (which our macros
-  // will ensure for current users). This must be a
-  // const char* as the type has to be trivially destructable.
-  // This will leak on usage, as the process will crash shortly afterwards.
-  const char* maybe_fatal_string;
-
-  fuchsia_syslog::LogBuffer buffer;
-  zx_handle_t socket;
-  FuchsiaLogSeverity raw_severity;
-  static RecordState* CreatePtr(LogBuffer* buffer) {
-    return reinterpret_cast<RecordState*>(&buffer->record_state);
-  }
-};
-static_assert(sizeof(RecordState) <= sizeof(LogBuffer::record_state) + sizeof(LogBuffer::data));
-static_assert(offsetof(LogBuffer, data) ==
-              offsetof(LogBuffer, record_state) + sizeof(LogBuffer::record_state));
-static_assert(std::alignment_of<RecordState>() == sizeof(uint64_t));
-
 const size_t kMaxTags = 4;  // Legacy from ulib/syslog. Might be worth rethinking.
 const char kTagFieldName[] = "tag";
 
@@ -267,22 +246,17 @@ void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severit
       msg = modified_msg->data();
     }
   }
-  auto* state = RecordState::CreatePtr(buffer);
-  // Invoke the constructor of RecordState to construct a valid RecordState
-  // inside the LogBuffer.
-  new (state) RecordState;
-  state->raw_severity = severity;
+  buffer->raw_severity = severity;
   if (socket == ZX_HANDLE_INVALID) {
     socket = std::get<0>(log_state->descriptor()).get();
   }
-  state->socket = socket;
   if (severity == fuchsia_logging::LOG_FATAL) {
-    state->maybe_fatal_string = msg->data();
+    buffer->maybe_fatal_string = msg->data();
   }
-  state->buffer.BeginRecord(severity, file_name, line, msg, zx::unowned_socket(socket), 0, pid,
+  buffer->inner.BeginRecord(severity, file_name, line, msg, zx::unowned_socket(socket), 0, pid,
                             tid);
   for (size_t i = 0; i < log_state->tag_count(); i++) {
-    state->buffer.WriteKeyValue(kTagFieldName, log_state->tags()[i]);
+    buffer->inner.WriteKeyValue(kTagFieldName, log_state->tags()[i]);
   }
 }
 
@@ -297,60 +271,34 @@ void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity sever
   BeginRecordInternal(buffer, severity, file_name, line, msg, condition, socket);
 }
 
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
-}
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, int64_t value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
-}
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, uint64_t value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
-}
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, double value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
-}
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
-}
-
 void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, int64_t value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, uint64_t value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, double value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, bool value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 bool LogBuffer::Flush() {
   GlobalStateLock log_state;
-  auto* state = RecordState::CreatePtr(this);
-  if (state->raw_severity < log_state->min_severity()) {
+  if (raw_severity < log_state->min_severity()) {
     return true;
   }
-  auto ret = state->buffer.FlushRecord();
-  if (state->raw_severity == fuchsia_logging::LOG_FATAL) {
-    std::cerr << state->maybe_fatal_string << std::endl;
+  auto ret = inner.FlushRecord();
+  if (raw_severity == fuchsia_logging::LOG_FATAL) {
+    std::cerr << *maybe_fatal_string << std::endl;
     abort();
   }
   return ret;

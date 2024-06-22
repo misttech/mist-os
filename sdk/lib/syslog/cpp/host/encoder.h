@@ -14,7 +14,7 @@
 // This file contains shared implementations for writing string logs between the legacy backend and
 // the host backend
 
-namespace syslog_runtime {
+namespace syslog_runtime::internal {
 struct MsgHeader {
   fuchsia_logging::LogSeverity severity;
   char* offset;
@@ -110,24 +110,6 @@ const std::string GetNameForLogSeverity(fuchsia_logging::LogSeverity severity);
 
 static_assert(sizeof(MsgHeader) <= sizeof(LogBuffer::record_state),
               "message header must be no larger than record_state");
-
-void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                       cpp17::optional<cpp17::string_view> file, unsigned int line,
-                       cpp17::optional<cpp17::string_view> msg,
-                       cpp17::optional<cpp17::string_view> condition);
-
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value);
-
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, int64_t value);
-
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, uint64_t value);
-
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, double value);
-
-void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, bool value);
-
-void EndRecordLegacy(LogBuffer* buffer);
-
-}  // namespace syslog_runtime
+}  // namespace syslog_runtime::internal
 
 #endif  // LIB_SYSLOG_CPP_HOST_ENCODER_H_

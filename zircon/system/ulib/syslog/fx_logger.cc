@@ -177,11 +177,11 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
       for (const auto& tag : tags_) {
         size_t len = tag.length();
         ZX_DEBUG_ASSERT(len < 128);
-        syslog_runtime::WriteKeyValue(&buffer, "tag", tag.data());
+        buffer.WriteKeyValue("tag", tag.data());
       }
     }
     if (tag) {
-      syslog_runtime::WriteKeyValue(&buffer, "tag", tag);
+      buffer.WriteKeyValue("tag", tag);
     }
     if (!buffer.Flush()) {
       return ZX_ERR_IO;

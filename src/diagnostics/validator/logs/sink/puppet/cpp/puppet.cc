@@ -59,19 +59,19 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
         case fuchsia::diagnostics::stream::Value::Invalid:
           break;
         case fuchsia::diagnostics::stream::Value::kFloating:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.floating());
+          buffer.WriteKeyValue(arg.name, arg.value.floating());
           break;
         case fuchsia::diagnostics::stream::Value::kSignedInt:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.signed_int());
+          buffer.WriteKeyValue(arg.name, arg.value.signed_int());
           break;
         case fuchsia::diagnostics::stream::Value::kUnsignedInt:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.unsigned_int());
+          buffer.WriteKeyValue(arg.name, arg.value.unsigned_int());
           break;
         case fuchsia::diagnostics::stream::Value::kText:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.text().data());
+          buffer.WriteKeyValue(arg.name, arg.value.text().data());
           break;
         case fuchsia::diagnostics::stream::Value::kBoolean:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.boolean());
+          buffer.WriteKeyValue(arg.name, arg.value.boolean());
           break;
       }
     }

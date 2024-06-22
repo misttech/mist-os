@@ -9,7 +9,9 @@
 #include <lib/stdcompat/string_view.h>
 #include <lib/syslog/cpp/log_level.h>
 #include <zircon/types.h>
-
+#ifdef __Fuchsia__
+#include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
+#endif
 #include <atomic>
 #include <functional>
 #include <limits>
@@ -79,23 +81,6 @@ void SetInterestChangedListener(void (*callback)(void* context,
 void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
                  unsigned int line, NullSafeStringView msg, NullSafeStringView condition);
 
-// These methods are deprecated and are being removed.
-// Use WriteKeyValue on LogBuffer instead.
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value);
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, int64_t value);
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, uint64_t value);
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, double value);
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value);
-
-[[maybe_unused]]
-static void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, const char* value) {
-  WriteKeyValue(buffer, key, cpp17::string_view(value));
-}
-
 template <typename... Args>
 constexpr size_t ArgsSize(Args... args) {
   return sizeof...(args);
@@ -119,6 +104,19 @@ struct KeyValue final {
 // This structure only has meaning to the backend and application code shouldn't
 // touch these values.
 struct LogBuffer final {
+#ifdef __Fuchsia__
+  // Message string -- valid if severity is FATAL. For FATAL
+  // logs the caller is responsible for ensuring the string
+  // is valid for the duration of the call (which our macros
+  // will ensure for current users).
+  // This will leak on usage, as the process will crash shortly afterwards.
+  cpp17::optional<cpp17::string_view> maybe_fatal_string;
+
+  // Severity of the log message.
+  FuchsiaLogSeverity raw_severity;
+  // Underlying log buffer.
+  fuchsia_syslog::LogBuffer inner;
+#else
   // Max size of log buffer. This number may change as additional fields
   // are added to the internal encoding state. It is based on trial-and-error
   // and is adjusted when compilation fails due to it not being large enough.
@@ -130,6 +128,7 @@ struct LogBuffer final {
   // Log data (used by the backend to encode the log into). The format
   // for this is backend-specific.
   uint64_t data[kBufferSize];
+#endif
 
   void WriteKeyValue(cpp17::string_view key, cpp17::string_view value);
 

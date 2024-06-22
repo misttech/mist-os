@@ -21,8 +21,113 @@ namespace {
 // we don't use shared libraries.
 fuchsia_logging::LogSettings g_log_settings;
 
-}  // namespace
+cpp17::string_view StripDots(cpp17::string_view path) {
+  auto pos = path.rfind("../");
+  return pos == cpp17::string_view::npos ? path : path.substr(pos + 3);
+}
 
+void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                       cpp17::optional<cpp17::string_view> file, unsigned int line,
+                       cpp17::optional<cpp17::string_view> msg,
+                       cpp17::optional<cpp17::string_view> condition) {
+  if (!file) {
+    file = "";
+  }
+  auto header = internal::MsgHeader::CreatePtr(buffer);
+  header->buffer = buffer;
+  header->Init(buffer, severity);
+#ifndef __Fuchsia__
+  auto severity_string = internal::GetNameForLogSeverity(severity);
+  header->WriteString(severity_string.data());
+  header->WriteString(": ");
+#endif
+  header->WriteChar('[');
+  header->WriteString(StripDots(*file));
+  header->WriteChar('(');
+  char a_buffer[128];
+  snprintf(a_buffer, 128, "%i", line);
+  header->WriteString(a_buffer);
+  header->WriteString(")] ");
+  if (condition) {
+    header->WriteString("Check failed: ");
+    header->WriteString(*condition);
+    header->WriteString(". ");
+  }
+  if (msg) {
+    header->WriteString(*msg);
+    header->has_msg = true;
+  }
+}
+
+// Common initialization for all KV pairs.
+// Returns the header for writing the value.
+internal::MsgHeader* StartKv(LogBuffer* buffer, cpp17::string_view key) {
+  auto header = internal::MsgHeader::CreatePtr(buffer);
+  if (!header->first_kv || header->has_msg) {
+    header->WriteChar(' ');
+  }
+  header->WriteString(key);
+  header->WriteChar('=');
+  header->first_kv = false;
+  return header;
+}
+
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value) {
+  // "tag" has special meaning to our logging API
+  if (key == "tag") {
+    auto header = internal::MsgHeader::CreatePtr(buffer);
+    auto tag_size = value.size() + 1;
+    header->user_tag = (reinterpret_cast<char*>(buffer->data) + sizeof(buffer->data)) - tag_size;
+    memcpy(header->user_tag, value.data(), value.size());
+    header->user_tag[value.size()] = '\0';
+    return;
+  }
+  auto header = StartKv(buffer, key);
+  header->WriteChar('"');
+  if (memchr(value.data(), '"', value.size()) != nullptr) {
+    // Escape quotes in strings.
+    for (char c : value) {
+      if (c == '"') {
+        header->WriteChar('\\');
+      }
+      header->WriteChar(c);
+    }
+  } else {
+    header->WriteString(value);
+  }
+  header->WriteChar('"');
+}
+
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, int64_t value) {
+  auto header = StartKv(buffer, key);
+  char a_buffer[128];
+  snprintf(a_buffer, 128, "%" PRId64, value);
+  header->WriteString(a_buffer);
+}
+
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, uint64_t value) {
+  auto header = StartKv(buffer, key);
+  char a_buffer[128];
+  snprintf(a_buffer, 128, "%" PRIu64, value);
+  header->WriteString(a_buffer);
+}
+
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, double value) {
+  auto header = StartKv(buffer, key);
+  char a_buffer[128];
+  snprintf(a_buffer, 128, "%f", value);
+  header->WriteString(a_buffer);
+}
+
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, bool value) {
+  auto header = StartKv(buffer, key);
+  header->WriteString(value ? "true" : "false");
+}
+
+void EndRecordLegacy(LogBuffer* buffer) {}
+
+}  // namespace
+namespace internal {
 const std::string GetNameForLogSeverity(fuchsia_logging::LogSeverity severity) {
   switch (severity) {
     case fuchsia_logging::LOG_TRACE:
@@ -47,7 +152,8 @@ const std::string GetNameForLogSeverity(fuchsia_logging::LogSeverity severity) {
 
   return "UNKNOWN";
 }
-
+}  // namespace internal
+namespace {
 void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
   g_log_settings.min_log_level = std::min(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
@@ -75,7 +181,7 @@ void SetLogSettings(const fuchsia_logging::LogSettings& settings,
                     const std::initializer_list<std::string>& tags) {
   syslog_runtime::SetLogSettings(settings);
 }
-
+}  // namespace
 void SetLogTags(const std::initializer_list<std::string>& tags) {
   // Global tags aren't supported on host.
 }
@@ -89,50 +195,30 @@ void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullS
   BeginRecordLegacy(buffer, severity, file, line, msg, condition);
 }
 
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value) {
-  WriteKeyValueLegacy(buffer, key, value);
-}
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, int64_t value) {
-  WriteKeyValueLegacy(buffer, key, value);
-}
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, uint64_t value) {
-  WriteKeyValueLegacy(buffer, key, value);
-}
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, double value) {
-  WriteKeyValueLegacy(buffer, key, value);
-}
-
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value) {
-  WriteKeyValueLegacy(buffer, key, value);
-}
-
 void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  WriteKeyValueLegacy(this, key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, int64_t value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  WriteKeyValueLegacy(this, key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, uint64_t value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  WriteKeyValueLegacy(this, key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, double value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  WriteKeyValueLegacy(this, key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, bool value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  WriteKeyValueLegacy(this, key, value);
 }
 
 void EndRecord(LogBuffer* buffer) { EndRecordLegacy(buffer); }
 
 bool LogBuffer::Flush() {
-  auto header = MsgHeader::CreatePtr(this);
+  auto header = internal::MsgHeader::CreatePtr(this);
   *(header->offset++) = 0;
   if (header->user_tag) {
     auto tag = header->user_tag;
@@ -147,7 +233,8 @@ void WriteLog(fuchsia_logging::LogSeverity severity, const char* file, unsigned 
   if (tag)
     std::cerr << "[" << tag << "] ";
 
-  std::cerr << "[" << GetNameForLogSeverity(severity) << ":" << file << "(" << line << ")]";
+  std::cerr << "[" << internal::GetNameForLogSeverity(severity) << ":" << file << "(" << line
+            << ")]";
 
   if (condition)
     std::cerr << " Check failed: " << condition << ".";

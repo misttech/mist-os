@@ -103,8 +103,8 @@ TEST(StructuredLogging, BackendDirect) {
   buffer.Flush();
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
-  syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
-  syslog_runtime::WriteKeyValue(&buffer, "bar", true);
+  buffer.WriteKeyValue("foo", static_cast<int64_t>(42));
+  buffer.WriteKeyValue("bar", true);
   ASSERT_TRUE(buffer.Flush());
   // TODO(https://fxbug.dev/42135333): Figure out how to verify this appropriately.
 }
@@ -120,8 +120,8 @@ TEST(StructuredLogging, Overflow) {
   buffer.Flush();
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
                               "condition");
-  syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
-  syslog_runtime::WriteKeyValue(&buffer, "bar", very_large_string.data());
+  buffer.WriteKeyValue("foo", static_cast<int64_t>(42));
+  buffer.WriteKeyValue("bar", very_large_string.data());
 
   ASSERT_FALSE(buffer.Flush());
 }

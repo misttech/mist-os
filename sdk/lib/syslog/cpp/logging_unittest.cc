@@ -289,12 +289,12 @@ TEST_F(LoggingFixture, BackendDirect) {
   syslog_runtime::LogBuffer buffer;
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "Log message",
                               "condition");
-  syslog_runtime::WriteKeyValue(&buffer, "tag", "fake tag");
+  buffer.WriteKeyValue("tag", "fake tag");
   buffer.Flush();
   syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "fake message",
                               "condition");
-  syslog_runtime::WriteKeyValue(&buffer, "tag", "fake tag");
-  syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
+  buffer.WriteKeyValue("tag", "fake tag");
+  buffer.WriteKeyValue("foo", static_cast<int64_t>(42));
   buffer.Flush();
 
   std::string log = ReadLogs(state);
@@ -369,7 +369,7 @@ TEST(StructuredLogging, Remaining) {
   builder.BuildAndInitialize();
   syslog_runtime::LogBuffer buffer;
   syslog_runtime::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
-  auto header = syslog_runtime::MsgHeader::CreatePtr(&buffer);
+  auto header = syslog_runtime::internal::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();
   header->WriteChar('t');
   ASSERT_EQ(header->RemainingSpace(), initial - 1);
@@ -380,7 +380,7 @@ TEST(StructuredLogging, Remaining) {
 TEST(StructuredLogging, FlushAndReset) {
   syslog_runtime::LogBuffer buffer;
   syslog_runtime::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
-  auto header = syslog_runtime::MsgHeader::CreatePtr(&buffer);
+  auto header = syslog_runtime::internal::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();
   header->WriteString("test");
   ASSERT_EQ(header->RemainingSpace(), initial - 4);

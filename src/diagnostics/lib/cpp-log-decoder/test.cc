@@ -23,9 +23,9 @@ TEST(LogDecoder, DecodesCorrectly) {
   zx::socket::create(ZX_SOCKET_DATAGRAM, &logger_socket, &our_socket);
   syslog_runtime::BeginRecordWithSocket(&buffer, fuchsia_logging::LOG_INFO, __FILE__, __LINE__,
                                         "test message", nullptr, logger_socket.release());
-  syslog_runtime::WriteKeyValue(&buffer, "tag", "some tag");
-  syslog_runtime::WriteKeyValue(&buffer, "tag", "some other tag");
-  syslog_runtime::WriteKeyValue(&buffer, "user property", 5.2);
+  buffer.WriteKeyValue("tag", "some tag");
+  buffer.WriteKeyValue("tag", "some other tag");
+  buffer.WriteKeyValue("user property", 5.2);
   buffer.Flush();
   uint8_t data[2048];
   size_t processed = 0;
