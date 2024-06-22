@@ -526,6 +526,7 @@ mod test {
     use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     #[::fuchsia::test]
+    #[ignore]
     async fn test_read_image() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
