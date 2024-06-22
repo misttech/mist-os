@@ -251,33 +251,6 @@ Device::Device(zx_device_t* parent_device, Driver* parent_driver)
   loop_checker_.emplace(fit::thread_checker());
 }
 
-Device::~Device() {
-  if (loop_.GetState() != ASYNC_LOOP_RUNNABLE) {
-    // This is the normal case.
-    return;
-  }
-
-  // In unit tests, Device::Bind() may not have been run, so ensure the loop_checker_ has been moved
-  // to the loop_ thread before DdkUnbindInternal() below which expects to use the loop_ thread.
-  libsync::Completion completion;
-  postTask([this, &completion] {
-    ZX_ASSERT(loop_checker_.has_value());
-    // After this point, all operations must happen on the loop thread.
-    loop_checker_.emplace(fit::thread_checker());
-    completion.Signal();
-  });
-  completion.Wait();
-
-  // This may happen from tests that may not call DdkUnbind() first.
-  //
-  // TODO(b/332631101): Consider changing the tests to call DdkUnbind, DdkRelease, instead of just
-  // ~Device.
-  //
-  // Shouldn't be seen outside of tests:
-  LOG(ERROR, "Device::~Device() called without DdkUnbind() first (MockDdk test?)");
-  DdkUnbindInternal();
-}
-
 zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_config::Config>& config,
                                                  uint64_t* guard_bytes_out,
                                                  bool* unused_pages_guarded,

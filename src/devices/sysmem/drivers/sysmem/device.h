@@ -72,11 +72,6 @@ class Device final : public DdkDeviceType,
  public:
   Device(zx_device_t* parent_device, Driver* parent_driver);
 
-  // Regarding the public destructor, in production the destructor is normally called by DdkRelease,
-  // except in case of failure during Bind, in which case the destructor is called by
-  // ~unique_ptr<Device>. The destructor is also called by some tests.
-  ~Device();
-
   [[nodiscard]] zx_status_t GetContiguousGuardParameters(
       const std::optional<sysmem_config::Config>& config, uint64_t* guard_bytes_out,
       bool* unused_pages_guarded, int64_t* unused_guard_pattern_period_bytes,
