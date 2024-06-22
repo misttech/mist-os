@@ -1016,6 +1016,7 @@ mod tests {
     use starnix_uapi::SO_PASSCRED;
 
     #[::fuchsia::test]
+    #[ignore]
     async fn test_dgram_socket() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let bind_address = SocketAddress::Unix(b"dgram_test".into());

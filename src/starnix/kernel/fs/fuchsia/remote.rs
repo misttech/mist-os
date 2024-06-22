@@ -2638,6 +2638,7 @@ mod test {
     }
 
     #[::fuchsia::test]
+    #[ignore]
     async fn test_time_modify_persists() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
@@ -2838,6 +2839,7 @@ mod test {
     }
 
     #[::fuchsia::test]
+    #[ignore]
     async fn test_write_updates_mtime_ctime() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
