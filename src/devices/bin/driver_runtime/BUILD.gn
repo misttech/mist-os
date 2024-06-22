@@ -66,7 +66,6 @@ sdk_shared_library("driver_runtime") {
   runtime_deps = [
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/svc:svc_sdk",
-    "//zircon/system/ulib/syslog:syslog_sdk",
     "//zircon/system/ulib/trace-engine:trace-engine_sdk",
   ]
 }
