@@ -62,6 +62,7 @@ rustc_library_with_features("netstack3-core") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   check_cfgs = [
     "benchmark",
+    "loom",
     "no_lock_order",
   ]
 

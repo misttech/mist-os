@@ -206,5 +206,5 @@ fn test_route_tracks_interface_metric<I: TestIpExt>() {
     );
 
     // Remove the device and routes to clear all dangling references.
-    ctx.test_api().clear_routes_and_remove_ethernet_device(device_id);
+    ctx.test_api().clear_routes_and_remove_device(device_id);
 }

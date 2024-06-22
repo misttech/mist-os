@@ -36,8 +36,12 @@ mod caller {
         /// This holds weak references to allow callers to drop without
         /// synchronizing. Invalid weak pointers are cleaned up periodically but
         /// are not logically present.
+        ///
+        /// Note that using [`std::sync::Mutex`] here is intentional to opt this
+        /// out of loom checking, which makes testing with `rc-debug-names`
+        /// impossibly slow.
         #[cfg(feature = "rc-debug-names")]
-        pub(super) callers: crate::Mutex<std::collections::HashMap<Location<'static>, usize>>,
+        pub(super) callers: std::sync::Mutex<std::collections::HashMap<Location<'static>, usize>>,
     }
 
     impl core::fmt::Debug for Callers {
@@ -48,7 +52,7 @@ mod caller {
         #[cfg(feature = "rc-debug-names")]
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             let Self { callers } = self;
-            let callers = callers.lock();
+            let callers = callers.lock().unwrap();
             write!(f, "[\n")?;
             for (l, c) in callers.iter() {
                 write!(f, "   {l} => {c},\n")?;
@@ -70,7 +74,7 @@ mod caller {
             #[cfg(feature = "rc-debug-names")]
             {
                 let Self { callers } = self;
-                let mut callers = callers.lock();
+                let mut callers = callers.lock().unwrap();
                 let count = callers.entry(caller.clone()).or_insert(0);
                 *count += 1;
                 TrackedCaller { location: caller.clone() }
@@ -93,7 +97,7 @@ mod caller {
         #[cfg(feature = "rc-debug-names")]
         pub(super) fn release(&mut self, Callers { callers }: &Callers) {
             let Self { location } = self;
-            let mut callers = callers.lock();
+            let mut callers = callers.lock().unwrap();
             let mut entry = match callers.entry(location.clone()) {
                 std::collections::hash_map::Entry::Vacant(_) => {
                     panic!("location {location:?} was not in the callers map")
@@ -761,7 +765,8 @@ pub trait Notifier<T>: Send {
 /// `Clone` type.
 ///
 /// Useful for tests where completion assertions are possible and useful.
-#[derive(Debug, Clone)]
+#[derive(Debug, Derivative)]
+#[derivative(Clone(bound = ""))]
 pub struct ArcNotifier<T>(alloc::sync::Arc<crate::Mutex<Option<T>>>);
 
 impl<T> ArcNotifier<T> {
@@ -838,7 +843,7 @@ mod tests {
         const INITIAL_VAL: u8 = 1;
         const NEW_VAL: u8 = 2;
 
-        let primary = Primary::new(std::sync::Mutex::new(INITIAL_VAL));
+        let primary = Primary::new(crate::sync::Mutex::new(INITIAL_VAL));
         let strong = Primary::clone_strong(&primary);
         let weak = Strong::downgrade(&strong);
 
@@ -908,7 +913,7 @@ mod tests {
             assert_eq!(prev.file(), cur.file(), "{i}");
             assert!(prev.line() < cur.line(), "{prev} < {cur}, {i}");
             {
-                let callers = callers.callers.lock();
+                let callers = callers.callers.lock().unwrap();
                 assert_eq!(callers.get(cur).copied(), Some(1));
             }
 
@@ -918,7 +923,7 @@ mod tests {
         // All callers must be removed from the callers map on drop.
         std::mem::drop(strongs);
         {
-            let callers = callers.callers.lock();
+            let callers = callers.callers.lock().unwrap();
             let callers = callers.deref();
             assert!(callers.is_empty(), "{callers:?}");
         }
@@ -940,7 +945,7 @@ mod tests {
             &***inner;
 
         {
-            let callers = callers.callers.lock();
+            let callers = callers.callers.lock().unwrap();
             assert_eq!(callers.get(&strong1.caller.location).copied(), Some(2));
         }
 
@@ -948,7 +953,7 @@ mod tests {
         std::mem::drop(strong2);
 
         {
-            let callers = callers.callers.lock();
+            let callers = callers.callers.lock().unwrap();
             let callers = callers.deref();
             assert!(callers.is_empty(), "{callers:?}");
         }

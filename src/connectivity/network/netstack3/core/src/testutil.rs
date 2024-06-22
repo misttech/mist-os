@@ -11,10 +11,8 @@ use alloc::collections::HashMap;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
-use assert_matches::assert_matches;
 
 use core::borrow::Borrow;
-use core::convert::Infallible as Never;
 use core::ffi::CStr;
 use core::fmt::Debug;
 use core::hash::Hash;
@@ -50,8 +48,8 @@ use netstack3_device::queue::{ReceiveQueueBindingsContext, TransmitQueueBindings
 use netstack3_device::socket::{DeviceSocketBindingsContext, DeviceSocketTypes};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_device::{
-    self as device, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceLayerTypes,
-    DeviceSendFrameError, WeakDeviceId,
+    self as device, for_any_device_id, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
+    DeviceLayerTypes, DeviceProvider, DeviceSendFrameError, WeakDeviceId,
 };
 use netstack3_filter::{FilterBindingsTypes, FilterTimerId};
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
@@ -328,19 +326,17 @@ where
     }
 
     /// Removes all of the routes through the device, then removes the device.
-    pub fn clear_routes_and_remove_ethernet_device(
-        &mut self,
-        ethernet_device: EthernetDeviceId<BC>,
-    ) {
-        let device_id = ethernet_device.into();
-        self.del_device_routes(&device_id);
-        let ethernet_device = assert_matches!(device_id, DeviceId::Ethernet(id) => id);
-        match self.core_api().device().remove_device(ethernet_device) {
-            RemoveResourceResult::Removed(_external_state) => {}
-            RemoveResourceResult::Deferred(_reference_receiver) => {
-                panic!("failed to remove ethernet device")
+    pub fn clear_routes_and_remove_device<D: Into<DeviceId<BC>>>(&mut self, device: D) {
+        let device = device.into();
+        self.del_device_routes(&device);
+
+        for_any_device_id!(DeviceId, DeviceProvider, D, device,
+            device => match self.core_api().device::<D>().remove_device(device) {
+                RemoveResourceResult::Removed(_external_state) => {}
+                RemoveResourceResult::Deferred(_reference_receiver) => {
+                panic!("failed to remove device")
             }
-        }
+        });
     }
 
     /// Enables or disables the device for IP version `I` and returns whether it
@@ -787,28 +783,63 @@ impl TcpBindingsTypes for FakeBindingsCtx {
     }
 }
 
-impl ReferenceNotifiers for FakeBindingsCtx {
-    type ReferenceReceiver<T: 'static> = Never;
+#[cfg(not(loom))]
+mod fake_notifiers {
+    use core::convert::Infallible as Never;
 
-    type ReferenceNotifier<T: Send + 'static> = Never;
+    use super::*;
 
-    fn new_reference_notifier<T: Send + 'static>(
-        debug_references: DynDebugReferences,
-    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
-        // NB: We don't want deferred destruction in core tests. These are
-        // always single-threaded and single-task, and we want to encourage
-        // explicit cleanup.
-        panic!(
-            "FakeBindingsCtx can't create deferred reference notifiers for type {}: \
-            debug_references={debug_references:?}",
-            core::any::type_name::<T>()
-        );
+    impl ReferenceNotifiers for FakeBindingsCtx {
+        type ReferenceReceiver<T: 'static> = Never;
+
+        type ReferenceNotifier<T: Send + 'static> = Never;
+
+        fn new_reference_notifier<T: Send + 'static>(
+            debug_references: DynDebugReferences,
+        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+            // NB: We don't want deferred destruction in core tests. These are
+            // always single-threaded and single-task, and we want to encourage
+            // explicit cleanup.
+            panic!(
+                "FakeBindingsCtx can't create deferred reference notifiers for type {}: \
+                debug_references={debug_references:?}",
+                core::any::type_name::<T>()
+            );
+        }
+    }
+
+    impl DeferredResourceRemovalContext for FakeBindingsCtx {
+        fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
+            match receiver {}
+        }
     }
 }
 
-impl DeferredResourceRemovalContext for FakeBindingsCtx {
-    fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
-        match receiver {}
+/// Implements the notifier methods for loom tests, which use multiple threads
+/// and hence need to handle notifiers.
+#[cfg(loom)]
+mod loom_notifiers {
+    use super::*;
+
+    use netstack3_sync::rc::ArcNotifier;
+
+    impl ReferenceNotifiers for FakeBindingsCtx {
+        type ReferenceReceiver<T: 'static> = ArcNotifier<T>;
+        type ReferenceNotifier<T: Send + 'static> = ArcNotifier<T>;
+
+        fn new_reference_notifier<T: Send + 'static>(
+            _debug_references: DynDebugReferences,
+        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+            let notifier = ArcNotifier::new();
+            let receiver = notifier.clone();
+            (notifier, receiver)
+        }
+    }
+
+    impl DeferredResourceRemovalContext for FakeBindingsCtx {
+        fn defer_removal<T: Send + 'static>(&mut self, _receiver: Self::ReferenceReceiver<T>) {
+            // Do nothing.
+        }
     }
 }
 

@@ -7,29 +7,32 @@
 #![deny(missing_docs, unreachable_patterns, unused)]
 
 extern crate alloc;
+
 #[cfg(loom)]
-extern crate loom as std;
+pub(crate) use loom::sync;
+#[cfg(not(loom))]
+pub(crate) use std::sync;
 
 use net_types::ip::{GenericOverIp, Ip};
 
 pub mod rc;
 
-/// A [`std::sync::Mutex`] assuming lock poisoning will never occur.
+/// A [`sync::Mutex`] assuming lock poisoning will never occur.
 #[derive(Debug, Default)]
-pub struct Mutex<T>(std::sync::Mutex<T>);
+pub struct Mutex<T>(sync::Mutex<T>);
 
 /// Lock guard for access to a [`Mutex`].
-pub type LockGuard<'a, T> = lock_guard::LockGuard<'a, Mutex<T>, std::sync::MutexGuard<'a, T>>;
+pub type LockGuard<'a, T> = lock_guard::LockGuard<'a, Mutex<T>, sync::MutexGuard<'a, T>>;
 
 impl<T> Mutex<T> {
     /// Creates a new mutex in an unlocked state ready for use.
     pub fn new(t: T) -> Mutex<T> {
-        Mutex(std::sync::Mutex::new(t))
+        Mutex(sync::Mutex::new(t))
     }
 
     /// Acquires a mutex, blocking the current thread until it is able to do so.
     ///
-    /// See [`std::sync::Mutex::lock`] for more details.
+    /// See [`sync::Mutex::lock`] for more details.
     ///
     /// # Panics
     ///
@@ -51,7 +54,7 @@ impl<T> Mutex<T> {
     /// Returns a mutable reference to the underlying data.
     ///
     /// Since this call borrows the [`Mutex`] mutably, no actual locking needs
-    /// to take place. See [`std::sync::Mutex::get_mut`] for more details.
+    /// to take place. See [`sync::Mutex::get_mut`] for more details.
     #[inline]
     // TODO(https://github.com/tokio-rs/loom/pull/322): remove the disable for
     // loom once loom's lock type supports the method.
@@ -76,28 +79,28 @@ where
     type Type = Mutex<T::Type>;
 }
 
-/// A [`std::sync::RwLock`] assuming lock poisoning will never occur.
+/// A [`sync::RwLock`] assuming lock poisoning will never occur.
 #[derive(Debug, Default)]
-pub struct RwLock<T>(std::sync::RwLock<T>);
+pub struct RwLock<T>(sync::RwLock<T>);
 
 /// Lock guard for read access to a [`RwLock`].
 pub type RwLockReadGuard<'a, T> =
-    lock_guard::LockGuard<'a, RwLock<T>, std::sync::RwLockReadGuard<'a, T>>;
+    lock_guard::LockGuard<'a, RwLock<T>, sync::RwLockReadGuard<'a, T>>;
 
 /// Lock guard for write access to a [`RwLock`].
 pub type RwLockWriteGuard<'a, T> =
-    lock_guard::LockGuard<'a, RwLock<T>, std::sync::RwLockWriteGuard<'a, T>>;
+    lock_guard::LockGuard<'a, RwLock<T>, sync::RwLockWriteGuard<'a, T>>;
 
 impl<T> RwLock<T> {
     /// Creates a new instance of an `RwLock<T>` which is unlocked.
     pub fn new(t: T) -> RwLock<T> {
-        RwLock(std::sync::RwLock::new(t))
+        RwLock(sync::RwLock::new(t))
     }
 
     /// Locks this rwlock with shared read access, blocking the current thread
     /// until it can be acquired.
     ///
-    /// See [`std::sync::RwLock::read`] for more details.
+    /// See [`sync::RwLock::read`] for more details.
     ///
     /// # Panics
     ///
@@ -112,7 +115,7 @@ impl<T> RwLock<T> {
     /// Locks this rwlock with exclusive write access, blocking the current
     /// thread until it can be acquired.
     ///
-    /// See [`std::sync::RwLock::write`] for more details.
+    /// See [`sync::RwLock::write`] for more details.
     ///
     /// # Panics
     ///
@@ -134,7 +137,7 @@ impl<T> RwLock<T> {
     /// Returns a mutable reference to the underlying data.
     ///
     /// Since this call borrows the [`RwLock`] mutably, no actual locking needs
-    /// to take place. See [`std::sync::RwLock::get_mut`] for more details.
+    /// to take place. See [`sync::RwLock::get_mut`] for more details.
     #[inline]
     // TODO(https://github.com/tokio-rs/loom/pull/322): remove the disable for
     // loom once loom's lock type supports the method.

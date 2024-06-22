@@ -614,6 +614,7 @@ where
             }
         }
     }
+    let was_closed = matches!(state, State::Closed { .. });
     let (reply, passive_open, data_acked) = core_ctx.with_counters(|counters| {
         state.on_segment::<_, BC>(counters, incoming, bindings_ctx.now(), socket_options, *defunct)
     });
@@ -659,12 +660,17 @@ where
             // regardless of the socket being defunct or not. The justification
             // is that CLOSED is a synthetic state and it means no connection
             // exists, thus it should not exist in the demuxer.
-            TcpDemuxContext::<WireI, _, _>::with_demux_mut(
-                core_ctx,
-                |DemuxState { socketmap, .. }| {
-                    assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
-                },
-            );
+            //
+            // If the socket was already in the closed state we can assume it's
+            // no longer in the demux.
+            if !was_closed {
+                TcpDemuxContext::<WireI, _, _>::with_demux_mut(
+                    core_ctx,
+                    |DemuxState { socketmap, .. }| {
+                        assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
+                    },
+                );
+            }
             let _: Option<_> = bindings_ctx.cancel_timer(timer);
             if let Some(accept_queue) = accept_queue {
                 accept_queue.remove(&conn_id);
