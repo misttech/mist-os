@@ -129,16 +129,25 @@ impl InputDevice {
                         let num_received_events: u64 = touch_events.len().try_into().unwrap();
                         previous_event_disposition =
                             touch_events.iter().map(make_response_for_fidl_event).collect();
-                        let converted_events =
-                            touch_events.iter().filter_map(parse_fidl_touch_event);
-                        let num_converted_events: u64 =
-                            converted_events.clone().count().try_into().unwrap();
-                        // `flat`: each FIDL event yields a `Vec<uapi::input_event>`,
-                        // but the end result should be a single vector of UAPI events,
-                        // not a `Vec<Vec<uapi::input_event>>`.
-                        let new_events = converted_events.flat_map(make_uapi_events);
-                        let num_generated_events: u64 =
-                            new_events.clone().count().try_into().unwrap();
+
+                        let mut num_ignored_events: u64 = 0;
+                        let mut num_converted_events: u64 = 0;
+                        let mut converted_events: Vec<TouchEvent> = vec![];
+
+                        for event in touch_events.iter() {
+                            match parse_fidl_touch_event(event) {
+                                None => {
+                                    num_ignored_events += 1;
+                                }
+                                Some(e) => {
+                                    num_converted_events += 1;
+                                    converted_events.push(e);
+                                }
+                            }
+                        }
+                        let new_events: Vec<uapi::input_event> =
+                            converted_events.into_iter().flat_map(make_uapi_events).collect();
+                        let num_generated_events: u64 = new_events.len().try_into().unwrap();
 
                         let mut files = slf.open_files.lock();
                         let filtered_files: Vec<Arc<InputFile>> =
@@ -148,6 +157,7 @@ impl InputDevice {
                             match &inner.inspect_status {
                                 Some(inspect_status) => {
                                     inspect_status.count_received_events(num_received_events);
+                                    inspect_status.count_ignored_events(num_ignored_events);
                                     inspect_status.count_converted_events(num_converted_events);
                                     inspect_status.count_generated_events(num_generated_events);
                                 }
@@ -364,7 +374,7 @@ fn parse_fidl_touch_event(fidl_event: &FidlTouchEvent) -> Option<TouchEvent> {
             pos_x: *x,
             pos_y: *y,
         }),
-        _ => None, // TODO(https://fxbug.dev/42075446): Add some inspect counters of ignored events.
+        _ => None,
     }
 }
 
@@ -1287,6 +1297,7 @@ mod test {
         assert_data_tree!(inspector, root: {
             touch_input_file: {
                 fidl_events_received_count: 0u64,
+                fidl_events_ignored_count: 0u64,
                 fidl_events_converted_count: 0u64,
                 uapi_events_generated_count: 0u64,
                 uapi_events_read_count: 0u64,
@@ -1342,6 +1353,7 @@ mod test {
             touch_device: {
                 touch_file: {
                     fidl_events_received_count: 7u64,
+                    fidl_events_ignored_count: 2u64,
                     fidl_events_converted_count: 5u64,
                     uapi_events_generated_count: 19u64,
                     uapi_events_read_count: 19u64,
