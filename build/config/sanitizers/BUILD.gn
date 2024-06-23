@@ -7,6 +7,67 @@ import("//build/config/sanitizers/sanitizer_default_options.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
 
+_prebuilt_runtime = toolchain_variant.tags + [ "standalone" ] -
+                    [ "standalone" ] == toolchain_variant.tags
+
+config("variant-libprefix") {
+  visibility = [ ":*" ]
+  if (is_fuchsia && _prebuilt_runtime) {
+    dynamic_linker_flags =
+        "-dynamic-linker=${toolchain_variant.libprefix}ld.so.1"
+    ldflags = [ "-Wl,$dynamic_linker_flags" ]
+    rustflags = [ "-Clink-arg=$dynamic_linker_flags" ]
+  }
+}
+
+template("sanitizer_rustflags") {
+  if (is_mac) {
+    extension = "_osx_dynamic.dylib"
+  } else if (invoker.shared_runtime) {
+    extension = ".so"
+  } else {
+    extension = ".a"
+  }
+
+  # For dynamic linking (Fuchsia and macOS), there is just one combined DSO.
+  # For static linking (other platforms), there are separate libraries for the
+  # generic (C) and C++-specific runtime support.
+  if (defined(invoker.libs)) {
+    needed_libs = invoker.libs
+  } else {
+    needed_libs = [ invoker.variant ]
+  }
+  if (extension == ".a" && defined(invoker.static_libs)) {
+    needed_libs += invoker.static_libs
+  } else {
+    not_needed(invoker, [ "static_libs" ])
+  }
+
+  config(target_name) {
+    visibility = [ ":*" ]
+    rustflags = []
+    foreach(lib, needed_libs) {
+      # TODO(phosek): use runtime.json instead of invoking Clang.
+      libclang_rt_lib = rebase_path(
+              exec_script("/usr/bin/env",
+                          [
+                            "${rebased_clang_prefix}/clang",
+                            "--target=${current_target_tuple}",
+                            "-print-file-name=libclang_rt.${lib}${extension}",
+                          ],
+                          "trim string"),
+              root_build_dir)
+      rustflags += [ "-Clink-arg=${libclang_rt_lib}" ]
+    }
+
+    # Expose the presence of sanitizers as a compile-time condition.
+    # This allows conditional compilation of code for this variant,
+    # for instance in order to disable a specific test case.
+    # TODO(https://fxbug.dev/42168338): use cfg_sanitize instead.
+    rustflags += [ "--cfg=feature=\"variant_${invoker.variant}\"" ]
+  }
+}
+
 variant("asan") {
   common_flags = [ "-fsanitize=address" ]
   cflags = [
@@ -23,54 +84,26 @@ variant("asan") {
     "-fno-sanitize-address-use-odr-indicator",
   ]
 
-  # TODO(phosek): use runtime.json instead of invoking Clang.
-  if (is_fuchsia) {
-    extension = ".so"
-  } else if (is_mac) {
-    extension = "_osx_dynamic.dylib"
-  } else {
-    extension = ".a"
-  }
-
-  # For dynamic linking (Fuchsia and macOS), there is just one combined DSO.
-  # For static linking (other platforms), there are separate libraries for the
-  # generic (C) and C++-specific runtime support.
-  needed_asan_libs = [ "asan" ]
-  if (extension == ".a") {
-    needed_asan_libs += [ "asan_cxx" ]
-  }
-  rustflags = []
-  foreach(asan, needed_asan_libs) {
-    libclang_rt_asan = rebase_path(
-            exec_script("/usr/bin/env",
-                        [
-                          "${rebased_clang_prefix}/clang",
-                          "--target=${current_target_tuple}",
-                          "-print-file-name=libclang_rt.${asan}${extension}",
-                        ],
-                        "trim string"),
-            root_build_dir)
-    rustflags += [ "-Clink-arg=${libclang_rt_asan}" ]
-  }
-  if (is_fuchsia) {
-    rustflags += [ "-Clink-arg=-dynamic-linker=asan/ld.so.1" ]
-  }
+  configs = [
+    ":variant-libprefix",
+    ":asan.rustflags",
+  ]
 
   # ASan wants frame pointers because it captures stack traces
   # on allocations and such, not just on errors.
-  configs = [ "//build/config:frame_pointers" ]
+  configs += [ "//build/config:frame_pointers" ]
 
   if (is_kernel) {
     configs += [ "//zircon/kernel/lib/instrumentation/asan:kasan" ]
   }
 
   deps = [ ":asan_default_options" ]
+}
 
-  # Expose the presence of sanitizers as a compile-time condition.
-  # This allows conditional compilation of code for this variant,
-  # for instance in order to disable a specific test case.
-  # TODO(https://fxbug.dev/42168338): use cfg_sanitize instead.
-  rustflags += [ "--cfg=feature=\"variant_asan\"" ]
+sanitizer_rustflags("asan.rustflags") {
+  variant = "asan"
+  shared_runtime = is_fuchsia
+  static_libs = [ "asan_cxx" ]
 }
 
 sanitizer_default_options("asan_default_options") {
@@ -193,24 +226,15 @@ variant("lsan") {
 }
 
 variant("ubsan") {
-  _prebuilt_runtime = toolchain_variant.tags + [ "standalone" ] -
-                      [ "standalone" ] == toolchain_variant.tags
-
   common_flags = []
+  configs = []
   if (!_prebuilt_runtime) {
     # If not using the prebuilt runtime, then enable options appropriate for a
     # custom runtime.  There are no deps injected to get the custom runtime
     # because how it's defined depends on the particular environment.
-    configs = [ "//src/lib/ubsan-custom:ubsan" ]
+    configs += [ "//src/lib/ubsan-custom:ubsan" ]
   } else {
     common_flags = [ "-fsanitize=undefined" ]
-  }
-
-  if (is_fuchsia && _prebuilt_runtime) {
-    dynamic_linker_flags =
-        "-dynamic-linker=${toolchain_variant.libprefix}ld.so.1"
-    ldflags = [ "-Wl,$dynamic_linker_flags" ]
-    rustflags = [ "-Clink-arg=$dynamic_linker_flags" ]
   }
 
   if (is_host) {
@@ -227,10 +251,22 @@ variant("ubsan") {
   }
 
   # If asan is also in use, it handles ubsan_default_options indirectly.
+  # It also includes the ubsan runtime and plumbing for it.
   if (_prebuilt_runtime && toolchain_variant.tags + [ "asan" ] - [ "asan" ] ==
                            toolchain_variant.tags) {
     deps = [ ":ubsan_default_options" ]
+    configs += [
+      ":variant-libprefix",
+      ":ubsan.rustflags",
+    ]
   }
+}
+
+sanitizer_rustflags("ubsan.rustflags") {
+  variant = "ubsan"
+  shared_runtime = is_fuchsia
+  libs = [ "ubsan_standalone" ]
+  static_libs = [ "ubsan_standalone_cxx" ]
 }
 
 sanitizer_default_options("ubsan_default_options") {
@@ -242,42 +278,16 @@ variant("sancov") {
 
 variant("tsan") {
   common_flags = [ "-fsanitize=thread" ]
+  configs = [
+    ":variant-libprefix",
+    ":tsan.rustflags",
+  ]
+}
 
-  # TODO(phosek): use runtime.json instead of invoking Clang.
-  if (is_mac) {
-    extension = "_osx_dynamic.dylib"
-  } else {
-    extension = ".a"
-  }
-
-  # For dynamic linking (macOS), there is just one combined DSO.
-  # For static linking (other platforms), there are separate libraries for the
-  # generic (C) and C++-specific runtime support.
-  needed_tsan_libs = [ "tsan" ]
-  if (extension == ".a") {
-    needed_tsan_libs += [ "tsan_cxx" ]
-  }
-  rustflags = []
-  foreach(tsan, needed_tsan_libs) {
-    libclang_rt_tsan = rebase_path(
-            exec_script("/usr/bin/env",
-                        [
-                          "${rebased_clang_prefix}/clang",
-                          "--target=${current_target_tuple}",
-                          "-print-file-name=libclang_rt.${tsan}${extension}",
-                        ],
-                        "trim string"),
-            root_build_dir)
-    rustflags += [ "-Clink-arg=${libclang_rt_tsan}" ]
-  }
-
-  deps = [ ":tsan_default_options" ]
-
-  # Expose the presence of sanitizers as a compile-time condition.
-  # This allows conditional compilation of code for this variant,
-  # for instance in order to disable a specific test case.
-  # TODO(https://fxbug.dev/42168338): use cfg_sanitize instead.
-  rustflags += [ "--cfg=feature=\"variant_tsan\"" ]
+sanitizer_rustflags("tsan.rustflags") {
+  variant = "tsan"
+  shared_runtime = false
+  static_libs = [ "tsan_cxx" ]
 }
 
 sanitizer_default_options("tsan_default_options") {
@@ -285,45 +295,16 @@ sanitizer_default_options("tsan_default_options") {
 
 variant("hwasan") {
   common_flags = [ "-fsanitize=hwaddress" ]
+  configs = [
+    ":variant-libprefix",
+    ":hwasan.rustflags",
+  ]
+}
 
-  # TODO(phosek): use runtime.json instead of invoking Clang.
-  if (is_fuchsia) {
-    extension = ".so"
-  } else {
-    extension = ".a"
-  }
-
-  # For dynamic linking (Fuchsia and macOS), there is just one combined DSO.
-  # For static linking (other platforms), there are separate libraries for the
-  # generic (C) and C++-specific runtime support.
-  needed_hwasan_libs = [ "hwasan" ]
-  if (extension == ".a") {
-    needed_hwasan_libs += [ "hwasan_cxx" ]
-  }
-  rustflags = []
-  foreach(hwasan, needed_hwasan_libs) {
-    libclang_rt_hwasan = rebase_path(
-            exec_script("/usr/bin/env",
-                        [
-                          "${rebased_clang_prefix}/clang",
-                          "--target=${current_target_tuple}",
-                          "-print-file-name=libclang_rt.${hwasan}${extension}",
-                        ],
-                        "trim string"),
-            root_build_dir)
-    rustflags += [ "-Clink-arg=${libclang_rt_hwasan}" ]
-  }
-  if (is_fuchsia) {
-    rustflags += [ "-Clink-arg=-dynamic-linker=hwasan/ld.so.1" ]
-  }
-
-  deps = [ ":hwasan_default_options" ]
-
-  # Expose the presence of sanitizers as a compile-time condition.
-  # This allows conditional compilation of code for this variant,
-  # for instance in order to disable a specific test case.
-  # TODO(https://fxbug.dev/42168338): use cfg_sanitize instead.
-  rustflags += [ "--cfg=feature=\"variant_hwasan\"" ]
+sanitizer_rustflags("hwasan.rustflags") {
+  variant = "hwasan"
+  shared_runtime = is_fuchsia
+  static_libs = [ "hwasan_cxx" ]
 }
 
 sanitizer_default_options("hwasan_default_options") {
