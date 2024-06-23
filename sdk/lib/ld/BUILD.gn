@@ -321,6 +321,7 @@ shared_library("ld-startup") {
     ":standalone",
     ":startup-diagnostics",
     ":startup-load",
+    ":startup-ubsan",
     ":tlsdesc",
   ]
 
@@ -396,6 +397,27 @@ source_set("startup-diagnostics") {
       ":ld-log-posix",
       ":posix.headers",
     ]
+  }
+}
+
+# The full ubsan runtime is likely to depend on more libc functions than
+# the standalone ld-startup build provides.  Instead instantiate
+# ubsan-custom to provide a bespoke ubsan runtime that reuses the normal
+# diagnostics code.
+source_set("startup-ubsan") {
+  if (is_ubsan) {
+    sources = [ "startup-ubsan.cc" ]
+
+    deps = [
+      ":abi-headers",
+      ":startup-diagnostics",
+      "//src/lib/ubsan-custom:handlers",
+    ]
+
+    # ubsan-custom:handlers confers the no-ubsan config via public_configs so
+    # the headers can't use `#if __has_feature(undefined_behavior_sanitizer)`
+    # alone.  Provide a macro so they can do `#if ... || LD_UBSAN` instead.
+    defines = [ "LD_UBSAN=1" ]
   }
 }
 
