@@ -254,6 +254,9 @@ config("standalone.config") {
 
   ldflags = []
   if (!is_gcc) {
+    # The sanitizer runtimes need libc ABIs that aren't provided here.
+    ldflags += [ "-fno-sanitize-link-runtime" ]
+
     # The standard profiling runtime can't be used in the minimal standalone
     # context of ld.so.
     #
