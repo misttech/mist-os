@@ -1731,11 +1731,14 @@ declare_args() {
       configs = [ "//build/config/sanitizers:ubsan" ]
       remove_common_configs = _ubsan_remove_common_configs
       tags = [
-        # This doesn't have "instrumentation-runtime" et al because while it
-        # requires some kind of runtime, every special environment that avoids
-        # the toolchain prebuilt libraries can use a custom runtime of its own.
         "instrumented",
         "ubsan",
+
+        # This has "custom-runtime" instead of "instrumentation-runtime" et al
+        # because while it requires some kind of runtime, every special
+        # environment that avoids the toolchain prebuilt libraries can use a
+        # custom runtime of its own via //src/lib/ubsan-custom.
+        "custom-runtime",
       ]
     },
     {
