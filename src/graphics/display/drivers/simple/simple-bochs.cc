@@ -4,8 +4,8 @@
 
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <lib/device-protocol/pci.h>
-#include <lib/driver/compat/cpp/logging.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
@@ -50,7 +50,7 @@ inline void bochs_vbe_dispi_write(MMIO_PTR void* base, uint32_t reg, uint16_t va
 #define BOCHS_VBE_DISPI_LFB_ENABLED 0x40
 
 void set_hw_mode(MMIO_PTR void* regs, uint16_t width, uint16_t height, uint16_t bits_per_pixel) {
-  zxlogf(TRACE, "id: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ID));
+  FDF_LOG(TRACE, "id: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ID));
 
   bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_ENABLE, 0);
   bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_BPP, bits_per_pixel);
@@ -64,18 +64,18 @@ void set_hw_mode(MMIO_PTR void* regs, uint16_t width, uint16_t height, uint16_t 
   bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_ENABLE,
                         BOCHS_VBE_DISPI_ENABLED | BOCHS_VBE_DISPI_LFB_ENABLED);
 
-  zxlogf(TRACE, "bochs_vbe_set_hw_mode:");
-  zxlogf(TRACE, "     ID: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ID));
-  zxlogf(TRACE, "   XRES: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_XRES));
-  zxlogf(TRACE, "   YRES: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_YRES));
-  zxlogf(TRACE, "    BPP: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_BPP));
-  zxlogf(TRACE, " ENABLE: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ENABLE));
-  zxlogf(TRACE, "   BANK: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_BANK));
-  zxlogf(TRACE, "VWIDTH: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIRT_WIDTH));
-  zxlogf(TRACE, "VHEIGHT: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIRT_HEIGHT));
-  zxlogf(TRACE, "   XOFF: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_X_OFFSET));
-  zxlogf(TRACE, "   YOFF: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_Y_OFFSET));
-  zxlogf(TRACE, "    64K: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIDEO_MEMORY_64K));
+  FDF_LOG(TRACE, "bochs_vbe_set_hw_mode:");
+  FDF_LOG(TRACE, "     ID: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ID));
+  FDF_LOG(TRACE, "   XRES: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_XRES));
+  FDF_LOG(TRACE, "   YRES: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_YRES));
+  FDF_LOG(TRACE, "    BPP: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_BPP));
+  FDF_LOG(TRACE, " ENABLE: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ENABLE));
+  FDF_LOG(TRACE, "   BANK: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_BANK));
+  FDF_LOG(TRACE, "VWIDTH: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIRT_WIDTH));
+  FDF_LOG(TRACE, "VHEIGHT: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIRT_HEIGHT));
+  FDF_LOG(TRACE, "   XOFF: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_X_OFFSET));
+  FDF_LOG(TRACE, "   YOFF: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_Y_OFFSET));
+  FDF_LOG(TRACE, "    64K: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIDEO_MEMORY_64K));
 }
 
 class SimpleBochsDisplayDriver final : public SimpleDisplayDriver {
@@ -109,7 +109,7 @@ zx::result<ddk::Pci> SimpleBochsDisplayDriver::GetPciClient() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
       incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
   if (pci_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to PCI protocol: %s", pci_result.status_string());
+    FDF_LOG(ERROR, "Failed to connect to PCI protocol: %s", pci_result.status_string());
     return pci_result.take_error();
   }
   ddk::Pci pci(std::move(pci_result).value());
@@ -130,7 +130,7 @@ zx::result<> SimpleBochsDisplayDriver::ConfigureHardware() {
   zx_status_t status =
       pci.MapMmio(kQemuBochsRegisterMmioBarIndex, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map PCI config: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map PCI config: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -150,8 +150,8 @@ zx::result<fdf::MmioBuffer> SimpleBochsDisplayDriver::GetFrameBufferMmioBuffer()
   zx_status_t status =
       pci.MapMmio(kFramebufferPciBarIndex, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map PCI bar %" PRIu32 ": %s", kFramebufferPciBarIndex,
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map PCI bar %" PRIu32 ": %s", kFramebufferPciBarIndex,
+            zx_status_get_string(status));
     return zx::error(status);
   }
 

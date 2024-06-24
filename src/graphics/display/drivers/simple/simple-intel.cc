@@ -4,8 +4,8 @@
 
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/device-protocol/pci.h>
-#include <lib/driver/compat/cpp/logging.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/image-format/image_format.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zx/result.h>
@@ -52,7 +52,7 @@ zx::result<fdf::MmioBuffer> SimpleIntelDisplayDriver::GetFrameBufferMmioBuffer()
   zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
       incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
   if (pci_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to PCI protocol: %s", pci_result.status_string());
+    FDF_LOG(ERROR, "Failed to connect to PCI protocol: %s", pci_result.status_string());
     return pci_result.take_error();
   }
   ddk::Pci pci(std::move(pci_result).value());
@@ -63,8 +63,8 @@ zx::result<fdf::MmioBuffer> SimpleIntelDisplayDriver::GetFrameBufferMmioBuffer()
   zx_status_t status =
       pci.MapMmio(kIntelFramebufferPciBarIndex, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map PCI bar %" PRIu32 ": %s", kIntelFramebufferPciBarIndex,
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map PCI bar %" PRIu32 ": %s", kIntelFramebufferPciBarIndex,
+            zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -76,8 +76,8 @@ zx::result<zx::resource> SimpleIntelDisplayDriver::GetFramebufferResource() {
   zx::result framebuffer_resource_result =
       incoming()->Connect<fuchsia_kernel::FramebufferResource>();
   if (framebuffer_resource_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to framebuffer resource: %s",
-           framebuffer_resource_result.status_string());
+    FDF_LOG(ERROR, "Failed to connect to framebuffer resource: %s",
+            framebuffer_resource_result.status_string());
     return framebuffer_resource_result.take_error();
   }
   fidl::WireSyncClient<fuchsia_kernel::FramebufferResource> framebuffer_resource =
@@ -85,7 +85,7 @@ zx::result<zx::resource> SimpleIntelDisplayDriver::GetFramebufferResource() {
   fidl::WireResult<fuchsia_kernel::FramebufferResource::Get> get_result =
       framebuffer_resource->Get();
   if (!get_result.ok()) {
-    zxlogf(ERROR, "Failed to get framebuffer resource: %s", get_result.status_string());
+    FDF_LOG(ERROR, "Failed to get framebuffer resource: %s", get_result.status_string());
     return zx::error(get_result.status());
   }
   return zx::ok(std::move(std::move(get_result).value()).resource);
@@ -103,7 +103,7 @@ zx::result<DisplayProperties> SimpleIntelDisplayDriver::GetDisplayProperties() {
   zx_status_t status =
       zx_framebuffer_get_info(framebuffer_resource.get(), &format, &width, &height, &stride);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get bootloader dimensions: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to get bootloader dimensions: %s", zx_status_get_string(status));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -114,7 +114,7 @@ zx::result<DisplayProperties> SimpleIntelDisplayDriver::GetDisplayProperties() {
   fpromise::result<fuchsia_images2::wire::PixelFormat> sysmem2_format_type_result =
       ImageFormatConvertZbiToSysmemPixelFormat_v2(format);
   if (!sysmem2_format_type_result.is_ok()) {
-    zxlogf(ERROR, "Failed to convert framebuffer format: %" PRIu32, static_cast<uint32_t>(format));
+    FDF_LOG(ERROR, "Failed to convert framebuffer format: %" PRIu32, static_cast<uint32_t>(format));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   fuchsia_images2::wire::PixelFormat sysmem2_format = sysmem2_format_type_result.take_value();

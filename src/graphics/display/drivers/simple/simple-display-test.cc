@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/driver/compat/cpp/logging.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/object.h>
@@ -151,7 +150,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Alloca
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    zxlogf(ERROR, "%s not implemented", name.c_str());
+    FDF_LOG(ERROR, "%s not implemented", name.c_str());
     EXPECT_TRUE(false);
   }
 
