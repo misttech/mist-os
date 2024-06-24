@@ -27,12 +27,17 @@ pub trait TimerOps: Send + Sync + 'static {
     ///
     /// This method should start the timer and schedule it to trigger at the specified `deadline`.
     /// The timer should be cancelled if it is already running.
-    fn start(&self, current_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno>;
+    fn start(
+        &self,
+        current_task: &CurrentTask,
+        file_object: &FileObject,
+        deadline: zx::Time,
+    ) -> Result<(), Errno>;
 
     /// Stops the timer.
     ///
     /// This method should stop the timer and prevent it from triggering.
-    fn stop(&self, current_task: &CurrentTask) -> Result<(), Errno>;
+    fn stop(&self, current_task: &CurrentTask, file_object: &FileObject) -> Result<(), Errno>;
 
     /// Creates a `WaitCnaceler` that can be used to wait for the timer to be cancelled.
     fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler;
@@ -52,14 +57,19 @@ impl ZxTimer {
 }
 
 impl TimerOps for ZxTimer {
-    fn start(&self, _currnet_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno> {
+    fn start(
+        &self,
+        _currnet_task: &CurrentTask,
+        _file_object: &FileObject,
+        deadline: zx::Time,
+    ) -> Result<(), Errno> {
         self.timer
             .set(deadline, zx::Duration::default())
             .map_err(|status| from_status_like_fdio!(status))?;
         Ok(())
     }
 
-    fn stop(&self, _current_task: &CurrentTask) -> Result<(), Errno> {
+    fn stop(&self, _current_task: &CurrentTask, _file_object: &FileObject) -> Result<(), Errno> {
         self.timer.cancel().map_err(|status| from_status_like_fdio!(status))
     }
 
@@ -155,6 +165,7 @@ impl TimerFile {
     pub fn set_timer_spec(
         &self,
         current_task: &CurrentTask,
+        file_object: &FileObject,
         timer_spec: itimerspec,
         flags: u32,
     ) -> Result<itimerspec, Errno> {
@@ -165,7 +176,7 @@ impl TimerFile {
         if timespec_is_zero(timer_spec.it_value) {
             // Sayeth timerfd_settime(2):
             // Setting both fields of new_value.it_value to zero disarms the timer.
-            self.timer.stop(current_task)?;
+            self.timer.stop(current_task, file_object)?;
         } else {
             let now_monotonic = zx::Time::get_monotonic();
             let new_deadline = if flags & TFD_TIMER_ABSTIME != 0 {
@@ -194,7 +205,7 @@ impl TimerFile {
             };
             let new_interval = duration_from_timespec(timer_spec.it_interval)?;
 
-            self.timer.start(current_task, new_deadline)?;
+            self.timer.start(current_task, file_object, new_deadline)?;
             *deadline_interval = (new_deadline, new_interval);
         }
 
@@ -273,7 +284,7 @@ impl FileOps for TimerFile {
 
                 // The timer is set to clear the `ZX_TIMER_SIGNALED` signal until the next deadline
                 // is reached.
-                self.timer.start(current_task, new_deadline)?;
+                self.timer.start(current_task, file, new_deadline)?;
 
                 // Update the stored deadline.
                 *deadline_interval = (new_deadline, interval);
@@ -283,7 +294,7 @@ impl FileOps for TimerFile {
                 // The timer is non-repeating, so cancel the timer to clear the `ZX_TIMER_SIGNALED`
                 // signal.
                 *deadline_interval = (zx::Time::default(), interval);
-                self.timer.stop(current_task)?;
+                self.timer.stop(current_task, file)?;
                 1
             };
 

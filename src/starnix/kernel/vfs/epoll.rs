@@ -449,6 +449,18 @@ impl EpollFileObject {
             entry.get().wake_lease.take_lease();
         }
     }
+
+    /// Activate the wake lease associated with the `file`.
+    pub fn activate_lease(&self, file: &FileHandle, baton_lease: zx::Channel) -> Result<(), Errno> {
+        let mut guard = self.state.lock();
+        let key = as_epoll_key(file).into();
+        let Entry::Occupied(entry) = guard.wait_objects.entry(key) else {
+            return error!(EINVAL);
+        };
+        let res = entry.get().wake_lease.activate();
+        drop(baton_lease);
+        res
+    }
 }
 
 impl FileOps for EpollFileObject {

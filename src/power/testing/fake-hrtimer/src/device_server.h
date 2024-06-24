@@ -7,6 +7,8 @@
 
 #include <fidl/fuchsia.hardware.hrtimer/cpp/fidl.h>
 
+#include "lib/fidl/cpp/channel.h"
+
 namespace fake_hrtimer {
 
 // Protocol served to client components over devfs.
@@ -27,6 +29,8 @@ class DeviceServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
  private:
   fidl::ServerBindingGroup<fuchsia_hardware_hrtimer::Device> bindings_;
   std::optional<zx::event> event_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client_;
+  std::optional<fidl::SyncClient<fuchsia_power_broker::Lessor>> lessor_;
 };
 
 }  // namespace fake_hrtimer
