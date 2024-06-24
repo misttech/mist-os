@@ -78,7 +78,6 @@ if (allowed_device_types == []) {
     allowed_device_types = [
       "AEMU",
       "QEMU",
-      "Intel NUC Kit NUC7i5DNHE",
       "Intel NUC Kit NUC11TNHv5",
       "GCE",
     ]
