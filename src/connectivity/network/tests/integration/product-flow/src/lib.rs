@@ -41,6 +41,7 @@ enum IpSupported {
 /// misleading clients of the API into thinking connectivity has not
 /// been restored when it has).
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(IpSupported::Ipv6Only; "ipv6_only")]
 #[test_case(IpSupported::Ipv4Only; "ipv4_only")]
 #[test_case(IpSupported::DualStack; "dual_stack")]

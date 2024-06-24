@@ -85,6 +85,7 @@ where
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn ns_sets_thread_profiles<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let (_realm, mut fs) = create_netstack_with_mock_endpoint::<
@@ -150,6 +151,7 @@ async fn ns_sets_thread_profiles<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn ns_requests_inspect_persistence<N: Netstack>(name: &str) {
     let persist_path = format!(
         "{}-netstack",
@@ -192,6 +194,7 @@ async fn assert_persist_called_for_tags<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn ns_persist_tags_under_size_limits<N: Netstack>(name: &str) {
     test_persistence::<N, _>(name, |inspect_payload, tag, tag_config| {
         // Convert inspect payload to a JSON string.
@@ -211,7 +214,6 @@ async fn ns_persist_tags_under_size_limits<N: Netstack>(name: &str) {
     .await
 }
 
-#[netstack_test]
 // This test validates that for any given selector in netstack.persist, the root
 // inspect node specified in that selector has been persisted in an archivist
 // payload.
@@ -221,6 +223,8 @@ async fn ns_persist_tags_under_size_limits<N: Netstack>(name: &str) {
 // archivist payload, nor that all child nodes of any given selector are
 // persisted. We're still relying on fireteam primaries and netstack developers
 // to keep the persist file in sync with our inspect logic.
+#[netstack_test]
+#[variant(N, Netstack)]
 async fn ns_persist_root_inspect_nodes_for_selectors<N: Netstack>(name: &str) {
     test_persistence::<N, _>(name, |inspect_payload, _tag, tag_config| {
         for selector in tag_config.selectors.iter() {
@@ -346,6 +350,7 @@ where
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn serves_update_verify<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let sandbox = &sandbox;
@@ -362,6 +367,7 @@ async fn serves_update_verify<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn emits_logs<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");

@@ -25,3 +25,8 @@ rustc_macro("netstack_testing_macros") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   with_unit_tests = true
 }
+
+group("tests") {
+  testonly = true
+  deps = [ ":netstack_testing_macros_test" ]
+}

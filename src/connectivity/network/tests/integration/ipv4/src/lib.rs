@@ -148,6 +148,7 @@ fn check_igmp_report(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(Some(fnet_interfaces_admin::IgmpVersion::V1); "igmpv1")]
 #[test_case(Some(fnet_interfaces_admin::IgmpVersion::V2); "igmpv2")]
 #[test_case(Some(fnet_interfaces_admin::IgmpVersion::V3); "igmpv3")]
@@ -299,6 +300,7 @@ async fn sends_igmp_reports<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn all_ones_broadcast<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("error creating sandbox");
 

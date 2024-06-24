@@ -34,6 +34,7 @@ async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_admin_unknown<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -57,6 +58,7 @@ async fn get_admin_unknown<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_admin_loopback<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -74,6 +76,7 @@ async fn get_admin_loopback<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_admin_netemul_endpoint<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -108,6 +111,7 @@ async fn get_mac(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_mac_not_found<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -123,6 +127,7 @@ async fn get_mac_not_found<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_mac_loopback<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -138,6 +143,7 @@ async fn get_mac_loopback<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_mac_pure_ip<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -158,6 +164,7 @@ async fn get_mac_pure_ip<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_mac_netemul_endpoint<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -181,6 +188,7 @@ async fn get_mac_netemul_endpoint<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_port<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -218,6 +226,7 @@ async fn get_port<N: Netstack>(name: &str) {
 // call completes. Checking the output in syslog would be too much of a change
 // detector.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn log_debug_info_to_syslog<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -227,6 +236,7 @@ async fn log_debug_info_to_syslog<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_process_handle_for_inspection<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");

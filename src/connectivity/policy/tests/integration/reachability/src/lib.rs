@@ -528,6 +528,7 @@ async fn accelerate_fake_clock(fake_clock: &ftesting::FakeClockControlProxy) -> 
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     "gateway",
     &[(InterfaceConfig::new_primary(LOWER_METRIC), LinkState::Gateway.into())];
@@ -817,6 +818,7 @@ impl<'a> ReachabilityTestHelper<'a> {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(LinkState::Internet.into(), LinkState::Internet.into())]
 #[test_case(LinkState::Internet.into(), LinkState::Gateway.into())]
 #[test_case(LinkState::Internet.into(), LinkState::Up.into())]
@@ -837,6 +839,7 @@ async fn test_internet_available<N: Netstack>(name: &str, state1: State, state2:
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(LinkState::Internet.into(), LinkState::Internet.into())]
 #[test_case(LinkState::Internet.into(), LinkState::Gateway.into())]
 #[test_case(LinkState::Internet.into(), LinkState::Up.into())]
@@ -856,6 +859,7 @@ async fn test_internet_comes_up<N: Netstack>(name: &str, state1: State, state2: 
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(LinkState::Gateway.into(), LinkState::Gateway.into())]
 #[test_case(LinkState::Up.into(), LinkState::Up.into())]
 async fn test_internet_goes_down<N: Netstack>(name: &str, state1: State, state2: State) {
@@ -877,6 +881,7 @@ async fn test_internet_goes_down<N: Netstack>(name: &str, state1: State, state2:
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(LinkState::Gateway.into(), LinkState::Gateway.into())]
 #[test_case(LinkState::Gateway.into(), LinkState::Up.into())]
 async fn test_gateway_goes_down<N: Netstack>(name: &str, state1: State, state2: State) {
@@ -899,6 +904,7 @@ async fn test_gateway_goes_down<N: Netstack>(name: &str, state1: State, state2: 
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_internet_to_gateway_state<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let env = setup_reachability_env::<N>(name, &sandbox, false).await;
@@ -919,6 +925,7 @@ async fn test_internet_to_gateway_state<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_hanging_get_multiple_clients<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox
@@ -959,6 +966,7 @@ async fn test_hanging_get_multiple_clients<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_cannot_call_set_options_after_watch<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox
@@ -988,6 +996,7 @@ async fn test_cannot_call_set_options_after_watch<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_cannot_call_set_options_twice<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox

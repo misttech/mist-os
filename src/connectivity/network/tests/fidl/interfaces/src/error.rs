@@ -17,6 +17,7 @@ use netstack_testing_common::realms::{Netstack, NetstackVersion, TestSandboxExt 
 use netstack_testing_macros::netstack_test;
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create netstack");

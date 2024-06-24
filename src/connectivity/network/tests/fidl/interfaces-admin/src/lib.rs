@@ -14,7 +14,7 @@ use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip, std_ip_v6, std_socket_addr};
-use net_types::ip::{IpAddress as _, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpAddress as _, IpVersion, Ipv4, Ipv6};
 use netemul::{InterfaceConfig, RealmUdpSocket as _};
 use netstack_testing_common::devices::{
     add_pure_ip_interface, create_ip_tun_port, create_tun_device, create_tun_port_with,
@@ -41,6 +41,7 @@ use {
 };
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn address_deprecation<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -130,6 +131,7 @@ async fn address_deprecation<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn update_address_lifetimes<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -283,6 +285,7 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -353,6 +356,7 @@ async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn add_address_errors<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -453,6 +457,7 @@ async fn add_address_errors<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn add_ipv4_mapped_ipv6_address<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -504,6 +509,7 @@ async fn add_ipv4_mapped_ipv6_address<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case([FrameType::Ethernet], [FrameType::Ethernet],
     Some(fidl_mac!("02:03:04:05:06:07")), Ok(()); "ethernet")]
 #[test_case([FrameType::Ipv4], [FrameType::Ipv4], None, Err(()); "ipv4-only-fails")]
@@ -569,6 +575,7 @@ enum AddressRemovalMethod {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(false, AddressRemovalMethod::InterfaceControl ; "eth removing address via Control.Remove")]
 #[test_case(false, AddressRemovalMethod::AddressStateProviderExplicitRemove ; "eth removing address via AddressStateProvider.Remove")]
 #[test_case(true, AddressRemovalMethod::InterfaceControl ; "tun removing address via Control.Remove")]
@@ -715,6 +722,7 @@ async fn add_address_removal<N: Netstack>(
 // Add an address while the interface is offline, bring the interface online and ensure that the
 // assignment state is set correctly.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn add_address_offline<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("new sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -771,6 +779,7 @@ async fn add_address_offline<N: Netstack>(name: &str) {
 // request is pending causes the `AddressStateProvider` protocol to close,
 // regardless of whether the protocol is detached.
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(false; "no_detach")]
 #[test_case(true; "detach")]
 async fn duplicate_watch_address_assignment_state<N: Netstack>(name: &str, detach: bool) {
@@ -883,6 +892,7 @@ enum AddressRemoval {
 use AddressRemoval::*;
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     None,
     false,
@@ -1141,6 +1151,7 @@ async fn add_address_and_remove<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(None, false; "default add_subnet_route")]
 #[test_case(Some(false), false; "add_subnet_route is false")]
 #[test_case(Some(true), true; "add_subnet_route is true")]
@@ -1216,6 +1227,7 @@ async fn add_address_and_detach<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
     const IPV4_LOOPBACK: fidl_fuchsia_net::Subnet = fidl_subnet!("127.0.0.1/8");
     const IPV6_LOOPBACK: fidl_fuchsia_net::Subnet = fidl_subnet!("::1/128");
@@ -1277,6 +1289,7 @@ async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn remove_slaac_address<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("new sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -1329,6 +1342,7 @@ async fn remove_slaac_address<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn device_control_create_interface<N: Netstack>(name: &str) {
     // NB: interface names are limited to fuchsia.net.interfaces/INTERFACE_NAME_LENGTH.
     const IF_NAME: &'static str = "ctrl_create_if";
@@ -1404,6 +1418,7 @@ async fn device_control_create_interface<N: Netstack>(name: &str) {
 // Tests that when a DeviceControl instance is dropped, all interfaces created
 // from it are dropped as well.
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(false; "no_detach")]
 #[test_case(true; "detach")]
 async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detach: bool) {
@@ -1613,6 +1628,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
 fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::DuplicateName;
 "DuplicateName"
@@ -1814,6 +1830,7 @@ async fn control_terminal_events<N: Netstack>(
 
 // Test that destroying a device causes device control instance to close.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn device_control_closes_on_device_close<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -1889,7 +1906,9 @@ impl<T: fasync::TimeoutExt> PanicOnTimeout for T {}
 
 // Tests that interfaces created through installer have a valid datapath.
 #[netstack_test]
-async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name: &str) {
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn installer_creates_datapath<N: Netstack, I: Ip>(test_name: &str) {
     const SUBNET: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.0/24");
     const ALICE_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.1/24");
     const BOB_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.2/24");
@@ -2144,6 +2163,7 @@ async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn control_enable_disable<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -2244,6 +2264,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("new sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -2340,6 +2361,8 @@ enum SetupOrder {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(SetupOrder::PreferredInterfaceFirst; "setup_preferred_interface_first")]
 #[test_case(SetupOrder::PreferredInterfaceLast; "setup_preferred_interface_last")]
 // Verify that interfaces with lower routing metrics are preferred.
@@ -2350,10 +2373,7 @@ enum SetupOrder {
 // within the same subnet (and add subnet routes). Finally, verify (by checking
 // the source addr) that sending from the send side to the receive side uses the
 // preferred send interface.
-async fn interface_routing_metric<N: Netstack, I: net_types::ip::Ip>(
-    name: &str,
-    order: SetupOrder,
-) {
+async fn interface_routing_metric<N: Netstack, I: Ip>(name: &str, order: SetupOrder) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let send_realm =
         sandbox.create_netstack_realm::<N, _>(format!("{name}_send")).expect("create realm");
@@ -2418,10 +2438,7 @@ async fn interface_routing_metric<N: Netstack, I: net_types::ip::Ip>(
     )
     .await;
 
-    async fn create_socket_in_realm<I: net_types::ip::Ip>(
-        realm: &netemul::TestRealm<'_>,
-        port: u16,
-    ) -> UdpSocket {
+    async fn create_socket_in_realm<I: Ip>(realm: &netemul::TestRealm<'_>, port: u16) -> UdpSocket {
         let (domain, addr) = match I::VERSION {
             IpVersion::V4 => (
                 fposix_socket::Domain::Ipv4,
@@ -2464,8 +2481,9 @@ async fn interface_routing_metric<N: Netstack, I: net_types::ip::Ip>(
     assert_eq!(&buffer[..BUF.len()], BUF.as_bytes());
 }
 
-#[netstack_test]
 // Test add/remove address and observe the events in InterfaceWatcher.
+#[netstack_test]
+#[variant(N, Netstack)]
 async fn control_add_remove_address<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -2634,6 +2652,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(false; "no_detach")]
 #[test_case(true; "detach")]
 async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) {
@@ -2841,6 +2860,7 @@ async fn get_ip_forwarding(iface: &fnet_interfaces_ext::admin::Control) -> IpFor
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     IpForwarding { v4: None, v4_multicast: None, v6: None, v6_multicast: None },
     None
@@ -2937,6 +2957,7 @@ async fn get_set_forwarding_loopback<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(IpForwarding { v4: None, v4_multicast: None, v6: None, v6_multicast: None }; "set_none")]
 #[test_case(IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(false), v6_multicast: None }; "set_ip_false")]
 #[test_case(IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(false), v6_multicast: None }; "set_ipv4_true")]
@@ -3049,6 +3070,7 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
 
 // Test that reinstalling a port with the same base port identifier works.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn reinstall_same_port<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -3155,6 +3177,7 @@ async fn reinstall_same_port<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn synchronous_remove<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -3167,6 +3190,7 @@ async fn synchronous_remove<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn no_remove_loopback<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -3189,6 +3213,7 @@ async fn no_remove_loopback<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn epitaph_is_sent_after_interface_removal<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -3236,7 +3261,7 @@ async fn epitaph_is_sent_after_interface_removal<N: Netstack>(name: &str) {
     }
 }
 
-fn to_ip_nud_configuration<I: net_types::ip::Ip>(
+fn to_ip_nud_configuration<I: Ip>(
     config: finterfaces_admin::Configuration,
 ) -> Option<finterfaces_admin::NudConfiguration> {
     match I::VERSION {
@@ -3245,7 +3270,7 @@ fn to_ip_nud_configuration<I: net_types::ip::Ip>(
     }
 }
 
-fn new_nud_config<I: net_types::ip::Ip>(
+fn new_nud_config<I: Ip>(
     nud: finterfaces_admin::NudConfiguration,
 ) -> finterfaces_admin::Configuration {
     match I::VERSION {
@@ -3273,7 +3298,9 @@ fn new_nud_config<I: net_types::ip::Ip>(
 }
 
 #[netstack_test]
-async fn nud_max_multicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn nud_max_multicast_solicitations<N: Netstack, I: Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm::<N, _>(format!("{name}_client"))
@@ -3362,7 +3389,9 @@ async fn nud_max_multicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name
 }
 
 #[netstack_test]
-async fn nud_config_not_supported_on_loopback<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn nud_config_not_supported_on_loopback<N: Netstack, I: Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
 
@@ -3416,7 +3445,9 @@ async fn nud_config_not_supported_on_loopback<N: Netstack, I: net_types::ip::Ip>
 /// at the wire behavior after setting. We rely on unit tests for that because
 /// the set up is more trouble than it's worth.
 #[netstack_test]
-async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn nud_max_unicast_solicitations<N: Netstack, I: Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm::<N, _>(format!("{name}_client"))
@@ -3471,7 +3502,9 @@ async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: 
 /// in REACHABLE changes as a result of changing base reachable time due to
 /// timing sensitivity.
 #[netstack_test]
-async fn nud_base_reachable_time<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn nud_base_reachable_time<N: Netstack, I: Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm::<N, _>(format!("{name}_client"))
@@ -3528,6 +3561,7 @@ async fn nud_base_reachable_time<N: Netstack, I: net_types::ip::Ip>(name: &str) 
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn dad_transmits<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -3590,6 +3624,7 @@ async fn dad_transmits<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn interface_authorization<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -3635,6 +3670,7 @@ async fn interface_authorization<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn interface_authorization_root_access<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");

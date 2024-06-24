@@ -5,42 +5,32 @@
 #![cfg(test)]
 
 use fdio::{SpawnAction, SpawnOptions};
-use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
-use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_stack as fnet_stack;
-use fidl_fuchsia_posix_socket as fposix_socket;
-use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, HandleBased as _, ProcessInfo};
-use futures::{
-    future,
-    io::{AsyncBufReadExt, AsyncReadExt, BufReader},
-    stream::StreamExt as _,
-};
+use futures::future;
+use futures::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+use futures::stream::StreamExt as _;
 use libc::{STDERR_FILENO, STDOUT_FILENO};
 use net_declare::{fidl_ip_v4, fidl_mac, std_socket_addr};
 use netemul::RealmUdpSocket as _;
-use netstack_testing_common::{
-    interfaces,
-    realms::{Netstack, TestSandboxExt as _},
-};
+use netstack_testing_common::interfaces;
+use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use packet::{Buf, Serializer};
-use packet_formats::{
-    ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
-    ip::{IpProto, Ipv4Proto},
-    ipv4::Ipv4PacketBuilder,
-    udp::UdpPacketBuilder,
-};
+use packet_formats::ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG};
+use packet_formats::ip::{IpProto, Ipv4Proto};
+use packet_formats::ipv4::Ipv4PacketBuilder;
+use packet_formats::udp::UdpPacketBuilder;
 use regex::Regex;
-use std::{
-    convert::TryInto as _,
-    ffi::{CStr, CString},
-    num::NonZeroU16,
+use std::convert::TryInto as _;
+use std::ffi::{CStr, CString};
+use std::num::NonZeroU16;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fposix_socket_packet, fuchsia_async as fasync,
 };
 
 const BINARY_PATH: &str = "/pkg/bin/tcpdump";
@@ -159,10 +149,8 @@ async fn start_tcpdump_and_wait_for_patterns<
             ),
         ],
     );
-    let mut stdout_reader =
-        BufReader::new(fasync::Socket::from_socket(stdout_reader));
-    let mut stderr_reader =
-        BufReader::new(fasync::Socket::from_socket(stderr_reader));
+    let mut stdout_reader = BufReader::new(fasync::Socket::from_socket(stdout_reader));
+    let mut stderr_reader = BufReader::new(fasync::Socket::from_socket(stderr_reader));
 
     let mut svcfs = ServiceFs::new_local();
     let svcfs = svcfs
@@ -247,10 +235,8 @@ async fn version_test() {
         process.info().expect("process info");
     assert_eq!(return_code, 0);
 
-    let mut stdout_reader =
-        BufReader::new(fasync::Socket::from_socket(stdout_reader));
-    let mut stderr_reader =
-        fasync::Socket::from_socket(stderr_reader);
+    let mut stdout_reader = BufReader::new(fasync::Socket::from_socket(stdout_reader));
+    let mut stderr_reader = fasync::Socket::from_socket(stderr_reader);
 
     wait_for_pattern(
         &mut stdout_reader,
@@ -264,6 +250,7 @@ async fn version_test() {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 // TODO(https://fxbug.dev/42169332): Fix memory leak and run this with Lsan.
 #[cfg_attr(feature = "variant_asan", ignore)]
 async fn packet_test<N: Netstack>(name: &str) {

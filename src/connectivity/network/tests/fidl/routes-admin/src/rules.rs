@@ -39,9 +39,8 @@ fn rule_set_err_stream<I: FidlRuleAdminIpExt>(
 }
 
 #[netstack_test]
-async fn add_remove_rules<
-    I: net_types::ip::Ip + FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRouteIpExt,
->(
+#[variant(I, Ip)]
+async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRouteIpExt>(
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");

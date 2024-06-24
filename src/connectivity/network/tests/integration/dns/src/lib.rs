@@ -47,6 +47,7 @@ use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use packet_formats_dhcp::v6;
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn no_ip_literal<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -142,6 +143,8 @@ async fn poll_lookup_admin<
 /// Tests that Netstack exposes DNS servers discovered dynamically and NetworkManager
 /// configures the Lookup service.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
     const SERVER_ADDR: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
     /// DNS server served by DHCP.
@@ -293,6 +296,8 @@ async fn discovered_dns<M: Manager, N: Netstack>(name: &str) {
 /// Tests that DHCPv6 exposes DNS servers discovered dynamically and the network manager
 /// configures the Lookup service.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str) {
     /// DHCPv6 server IP.
     const DHCPV6_SERVER: net_types_ip::Ipv6Addr =
@@ -532,6 +537,7 @@ const EXAMPLE_IPV4_ADDR: fnet::IpAddress = fidl_ip!("93.184.216.34");
 const EXAMPLE_IPV6_ADDR: fnet::IpAddress = fidl_ip!("2606:2800:220:1:248:1893:25c8:1946");
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(name: &str) {
     use trust_dns_proto::op::{Message, ResponseCode};
     use trust_dns_proto::rr::RecordType;
@@ -682,6 +688,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn fallback_on_error_response_code<N: Netstack>(name: &str) {
     use itertools::Itertools as _;
     use trust_dns_proto::op::{Message, ResponseCode};
@@ -887,6 +894,7 @@ async fn setup_dns_server(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn no_fallback_to_tcp_on_failed_udp<N: Netstack>(name: &str) {
     use trust_dns_proto::op::{Message, ResponseCode};
 
@@ -944,6 +952,7 @@ async fn no_fallback_to_tcp_on_failed_udp<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
     use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
 
@@ -1046,6 +1055,7 @@ async fn fallback_to_tcp_on_truncated_response<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
     use trust_dns_proto::op::{Message, MessageType, OpCode, ResponseCode};
 

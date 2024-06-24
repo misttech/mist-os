@@ -46,6 +46,7 @@ async fn resolve(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn resolve_loopback_route<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
@@ -72,6 +73,7 @@ async fn resolve_loopback_route<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn resolve_route<N: Netstack>(name: &str) {
     const GATEWAY_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.1/24");
     const GATEWAY_IP_V6: fidl_fuchsia_net::Subnet = fidl_subnet!("3080::1/64");
@@ -198,6 +200,7 @@ async fn resolve_route<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn resolve_default_route_while_dhcp_is_running<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -283,10 +286,12 @@ async fn resolve_default_route_while_dhcp_is_running<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 // Resolve returns the preferred source address used when communicating with the
 // destination. Expect Resolve to fail on interfaces without any assigned
 // addresses, even if the destination is reachable and routable.
-async fn resolve_fails_with_no_src_address<N: Netstack, I: net_types::ip::Ip>(name: &str) {
+async fn resolve_fails_with_no_src_address<N: Netstack, I: Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
@@ -532,11 +537,11 @@ fn initial_ethernet_routes_v6(
 // Verifies the startup behavior of the watcher protocols; including the
 // expected preinstalled routes.
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 async fn watcher_existing<
     N: Netstack,
-    I: net_types::ip::Ip
-        + fnet_routes_ext::FidlRouteIpExt
-        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 >(
     name: &str,
 ) {
@@ -628,11 +633,11 @@ const TEST_SUBNET_V6: net_types::ip::Subnet<Ipv6Addr> = net_subnet_v6!("fd::/64"
 // Verifies that a client-installed route is observed as `existing` if added
 // before the watcher client connects.
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 async fn watcher_add_before_watch<
     N: Netstack,
-    I: net_types::ip::Ip
-        + fnet_routes_ext::FidlRouteIpExt
-        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 >(
     name: &str,
 ) {
@@ -671,11 +676,11 @@ async fn watcher_add_before_watch<
 
 // Verifies the watcher protocols correctly report `added` and `removed` events.
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 async fn watcher_add_remove<
     N: Netstack,
-    I: net_types::ip::Ip
-        + fnet_routes_ext::FidlRouteIpExt
-        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 >(
     name: &str,
 ) {
@@ -727,12 +732,9 @@ async fn watcher_add_remove<
 // Verifies the watcher protocols close if the client incorrectly calls `Watch()`
 // while there is already a pending `Watch()` call parked in the server.
 #[netstack_test]
-async fn watcher_already_pending<
-    N: Netstack,
-    I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt,
->(
-    name: &str,
-) {
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn watcher_already_pending<N: Netstack, I: fnet_routes_ext::FidlRouteIpExt>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
     let state_proxy =
@@ -775,12 +777,9 @@ async fn watcher_already_pending<
 // Verifies the watcher protocol does not get torn down when the `State`
 // protocol is closed.
 #[netstack_test]
-async fn watcher_outlives_state<
-    N: Netstack,
-    I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt,
->(
-    name: &str,
-) {
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn watcher_outlives_state<N: Netstack, I: fnet_routes_ext::FidlRouteIpExt>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
@@ -809,11 +808,11 @@ async fn watcher_outlives_state<
 /// Verifies several instantiations of the watcher protocol can exist independent
 /// of one another.
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 async fn watcher_multiple_instances<
     N: Netstack,
-    I: net_types::ip::Ip
-        + fnet_routes_ext::FidlRouteIpExt
-        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 >(
     name: &str,
 ) {
@@ -890,10 +889,9 @@ async fn watcher_multiple_instances<
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 async fn watch_nonexisting_table<
-    I: net_types::ip::Ip
-        + fnet_routes_ext::FidlRouteIpExt
-        + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 >(
     name: &str,
 ) {
@@ -917,10 +915,9 @@ async fn watch_nonexisting_table<
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 async fn route_watcher_in_specific_table<
-    I: net_types::ip::Ip
-        + fnet_routes_ext::admin::FidlRouteAdminIpExt
-        + fnet_routes_ext::FidlRouteIpExt,
+    I: fnet_routes_ext::admin::FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt,
 >(
     name: &str,
 ) {

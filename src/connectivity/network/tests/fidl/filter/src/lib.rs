@@ -1331,6 +1331,7 @@ fn invalid_transport_protocol_matcher<I: net_types::ip::Ip>() -> Matchers {
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::AddressRange)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::Subnet)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::TransportProtocol)]
@@ -1403,6 +1404,7 @@ async fn ip_specific_matcher_in_namespace<I: net_types::ip::Ip>(
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::AddressRange)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::Subnet)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::TransportProtocol)]
@@ -1665,6 +1667,7 @@ async fn routine_cycle(name: &str, calling_routine: RoutineType) {
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 async fn uninstalled_routine_validated_even_if_unreachable<I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");

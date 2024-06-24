@@ -376,6 +376,7 @@ async fn assert_entries<
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn neigh_list_entries<N: Netstack>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -570,6 +571,7 @@ async fn next_solicitation_resolution(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     |controller, id| {
         controller.clear_entries(id, fidl_fuchsia_net::IpVersion::V4)
@@ -621,6 +623,7 @@ async fn neigh_wrong_interface<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn neigh_clear_entries<N: Netstack>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -732,6 +735,7 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(fidl_ip!("255.255.255.255"); "ipv4_limited_broadcast")]
 #[test_case(fidl_ip!("127.0.0.1"); "ipv4_loopback")]
 #[test_case(fidl_ip!("::1"); "ipv6_loopback")]
@@ -785,6 +789,7 @@ async fn neigh_add_remove_entry_invalid_addr<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(fidl_mac!("ff:ff:ff:ff:ff:ff"); "broadcast_mac")]
 #[test_case(fidl_mac!("01:00:00:00:00:00"); "multicast_mac")]
 async fn neigh_add_entry_invalid_mac<N: Netstack>(
@@ -827,6 +832,7 @@ async fn neigh_add_entry_invalid_mac<N: Netstack>(
 // neigh_add_remove_entry since that test is a superset of this test but it
 // doesn't yet pass due to the lack of fuchsia.net.neighbor/EntryIterator.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn neigh_remove_entry_not_found<N: Netstack>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -857,6 +863,7 @@ async fn neigh_remove_entry_not_found<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -1010,6 +1017,7 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn neigh_unreachable_entries<N: Netstack>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -1081,6 +1089,7 @@ async fn neigh_unreachable_entries<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn cant_hang_twice<N: Netstack>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
 
@@ -1115,6 +1124,7 @@ async fn cant_hang_twice<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn channel_is_closed_if_not_polled<N: Netstack>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -1190,6 +1200,7 @@ async fn channel_is_closed_if_not_polled<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn remove_device_clears_neighbors<N: Netstack>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -1247,6 +1258,7 @@ async fn remove_device_clears_neighbors<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 // Verify that the `fuchsia.net.neighbor/EntryIterator` connection "survives"
 // a large burst of neighbor events. In particular, when a neighbor with many
 // addresses disconnects.

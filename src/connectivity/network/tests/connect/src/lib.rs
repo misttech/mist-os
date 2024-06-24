@@ -59,6 +59,7 @@ const REMOTE_IP: std::net::IpAddr = std_ip!("192.168.0.1");
 const PORT: u16 = 80;
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn timeouts<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");

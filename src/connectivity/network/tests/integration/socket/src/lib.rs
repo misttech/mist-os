@@ -204,6 +204,7 @@ enum UdpProtocol {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     UdpProtocol::Synchronous, false; "synchronous_protocol not mapped to ipv6")]
 #[test_case(
@@ -451,7 +452,7 @@ async fn execute_and_validate_preflights(
         .await
 }
 
-trait UdpSendMsgPreflightTestIpExt {
+trait UdpSendMsgPreflightTestIpExt: Ip {
     const PORT: u16;
     const SOCKET_DOMAIN: fposix_socket::Domain;
     const INSTALLED_ADDR: fnet::Subnet;
@@ -533,7 +534,7 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
     }
 }
 
-async fn udp_send_msg_preflight_fidl_setup<I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt>(
+async fn udp_send_msg_preflight_fidl_setup<I: UdpSendMsgPreflightTestIpExt>(
     iface: &netemul::TestInterface<'_>,
     socket: &fposix_socket::DatagramSocketProxy,
 ) -> Vec<fposix_socket::DatagramSocketSendMsgPreflightResponse> {
@@ -611,6 +612,8 @@ fn assert_preflights_invalidated(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case("connect_called", UdpCacheInvalidationReason::ConnectCalled)]
 #[test_case("Control.Disable", UdpCacheInvalidationReason::InterfaceDisabled)]
 #[test_case("Control.RemoveAddress", UdpCacheInvalidationReason::AddressRemoved)]
@@ -621,10 +624,7 @@ fn assert_preflights_invalidated(
 )]
 #[test_case("route_removed", UdpCacheInvalidationReason::RouteRemoved)]
 #[test_case("route_added", UdpCacheInvalidationReason::RouteAdded)]
-async fn udp_send_msg_preflight_fidl<
-    N: Netstack,
-    I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt,
->(
+async fn udp_send_msg_preflight_fidl<N: Netstack, I: UdpSendMsgPreflightTestIpExt>(
     root_name: &str,
     test_name: &str,
     invalidation_reason: UdpCacheInvalidationReason,
@@ -701,6 +701,7 @@ enum UdpCacheInvalidationReasonV4 {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case("broadcast_called", UdpCacheInvalidationReasonV4::BroadcastCalled)]
 async fn udp_send_msg_preflight_fidl_v4only<N: Netstack>(
     root_name: &str,
@@ -732,6 +733,7 @@ enum UdpCacheInvalidationReasonV6 {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case("ipv6_only_called", UdpCacheInvalidationReasonV6::Ipv6OnlyCalled)]
 async fn udp_send_msg_preflight_fidl_v6only<N: Netstack>(
     root_name: &str,
@@ -764,6 +766,7 @@ enum UdpCacheInvalidationReasonNdp {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case("ra", UdpCacheInvalidationReasonNdp::RouterAdvertisement)]
 #[test_case("ra_with_prefix", UdpCacheInvalidationReasonNdp::RouterAdvertisementWithPrefix)]
 async fn udp_send_msg_preflight_fidl_ndp<N: Netstack>(
@@ -1024,6 +1027,7 @@ async fn assert_preflight_response_invalidated(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let (net, netstack, iface, socket) =
@@ -1144,6 +1148,7 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &st
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn udp_send_msg_preflight_dad_failure<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let (net, _netstack, iface, socket) =
@@ -1323,6 +1328,7 @@ async fn toggle_cmsg(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case("ip_tos", CmsgType::IpTos)]
 #[test_case("ip_ttl", CmsgType::IpTtl)]
 #[test_case("ipv6_tclass", CmsgType::Ipv6Tclass)]
@@ -1476,7 +1482,7 @@ async fn run_tcp_socket_test(
     let ((), ()) = futures::future::join(client_fut, server_fut).await;
 }
 
-trait TestIpExt {
+trait TestIpExt: Ip {
     const DOMAIN: fposix_socket::Domain;
     const CLIENT_SUBNET: fnet::Subnet;
     const SERVER_SUBNET: fnet::Subnet;
@@ -1500,7 +1506,7 @@ impl TestIpExt for Ipv6 {
 // ultimately fail the tests. Using a closure allows us to execute the rest of
 // test within the context where the endpoints are still alive.
 async fn tcp_socket_accept_cross_ns<
-    I: net_types::ip::Ip + TestIpExt,
+    I: TestIpExt,
     Client: Netstack,
     Server: Netstack,
     Fut: Future,
@@ -1555,20 +1561,18 @@ async fn tcp_socket_accept_cross_ns<
 }
 
 #[netstack_test]
-async fn tcp_socket_accept<I: net_types::ip::Ip + TestIpExt, Client: Netstack, Server: Netstack>(
-    name: &str,
-) {
+#[variant(I, Ip)]
+#[variant(Client, Netstack)]
+#[variant(Server, Netstack)]
+async fn tcp_socket_accept<I: TestIpExt, Client: Netstack, Server: Netstack>(name: &str) {
     tcp_socket_accept_cross_ns::<I, Client, Server, _, _>(name, |_client, _server| async {}).await
 }
 
 #[netstack_test]
-async fn tcp_socket_send_recv<
-    I: net_types::ip::Ip + TestIpExt,
-    Client: Netstack,
-    Server: Netstack,
->(
-    name: &str,
-) {
+#[variant(I, Ip)]
+#[variant(Client, Netstack)]
+#[variant(Server, Netstack)]
+async fn tcp_socket_send_recv<I: TestIpExt, Client: Netstack, Server: Netstack>(name: &str) {
     async fn send_recv(mut sender: fasync::net::TcpStream, mut receiver: fasync::net::TcpStream) {
         const PAYLOAD: &'static [u8] = b"Hello World";
         let write_count = sender.write(PAYLOAD).await.expect("write to tcp client stream failed");
@@ -1591,11 +1595,10 @@ async fn tcp_socket_send_recv<
 }
 
 #[netstack_test]
-async fn tcp_socket_shutdown_connection<
-    I: net_types::ip::Ip + TestIpExt,
-    Client: Netstack,
-    Server: Netstack,
->(
+#[variant(I, Ip)]
+#[variant(Client, Netstack)]
+#[variant(Server, Netstack)]
+async fn tcp_socket_shutdown_connection<I: TestIpExt, Client: Netstack, Server: Netstack>(
     name: &str,
 ) {
     tcp_socket_accept_cross_ns::<I, Client, Server, _, _>(
@@ -1619,7 +1622,9 @@ async fn tcp_socket_shutdown_connection<
 }
 
 #[netstack_test]
-async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &str) {
+#[variant(I, Ip)]
+#[variant(N, Netstack)]
+async fn tcp_socket_shutdown_listener<I: TestIpExt, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -1682,6 +1687,7 @@ async fn tcp_socket_shutdown_listener<I: net_types::ip::Ip + TestIpExt, N: Netst
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn tcpv4_tcpv6_listeners_coexist<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -1711,14 +1717,13 @@ async fn tcpv4_tcpv6_listeners_coexist<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(100; "large positive")]
 #[test_case(1; "min positive")]
 #[test_case(0; "zero")]
 #[test_case(-1; "negative")]
-async fn tcp_socket_listen<N: Netstack, I: net_types::ip::Ip + TestIpExt>(
-    name: &str,
-    backlog: i16,
-) {
+async fn tcp_socket_listen<N: Netstack, I: TestIpExt>(name: &str, backlog: i16) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
 
     let host = sandbox
@@ -1763,6 +1768,7 @@ async fn tcp_socket_listen<N: Netstack, I: net_types::ip::Ip + TestIpExt>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn tcp_socket<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -1806,12 +1812,11 @@ enum WhichEnd {
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
+#[variant(N, Netstack)]
 #[test_case(WhichEnd::Send; "send buffer")]
 #[test_case(WhichEnd::Receive; "receive buffer")]
-async fn tcp_buffer_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(
-    name: &str,
-    which: WhichEnd,
-) {
+async fn tcp_buffer_size<I: TestIpExt, N: Netstack>(name: &str, which: WhichEnd) {
     tcp_socket_accept_cross_ns::<I, N, N, _, _>(name, |mut sender, mut receiver| async move {
         // Set either the sender SO_SNDBUF or receiver SO_RECVBUF so that a
         // large amount of data can be buffered even if the receiver isn't
@@ -1849,7 +1854,9 @@ async fn tcp_buffer_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(
 }
 
 #[netstack_test]
-async fn decrease_tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &str) {
+#[variant(I, Ip)]
+#[variant(N, Netstack)]
+async fn decrease_tcp_sendbuf_size<I: TestIpExt, N: Netstack>(name: &str) {
     // This is a regression test for https://fxbug.dev/42072897. With Netstack3,
     // if a TCP socket had a full send buffer and a decrease of the send buffer
     // size was requested, the new size would not take effect immediately as
@@ -2021,11 +2028,13 @@ enum IpEndpointsSocketTestCase {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(IpEndpointsSocketTestCase::Udp; "udp_socket")]
 #[test_case(IpEndpointsSocketTestCase::Tcp; "tcp_socket")]
 #[test_case(IpEndpointsSocketTestCase::Packet(fpacket::Kind::Network); "packet_dgram_socket")]
 #[test_case(IpEndpointsSocketTestCase::Packet(fpacket::Kind::Link); "packet_raw_socket")]
-async fn ip_endpoints_socket<N: Netstack, I: net_types::ip::Ip>(
+async fn ip_endpoints_socket<N: Netstack, I: Ip>(
     name: &str,
     socket_type: IpEndpointsSocketTestCase,
 ) {
@@ -2141,6 +2150,7 @@ fn is_packet_spurious(ip_version: IpVersion, mut body: &[u8]) -> Result<bool> {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create client realm");
@@ -2403,6 +2413,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn ping<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -2441,6 +2452,7 @@ async fn ping<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(net_addr_subnet!("192.0.2.1/32"); "v4")]
 #[test_case(net_addr_subnet!("fe80::1234:5678:90ab:cdef/128"); "v6_link_local")]
 #[test_case(net_addr_subnet!("2001:db8::1/128"); "v6")]
@@ -2484,13 +2496,15 @@ enum SocketType {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(SocketType::Udp, true; "UDP specified")]
 #[test_case(SocketType::Udp, false; "UDP unspecified")]
 #[test_case(SocketType::Tcp, true; "TCP specified")]
 #[test_case(SocketType::Tcp, false; "TCP unspecified")]
 // Verify socket connectivity over loopback.
 // The Netstack is expected to treat the unspecified address as loopback.
-async fn socket_loopback_test<N: Netstack, I: net_types::ip::Ip>(
+async fn socket_loopback_test<N: Netstack, I: Ip>(
     name: &str,
     socket_type: SocketType,
     specified: bool,
@@ -2510,6 +2524,7 @@ async fn socket_loopback_test<N: Netstack, I: net_types::ip::Ip>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(SocketType::Udp)]
 #[test_case(SocketType::Tcp)]
 async fn socket_clone_bind<N: Netstack>(name: &str, socket_type: SocketType) {
@@ -2557,6 +2572,7 @@ async fn socket_clone_bind<N: Netstack>(name: &str, socket_type: SocketType) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn udp_sendto_unroutable_leaves_socket_bound<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -2659,7 +2675,7 @@ struct Network<'a, A> {
 async fn with_multinic_and_peer_networks<
     'params,
     N: Netstack,
-    I: net_types::ip::Ip + TestIpExt,
+    I: TestIpExt,
     F: for<'a> FnOnce(
         Vec<Network<'a, I::Addr>>,
         &'a netemul::TestRealm<'a>,
@@ -2743,7 +2759,7 @@ async fn with_multinic_and_peer_networks<
 async fn with_multinic_and_peers<
     N: Netstack,
     S: MakeSocket,
-    I: net_types::ip::Ip + TestIpExt,
+    I: TestIpExt,
     F: FnOnce(Vec<MultiNicAndPeerConfig<S>>) -> R,
     R: Future<Output = ()>,
 >(
@@ -2815,6 +2831,7 @@ async fn with_multinic_and_peers<
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn udp_receive_on_bound_to_devices<N: Netstack>(name: &str) {
     const NUM_PEERS: u8 = 3;
     const PORT: u16 = 80;
@@ -2875,6 +2892,7 @@ async fn udp_receive_on_bound_to_devices<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
     const NUM_PEERS: u8 = 3;
     const PORT: u16 = 80;
@@ -2937,6 +2955,7 @@ async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_udp_source_address_has_zone<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -3037,6 +3056,7 @@ async fn test_udp_source_address_has_zone<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn tcp_connect_bound_to_device<N: Netstack>(name: &str) {
     const NUM_PEERS: u8 = 2;
     const PORT: u16 = 90;
@@ -3114,6 +3134,7 @@ async fn tcp_connect_bound_to_device<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn get_bound_device_errors_after_device_deleted<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -3182,6 +3203,7 @@ struct MultiNicAndPeerConfig<S> {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn send_to_remote_with_zone<N: Netstack>(name: &str) {
     const PORT: u16 = 80;
     const NUM_BYTES: usize = 10;
@@ -3309,6 +3331,7 @@ async fn tcp_communicate_with_remote_with_zone<
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
     match N::VERSION {
         NetstackVersion::Netstack2 { tracing: _, fast_udp: _ } | NetstackVersion::ProdNetstack2 => {
@@ -3338,6 +3361,7 @@ async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn tcp_bind_with_zone_connect_unzoned<N: Netstack>(name: &str) {
     const PORT: u16 = 80;
 
@@ -3366,6 +3390,7 @@ enum ProtocolWithZirconSocket {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(ProtocolWithZirconSocket::Tcp)]
 #[test_case(ProtocolWithZirconSocket::FastUdp)]
 async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconSocket) {
@@ -3460,6 +3485,7 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => libc::ENETUNREACH)]
 #[test_case(Icmpv4DestUnreachableCode::DestHostUnreachable => libc::EHOSTUNREACH)]
 #[test_case(Icmpv4DestUnreachableCode::DestProtocolUnreachable => libc::ENOPROTOOPT)]
@@ -3579,6 +3605,7 @@ async fn tcp_icmp_error_v4<N: Netstack>(name: &str, code: Icmpv4DestUnreachableC
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(Icmpv6DestUnreachableCode::NoRoute => libc::ENETUNREACH)]
 #[test_case(Icmpv6DestUnreachableCode::PortUnreachable => libc::ECONNREFUSED)]
 // TODO(https://fxbug.dev/42076684): Test against all possible codes once we can
@@ -3684,6 +3711,7 @@ async fn tcp_icmp_error_v6<N: Netstack>(name: &str, code: Icmpv6DestUnreachableC
 /// returns the expected scope id even if the device the scope id matches has
 /// been removed from the stack.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn tcp_accept_with_removed_device_scope<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
@@ -3830,12 +3858,11 @@ async fn init_multicast_test_networks<'a, I: MulticastTestIpExt>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(0)]
 #[test_case(1)]
-async fn multicast_send<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
-    name: &str,
-    target_interface: usize,
-) {
+async fn multicast_send<N: Netstack, I: MulticastTestIpExt>(name: &str, target_interface: usize) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let client = sandbox
         .create_netstack_realm::<N, _>(format!("{name}_client"))
@@ -3917,12 +3944,14 @@ async fn multicast_send<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(None, 0, false)]
 #[test_case(Some(true), 0, false)]
 #[test_case(Some(true), 1, true)]
 #[test_case(Some(false), 0, false)]
 #[test_case(Some(false), 1, true)]
-async fn multicast_loop<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
+async fn multicast_loop<N: Netstack, I: MulticastTestIpExt>(
     name: &str,
     multicast_loop_value: Option<bool>,
     target_interface: usize,
@@ -4040,9 +4069,11 @@ async fn multicast_loop<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(true)]
 #[test_case(false)]
-async fn multicast_loop_on_loopback_dev<N: Netstack, I: net_types::ip::Ip + MulticastTestIpExt>(
+async fn multicast_loop_on_loopback_dev<N: Netstack, I: MulticastTestIpExt>(
     name: &str,
     multicast_loop_value: bool,
 ) {

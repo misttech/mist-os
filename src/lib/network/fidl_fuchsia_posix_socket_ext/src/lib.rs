@@ -60,6 +60,7 @@ mod test {
     };
 
     #[netstack_test]
+    #[variant(N, Netstack)]
     async fn datagram_socket_send_receive<N: Netstack>(name: &str) {
         let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
 
@@ -158,6 +159,7 @@ mod test {
     }
 
     #[netstack_test]
+    #[variant(N, Netstack)]
     async fn packet_socket_send_receive<N: Netstack>(name: &str) {
         let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
 

@@ -64,6 +64,7 @@ enum Step {
 // link of an interface attached to a bridge and ensuring that the bridge
 // functions correctly afterwards.
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     "none",
     &[Step::Bridge(vec![])];
@@ -339,6 +340,7 @@ async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
 // Tests that an admin-disabled interface attached to a bridge is still
 // disabled when the bridge is removed.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_remove_bridge_interface_disabled<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let gateway_realm = sandbox

@@ -276,6 +276,8 @@ struct Settings<'a> {
 }
 
 #[netstack_test]
+#[variant(SERVER, Netstack)]
+#[variant(CLIENT, NetstackAndDhcpClient)]
 #[test_case(true; "remove dhcp address")]
 #[test_case(false; "remove non-dhcp address")]
 async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: NetstackAndDhcpClient>(
@@ -417,6 +419,8 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
 }
 
 #[netstack_test]
+#[variant(SERVER, Netstack)]
+#[variant(CLIENT, NetstackAndDhcpClient)]
 async fn acquire_with_dhcpd_bound_device<SERVER: Netstack, CLIENT: NetstackAndDhcpClient>(
     name: &str,
 ) {
@@ -465,6 +469,8 @@ async fn acquire_with_dhcpd_bound_device<SERVER: Netstack, CLIENT: NetstackAndDh
 
 // Regression test for https://fxbug.dev/42081372.
 #[netstack_test]
+#[variant(SERVER, Netstack)]
+#[variant(CLIENT, NetstackAndDhcpClient)]
 async fn does_not_crash_with_overlapping_subnet_route<
     SERVER: Netstack,
     CLIENT: NetstackAndDhcpClient,
@@ -603,6 +609,8 @@ async fn does_not_crash_with_overlapping_subnet_route<
 }
 
 #[netstack_test]
+#[variant(SERVER, Netstack)]
+#[variant(CLIENT, NetstackAndDhcpClient)]
 async fn acquire_then_renew_with_dhcpd_bound_device<
     SERVER: Netstack,
     CLIENT: NetstackAndDhcpClient,
@@ -671,6 +679,8 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
 // variability. This could be done by configuring the number of IPV4
 // `dad_transmits` to some large value.
 #[netstack_test]
+#[variant(SERVER, Netstack)]
+#[variant(CLIENT, NetstackAndDhcpClient)]
 async fn acquire_with_dhcpd_bound_device_dup_addr<
     SERVER: Netstack,
     CLIENT: NetstackAndDhcpClient,
@@ -1098,6 +1108,8 @@ fn param_name(param: &fidl_fuchsia_net_dhcp::Parameter) -> fidl_fuchsia_net_dhcp
 // clear_leases() function is triggered, which will cause a panic if the server is in an
 // inconsistent state.
 #[netstack_test]
+#[variant(SERVER, Netstack)]
+#[variant(CLIENT, NetstackAndDhcpClient)]
 async fn acquire_persistent_dhcp_server_after_restart<
     SERVER: Netstack,
     CLIENT: NetstackAndDhcpClient,
@@ -1113,6 +1125,8 @@ async fn acquire_persistent_dhcp_server_after_restart<
 // configuration.  This test verifies that an ephemeral dhcp server will return an error if run
 // after restarting.
 #[netstack_test]
+#[variant(SERVER, Netstack)]
+#[variant(CLIENT, NetstackAndDhcpClient)]
 async fn acquire_ephemeral_dhcp_server_after_restart<
     SERVER: Netstack,
     CLIENT: NetstackAndDhcpClient,
@@ -1299,12 +1313,14 @@ async fn acquire_dhcp_server_after_restart<SERVER: Netstack, CLIENT: NetstackAnd
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn dhcp_server_persistence_mode_persistent<N: Netstack>(name: &str) {
     let mode = PersistenceMode::Persistent;
     test_dhcp_server_persistence_mode::<N>(&format!("{}_{}", name, mode), mode).await
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn dhcp_server_persistence_mode_ephemeral<N: Netstack>(name: &str) {
     let mode = PersistenceMode::Ephemeral;
     test_dhcp_server_persistence_mode::<N>(&format!("{}_{}", name, mode), mode).await

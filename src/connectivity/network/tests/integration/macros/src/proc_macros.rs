@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::str::FromStr;
+
 use either::Either;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use quote::quote;
+use quote::{quote, ToTokens};
+use syn::spanned::Spanned as _;
 
 /// A specific implementation of a test variant.
 #[derive(Clone, Debug)]
@@ -16,9 +19,134 @@ struct Implementation {
 }
 
 /// A variant tests will be generated for.
-struct Variant<'a> {
-    trait_bound: syn::Path,
-    implementations: &'a [Implementation],
+struct Variant {
+    ident: syn::Ident,
+    variant_type: VariantType,
+    seen: bool,
+}
+
+impl syn::parse::Parse for Variant {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        let ident = syn::Ident::parse(input)?;
+        let _ = <syn::Token![,]>::parse(input)?;
+        let variant_ident = syn::Ident::parse(input)?;
+        if !input.is_empty() {
+            return Err(syn::Error::new(input.span(), "unexpected trailing arguments"));
+        }
+        let variant_type = VariantType::from_str(&variant_ident.to_string())
+            .map_err(|()| syn::Error::new(variant_ident.span(), "invalid variant"))?;
+        Ok(Variant { ident, variant_type, seen: false })
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum VariantType {
+    Ip,
+    Netstack,
+    DhcpClient,
+    Manager,
+    NetstackAndDhcpClient,
+}
+
+impl FromStr for VariantType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Ip" => Ok(Self::Ip),
+            "Netstack" => Ok(Self::Netstack),
+            "DhcpClient" => Ok(Self::DhcpClient),
+            "Manager" => Ok(Self::Manager),
+            "NetstackAndDhcpClient" => Ok(Self::NetstackAndDhcpClient),
+            _ => Err(()),
+        }
+    }
+}
+
+impl VariantType {
+    // NB: Extracted to constants so they can be reused in tests.
+    const NETSTACK2: &'static str = "netstack_testing_common::realms::Netstack2";
+    const NETSTACK3: &'static str = "netstack_testing_common::realms::Netstack3";
+    const IPV4: &'static str = "net_types::ip::Ipv4";
+    const IPV6: &'static str = "net_types::ip::Ipv6";
+
+    fn implementations(&self) -> Vec<Implementation> {
+        let disable_on_riscv = || syn::parse_quote!(#[cfg(not(target_arch = "riscv64"))]);
+
+        match self {
+            Self::Netstack => vec![
+                Implementation {
+                    type_name: str_to_syn_path(Self::NETSTACK2),
+                    suffix: "ns2",
+                    attrs: vec![disable_on_riscv()],
+                },
+                Implementation {
+                    type_name: str_to_syn_path(Self::NETSTACK3),
+                    suffix: "ns3",
+                    attrs: vec![],
+                },
+            ],
+            Self::Ip => vec![
+                Implementation {
+                    type_name: str_to_syn_path(Self::IPV4),
+                    suffix: "v4",
+                    attrs: vec![],
+                },
+                Implementation {
+                    type_name: str_to_syn_path(Self::IPV6),
+                    suffix: "v6",
+                    attrs: vec![],
+                },
+            ],
+            Self::Manager => vec![
+                Implementation {
+                    type_name: str_to_syn_path("netstack_testing_common::realms::NetCfgBasic"),
+                    suffix: "netcfg_basic",
+                    attrs: vec![],
+                },
+                Implementation {
+                    type_name: str_to_syn_path("netstack_testing_common::realms::NetCfgAdvanced"),
+                    suffix: "netcfg_advanced",
+                    attrs: vec![],
+                },
+            ],
+            Self::DhcpClient => vec![
+                Implementation {
+                    type_name: str_to_syn_path("netstack_testing_common::realms::InStack"),
+                    suffix: "dhcp_in_stack",
+                    attrs: vec![],
+                },
+                Implementation {
+                    type_name: str_to_syn_path("netstack_testing_common::realms::OutOfStack"),
+                    suffix: "dhcp_out_of_stack",
+                    attrs: vec![],
+                },
+            ],
+            Self::NetstackAndDhcpClient => vec![
+                Implementation {
+                    type_name: str_to_syn_path(
+                        "netstack_testing_common::realms::Netstack2AndInStackDhcpClient",
+                    ),
+                    suffix: "ns2_with_dhcp_in_stack",
+                    attrs: vec![disable_on_riscv()],
+                },
+                Implementation {
+                    type_name: str_to_syn_path(
+                        "netstack_testing_common::realms::Netstack2AndOutOfStackDhcpClient",
+                    ),
+                    suffix: "ns2_with_dhcp_out_of_stack",
+                    attrs: vec![disable_on_riscv()],
+                },
+                Implementation {
+                    type_name: str_to_syn_path(
+                        "netstack_testing_common::realms::Netstack3AndOutOfStackDhcpClient",
+                    ),
+                    suffix: "ns3_with_dhcp_out_of_stack",
+                    attrs: vec![],
+                },
+            ],
+        }
+    }
 }
 
 /// A specific variation of a test.
@@ -46,36 +174,36 @@ fn str_to_syn_path(path: &str) -> syn::Path {
 }
 
 fn permutations_over_type_generics<'a>(
-    variants: &'a [Variant<'a>],
+    variants: &'a mut [Variant],
     type_generics: &'a [&'a syn::TypeParam],
 ) -> impl Iterator<Item = TestVariation> + 'a {
     if type_generics.is_empty() {
         return Either::Right(std::iter::once(TestVariation::default()));
     }
 
-    let find_implementations = |type_param: &syn::TypeParam| -> Option<&[Implementation]> {
-        let trait_bound = type_param.bounds.iter().find_map(|b| match b {
-            syn::TypeParamBound::Lifetime(_) => None,
-            syn::TypeParamBound::Trait(t) => Some(t),
-        })?;
-        variants.iter().find_map(|Variant { trait_bound: t, implementations }| {
-            (t == &trait_bound.path).then_some(*implementations)
+    let mut find_variants = |type_param: &syn::TypeParam| -> Option<VariantType> {
+        variants.iter_mut().find_map(|Variant { ident, variant_type, seen }| {
+            (ident == &type_param.ident).then(|| {
+                *seen = true;
+                *variant_type
+            })
         })
     };
 
     #[derive(Clone, Debug)]
     enum Piece<'a> {
         PassThroughGeneric(&'a syn::TypeParam),
-        Instantiated(&'a Implementation),
+        Instantiated(Implementation),
     }
     let piece_iterators = type_generics.into_iter().map(|type_param| {
         // If there are multiple implementations, produce an iterator that
         // will yield them all. Otherwise produce an iterator that will
         // yield the generic parameter once.
-        match find_implementations(type_param) {
+        match find_variants(type_param) {
             None => Either::Left(std::iter::once(Piece::PassThroughGeneric(*type_param))),
-            Some(implementations) => Either::Right(
-                implementations
+            Some(variant_type) => Either::Right(
+                variant_type
+                    .implementations()
                     .into_iter()
                     .map(|implementation| Piece::Instantiated(implementation)),
             ),
@@ -89,8 +217,8 @@ fn permutations_over_type_generics<'a>(
             match piece {
                 Piece::Instantiated(Implementation { type_name, suffix, attrs }) => {
                     params.push(type_name.clone());
-                    name_pieces.push(*suffix);
-                    attributes.extend(attrs.into_iter().cloned());
+                    name_pieces.push(suffix);
+                    attributes.extend(attrs.into_iter());
                 }
                 Piece::PassThroughGeneric(type_param) => {
                     params.push(type_param.ident.clone().into());
@@ -103,9 +231,61 @@ fn permutations_over_type_generics<'a>(
     }))
 }
 
-fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStream {
-    let item = input.clone();
-    let mut item = syn::parse_macro_input!(item as syn::ItemFn);
+struct NetstackTestArgs {
+    test_name: bool,
+}
+
+impl syn::parse::Parse for NetstackTestArgs {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        // Default using test name to true. User can override.
+        let mut test_name = true;
+
+        let args =
+            syn::punctuated::Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(
+                input,
+            )?;
+        for syn::MetaNameValue { path, lit, .. } in args {
+            let ident = path
+                .get_ident()
+                .ok_or_else(|| syn::Error::new(path.span(), "expecting identifier"))?;
+            if ident == "test_name" {
+                let lit = match lit {
+                    syn::Lit::Bool(b) => b,
+                    _ => return Err(syn::Error::new(lit.span(), "expected boolean")),
+                };
+                test_name = lit.value;
+            } else {
+                return Err(syn::Error::new(path.span(), format!("unrecognized option {ident}")));
+            }
+        }
+        Ok(Self { test_name })
+    }
+}
+
+fn extract_variants(mut input: syn::ItemFn) -> Result<(syn::ItemFn, Vec<Variant>), syn::Error> {
+    let syn::ItemFn { attrs, .. } = &mut input;
+    let all_attrs = std::mem::take(attrs);
+    // Filter out the attributes that are determining variants, putting back the
+    // ones that aren't part of netstack_test.
+    let mut variants = Vec::new();
+    for attr in all_attrs {
+        if !attr.path.get_ident().is_some_and(|ident| ident == "variant") {
+            // Not a netstack_test variant attribute.
+            attrs.push(attr);
+            continue;
+        }
+        variants.push(attr.parse_args::<Variant>()?);
+    }
+
+    Ok((input, variants))
+}
+
+fn netstack_test_inner(
+    args: NetstackTestArgs,
+    input: syn::ItemFn,
+    variants: &mut [Variant],
+) -> TokenStream {
+    let mut item = input.clone();
     let impl_attrs = std::mem::replace(&mut item.attrs, Vec::new());
     let syn::ItemFn { attrs: _, vis: _, ref sig, block: _ } = &item;
     let syn::Signature {
@@ -122,71 +302,75 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
         output,
     } = sig;
 
-    let arg = if let Some(arg) = inputs.first() {
-        arg
-    } else {
-        return syn::Error::new_spanned(inputs, "test functions must have a name argument")
+    let NetstackTestArgs { test_name } = args;
+
+    if test_name {
+        let arg = if let Some(arg) = inputs.first() {
+            arg
+        } else {
+            return syn::Error::new_spanned(inputs, "test functions must have a name argument")
+                .to_compile_error()
+                .into();
+        };
+
+        let arg_type = match arg {
+            syn::FnArg::Typed(syn::PatType { attrs: _, pat: _, colon_token: _, ty }) => ty,
+            other => {
+                return syn::Error::new_spanned(
+                    inputs,
+                    format!(
+                    "test function's first argument must be a `&str` for test name; got = {:#?}",
+                    other
+                ),
+                )
+                .to_compile_error()
+                .into()
+            }
+        };
+
+        let arg_type = match arg_type.as_ref() {
+            syn::Type::Reference(syn::TypeReference {
+                and_token: _,
+                lifetime: _,
+                mutability: _,
+                elem,
+            }) => elem,
+            other => {
+                return syn::Error::new_spanned(
+                    inputs,
+                    format!(
+                    "test function's first argument must be a `&str` for test name; got = {:#?}",
+                    other
+                ),
+                )
+                .to_compile_error()
+                .into()
+            }
+        };
+
+        let arg_type = match arg_type.as_ref() {
+            syn::Type::Path(syn::TypePath { qself: _, path }) => path,
+            other => {
+                return syn::Error::new_spanned(
+                    inputs,
+                    format!(
+                    "test function's first argument must be a `&str` for test name; got = {:#?}",
+                    other
+                ),
+                )
+                .to_compile_error()
+                .into()
+            }
+        };
+
+        if !arg_type.is_ident("str") {
+            return syn::Error::new_spanned(
+                inputs,
+                "test function's first argument must be a `&str`  for test name",
+            )
             .to_compile_error()
             .into();
-    };
-
-    let arg_type = match arg {
-        syn::FnArg::Typed(syn::PatType { attrs: _, pat: _, colon_token: _, ty }) => ty,
-        other => {
-            return syn::Error::new_spanned(
-                inputs,
-                format!(
-                    "test function's first argument must be a `&str` for test name; got = {:#?}",
-                    other
-                ),
-            )
-            .to_compile_error()
-            .into()
         }
-    };
-
-    let arg_type = match arg_type.as_ref() {
-        syn::Type::Reference(syn::TypeReference {
-            and_token: _,
-            lifetime: _,
-            mutability: _,
-            elem,
-        }) => elem,
-        other => {
-            return syn::Error::new_spanned(
-                inputs,
-                format!(
-                    "test function's first argument must be a `&str` for test name; got = {:#?}",
-                    other
-                ),
-            )
-            .to_compile_error()
-            .into()
-        }
-    };
-
-    let arg_type = match arg_type.as_ref() {
-        syn::Type::Path(syn::TypePath { qself: _, path }) => path,
-        other => {
-            return syn::Error::new_spanned(
-                inputs,
-                format!(
-                    "test function's first argument must be a `&str` for test name; got = {:#?}",
-                    other
-                ),
-            )
-            .to_compile_error()
-            .into()
-        }
-    };
-
-    if !arg_type.is_ident("str") {
-        return syn::Error::new_spanned(
-            inputs,
-            "test function's first argument must be a `&str`  for test name",
-        )
-        .to_compile_error()
-        .into();
     }
 
     // We only care about generic type parameters and their last trait bound.
@@ -196,7 +380,7 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
             syn::GenericParam::Type(t) => t,
             other => {
                 return syn::Error::new_spanned(
-                    proc_macro2::TokenStream::from(input),
+                    input.to_token_stream(),
                     format!("test functions only support generic parameters; got = {:#?}", other),
                 )
                 .to_compile_error()
@@ -209,7 +393,8 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 
     // Pass the test name as the first argument, and keep other arguments
     // in the generated function which will be passed to the original function.
-    let impl_inputs = inputs.iter().skip(1).cloned().collect::<Vec<_>>();
+    let skip = test_name.then(|| 1).unwrap_or(0);
+    let impl_inputs = inputs.iter().skip(skip).cloned().collect::<Vec<_>>();
 
     let mut args = Vec::new();
     for arg in impl_inputs.iter() {
@@ -217,7 +402,7 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
             syn::FnArg::Typed(syn::PatType { attrs: _, pat, colon_token: _, ty: _ }) => pat,
             other => {
                 return syn::Error::new_spanned(
-                    proc_macro2::TokenStream::from(input),
+                    input.to_token_stream(),
                     format!("expected typed fn arg; got = {:#?}", other),
                 )
                 .to_compile_error()
@@ -235,7 +420,7 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
             }) => ident,
             other => {
                 return syn::Error::new_spanned(
-                    proc_macro2::TokenStream::from(input),
+                    input.to_token_stream(),
                     format!("expected ident fn arg; got = {:#?}", other),
                 )
                 .to_compile_error()
@@ -251,11 +436,15 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
     }
 
     let make_args = |name: String| {
-        std::iter::once(syn::Expr::Lit(syn::ExprLit {
-            attrs: vec![],
-            lit: syn::Lit::Str(syn::LitStr::new(&name, Span::call_site())),
-        }))
-        .chain(args.iter().cloned())
+        test_name
+            .then(|| {
+                syn::Expr::Lit(syn::ExprLit {
+                    attrs: vec![],
+                    lit: syn::Lit::Str(syn::LitStr::new(&name, Span::call_site())),
+                })
+            })
+            .into_iter()
+            .chain(args.iter().cloned())
     };
 
     let mut permutations = permutations_over_type_generics(variants, &type_generics).peekable();
@@ -311,17 +500,21 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
     result.into()
 }
 
-/// Runs a test `fn` over different variations of Netstacks, device endpoints
-/// and/or network managers based on the test `fn`'s type parameters.
+/// Runs a test `fn` over different variations of known type parameters. based
+///  on the test `fn`'s type parameters.
 ///
-/// The test `fn` may only be generic over any combination of `Netstack` and
-/// `Manager`. It may only have a single `&str` argument, used to identify the
-/// test variation.
+/// Each supported type parameter substitution must be informed with a call to
+/// the `#[variant(X, Variant)]` attribute where `X` is the type parameter
+/// identifier and `Variant` is one of the supported variant substitutions.
+///
+/// See [`VariantType`] for the supported variants passed to the
+/// `#[variant(..)]` attribute.
 ///
 /// Example:
 ///
 /// ```
 /// #[netstack_test]
+/// #[variant(N, Netstack)]
 /// async fn test_foo<N: Netstack>(name: &str) {}
 /// ```
 ///
@@ -341,6 +534,7 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 /// Similarly,
 /// ```
 /// #[netstack_test]
+/// #[variant(M, Manager)]
 /// async fn test_foo<M: Manager>(name: &str) {/*...*/}
 /// ```
 ///
@@ -350,6 +544,8 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 /// multiple occurrences of the same trait bound.
 /// ```
 /// #[netstack_test]
+/// #[variant(N1, Netstack)]
+/// #[variant(N2, Netstack)]
 /// async fn test_foo<N1: Netstack, N2: Netstack>(name: &str) {/*...*/}
 /// ```
 ///
@@ -405,112 +601,29 @@ fn netstack_test_inner(input: TokenStream, variants: &[Variant<'_>]) -> TokenStr
 ///    test_foo("test_foo").await
 /// }
 /// ```
+///
+/// Substitution of the first parameter with the test name can be disabled with
+///
+/// ```
+/// #[netstack_test(test_name = false)]
+/// ```
 #[proc_macro_attribute]
 pub fn netstack_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
-    if !attrs.is_empty() {
-        return syn::Error::new_spanned(
-            proc_macro2::TokenStream::from(attrs),
-            "unrecognized attributes",
-        )
-        .to_compile_error()
-        .into();
+    let args = syn::parse_macro_input!(attrs as NetstackTestArgs);
+
+    let item = syn::parse_macro_input!(input as syn::ItemFn);
+    let (item, mut variants) = match extract_variants(item) {
+        Ok(i) => i,
+        Err(e) => return e.to_compile_error().into(),
+    };
+
+    let result = netstack_test_inner(args, item, &mut variants[..]);
+
+    // Check for unused variants before returning.
+    if let Some(v) = variants.iter().find(|v| !v.seen) {
+        return syn::Error::new(v.ident.span(), "unused variant").to_compile_error().into();
     }
-
-    let disable_on_riscv: syn::Attribute = syn::parse_quote!(#[cfg(not(target_arch = "riscv64"))]);
-
-    netstack_test_inner(
-        input,
-        &[
-            Variant {
-                trait_bound: str_to_syn_path("Netstack"),
-                implementations: &[
-                    Implementation {
-                        type_name: str_to_syn_path("netstack_testing_common::realms::Netstack2"),
-                        suffix: "ns2",
-                        attrs: vec![disable_on_riscv.clone()],
-                    },
-                    Implementation {
-                        type_name: str_to_syn_path("netstack_testing_common::realms::Netstack3"),
-                        suffix: "ns3",
-                        attrs: vec![],
-                    },
-                ],
-            },
-            Variant {
-                trait_bound: str_to_syn_path("DhcpClient"),
-                implementations: &[
-                    Implementation {
-                        type_name: str_to_syn_path("netstack_testing_common::realms::InStack"),
-                        suffix: "dhcp_in_stack",
-                        attrs: vec![],
-                    },
-                    Implementation {
-                        type_name: str_to_syn_path("netstack_testing_common::realms::OutOfStack"),
-                        suffix: "dhcp_out_of_stack",
-                        attrs: vec![],
-                    },
-                ],
-            },
-            Variant {
-                trait_bound: str_to_syn_path("NetstackAndDhcpClient"),
-                implementations: &[
-                    Implementation {
-                        type_name: str_to_syn_path(
-                            "netstack_testing_common::realms::Netstack2AndInStackDhcpClient",
-                        ),
-                        suffix: "ns2_with_dhcp_in_stack",
-                        attrs: vec![disable_on_riscv.clone()],
-                    },
-                    Implementation {
-                        type_name: str_to_syn_path(
-                            "netstack_testing_common::realms::Netstack2AndOutOfStackDhcpClient",
-                        ),
-                        suffix: "ns2_with_dhcp_out_of_stack",
-                        attrs: vec![disable_on_riscv.clone()],
-                    },
-                    Implementation {
-                        type_name: str_to_syn_path(
-                            "netstack_testing_common::realms::Netstack3AndOutOfStackDhcpClient",
-                        ),
-                        suffix: "ns3_with_dhcp_out_of_stack",
-                        attrs: vec![],
-                    },
-                ],
-            },
-            Variant {
-                trait_bound: str_to_syn_path("Manager"),
-                implementations: &[
-                    Implementation {
-                        type_name: str_to_syn_path("netstack_testing_common::realms::NetCfgBasic"),
-                        suffix: "netcfg_basic",
-                        attrs: vec![],
-                    },
-                    Implementation {
-                        type_name: str_to_syn_path(
-                            "netstack_testing_common::realms::NetCfgAdvanced",
-                        ),
-                        suffix: "netcfg_advanced",
-                        attrs: vec![],
-                    },
-                ],
-            },
-            Variant {
-                trait_bound: str_to_syn_path("net_types::ip::Ip"),
-                implementations: &[
-                    Implementation {
-                        type_name: str_to_syn_path("net_types::ip::Ipv6"),
-                        suffix: "v6",
-                        attrs: vec![],
-                    },
-                    Implementation {
-                        type_name: str_to_syn_path("net_types::ip::Ipv4"),
-                        suffix: "v4",
-                        attrs: vec![],
-                    },
-                ],
-            },
-        ],
-    )
+    result
 }
 
 #[cfg(test)]
@@ -527,12 +640,12 @@ mod tests {
     impl PartialEq<TestVariation> for VariantExpectation {
         fn eq(&self, other: &TestVariation) -> bool {
             self.suffix == other.suffix
-                && self.params
-                    == other
-                        .params
-                        .iter()
-                        .map(|p| p.get_ident().unwrap().to_string())
-                        .collect::<Vec<_>>()
+                && self
+                    .params
+                    .iter()
+                    .map(|p| syn::parse_str::<syn::Path>(p).unwrap())
+                    .collect::<Vec<_>>()
+                    == other.params
         }
     }
 
@@ -540,39 +653,39 @@ mod tests {
         params: vec![],
         suffix: "",
     }]; "default")]
-    #[test_case(vec!["T: TraitA"] => vec![VariantExpectation {
-        params: vec!["ImplA1"],
-        suffix: "_a1",
+    #[test_case(vec!["N"] => vec![VariantExpectation {
+        params: vec![VariantType::NETSTACK2],
+        suffix: "_ns2",
     }, VariantExpectation {
-        params: vec!["ImplA2"],
-        suffix: "_a2",
+        params: vec![VariantType::NETSTACK3],
+        suffix: "_ns3",
     }]; "simple case")]
-    #[test_case(vec!["T: TraitA", "S: TraitB"] => vec![VariantExpectation {
-        params: vec!["ImplA1", "ImplB1"],
-        suffix: "_a1_b1",
+    #[test_case(vec!["N", "I"] => vec![VariantExpectation {
+        params: vec![VariantType::NETSTACK2, VariantType::IPV4],
+        suffix: "_ns2_v4",
     }, VariantExpectation {
-        params: vec!["ImplA1", "ImplB2"],
-        suffix: "_a1_b2",
+        params: vec![VariantType::NETSTACK2, VariantType::IPV6],
+        suffix: "_ns2_v6",
     }, VariantExpectation {
-        params: vec!["ImplA2", "ImplB1"],
-        suffix: "_a2_b1",
+        params: vec![VariantType::NETSTACK3, VariantType::IPV4],
+        suffix: "_ns3_v4",
     }, VariantExpectation {
-        params: vec!["ImplA2", "ImplB2"],
-        suffix: "_a2_b2",
+        params: vec![VariantType::NETSTACK3, VariantType::IPV6],
+        suffix: "_ns3_v6",
     }]; "two traits")]
-    #[test_case(vec!["T1: TraitA", "T2: TraitA"] => vec![VariantExpectation {
-        params: vec!["ImplA1", "ImplA1"],
-        suffix: "_a1_a1",
+    #[test_case(vec!["N", "NN"] => vec![VariantExpectation {
+        params: vec![VariantType::NETSTACK2, VariantType::NETSTACK2],
+        suffix: "_ns2_ns2",
     }, VariantExpectation {
-        params: vec!["ImplA1", "ImplA2"],
-        suffix: "_a1_a2",
+        params: vec![VariantType::NETSTACK2, VariantType::NETSTACK3],
+        suffix: "_ns2_ns3",
     }, VariantExpectation {
-        params: vec!["ImplA2", "ImplA1"],
-        suffix: "_a2_a1",
+        params: vec![VariantType::NETSTACK3, VariantType::NETSTACK2],
+        suffix: "_ns3_ns2",
     }, VariantExpectation {
-        params: vec!["ImplA2", "ImplA2"],
-        suffix: "_a2_a2",
-    }]; "two occurrences of a single trait")]
+        params: vec![VariantType::NETSTACK3, VariantType::NETSTACK3],
+        suffix: "_ns3_ns3",
+    }]; "two occurrences of a single variant type")]
     fn permutation(generics: impl IntoIterator<Item = &'static str>) -> Vec<TestVariation> {
         let generics = generics
             .into_iter()
@@ -581,36 +694,21 @@ mod tests {
         let generics = generics.iter().collect::<Vec<&_>>();
 
         permutations_over_type_generics(
-            &[
+            &mut [
                 Variant {
-                    trait_bound: syn::parse_str("TraitA").unwrap(),
-                    implementations: &[
-                        Implementation {
-                            type_name: syn::parse_str("ImplA1").unwrap(),
-                            suffix: "a1",
-                            attrs: vec![],
-                        },
-                        Implementation {
-                            type_name: syn::parse_str("ImplA2").unwrap(),
-                            suffix: "a2",
-                            attrs: vec![],
-                        },
-                    ],
+                    ident: syn::parse_str("N").unwrap(),
+                    variant_type: VariantType::Netstack,
+                    seen: false,
                 },
                 Variant {
-                    trait_bound: syn::parse_str("TraitB").unwrap(),
-                    implementations: &[
-                        Implementation {
-                            type_name: syn::parse_str("ImplB1").unwrap(),
-                            suffix: "b1",
-                            attrs: vec![],
-                        },
-                        Implementation {
-                            type_name: syn::parse_str("ImplB2").unwrap(),
-                            suffix: "b2",
-                            attrs: vec![],
-                        },
-                    ],
+                    ident: syn::parse_str("NN").unwrap(),
+                    variant_type: VariantType::Netstack,
+                    seen: false,
+                },
+                Variant {
+                    ident: syn::parse_str("I").unwrap(),
+                    variant_type: VariantType::Ip,
+                    seen: false,
                 },
             ],
             &generics,

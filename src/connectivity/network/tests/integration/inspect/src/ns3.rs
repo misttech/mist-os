@@ -20,7 +20,7 @@ use {
 };
 
 use net_declare::{fidl_mac, fidl_subnet, std_ip_v4, std_ip_v6};
-use net_types::ip::{IpAddress, IpInvariant, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
 use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
 use netstack_testing_common::{constants, get_inspect_data};
@@ -36,11 +36,12 @@ enum TcpSocketState {
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(TcpSocketState::Unbound; "unbound")]
 #[test_case(TcpSocketState::Bound; "bound")]
 #[test_case(TcpSocketState::Listener; "listener")]
 #[test_case(TcpSocketState::Connected; "connected")]
-async fn inspect_tcp_sockets<I: net_types::ip::Ip>(name: &str, socket_state: TcpSocketState) {
+async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm =
         sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
@@ -291,6 +292,7 @@ impl TestIpExt for Ipv6 {
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(
     fposix_socket::DatagramSocketProtocol::Udp, SocketState::Bound;
     "udp_bound"
@@ -307,7 +309,7 @@ impl TestIpExt for Ipv6 {
     fposix_socket::DatagramSocketProtocol::IcmpEcho, SocketState::Connected;
     "icmp_connected"
 )]
-async fn inspect_datagram_sockets<I: net_types::ip::Ip + TestIpExt>(
+async fn inspect_datagram_sockets<I: TestIpExt>(
     name: &str,
     proto: fposix_socket::DatagramSocketProtocol,
     socket_state: SocketState,
