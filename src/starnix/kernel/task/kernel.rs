@@ -109,6 +109,8 @@ pub struct Kernel {
     pub sys_fs: OnceCell<FileSystemHandle>,
     // Owned by security/selinux_hooks/fs.rs
     pub selinux_fs: OnceCell<FileSystemHandle>,
+    // Owned by nmfs.rs
+    pub nmfs: OnceCell<FileSystemHandle>,
     // The SELinux security server. Initialized if SELinux is enabled.
     pub security_server: Option<Arc<SecurityServer>>,
     // Owned by tracefs/fs.rs
@@ -329,6 +331,7 @@ impl Kernel {
             socket_fs: Default::default(),
             sys_fs: Default::default(),
             selinux_fs: Default::default(),
+            nmfs: Default::default(),
             security_server,
             trace_fs: Default::default(),
             fusectl_fs: Default::default(),

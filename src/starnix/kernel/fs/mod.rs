@@ -8,6 +8,7 @@ pub mod ext4;
 pub mod fuchsia;
 pub mod functionfs;
 pub mod layeredfs;
+pub mod nmfs;
 pub mod overlayfs;
 pub mod proc;
 pub mod sysfs;

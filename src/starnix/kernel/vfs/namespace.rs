@@ -8,6 +8,7 @@ use crate::fs::devpts::dev_pts_fs;
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::ext4::ExtFilesystem;
 use crate::fs::functionfs::FunctionFs;
+use crate::fs::nmfs::nmfs;
 use crate::fs::overlayfs::OverlayFs;
 use crate::fs::proc::proc_fs;
 use crate::fs::sysfs::sys_fs;
@@ -749,6 +750,7 @@ impl FileSystemCreator for CurrentTask {
             b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
             b"ext4" => ExtFilesystem::new_fs(locked, kernel, self, options),
             b"functionfs" => FunctionFs::new_fs(self, options),
+            b"nmfs" => Ok(nmfs(self, options).clone()),
             b"overlay" => OverlayFs::new_fs(locked, self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
             b"tracefs" => Ok(trace_fs(self, options).clone()),

@@ -29,6 +29,7 @@ syscall_tests = [
   "memfd_test",
   "mmap_test",
   "mount_test",
+  "nmfs_test",
   "overlayfs_test",
   "pidfd_test",
   "pipe_test",

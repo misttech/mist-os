@@ -59,6 +59,7 @@ impl SysFs {
             dir.subdir(current_task, "fuse", 0o755, |dir| {
                 dir.subdir(current_task, "connections", 0o755, |_| ())
             });
+            dir.subdir(current_task, "nmfs", 0o755, |_| ());
         });
 
         let registry = &kernel.device_registry;

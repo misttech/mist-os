@@ -147,6 +147,8 @@ rustc_library("starnix_core") {
     "fs/functionfs.rs",
     "fs/layeredfs.rs",
     "fs/mod.rs",
+    "fs/nmfs/fs.rs",
+    "fs/nmfs/mod.rs",
     "fs/overlayfs.rs",
     "fs/proc/fs.rs",
     "fs/proc/mod.rs",
