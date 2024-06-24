@@ -239,7 +239,7 @@ impl SessionManagerState {
             return Err(startup::StartupError::NotRunning);
         };
         let url = url.clone();
-        self.start_impl(&mut *session, url).await?;
+        self.start_impl(&mut session, url).await?;
         Ok(())
     }
 

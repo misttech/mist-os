@@ -92,7 +92,7 @@ impl PowerElement {
         loop {
             match lease.watch_status(status).await? {
                 fbroker::LeaseStatus::Satisfied => break,
-                new_status @ _ => status = new_status,
+                new_status => status = new_status,
             }
         }
         let lease = lease.into_client_end().expect("No ongoing calls on lease");

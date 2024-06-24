@@ -36,9 +36,9 @@ pub enum StartupError {
     NotRunning,
 }
 
-impl Into<fsession::LaunchError> for StartupError {
-    fn into(self) -> fsession::LaunchError {
-        match self {
+impl From<StartupError> for fsession::LaunchError {
+    fn from(e: StartupError) -> fsession::LaunchError {
+        match e {
             StartupError::NotDestroyed { .. } => fsession::LaunchError::DestroyComponentFailed,
             StartupError::NotCreated { err, .. } => match err {
                 fcomponent::Error::InstanceCannotResolve => fsession::LaunchError::NotFound,
@@ -53,9 +53,9 @@ impl Into<fsession::LaunchError> for StartupError {
     }
 }
 
-impl Into<fsession::RestartError> for StartupError {
-    fn into(self) -> fsession::RestartError {
-        match self {
+impl From<StartupError> for fsession::RestartError {
+    fn from(e: StartupError) -> fsession::RestartError {
+        match e {
             StartupError::NotDestroyed { .. } => fsession::RestartError::DestroyComponentFailed,
             StartupError::NotCreated { err, .. } => match err {
                 fcomponent::Error::InstanceCannotResolve => fsession::RestartError::NotFound,
@@ -70,9 +70,9 @@ impl Into<fsession::RestartError> for StartupError {
     }
 }
 
-impl Into<fsession::LifecycleError> for StartupError {
-    fn into(self) -> fsession::LifecycleError {
-        match self {
+impl From<StartupError> for fsession::LifecycleError {
+    fn from(e: StartupError) -> fsession::LifecycleError {
+        match e {
             StartupError::NotDestroyed { .. } => fsession::LifecycleError::DestroyComponentFailed,
             StartupError::NotCreated { err, .. } => match err {
                 fcomponent::Error::InstanceCannotResolve => {
@@ -117,7 +117,7 @@ pub async fn launch_session(
     info!(session_url, "Launching session");
 
     let start_time = zx::Time::get_monotonic();
-    let controller = set_session(&session_url, realm, exposed_dir).await?;
+    let controller = set_session(session_url, realm, exposed_dir).await?;
     let end_time = zx::Time::get_monotonic();
 
     fasync::Task::local(async move {
@@ -190,7 +190,7 @@ async fn set_session(
     };
     realm_management::create_child_component(
         SESSION_NAME,
-        &session_url,
+        session_url,
         SESSION_CHILD_COLLECTION,
         create_child_args,
         realm,

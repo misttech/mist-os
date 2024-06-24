@@ -74,6 +74,7 @@ pub async fn log_session_launch_time(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_metrics::{MetricEventLoggerMarker, MetricEventLoggerRequest};
     use futures::TryStreamExt;
@@ -92,26 +93,20 @@ mod tests {
         })
         .detach();
 
-        if let Some(log_request) = logger_server.try_next().await.unwrap() {
-            if let MetricEventLoggerRequest::LogInteger {
-                metric_id,
-                value,
+        assert_matches!(
+            logger_server.try_next().await.unwrap(),
+            Some(MetricEventLoggerRequest::LogInteger {
+                metric_id: metrics::SESSION_LAUNCH_TIME_MIGRATED_METRIC_ID,
+                value: 5,
                 event_codes,
                 responder: _,
-            } = log_request
-            {
-                assert_eq!(metric_id, metrics::SESSION_LAUNCH_TIME_MIGRATED_METRIC_ID);
+            }) => {
                 assert_eq!(
                     event_codes,
                     vec![metrics::SessionLaunchTimeMigratedMetricDimensionStatus::Success as u32]
                 );
-                assert_eq!(value, 5);
-            } else {
-                assert!(false);
             }
-        } else {
-            assert!(false);
-        }
+        )
     }
 
     /// Tests that an error is raised if end_time < start_time.
