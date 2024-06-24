@@ -220,7 +220,7 @@ class LogBufferBuilder {
   explicit LogBufferBuilder(fuchsia_logging::LogSeverity severity) : severity_(severity) {}
 
   /// Sets the file name and line number for the log message
-  LogBufferBuilder& SetFile(cpp17::string_view file, unsigned int line) {
+  LogBufferBuilder& WithFile(cpp17::string_view file, unsigned int line) {
     file_name_ = file;
     line_ = line;
     return *this;
@@ -450,7 +450,7 @@ void fx_slog_internal(fuchsia_logging::LogSeverity severity, const char* file, i
                       Args... args) {
   syslog_runtime::LogBufferBuilder builder(severity);
   if (file) {
-    builder.SetFile(file, line);
+    builder.WithFile(file, line);
   }
   if (msg != nullptr) {
     builder.WithMsg(msg);

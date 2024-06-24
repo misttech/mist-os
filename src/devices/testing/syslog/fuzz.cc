@@ -40,7 +40,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   auto msg = provider.ConsumeRandomLengthString();
   auto condition = provider.ConsumeRandomLengthString();
   auto builder = syslog_runtime::LogBufferBuilder(severity);
-  auto buffer = builder.WithCondition(condition).WithMsg(msg).SetFile(file, line).Build();
+  auto buffer = builder.WithCondition(condition).WithMsg(msg).WithFile(file, line).Build();
   while (provider.remaining_bytes()) {
     auto op = provider.ConsumeEnum<OP>();
     auto key = provider.ConsumeRandomLengthString();
