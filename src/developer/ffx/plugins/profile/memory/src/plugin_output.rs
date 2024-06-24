@@ -70,7 +70,8 @@ mod tests {
                 mock_process(3, "process3"),
             ],
             vmos: vec![],
-            buckets: vec![],
+            buckets: None,
+            total_undigested: None,
         }
     }
 

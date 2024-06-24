@@ -191,7 +191,7 @@ pub mod raw {
     }
 
     /// Defines a memory bucket.
-    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     pub struct BucketDefinition {
         /// The Cobalt event code associated with this bucket.
         pub event_code: u64,
@@ -227,7 +227,7 @@ pub mod processed {
     use std::collections::{HashMap, HashSet};
 
     /// Per process memory attribution.
-    #[derive(Serialize, PartialEq, Debug, Default)]
+    #[derive(Serialize, PartialEq, Debug, Default, Clone)]
     pub struct RetainedMemory {
         /// Total size, in bytes, of VMOs exclusively retained
         /// (directly, or indirectly via children VMOs) by the
@@ -267,7 +267,7 @@ pub mod processed {
     }
 
     /// Summary of memory-related data for a given process.
-    #[derive(Serialize, PartialEq, Debug)]
+    #[derive(Serialize, PartialEq, Debug, Clone)]
     pub struct Process {
         /// Kernel Object ID. See related Fuchsia Kernel concept.
         pub koid: u64,
@@ -308,7 +308,9 @@ pub mod processed {
         /// Details about VMOs.
         pub vmos: Vec<Vmo>,
         /// Buckets
-        pub buckets: Vec<Bucket>,
+        pub buckets: Option<Vec<Bucket>>,
+        /// The sum of all the committed bytes not in a bucket.
+        pub total_undigested: Option<u64>,
     }
 
     /// Returns the name of a VMO category when the name match on of the rules.
@@ -335,9 +337,14 @@ pub mod processed {
 
     /// Conversion trait from a raw digest to a human-friendly
     /// processed digest. Data is aggregated, normalized, sorted.
+    /// Arguments:
+    ///   - `memory_monitor_output`: data from the device memory monitor
+    ///   - `bucketize`: if true, bins the memory into memory buckets
+    ///   - `undigest_view`: if true, only return the memory which isn't part of any memory bucket
     pub fn digest_from_memory_monitor_output(
         memory_monitor_output: raw::MemoryMonitorOutput,
         bucketize: bool,
+        undigest_view: bool,
     ) -> Digest {
         let capture = memory_monitor_output.capture;
         // Index processes by koid.
@@ -398,6 +405,36 @@ pub mod processed {
             }
             processes
         };
+
+        let (buckets, total_undigested) = if bucketize || undigest_view {
+            let (buckets, undigested) = compute_buckets(
+                &memory_monitor_output.buckets_definitions,
+                &processes,
+                &koid_to_vmo,
+            );
+
+            let total_undigested = Some(
+                undigested
+                    .iter()
+                    .map(|vmo| koid_to_vmo.get(vmo).unwrap().committed_bytes)
+                    .sum::<u64>(),
+            );
+            if undigest_view {
+                for process in processes.iter_mut() {
+                    // Only keep undigested VMOs when the undigested view is requested. The other VMOs are hidden and discarded.
+                    process.vmos.retain(|vmo| undigested.contains(vmo));
+                }
+                processes.retain(|process| !process.vmos.is_empty());
+            }
+            if bucketize {
+                (Some(buckets), total_undigested)
+            } else {
+                (None, total_undigested)
+            }
+        } else {
+            (None, None)
+        };
+
         // Mapping from each VMO koid to the set of every processes that refer
         // this VMO, either directly, or indirectly via related VMOs.
         // Also maps process to VMOs either directly, or indirectly.
@@ -465,12 +502,6 @@ pub mod processed {
         };
         let kernel_vmo = capture.kernel.vmo.saturating_sub(total_committed_vmo);
 
-        let buckets = if bucketize {
-            compute_buckets(&memory_monitor_output.buckets_definitions, &processes, &koid_to_vmo)
-        } else {
-            vec![]
-        };
-
         Digest {
             time: capture.time,
             total_committed_bytes_in_vmos: total_committed_vmo,
@@ -478,6 +509,7 @@ pub mod processed {
             processes,
             vmos: koid_to_vmo.into_values().collect(),
             buckets,
+            total_undigested,
         }
     }
 }
@@ -534,8 +566,19 @@ mod tests {
                     name: "process5".to_string(),
                     vmos: vec![2],
                 }),
+                // Process with one child VMO
+                raw::Process::Data(raw::ProcessData {
+                    koid: 6,
+                    name: "process6".to_string(),
+                    vmos: vec![4],
+                }),
             ],
-            vmo_names: vec!["vmo1".to_string(), "vmo2".to_string(), "vmo3".to_string()],
+            vmo_names: vec![
+                "vmo1".to_string(),
+                "vmo2".to_string(),
+                "vmo3".to_string(),
+                "vmo4".to_string(),
+            ],
             vmos: vec![
                 raw::Vmo::Headers(raw::VmoHeaders::default()),
                 raw::Vmo::Data(raw::VmoData {
@@ -557,6 +600,14 @@ mod tests {
                 raw::Vmo::Data(raw::VmoData {
                     koid: 3,
                     name: 2,
+                    parent_koid: 0,
+                    committed_bytes: 100,
+                    allocated_bytes: 200,
+                    populated_bytes: Some(200),
+                }),
+                raw::Vmo::Data(raw::VmoData {
+                    koid: 4,
+                    name: 3,
                     parent_koid: 0,
                     committed_bytes: 100,
                     allocated_bytes: 200,
@@ -726,6 +777,40 @@ mod tests {
                     result
                 },
             },
+            processed::Process {
+                koid: 6,
+                name: "process6".to_string(),
+                memory: processed::RetainedMemory {
+                    private: 100,
+                    scaled: 100,
+                    total: 100,
+                    private_populated: 200,
+                    scaled_populated: 200,
+                    total_populated: 200,
+                    vmos: vec![],
+                },
+                name_to_vmo_memory: {
+                    let mut result = HashMap::new();
+                    result.insert(
+                        "vmo4".to_string(),
+                        processed::RetainedMemory {
+                            private: 100,
+                            scaled: 100,
+                            total: 100,
+                            private_populated: 200,
+                            scaled_populated: 200,
+                            total_populated: 200,
+                            vmos: vec![4],
+                        },
+                    );
+                    result
+                },
+                vmos: {
+                    let mut result = HashSet::new();
+                    result.insert(4);
+                    result
+                },
+            },
         ];
 
         let buckets_definitions = vec![
@@ -744,8 +829,12 @@ mod tests {
         ];
 
         let processed = processed::digest_from_memory_monitor_output(
-            raw::MemoryMonitorOutput { capture, buckets_definitions },
+            raw::MemoryMonitorOutput {
+                capture: capture.clone(),
+                buckets_definitions: buckets_definitions.clone(),
+            },
             true,
+            false,
         );
         // Check that the process list is sorted
         {
@@ -790,6 +879,14 @@ mod tests {
                 allocated_bytes: 200,
                 populated_bytes: Some(200),
             },
+            processed::Vmo {
+                koid: 4,
+                name: "vmo4".to_string(),
+                parent_koid: 0,
+                committed_bytes: 100,
+                allocated_bytes: 200,
+                populated_bytes: Some(200),
+            },
         ];
 
         pretty_assertions::assert_eq!(
@@ -802,10 +899,25 @@ mod tests {
         let buckets = processed.buckets;
         pretty_assertions::assert_eq!(
             buckets,
-            vec![
+            Some(vec![
                 Bucket { name: "bucket0".to_string(), size: 400, vmos: HashSet::from([1, 3]) },
                 Bucket { name: "bucket1".to_string(), size: 100, vmos: HashSet::from([2]) }
-            ]
+            ])
+        );
+
+        // VMO 4 from process 6 is the only VMO not part of any bucket.
+        pretty_assertions::assert_eq!(processed.total_undigested, Some(100));
+
+        // When `undigest_view` is active, only undigested VMOs are returned.
+        let undigested_processed = processed::digest_from_memory_monitor_output(
+            raw::MemoryMonitorOutput { capture, buckets_definitions },
+            true,
+            true,
+        );
+
+        pretty_assertions::assert_eq!(
+            sorted_by_koid(&undigested_processed.processes),
+            sorted_by_koid(&vec![expected_processes[4].clone()])
         );
     }
 
@@ -937,6 +1049,7 @@ mod tests {
         ];
         let processed = processed::digest_from_memory_monitor_output(
             raw::MemoryMonitorOutput { capture, buckets_definitions: vec![] },
+            false,
             false,
         );
 

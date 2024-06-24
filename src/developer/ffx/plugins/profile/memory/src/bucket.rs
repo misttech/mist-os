@@ -45,11 +45,12 @@ fn regex_that_matches_everything_if_string_empty(regex_str: &String) -> regex::R
 /// A VMO will be attributed to the first bucket it matches.
 /// A VMO will match a given bucket if the bucket's `process` regex matches a process
 /// that references the VMO *and* if the bucket's `vmo` regex matches the name of the VMO.
+/// Returns the list of buckets, and the list of koids of VMOs not in any bucket.
 pub fn compute_buckets(
     buckets_definitions: &Vec<BucketDefinition>,
     processes: &Vec<Process>,
     koid_to_vmo: &HashMap<u64, Vmo>,
-) -> Vec<Bucket> {
+) -> (Vec<Bucket>, HashSet<u64>) {
     let mut buckets: Vec<Bucket> = vec![];
     let mut digested_vmos = HashSet::new();
 
@@ -85,7 +86,7 @@ pub fn compute_buckets(
             vmos: bucket_vmos,
         });
     }
-    buckets
+    (buckets, koid_to_vmo.keys().filter(|&k| !digested_vmos.contains(k)).copied().collect())
 }
 
 #[cfg(test)]
@@ -207,7 +208,7 @@ mod tests {
 
         // Step 3/3:
         // Run `compute_buckets`, and check the output.
-        let buckets = compute_buckets(&buckets_definitions, &processes, &koid_to_vmo);
+        let (buckets, undigested) = compute_buckets(&buckets_definitions, &processes, &koid_to_vmo);
         pretty_assertions::assert_eq!(
             buckets[0],
             Bucket { name: "bucket0".to_string(), size: 0, vmos: HashSet::new() }
@@ -241,5 +242,6 @@ mod tests {
             }
         );
         pretty_assertions::assert_eq!(buckets.len(), 6);
+        pretty_assertions::assert_eq!(undigested, Default::default());
     }
 }
