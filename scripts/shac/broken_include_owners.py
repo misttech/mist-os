@@ -21,20 +21,27 @@ def main():
 
     for line_number, line in enumerate(lines, start=1):
         include_path = None
-        # Search for "file:" or "include" keyword for importing OWNERS file
-        match = re.search(r"(include\s|file:)\s*(\S+)", line)
+        line = line.split("#")[0]  # Ignore comments.
+        # Search for "file:" or "include" keyword for importing OWNERS file.
+        match = re.search(r"(include\s+|file:\s*)(\S+)", line)
         if match:
-            include_path = match.group(2)
-
-            if include_path.startswith("/"):
-                include_path = include_path.lstrip("/")
-                abs_path = os.path.abspath(include_path)
+            if line.startswith("include"):
+                include_path = match.group(2)
             else:
-                dir_path = os.path.dirname(owners_file)
-                abs_path = os.path.abspath(os.path.join(dir_path, include_path))
+                include_path = match.group(2)
 
-            if not os.path.exists(abs_path):
-                broken_includes.append(line_number)
+            if include_path:
+                if include_path.startswith("/"):
+                    include_path = include_path.lstrip("/")
+                    abs_path = os.path.abspath(include_path)
+                else:
+                    dir_path = os.path.dirname(owners_file)
+                    abs_path = os.path.abspath(
+                        os.path.join(dir_path, include_path)
+                    )
+
+                if not os.path.exists(abs_path):
+                    broken_includes.append(line_number)
 
     print(json.dumps([{"lines": broken_includes}], indent=2))
 
