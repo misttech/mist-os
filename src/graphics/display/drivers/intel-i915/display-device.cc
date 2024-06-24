@@ -265,19 +265,19 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
   }
 }
 
-added_display_args_t DisplayDevice::CreateAddedDisplayArgs() {
+raw_display_info_t DisplayDevice::CreateRawDisplayInfo() {
   i2c_impl_protocol_t i2c_protocol;
   i2c().GetProto(&i2c_protocol);
 
-  return added_display_args_t{
+  return raw_display_info_t{
       .display_id = display::ToBanjoDisplayId(id()),
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_I2C,
-      .panel =
-          {
-              .i2c = i2c_protocol,
-          },
-      .pixel_format_list = kBanjoSupportedPixelFormats.data(),
-      .pixel_format_count = kBanjoSupportedPixelFormats.size(),
+      .preferred_modes_list = nullptr,
+      .preferred_modes_count = 0,
+      .edid_bytes_list = nullptr,
+      .edid_bytes_count = 0,
+      .eddc_client = i2c_protocol,
+      .pixel_formats_list = kBanjoSupportedPixelFormats.data(),
+      .pixel_formats_count = kBanjoSupportedPixelFormats.size(),
   };
 
   // TODO(b/317914671): After the display coordinator provides display metadata

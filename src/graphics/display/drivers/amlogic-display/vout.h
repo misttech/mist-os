@@ -64,7 +64,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   Vout& operator=(const Vout&) = delete;
 
   // `pixel_formats` must outlive the returned added_display_args_t.
-  added_display_args_t CreateAddedDisplayArgs(
+  raw_display_info_t CreateRawDisplayInfo(
       display::DisplayId display_id,
       cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats);
 
@@ -134,6 +134,9 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
     // TODO(https://fxbug.dev/318800903): Use const reference when `dsi_` moves
     // to its own implementation class.
     PanelConfig panel_config;
+
+    // Matches the timing in `panel_config`.
+    display_mode_t banjo_display_mode;
   } dsi_;
 
   struct hdmi_t {

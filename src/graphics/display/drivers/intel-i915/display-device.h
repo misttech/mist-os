@@ -115,7 +115,7 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
 
   virtual bool CheckPixelRate(int64_t pixel_rate_hz) = 0;
 
-  added_display_args_t CreateAddedDisplayArgs();
+  raw_display_info_t CreateRawDisplayInfo();
 
   // FIDL calls
   void GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) override;

@@ -233,7 +233,7 @@ class DisplayCaptureCompletion {
   display_controller_interface_protocol_t GetDisplayControllerInterfaceProtocol() {
     static constexpr display_controller_interface_protocol_ops_t
         kDisplayControllerInterfaceProtocolOps = {
-            .on_display_added = [](void* ctx, const added_display_args_t* added_display) {},
+            .on_display_added = [](void* ctx, const raw_display_info_t* display_info) {},
             .on_display_removed = [](void* ctx, uint64_t display_id) {},
             .on_display_vsync = [](void* ctx, uint64_t display_id, zx_time_t timestamp,
                                    const config_stamp_t* config_stamp) {},

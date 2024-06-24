@@ -89,18 +89,20 @@ void DisplayEngine::OnCoordinatorConnected() {
       .pixel_repetition = 0,
   };
 
-  const added_display_args_t added_display_args = {
+  const display_mode_t banjo_display_mode = display::ToBanjoDisplayMode(timing);
+
+  const raw_display_info_t banjo_display_info = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
-      .panel =
-          {
-              .mode = display::ToBanjoDisplayMode(timing),
-          },
-      .pixel_format_list = kSupportedFormats.data(),
-      .pixel_format_count = kSupportedFormats.size(),
+      .preferred_modes_list = &banjo_display_mode,
+      .preferred_modes_count = 1,
+      .edid_bytes_list = nullptr,
+      .edid_bytes_count = 0,
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
+      .pixel_formats_list = kSupportedFormats.data(),
+      .pixel_formats_count = kSupportedFormats.size(),
   };
 
-  coordinator_events_.OnDisplayAdded(added_display_args);
+  coordinator_events_.OnDisplayAdded(banjo_display_info);
 }
 
 zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForImage(

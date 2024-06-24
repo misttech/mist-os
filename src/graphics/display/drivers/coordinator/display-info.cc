@@ -124,7 +124,8 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
 }
 
 // static
-zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_args_t& info) {
+zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
+    const raw_display_info_t& banjo_display_info) {
   fbl::AllocChecker ac;
   fbl::RefPtr<DisplayInfo> out = fbl::AdoptRef(new (&ac) DisplayInfo);
   if (!ac.check()) {
@@ -133,11 +134,11 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
 
   out->pending_layer_change = false;
   out->layer_count = 0;
-  out->id = ToDisplayId(info.display_id);
+  out->id = ToDisplayId(banjo_display_info.display_id);
 
   zx::result get_display_info_pixel_formats_result =
-      CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
-          cpp20::span(info.pixel_format_list, info.pixel_format_count));
+      CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(cpp20::span(
+          banjo_display_info.pixel_formats_list, banjo_display_info.pixel_formats_count));
   if (get_display_info_pixel_formats_result.is_error()) {
     zxlogf(ERROR, "Cannot convert pixel formats to FIDL pixel format value: %s",
            get_display_info_pixel_formats_result.status_string());
@@ -145,25 +146,34 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
   }
   out->pixel_formats = std::move(get_display_info_pixel_formats_result.value());
 
-  if (info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE) {
-    out->mode = ToDisplayTiming(info.panel.mode);
+  if (banjo_display_info.preferred_modes_count != 0) {
+    ZX_DEBUG_ASSERT(banjo_display_info.preferred_modes_count == 1);
+
+    out->mode = ToDisplayTiming(banjo_display_info.preferred_modes_list[0]);
+
+    // TODO(https://fxbug.dev/348695412): This should not be an early return.
+    // `preferred_modes` should be merged and de-duplicated with the modes
+    // decoded from the display's EDID, by the logic below.
     return zx::ok(std::move(out));
   }
 
-  ZX_DEBUG_ASSERT(info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_I2C ||
-                  info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_BYTES);
+  auto edid_result = [&]() -> fit::result<const char*, Edid> {
+    if (banjo_display_info.edid_bytes_count != 0) {
+      cpp20::span<const uint8_t> edid_bytes(banjo_display_info.edid_bytes_list,
+                                            banjo_display_info.edid_bytes_count);
+      // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
+      // `preferred_modes` from the logic above.
+      return InitEdidFromBytes(edid_bytes);
+    }
 
-  fit::result edid_result = [&] {
-    if (info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_I2C) {
-      ddk::I2cImplProtocolClient i2c(&info.panel.i2c);
-      ZX_ASSERT(i2c.is_valid());
+    ddk::I2cImplProtocolClient i2c(&banjo_display_info.eddc_client);
+    if (i2c.is_valid()) {
+      // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
+      // `preferred_modes` from the logic above.
       return InitEdidFromI2c(i2c);
     }
 
-    ZX_DEBUG_ASSERT(info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID_BYTES);
-    cpp20::span<const uint8_t> edid_bytes(info.panel.edid_bytes.bytes_list,
-                                          info.panel.edid_bytes.bytes_count);
-    return InitEdidFromBytes(edid_bytes);
+    return fit::error("Missing display hardware support information");
   }();
 
   if (!edid_result.is_ok()) {

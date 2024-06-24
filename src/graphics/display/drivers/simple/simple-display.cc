@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "simple-display.h"
+#include "src/graphics/display/drivers/simple/simple-display.h"
 
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
@@ -123,17 +123,18 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   fuchsia_images2_pixel_format_enum_value_t pixel_format =
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(properties_.pixel_format);
 
-  const added_display_args_t added_display_args = {
+  const display_mode_t banjo_display_mode = display::ToBanjoDisplayMode(timing);
+  const raw_display_info_t banjo_display_info = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
-      .panel =
-          {
-              .mode = display::ToBanjoDisplayMode(timing),
-          },
-      .pixel_format_list = &pixel_format,
-      .pixel_format_count = 1,
+      .preferred_modes_list = &banjo_display_mode,
+      .preferred_modes_count = 1,
+      .edid_bytes_list = nullptr,
+      .edid_bytes_count = 0,
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
+      .pixel_formats_list = &pixel_format,
+      .pixel_formats_count = 1,
   };
-  intf_.OnDisplayAdded(&added_display_args);
+  intf_.OnDisplayAdded(&banjo_display_info);
 }
 
 void SimpleDisplay::DisplayControllerImplResetDisplayControllerInterface() {

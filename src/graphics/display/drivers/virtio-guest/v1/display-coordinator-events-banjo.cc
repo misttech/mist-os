@@ -32,7 +32,7 @@ void DisplayCoordinatorEventsBanjo::SetDisplayControllerInterface(
   display_controller_interface_ = *display_controller_interface;
 }
 
-void DisplayCoordinatorEventsBanjo::OnDisplayAdded(const added_display_args_t& added_display_args) {
+void DisplayCoordinatorEventsBanjo::OnDisplayAdded(const raw_display_info_t& added_display_args) {
   fbl::AutoLock event_lock(&event_mutex_);
   if (display_controller_interface_.ops == nullptr) {
     return;

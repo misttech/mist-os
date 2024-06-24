@@ -22,23 +22,18 @@ TEST(DisplayInfo, InitializeWithEdidValueSingleBlock) {
   const std::vector<fuchsia_images2_pixel_format_enum_value_t> pixel_formats = {
       fuchsia_images2_pixel_format_enum_value_t{fuchsia_images2::PixelFormat::kR8G8B8A8},
   };
-  const added_display_args_t added_display_args = {
+  const raw_display_info_t raw_display_info = {
       .display_id = 1,
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_BYTES,
-      .panel =
-          {
-              .edid_bytes =
-                  {
-                      .bytes_list = edid::kHpZr30wEdid.data(),
-                      .bytes_count = edid::kHpZr30wEdid.size(),
-                  },
-          },
-      .pixel_format_list = pixel_formats.data(),
-      .pixel_format_count = pixel_formats.size(),
+      .preferred_modes_list = nullptr,
+      .preferred_modes_count = 0,
+      .edid_bytes_list = edid::kHpZr30wEdid.data(),
+      .edid_bytes_count = edid::kHpZr30wEdid.size(),
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
+      .pixel_formats_list = pixel_formats.data(),
+      .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
-      DisplayInfo::Create(added_display_args);
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
   ASSERT_TRUE(display_info_result.is_ok())
       << "Failed to create DisplayInfo: "
       << zx_status_get_string(display_info_result.error_value());
@@ -57,23 +52,18 @@ TEST(DisplayInfo, InitializeWithEdidValueMultipleBlocks) {
   const std::vector<fuchsia_images2_pixel_format_enum_value_t> pixel_formats = {
       fuchsia_images2_pixel_format_enum_value_t{fuchsia_images2::PixelFormat::kR8G8B8A8},
   };
-  const added_display_args_t added_display_args = {
+  const raw_display_info_t raw_display_info = {
       .display_id = 1,
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_BYTES,
-      .panel =
-          {
-              .edid_bytes =
-                  {
-                      .bytes_list = edid::kSamsungCrg9Edid.data(),
-                      .bytes_count = edid::kSamsungCrg9Edid.size(),
-                  },
-          },
-      .pixel_format_list = pixel_formats.data(),
-      .pixel_format_count = pixel_formats.size(),
+      .preferred_modes_list = nullptr,
+      .preferred_modes_count = 0,
+      .edid_bytes_list = edid::kSamsungCrg9Edid.data(),
+      .edid_bytes_count = edid::kSamsungCrg9Edid.size(),
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
+      .pixel_formats_list = pixel_formats.data(),
+      .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
-      DisplayInfo::Create(added_display_args);
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
   ASSERT_TRUE(display_info_result.is_ok())
       << "Failed to create DisplayInfo: "
       << zx_status_get_string(display_info_result.error_value());
@@ -96,23 +86,18 @@ TEST(DisplayInfo, InitializeWithEdidValueOfInvalidLength) {
   const size_t kInvalidEdidSizeBytes = 173;
   ASSERT_LT(kInvalidEdidSizeBytes, edid::kSamsungCrg9Edid.size());
 
-  const added_display_args_t added_display_args = {
+  const raw_display_info_t raw_display_info = {
       .display_id = 1,
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_BYTES,
-      .panel =
-          {
-              .edid_bytes =
-                  {
-                      .bytes_list = edid::kSamsungCrg9Edid.data(),
-                      .bytes_count = kInvalidEdidSizeBytes,
-                  },
-          },
-      .pixel_format_list = pixel_formats.data(),
-      .pixel_format_count = pixel_formats.size(),
+      .preferred_modes_list = nullptr,
+      .preferred_modes_count = 0,
+      .edid_bytes_list = edid::kSamsungCrg9Edid.data(),
+      .edid_bytes_count = kInvalidEdidSizeBytes,
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
+      .pixel_formats_list = pixel_formats.data(),
+      .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
-      DisplayInfo::Create(added_display_args);
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_EQ(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
@@ -125,23 +110,18 @@ TEST(DisplayInfo, InitializeWithEdidValueIncomplete) {
   const size_t kIncompleteEdidSizeBytes = 128;
   ASSERT_LT(kIncompleteEdidSizeBytes, edid::kSamsungCrg9Edid.size());
 
-  const added_display_args_t added_display_args = {
+  const raw_display_info_t raw_display_info = {
       .display_id = 1,
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_BYTES,
-      .panel =
-          {
-              .edid_bytes =
-                  {
-                      .bytes_list = edid::kSamsungCrg9Edid.data(),
-                      .bytes_count = kIncompleteEdidSizeBytes,
-                  },
-          },
-      .pixel_format_list = pixel_formats.data(),
-      .pixel_format_count = pixel_formats.size(),
+      .preferred_modes_list = nullptr,
+      .preferred_modes_count = 0,
+      .edid_bytes_list = edid::kSamsungCrg9Edid.data(),
+      .edid_bytes_count = kIncompleteEdidSizeBytes,
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
+      .pixel_formats_list = pixel_formats.data(),
+      .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
-      DisplayInfo::Create(added_display_args);
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_EQ(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
@@ -163,23 +143,17 @@ TEST(DisplayInfo, InitializeWithEdidValueNonDigitalDisplay) {
       fuchsia_images2_pixel_format_enum_value_t{fuchsia_images2::PixelFormat::kR8G8B8A8},
   };
 
-  const added_display_args_t added_display_args = {
+  const raw_display_info_t raw_display_info = {
       .display_id = 1,
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID_BYTES,
-      .panel =
-          {
-              .edid_bytes =
-                  {
-                      .bytes_list = kEdidAnalogDisplay.data(),
-                      .bytes_count = kEdidAnalogDisplay.size(),
-                  },
-          },
-      .pixel_format_list = pixel_formats.data(),
-      .pixel_format_count = pixel_formats.size(),
+      .preferred_modes_list = nullptr,
+      .preferred_modes_count = 0,
+      .edid_bytes_list = kEdidAnalogDisplay.data(),
+      .edid_bytes_count = kEdidAnalogDisplay.size(),
+      .pixel_formats_list = pixel_formats.data(),
+      .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
-      DisplayInfo::Create(added_display_args);
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_EQ(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }

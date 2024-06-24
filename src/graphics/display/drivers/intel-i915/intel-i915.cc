@@ -199,8 +199,8 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
   }
 
   if (dc_intf_.is_valid()) {
-    const added_display_args_t added_display_args = new_device_ptr->CreateAddedDisplayArgs();
-    dc_intf_.OnDisplayAdded(&added_display_args);
+    const raw_display_info_t banjo_display_info = new_device_ptr->CreateRawDisplayInfo();
+    dc_intf_.OnDisplayAdded(&banjo_display_info);
   }
 }
 
@@ -799,8 +799,8 @@ void Controller::DisplayControllerImplSetDisplayControllerInterface(
   // responsible for notifying the coordinator of existing display devices.
   if (driver_initialized_ && !display_devices_.is_empty()) {
     for (const std::unique_ptr<DisplayDevice>& display_device : display_devices_) {
-      const added_display_args_t added_display_args = display_device->CreateAddedDisplayArgs();
-      dc_intf_.OnDisplayAdded(&added_display_args);
+      const raw_display_info_t banjo_display_info = display_device->CreateRawDisplayInfo();
+      dc_intf_.OnDisplayAdded(&banjo_display_info);
     }
   }
 }
@@ -2114,8 +2114,8 @@ void Controller::DdkInit(ddk::InitTxn txn) {
     // notifying the coordinator of existing display devices.
     if ((!display_devices_.is_empty()) && dc_intf_.is_valid()) {
       for (const std::unique_ptr<DisplayDevice>& display_device : display_devices_) {
-        const added_display_args_t added_display_args = display_device->CreateAddedDisplayArgs();
-        dc_intf_.OnDisplayAdded(&added_display_args);
+        const raw_display_info_t banjo_display_info = display_device->CreateRawDisplayInfo();
+        dc_intf_.OnDisplayAdded(&banjo_display_info);
       }
     }
 

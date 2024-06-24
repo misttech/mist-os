@@ -134,11 +134,11 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   }
 }
 
-zx::result<> Controller::AddDisplay(const added_display_args_t& banjo_added_display_args) {
+zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info) {
   zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
-      DisplayInfo::Create(banjo_added_display_args);
+      DisplayInfo::Create(banjo_display_info);
   if (display_info_result.is_error()) {
-    zxlogf(WARNING, "Failed to add display %" PRIu64 ": %s", banjo_added_display_args.display_id,
+    zxlogf(WARNING, "Failed to add display %" PRIu64 ": %s", banjo_display_info.display_id,
            display_info_result.status_string());
     return display_info_result.take_error();
   }
@@ -248,11 +248,11 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
 }
 
 void Controller::DisplayControllerInterfaceOnDisplayAdded(
-    const added_display_args_t* banjo_added_display) {
-  ZX_DEBUG_ASSERT(banjo_added_display != nullptr);
-  zx::result<> added_display_result = AddDisplay(*banjo_added_display);
+    const raw_display_info_t* banjo_display_info) {
+  ZX_DEBUG_ASSERT(banjo_display_info != nullptr);
+  zx::result<> added_display_result = AddDisplay(*banjo_display_info);
   if (added_display_result.is_error()) {
-    zxlogf(WARNING, "Failed to add a display %" PRIu64 ": %s", banjo_added_display->display_id,
+    zxlogf(WARNING, "Failed to add a display %" PRIu64 ": %s", banjo_display_info->display_id,
            added_display_result.status_string());
   }
 }

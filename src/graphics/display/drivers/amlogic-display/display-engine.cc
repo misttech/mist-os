@@ -212,9 +212,9 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
   if (display_attached_) {
-    const added_display_args_t added_display_args =
-        vout_->CreateAddedDisplayArgs(display_id_, kSupportedBanjoPixelFormats);
-    dc_intf_.OnDisplayAdded(&added_display_args);
+    const raw_display_info_t added_display_info =
+        vout_->CreateRawDisplayInfo(display_id_, kSupportedBanjoPixelFormats);
+    dc_intf_.OnDisplayAdded(&added_display_info);
   }
 }
 
@@ -1037,10 +1037,10 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
 
     vout_->DisplayConnected();
 
-    const added_display_args_t added_display_args =
-        vout_->CreateAddedDisplayArgs(display_id_, kSupportedBanjoPixelFormats);
+    const raw_display_info_t banjo_display_info =
+        vout_->CreateRawDisplayInfo(display_id_, kSupportedBanjoPixelFormats);
     if (dc_intf_.is_valid()) {
-      dc_intf_.OnDisplayAdded(&added_display_args);
+      dc_intf_.OnDisplayAdded(&banjo_display_info);
     }
     return;
   }
