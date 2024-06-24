@@ -273,7 +273,7 @@ TEST(SimpleDisplay, ImportBufferCollection) {
       .pixel_format = kPixelFormat,
   };
 
-  SimpleDisplay display(nullptr, fidl::WireSyncClient(std::move(hardware_sysmem_client)),
+  SimpleDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
                         std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
 
   auto token1_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
@@ -366,7 +366,7 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
       .pixel_format = kPixelFormat,
   };
 
-  SimpleDisplay display(nullptr, fidl::WireSyncClient(std::move(hardware_sysmem_client)),
+  SimpleDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
                         std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
 
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();

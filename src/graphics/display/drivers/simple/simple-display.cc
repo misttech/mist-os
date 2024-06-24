@@ -9,8 +9,6 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -446,10 +444,6 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   return ZX_OK;
 }
 
-// implement device protocol:
-
-void SimpleDisplay::DdkRelease() { delete this; }
-
 // implement sysmem heap protocol:
 
 void SimpleDisplay::AllocateVmo(AllocateVmoRequestView request,
@@ -505,19 +499,14 @@ void SimpleDisplay::DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::
 
 // implement driver object:
 
-zx::result<> SimpleDisplay::Initialize(const char* device_name) {
+zx::result<> SimpleDisplay::Initialize() {
   auto [heap_client, heap_server] = fidl::Endpoints<fuchsia_hardware_sysmem::Heap>::Create();
 
   auto result = hardware_sysmem_->RegisterHeap(
       static_cast<uint64_t>(fuchsia_sysmem::wire::HeapType::kFramebuffer), std::move(heap_client));
   if (!result.ok()) {
-    printf("%s: failed to register sysmem heap: %s\n", device_name, result.status_string());
+    zxlogf(ERROR, "Failed to register sysmem heap: %s", result.status_string());
     return zx::error(result.status());
-  }
-
-  zx_status_t status = DdkAdd(device_name);
-  if (status != ZX_OK) {
-    return zx::error(status);
   }
 
   // Start heap server.
@@ -542,20 +531,17 @@ zx::result<> SimpleDisplay::Initialize(const char* device_name) {
   async::PostTask(loop_.dispatcher(), [this]() { OnPeriodicVSync(); });
 
   zxlogf(INFO,
-         "%s: initialized display, %" PRId32 " x %" PRId32 " (stride=%" PRId32 " format=%" PRIu32
-         ")",
-         device_name, properties_.width_px, properties_.height_px, properties_.row_stride_px,
+         "Initialized display, %" PRId32 " x %" PRId32 " (stride=%" PRId32 " format=%" PRIu32 ")",
+         properties_.width_px, properties_.height_px, properties_.row_stride_px,
          static_cast<uint32_t>(properties_.pixel_format));
 
   return zx::ok();
 }
 
-SimpleDisplay::SimpleDisplay(zx_device_t* parent,
-                             fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
+SimpleDisplay::SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                              fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
                              fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties)
-    : DeviceType(parent),
-      hardware_sysmem_(std::move(hardware_sysmem)),
+    : hardware_sysmem_(std::move(hardware_sysmem)),
       sysmem_(std::move(sysmem)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       has_image_(false),
@@ -593,67 +579,11 @@ void SimpleDisplay::OnPeriodicVSync() {
   async::PostTaskForTime(loop_.dispatcher(), [this]() { OnPeriodicVSync(); }, next_vsync_time_);
 }
 
-// static
-zx::result<> SimpleDisplay::Create(zx_device_t* parent, const char* device_name,
-                                   uint32_t pci_bar_index, DisplayProperties properties) {
-  ddk::Pci pci(parent, "pci");
-  if (!pci.is_valid()) {
-    zxlogf(ERROR, "Failed to get PCI protocol");
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  // Since this function is used by multiple drivers with different bind rules,
-  // the fragment name here must be the same as both the simple-display
-  // composite fragment defined in this directory and the PCI sysmem
-  // fragment defined elsewhere.
-  zx::result hardware_sysmem_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
-          parent, "sysmem");
-  if (hardware_sysmem_result.is_error()) {
-    zxlogf(ERROR, "Failed to get sysmem protocol: %s", hardware_sysmem_result.status_string());
-    return hardware_sysmem_result.take_error();
-  }
-  fidl::WireSyncClient hardware_sysmem{std::move(*hardware_sysmem_result)};
-
-  zx::result sysmem_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-      fuchsia_hardware_sysmem::Service::AllocatorV2>(parent, "sysmem");
-  if (sysmem_result.is_error()) {
-    zxlogf(ERROR, "Failed to get fuchsia.sysmem2.Allocator protocol: %s",
-           sysmem_result.status_string());
-    return sysmem_result.take_error();
-  }
-  fidl::WireSyncClient sysmem(std::move(*sysmem_result));
-
-  std::optional<fdf::MmioBuffer> framebuffer_mmio;
-  // map framebuffer window
-  zx_status_t status =
-      pci.MapMmio(pci_bar_index, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map pci bar %" PRIu32 ": %s", pci_bar_index,
-           zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  fbl::AllocChecker ac;
-  auto display = fbl::make_unique_checked<SimpleDisplay>(&ac, parent, std::move(hardware_sysmem),
-                                                         std::move(sysmem),
-                                                         std::move(*framebuffer_mmio), properties);
-  if (!ac.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for SimpleDisplay");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  zx::result<> initialize_result = display->Initialize(device_name);
-  if (initialize_result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize SimpleDisplay: %s", initialize_result.status_string());
-    return initialize_result.take_error();
-  }
-
-  // The device manager now owns this pointer, release it to avoid destroying
-  // the object when `display` goes out of scope.
-  [[maybe_unused]] SimpleDisplay* simple_display_released = display.release();
-
-  return zx::ok();
+display_controller_impl_protocol_t SimpleDisplay::GetProtocol() {
+  return {
+      .ops = &display_controller_impl_protocol_ops_,
+      .ctx = this,
+  };
 }
 
 }  // namespace simple_display

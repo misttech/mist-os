@@ -10,6 +10,8 @@ import("//build/test.gni")
 source_set("shared") {
   visibility = [ ":*" ]
   sources = [
+    "simple-display-driver.cc",
+    "simple-display-driver.h",
     "simple-display.cc",
     "simple-display.h",
   ]

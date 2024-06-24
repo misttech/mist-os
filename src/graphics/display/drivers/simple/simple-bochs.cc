@@ -11,7 +11,10 @@
 #include <zircon/errors.h>
 #include <zircon/process.h>
 
-#include "simple-display.h"
+#include <fbl/alloc_checker.h>
+
+#include "src/graphics/display/drivers/simple/simple-display-driver.h"
+#include "src/graphics/display/drivers/simple/simple-display.h"
 
 namespace simple_display {
 
@@ -76,11 +79,57 @@ void set_hw_mode(MMIO_PTR void* regs, uint16_t width, uint16_t height, uint16_t 
   zxlogf(TRACE, "    64K: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIDEO_MEMORY_64K));
 }
 
-zx_status_t BindBochsVesaBiosExtensionDisplay(void* ctx, zx_device_t* dev) {
-  ddk::Pci pci(dev, "pci");
+class SimpleBochsDisplayDriver final : public SimpleDisplayDriver {
+ public:
+  static zx::result<> Create(zx_device_t* parent);
+
+  explicit SimpleBochsDisplayDriver(zx_device_t* parent);
+
+  SimpleBochsDisplayDriver(const SimpleBochsDisplayDriver&) = delete;
+  SimpleBochsDisplayDriver(SimpleBochsDisplayDriver&&) = delete;
+  SimpleBochsDisplayDriver& operator=(const SimpleBochsDisplayDriver&) = delete;
+  SimpleBochsDisplayDriver& operator=(SimpleBochsDisplayDriver&&) = delete;
+
+  ~SimpleBochsDisplayDriver() override;
+
+  // SimpleDisplayDriver:
+  zx::result<> ConfigureHardware() override;
+  zx::result<fdf::MmioBuffer> GetFrameBufferMmioBuffer() override;
+  zx::result<DisplayProperties> GetDisplayProperties() override;
+};
+
+zx::result<> SimpleBochsDisplayDriver::Create(zx_device_t* parent) {
+  fbl::AllocChecker alloc_checker;
+  auto simple_bochs_display_driver =
+      fbl::make_unique_checked<SimpleBochsDisplayDriver>(&alloc_checker, parent);
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for SimpleBochsDisplayDriver");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  zx::result<> init_result = simple_bochs_display_driver->Initialize();
+  if (init_result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize SimpleBochsDisplayDriver: %s", init_result.status_string());
+    return init_result.take_error();
+  }
+
+  // `simple_bochs_display_driver` is now managed by the driver manager.
+  [[maybe_unused]] SimpleBochsDisplayDriver* driver_released =
+      simple_bochs_display_driver.release();
+
+  return zx::ok();
+}
+
+SimpleBochsDisplayDriver::SimpleBochsDisplayDriver(zx_device_t* parent)
+    : SimpleDisplayDriver(parent, "bochs-vbe") {}
+
+SimpleBochsDisplayDriver::~SimpleBochsDisplayDriver() = default;
+
+zx::result<> SimpleBochsDisplayDriver::ConfigureHardware() {
+  ddk::Pci pci(parent(), "pci");
   if (!pci.is_valid()) {
-    printf("bochs-vbe: failed to get pci protocol\n");
-    return ZX_ERR_INTERNAL;
+    zxlogf(ERROR, "Failed to get pci protocol");
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   std::optional<fdf::MmioBuffer> mmio;
@@ -89,34 +138,51 @@ zx_status_t BindBochsVesaBiosExtensionDisplay(void* ctx, zx_device_t* dev) {
   zx_status_t status =
       pci.MapMmio(kQemuBochsRegisterMmioBarIndex, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
   if (status != ZX_OK) {
-    printf("bochs-vbe: failed to map pci config: %d\n", status);
-    return status;
+    zxlogf(ERROR, "Failed to map pci config: %s", zx_status_get_string(status));
+    return zx::error(status);
   }
 
   set_hw_mode(mmio->get(), kDisplayWidth, kDisplayHeight, kBitsPerPixel);
+  return zx::ok();
+}
 
-  constexpr DisplayProperties kDisplayProperties = {
+zx::result<fdf::MmioBuffer> SimpleBochsDisplayDriver::GetFrameBufferMmioBuffer() {
+  ddk::Pci pci(parent(), "pci");
+  if (!pci.is_valid()) {
+    zxlogf(ERROR, "Failed to get PCI protocol");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  std::optional<fdf::MmioBuffer> framebuffer_mmio;
+  static constexpr uint32_t kFramebufferPciBarIndex = 0;
+  zx_status_t status =
+      pci.MapMmio(kFramebufferPciBarIndex, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map pci bar %" PRIu32 ": %s", kFramebufferPciBarIndex,
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  ZX_DEBUG_ASSERT(framebuffer_mmio.has_value());
+  return zx::ok(std::move(framebuffer_mmio).value());
+}
+
+zx::result<DisplayProperties> SimpleBochsDisplayDriver::GetDisplayProperties() {
+  static constexpr DisplayProperties kDisplayProperties = {
       .width_px = kDisplayWidth,
       .height_px = kDisplayHeight,
       .row_stride_px = kDisplayWidth,
       .pixel_format = kDisplayFormat,
   };
-
-  static constexpr uint32_t kFramebufferPciBar = 0u;
-  zx::result<> create_simple_display_result =
-      SimpleDisplay::Create(dev, "bochs_vbe", kFramebufferPciBar, kDisplayProperties);
-  if (create_simple_display_result.is_error()) {
-    zxlogf(ERROR, "Failed to create simple display: %s",
-           create_simple_display_result.status_string());
-    return create_simple_display_result.error_value();
-  }
-
-  return ZX_OK;
+  return zx::ok(kDisplayProperties);
 }
 
 constexpr zx_driver_ops_t kBochsVesaBiosExtensionDriverOps = {
     .version = DRIVER_OPS_VERSION,
-    .bind = BindBochsVesaBiosExtensionDisplay,
+    .bind =
+        [](void* ctx, zx_device_t* parent) {
+          return SimpleBochsDisplayDriver::Create(parent).status_value();
+        },
 };
 
 }  // namespace

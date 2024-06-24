@@ -12,7 +12,6 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
-#include <lib/ddk/driver.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio.h>
@@ -25,7 +24,6 @@
 #include <atomic>
 #include <memory>
 
-#include <ddktl/device.h>
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
@@ -41,27 +39,17 @@ struct DisplayProperties {
 };
 
 class SimpleDisplay;
-using DeviceType = ddk::Device<SimpleDisplay>;
 using HeapServer = fidl::WireServer<fuchsia_hardware_sysmem::Heap>;
 using BufferKey = std::pair<uint64_t, uint32_t>;
-class SimpleDisplay : public DeviceType,
-                      public HeapServer,
-                      public ddk::DisplayControllerImplProtocol<SimpleDisplay, ddk::base_protocol> {
+class SimpleDisplay : public HeapServer, public ddk::DisplayControllerImplProtocol<SimpleDisplay> {
  public:
-  // Factory function used by the device manager glue code.
-  static zx::result<> Create(zx_device_t* parent, const char* device_name, uint32_t pci_bar_index,
-                             DisplayProperties properties);
-
-  SimpleDisplay(zx_device_t* parent,
-                fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
+  SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                 fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
                 fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties);
   ~SimpleDisplay() = default;
 
-  void DdkRelease();
-
   // Initialization logic not suitable in the constructor.
-  zx::result<> Initialize(const char* device_name);
+  zx::result<> Initialize();
 
   void AllocateVmo(AllocateVmoRequestView request, AllocateVmoCompleter::Sync& completer) override;
   void DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) override;
@@ -111,6 +99,8 @@ class SimpleDisplay : public DeviceType,
   GetBufferCollectionsForTesting() const {
     return buffer_collections_;
   }
+
+  display_controller_impl_protocol_t GetProtocol();
 
  private:
   bool IsBanjoDisplayConfigSupported(const display_config_t& banjo_display_config);
