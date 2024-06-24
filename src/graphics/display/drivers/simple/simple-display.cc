@@ -560,8 +560,7 @@ void SimpleDisplay::OnPeriodicVSync() {
   async::PostTaskForTime(loop_.dispatcher(), [this]() { OnPeriodicVSync(); }, next_vsync_time_);
 }
 
-zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar,
-                                               bool use_fidl) {
+zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar) {
   zbi_pixel_format_t format;
   uint32_t width, height, stride;
   zx_status_t status =
@@ -578,9 +577,6 @@ zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* nam
   }
   fuchsia_images2::wire::PixelFormat sysmem2_format = sysmem2_format_type_result.take_value();
 
-  if (use_fidl) {
-    return bind_simple_fidl_pci_display(dev, name, bar, width, height, stride, sysmem2_format);
-  }
   return bind_simple_pci_display(dev, name, bar, width, height, stride, sysmem2_format);
 }
 
@@ -631,72 +627,6 @@ zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-
-  return display->Bind(name, &display);
-}
-
-zx_status_t bind_simple_fidl_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
-                                         uint32_t width, uint32_t height, uint32_t stride,
-                                         fuchsia_images2::wire::PixelFormat format) {
-  zx::result client =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_pci::Service::Device>(
-          dev, "pci");
-  if (client.is_error()) {
-    zxlogf(ERROR, "%s: could not get PCI protocol: %s", name, client.status_string());
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  fidl::WireSyncClient<fuchsia_hardware_pci::Device> pci(std::move(*client));
-
-  // For important information about the fragment name, see the note in bind_simple_pci_display
-  // above.
-  zx::result hardware_sysmem_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
-          dev, "sysmem");
-  if (hardware_sysmem_result.is_error()) {
-    zxlogf(ERROR, "%s: could not get SYSMEM protocol: %s", name,
-           hardware_sysmem_result.status_string());
-    return hardware_sysmem_result.status_value();
-  }
-  fidl::WireSyncClient hardware_sysmem{std::move(*hardware_sysmem_result)};
-
-  zx::result sysmem_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-      fuchsia_hardware_sysmem::Service::AllocatorV2>(dev, "sysmem");
-  if (sysmem_result.is_error()) {
-    zxlogf(ERROR, "%s: could not get fuchsia.sysmem2.Allocator protocol: %s", name,
-           sysmem_result.status_string());
-    return sysmem_result.status_value();
-  }
-  fidl::WireSyncClient sysmem(std::move(*sysmem_result));
-
-  fidl::WireResult<fuchsia_hardware_pci::Device::GetBar> bar_result = pci->GetBar(bar);
-  if (!bar_result.ok()) {
-    zxlogf(ERROR, "Failed to send map PCI bar %d: %s", bar, bar_result.FormatDescription().data());
-    return bar_result.status();
-  }
-
-  if (bar_result.value().is_error()) {
-    zxlogf(ERROR, "Failed to map PCI bar %d: %s", bar,
-           zx_status_get_string(bar_result.value().error_value()));
-    return bar_result.value().error_value();
-  }
-
-  if (!bar_result.value().value()->result.result.is_vmo()) {
-    zxlogf(ERROR, "PCI bar %u is not an MMIO BAR!", bar);
-    return ZX_ERR_WRONG_TYPE;
-  }
-
-  // map framebuffer window
-  auto mmio = fdf::MmioBuffer::Create(0, bar_result.value().value()->result.size,
-                                      std::move(bar_result.value().value()->result.result.vmo()),
-                                      ZX_CACHE_POLICY_WRITE_COMBINING);
-  if (mmio.is_error()) {
-    printf("%s: failed to map pci bar %d: %s\n", name, bar, mmio.status_string());
-    return mmio.status_value();
-  }
-
-  auto display = std::make_unique<SimpleDisplay>(dev, std::move(hardware_sysmem), std::move(sysmem),
-                                                 std::move(*mmio), width, height, stride, format);
 
   return display->Bind(name, &display);
 }
