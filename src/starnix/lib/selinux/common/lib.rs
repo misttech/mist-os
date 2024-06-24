@@ -251,6 +251,17 @@ class_permission_enum! {
         Ptrace("ptrace"),
         /// Permission to get the session ID.
         GetSession("getsession"),
+        /// Permission to set the calling task's current Security Context.
+        /// The "dyntransition" permission separately limits which Contexts "setcurrent" may be used to transition to.
+        SetCurrent("setcurrent"),
+        /// Permission to set the Security Context used by `exec()`.
+        SetExec("setexec"),
+        /// Permission to set the Security Context used when creating filesystem objects.
+        SetFsCreate("setfscreate"),
+        /// Permission to set the Security Context used when creating kernel keyrings.
+        SetKeyCreate("setkeycreate"),
+        /// Permission to set the Security Context used when creating new labeled sockets.
+        SetSockCreate("setsockcreate"),
     }
 }
 
