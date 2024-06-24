@@ -11,7 +11,7 @@ from typing import List, Callable, IO
 Handler = Callable[[bytes], None]
 
 
-def handle_stream(stream: IO[bytes], output_handler: Handler):
+def handle_stream(stream: IO[bytes], output_handler: Handler) -> None:
     """Calls `output_handler` with the output bytes. Makes it easy to unit test `CommandRunner`.
 
     Args:

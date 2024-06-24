@@ -11,7 +11,7 @@ from execution_params import ExecutionParams
 class TestExecutionParams(unittest.TestCase):
     TEST_URL = "fuchsia-pkg://fuchsia.com/pkg#meta/test_component.cm"
 
-    def test_init(self):
+    def test_init(self) -> None:
         test_url = self.TEST_URL
         test_args = ["arg1", "arg2"]
         test_filters = ["filter1", "filter2"]
@@ -38,7 +38,7 @@ class TestExecutionParams(unittest.TestCase):
         self.assertEqual(execution_params.max_severity_logs, max_severity_logs)
         self.assertEqual(execution_params.realm, realm)
 
-    def test_initialize_from_json(self):
+    def test_initialize_from_json(self) -> None:
         json_str = """{{
             "test_url": "{}",
             "test_args": ["arg1", "arg2"],
@@ -61,7 +61,7 @@ class TestExecutionParams(unittest.TestCase):
         self.assertEqual(execution_params.max_severity_logs, "WARN")
         self.assertEqual(execution_params.realm, "/some/moniker")
 
-    def test_initialize_from_json_missing_url(self):
+    def test_initialize_from_json_missing_url(self) -> None:
         # Test with missing 'test_url' key in the JSON data
         json_str = """{
             "test_args": ["arg1", "arg2"],
@@ -79,7 +79,7 @@ class TestExecutionParams(unittest.TestCase):
             str(context.exception), "Missing 'test_url' in the JSON data"
         )
 
-    def test_initialize_from_json_with_defaults(self):
+    def test_initialize_from_json_with_defaults(self) -> None:
         json_data = {
             "test_url": self.TEST_URL,
             # Other keys are missing

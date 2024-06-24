@@ -19,20 +19,20 @@ from execution_params import ExecutionParams
 class TestParams(unittest.TestCase):
     TEST_URL = "fuchsia-pkg://fuchsia.com/pkg#meta/test_component.cm"
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Create temporary directories for sdk tool path and output directory
         self.sdk_tool_path = tempfile.mkdtemp()
         self.output_directory = tempfile.mkdtemp()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         # Clean up temporary directories
         if os.path.exists(self.sdk_tool_path):
             os.rmdir(self.sdk_tool_path)
         if os.path.exists(self.output_directory):
             os.rmdir(self.output_directory)
 
-    def test_valid_initialization(self):
-        env_vars = {
+    def test_valid_initialization(self) -> None:
+        env_vars: dict[str, str | None] = {
             SDK_TOOL_PATH_KEY: self.sdk_tool_path,
             TARGETS_KEY: "target1",
             OUTPUT_DIRECTORY_KEY: self.output_directory,
@@ -66,8 +66,8 @@ class TestParams(unittest.TestCase):
         self.assertEqual(execution_params.max_severity_logs, "INFO")
         self.assertEqual(execution_params.realm, "/some/moniker")
 
-    def test_missing_sdk_tool_path(self):
-        env_vars = {
+    def test_missing_sdk_tool_path(self) -> None:
+        env_vars: dict[str, str | None] = {
             TARGETS_KEY: "target1",
             OUTPUT_DIRECTORY_KEY: self.output_directory,
             EXECUTION_JSON_KEY: '{"test_url": self.TEST_URL}',
@@ -81,8 +81,8 @@ class TestParams(unittest.TestCase):
             f"'{SDK_TOOL_PATH_KEY}' environment variable is not available.",
         )
 
-    def test_missing_output_directory(self):
-        env_vars = {
+    def test_missing_output_directory(self) -> None:
+        env_vars: dict[str, str | None] = {
             SDK_TOOL_PATH_KEY: self.sdk_tool_path,
             TARGETS_KEY: "target1",
             EXECUTION_JSON_KEY: '{"test_url": self.TEST_URL}',
@@ -96,8 +96,8 @@ class TestParams(unittest.TestCase):
             f"'{OUTPUT_DIRECTORY_KEY}' environment variable is not available.",
         )
 
-    def test_non_existent_sdk_tool_path(self):
-        env_vars = {
+    def test_non_existent_sdk_tool_path(self) -> None:
+        env_vars: dict[str, str | None] = {
             SDK_TOOL_PATH_KEY: "/nonexistent/path/to/sdk_tool",
             TARGETS_KEY: "target1",
             OUTPUT_DIRECTORY_KEY: self.output_directory,
@@ -112,8 +112,8 @@ class TestParams(unittest.TestCase):
             f"'{SDK_TOOL_PATH_KEY}: /nonexistent/path/to/sdk_tool' path does not exist.",
         )
 
-    def test_non_existent_output_directory(self):
-        env_vars = {
+    def test_non_existent_output_directory(self) -> None:
+        env_vars: dict[str, str | None] = {
             SDK_TOOL_PATH_KEY: self.sdk_tool_path,
             TARGETS_KEY: "target1",
             OUTPUT_DIRECTORY_KEY: "/nonexistent/output",
@@ -128,8 +128,8 @@ class TestParams(unittest.TestCase):
             f"'{OUTPUT_DIRECTORY_KEY}: /nonexistent/output' path does not exist.",
         )
 
-    def test_missing_execution_json(self):
-        env_vars = {
+    def test_missing_execution_json(self) -> None:
+        env_vars: dict[str, str | None] = {
             SDK_TOOL_PATH_KEY: self.sdk_tool_path,
             TARGETS_KEY: "target1",
             OUTPUT_DIRECTORY_KEY: self.output_directory,
@@ -143,8 +143,8 @@ class TestParams(unittest.TestCase):
             f"'{EXECUTION_JSON_KEY}' environment variable is not available.",
         )
 
-    def test_invalid_execution_json(self):
-        env_vars = {
+    def test_invalid_execution_json(self) -> None:
+        env_vars: dict[str, str | None] = {
             SDK_TOOL_PATH_KEY: self.sdk_tool_path,
             TARGETS_KEY: "target1",
             OUTPUT_DIRECTORY_KEY: self.output_directory,

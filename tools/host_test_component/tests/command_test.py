@@ -8,7 +8,7 @@ from command import Command
 
 
 class TestCommand(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.sdk_tool_path = "/path/to/sdk"
         self.ffx_path = f"{self.sdk_tool_path}/ffx"
         self.target = "test_target"
@@ -34,7 +34,7 @@ class TestCommand(unittest.TestCase):
             self.output_directory,
         )
 
-    def test_get_command(self):
+    def test_get_command(self) -> None:
         isolate_dir = "/path/to/isolate"
 
         expected_command = [
@@ -61,7 +61,7 @@ class TestCommand(unittest.TestCase):
             self.command.get_command(isolate_dir), expected_command
         )
 
-    def test_get_command_with_default_values(self):
+    def test_get_command_with_default_values(self) -> None:
         self.command = Command(
             self.sdk_tool_path,
             None,

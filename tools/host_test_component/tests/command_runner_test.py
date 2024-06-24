@@ -14,18 +14,18 @@ from command_runner import run_command
 class OutputHandler:
     output: bytes = b""
 
-    def __call__(self, line: bytes):
+    def __call__(self, line: bytes) -> None:
         self.output += line
 
 
 class TestCommandRunner(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.cur_path = os.path.dirname(__file__)
         while not os.path.isdir(self.cur_path):
             self.cur_path = os.path.split(self.cur_path)[0]
         self.test_data_path = os.path.join(self.cur_path, "test_data")
 
-    def test_run_command_success(self):
+    def test_run_command_success(self) -> None:
         cmd = ["echo", "Hello, World"]
         output_handler = OutputHandler()
         error_handler = MagicMock()
@@ -36,7 +36,7 @@ class TestCommandRunner(unittest.TestCase):
         error_handler.assert_not_called()
         self.assertEqual(output_handler.output, b"Hello, World\n")
 
-    def test_run_command_no_binary_found(self):
+    def test_run_command_no_binary_found(self) -> None:
         cmd = ["nonexistent_command"]
         output_handler = MagicMock()
         error_handler = MagicMock()
@@ -49,7 +49,7 @@ class TestCommandRunner(unittest.TestCase):
         output_handler.assert_not_called()
         error_handler.assert_not_called()
 
-    def test_run_command_exit_code(self):
+    def test_run_command_exit_code(self) -> None:
         cmd = [os.path.join(self.test_data_path, "exit"), "123"]
         output_handler = MagicMock()
         error_handler = MagicMock()
@@ -58,7 +58,7 @@ class TestCommandRunner(unittest.TestCase):
         output_handler.assert_not_called()
         error_handler.assert_not_called()
 
-    def test_run_command_test_output(self):
+    def test_run_command_test_output(self) -> None:
         cmd = [os.path.join(self.test_data_path, "output_mock")]
         output_handler = OutputHandler()
         error_handler = OutputHandler()
