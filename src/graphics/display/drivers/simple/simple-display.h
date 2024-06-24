@@ -44,7 +44,7 @@ class SimpleDisplay : public DeviceType,
   SimpleDisplay(zx_device_t* parent,
                 fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                 fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
-                fdf::MmioBuffer framebuffer_mmio, uint32_t width, uint32_t height, uint32_t stride,
+                fdf::MmioBuffer framebuffer_mmio, int32_t width, int32_t height, int32_t stride,
                 fuchsia_images2::wire::PixelFormat format);
   ~SimpleDisplay() = default;
 
@@ -61,7 +61,7 @@ class SimpleDisplay : public DeviceType,
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
       uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
+  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* banjo_image_metadata,
                                                uint64_t banjo_driver_buffer_collection_id,
                                                uint32_t index, uint64_t* out_image_handle);
   zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
@@ -101,6 +101,8 @@ class SimpleDisplay : public DeviceType,
   }
 
  private:
+  bool IsBanjoDisplayConfigSupported(const display_config_t& banjo_display_config);
+
   void OnPeriodicVSync();
 
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem_;
@@ -128,9 +130,9 @@ class SimpleDisplay : public DeviceType,
   display::ConfigStamp config_stamp_ TA_GUARDED(mtx_) = display::kInvalidConfigStamp;
 
   const fdf::MmioBuffer framebuffer_mmio_;
-  const uint32_t width_;
-  const uint32_t height_;
-  const uint32_t stride_;
+  const int32_t width_;
+  const int32_t height_;
+  const int32_t stride_;
   const fuchsia_images2::wire::PixelFormat format_;
 
   const fuchsia_images2::wire::PixelFormatModifier kFormatModifier =
@@ -141,8 +143,8 @@ class SimpleDisplay : public DeviceType,
   ddk::DisplayControllerInterfaceProtocolClient intf_;
 };
 
-zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
-                                    uint32_t width, uint32_t height, uint32_t stride,
+zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar, int32_t width,
+                                    int32_t height, int32_t stride,
                                     fuchsia_images2::wire::PixelFormat format);
 
 zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar);

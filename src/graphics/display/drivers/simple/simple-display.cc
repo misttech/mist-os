@@ -23,6 +23,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -33,6 +34,8 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types-cpp/frame.h"
+#include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 
 namespace simple_display {
 
@@ -99,11 +102,11 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
   ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
   const display::DisplayTiming timing = {
-      .horizontal_active_px = static_cast<int32_t>(width_),
+      .horizontal_active_px = width_,
       .horizontal_front_porch_px = 0,
       .horizontal_sync_width_px = 0,
       .horizontal_back_porch_px = 0,
-      .vertical_active_lines = static_cast<int32_t>(height_),
+      .vertical_active_lines = height_,
       .vertical_front_porch_lines = 0,
       .vertical_sync_width_lines = 0,
       .vertical_back_porch_lines = 0,
@@ -186,7 +189,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplReleaseBufferCollection(
 }
 
 zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
-    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
+    const image_metadata_t* banjo_image_metadata, uint64_t banjo_driver_buffer_collection_id,
     uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -244,7 +247,8 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
   auto sysmem2_collection_format =
       collection_info.settings().image_format_constraints().pixel_format();
   if (sysmem2_collection_format != format_) {
-    zxlogf(ERROR, "Image format from sysmem (%u) doesn't match expected format (%u)",
+    zxlogf(ERROR,
+           "Image format from sysmem (%" PRIu32 ") doesn't match expected format (%" PRIu32 ")",
            static_cast<uint32_t>(sysmem2_collection_format), static_cast<uint32_t>(format_));
     return ZX_ERR_INVALID_ARGS;
   }
@@ -277,7 +281,8 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (image_metadata->width != width_ || image_metadata->height != height_) {
+  display::ImageMetadata image_metadata(*banjo_image_metadata);
+  if (image_metadata.width() != width_ || image_metadata.height() != height_) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -311,24 +316,7 @@ config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
     *out_client_composition_opcodes_actual = client_composition_opcodes.size();
   }
 
-  bool success;
-  if (display_configs[0].layer_count != 1) {
-    success = false;
-  } else {
-    const primary_layer_t* layer = &display_configs[0].layer_list[0].cfg.primary;
-    frame_t frame = {
-        .x_pos = 0,
-        .y_pos = 0,
-        .width = width_,
-        .height = height_,
-    };
-    success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
-              layer->transform_mode == FRAME_TRANSFORM_IDENTITY &&
-              layer->image_metadata.width == width_ && layer->image_metadata.height == height_ &&
-              memcmp(&layer->dest_frame, &frame, sizeof(frame_t)) == 0 &&
-              memcmp(&layer->src_frame, &frame, sizeof(frame_t)) == 0 &&
-              display_configs[0].cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
-  }
+  bool success = IsBanjoDisplayConfigSupported(display_configs[0]);
   if (!success) {
     client_composition_opcodes[0] = CLIENT_COMPOSITION_OPCODE_MERGE_BASE;
     for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
@@ -336,6 +324,55 @@ config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
     }
   }
   return CONFIG_CHECK_RESULT_OK;
+}
+
+bool SimpleDisplay::IsBanjoDisplayConfigSupported(const display_config_t& banjo_display_config) {
+  if (banjo_display_config.layer_count != 1) {
+    return false;
+  }
+
+  if (banjo_display_config.layer_list[0].type != LAYER_TYPE_PRIMARY) {
+    return false;
+  }
+
+  const primary_layer_t& banjo_layer = banjo_display_config.layer_list[0].cfg.primary;
+  if (banjo_layer.transform_mode != FRAME_TRANSFORM_IDENTITY) {
+    return false;
+  }
+
+  const display::ImageMetadata image_metadata(banjo_layer.image_metadata);
+  if (image_metadata.width() != width_) {
+    return false;
+  }
+  if (image_metadata.height() != height_) {
+    return false;
+  }
+
+  const display::Frame expected_frame = {
+      .x_pos = 0,
+      .y_pos = 0,
+      .width = width_,
+      .height = height_,
+  };
+  const display::Frame actual_dest_frame = display::ToFrame(banjo_layer.dest_frame);
+  if (actual_dest_frame != expected_frame) {
+    return false;
+  }
+
+  const display::Frame actual_src_frame = display::ToFrame(banjo_layer.src_frame);
+  if (actual_src_frame != expected_frame) {
+    return false;
+  }
+
+  if (banjo_display_config.cc_flags != 0) {
+    return false;
+  }
+
+  if (banjo_layer.alpha_mode != ALPHA_DISABLE) {
+    return false;
+  }
+
+  return true;
 }
 
 void SimpleDisplay::DisplayControllerImplApplyConfiguration(
@@ -386,8 +423,10 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   image_constraints.pixel_format(format_);
   image_constraints.pixel_format_modifier(kFormatModifier);
   image_constraints.color_spaces(std::array{fuchsia_images2::ColorSpace::kSrgb});
-  image_constraints.min_size({width_, height_});
-  image_constraints.max_size({width_, height_});
+  image_constraints.min_size(
+      {.width = static_cast<uint32_t>(width_), .height = static_cast<uint32_t>(height_)});
+  image_constraints.max_size(
+      {.width = static_cast<uint32_t>(width_), .height = static_cast<uint32_t>(height_)});
   image_constraints.min_bytes_per_row(bytes_per_row);
   image_constraints.max_bytes_per_row(bytes_per_row);
   constraints.image_format_constraints(std::array{image_constraints.Build()});
@@ -509,8 +548,10 @@ zx_status_t SimpleDisplay::Bind(const char* name, std::unique_ptr<SimpleDisplay>
   // when device goes out of scope.
   [[maybe_unused]] auto ptr = vbe_ptr->release();
 
-  zxlogf(INFO, "%s: initialized display, %u x %u (stride=%u format=%u)", name, width_, height_,
-         stride_, static_cast<uint32_t>(format_));
+  zxlogf(INFO,
+         "%s: initialized display, %" PRId32 " x %" PRId32 " (stride=%" PRId32 " format=%" PRIu32
+         ")",
+         name, width_, height_, stride_, static_cast<uint32_t>(format_));
 
   return ZX_OK;
 }
@@ -518,8 +559,8 @@ zx_status_t SimpleDisplay::Bind(const char* name, std::unique_ptr<SimpleDisplay>
 SimpleDisplay::SimpleDisplay(zx_device_t* parent,
                              fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                              fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
-                             fdf::MmioBuffer framebuffer_mmio, uint32_t width, uint32_t height,
-                             uint32_t stride, fuchsia_images2::wire::PixelFormat format)
+                             fdf::MmioBuffer framebuffer_mmio, int32_t width, int32_t height,
+                             int32_t stride, fuchsia_images2::wire::PixelFormat format)
     : DeviceType(parent),
       hardware_sysmem_(std::move(hardware_sysmem)),
       sysmem_(std::move(sysmem)),
@@ -572,18 +613,25 @@ zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* nam
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  ZX_DEBUG_ASSERT(width <= std::numeric_limits<int32_t>::max());
+  ZX_DEBUG_ASSERT(height <= std::numeric_limits<int32_t>::max());
+  ZX_DEBUG_ASSERT(stride <= std::numeric_limits<int32_t>::max());
+
   auto sysmem2_format_type_result = ImageFormatConvertZbiToSysmemPixelFormat_v2(format);
   if (!sysmem2_format_type_result.is_ok()) {
-    zxlogf(ERROR, "%s: failed to convert framebuffer format: %u", name, format);
+    zxlogf(ERROR, "%s: failed to convert framebuffer format: %" PRIu32, name,
+           static_cast<uint32_t>(format));
     return ZX_ERR_NOT_SUPPORTED;
   }
   fuchsia_images2::wire::PixelFormat sysmem2_format = sysmem2_format_type_result.take_value();
 
-  return bind_simple_pci_display(dev, name, bar, width, height, stride, sysmem2_format);
+  return bind_simple_pci_display(dev, name, bar, static_cast<int32_t>(width),
+                                 static_cast<int32_t>(height), static_cast<int32_t>(stride),
+                                 sysmem2_format);
 }
 
-zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
-                                    uint32_t width, uint32_t height, uint32_t stride,
+zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar, int32_t width,
+                                    int32_t height, int32_t stride,
                                     fuchsia_images2::wire::PixelFormat format) {
   ddk::Pci pci(dev, "pci");
   if (!pci.is_valid()) {
