@@ -126,6 +126,21 @@ impl Vmo {
         }
     }
 
+    /// Provides the thinest wrapper possible over `zx_vmo_read`.
+    ///
+    /// # Safety
+    ///
+    /// Callers must guarantee that the buffer is valid to write to.
+    pub unsafe fn read_raw(
+        &self,
+        buffer: *mut u8,
+        buffer_length: usize,
+        offset: u64,
+    ) -> Result<(), Status> {
+        let status = sys::zx_vmo_read(self.raw_handle(), buffer, offset, buffer_length);
+        ok(status)
+    }
+
     /// Same as read, but reads into memory that might not be initialized, returning an initialized
     /// slice of bytes on success.
     pub fn read_uninit<'a>(
@@ -136,14 +151,12 @@ impl Vmo {
         // SAFETY: This system call requires that the pointer and length we pass are valid to write
         // to, which we guarantee here by getting the pointer and length from a valid slice.
         unsafe {
-            let status = sys::zx_vmo_read(
-                self.raw_handle(),
+            self.read_raw(
                 // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_as_mut_ptr when stable
                 data.as_mut_ptr() as *mut u8,
-                offset,
                 data.len(),
-            );
-            ok(status)?;
+                offset,
+            )?
         }
         // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_assume_init_mut when stable
         Ok(
