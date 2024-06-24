@@ -131,9 +131,6 @@ class DisplayEngine final : public DisplayEngineInterface {
   // until the device is released.
   zx_status_t InitSysmemAllocatorClient();
 
-  // gpu op
-  io_buffer_t gpu_req_ = {};
-
   DisplayInfo current_display_;
 
   // Flush thread

@@ -435,7 +435,7 @@ DisplayEngine::DisplayEngine(zx_device_t* bus_device,
   ZX_DEBUG_ASSERT(gpu_device_);
 }
 
-DisplayEngine::~DisplayEngine() { io_buffer_release(&gpu_req_); }
+DisplayEngine::~DisplayEngine() = default;
 
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
@@ -615,17 +615,6 @@ zx_status_t DisplayEngine::Init() {
     zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
     return set_debug_status.error().status();
   }
-
-  // Allocate a GPU request
-  zx_status_t status = io_buffer_init(&gpu_req_, gpu_device_->bti().get(),
-                                      zx_system_get_page_size(), IO_BUFFER_RW | IO_BUFFER_CONTIG);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate command buffers: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  zxlogf(TRACE, "Allocated command buffer at virtual address %p, physical address 0x%016" PRIx64,
-         io_buffer_virt(&gpu_req_), io_buffer_phys(&gpu_req_));
 
   return ZX_OK;
 }
