@@ -1051,6 +1051,7 @@ template("clang_toolchain") {
         } else if (link_rbe_check == "consistency") {
           _linker_prefix_list += [ "--compare" ]
         } else if (link_rbe_check == "none") {
+          _linker_prefix_list += _link_rbe_exec_strategy_flags
           _link_concurrent_jobs = concurrent_jobs.remote
         }
         _linker_prefix_list += [
