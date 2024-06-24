@@ -8,12 +8,12 @@ use crate::identity::ComponentIdentity;
 use crate::inspect::container::InspectHandle;
 use crate::inspect::repository::InspectRepository;
 use anyhow::Error;
-use fidl::endpoints::ControlHandle;
+use fidl::endpoints::{ControlHandle, Responder};
 use fuchsia_sync::{Mutex, RwLock};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
 pub struct InspectSinkServer {
@@ -76,6 +76,14 @@ impl InspectSinkServer {
                     ..
                 } => {
                     debug!(name, %component, "InspectSink/Publish without a tree");
+                }
+                finspect::InspectSinkRequest::Escrow { control_handle, .. } => {
+                    error!("https://fxbug.dev/346589931: Escrowing inspect is not yet implemented");
+                    control_handle.shutdown();
+                }
+                finspect::InspectSinkRequest::FetchEscrow { responder, .. } => {
+                    error!("https://fxbug.dev/346589931: Escrowing inspect is not yet implemented");
+                    responder.control_handle().shutdown();
                 }
                 finspect::InspectSinkRequest::_UnknownMethod {
                     ordinal,
