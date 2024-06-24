@@ -1,7 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_build_action.gni")
 import("//build/bazel/drivers/verify_driver_package.gni")
 import("//build/packages/prebuilt_package.gni")
 
@@ -46,18 +46,24 @@ template("bazel_driver_package") {
   bazel_target = invoker.bazel_target
   package_name = invoker.package_name
   bazel_build_target = "$target_name.bazel_build"
-  bazel_action(bazel_build_target) {
+  bazel_build_action(bazel_build_target) {
     forward_variables_from(invoker,
                            [
-                             "bazel_inputs",
                              "deps",
                              "metadata",
                              "testonly",
                              "visibility",
                              "inputs",
                            ])
-    command = "build"
-    bazel_targets = [ bazel_target ]
+
+    bazel_target = bazel_target
+    if (defined(invoker.bazel_inputs)) {
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += invoker.bazel_inputs
+    }
+
     fuchsia_package_outputs = {
       archive = "$target_out_dir/$package_name.far"
       copy_debug_symbols = true

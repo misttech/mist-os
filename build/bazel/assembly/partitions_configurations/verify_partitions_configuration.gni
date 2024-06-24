@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_build_action.gni")
 import("//build/bazel/bazel_workspace.gni")
 
 # Compares a GN generated partitions configuration with a Bazel generated one.
@@ -46,7 +46,7 @@ template("verify_partitions_configuration") {
   _bazel_partitions_config_target = "${target_name}.bazel_partitions_config"
   _bazel_partitions_config_dir = "${target_name}.bazel_partitions_config"
 
-  bazel_action(_bazel_partitions_config_target) {
+  bazel_build_action(_bazel_partitions_config_target) {
     forward_variables_from(invoker,
                            [
                              "bazel_inputs",
@@ -54,8 +54,7 @@ template("verify_partitions_configuration") {
                              "testonly",
                            ])
     visibility = [ ":${invoker.target_name}" ]
-    command = "build"
-    bazel_targets = [ invoker.bazel_partitions_config_target ]
+    bazel_target = invoker.bazel_partitions_config_target
     copy_outputs = [
       {
         bazel = "{{BAZEL_TARGET_OUT_PATH}}"

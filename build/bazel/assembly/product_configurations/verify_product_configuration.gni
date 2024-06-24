@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_build_action.gni")
 import("//build/bazel/bazel_workspace.gni")
 
 # Compares a GN generated product configuration with a Bazel generated one.
@@ -48,7 +48,7 @@ template("verify_product_configuration") {
   _bazel_product_config_target = "${target_name}.bazel_product_config"
   _bazel_product_config_file = "${target_name}/bazel_product_config.json"
 
-  bazel_action(_bazel_product_config_target) {
+  bazel_build_action(_bazel_product_config_target) {
     forward_variables_from(invoker,
                            [
                              "bazel_inputs",
@@ -56,8 +56,7 @@ template("verify_product_configuration") {
                              "testonly",
                            ])
     visibility = [ ":${invoker.target_name}" ]
-    command = "build"
-    bazel_targets = [ invoker.bazel_product_config_target ]
+    bazel_target = invoker.bazel_product_config_target
     copy_outputs = [
       {
         bazel =

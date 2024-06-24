@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_build_action.gni")
 import("//build/packages/prebuilt_package.gni")
 
 # Wraps a `fuchsia_package()` in a `BUILD.bazel` file.
@@ -57,19 +57,23 @@ template("bazel_fuchsia_package") {
   }
 
   bazel_build_target = "$target_name.bazel_build"
-  bazel_action(bazel_build_target) {
+  bazel_build_action(bazel_build_target) {
     forward_variables_from(invoker,
                            [
-                             "bazel_inputs",
                              "deps",
                              "metadata",
                              "testonly",
                              "visibility",
                              "inputs",
                            ])
-    command = "build"
 
-    bazel_targets = [ bazel_target ]
+    bazel_target = bazel_target
+    if (defined(invoker.bazel_inputs)) {
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += invoker.bazel_inputs
+    }
 
     fuchsia_package_outputs = {
       archive = "$target_out_dir/$package_name.far"
