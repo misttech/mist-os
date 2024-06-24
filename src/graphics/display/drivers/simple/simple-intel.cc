@@ -8,13 +8,21 @@
 
 #include "simple-display.h"
 
-static zx_status_t intel_disp_bind(void* ctx, zx_device_t* dev) {
+namespace simple_display {
+
+namespace {
+
+zx_status_t BindIntelDisplay(void* ctx, zx_device_t* dev) {
   return bind_simple_pci_display_bootloader(dev, "intel", 2u);
 }
 
-static zx_driver_ops_t intel_disp_driver_ops = {
+constexpr zx_driver_ops_t kIntelDisplayDriverOps = {
     .version = DRIVER_OPS_VERSION,
-    .bind = intel_disp_bind,
+    .bind = BindIntelDisplay,
 };
 
-ZIRCON_DRIVER(intel_disp, intel_disp_driver_ops, "zircon", "0.1");
+}  // namespace
+
+}  // namespace simple_display
+
+ZIRCON_DRIVER(intel_disp, simple_display::kIntelDisplayDriverOps, "zircon", "0.1");

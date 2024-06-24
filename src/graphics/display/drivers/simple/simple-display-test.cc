@@ -27,6 +27,8 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
+namespace simple_display {
+
 namespace {
 
 // TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
@@ -445,3 +447,5 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
 }
 
 }  // namespace
+
+}  // namespace simple_display

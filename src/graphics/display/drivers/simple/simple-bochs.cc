@@ -13,14 +13,14 @@
 
 #include "simple-display.h"
 
+namespace simple_display {
+
 namespace {
 
 constexpr int kDisplayWidth = 1024;
 constexpr int kDisplayHeight = 768;
 constexpr auto kDisplayFormat = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
 constexpr int kBitsPerPixel = 32;
-
-}  // namespace
 
 inline uint16_t bochs_vbe_dispi_read(MMIO_PTR void* base, uint32_t reg) {
   return MmioRead16(reinterpret_cast<MMIO_PTR uint16_t*>(reinterpret_cast<MMIO_PTR uint8_t*>(base) +
@@ -47,8 +47,7 @@ inline void bochs_vbe_dispi_write(MMIO_PTR void* base, uint32_t reg, uint16_t va
 #define BOCHS_VBE_DISPI_ENABLED 0x01
 #define BOCHS_VBE_DISPI_LFB_ENABLED 0x40
 
-static void set_hw_mode(MMIO_PTR void* regs, uint16_t width, uint16_t height,
-                        uint16_t bits_per_pixel) {
+void set_hw_mode(MMIO_PTR void* regs, uint16_t width, uint16_t height, uint16_t bits_per_pixel) {
   zxlogf(TRACE, "id: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ID));
 
   bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_ENABLE, 0);
@@ -77,7 +76,7 @@ static void set_hw_mode(MMIO_PTR void* regs, uint16_t width, uint16_t height,
   zxlogf(TRACE, "    64K: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIDEO_MEMORY_64K));
 }
 
-static zx_status_t bochs_vbe_bind(void* ctx, zx_device_t* dev) {
+zx_status_t BindBochsVesaBiosExtensionDisplay(void* ctx, zx_device_t* dev) {
   ddk::Pci pci(dev, "pci");
   if (!pci.is_valid()) {
     printf("bochs-vbe: failed to get pci protocol\n");
@@ -98,9 +97,13 @@ static zx_status_t bochs_vbe_bind(void* ctx, zx_device_t* dev) {
                                  /*stride=*/kDisplayWidth, kDisplayFormat);
 }
 
-static zx_driver_ops_t bochs_vbe_driver_ops = {
+constexpr zx_driver_ops_t kBochsVesaBiosExtensionDriverOps = {
     .version = DRIVER_OPS_VERSION,
-    .bind = bochs_vbe_bind,
+    .bind = BindBochsVesaBiosExtensionDisplay,
 };
 
-ZIRCON_DRIVER(bochs_vbe, bochs_vbe_driver_ops, "zircon", "0.1");
+}  // namespace
+
+}  // namespace simple_display
+
+ZIRCON_DRIVER(bochs_vbe, simple_display::kBochsVesaBiosExtensionDriverOps, "zircon", "0.1");

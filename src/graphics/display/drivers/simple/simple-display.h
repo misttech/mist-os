@@ -5,17 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_
 
-#include <lib/ddk/driver.h>
-#include <zircon/compiler.h>
-#include <zircon/errors.h>
-
-#include <fbl/mutex.h>
-
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-
-#if __cplusplus
-
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
@@ -23,17 +12,26 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/driver.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
 
 #include <atomic>
 #include <memory>
 
 #include <ddktl/device.h>
+#include <fbl/mutex.h>
+
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+
+namespace simple_display {
 
 class SimpleDisplay;
 using DeviceType = ddk::Device<SimpleDisplay>;
@@ -143,14 +141,12 @@ class SimpleDisplay : public DeviceType,
   ddk::DisplayControllerInterfaceProtocolClient intf_;
 };
 
-#endif  // __cplusplus
-
-__BEGIN_CDECLS
 zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
                                     uint32_t width, uint32_t height, uint32_t stride,
                                     fuchsia_images2::wire::PixelFormat format);
 
 zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar);
-__END_CDECLS
+
+}  // namespace simple_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_

@@ -34,6 +34,8 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
+namespace simple_display {
+
 namespace {
 
 static constexpr display::DisplayId kDisplayId(1);
@@ -630,3 +632,5 @@ zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t
 
   return display->Bind(name, &display);
 }
+
+}  // namespace simple_display
