@@ -33,6 +33,13 @@
 
 namespace simple_display {
 
+struct DisplayProperties {
+  int32_t width_px;
+  int32_t height_px;
+  int32_t row_stride_px;
+  fuchsia_images2::wire::PixelFormat pixel_format;
+};
+
 class SimpleDisplay;
 using DeviceType = ddk::Device<SimpleDisplay>;
 using HeapServer = fidl::WireServer<fuchsia_hardware_sysmem::Heap>;
@@ -44,8 +51,7 @@ class SimpleDisplay : public DeviceType,
   SimpleDisplay(zx_device_t* parent,
                 fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                 fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
-                fdf::MmioBuffer framebuffer_mmio, int32_t width, int32_t height, int32_t stride,
-                fuchsia_images2::wire::PixelFormat format);
+                fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties);
   ~SimpleDisplay() = default;
 
   void DdkRelease();
@@ -130,10 +136,7 @@ class SimpleDisplay : public DeviceType,
   display::ConfigStamp config_stamp_ TA_GUARDED(mtx_) = display::kInvalidConfigStamp;
 
   const fdf::MmioBuffer framebuffer_mmio_;
-  const int32_t width_;
-  const int32_t height_;
-  const int32_t stride_;
-  const fuchsia_images2::wire::PixelFormat format_;
+  const DisplayProperties properties_;
 
   const fuchsia_images2::wire::PixelFormatModifier kFormatModifier =
       fuchsia_images2::wire::PixelFormatModifier::kLinear;
@@ -143,9 +146,8 @@ class SimpleDisplay : public DeviceType,
   ddk::DisplayControllerInterfaceProtocolClient intf_;
 };
 
-zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar, int32_t width,
-                                    int32_t height, int32_t stride,
-                                    fuchsia_images2::wire::PixelFormat format);
+zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
+                                    DisplayProperties properties);
 
 zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar);
 

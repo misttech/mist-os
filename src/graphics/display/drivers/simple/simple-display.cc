@@ -98,15 +98,16 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
 
-  const int64_t pixel_clock_hz = int64_t{width_} * height_ * kRefreshRateHz;
+  const int64_t pixel_clock_hz =
+      int64_t{properties_.width_px} * properties_.height_px * kRefreshRateHz;
   ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
   ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
   const display::DisplayTiming timing = {
-      .horizontal_active_px = width_,
+      .horizontal_active_px = properties_.width_px,
       .horizontal_front_porch_px = 0,
       .horizontal_sync_width_px = 0,
       .horizontal_back_porch_px = 0,
-      .vertical_active_lines = height_,
+      .vertical_active_lines = properties_.height_px,
       .vertical_front_porch_lines = 0,
       .vertical_sync_width_lines = 0,
       .vertical_back_porch_lines = 0,
@@ -120,7 +121,7 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
 
   // fuchsia.images2.PixelFormat can always cast to AnyPixelFormat safely.
   fuchsia_images2_pixel_format_enum_value_t pixel_format =
-      static_cast<fuchsia_images2_pixel_format_enum_value_t>(format_);
+      static_cast<fuchsia_images2_pixel_format_enum_value_t>(properties_.pixel_format);
 
   const added_display_args_t added_display_args = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
@@ -246,10 +247,11 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
 
   auto sysmem2_collection_format =
       collection_info.settings().image_format_constraints().pixel_format();
-  if (sysmem2_collection_format != format_) {
+  if (sysmem2_collection_format != properties_.pixel_format) {
     zxlogf(ERROR,
            "Image format from sysmem (%" PRIu32 ") doesn't match expected format (%" PRIu32 ")",
-           static_cast<uint32_t>(sysmem2_collection_format), static_cast<uint32_t>(format_));
+           static_cast<uint32_t>(sysmem2_collection_format),
+           static_cast<uint32_t>(properties_.pixel_format));
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -282,7 +284,8 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
   }
 
   display::ImageMetadata image_metadata(*banjo_image_metadata);
-  if (image_metadata.width() != width_ || image_metadata.height() != height_) {
+  if (image_metadata.width() != properties_.width_px ||
+      image_metadata.height() != properties_.height_px) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -341,18 +344,18 @@ bool SimpleDisplay::IsBanjoDisplayConfigSupported(const display_config_t& banjo_
   }
 
   const display::ImageMetadata image_metadata(banjo_layer.image_metadata);
-  if (image_metadata.width() != width_) {
+  if (image_metadata.width() != properties_.width_px) {
     return false;
   }
-  if (image_metadata.height() != height_) {
+  if (image_metadata.height() != properties_.height_px) {
     return false;
   }
 
   const display::Frame expected_frame = {
       .x_pos = 0,
       .y_pos = 0,
-      .width = width_,
-      .height = height_,
+      .width = properties_.width_px,
+      .height = properties_.height_px,
   };
   const display::Frame actual_dest_frame = display::ToFrame(banjo_layer.dest_frame);
   if (actual_dest_frame != expected_frame) {
@@ -398,9 +401,9 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   }
   const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
-  const uint32_t bytes_per_pixel =
-      ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(format_, kFormatModifier));
-  uint32_t bytes_per_row = stride_ * bytes_per_pixel;
+  const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(
+      PixelFormatAndModifier(properties_.pixel_format, kFormatModifier));
+  uint32_t bytes_per_row = properties_.row_stride_px * bytes_per_pixel;
 
   fidl::Arena arena;
   auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
@@ -409,7 +412,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   constraints.usage(buffer_usage.Build());
   auto buffer_constraints = fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena);
   buffer_constraints.min_size_bytes(0);
-  buffer_constraints.max_size_bytes(height_ * bytes_per_row);
+  buffer_constraints.max_size_bytes(properties_.height_px * bytes_per_row);
   buffer_constraints.physically_contiguous_required(false);
   buffer_constraints.secure_required(false);
   buffer_constraints.ram_domain_supported(true);
@@ -420,13 +423,13 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   buffer_constraints.permitted_heaps(std::array{heap.Build()});
   constraints.buffer_memory_constraints(buffer_constraints.Build());
   auto image_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
-  image_constraints.pixel_format(format_);
+  image_constraints.pixel_format(properties_.pixel_format);
   image_constraints.pixel_format_modifier(kFormatModifier);
   image_constraints.color_spaces(std::array{fuchsia_images2::ColorSpace::kSrgb});
-  image_constraints.min_size(
-      {.width = static_cast<uint32_t>(width_), .height = static_cast<uint32_t>(height_)});
-  image_constraints.max_size(
-      {.width = static_cast<uint32_t>(width_), .height = static_cast<uint32_t>(height_)});
+  image_constraints.min_size({.width = static_cast<uint32_t>(properties_.width_px),
+                              .height = static_cast<uint32_t>(properties_.height_px)});
+  image_constraints.max_size({.width = static_cast<uint32_t>(properties_.width_px),
+                              .height = static_cast<uint32_t>(properties_.height_px)});
   image_constraints.min_bytes_per_row(bytes_per_row);
   image_constraints.max_bytes_per_row(bytes_per_row);
   constraints.image_format_constraints(std::array{image_constraints.Build()});
@@ -551,7 +554,8 @@ zx_status_t SimpleDisplay::Bind(const char* name, std::unique_ptr<SimpleDisplay>
   zxlogf(INFO,
          "%s: initialized display, %" PRId32 " x %" PRId32 " (stride=%" PRId32 " format=%" PRIu32
          ")",
-         name, width_, height_, stride_, static_cast<uint32_t>(format_));
+         name, properties_.width_px, properties_.height_px, properties_.row_stride_px,
+         static_cast<uint32_t>(properties_.pixel_format));
 
   return ZX_OK;
 }
@@ -559,18 +563,14 @@ zx_status_t SimpleDisplay::Bind(const char* name, std::unique_ptr<SimpleDisplay>
 SimpleDisplay::SimpleDisplay(zx_device_t* parent,
                              fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                              fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
-                             fdf::MmioBuffer framebuffer_mmio, int32_t width, int32_t height,
-                             int32_t stride, fuchsia_images2::wire::PixelFormat format)
+                             fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties)
     : DeviceType(parent),
       hardware_sysmem_(std::move(hardware_sysmem)),
       sysmem_(std::move(sysmem)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       has_image_(false),
       framebuffer_mmio_(std::move(framebuffer_mmio)),
-      width_(width),
-      height_(height),
-      stride_(stride),
-      format_(format),
+      properties_(properties),
       next_vsync_time_(zx::clock::get_monotonic()) {
   // Start thread. Heap server must be running on a separate
   // thread as sysmem might be making synchronous allocation requests
@@ -625,14 +625,17 @@ zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* nam
   }
   fuchsia_images2::wire::PixelFormat sysmem2_format = sysmem2_format_type_result.take_value();
 
-  return bind_simple_pci_display(dev, name, bar, static_cast<int32_t>(width),
-                                 static_cast<int32_t>(height), static_cast<int32_t>(stride),
-                                 sysmem2_format);
+  const DisplayProperties properties = {
+      .width_px = static_cast<int32_t>(width),
+      .height_px = static_cast<int32_t>(height),
+      .row_stride_px = static_cast<int32_t>(stride),
+      .pixel_format = sysmem2_format,
+  };
+  return bind_simple_pci_display(dev, name, bar, properties);
 }
 
-zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar, int32_t width,
-                                    int32_t height, int32_t stride,
-                                    fuchsia_images2::wire::PixelFormat format) {
+zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
+                                    DisplayProperties properties) {
   ddk::Pci pci(dev, "pci");
   if (!pci.is_valid()) {
     zxlogf(ERROR, "%s: could not get PCI protocol", name);
@@ -673,7 +676,7 @@ zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t
   fbl::AllocChecker ac;
   std::unique_ptr<SimpleDisplay> display(
       new (&ac) SimpleDisplay(dev, std::move(hardware_sysmem), std::move(sysmem),
-                              std::move(*framebuffer_mmio), width, height, stride, format));
+                              std::move(*framebuffer_mmio), properties));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

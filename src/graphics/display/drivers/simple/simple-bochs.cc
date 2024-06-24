@@ -93,8 +93,13 @@ zx_status_t BindBochsVesaBiosExtensionDisplay(void* ctx, zx_device_t* dev) {
 
   set_hw_mode(mmio->get(), kDisplayWidth, kDisplayHeight, kBitsPerPixel);
 
-  return bind_simple_pci_display(dev, "bochs_vbe", 0u, kDisplayWidth, kDisplayHeight,
-                                 /*stride=*/kDisplayWidth, kDisplayFormat);
+  constexpr DisplayProperties kDisplayProperties = {
+      .width_px = kDisplayWidth,
+      .height_px = kDisplayHeight,
+      .row_stride_px = kDisplayWidth,
+      .pixel_format = kDisplayFormat,
+  };
+  return bind_simple_pci_display(dev, "bochs_vbe", /*bar=*/0u, kDisplayProperties);
 }
 
 constexpr zx_driver_ops_t kBochsVesaBiosExtensionDriverOps = {
