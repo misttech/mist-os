@@ -59,6 +59,7 @@ logrotate3 "${{_LOG_DIR}}/workspace-events.log"
 # through local socket relays, launched by [infra/infra]/cmd/buildproxywrap/main.go.
 # Detect manually provided config options that involve the proxies.
 # TODO: This method doesn't work if the same configs are indirectly enabled.
+has_remote_config=
 proxy_overrides=()
 for arg in "$@"
 do
@@ -73,6 +74,7 @@ do
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_resultstore_socket_path" )
       ;;
     --config=remote) # Remote build execution service
+      has_remote_config=true
       [[ "${{BAZEL_rbe_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--remote_proxy=unix://$BAZEL_rbe_socket_path" )
       ;;
@@ -106,6 +108,17 @@ build_metadata_opts=()
     "--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=FX_BUILD_UUID:$FX_BUILD_UUID"
   )
   # search for siblings
+
+# Use a shared disk cache if FUCHSIA_BAZEL_DISK_CACHE is set and
+# --config=remote is not used. Bazel documentation states that --disk_cache
+# is compatible with remote caching, but RBE documentation says otherwise
+# so err on the side of caution. This path must be absolute.
+#
+# This is useful when several checkouts are used on the same machine,
+# or when performing repeated clean builds are performed frequently. Note that
+# Bazel itself never cleans up the disk cache, as this is left to the user.
+[[ -n "${{FUCHSIA_BAZEL_DISK_CACHE}}" && -z "${{has_remote_config}}" ]] &&
+  build_metadata_opts+=(--disk_cache="${{FUCHSIA_BAZEL_DISK_CACHE}}")
 
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if
 # the USER is not actually used. See https://fxbug.dev/42063551#c9.

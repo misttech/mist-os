@@ -842,6 +842,12 @@ def main() -> int:
         cpus = os.cpu_count()
         if cpus:
             jobs = 10 * cpus
+    else:
+        # RBE documentation states that --disk_cache 'does not mix'
+        # with it, so only support it when remote config is not used.
+        disk_cache = os.environ.get("FUCHSIA_BAZEL_DISK_CACHE")
+        if disk_cache:
+            bazel_common_args += [f"--disk_cache={disk_cache}"]
 
     bazel_config_args += build_metadata_flags()
 
