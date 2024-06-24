@@ -156,19 +156,20 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
         .child_level = kPowerLevelOn,
         .parent_level = static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kActive),
     }};
-    fuchsia_hardware_power::PowerDependency passive_on_execution_state = {{
+    fuchsia_hardware_power::PowerDependency opportunistic_on_execution_state = {{
         .child = kPowerElementName,
         .parent = fuchsia_hardware_power::ParentElement::WithSag(
             fuchsia_hardware_power::SagElement::kExecutionState),
         .level_deps = {{std::move(wake_handling_on)}},
-        .strength = fuchsia_hardware_power::RequirementType::kPassive,
+        .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
     }};
     fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
     fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelOn, .name = "on"}};
     fuchsia_hardware_power::PowerElement element = {
         {.name = kPowerElementName, .levels = {{std::move(off), std::move(on)}}}};
     fuchsia_hardware_power::PowerElementConfiguration wake_config = {
-        {.element = std::move(element), .dependencies = {{std::move(passive_on_execution_state)}}}};
+        {.element = std::move(element),
+         .dependencies = {{std::move(opportunistic_on_execution_state)}}}};
 
     completer.Reply(zx::ok(
         std::vector<fuchsia_hardware_power::PowerElementConfiguration>{{std::move(wake_config)}}));
@@ -286,7 +287,7 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
     wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
 
     fuchsia_power_system::ExecutionState wake_handling = {
-        {.passive_dependency_token = std::move(duplicate)}};
+        {.opportunistic_dependency_token = std::move(duplicate)}};
 
     elements = {{.execution_state = std::move(wake_handling)}};
 

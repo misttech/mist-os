@@ -40,7 +40,7 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
     wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
 
     fuchsia_power_system::WakeHandling wake_handling = {
-        {.active_dependency_token = std::move(duplicate)}};
+        {.assertive_dependency_token = std::move(duplicate)}};
 
     elements = {{.wake_handling = std::move(wake_handling)}};
 
@@ -213,7 +213,7 @@ class Environment : public fdf_testing::Environment {
         .parent = fuchsia_hardware_power::ParentElement::WithSag(
             fuchsia_hardware_power::SagElement::kWakeHandling),
         .level_deps = {{std::move(wake_handling_on)}},
-        .strength = fuchsia_hardware_power::RequirementType::kActive,
+        .strength = fuchsia_hardware_power::RequirementType::kAssertive,
     }};
     fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
     fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelHandling, .name = "on"}};

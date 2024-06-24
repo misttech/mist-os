@@ -96,9 +96,9 @@ FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
 
 class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
  public:
-  FakeSystemActivityGovernor(zx::event exec_state_passive, zx::event wake_handling_active)
-      : exec_state_passive_(std::move(exec_state_passive)),
-        wake_handling_active_(std::move(wake_handling_active)) {}
+  FakeSystemActivityGovernor(zx::event exec_state_opportunistic, zx::event wake_handling_assertive)
+      : exec_state_opportunistic_(std::move(exec_state_opportunistic)),
+        wake_handling_assertive_(std::move(wake_handling_assertive)) {}
 
   fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
     return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
@@ -108,14 +108,14 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
   void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
     fuchsia_power_system::PowerElements elements;
     zx::event execution_element, wake_handling_element;
-    exec_state_passive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
-    wake_handling_active_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_handling_element);
+    exec_state_opportunistic_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
+    wake_handling_assertive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_handling_element);
 
     fuchsia_power_system::ExecutionState exec_state = {
-        {.passive_dependency_token = std::move(execution_element)}};
+        {.opportunistic_dependency_token = std::move(execution_element)}};
 
     fuchsia_power_system::WakeHandling wake_handling = {
-        {.active_dependency_token = std::move(wake_handling_element)}};
+        {.assertive_dependency_token = std::move(wake_handling_element)}};
 
     elements = {
         {.execution_state = std::move(exec_state), .wake_handling = std::move(wake_handling)}};
@@ -132,8 +132,8 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
  private:
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
 
-  zx::event exec_state_passive_;
-  zx::event wake_handling_active_;
+  zx::event exec_state_opportunistic_;
+  zx::event wake_handling_assertive_;
 };
 
 class FakeElementControl : public fidl::Server<fuchsia_power_broker::ElementControl> {
@@ -350,18 +350,19 @@ class FakePowerTokenProvider : public fidl::Server<fuchsia_hardware_power::Power
 
 struct IncomingNamespace {
   IncomingNamespace() {
-    zx::event::create(0, &exec_passive);
-    zx::event::create(0, &wake_active);
-    zx::event exec_passive_dupe, wake_active_dupe;
-    ASSERT_OK(exec_passive.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_passive_dupe));
-    ASSERT_OK(wake_active.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_active_dupe));
-    system_activity_governor.emplace(std::move(exec_passive_dupe), std::move(wake_active_dupe));
+    zx::event::create(0, &exec_opportunistic);
+    zx::event::create(0, &wake_assertive);
+    zx::event exec_opportunistic_dupe, wake_assertive_dupe;
+    ASSERT_OK(exec_opportunistic.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_opportunistic_dupe));
+    ASSERT_OK(wake_assertive.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_assertive_dupe));
+    system_activity_governor.emplace(std::move(exec_opportunistic_dupe),
+                                     std::move(wake_assertive_dupe));
   }
 
   fdf_testing::TestNode node{"root"};
   fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer device_server;
-  zx::event exec_passive, wake_active;
+  zx::event exec_opportunistic, wake_assertive;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
   FakePowerBroker power_broker;
   FakePowerTokenProvider power_token_provider;

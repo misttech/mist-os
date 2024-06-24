@@ -251,14 +251,14 @@ impl BrokerSvc {
             return Err(fpb::AddElementError::Invalid);
         };
         let level_dependencies = payload.dependencies.unwrap_or(vec![]);
-        let active_dependency_tokens: Vec<credentials::Token> = payload
-            .active_dependency_tokens_to_register
+        let assertive_dependency_tokens: Vec<credentials::Token> = payload
+            .assertive_dependency_tokens_to_register
             .unwrap_or(vec![])
             .into_iter()
             .map(|d| d.into())
             .collect();
-        let passive_dependency_tokens: Vec<credentials::Token> = payload
-            .passive_dependency_tokens_to_register
+        let opportunistic_dependency_tokens: Vec<credentials::Token> = payload
+            .opportunistic_dependency_tokens_to_register
             .unwrap_or(vec![])
             .into_iter()
             .map(|d| d.into())
@@ -268,8 +268,8 @@ impl BrokerSvc {
             initial_current_level,
             valid_levels,
             level_dependencies,
-            active_dependency_tokens,
-            passive_dependency_tokens,
+            assertive_dependency_tokens,
+            opportunistic_dependency_tokens,
             payload.level_control_channels,
             payload.lessor_channel,
         ))
@@ -287,8 +287,8 @@ impl BrokerSvc {
                             initial_current_level,
                             valid_levels,
                             level_dependencies,
-                            active_dependency_tokens,
-                            passive_dependency_tokens,
+                            assertive_dependency_tokens,
+                            opportunistic_dependency_tokens,
                             level_control_channels,
                             lessor_channel,
                         )) = Self::validate_and_unpack_add_element_payload(payload)
@@ -304,8 +304,8 @@ impl BrokerSvc {
                                 initial_current_level,
                                 valid_levels,
                                 level_dependencies,
-                                active_dependency_tokens,
-                                passive_dependency_tokens,
+                                assertive_dependency_tokens,
+                                opportunistic_dependency_tokens,
                             )
                         };
                         tracing::debug!("AddElement add_element = {:?}", res);

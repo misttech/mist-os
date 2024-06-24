@@ -21,9 +21,9 @@ namespace {
 
 class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
  public:
-  FakeSystemActivityGovernor(zx::event exec_state_passive, zx::event wake_handling_active)
-      : exec_state_passive_(std::move(exec_state_passive)),
-        wake_handling_active_(std::move(wake_handling_active)) {}
+  FakeSystemActivityGovernor(zx::event exec_state_opportunistic, zx::event wake_handling_assertive)
+      : exec_state_opportunistic_(std::move(exec_state_opportunistic)),
+        wake_handling_assertive_(std::move(wake_handling_assertive)) {}
 
   fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
     return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
@@ -35,14 +35,14 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
     // completeness and consistency with the real implementation.
     fuchsia_power_system::PowerElements elements;
     zx::event execution_element, wake_handling_element;
-    exec_state_passive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
-    wake_handling_active_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_handling_element);
+    exec_state_opportunistic_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
+    wake_handling_assertive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_handling_element);
 
     fuchsia_power_system::ExecutionState exec_state = {
-        {.passive_dependency_token = std::move(execution_element)}};
+        {.opportunistic_dependency_token = std::move(execution_element)}};
 
     fuchsia_power_system::WakeHandling wake_handling = {
-        {.active_dependency_token = std::move(wake_handling_element)}};
+        {.assertive_dependency_token = std::move(wake_handling_element)}};
 
     elements = {
         {.execution_state = std::move(exec_state), .wake_handling = std::move(wake_handling)}};
@@ -59,8 +59,8 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
  private:
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
 
-  zx::event exec_state_passive_;
-  zx::event wake_handling_active_;
+  zx::event exec_state_opportunistic_;
+  zx::event wake_handling_assertive_;
 };
 
 class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
@@ -270,18 +270,19 @@ class FakePowerOwner : public FuchsiaPowerManager::Owner {
 
 struct IncomingNamespace {
   IncomingNamespace() {
-    zx::event::create(0, &exec_passive);
-    zx::event::create(0, &wake_active);
-    zx::event exec_passive_dupe, wake_active_dupe;
-    EXPECT_EQ(ZX_OK, exec_passive.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_passive_dupe));
-    EXPECT_EQ(ZX_OK, wake_active.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_active_dupe));
-    system_activity_governor.emplace(std::move(exec_passive_dupe), std::move(wake_active_dupe));
+    zx::event::create(0, &exec_opportunistic);
+    zx::event::create(0, &wake_assertive);
+    zx::event exec_opportunistic_dupe, wake_assertive_dupe;
+    EXPECT_EQ(ZX_OK, exec_opportunistic.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_opportunistic_dupe));
+    EXPECT_EQ(ZX_OK, wake_assertive.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_assertive_dupe));
+    system_activity_governor.emplace(std::move(exec_opportunistic_dupe),
+                                     std::move(wake_assertive_dupe));
   }
 
   fdf_testing::TestNode node{"root"};
   fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   fake_pdev::FakePDevFidl pdev_server;
-  zx::event exec_passive, wake_active;
+  zx::event exec_opportunistic, wake_assertive;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
   FakePowerBroker power_broker;
 };
@@ -315,16 +316,16 @@ fuchsia_hardware_power::PowerElementConfiguration hardware_power_config() {
       .parent_level =
           static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kWakeHandling),
   }};
-  fuchsia_hardware_power::PowerDependency passive_on_exec_state_wake_handling = {{
+  fuchsia_hardware_power::PowerDependency opportunistic_on_exec_state_wake_handling = {{
       .child = kPowerElementName,
       .parent = fuchsia_hardware_power::ParentElement::WithSag(
           fuchsia_hardware_power::SagElement::kExecutionState),
       .level_deps = {{on_to_wake_handling}},
-      .strength = fuchsia_hardware_power::RequirementType::kPassive,
+      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration hardware_power_config = {
-      {.element = hardware_power, .dependencies = {{passive_on_exec_state_wake_handling}}}};
+      {.element = hardware_power, .dependencies = {{opportunistic_on_exec_state_wake_handling}}}};
   return hardware_power_config;
 }
 

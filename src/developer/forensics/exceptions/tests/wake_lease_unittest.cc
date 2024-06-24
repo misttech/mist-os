@@ -117,7 +117,7 @@ TEST_F(WakeLeaseTest, AcquiresLeaseSuccessfully) {
 
   ASSERT_EQ(topology->Dependencies("exceptions-element-001").size(), 1u);
   EXPECT_EQ(topology->Dependencies("exceptions-element-001").front().dependency_type(),
-            fpb::DependencyType::kPassive);
+            fpb::DependencyType::kOpportunistic);
   EXPECT_EQ(topology->Dependencies("exceptions-element-001").front().dependent_level(),
             kPowerLevelActive);
   EXPECT_EQ(topology->Dependencies("exceptions-element-001")
@@ -283,7 +283,7 @@ TEST_F(WakeLeaseTest, WaitsUntilLeaseSatisfied) {
 
   ASSERT_EQ(topology->Dependencies("exceptions-element-001").size(), 1u);
   EXPECT_EQ(topology->Dependencies("exceptions-element-001").front().dependency_type(),
-            fpb::DependencyType::kPassive);
+            fpb::DependencyType::kOpportunistic);
   EXPECT_EQ(topology->Dependencies("exceptions-element-001").front().dependent_level(),
             kPowerLevelActive);
   EXPECT_EQ(topology->Dependencies("exceptions-element-001")

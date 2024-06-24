@@ -70,11 +70,12 @@ impl SystemActivityGovernorControl {
         let sag = connect_to_protocol::<fsystem::ActivityGovernorMarker>().unwrap();
         let sag_power_elements = sag.get_power_elements().await.unwrap();
 
-        let wh_token = sag_power_elements.wake_handling.unwrap().active_dependency_token.unwrap();
+        let wh_token =
+            sag_power_elements.wake_handling.unwrap().assertive_dependency_token.unwrap();
         let wake_handling_controller =
             PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
                 .dependencies(vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Active,
+                    dependency_type: fbroker::DependencyType::Assertive,
                     dependent_level: 1,
                     requires_token: wh_token,
                     requires_level_by_preference: vec![1],
@@ -84,11 +85,11 @@ impl SystemActivityGovernorControl {
                 .unwrap();
 
         let fwh_token =
-            sag_power_elements.full_wake_handling.unwrap().active_dependency_token.unwrap();
+            sag_power_elements.full_wake_handling.unwrap().assertive_dependency_token.unwrap();
         let full_wake_handling_controller =
             PowerElementContext::builder(&topology, "full_wake_controller", &[0, 1])
                 .dependencies(vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Active,
+                    dependency_type: fbroker::DependencyType::Assertive,
                     dependent_level: 1,
                     requires_token: fwh_token,
                     requires_level_by_preference: vec![1],
@@ -98,11 +99,11 @@ impl SystemActivityGovernorControl {
                 .unwrap();
 
         let aa_token =
-            sag_power_elements.application_activity.unwrap().active_dependency_token.unwrap();
+            sag_power_elements.application_activity.unwrap().assertive_dependency_token.unwrap();
         let application_activity_controller =
             PowerElementContext::builder(&topology, "application_activity_controller", &[0, 1])
                 .dependencies(vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Active,
+                    dependency_type: fbroker::DependencyType::Assertive,
                     dependent_level: 1,
                     requires_token: aa_token,
                     requires_level_by_preference: vec![1],

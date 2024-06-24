@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_POWER_CPP_ELEMENT_BUILDER_H
-#define LIB_DRIVER_POWER_CPP_ELEMENT_BUILDER_H
+#ifndef LIB_DRIVER_POWER_CPP_ELEMENT_DESCRIPTION_BUILDER_H_
+#define LIB_DRIVER_POWER_CPP_ELEMENT_DESCRIPTION_BUILDER_H_
 
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 
@@ -18,7 +18,8 @@ class ElementDescBuilder {
 
   /// Build an `ElementDesc` object based on the information we've been given.
   ///
-  /// If active or passive tokens are not set, `zx::event` objects are created.
+  /// If assertive or opportunistic tokens are not set, `zx::event` objects are
+  /// created.
   ///
   /// If current level, required level, or lessor channels are not set, these
   /// are created.  The `fidl::ClientEnd` of these channel is placed in the
@@ -26,13 +27,13 @@ class ElementDescBuilder {
   /// fields of the `ElementDesc` object returned.
   ElementDesc Build();
 
-  /// Sets the active token to associate with this element by duplicating the
-  /// token passed in.
-  ElementDescBuilder& SetActiveToken(const zx::unowned_event& active_token);
+  /// Sets the assertive token to associate with this element by duplicating
+  /// the token passed in.
+  ElementDescBuilder& SetAssertiveToken(const zx::unowned_event& assertive_token);
 
-  /// Sets the passive token to associate with this element by duplicating the
+  /// Sets the opportunistic token to associate with this element by duplicating the
   /// token passed in.
-  ElementDescBuilder& SetPassiveToken(const zx::unowned_event& passive_token);
+  ElementDescBuilder& SetOpportunisticToken(const zx::unowned_event& opportunistic_token);
 
   /// Sets the channel to use for the CurrentLevel protocol.
   ElementDescBuilder& SetCurrentLevel(fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> current);
@@ -47,8 +48,8 @@ class ElementDescBuilder {
  private:
   fuchsia_hardware_power::wire::PowerElementConfiguration element_config_;
   TokenMap tokens_;
-  std::optional<zx::event> active_token_;
-  std::optional<zx::event> passive_token_;
+  std::optional<zx::event> assertive_token_;
+  std::optional<zx::event> opportunistic_token_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>> current_level_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>> required_level_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor_;
@@ -56,4 +57,4 @@ class ElementDescBuilder {
 
 }  // namespace fdf_power
 
-#endif /* LIB_DRIVER_POWER_CPP_ELEMENT_BUILDER_H */
+#endif  // LIB_DRIVER_POWER_CPP_ELEMENT_DESCRIPTION_BUILDER_H_

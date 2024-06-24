@@ -14,18 +14,18 @@ ElementDesc ElementDescBuilder::Build() {
   to_return.element_config_ = element_config_;
   to_return.tokens_ = std::move(tokens_);
 
-  if (this->active_token_.has_value()) {
-    to_return.active_token_ = std::move(this->active_token_.value());
+  if (this->assertive_token_.has_value()) {
+    to_return.assertive_token_ = std::move(this->assertive_token_.value());
   } else {
     // make an event instead
-    zx::event::create(0, &to_return.active_token_);
+    zx::event::create(0, &to_return.assertive_token_);
   }
 
-  if (this->passive_token_.has_value()) {
-    to_return.passive_token_ = std::move(this->passive_token_.value());
+  if (this->opportunistic_token_.has_value()) {
+    to_return.opportunistic_token_ = std::move(this->opportunistic_token_.value());
   } else {
     // make an event instead
-    zx::event::create(0, &to_return.passive_token_);
+    zx::event::create(0, &to_return.opportunistic_token_);
   }
 
   fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> required_level_server;
@@ -71,17 +71,19 @@ ElementDesc ElementDescBuilder::Build() {
   return to_return;
 }
 
-ElementDescBuilder& ElementDescBuilder::SetActiveToken(const zx::unowned_event& active_token) {
+ElementDescBuilder& ElementDescBuilder::SetAssertiveToken(
+    const zx::unowned_event& assertive_token) {
   zx::event dupe;
-  active_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
-  active_token_ = std::move(dupe);
+  assertive_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
+  assertive_token_ = std::move(dupe);
   return *this;
 }
 
-ElementDescBuilder& ElementDescBuilder::SetPassiveToken(const zx::unowned_event& passive_token) {
+ElementDescBuilder& ElementDescBuilder::SetOpportunisticToken(
+    const zx::unowned_event& opportunistic_token) {
   zx::event dupe;
-  passive_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
-  passive_token_ = std::move(dupe);
+  opportunistic_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
+  opportunistic_token_ = std::move(dupe);
   return *this;
 }
 

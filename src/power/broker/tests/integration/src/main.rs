@@ -53,7 +53,7 @@ mod tests {
                     element_name: Some("P".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                    active_dependency_tokens_to_register: Some(vec![parent_token
+                    assertive_dependency_tokens_to_register: Some(vec![parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
@@ -82,7 +82,7 @@ mod tests {
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: parent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -267,7 +267,7 @@ mod tests {
                     element_name: Some("A".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                    active_dependency_tokens_to_register: Some(vec![element_a_token
+                    assertive_dependency_tokens_to_register: Some(vec![element_a_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
@@ -296,14 +296,14 @@ mod tests {
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: element_a_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
                         requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
-                    active_dependency_tokens_to_register: Some(vec![element_b_token
+                    assertive_dependency_tokens_to_register: Some(vec![element_b_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
@@ -332,7 +332,7 @@ mod tests {
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: element_b_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -575,7 +575,7 @@ mod tests {
                     element_name: Some("GP".into()),
                     initial_current_level: Some(10),
                     valid_levels: Some(vec![10, 90, 200]),
-                    active_dependency_tokens_to_register: Some(vec![grandparent_token
+                    assertive_dependency_tokens_to_register: Some(vec![grandparent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
@@ -599,7 +599,7 @@ mod tests {
                     valid_levels: Some(vec![0, 30, 50]),
                     dependencies: Some(vec![
                         LevelDependency {
-                            dependency_type: DependencyType::Active,
+                            dependency_type: DependencyType::Assertive,
                             dependent_level: 50,
                             requires_token: grandparent_token
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -607,7 +607,7 @@ mod tests {
                             requires_level_by_preference: vec![200],
                         },
                         LevelDependency {
-                            dependency_type: DependencyType::Active,
+                            dependency_type: DependencyType::Assertive,
                             dependent_level: 30,
                             requires_token: grandparent_token
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -615,7 +615,7 @@ mod tests {
                             requires_level_by_preference: vec![90],
                         },
                     ]),
-                    active_dependency_tokens_to_register: Some(vec![parent_token
+                    assertive_dependency_tokens_to_register: Some(vec![parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
@@ -638,7 +638,7 @@ mod tests {
                     initial_current_level: Some(0),
                     valid_levels: Some(vec![0, 5]),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 5,
                         requires_token: parent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -666,7 +666,7 @@ mod tests {
                     initial_current_level: Some(0),
                     valid_levels: Some(vec![0, 3]),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 3,
                         requires_token: parent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -900,11 +900,11 @@ mod tests {
     }
 
     #[test]
-    fn test_passive() -> Result<()> {
-        // B has an active dependency on A.
-        // C has a passive dependency on B (and transitively, a passive dependency on A)
-        //   and an active dependency on E.
-        // D has an active dependency on B (and transitively, an active dependency on A).
+    fn test_opportunistic() -> Result<()> {
+        // B has an assertive dependency on A.
+        // C has an opportunistic dependency on B (and transitively, an opportunistic dependency on A)
+        //   and an assertive dependency on E.
+        // D has an assertive dependency on B (and transitively, an assertive dependency on A).
         //  A     B     C     D     E
         // ON <= ON
         //       ON <- ON =======> ON
@@ -922,7 +922,7 @@ mod tests {
                     element_name: Some("A".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                    active_dependency_tokens_to_register: Some(vec![token_a
+                    assertive_dependency_tokens_to_register: Some(vec![token_a
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .unwrap()]),
                     level_control_channels: Some(fpb::LevelControlChannels {
@@ -935,8 +935,8 @@ mod tests {
                 .unwrap()
                 .expect("add_element failed")
         });
-        let token_b_active = zx::Event::create();
-        let token_b_passive = zx::Event::create();
+        let token_b_assertive = zx::Event::create();
+        let token_b_opportunistic = zx::Event::create();
         let (current_b, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (required_b, required_server) = create_proxy::<RequiredLevelMarker>()?;
         let _element_b_control = executor.run_singlethreaded(async {
@@ -946,15 +946,15 @@ mod tests {
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                         requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
-                    active_dependency_tokens_to_register: Some(vec![token_b_active
+                    assertive_dependency_tokens_to_register: Some(vec![token_b_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .unwrap()]),
-                    passive_dependency_tokens_to_register: Some(vec![token_b_passive
+                    opportunistic_dependency_tokens_to_register: Some(vec![token_b_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .unwrap()]),
                     level_control_channels: Some(fpb::LevelControlChannels {
@@ -967,7 +967,7 @@ mod tests {
                 .unwrap()
                 .expect("add_element failed")
         });
-        let token_e_active = zx::Event::create();
+        let token_e_assertive = zx::Event::create();
         let (current_e, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (required_e, required_server) = create_proxy::<RequiredLevelMarker>()?;
         let _element_e_control = executor.run_singlethreaded(async {
@@ -976,7 +976,7 @@ mod tests {
                     element_name: Some("E".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                    active_dependency_tokens_to_register: Some(vec![token_e_active
+                    assertive_dependency_tokens_to_register: Some(vec![token_e_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .unwrap()]),
                     level_control_channels: Some(fpb::LevelControlChannels {
@@ -1000,9 +1000,9 @@ mod tests {
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![
                         LevelDependency {
-                            dependency_type: DependencyType::Passive,
+                            dependency_type: DependencyType::Opportunistic,
                             dependent_level: BinaryPowerLevel::On.into_primitive(),
-                            requires_token: token_b_passive
+                            requires_token: token_b_opportunistic
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                                 .unwrap(),
                             requires_level_by_preference: vec![
@@ -1010,9 +1010,9 @@ mod tests {
                             ],
                         },
                         LevelDependency {
-                            dependency_type: DependencyType::Active,
+                            dependency_type: DependencyType::Assertive,
                             dependent_level: BinaryPowerLevel::On.into_primitive(),
-                            requires_token: token_e_active
+                            requires_token: token_e_assertive
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                                 .unwrap(),
                             requires_level_by_preference: vec![
@@ -1041,9 +1041,9 @@ mod tests {
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
-                        requires_token: token_b_active
+                        requires_token: token_b_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .unwrap(),
                         requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
@@ -1084,13 +1084,13 @@ mod tests {
         let mut required_e_fut = required_e.watch();
 
         // Lease C.
-        // A & B's required level should remain OFF because C's passive claim
+        // A & B's required level should remain OFF because C's opportunistic claim
         // does not raise the level of A or B.
         // C's required level should remain OFF because its lease is still pending.
         // D's required level should remain OFF.
-        // E's required level should remain OFF because C's passive claim on B
-        // has no other active claims to satisfy it (the lease is contingent)
-        // and hence its active claim on E should remain pending and should not
+        // E's required level should remain OFF because C's opportunistic claim on B
+        // has no other assertive claims to satisfy it (the lease is contingent)
+        // and hence its assertive claim on E should remain pending and should not
         // raise the level of E.
         // Lease C should be Pending.
         let lease_c = executor.run_singlethreaded(async {
@@ -1114,12 +1114,12 @@ mod tests {
         });
 
         // Lease D.
-        // A's required level should become ON because of D's transitive active claim.
+        // A's required level should become ON because of D's transitive assertive claim.
         // B's required level should remain OFF because A is not yet ON.
         // C's required level should remain OFF because B and E are not yet ON.
         // D's required level should remain OFF because B is not yet ON.
         // E's required level should become ON because it C's lease is no longer
-        // contingent on an active claim that would satisfy its passive claim.
+        // contingent on an assertive claim that would satisfy its opportunistic claim.
         // Lease C & D should be pending.
         let lease_d = executor.run_singlethreaded(async {
             element_d_lessor
@@ -1153,7 +1153,7 @@ mod tests {
 
         // Update A's current level to ON.
         // A's required level should remain ON.
-        // B's required level should become ON because of D's active claim and
+        // B's required level should become ON because of D's assertive claim and
         // its dependency on A being satisfied.
         // C's required level should remain OFF because B and E are not yet ON.
         // D's required level should remain OFF because B is not yet ON.
@@ -1333,7 +1333,7 @@ mod tests {
                 element_name: Some("Earth".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                 valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                active_dependency_tokens_to_register: Some(vec![
+                assertive_dependency_tokens_to_register: Some(vec![
                     earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
                 ]),
                 ..Default::default()
@@ -1352,12 +1352,12 @@ mod tests {
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: zx::Event::create(),
                         requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
-                    active_dependency_tokens_to_register: Some(vec![
+                    assertive_dependency_tokens_to_register: Some(vec![
                         water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
                     ]),
                     ..Default::default()
@@ -1374,14 +1374,14 @@ mod tests {
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: earth_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
                         requires_level_by_preference: vec![2],
                     }]),
-                    active_dependency_tokens_to_register: Some(vec![
+                    assertive_dependency_tokens_to_register: Some(vec![
                         water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
                     ]),
                     ..Default::default()
@@ -1397,14 +1397,14 @@ mod tests {
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                 valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                 dependencies: Some(vec![LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
                     requires_token: earth_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
                     requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                 }]),
-                active_dependency_tokens_to_register: Some(vec![
+                assertive_dependency_tokens_to_register: Some(vec![
                     water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
                 ]),
                 ..Default::default()

@@ -27,20 +27,21 @@ class WakeLeaseBase {
       zx::duration timeout) = 0;
 };
 
-// Adds a power element passively dependent on (ExecutionState, WakeHandling) and takes a lease on
-// that element.
+// Adds a power element opportunistically dependent on (ExecutionState, WakeHandling) and takes a
+// lease on that element.
 class WakeLease : public WakeLeaseBase {
  public:
   WakeLease(async_dispatcher_t* dispatcher, const std::string& power_element_name,
             fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client_end,
             fidl::ClientEnd<fuchsia_power_broker::Topology> topology_client_end);
 
-  // Acquires a lease on a power element that passively depends on (Execution State, Wake Handling).
-  // Note, the power element is added automatically when Acquire is called for the first time.
+  // Acquires a lease on a power element that opportunistically depends on (Execution State, Wake
+  // Handling). Note, the power element is added automatically when Acquire is called for the first
+  // time.
   //
-  // The promise returned needs scheduled on an executor and will complete ok with the power lease
-  // channel if successful. If there is an error, the promise will return an error indicating why,
-  // e.g., the timeout has been hit and the lease couldn't be acquired.
+  // The promise returned needs to be scheduled on an executor and will complete ok with the power
+  // lease channel if successful. If there is an error, the promise will return an error indicating
+  // why, e.g., the timeout has been hit and the lease couldn't be acquired.
   //
   // This function can be called many times. If the lease returned falls out of scope, the lease
   // will be dropped and can be later reacquired.
@@ -52,9 +53,9 @@ class WakeLease : public WakeLeaseBase {
   // continutations.
   fpromise::promise<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error> UnsafeAcquire();
 
-  // Adds a power element to the topology that passively depends on ExecutionState. The promise
-  // returned needs scheduled on an executor and will complete ok if the power element is
-  // successfully added to the topology. If there is an error, the promise will return an error
+  // Adds a power element to the topology that opportunistically depends on ExecutionState. The
+  // promise returned needs to be scheduled on an executor and will complete ok if the power element
+  // is successfully added to the topology. If there is an error, the promise will return an error
   // indicating why.
   //
   // This function must only be called once.

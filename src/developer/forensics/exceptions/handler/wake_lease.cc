@@ -28,7 +28,7 @@ namespace fps = fuchsia_power_system;
 fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Lessor> server_end,
                                const std::string& element_name) {
   fpb::LevelDependency dependency(
-      /*dependency_type=*/fpb::DependencyType::kPassive,
+      /*dependency_type=*/fpb::DependencyType::kOpportunistic,
       /*dependent_level=*/kPowerLevelActive,
       /*requires_token=*/std::move(requires_token),
       /*requires_level_by_preference=*/
@@ -126,8 +126,8 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
         }
 
         if (!result->execution_state().has_value() ||
-            !result->execution_state()->passive_dependency_token().has_value()) {
-          FX_LOGS(ERROR) << "Failed to get execution state passive dependency token";
+            !result->execution_state()->opportunistic_dependency_token().has_value()) {
+          FX_LOGS(ERROR) << "Failed to get execution state opportunistic dependency token";
           completer.complete_error(Error::kBadValue);
           return;
         }
@@ -139,9 +139,9 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
           return;
         }
 
-        fpb::ElementSchema schema =
-            BuildSchema(std::move(result->execution_state()->passive_dependency_token()).value(),
-                        std::move(endpoints->server), power_element_name_);
+        fpb::ElementSchema schema = BuildSchema(
+            std::move(result->execution_state()->opportunistic_dependency_token()).value(),
+            std::move(endpoints->server), power_element_name_);
 
         // TODO(https://fxbug.dev/341104129): connect to topology here instead of injecting the
         // connection in the constructor. Disconnect once no longer needed.

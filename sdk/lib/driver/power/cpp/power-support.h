@@ -71,8 +71,8 @@ using ElementDependencyMap =
 struct ElementDesc {
   fuchsia_hardware_power::wire::PowerElementConfiguration element_config_;
   TokenMap tokens_;
-  zx::event active_token_;
-  zx::event passive_token_;
+  zx::event assertive_token_;
+  zx::event opportunistic_token_;
   std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>
       level_control_servers_;
@@ -150,7 +150,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 /// Call `AddElement` on the `power_broker` channel passed in.
 /// This function uses the `config` and `tokens` arguments to properly construct
 /// the call to `fuchsia.power.broker/Topology.AddElement`. Optionally callers
-/// can pass in tokens to be registered for granting active and passive
+/// can pass in tokens to be registered for granting assertive and opportunistic
 /// dependency access on the created element.
 ///
 /// Returns the response from power broker if successful which includes
@@ -166,7 +166,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
     fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
-    const zx::unowned_event& active_token, const zx::unowned_event& passive_token,
+    const zx::unowned_event& assertive_token, const zx::unowned_event& opportunistic_token,
     std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
         level_control,

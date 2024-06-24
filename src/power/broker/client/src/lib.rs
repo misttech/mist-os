@@ -20,8 +20,8 @@ pub struct PowerElementContext {
     pub lessor: fbroker::LessorProxy,
     pub required_level: fbroker::RequiredLevelProxy,
     pub current_level: fbroker::CurrentLevelProxy,
-    active_dependency_token: fbroker::DependencyToken,
-    passive_dependency_token: fbroker::DependencyToken,
+    assertive_dependency_token: fbroker::DependencyToken,
+    opportunistic_dependency_token: fbroker::DependencyToken,
     name: String,
 }
 
@@ -34,14 +34,14 @@ impl PowerElementContext {
         PowerElementContextBuilder::new(topology, element_name, valid_levels)
     }
 
-    pub fn active_dependency_token(&self) -> fbroker::DependencyToken {
-        self.active_dependency_token
+    pub fn assertive_dependency_token(&self) -> fbroker::DependencyToken {
+        self.assertive_dependency_token
             .duplicate_handle(Rights::SAME_RIGHTS)
             .expect("failed to duplicate token")
     }
 
-    pub fn passive_dependency_token(&self) -> fbroker::DependencyToken {
-        self.passive_dependency_token
+    pub fn opportunistic_dependency_token(&self) -> fbroker::DependencyToken {
+        self.opportunistic_dependency_token
             .duplicate_handle(Rights::SAME_RIGHTS)
             .expect("failed to duplicate token")
     }
@@ -57,8 +57,8 @@ pub struct PowerElementContextBuilder<'a> {
     initial_current_level: fbroker::PowerLevel,
     valid_levels: &'a [fbroker::PowerLevel],
     dependencies: Vec<fbroker::LevelDependency>,
-    active_dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
-    passive_dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
+    assertive_dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
+    opportunistic_dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
 }
 
 impl<'a> PowerElementContextBuilder<'a> {
@@ -73,8 +73,8 @@ impl<'a> PowerElementContextBuilder<'a> {
             valid_levels,
             initial_current_level: Default::default(),
             dependencies: Default::default(),
-            active_dependency_tokens_to_register: Default::default(),
-            passive_dependency_tokens_to_register: Default::default(),
+            assertive_dependency_tokens_to_register: Default::default(),
+            opportunistic_dependency_tokens_to_register: Default::default(),
         }
     }
 
@@ -88,33 +88,33 @@ impl<'a> PowerElementContextBuilder<'a> {
         self
     }
 
-    pub fn active_dependency_tokens_to_register(
+    pub fn assertive_dependency_tokens_to_register(
         mut self,
         value: Vec<fbroker::DependencyToken>,
     ) -> Self {
-        self.active_dependency_tokens_to_register = value;
+        self.assertive_dependency_tokens_to_register = value;
         self
     }
 
-    pub fn passive_dependency_tokens_to_register(
+    pub fn opportunistic_dependency_tokens_to_register(
         mut self,
         value: Vec<fbroker::DependencyToken>,
     ) -> Self {
-        self.passive_dependency_tokens_to_register = value;
+        self.opportunistic_dependency_tokens_to_register = value;
         self
     }
 
     pub async fn build(mut self) -> Result<PowerElementContext> {
-        let active_dependency_token = fbroker::DependencyToken::create();
-        self.active_dependency_tokens_to_register.push(
-            active_dependency_token
+        let assertive_dependency_token = fbroker::DependencyToken::create();
+        self.assertive_dependency_tokens_to_register.push(
+            assertive_dependency_token
                 .duplicate_handle(Rights::SAME_RIGHTS)
                 .expect("failed to duplicate token"),
         );
 
-        let passive_dependency_token = fbroker::DependencyToken::create();
-        self.passive_dependency_tokens_to_register.push(
-            passive_dependency_token
+        let opportunistic_dependency_token = fbroker::DependencyToken::create();
+        self.opportunistic_dependency_tokens_to_register.push(
+            opportunistic_dependency_token
                 .duplicate_handle(Rights::SAME_RIGHTS)
                 .expect("failed to duplicate token"),
         );
@@ -131,11 +131,11 @@ impl<'a> PowerElementContextBuilder<'a> {
                 initial_current_level: Some(self.initial_current_level),
                 valid_levels: Some(self.valid_levels.to_vec()),
                 dependencies: Some(self.dependencies),
-                active_dependency_tokens_to_register: Some(
-                    self.active_dependency_tokens_to_register,
+                assertive_dependency_tokens_to_register: Some(
+                    self.assertive_dependency_tokens_to_register,
                 ),
-                passive_dependency_tokens_to_register: Some(
-                    self.passive_dependency_tokens_to_register,
+                opportunistic_dependency_tokens_to_register: Some(
+                    self.opportunistic_dependency_tokens_to_register,
                 ),
                 level_control_channels: Some(fbroker::LevelControlChannels {
                     current: current_level_server_end,
@@ -152,8 +152,8 @@ impl<'a> PowerElementContextBuilder<'a> {
             lessor,
             required_level,
             current_level,
-            active_dependency_token,
-            passive_dependency_token,
+            assertive_dependency_token,
+            opportunistic_dependency_token,
             name: self.element_name.to_string(),
         })
     }
@@ -300,8 +300,8 @@ mod tests {
             lessor,
             required_level,
             current_level,
-            active_dependency_token: fbroker::DependencyToken::create(),
-            passive_dependency_token: fbroker::DependencyToken::create(),
+            assertive_dependency_token: fbroker::DependencyToken::create(),
+            opportunistic_dependency_token: fbroker::DependencyToken::create(),
             name: "test_name".to_string(),
         };
 

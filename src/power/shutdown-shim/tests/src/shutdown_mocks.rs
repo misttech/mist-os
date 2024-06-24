@@ -175,8 +175,8 @@ async fn run_activity_governor(
                 responder
                     .send(fsystem::PowerElements {
                         wake_handling: Some(fsystem::WakeHandling {
-                            active_dependency_token: Some(
-                                sag.wake_handling.active_dependency_token(),
+                            assertive_dependency_token: Some(
+                                sag.wake_handling.assertive_dependency_token(),
                             ),
                             ..Default::default()
                         }),

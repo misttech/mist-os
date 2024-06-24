@@ -55,19 +55,19 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> GetBufferRegion(zx_h
 // This power element represents the SDMMC controller hardware.
 fuchsia_hardware_power::PowerElementConfiguration GetHardwarePowerConfig(
     const fuchsia_hardware_power::ParentElement& parent_element) {
-  // Add active dependency on parent driver's power element.
+  // Add assertive dependency on parent driver's power element.
   fuchsia_hardware_power::LevelTuple on_to_parent_on = {{
       .child_level = SdmmcBlockDevice::kPowerLevelOn,
       .parent_level = SdmmcBlockDevice::kPowerLevelOn,
   }};
-  fuchsia_hardware_power::PowerDependency active_on_parent = {{
+  fuchsia_hardware_power::PowerDependency assertive_on_parent = {{
       .child = SdmmcBlockDevice::kHardwarePowerElementName,
       .parent = parent_element,
       .level_deps = {{on_to_parent_on}},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
-  // Add passive dependency on SAG's (Execution State, wake handling) which allows for orderly
+  // Add opportunistic dependency on SAG's (Execution State, wake handling) which allows for orderly
   // power down of the hardware before the CPU suspends scheduling.
   auto transitions_from_off =
       std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
@@ -94,22 +94,22 @@ fuchsia_hardware_power::PowerElementConfiguration GetHardwarePowerConfig(
       .parent_level =
           static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kWakeHandling),
   }};
-  fuchsia_hardware_power::PowerDependency passive_on_exec_state_wake_handling = {{
+  fuchsia_hardware_power::PowerDependency opportunistic_on_exec_state_wake_handling = {{
       .child = SdmmcBlockDevice::kHardwarePowerElementName,
       .parent = fuchsia_hardware_power::ParentElement::WithSag(
           fuchsia_hardware_power::SagElement::kExecutionState),
       .level_deps = {{on_to_wake_handling}},
-      .strength = fuchsia_hardware_power::RequirementType::kPassive,
+      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration hardware_power_config = {
       {.element = hardware_power,
-       .dependencies = {{passive_on_exec_state_wake_handling, active_on_parent}}}};
+       .dependencies = {{opportunistic_on_exec_state_wake_handling, assertive_on_parent}}}};
   return hardware_power_config;
 }
 
 // TODO(b/329588116): Relocate this power config.
-// This power element does not represent real hardware. Its active dependency on SAG's
+// This power element does not represent real hardware. Its assertive dependency on SAG's
 // (Wake Handling, active) is used to secure the (Execution State, wake handling) necessary to
 // satisfy the hardware power element's dependency, thus allowing the hardware to wake up and serve
 // incoming requests.
@@ -138,16 +138,16 @@ fuchsia_hardware_power::PowerElementConfiguration GetSystemWakeOnRequestPowerCon
       .child_level = SdmmcBlockDevice::kPowerLevelOn,
       .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
   }};
-  fuchsia_hardware_power::PowerDependency active_on_wake_handling_active = {{
+  fuchsia_hardware_power::PowerDependency assertive_on_wake_handling_active = {{
       .child = SdmmcBlockDevice::kSystemWakeOnRequestPowerElementName,
       .parent = fuchsia_hardware_power::ParentElement::WithSag(
           fuchsia_hardware_power::SagElement::kWakeHandling),
       .level_deps = {{on_to_active}},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration wake_on_request_config = {
-      {.element = wake_on_request, .dependencies = {{active_on_wake_handling_active}}}};
+      {.element = wake_on_request, .dependencies = {{assertive_on_wake_handling_active}}}};
   return wake_on_request_config;
 }
 
@@ -1219,8 +1219,8 @@ void SdmmcBlockDevice::WorkerLoop() {
         wait_for_power_resumed_.Reset();
 
         // Acquire lease on wake-on-request power element. This indirectly raises SAG's Execution
-        // State, satisfying the hardware power element's lease status (which is passively dependent
-        // on SAG's Execution State), and thus resuming power.
+        // State, satisfying the hardware power element's lease status (which is opportunistically
+        // dependent on SAG's Execution State), and thus resuming power.
         ZX_ASSERT(!wake_on_request_lease_control_client_end.is_valid());
         zx::result lease_control_client_end = AcquireLease(wake_on_request_lessor_client_);
         if (!lease_control_client_end.is_ok()) {

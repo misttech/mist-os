@@ -22,15 +22,14 @@ type BinaryPowerLevel = strict enum : PowerLevel {
     ON = 1;
 };
 
-/// See the #fulfillment-policy-definition of the Power Topology RFC:
-/// https://fuchsia-review.googlesource.com/c/fuchsia/+/1004754 for a description of dependency
-/// types. Note, ACTIVE and PASSIVE are not concepts in the RFC and readers should interpret
-/// assertive as ACTIVE and opportunistic as PASSIVE.
-// TODO(b/341766303): make dependency types and comments consistent with Power Topology RFC once it
-// has been accepted.
+/// An assertive dependency is strongly-fulfilled and orderly-on-termination.
+/// An opportunistic dependency is weakly-fulfilled but still orderly-on-termination.
+///
+/// See https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0250_power_topology#dependency_types
+/// for more details on these definitions.
 type DependencyType = strict enum {
-    ACTIVE = 1;
-    PASSIVE = 2;
+    ASSERTIVE = 1;
+    OPPORTUNISTIC = 2;
 };
 
 const MAX_ELEMENT_NAME_LEN uint16 = 1024;
@@ -43,11 +42,9 @@ alias DependencyToken = zx.Handle:EVENT;
 /// Power dependency from an already specified element's PowerLevel to another.
 /// The dependent Element should already be known from context.
 type LevelDependency = resource struct {
-    /// Must match the expected type of the DependencyToken, i.e. ACTIVE must be used if the token
-    /// is specified to be an active dependency token and PASSIVE must be used if the token is
-    /// specified to be a passive dependency token.
-    // TODO(b/341766303): make this comment consistent with Power Topology RFC once it has been
-    // accepted.
+    /// Must match the expected type of the DependencyToken, i.e. ASSERTIVE must be used if the
+    /// token is specified to be an assertive dependency token and OPPORTUNISTIC must be used if
+    /// the token is specified to be an opportunistic dependency token.
     dependency_type DependencyType;
     dependent_level PowerLevel;
     /// Must supply a token registered via the RegisterDependencyToken call of
@@ -95,16 +92,17 @@ type ElementSchema = resource table {
     /// List of dependencies for this element's power levels.
     /// Note: dependencies UPON this element's levels cannot be added here.
     4: dependencies vector<LevelDependency>:MAX_DEPENDENCIES_IN_ADD_ELEMENT;
-    /// List of active dependency tokens to register for this element.
-    /// These tokens will allow other element owners to create active
+    /// List of assertive dependency tokens to register for this element.
+    /// These tokens will allow other element owners to create assertive
     /// dependencies upon this element by passing them as the
     /// requires_token of a LevelDependency.
-    5: active_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
-    /// List of passive dependency tokens to register for this element.
-    /// These tokens will allow other element owners to create passive
+    5: assertive_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
+    /// List of opportunistic dependency tokens to register for this element.
+    /// These tokens will allow other element owners to create opportunistic
     /// dependencies upon this element by passing them as the
     /// requires_token of a LevelDependency.
-    6: passive_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
+    6: opportunistic_dependency_tokens_to_register
+            vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
     /// Channels on which Power Broker will send required power levels and
     /// receive current level updates.
     7: level_control_channels LevelControlChannels;
@@ -146,8 +144,8 @@ open protocol ElementControl {
     });
 
     /// Register a token which will permit the bearer to add either an
-    /// active or passive dependency upon this element, depending on the
-    /// dependency_type specified.
+    /// assertive or opportunistic dependency upon this element, depending on
+    /// the dependency_type specified.
     flexible RegisterDependencyToken(resource struct {
         token DependencyToken;
         dependency_type DependencyType;
@@ -178,8 +176,8 @@ type UnregisterDependencyTokenError = flexible enum {
 
 /// Element Permissions
 type Permissions = strict bits : uint32 {
-    MODIFY_ACTIVE_DEPENDENT = 0b00000001;
-    MODIFY_PASSIVE_DEPENDENT = 0b0000010;
+    MODIFY_ASSERTIVE_DEPENDENT = 0b00000001;
+    MODIFY_OPPORTUNISTIC_DEPENDENT = 0b0000010;
     MODIFY_DEPENDENCY = 0b00000100;
 };
 

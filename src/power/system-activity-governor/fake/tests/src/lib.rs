@@ -107,11 +107,11 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
     );
 
     let power_elements = activity_governor.get_power_elements().await?;
-    let es_token = power_elements.execution_state.unwrap().passive_dependency_token.unwrap();
+    let es_token = power_elements.execution_state.unwrap().opportunistic_dependency_token.unwrap();
 
     let test_driver = PowerElementContext::builder(&topology, "test_driver", &[0, 1])
         .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Passive,
+            dependency_type: fbroker::DependencyType::Opportunistic,
             dependent_level: 1,
             requires_token: es_token,
             requires_level_by_preference: vec![2],
@@ -123,9 +123,9 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
     let test_driver_controller =
         PowerElementContext::builder(&topology, "test_driver_controller", &[0, 1])
             .dependencies(vec![fbroker::LevelDependency {
-                dependency_type: fbroker::DependencyType::Active,
+                dependency_type: fbroker::DependencyType::Assertive,
                 dependent_level: 1,
-                requires_token: test_driver.active_dependency_token(),
+                requires_token: test_driver.assertive_dependency_token(),
                 requires_level_by_preference: vec![1],
             }])
             .build()

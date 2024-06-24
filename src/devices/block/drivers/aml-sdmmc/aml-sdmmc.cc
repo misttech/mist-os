@@ -422,7 +422,7 @@ void AmlSdmmc::GetToken(GetTokenCompleter::Sync& completer) {
   }
 
   const fidl::WireResult result = hardware_power_element_control_client_->RegisterDependencyToken(
-      std::move(token), fuchsia_power_broker::DependencyType::kActive);
+      std::move(token), fuchsia_power_broker::DependencyType::kAssertive);
   if (!result.ok()) {
     FDF_LOGL(ERROR, logger(), "Call to RegisterDependencyToken failed: %s", result.status_string());
     completer.Reply(fit::error(result.status()));

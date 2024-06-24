@@ -51,9 +51,9 @@ impl PowerElement {
             .context("cannot get power elements from SAG")?;
         let Some(Some(application_activity_token)) = power_elements
             .application_activity
-            .map(|application_activity| application_activity.active_dependency_token)
+            .map(|application_activity| application_activity.assertive_dependency_token)
         else {
-            return Err(anyhow!("Did not find application activity active dependency token"));
+            return Err(anyhow!("Did not find application activity assertive dependency token"));
         };
 
         // TODO(https://fxbug.dev/316023943): also depend on execution_resume_latency after implemented.
@@ -67,7 +67,7 @@ impl PowerElement {
                 initial_current_level: Some(POWER_ON_LEVEL),
                 valid_levels: Some(power_levels),
                 dependencies: Some(vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Active,
+                    dependency_type: fbroker::DependencyType::Assertive,
                     dependent_level: POWER_ON_LEVEL,
                     requires_token: application_activity_token,
                     requires_level_by_preference: vec![

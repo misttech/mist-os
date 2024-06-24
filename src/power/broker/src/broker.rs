@@ -138,8 +138,8 @@ impl Broker {
         dependency_type: DependencyType,
     ) -> Result<(), RegisterDependencyTokenError> {
         let permissions = match dependency_type {
-            DependencyType::Active => Permissions::MODIFY_ACTIVE_DEPENDENT,
-            DependencyType::Passive => Permissions::MODIFY_PASSIVE_DEPENDENT,
+            DependencyType::Assertive => Permissions::MODIFY_ASSERTIVE_DEPENDENT,
+            DependencyType::Opportunistic => Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT,
         };
         match self
             .credentials
@@ -509,7 +509,8 @@ impl Broker {
                 .chain(pending_claims)
                 // Consider an assertive claim to match if is part of this lease. This captures the
                 // scenario where a lease is 'self-satisfying' - it holds an assertive claim for an
-                // element and a opportunistic claim for the same element (at the same or lower level).
+                // element and an opportunistic claim for the same element (at the same or lower
+                // level).
                 .filter(|c| lease_id == &c.lease_id || !self.is_lease_contingent(&c.lease_id))
                 .find(|c| c.requires().level.satisfies(claim.requires().level));
             if let Some(matching_assertive_claim) = matching_assertive_claim {
@@ -868,8 +869,10 @@ impl Broker {
             };
         }
         let labeled_dependency_tokens =
-            assertive_dependency_tokens.into_iter().zip(repeat(DependencyType::Active)).chain(
-                opportunistic_dependency_tokens.into_iter().zip(repeat(DependencyType::Passive)),
+            assertive_dependency_tokens.into_iter().zip(repeat(DependencyType::Assertive)).chain(
+                opportunistic_dependency_tokens
+                    .into_iter()
+                    .zip(repeat(DependencyType::Opportunistic)),
             );
         for (token, dependency_type) in labeled_dependency_tokens {
             if let Err(err) = self.register_dependency_token(&id, token, dependency_type) {
@@ -949,14 +952,14 @@ impl Broker {
             },
         };
         match dependency_type {
-            DependencyType::Active => {
-                if !requires_cred.contains(Permissions::MODIFY_ACTIVE_DEPENDENT) {
+            DependencyType::Assertive => {
+                if !requires_cred.contains(Permissions::MODIFY_ASSERTIVE_DEPENDENT) {
                     return Err(ModifyDependencyError::NotAuthorized);
                 }
                 self.catalog.topology.add_assertive_dependency(&dependency)
             }
-            DependencyType::Passive => {
-                if !requires_cred.contains(Permissions::MODIFY_PASSIVE_DEPENDENT) {
+            DependencyType::Opportunistic => {
+                if !requires_cred.contains(Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT) {
                     return Err(ModifyDependencyError::NotAuthorized);
                 }
                 self.catalog.topology.add_opportunistic_dependency(&dependency)
@@ -2118,7 +2121,7 @@ mod tests {
             OFF.level,
             BINARY_POWER_LEVELS.to_vec(),
             vec![fpb::LevelDependency {
-                dependency_type: DependencyType::Active,
+                dependency_type: DependencyType::Assertive,
                 dependent_level: ON.level,
                 requires_token: never_registered_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2137,7 +2140,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_mithril
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2204,7 +2207,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_mithril
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2471,7 +2474,7 @@ mod tests {
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: ON.level,
                         requires_token: parent1_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2479,7 +2482,7 @@ mod tests {
                         requires_level_by_preference: vec![ON.level],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: ON.level,
                         requires_token: parent2_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2728,7 +2731,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2742,7 +2745,7 @@ mod tests {
         broker
             .add_dependency(
                 &parent,
-                DependencyType::Active,
+                DependencyType::Assertive,
                 ON.level,
                 grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2852,7 +2855,7 @@ mod tests {
                 vec![0, 30, 50],
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 50,
                         requires_token: grandparent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2860,7 +2863,7 @@ mod tests {
                         requires_level_by_preference: vec![200],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 30,
                         requires_token: grandparent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2881,7 +2884,7 @@ mod tests {
                 0,
                 vec![0, 5],
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: 5,
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -2898,7 +2901,7 @@ mod tests {
                 0,
                 vec![0, 3],
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: 3,
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3136,12 +3139,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lease_opportunistic_direct() {
-        // Tests that a lease with a opportunistic claim is Contingent while there
+        // Tests that a lease with an opportunistic claim is Contingent while there
         // are no other leases with assertive claims that would satisfy its
         // opportunistic claim.
         //
         // B has an assertive dependency on A.
-        // C has a opportunistic dependency on A.
+        // C has an opportunistic dependency on A.
         //  A     B     C
         // ON <= ON
         // ON <------- ON
@@ -3172,7 +3175,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_a_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3190,7 +3193,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
                     requires_token: token_a_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3406,13 +3409,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_drop_opportunistic_lease_before_assertive_claim_satisifed() {
-        // Tests that if a lease has a opportunistic claim that has been satisfied by
+        // Tests that if a lease has an opportunistic claim that has been satisfied by
         // an assertive claim, and then the lease is dropped *before* the assertive claim
         // was satisfied, that the opportunistic claim should not be enforced, even though
         // it would have, had the lease not been dropped prematurely.
         //
         // A has an assertive dependency on B.
-        // C has a opportunistic dependency on B.
+        // C has an opportunistic dependency on B.
         //
         //  A     B     C
         // ON => ON <- ON
@@ -3443,7 +3446,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_b_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3461,7 +3464,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
                     requires_token: token_b_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3532,12 +3535,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lease_opportunistic_immediate() {
-        // Tests that a lease with a opportunistic claim is immediately satisfied if
+        // Tests that a lease with an opportunistic claim is immediately satisfied if
         // there are already leases with assertive claims that would satisfy its
         // opportunistic claim.
         //
         // B has an assertive dependency on A.
-        // C has a opportunistic dependency on A.
+        // C has an opportunistic dependency on A.
         //  A     B     C
         // ON <= ON
         // ON <------- ON
@@ -3568,7 +3571,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_a_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3586,7 +3589,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
                     requires_token: token_a_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3690,7 +3693,7 @@ mod tests {
         // by a third lease, correctly becomes satisfied.
         //
         // B has an assertive dependency on A.
-        // C has a opportunistic dependency on A and E.
+        // C has an opportunistic dependency on A and E.
         // D has an assertive dependency on E.
         //  A     B     C     D     E
         // ON <= ON
@@ -3723,7 +3726,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_a_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3760,7 +3763,7 @@ mod tests {
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Passive,
+                        dependency_type: DependencyType::Opportunistic,
                         dependent_level: ON.level,
                         requires_token: token_a_opportunistic
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3769,7 +3772,7 @@ mod tests {
                         requires_level_by_preference: vec![ON.level],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Passive,
+                        dependency_type: DependencyType::Opportunistic,
                         dependent_level: ON.level,
                         requires_token: token_e_opportunistic
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3788,7 +3791,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_e_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3936,11 +3939,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lease_opportunistic_reacquire() {
-        // Tests that a lease with a opportunistic claim is dropped and reacquired
+        // Tests that a lease with an opportunistic claim is dropped and reacquired
         // will not prevent power-down.
         //
         // B has an assertive dependency on A.
-        // C has a opportunistic dependency on A.
+        // C has an opportunistic dependency on A.
         //  A     B     C
         // ON <= ON
         // ON <------- ON
@@ -3971,7 +3974,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_a_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -3989,7 +3992,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
                     requires_token: token_a_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4111,11 +4114,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lease_opportunistic_reuse() {
-        // Tests that a lease with a opportunistic claim can be reused after
+        // Tests that a lease with an opportunistic claim can be reused after
         // the current level of the consumer element is lowered.
         //
         // B has an assertive dependency on A.
-        // C has a opportunistic dependency on A.
+        // C has an opportunistic dependency on A.
         //  A     B     C
         // ON <= ON
         // ON <------- ON
@@ -4146,7 +4149,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_a_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4164,7 +4167,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
                     requires_token: token_a_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4348,11 +4351,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lease_opportunistic_contingent() {
-        // Tests that a lease with a opportunistic claim does not affect required
+        // Tests that a lease with an opportunistic claim does not affect required
         // levels if it has not yet been satisfied.
         //
         // B has an assertive dependency on A @ 3.
-        // C has a opportunistic dependency on A @ 2.
+        // C has an opportunistic dependency on A @ 2.
         // D has an assertive dependency on A @ 1.
         //  A     B     C     D
         //  3 <== 1
@@ -4385,7 +4388,7 @@ mod tests {
                 0,
                 vec![0, 1],
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: 1,
                     requires_token: token_a_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4403,7 +4406,7 @@ mod tests {
                 0,
                 vec![0, 1],
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: 1,
                     requires_token: token_a_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4421,7 +4424,7 @@ mod tests {
                 0,
                 vec![0, 1],
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: 1,
                     requires_token: token_a_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4455,7 +4458,7 @@ mod tests {
         // C's required level should remain 0 because its lease is pending and contingent.
         // D's required level should remain 0.
         broker_status.assert_matches(&broker);
-        // Lease C should be pending and contingent on its passive claim.
+        // Lease C should be pending and contingent on its opportunistic claim.
         assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
 
@@ -4593,13 +4596,13 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_lease_opportunistic_levels() {
-        // Tests that a lease with a opportunistic claim remains unsatisfied
+        // Tests that a lease with an opportunistic claim remains unsatisfied
         // if a lease with an assertive but lower level claim on the required
         // element is added.
         //
         // B @ 10 has an assertive dependency on A @ 1.
         // B @ 20 has an assertive dependency on A @ 1.
-        // C @ 5 has a opportunistic dependency on A @ 2.
+        // C @ 5 has an opportunistic dependency on A @ 2.
         //  A     B     C
         //  2 <= 20
         //  1 <= 10
@@ -4632,7 +4635,7 @@ mod tests {
                 vec![0, 10, 20],
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 10,
                         requires_token: token_a_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4641,7 +4644,7 @@ mod tests {
                         requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 20,
                         requires_token: token_a_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4660,7 +4663,7 @@ mod tests {
                 0,
                 vec![0, 5],
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: 5,
                     requires_token: token_a_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4689,7 +4692,7 @@ mod tests {
         // A's required level should remain 0 because of C's opportunistic claim.
         // B's required level should remain 0.
         // C's required level should remain 0 because its lease is pending and contingent.
-        // Lease C should be pending because it is contingent on a opportunistic claim.
+        // Lease C should be pending because it is contingent on an opportunistic claim.
         let lease_c = broker
             .acquire_lease(&element_c, IndexedPowerLevel { level: 5, index: 1 })
             .expect("acquire failed");
@@ -4827,7 +4830,7 @@ mod tests {
         // but no other leases have assertive claims that would satisfy them).
         //
         // B has an assertive dependency on A.
-        // C has a opportunistic dependency on A.
+        // C has an opportunistic dependency on A.
         // C has an assertive dependency on D.
         //  A     B     C     D
         // ON <= ON
@@ -4859,7 +4862,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_a_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4892,7 +4895,7 @@ mod tests {
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Passive,
+                        dependency_type: DependencyType::Opportunistic,
                         dependent_level: ON.level,
                         requires_token: token_a_opportunistic
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -4901,7 +4904,7 @@ mod tests {
                         requires_level_by_preference: vec![ON.level],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: ON.level,
                         requires_token: token_d_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5037,8 +5040,8 @@ mod tests {
         // lease is made non-contingent.
         //
         // B has an assertive dependency on C.
-        // D has an assertive dependency on A and a opportunistic dependency on C.
-        // E has a opportunistic dependency on A.
+        // D has an assertive dependency on A and an opportunistic dependency on C.
+        // E has an opportunistic dependency on A.
         //  A     B     C     D     E
         //       ON => ON
         // ON <============= ON
@@ -5090,7 +5093,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_c_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5112,7 +5115,7 @@ mod tests {
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: ON.level,
                         requires_token: token_a_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5121,7 +5124,7 @@ mod tests {
                         requires_level_by_preference: vec![ON.level],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Passive,
+                        dependency_type: DependencyType::Opportunistic,
                         dependent_level: ON.level,
                         requires_token: token_c_opportunistic
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5140,7 +5143,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
                     requires_token: token_a_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5295,9 +5298,9 @@ mod tests {
         // which in turn depend on assertive dependencies, all work as expected.
         //
         // B has an assertive dependency on A.
-        // C has a opportunistic dependency on B (and transitively, a opportunistic dependency on A).
+        // C has an opportunistic dependency on B (and transitively, an opportunistic dependency on A).
         // D has an assertive dependency on B (and transitively, an assertive dependency on A).
-        // E has an assertive dependency on C (and transitively, a opportunistic dependency on A & B).
+        // E has an assertive dependency on C (and transitively, an opportunistic dependency on A & B).
         //  A     B     C     D     E
         // ON <= ON
         //       ON <- ON <======= ON
@@ -5324,7 +5327,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_a
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5349,7 +5352,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
                     requires_token: token_b_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5370,7 +5373,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_b_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5388,7 +5391,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_c_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5591,7 +5594,7 @@ mod tests {
                 v012_u8.clone(),
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 1,
                         requires_token: token_b_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5600,7 +5603,7 @@ mod tests {
                         requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 2,
                         requires_token: token_c_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5676,10 +5679,10 @@ mod tests {
         // and assertive) are properly requested when a lease is acquired.
         //
         // A[1] has an assertive dependency on D[1].
-        // A[2] has a opportunistic dependency on C[1].
+        // A[2] has an opportunistic dependency on C[1].
         // A[3] has an assertive dependency on B[2].
         // D[1] has an assertive dependency on E[1].
-        // D[1] has a opportunistic dependency on B[1].
+        // D[1] has an opportunistic dependency on B[1].
         // F[1] has an assertive dependency on C[1].
         //
         // A[3] has an implicit, transitive, opportunistic dependency on B[1].
@@ -5740,7 +5743,7 @@ mod tests {
                 v0123_u8.clone(),
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 1,
                         requires_token: token_e_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5749,7 +5752,7 @@ mod tests {
                         requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Passive,
+                        dependency_type: DependencyType::Opportunistic,
                         dependent_level: 1,
                         requires_token: token_b_opportunistic
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5787,7 +5790,7 @@ mod tests {
                 0,
                 v0123_u8.clone(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: 1,
                     requires_token: token_c_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5806,7 +5809,7 @@ mod tests {
                 v0123_u8.clone(),
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 1,
                         requires_token: token_d_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5815,7 +5818,7 @@ mod tests {
                         requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Passive,
+                        dependency_type: DependencyType::Opportunistic,
                         dependent_level: 2,
                         requires_token: token_c_opportunistic
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -5824,7 +5827,7 @@ mod tests {
                         requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 3,
                         requires_token: token_b_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6008,10 +6011,10 @@ mod tests {
         // requested when a lease is acquired and when the requested element can satisfy it's
         // opportunistic dependency with it's own assertive dependency.
         //
-        // A[1] has a opportunistic dependency on B[1].
+        // A[1] has an opportunistic dependency on B[1].
         // A[2] has an assertive dependency on B[2].
         // A[3] has an assertive dependency on C[2].
-        // B[2] has a opportunistic dependency on C[1].
+        // B[2] has an opportunistic dependency on C[1].
         //
         // A[3] has an implicit, opportunistic dependency on B[1].
         // A[3] has an implicit, assertive dependency on B[2].
@@ -6056,7 +6059,7 @@ mod tests {
                 0,
                 v0123_u8.clone(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: 2,
                     requires_token: token_c_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6081,7 +6084,7 @@ mod tests {
                 v0123_u8.clone(),
                 vec![
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Passive,
+                        dependency_type: DependencyType::Opportunistic,
                         dependent_level: 1,
                         requires_token: token_b_opportunistic
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6090,7 +6093,7 @@ mod tests {
                         requires_level_by_preference: vec![1],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 2,
                         requires_token: token_b_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6099,7 +6102,7 @@ mod tests {
                         requires_level_by_preference: vec![2],
                     },
                     fpb::LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 3,
                         requires_token: token_c_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6225,7 +6228,7 @@ mod tests {
                 OFF.level,
                 vec![0, 1],
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_sag_es_active
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6246,7 +6249,7 @@ mod tests {
                 OFF.level,
                 vec![0, 1],
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
                     requires_token: token_sag_es_passive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6264,7 +6267,7 @@ mod tests {
                 OFF.level,
                 vec![0, 1],
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_sag_wh_active
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6414,7 +6417,7 @@ mod tests {
         // on element A will never be satisfied.
         //
         // B has an assertive dependency on A.
-        // C has a opportunistic dependency on A.
+        // C has an opportunistic dependency on A.
         //  A     B     C
         // ON <= ON
         //    <------- ON
@@ -6445,7 +6448,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_a_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6463,7 +6466,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Passive,
+                    dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
                     requires_token: token_a_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -6584,7 +6587,7 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
                     requires_token: token_mithril
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)

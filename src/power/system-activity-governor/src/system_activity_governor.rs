@@ -84,8 +84,8 @@ struct ExecutionStateManagerInner {
 
 /// Manager of the execution_state power element and suspend logic.
 struct ExecutionStateManager {
-    /// The passive dependency token of the execution_state power element.
-    passive_dependency_token: fbroker::DependencyToken,
+    /// The opportunistic dependency token of the execution_state power element.
+    opportunistic_dependency_token: fbroker::DependencyToken,
     /// State of the execution_state power element and suspend controls.
     inner: Mutex<ExecutionStateManagerInner>,
     /// SuspendResumeListener object to notify of suspend/resume.
@@ -101,7 +101,7 @@ impl ExecutionStateManager {
         inspect: INode,
     ) -> Self {
         Self {
-            passive_dependency_token: execution_state.passive_dependency_token(),
+            opportunistic_dependency_token: execution_state.opportunistic_dependency_token(),
             inner: Mutex::new(ExecutionStateManagerInner {
                 execution_state,
                 suspender,
@@ -122,9 +122,9 @@ impl ExecutionStateManager {
             .unwrap();
     }
 
-    /// Gets a copy of the passive dependency token.
-    fn passive_dependency_token(&self) -> fbroker::DependencyToken {
-        self.passive_dependency_token
+    /// Gets a copy of the opportunistic dependency token.
+    fn opportunistic_dependency_token(&self) -> fbroker::DependencyToken {
+        self.opportunistic_dependency_token
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .expect("failed to duplicate token")
     }
@@ -434,9 +434,9 @@ impl SystemActivityGovernor {
             ],
         )
         .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Active,
+            dependency_type: fbroker::DependencyType::Assertive,
             dependent_level: ApplicationActivityLevel::Active.into_primitive(),
-            requires_token: execution_state.active_dependency_token(),
+            requires_token: execution_state.assertive_dependency_token(),
             requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
         }])
         .build()
@@ -460,9 +460,9 @@ impl SystemActivityGovernor {
             ],
         )
         .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Active,
+            dependency_type: fbroker::DependencyType::Assertive,
             dependent_level: FullWakeHandlingLevel::Active.into_primitive(),
-            requires_token: execution_state.active_dependency_token(),
+            requires_token: execution_state.assertive_dependency_token(),
             requires_level_by_preference: vec![ExecutionStateLevel::WakeHandling.into_primitive()],
         }])
         .build()
@@ -486,9 +486,9 @@ impl SystemActivityGovernor {
             ],
         )
         .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Active,
+            dependency_type: fbroker::DependencyType::Assertive,
             dependent_level: WakeHandlingLevel::Active.into_primitive(),
-            requires_token: execution_state.active_dependency_token(),
+            requires_token: execution_state.assertive_dependency_token(),
             requires_level_by_preference: vec![ExecutionStateLevel::WakeHandling.into_primitive()],
         }])
         .build()
@@ -509,9 +509,9 @@ impl SystemActivityGovernor {
             &[BootControlLevel::Inactive.into(), BootControlLevel::Active.into()],
         )
         .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Active,
+            dependency_type: fbroker::DependencyType::Assertive,
             dependent_level: BootControlLevel::Active.into(),
-            requires_token: execution_state.active_dependency_token(),
+            requires_token: execution_state.assertive_dependency_token(),
             requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
         }])
         .build()
@@ -850,26 +850,26 @@ impl SystemActivityGovernor {
                 Ok(fsystem::ActivityGovernorRequest::GetPowerElements { responder }) => {
                     let result = responder.send(fsystem::PowerElements {
                         execution_state: Some(fsystem::ExecutionState {
-                            passive_dependency_token: Some(
-                                self.execution_state_manager.passive_dependency_token(),
+                            opportunistic_dependency_token: Some(
+                                self.execution_state_manager.opportunistic_dependency_token(),
                             ),
                             ..Default::default()
                         }),
                         application_activity: Some(fsystem::ApplicationActivity {
-                            active_dependency_token: Some(
-                                self.application_activity.active_dependency_token(),
+                            assertive_dependency_token: Some(
+                                self.application_activity.assertive_dependency_token(),
                             ),
                             ..Default::default()
                         }),
                         full_wake_handling: Some(fsystem::FullWakeHandling {
-                            active_dependency_token: Some(
-                                self.full_wake_handling.active_dependency_token(),
+                            assertive_dependency_token: Some(
+                                self.full_wake_handling.assertive_dependency_token(),
                             ),
                             ..Default::default()
                         }),
                         wake_handling: Some(fsystem::WakeHandling {
-                            active_dependency_token: Some(
-                                self.wake_handling.active_dependency_token(),
+                            assertive_dependency_token: Some(
+                                self.wake_handling.assertive_dependency_token(),
                             ),
                             ..Default::default()
                         }),
@@ -1030,10 +1030,12 @@ impl ResumeLatencyContext {
 
     fn to_fidl(&self) -> fsystem::ExecutionResumeLatency {
         fsystem::ExecutionResumeLatency {
-            passive_dependency_token: Some(
-                self.execution_resume_latency.passive_dependency_token(),
+            opportunistic_dependency_token: Some(
+                self.execution_resume_latency.opportunistic_dependency_token(),
             ),
-            active_dependency_token: Some(self.execution_resume_latency.active_dependency_token()),
+            assertive_dependency_token: Some(
+                self.execution_resume_latency.assertive_dependency_token(),
+            ),
             resume_latencies: Some(self.resume_latencies.clone()),
             ..Default::default()
         }

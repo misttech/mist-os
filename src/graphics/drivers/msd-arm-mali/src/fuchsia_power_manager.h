@@ -49,8 +49,8 @@ class FuchsiaPowerManager final : public TimeoutSource {
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
   fidl::ClientEnd<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_end_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
-  std::vector<zx::event> active_power_dep_tokens_;
-  std::vector<zx::event> passive_power_dep_tokens_;
+  std::vector<zx::event> assertive_power_dep_tokens_;
+  std::vector<zx::event> opportunistic_power_dep_tokens_;
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end_;
 
   inspect::BoolProperty power_lease_active_;

@@ -51,14 +51,14 @@ fit::result<Error, std::vector<fuchsia_power_broker::LevelDependency>> ConvertPo
     return fit::error(Error::INVALID_ARGS);
   }
 
-  // See if this is an active or passive dependency
+  // See if this is an assertive or opportunistic dependency
   fuchsia_power_broker::DependencyType dep_type;
   switch (driver_config_deps->strength()) {
-    case fuchsia_hardware_power::wire::RequirementType::kActive:
-      dep_type = fuchsia_power_broker::DependencyType::kActive;
+    case fuchsia_hardware_power::wire::RequirementType::kAssertive:
+      dep_type = fuchsia_power_broker::DependencyType::kAssertive;
       break;
-    case fuchsia_hardware_power::wire::RequirementType::kPassive:
-      dep_type = fuchsia_power_broker::DependencyType::kPassive;
+    case fuchsia_hardware_power::wire::RequirementType::kOpportunistic:
+      dep_type = fuchsia_power_broker::DependencyType::kOpportunistic;
       break;
   }
 
@@ -362,17 +362,17 @@ fit::result<Error, TokenMap> GetDependencyTokens(
       continue;
     }
 
-    // TODO(https://fxbug.dev/328527451): We should be respecting active vs
-    // passive deps here. For the very short term we know what these will be
-    // for all clients, but very soon we should modify the return types and
+    // TODO(https://fxbug.dev/328527451): We should be respecting assertive vs
+    // opportunistic deps here. For the very short term we know what these will
+    // be for all clients, but very soon we should modify the return types and
     // return the right tokens.
     switch (parent.sag().value()) {
       case fuchsia_hardware_power::SagElement::kExecutionState: {
         if (elements->has_execution_state() &&
-            elements->execution_state().has_passive_dependency_token()) {
+            elements->execution_state().has_opportunistic_dependency_token()) {
           zx::event copy;
-          elements->execution_state().passive_dependency_token().duplicate(ZX_RIGHT_SAME_RIGHTS,
-                                                                           &copy);
+          elements->execution_state().opportunistic_dependency_token().duplicate(
+              ZX_RIGHT_SAME_RIGHTS, &copy);
           tokens.emplace(std::make_pair(parent, std::move(copy)));
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
@@ -380,9 +380,9 @@ fit::result<Error, TokenMap> GetDependencyTokens(
       } break;
       case fuchsia_hardware_power::SagElement::kExecutionResumeLatency: {
         if (elements->has_execution_resume_latency() &&
-            elements->execution_resume_latency().has_active_dependency_token()) {
+            elements->execution_resume_latency().has_assertive_dependency_token()) {
           zx::event copy;
-          elements->execution_resume_latency().active_dependency_token().duplicate(
+          elements->execution_resume_latency().assertive_dependency_token().duplicate(
               ZX_RIGHT_SAME_RIGHTS, &copy);
           tokens.emplace(std::make_pair(parent, std::move(copy)));
         } else {
@@ -391,10 +391,10 @@ fit::result<Error, TokenMap> GetDependencyTokens(
       } break;
       case fuchsia_hardware_power::SagElement::kWakeHandling: {
         if (elements->has_wake_handling() &&
-            elements->wake_handling().has_active_dependency_token()) {
+            elements->wake_handling().has_assertive_dependency_token()) {
           zx::event copy;
-          elements->wake_handling().active_dependency_token().duplicate(ZX_RIGHT_SAME_RIGHTS,
-                                                                        &copy);
+          elements->wake_handling().assertive_dependency_token().duplicate(ZX_RIGHT_SAME_RIGHTS,
+                                                                           &copy);
           tokens.emplace(std::make_pair(parent, std::move(copy)));
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
@@ -402,10 +402,10 @@ fit::result<Error, TokenMap> GetDependencyTokens(
       } break;
       case fuchsia_hardware_power::SagElement::kApplicationActivity: {
         if (elements->has_application_activity() &&
-            elements->application_activity().has_active_dependency_token()) {
+            elements->application_activity().has_assertive_dependency_token()) {
           zx::event copy;
-          elements->application_activity().active_dependency_token().duplicate(ZX_RIGHT_SAME_RIGHTS,
-                                                                               &copy);
+          elements->application_activity().assertive_dependency_token().duplicate(
+              ZX_RIGHT_SAME_RIGHTS, &copy);
           tokens.emplace(std::make_pair(parent, std::move(copy)));
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
@@ -431,7 +431,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
     fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
-    const zx::unowned_event& active_token, const zx::unowned_event& passive_token,
+    const zx::unowned_event& assertive_token, const zx::unowned_event& opportunistic_token,
     std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
         level_control,
@@ -470,7 +470,7 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     // Create level deps that include the dependency token
     for (const auto& needs : dep.second) {
       // TODO(https://fxbug.dev/328527451) We'll need to update this once we
-      // properly handle active vs passive tokens
+      // properly handle assertive vs opportunistic tokens
       zx::event dupe;
       zx_status_t dupe_result =
           tokens.find(dep.first)->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
@@ -489,26 +489,26 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     }
   }
 
-  // Duplicate the token for active dependencies
-  std::vector<zx::event> active_tokens{};
-  if (active_token->is_valid()) {
+  // Duplicate the token for assertive dependencies
+  std::vector<zx::event> assertive_tokens{};
+  if (assertive_token->is_valid()) {
     zx::event dupe;
-    zx_status_t dupe_result = active_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
+    zx_status_t dupe_result = assertive_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
     if (dupe_result != ZX_OK) {
       return fit::error(Error::INVALID_ARGS);
     }
-    active_tokens.emplace_back(std::move(dupe));
+    assertive_tokens.emplace_back(std::move(dupe));
   }
 
-  // Duplicate the token for passive dependencies
-  std::vector<zx::event> passive_tokens{};
-  if (passive_token->is_valid()) {
+  // Duplicate the token for opportunistic dependencies
+  std::vector<zx::event> opportunistic_tokens{};
+  if (opportunistic_token->is_valid()) {
     zx::event dupe;
-    zx_status_t dupe_result = passive_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
+    zx_status_t dupe_result = opportunistic_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
     if (dupe_result != ZX_OK) {
       return fit::error(Error::INVALID_ARGS);
     }
-    passive_tokens.emplace_back(std::move(dupe));
+    opportunistic_tokens.emplace_back(std::move(dupe));
   }
 
   std::optional<fuchsia_power_broker::LevelControlChannels> lvl_ctrl;
@@ -523,8 +523,8 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
       .initial_current_level = static_cast<uint8_t>(0),
       .valid_levels = std::move(levels),
       .dependencies = std::move(level_deps),
-      .active_dependency_tokens_to_register = std::move(active_tokens),
-      .passive_dependency_tokens_to_register = std::move(passive_tokens),
+      .assertive_dependency_tokens_to_register = std::move(assertive_tokens),
+      .opportunistic_dependency_tokens_to_register = std::move(opportunistic_tokens),
       .level_control_channels = std::move(lvl_ctrl),
   }};
   if (lessor.has_value()) {
@@ -555,10 +555,10 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
 
 fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker, ElementDesc& description) {
-  return AddElement(power_broker, description.element_config_, std::move(description.tokens_),
-                    description.active_token_.borrow(), description.passive_token_.borrow(),
-                    std::move(description.level_control_servers_),
-                    std::move(description.lessor_server_));
+  return AddElement(
+      power_broker, description.element_config_, std::move(description.tokens_),
+      description.assertive_token_.borrow(), description.opportunistic_token_.borrow(),
+      std::move(description.level_control_servers_), std::move(description.lessor_server_));
 }
 
 }  // namespace fdf_power

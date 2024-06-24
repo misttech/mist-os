@@ -48,8 +48,8 @@ TEST_F(PowerLibTest, ElementBuilderFilledOut) {
       fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
 
   fdf_power::ElementDesc desc = fdf_power::ElementDescBuilder(config, std::move(tokens))
-                                    .SetActiveToken(active_event.borrow())
-                                    .SetPassiveToken(passive_event.borrow())
+                                    .SetAssertiveToken(active_event.borrow())
+                                    .SetOpportunisticToken(passive_event.borrow())
                                     .SetCurrentLevel(std::move(current_level.server))
                                     .SetRequiredLevel(std::move(required_level.server))
                                     .SetLessor(std::move(lessor.server))
@@ -59,8 +59,8 @@ TEST_F(PowerLibTest, ElementBuilderFilledOut) {
   ASSERT_TRUE(desc.level_control_servers_.first.is_valid());
   ASSERT_TRUE(desc.level_control_servers_.second.is_valid());
 
-  ASSERT_TRUE(desc.active_token_.is_valid());
-  ASSERT_TRUE(desc.passive_token_.is_valid());
+  ASSERT_TRUE(desc.assertive_token_.is_valid());
+  ASSERT_TRUE(desc.opportunistic_token_.is_valid());
 
   ASSERT_EQ(desc.current_level_client_, std::nullopt);
   ASSERT_EQ(desc.required_level_client_, std::nullopt);
@@ -88,8 +88,8 @@ TEST_F(PowerLibTest, ElementBuilderMissingCurrentLevel) {
       fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
 
   fdf_power::ElementDesc desc = fdf_power::ElementDescBuilder(config, std::move(tokens))
-                                    .SetActiveToken(active_event.borrow())
-                                    .SetPassiveToken(passive_event.borrow())
+                                    .SetAssertiveToken(active_event.borrow())
+                                    .SetOpportunisticToken(passive_event.borrow())
                                     .SetRequiredLevel(std::move(required_level.server))
                                     .SetLessor(std::move(lessor.server))
                                     .Build();
@@ -98,8 +98,8 @@ TEST_F(PowerLibTest, ElementBuilderMissingCurrentLevel) {
   ASSERT_TRUE(desc.level_control_servers_.first.is_valid());
   ASSERT_TRUE(desc.level_control_servers_.second.is_valid());
 
-  ASSERT_TRUE(desc.active_token_.is_valid());
-  ASSERT_TRUE(desc.passive_token_.is_valid());
+  ASSERT_TRUE(desc.assertive_token_.is_valid());
+  ASSERT_TRUE(desc.opportunistic_token_.is_valid());
 
   ASSERT_TRUE(desc.current_level_client_.has_value());
   ASSERT_EQ(desc.required_level_client_, std::nullopt);
@@ -130,8 +130,8 @@ TEST_F(PowerLibTest, ElementBuilderMin) {
   ASSERT_TRUE(desc.level_control_servers_.first.is_valid());
   ASSERT_TRUE(desc.level_control_servers_.second.is_valid());
 
-  ASSERT_TRUE(desc.active_token_.is_valid());
-  ASSERT_TRUE(desc.passive_token_.is_valid());
+  ASSERT_TRUE(desc.assertive_token_.is_valid());
+  ASSERT_TRUE(desc.opportunistic_token_.is_valid());
 
   check_channels_peered(desc.current_level_client_->handle()->get(),
                         desc.level_control_servers_.first.handle()->get());

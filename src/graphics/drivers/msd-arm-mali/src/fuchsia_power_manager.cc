@@ -65,8 +65,8 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
       return false;
     }
 
-    active_power_dep_tokens_.push_back(std::move(description.active_token_));
-    passive_power_dep_tokens_.push_back(std::move(description.passive_token_));
+    assertive_power_dep_tokens_.push_back(std::move(description.assertive_token_));
+    opportunistic_power_dep_tokens_.push_back(std::move(description.opportunistic_token_));
 
     if (config.element().name().get() == kHardwarePowerElementName) {
       hardware_power_element_control_client_end_ =

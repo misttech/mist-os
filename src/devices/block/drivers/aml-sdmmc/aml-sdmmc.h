@@ -313,8 +313,8 @@ class AmlSdmmc : public fdf::DriverBase,
   void WatchWakeOnRequestRequiredLevel();
 
   // Acquire lease on wake-on-request power element. This indirectly raises SAG's Execution State,
-  // satisfying the hardware power element's lease status (which is passively dependent on SAG's
-  // Execution State), and thus resuming power.
+  // satisfying the hardware power element's lease status (which is opportunistically dependent on
+  // SAG's Execution State), and thus resuming power.
   zx_status_t ActivateWakeOnRequest() TA_REQ(lock_);
 
   // Serves requests that were delayed because they were received during suspended state.
