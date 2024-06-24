@@ -48,6 +48,10 @@ class SimpleDisplay : public DeviceType,
                       public HeapServer,
                       public ddk::DisplayControllerImplProtocol<SimpleDisplay, ddk::base_protocol> {
  public:
+  // Factory function used by the device manager glue code.
+  static zx::result<> Create(zx_device_t* parent, const char* device_name, uint32_t pci_bar_index,
+                             DisplayProperties properties);
+
   SimpleDisplay(zx_device_t* parent,
                 fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                 fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
@@ -55,7 +59,9 @@ class SimpleDisplay : public DeviceType,
   ~SimpleDisplay() = default;
 
   void DdkRelease();
-  zx_status_t Bind(const char* name, std::unique_ptr<SimpleDisplay>* controller_ptr);
+
+  // Initialization logic not suitable in the constructor.
+  zx::result<> Initialize(const char* device_name);
 
   void AllocateVmo(AllocateVmoRequestView request, AllocateVmoCompleter::Sync& completer) override;
   void DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) override;
@@ -145,9 +151,6 @@ class SimpleDisplay : public DeviceType,
   zx::time next_vsync_time_;
   ddk::DisplayControllerInterfaceProtocolClient intf_;
 };
-
-zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
-                                    DisplayProperties properties);
 
 }  // namespace simple_display
 

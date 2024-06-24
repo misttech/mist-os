@@ -85,7 +85,9 @@ zx_status_t BindBochsVesaBiosExtensionDisplay(void* ctx, zx_device_t* dev) {
 
   std::optional<fdf::MmioBuffer> mmio;
   // map register window
-  zx_status_t status = pci.MapMmio(2u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
+  static constexpr uint32_t kQemuBochsRegisterMmioBarIndex = 2;
+  zx_status_t status =
+      pci.MapMmio(kQemuBochsRegisterMmioBarIndex, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
   if (status != ZX_OK) {
     printf("bochs-vbe: failed to map pci config: %d\n", status);
     return status;
@@ -99,7 +101,17 @@ zx_status_t BindBochsVesaBiosExtensionDisplay(void* ctx, zx_device_t* dev) {
       .row_stride_px = kDisplayWidth,
       .pixel_format = kDisplayFormat,
   };
-  return bind_simple_pci_display(dev, "bochs_vbe", /*bar=*/0u, kDisplayProperties);
+
+  static constexpr uint32_t kFramebufferPciBar = 0u;
+  zx::result<> create_simple_display_result =
+      SimpleDisplay::Create(dev, "bochs_vbe", kFramebufferPciBar, kDisplayProperties);
+  if (create_simple_display_result.is_error()) {
+    zxlogf(ERROR, "Failed to create simple display: %s",
+           create_simple_display_result.status_string());
+    return create_simple_display_result.error_value();
+  }
+
+  return ZX_OK;
 }
 
 constexpr zx_driver_ops_t kBochsVesaBiosExtensionDriverOps = {

@@ -56,7 +56,17 @@ zx_status_t BindIntelDisplay(void* ctx, zx_device_t* dev) {
     return get_display_properties_result.error_value();
   }
   const DisplayProperties properties = std::move(get_display_properties_result).value();
-  return bind_simple_pci_display(dev, "intel", /*bar=*/2u, properties);
+
+  static constexpr uint32_t kIntelFramebufferPciBarIndex = 2;
+  zx::result<> create_simple_display_result =
+      SimpleDisplay::Create(dev, /*name=*/"intel", kIntelFramebufferPciBarIndex, properties);
+  if (create_simple_display_result.is_error()) {
+    zxlogf(ERROR, "Failed to create simple display: %s",
+           create_simple_display_result.status_string());
+    return create_simple_display_result.error_value();
+  }
+
+  return ZX_OK;
 }
 
 constexpr zx_driver_ops_t kIntelDisplayDriverOps = {
