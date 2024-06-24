@@ -296,6 +296,22 @@ pub struct IpRoutines<I: IpExt, DeviceClass, RuleInfo> {
     pub egress: Hook<I, DeviceClass, RuleInfo>,
 }
 
+impl<I: IpExt, DeviceClass: Debug> Inspectable for IpRoutines<I, DeviceClass, ()> {
+    fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
+        let Self { ingress, local_ingress, forwarding, local_egress, egress } = self;
+
+        inspector.record_child("ingress", |inspector| inspector.delegate_inspectable(ingress));
+        inspector.record_child("local_ingress", |inspector| {
+            inspector.delegate_inspectable(local_ingress)
+        });
+        inspector
+            .record_child("forwarding", |inspector| inspector.delegate_inspectable(forwarding));
+        inspector
+            .record_child("local_egress", |inspector| inspector.delegate_inspectable(local_egress));
+        inspector.record_child("egress", |inspector| inspector.delegate_inspectable(egress));
+    }
+}
+
 /// Routines that can perform NAT.
 ///
 /// Note that NAT routines are only executed *once* for a given connection, for
@@ -312,6 +328,20 @@ pub struct NatRoutines<I: IpExt, DeviceClass, RuleInfo> {
     pub local_egress: Hook<I, DeviceClass, RuleInfo>,
     /// Occurs for all outgoing traffic after a routing decision has been made.
     pub egress: Hook<I, DeviceClass, RuleInfo>,
+}
+
+impl<I: IpExt, DeviceClass: Debug> Inspectable for NatRoutines<I, DeviceClass, ()> {
+    fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
+        let Self { ingress, local_ingress, local_egress, egress } = self;
+
+        inspector.record_child("ingress", |inspector| inspector.delegate_inspectable(ingress));
+        inspector.record_child("local_ingress", |inspector| {
+            inspector.delegate_inspectable(local_ingress)
+        });
+        inspector
+            .record_child("local_egress", |inspector| inspector.delegate_inspectable(local_egress));
+        inspector.record_child("egress", |inspector| inspector.delegate_inspectable(egress));
+    }
 }
 
 /// IP version-specific filtering routine state.
@@ -353,21 +383,10 @@ impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {
 impl<I: IpExt, BT: FilterBindingsTypes> Inspectable for State<I, BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let Self { installed_routines, uninstalled_routines, conntrack } = self;
-        // TODO(https://fxbug.dev/318717702): when we implement NAT, report NAT
-        // routines in inspect data.
-        let Routines { ip, nat: _ } = installed_routines.get();
-        let IpRoutines { ingress, local_ingress, forwarding, local_egress, egress } = ip;
+        let Routines { ip, nat } = installed_routines.get();
 
-        inspector.record_child("ingress", |inspector| inspector.delegate_inspectable(ingress));
-        inspector.record_child("local_ingress", |inspector| {
-            inspector.delegate_inspectable(local_ingress)
-        });
-        inspector
-            .record_child("forwarding", |inspector| inspector.delegate_inspectable(forwarding));
-        inspector
-            .record_child("local_egress", |inspector| inspector.delegate_inspectable(local_egress));
-        inspector.record_child("egress", |inspector| inspector.delegate_inspectable(egress));
-
+        inspector.record_child("IP", |inspector| inspector.delegate_inspectable(ip));
+        inspector.record_child("NAT", |inspector| inspector.delegate_inspectable(nat));
         inspector.record_child("uninstalled", |inspector| {
             inspector.record_usize("routines", uninstalled_routines.len());
             for routine in uninstalled_routines {

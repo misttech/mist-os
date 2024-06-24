@@ -64,6 +64,7 @@ rustc_test("netstack3_inspect_tests") {
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/diagnostics/lib/sampler-config",
+    "//src/lib/const-unwrap",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/selectors",
     "//src/lib/fuchsia-async",

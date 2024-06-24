@@ -10,15 +10,11 @@ mod common;
 
 use std::collections::HashMap;
 use std::convert::TryFrom as _;
-use std::num::NonZeroU64;
+use std::num::{NonZeroU16, NonZeroU64};
 use std::time::Duration;
 
 use assert_matches::assert_matches;
-use {
-    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_posix_socket as fposix_socket,
-};
-
+use const_unwrap::const_unwrap_option;
 use net_declare::{fidl_mac, fidl_subnet, std_ip_v4, std_ip_v6};
 use net_types::ip::{Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
@@ -27,6 +23,10 @@ use netstack_testing_common::{constants, get_inspect_data};
 use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
 use test_case::test_case;
+use {
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fidl_fuchsia_posix_socket as fposix_socket,
+};
 
 enum TcpSocketState {
     Unbound,
@@ -917,8 +917,8 @@ async fn inspect_counters(name: &str) {
 async fn inspect_filtering_state(name: &str) {
     use fnet_filter_ext::{
         Action, AddressMatcher, AddressMatcherType, Change, Controller, ControllerId, Domain,
-        InstalledIpRoutine, InterfaceMatcher, IpHook, Matchers, Namespace, NamespaceId,
-        PortMatcher, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
+        InstalledIpRoutine, InstalledNatRoutine, InterfaceMatcher, IpHook, Matchers, Namespace,
+        NamespaceId, NatHook, PortMatcher, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
         TransportProtocolMatcher,
     };
 
@@ -942,20 +942,36 @@ async fn inspect_filtering_state(name: &str) {
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Filtering State": {
             "IPv4": {
-                "ingress": {
-                    "routines": 0u64,
+                "IP": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "forwarding": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 0u64,
+                    },
                 },
-                "local_ingress": {
-                    "routines": 0u64,
-                },
-                "forwarding": {
-                    "routines": 0u64,
-                },
-                "local_egress": {
-                    "routines": 0u64,
-                },
-                "egress": {
-                    "routines": 0u64,
+                "NAT": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 0u64,
+                    },
                 },
                 "uninstalled": {
                     "routines": 0u64,
@@ -965,23 +981,39 @@ async fn inspect_filtering_state(name: &str) {
                     "table_limit_hits": 0u64,
                     "num_connections": 0u64,
                     "connections": {},
-                }
+                },
             },
             "IPv6": {
-                "ingress": {
-                    "routines": 0u64,
+                "IP": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "forwarding": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 0u64,
+                    },
                 },
-                "local_ingress": {
-                    "routines": 0u64,
-                },
-                "forwarding": {
-                    "routines": 0u64,
-                },
-                "local_egress": {
-                    "routines": 0u64,
-                },
-                "egress": {
-                    "routines": 0u64,
+                "NAT": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 0u64,
+                    },
                 },
                 "uninstalled": {
                     "routines": 0u64,
@@ -991,14 +1023,17 @@ async fn inspect_filtering_state(name: &str) {
                     "table_limit_hits": 0u64,
                     "num_connections": 0u64,
                     "connections": {},
-                }
+                },
             },
-        }
+        },
     });
+
+    const NONZERO_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
 
     let namespace = NamespaceId(String::from("test-namespace"));
     let ingress_routine = RoutineId { namespace: namespace.clone(), name: String::from("ingress") };
     let egress_routine = RoutineId { namespace: namespace.clone(), name: String::from("egress") };
+    let nat_routine = RoutineId { namespace: namespace.clone(), name: String::from("nat") };
     let target_routine_name = String::from("target");
     controller
         .push_changes(
@@ -1054,6 +1089,24 @@ async fn inspect_filtering_state(name: &str) {
                     },
                     action: Action::Jump(target_routine_name),
                 }),
+                Resource::Routine(Routine {
+                    id: nat_routine.clone(),
+                    routine_type: RoutineType::Nat(Some(InstalledNatRoutine {
+                        hook: NatHook::LocalEgress,
+                        priority: 0,
+                    })),
+                }),
+                Resource::Rule(Rule {
+                    id: RuleId { routine: nat_routine, index: 0 },
+                    matchers: Matchers {
+                        transport_protocol: Some(TransportProtocolMatcher::Udp {
+                            src_port: None,
+                            dst_port: None,
+                        }),
+                        ..Default::default()
+                    },
+                    action: Action::Redirect { dst_port: Some(NONZERO_PORT..=NONZERO_PORT) },
+                }),
             ]
             .into_iter()
             .map(Change::Create)
@@ -1072,52 +1125,81 @@ async fn inspect_filtering_state(name: &str) {
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Filtering State": {
             "IPv4": {
-                "ingress": {
-                    "routines": 1u64,
-                    "0": {
-                        "rules": 2u64,
+                "IP": {
+                    "ingress": {
+                        "routines": 1u64,
                         "0": {
-                            "matchers": {
-                                "transport_protocol": "TransportProtocolMatcher { \
-                                    proto: TCP, \
-                                    src_port: None, \
-                                    dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
-                                }",
+                            "rules": 2u64,
+                            "0": {
+                                "matchers": {
+                                    "transport_protocol": "TransportProtocolMatcher { \
+                                        proto: TCP, \
+                                        src_port: None, \
+                                        dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
+                                    }",
+                                },
+                                "action": "Drop",
                             },
-                            "action": "Drop",
+                            "1": {
+                                "matchers": {
+                                    "in_interface": "Id(1)",
+                                },
+                                "action": "Drop",
+                            },
                         },
-                        "1": {
-                            "matchers": {
-                                "in_interface": "Id(1)",
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "forwarding": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 1u64,
+                        "0": {
+                            "rules": 1u64,
+                            "0": {
+                                // Note that this rule is only included in the IPv4 filtering state
+                                // because it has an address matcher with an IPv4 subnet.
+                                "matchers": {
+                                    "dst_address": "AddressMatcher { \
+                                        matcher: Subnet(127.0.0.0/8), \
+                                        invert: false \
+                                    }",
+                                },
+                                "action": "Jump(UninstalledRoutine(2))",
                             },
-                            "action": "Drop",
                         },
                     },
                 },
-                "local_ingress": {
-                    "routines": 0u64,
-                },
-                "forwarding": {
-                    "routines": 0u64,
-                },
-                "local_egress": {
-                    "routines": 0u64,
-                },
-                "egress": {
-                    "routines": 1u64,
-                    "0": {
-                        "rules": 1u64,
+                "NAT": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 1u64,
                         "0": {
-                            // Note that this rule is only included in the IPv4 filtering state
-                            // because it has an address matcher with an IPv4 subnet.
-                            "matchers": {
-                                "dst_address": "AddressMatcher { \
-                                    matcher: Subnet(127.0.0.0/8), \
-                                    invert: false \
-                                }",
+                            "rules": 1u64,
+                            "0": {
+                                "matchers": {
+                                    "transport_protocol": "TransportProtocolMatcher { \
+                                        proto: UDP, \
+                                        src_port: None, \
+                                        dst_port: None \
+                                    }",
+                                },
+                                "action": "Redirect { dst_port: Some(8080..=8080) }",
                             },
-                            "action": "Jump(UninstalledRoutine(2))",
                         },
+                    },
+                    "egress": {
+                        "routines": 0u64,
                     },
                 },
                 // Because the uninstalled routine is only jumped to from an IPv4 routine, it
@@ -1136,41 +1218,70 @@ async fn inspect_filtering_state(name: &str) {
                 }
             },
             "IPv6": {
-                "ingress": {
-                    "routines": 1u64,
-                    "0": {
-                        "rules": 2u64,
+                "IP": {
+                    "ingress": {
+                        "routines": 1u64,
                         "0": {
-                            "matchers": {
-                                "transport_protocol": "TransportProtocolMatcher { \
-                                    proto: TCP, \
-                                    src_port: None, \
-                                    dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
-                                }",
+                            "rules": 2u64,
+                            "0": {
+                                "matchers": {
+                                    "transport_protocol": "TransportProtocolMatcher { \
+                                        proto: TCP, \
+                                        src_port: None, \
+                                        dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
+                                    }",
+                                },
+                                "action": "Drop",
                             },
-                            "action": "Drop",
+                            "1": {
+                                "matchers": {
+                                    "in_interface": "Id(1)",
+                                },
+                                "action": "Drop",
+                            },
                         },
-                        "1": {
-                            "matchers": {
-                                "in_interface": "Id(1)",
-                            },
-                            "action": "Drop",
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "forwarding": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 1u64,
+                        "0": {
+                            "rules": 0u64,
                         },
                     },
                 },
-                "local_ingress": {
-                    "routines": 0u64,
-                },
-                "forwarding": {
-                    "routines": 0u64,
-                },
-                "local_egress": {
-                    "routines": 0u64,
-                },
-                "egress": {
-                    "routines": 1u64,
-                    "0": {
-                        "rules": 0u64,
+                "NAT": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 1u64,
+                        "0": {
+                            "rules": 1u64,
+                            "0": {
+                                "matchers": {
+                                    "transport_protocol": "TransportProtocolMatcher { \
+                                        proto: UDP, \
+                                        src_port: None, \
+                                        dst_port: None \
+                                    }",
+                                },
+                                "action": "Redirect { dst_port: Some(8080..=8080) }",
+                            },
+                        },
+                    },
+                    "egress": {
+                        "routines": 0u64,
                     },
                 },
                 "uninstalled": {
