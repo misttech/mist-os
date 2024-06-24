@@ -15,8 +15,8 @@ mod receiver;
 mod router;
 mod unit;
 
-// TODO(340891837): open only builds on target due to its reliance on the vfs library. There's no
-// point investing time into reducing that reliance, as open is going to be deleted.
+// TODO(340891837): dir_entry only builds on target due to its reliance on the vfs library. There's
+// no point investing time into reducing that reliance, as dir_entry is going to be deleted.
 #[cfg(target_os = "fuchsia")]
 mod dir_entry;
 
@@ -35,4 +35,4 @@ pub use self::router::{Request, Routable, Router};
 pub use self::unit::Unit;
 
 #[cfg(target_os = "fuchsia")]
-pub use {self::dir_entry::Open, fidl::RemotableCapability};
+pub use {self::dir_entry::DirEntry, fidl::RemotableCapability};

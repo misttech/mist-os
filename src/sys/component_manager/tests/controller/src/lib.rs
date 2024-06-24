@@ -609,5 +609,5 @@ async fn get_exposed_dictionary() {
     // opaque token, there's not much we can do with the capability in this test. But once we
     // switch over exposed dictionary to use a different capability to represent protocols, we can
     // update this test to exercise the capability.
-    assert_matches!(echo_cap, fsandbox::Capability::Open(_));
+    assert_matches!(echo_cap, fsandbox::Capability::DirEntry(_));
 }

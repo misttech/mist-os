@@ -84,7 +84,7 @@ pub enum Capability {
     Component(crate::WeakComponentToken),
 
     #[cfg(target_os = "fuchsia")]
-    Open(crate::Open),
+    DirEntry(crate::DirEntry),
 }
 
 impl Capability {
@@ -107,7 +107,7 @@ impl Capability {
             Self::Component(_) => "Component",
 
             #[cfg(target_os = "fuchsia")]
-            Self::Open(_) => "Open",
+            Self::DirEntry(_) => "DirEntry",
         }
     }
 }

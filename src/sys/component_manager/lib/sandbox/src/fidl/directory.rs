@@ -23,7 +23,7 @@ impl RemotableCapability for Directory {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Open;
+    use crate::DirEntry;
     use fidl::endpoints::{create_endpoints, ServerEnd};
     use fidl::handle::Status;
     use fidl_fuchsia_io as fio;
@@ -75,10 +75,10 @@ mod tests {
             }
         }
 
-        let open = Open::new(Arc::new(MockDir(open_tx)));
+        let dir_entry = DirEntry::new(Arc::new(MockDir(open_tx)));
 
         let fs = pseudo_directory! {
-            "foo" => open.try_into_directory_entry().unwrap(),
+            "foo" => dir_entry.try_into_directory_entry().unwrap(),
         };
 
         // Create a Directory capability, and a clone.

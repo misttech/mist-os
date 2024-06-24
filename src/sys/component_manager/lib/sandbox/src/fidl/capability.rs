@@ -22,7 +22,7 @@ impl From<Capability> for fsandbox::Capability {
     fn from(capability: Capability) -> Self {
         match capability {
             Capability::Connector(s) => s.into(),
-            Capability::Open(s) => s.into(),
+            Capability::DirEntry(s) => s.into(),
             Capability::Router(s) => s.into(),
             Capability::Dictionary(s) => s.into(),
             Capability::Data(s) => s.into(),
@@ -79,11 +79,13 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 };
                 Ok(any)
             }
-            fsandbox::Capability::Open(open) => {
-                let any = try_from_handle_in_registry(open.token.as_handle_ref())?;
+            fsandbox::Capability::DirEntry(dir_entry) => {
+                let any = try_from_handle_in_registry(dir_entry.token.as_handle_ref())?;
                 match &any {
-                    Capability::Open(_) => (),
-                    _ => panic!("BUG: registry has a non-Open capability under an Open koid"),
+                    Capability::DirEntry(_) => (),
+                    _ => {
+                        panic!("BUG: registry has a non-DirEntry capability under a DirEntry koid")
+                    }
                 };
                 Ok(any)
             }
@@ -96,7 +98,7 @@ impl RemotableCapability for Capability {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         match self {
             Self::Connector(s) => s.try_into_directory_entry(),
-            Self::Open(s) => s.try_into_directory_entry(),
+            Self::DirEntry(s) => s.try_into_directory_entry(),
             Self::Router(s) => s.try_into_directory_entry(),
             Self::Dictionary(s) => s.try_into_directory_entry(),
             Self::Data(s) => s.try_into_directory_entry(),

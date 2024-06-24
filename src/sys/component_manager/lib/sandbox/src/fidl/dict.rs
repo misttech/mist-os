@@ -234,7 +234,7 @@ async fn serve_dict_key_iterator(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Data, Dict, Directory, Open, Unit};
+    use crate::{Data, Dict, DirEntry, Directory, Unit};
     use anyhow::{Error, Result};
     use assert_matches::assert_matches;
     use fidl::endpoints::{
@@ -242,7 +242,7 @@ mod tests {
     };
     use fidl::handle::{Channel, Status};
     use fidl_fuchsia_io as fio;
-    use fuchsia_fs::directory::DirEntry;
+    use fuchsia_fs::directory;
     use futures::try_join;
     use lazy_static::lazy_static;
     use test_util::Counter;
@@ -624,14 +624,13 @@ mod tests {
         }
     }
 
-    /// Convert a dict `{ CAP_KEY: open }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success() {
         let dict = Dict::new();
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
-        dict.insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())))
+        dict.insert(CAP_KEY.clone(), Capability::DirEntry(DirEntry::new(mock_dir.clone())))
             .expect("dict entry already exists");
-        let remote = dict.try_into_directory_entry().expect("convert dict into Open capability");
+        let remote = dict.try_into_directory_entry().unwrap();
         let scope = ExecutionScope::new();
 
         let dir_client_end =
@@ -645,13 +644,12 @@ mod tests {
         assert_eq!(mock_dir.0.get(), 1);
     }
 
-    /// Convert a dict `{ CAP_KEY: { CAP_KEY: open } }` to [Open].
     #[fuchsia::test]
     async fn try_into_open_success_nested() {
         let inner_dict = Dict::new();
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
         inner_dict
-            .insert(CAP_KEY.clone(), Capability::Open(Open::new(mock_dir.clone())))
+            .insert(CAP_KEY.clone(), Capability::DirEntry(DirEntry::new(mock_dir.clone())))
             .expect("dict entry already exists");
         let dict = Dict::new();
         dict.insert(CAP_KEY.clone(), Capability::Dictionary(inner_dict)).unwrap();
@@ -666,7 +664,10 @@ mod tests {
         let dir = dir_client_end.into_proxy().unwrap();
         assert_eq!(
             fuchsia_fs::directory::readdir(&dir).await.unwrap(),
-            vec![DirEntry { name: CAP_KEY.to_string(), kind: fio::DirentType::Directory },]
+            vec![directory::DirEntry {
+                name: CAP_KEY.to_string(),
+                kind: fio::DirentType::Directory
+            },]
         );
 
         // Open the inner most capability.
@@ -693,11 +694,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn try_into_open_with_directory() {
-        let open = Open::new(endpoint(|_scope, _channel| {}));
+        let dir_entry = DirEntry::new(endpoint(|_scope, _channel| {}));
         let fs = pseudo_directory! {
-            "a" => open.clone().into_remote(),
-            "b" => open.clone().into_remote(),
-            "c" => open.into_remote(),
+            "a" => dir_entry.clone().try_into_directory_entry().unwrap(),
+            "b" => dir_entry.clone().try_into_directory_entry().unwrap(),
+            "c" => dir_entry.try_into_directory_entry().unwrap(),
         };
         let directory = Directory::from(serve_vfs_dir(fs));
         let dict = Dict::new();
@@ -715,7 +716,10 @@ mod tests {
                 .unwrap();
             assert_eq!(
                 fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(),
-                vec![DirEntry { name: CAP_KEY.to_string(), kind: fio::DirentType::Directory },]
+                vec![directory::DirEntry {
+                    name: CAP_KEY.to_string(),
+                    kind: fio::DirentType::Directory
+                },]
             );
         }
         {
@@ -734,9 +738,9 @@ mod tests {
             assert_eq!(
                 fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(),
                 vec![
-                    DirEntry { name: "a".to_string(), kind: fio::DirentType::Service },
-                    DirEntry { name: "b".to_string(), kind: fio::DirentType::Service },
-                    DirEntry { name: "c".to_string(), kind: fio::DirentType::Service },
+                    directory::DirEntry { name: "a".to_string(), kind: fio::DirentType::Service },
+                    directory::DirEntry { name: "b".to_string(), kind: fio::DirentType::Service },
+                    directory::DirEntry { name: "c".to_string(), kind: fio::DirentType::Service },
                 ]
             );
         }

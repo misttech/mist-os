@@ -3,26 +3,26 @@
 // found in the LICENSE file.
 
 use crate::fidl::registry;
-use crate::{ConversionError, Open, RemotableCapability};
+use crate::{ConversionError, DirEntry, RemotableCapability};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
 
-impl RemotableCapability for Open {
+impl RemotableCapability for DirEntry {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         Ok(self.entry)
     }
 }
 
-impl From<Open> for fsandbox::Open {
-    fn from(value: Open) -> Self {
-        fsandbox::Open { token: registry::insert_token(value.into()) }
+impl From<DirEntry> for fsandbox::DirEntry {
+    fn from(value: DirEntry) -> Self {
+        fsandbox::DirEntry { token: registry::insert_token(value.into()) }
     }
 }
 
-impl From<Open> for fsandbox::Capability {
-    fn from(open: Open) -> Self {
-        fsandbox::Capability::Open(open.into())
+impl From<DirEntry> for fsandbox::Capability {
+    fn from(value: DirEntry) -> Self {
+        fsandbox::Capability::DirEntry(value.into())
     }
 }
 
@@ -64,13 +64,13 @@ mod tests {
     #[fuchsia::test]
     async fn into_fidl() {
         let mock_dir = Arc::new(MockDir(Counter::new(0)));
-        let open = Capability::Open(Open::new(mock_dir.clone()));
+        let dir_entry = Capability::DirEntry(DirEntry::new(mock_dir.clone()));
 
         // Round-trip to fidl and back. The fidl representation is just a token, so we need to
         // convert it back to internal to do anything useful with it.
-        let cap = fsandbox::Capability::from(open);
+        let cap = fsandbox::Capability::from(dir_entry);
         let cap = Capability::try_from(cap).unwrap();
-        let Capability::Open(open) = cap else {
+        let Capability::DirEntry(dir_entry) = cap else {
             panic!();
         };
 
@@ -79,7 +79,7 @@ mod tests {
         let flags = fio::OpenFlags::DIRECTORY;
         let (_client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
         let mut object_request = flags.to_object_request(server);
-        let dir_entry = open.clone().try_into_directory_entry().unwrap();
+        let dir_entry = dir_entry.clone().try_into_directory_entry().unwrap();
         dir_entry
             .open_entry(OpenRequest::new(
                 scope.clone(),

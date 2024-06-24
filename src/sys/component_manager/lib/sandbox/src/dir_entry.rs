@@ -3,53 +3,32 @@
 // found in the LICENSE file.
 
 use crate::connector::Connectable;
-use crate::fidl::registry;
 use crate::Connector;
 use core::fmt;
-use fidl::endpoints::{create_request_stream, ClientEnd};
-use fidl::handle::{AsHandleRef, Channel, Status};
+use fidl::handle::{Channel, Status};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::Koid;
-use futures::TryStreamExt;
 use std::sync::Arc;
-use vfs::directory::entry::{DirectoryEntry, OpenRequest, SubNode};
+use vfs::directory::entry::{DirectoryEntry, OpenRequest};
 use vfs::execution_scope::ExecutionScope;
-use vfs::remote::remote_dir;
-use vfs::service::endpoint;
 use vfs::ToObjectRequest;
 
-/// An [Open] capability lets the holder obtain other capabilities by pipelining
-/// a [Channel], usually treated as the server endpoint of some FIDL protocol.
-/// We call this operation opening the capability.
+/// [DirEntry] is a [Capability] that's a thin wrapper over [vfs::directory::entry::DirectoryEntry]
+/// When externalized to FIDL, a [DirEntry] becomes an opaque `eventpair` token. This means that
+/// external users can delegate [DirEntry]s and put them in [Dict]s, but they cannot create their
+/// own.
 ///
-/// ## Open via remoting
+/// The [Capability::try_into_directory_entry] implementation simply extracts the inner
+/// [vfs::directory::entry::DirectoryEntry] object.
 ///
-/// The most straightforward way to open the capability is to convert it to a `fuchsia.io/Openable`
-/// client end, via [Into<ClientEnd<fio::Openable>>]. FIDL open requests on this endpoint
-/// translate to [OpenFn] calls.
+/// [DirEntry] is a stopgap for representing CF capabilities that don't have a natural bedrock
+/// representation yet. https://fxbug.dev/340891837 tracks its planned deletion.
 ///
-/// Intuitively this is opening a new connection to the current object.
-///
-/// ## Open via `Dict` integration
-///
-/// When converting a `Dict` capability to [Open], all the dictionary entries will be
-/// recursively converted to [Open] capabilities. An open capability within the `Dict`
-/// functions similarly to a directory entry:
-///
-/// * Remoting the [Open] from the `Dict` gives access to a `fuchsia.io/Directory`.
-/// * Within this directory, each member [Open] will show up as a directory entry, whose
-///   type is `entry_type`.
-/// * When a `fuchsia.io/Directory.Open` request hits the directory, the [OpenFn] of the
-///   entry matching the first path segment of the open request will be invoked, passing
-///   the remaining relative path if any, or "." if the path terminates at that entry.
-///
-/// Intuitively this is akin to mounting a remote VFS node in a directory.
 #[derive(Clone)]
-pub struct Open {
+pub struct DirEntry {
     pub(crate) entry: Arc<dyn DirectoryEntry>,
 }
 
-impl Connectable for Open {
+impl Connectable for DirEntry {
     fn send(&self, message: crate::Message) -> Result<(), ()> {
         self.open(
             ExecutionScope::new(),
@@ -61,15 +40,10 @@ impl Connectable for Open {
     }
 }
 
-impl Open {
-    /// Creates an [Open] capability.
-    ///
-    /// Arguments:
-    ///
-    /// * `entry` - A VFS object that is responsible for handling the open.
-    ///
+impl DirEntry {
+    /// Creates a [DirEntry] capability from a [vfs::directory::entry::DirectoryEntry].
     pub fn new(entry: Arc<dyn DirectoryEntry>) -> Self {
-        Open { entry }
+        Self { entry }
     }
 
     /// Opens the corresponding entry.
@@ -93,96 +67,15 @@ impl Open {
     pub fn open_entry(&self, open_request: OpenRequest<'_>) -> Result<(), Status> {
         self.entry.clone().open_entry(open_request)
     }
-
-    /// Returns an [`Open`] capability which will open paths relative to
-    /// `relative_path` if non-empty, from the base [`Open`] object.
-    ///
-    /// The base capability is lazily exercised when the returned capability is exercised.
-    ///
-    /// Returns None if the underlying capability isn't directory-like.
-    pub fn downscope_path(
-        self,
-        relative_path: vfs::path::Path,
-        entry_type: fio::DirentType,
-    ) -> Option<Open> {
-        if self.entry.entry_info().type_() != fio::DirentType::Directory {
-            None
-        } else {
-            Some(Open::new(Arc::new(SubNode::new(self.entry.clone(), relative_path, entry_type))))
-        }
-    }
-
-    /// Turn the [Open] into a remote VFS node.
-    ///
-    /// Both `into_remote` and FIDL conversion will let us open the capability:
-    ///
-    /// * `into_remote` returns a type that implements `RemoteLike` and `DirectoryEntry` which
-    ///   supports [RemoteLike::open].
-    /// * FIDL conversion returns a client endpoint and calls
-    ///   [DirectoryEntry::open] with the server endpoint given open requests.
-    ///
-    /// `into_remote` avoids a round trip through FIDL and channels, and is used as an
-    /// internal performance optimization by `Dict` when building a directory tree.
-    pub fn into_remote(self) -> Arc<dyn DirectoryEntry> {
-        self.entry.clone()
-    }
-
-    /// Serves the `fuchsia.io.Openable` protocol for this Open and moves it into the registry.
-    pub fn serve_and_register(self, mut stream: fio::OpenableRequestStream, koid: Koid) {
-        let open = self.clone();
-
-        // Move this capability into the registry.
-        registry::insert(self.into(), koid, async move {
-            let scope = ExecutionScope::new();
-            while let Ok(Some(request)) = stream.try_next().await {
-                match request {
-                    fio::OpenableRequest::Open { flags, mode: _, path, object, .. } => {
-                        open.open(scope.clone(), flags, path, object.into_channel())
-                    }
-                }
-            }
-            scope.wait().await;
-        });
-    }
 }
 
-impl fmt::Debug for Open {
+impl fmt::Debug for DirEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Open").field("entry_type", &self.entry.entry_info().type_()).finish()
+        f.debug_struct("DirEntry").field("entry_type", &self.entry.entry_info().type_()).finish()
     }
 }
 
-impl From<ClientEnd<fio::OpenableMarker>> for Open {
-    fn from(value: ClientEnd<fio::OpenableMarker>) -> Self {
-        // Open is one-way so a synchronous proxy is not going to block.
-        let proxy = fio::OpenableSynchronousProxy::new(value.into_channel());
-        Open::new(endpoint(move |_scope, server_end| {
-            let _ = proxy.open(
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
-                ".",
-                server_end.into_zx_channel().into(),
-            );
-        }))
-    }
-}
-
-impl From<ClientEnd<fio::DirectoryMarker>> for Open {
-    fn from(value: ClientEnd<fio::DirectoryMarker>) -> Self {
-        Open::new(remote_dir(value.into_proxy().unwrap()))
-    }
-}
-
-impl From<Open> for ClientEnd<fio::OpenableMarker> {
-    /// Serves the `fuchsia.io.Openable` protocol for this Open and moves it into the registry.
-    fn from(open: Open) -> Self {
-        let (client_end, openable_stream) = create_request_stream::<fio::OpenableMarker>().unwrap();
-        open.serve_and_register(openable_stream, client_end.get_koid().unwrap());
-        client_end
-    }
-}
-
-impl From<Connector> for Open {
+impl From<Connector> for DirEntry {
     fn from(connector: Connector) -> Self {
         Self::new(vfs::service::endpoint(move |_scope, server_end| {
             let _ = connector.send_channel(server_end.into_zx_channel().into());
@@ -217,103 +110,19 @@ mod tests {
     use super::*;
     use crate::fidl::RemotableCapability;
     use crate::{Capability, Dict, Receiver};
-    use anyhow::Result;
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_endpoints, create_proxy};
+    use fidl::endpoints::ClientEnd;
+    use fidl::AsHandleRef;
     use futures::StreamExt;
-    use vfs::directory::entry::serve_directory;
-    use vfs::directory::entry_container::Directory as _;
-    use vfs::directory::helper::DirectlyMutable;
-    use vfs::directory::immutable::simple as pfs;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
-
-    async fn get_entries(client_end: ClientEnd<fio::DirectoryMarker>) -> Result<Vec<String>> {
-        let client = client_end.into_proxy()?;
-        let entries = fuchsia_fs::directory::readdir(&client).await?;
-        Ok(entries.into_iter().map(|entry| entry.name).collect())
-    }
-
-    #[fuchsia::test]
-    async fn downscope_path() {
-        // Build a directory tree with `/foo`.
-        let dir = pfs::simple();
-        dir.add_entry_impl("foo".to_owned().try_into().unwrap(), pfs::simple(), false).unwrap();
-
-        // Make an [Open] that corresponds to `/`.
-        let scope = ExecutionScope::new();
-        let (dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
-        dir.clone().open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            dir_server_end.into_channel().into(),
-        );
-        let open = Open::from(dir_client_end);
-
-        // Verify that the connection has a directory named `foo`.
-        let scope = ExecutionScope::new();
-        let directory = serve_directory(
-            open.clone().try_into_directory_entry().unwrap(),
-            &scope,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
-        let entries = get_entries(directory).await.unwrap();
-        assert_eq!(entries, vec!["foo".to_owned()]);
-
-        // Downscope the path to `foo`.
-        let open = open
-            .clone()
-            .downscope_path(
-                vfs::path::Path::validate_and_split("foo".to_string()).unwrap(),
-                fio::DirentType::Directory,
-            )
-            .unwrap();
-        let directory = serve_directory(
-            open.clone().try_into_directory_entry().unwrap(),
-            &scope,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
-
-        // Verify that the connection does not have anymore children, since `foo` has no children.
-        let entries = get_entries(directory).await.unwrap();
-        assert_eq!(entries, vec![] as Vec<String>);
-    }
-
-    #[fuchsia::test]
-    async fn invalid_path() {
-        let (proxy, _server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        let open = Open::new(remote_dir(proxy));
-
-        let client_end: ClientEnd<fio::OpenableMarker> = open.into();
-        let openable = client_end.into_proxy().unwrap();
-
-        let (client_end, server_end) = fidl::endpoints::create_endpoints();
-        openable.open(fio::OpenFlags::DESCRIBE, fio::ModeType::empty(), "..", server_end).unwrap();
-        let proxy = client_end.into_proxy().unwrap();
-        let mut event_stream = proxy.take_event_stream();
-
-        let event = event_stream.try_next().await.unwrap().unwrap();
-        let on_open = event.into_on_open_().unwrap();
-        assert_eq!(on_open.0, Status::INVALID_ARGS.into_raw());
-
-        let event = event_stream.try_next().await;
-        let error = event.unwrap_err();
-        assert_matches!(
-            error,
-            fidl::Error::ClientChannelClosed { status, .. }
-            if status == Status::INVALID_ARGS
-        );
-    }
 
     #[fuchsia::test]
     async fn test_connector_into_open() {
         let (receiver, sender) = Receiver::new();
-        let open = Open::new(sender.try_into_directory_entry().unwrap());
+        let dir_entry = DirEntry::new(sender.try_into_directory_entry().unwrap());
         let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
-        open.open(scope, fio::OpenFlags::empty(), ".".to_owned(), server_end);
+        dir_entry.open(scope, fio::OpenFlags::empty(), ".".to_owned(), server_end);
         let msg = receiver.receive().await.unwrap();
         assert_eq!(
             client_end.basic_info().unwrap().related_koid,
@@ -326,10 +135,10 @@ mod tests {
         let mut ex = fasync::TestExecutor::new();
 
         let (receiver, sender) = Receiver::new();
-        let open = Open::new(sender.try_into_directory_entry().unwrap());
+        let dir_entry = DirEntry::new(sender.try_into_directory_entry().unwrap());
         let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
-        open.open(scope, fio::OpenFlags::empty(), "foo".to_owned(), server_end);
+        dir_entry.open(scope, fio::OpenFlags::empty(), "foo".to_owned(), server_end);
 
         let mut fut = std::pin::pin!(receiver.receive());
         assert!(ex.run_until_stalled(&mut fut).is_pending());
@@ -351,10 +160,10 @@ mod tests {
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 
-        let open = Open::new(dict.try_into_directory_entry().unwrap());
+        let dir_entry = DirEntry::new(dict.try_into_directory_entry().unwrap());
         let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
-        open.open(scope, fio::OpenFlags::empty(), "echo".to_owned(), server_end);
+        dir_entry.open(scope, fio::OpenFlags::empty(), "echo".to_owned(), server_end);
 
         let msg = receiver.receive().await.unwrap();
         assert_eq!(
@@ -372,10 +181,10 @@ mod tests {
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 
-        let open = Open::new(dict.try_into_directory_entry().unwrap());
+        let dir_entry = DirEntry::new(dict.try_into_directory_entry().unwrap());
         let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
-        open.open(scope, fio::OpenFlags::empty(), "echo/foo".to_owned(), server_end);
+        dir_entry.open(scope, fio::OpenFlags::empty(), "echo/foo".to_owned(), server_end);
 
         let mut fut = std::pin::pin!(receiver.receive());
         assert!(ex.run_until_stalled(&mut fut).is_pending());

@@ -54,12 +54,13 @@ use hooks::{CapabilityReceiver, EventPayload};
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::RouterError;
 use sandbox::{
-    Capability, Dict, Open, RemotableCapability, Request, Routable, Router, WeakComponentToken,
+    Capability, Dict, DirEntry, RemotableCapability, Request, Routable, Router, WeakComponentToken,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 use tracing::warn;
+use vfs::directory::entry::SubNode;
 use vfs::directory::immutable::simple as pfs;
 use vfs::path::Path;
 use {
@@ -325,7 +326,7 @@ pub struct ResolvedInstanceState {
 
     /// Hosts a directory mapping the component's exposed capabilities, generated from `exposed_dict`.
     /// Created on demand.
-    exposed_dir: Once<Open>,
+    exposed_dir: Once<DirEntry>,
 
     /// Dynamic capabilities this component supports.
     ///
@@ -473,13 +474,16 @@ impl ResolvedInstanceState {
         let name = capability_decl.name();
         let path = fuchsia_fs::canonicalize_path(&path);
         let entry_type = ComponentCapability::from(capability_decl.clone()).type_name().into();
-        let open = component
+        let relative_path = Path::validate_and_split(path).unwrap();
+        let outgoing_dir_entry = component
             .get_outgoing()
-            .downscope_path(Path::validate_and_split(path).unwrap(), entry_type)
-            .expect("get_outgoing must return a directory node");
+            .try_into_directory_entry()
+            .expect("conversion to directory entry should succeed");
+        let dir_entry =
+            DirEntry::new(Arc::new(SubNode::new(outgoing_dir_entry, relative_path, entry_type)));
         let capability: Capability = match capability_decl {
-            CapabilityDecl::Protocol(_) => sandbox::Connector::new_sendable(open).into(),
-            _ => open.into(),
+            CapabilityDecl::Protocol(_) => sandbox::Connector::new_sendable(dir_entry).into(),
+            _ => dir_entry.into(),
         };
         let hook =
             CapabilityRequestedHook { source: component.as_weak(), name: name.clone(), capability };
@@ -626,10 +630,10 @@ impl ResolvedInstanceState {
         }
     }
 
-    pub async fn get_exposed_dir(&self) -> &Open {
+    pub async fn get_exposed_dir(&self) -> &DirEntry {
         let create_exposed_dir = async {
             let exposed_dict = self.make_exposed_dict().await;
-            Open::new(
+            DirEntry::new(
                 exposed_dict
                     .try_into_directory_entry()
                     .expect("converting exposed dict to open should always succeed"),

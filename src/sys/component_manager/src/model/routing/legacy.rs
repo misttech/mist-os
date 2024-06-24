@@ -13,7 +13,7 @@ use cm_rust::{
     CapabilityTypeName, ExposeDecl, UseDirectoryDecl, UseEventStreamDecl, UseStorageDecl,
 };
 use router_error::Explain;
-use sandbox::{Capability, Directory, Open};
+use sandbox::{Capability, DirEntry, Directory};
 use std::sync::Arc;
 use tracing::*;
 use vfs::directory::entry::{
@@ -80,7 +80,7 @@ fn expose_any(
     target: &Arc<ComponentInstance>,
     type_name: CapabilityTypeName,
 ) -> Capability {
-    Open::new(RouteEntry::new(target.as_weak(), request, type_name.into())).into()
+    DirEntry::new(RouteEntry::new(target.as_weak(), request, type_name.into())).into()
 }
 
 fn use_service(decl: cm_rust::UseServiceDecl, target: &Arc<ComponentInstance>) -> Capability {
@@ -136,7 +136,7 @@ fn use_service(decl: cm_rust::UseServiceDecl, target: &Arc<ComponentInstance>) -
                 .map_err(|e| e.as_zx_status())
         }
     }
-    Open::new(Arc::new(Service {
+    DirEntry::new(Arc::new(Service {
         target: target.as_weak(),
         scope: target.execution_scope.clone(),
         decl,
@@ -270,5 +270,5 @@ fn use_event_stream(decl: UseEventStreamDecl, target: &Arc<ComponentInstance>) -
                 .map_err(|e| e.as_zx_status())
         }
     }
-    Open::new(Arc::new(UseEventStream { component: target.as_weak(), decl })).into()
+    DirEntry::new(Arc::new(UseEventStream { component: target.as_weak(), decl })).into()
 }

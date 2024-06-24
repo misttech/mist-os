@@ -164,11 +164,11 @@ fn extend_dict_with_dictionary(
                                 self.component.moniker.clone(),
                             ))
                         })?;
-                        let open = component.get_outgoing();
+                        let dir_entry = component.get_outgoing();
 
                         let (inner_router, server_end) =
                             create_proxy::<fsandbox::RouterMarker>().unwrap();
-                        open.open(
+                        dir_entry.open(
                             ExecutionScope::new(),
                             fio::OpenFlags::empty(),
                             vfs::path::Path::validate_and_split(self.source_path.to_string())

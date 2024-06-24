@@ -11,7 +11,7 @@ use futures::future::BoxFuture;
 use moniker::ExtendedMoniker;
 use router_error::{Explain, RouterError};
 use sandbox::{
-    Capability, Dict, Open, RemotableCapability, Request, Routable, Router, WeakComponentToken,
+    Capability, Dict, DirEntry, RemotableCapability, Request, Routable, Router, WeakComponentToken,
 };
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
@@ -91,7 +91,7 @@ impl RouterExt for Router {
                     };
                     // TODO: Should we convert the Open to a Directory here if the Router wraps a
                     // Dict?
-                    Capability::Open(Open::new(router.into_directory_entry(
+                    Capability::DirEntry(DirEntry::new(router.into_directory_entry(
                         request,
                         fio::DirentType::Service,
                         scope.clone(),

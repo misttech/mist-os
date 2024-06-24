@@ -400,8 +400,8 @@ mod tests {
         assert_eq!(reason, StartReason::OutgoingDirectory);
 
         let mut outgoing = escrow.outgoing_dir.into_stream().unwrap();
-        let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
-        assert_eq!(open.2, "foo");
+        let dir_entry = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
+        assert_eq!(dir_entry.2, "foo");
 
         drop(actor);
         task_group.join().await;

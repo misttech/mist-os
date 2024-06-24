@@ -44,7 +44,7 @@ use instance::{
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
-use sandbox::{Capability, Dict, Open, Request, Routable, Router};
+use sandbox::{Capability, Dict, DirEntry, Request, Routable, Router};
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -937,9 +937,10 @@ impl ComponentInstance {
         }
     }
 
-    /// Returns an [`Open`] representation of the outgoing directory of the component. It performs
-    /// the same checks as `open_outgoing`, but errors are surfaced at the server endpoint.
-    pub fn get_outgoing(self: &Arc<Self>) -> Open {
+    /// Returns a [sandbox::DirEntry] representation of the outgoing directory of the component. It
+    /// performs the same checks as `open_outgoing`, but errors are surfaced at the server
+    /// endpoint.
+    pub fn get_outgoing(self: &Arc<Self>) -> DirEntry {
         struct GetOutgoing {
             component: WeakComponentInstance,
         }
@@ -956,7 +957,7 @@ impl ComponentInstance {
             }
         }
 
-        Open::new(Arc::new(GetOutgoing { component: WeakComponentInstance::from(self) }))
+        DirEntry::new(Arc::new(GetOutgoing { component: WeakComponentInstance::from(self) }))
     }
 
     /// Obtains the program output dict.

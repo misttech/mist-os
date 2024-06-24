@@ -51,7 +51,7 @@ mod tests {
     async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
         let receiver = {
             let (receiver, sender) = Receiver::new();
-            let open: crate::Open = sender.into();
+            let open: crate::DirEntry = sender.into();
             let (client_end, server_end) = Channel::create();
             let scope = ExecutionScope::new();
             open.open(
@@ -83,7 +83,7 @@ mod tests {
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_describe() {
         let (receiver, sender) = Receiver::new();
-        let open: crate::Open = sender.into();
+        let open: crate::DirEntry = sender.into();
 
         let (client_end, server_end) = Channel::create();
         // The VFS should send the DESCRIBE event, then hand us the channel.
@@ -108,7 +108,7 @@ mod tests {
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_empty() {
         let (receiver, sender) = Receiver::new();
-        let open: crate::Open = sender.into();
+        let open: crate::DirEntry = sender.into();
 
         let (client_end, server_end) = Channel::create();
         // The VFS should not send any event, but directly hand us the channel.

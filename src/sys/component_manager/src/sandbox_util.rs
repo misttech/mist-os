@@ -19,7 +19,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use router_error::RouterError;
 use sandbox::{
-    Capability, Connectable, Connector, Message, Open, Request, Routable, Router,
+    Capability, Connectable, Connector, DirEntry, Message, Request, Routable, Router,
     WeakComponentToken,
 };
 use std::fmt::Debug;
@@ -288,9 +288,11 @@ impl<T: Routable + 'static> RoutableExt for T {
                     }
                 }
 
-                Ok(Capability::Open(Open::new(
-                    Arc::new(OnReadable(self.scope.clone(), entry)) as Arc<dyn DirectoryEntry>
-                )))
+                Ok(Capability::DirEntry(DirEntry::new(Arc::new(OnReadable(
+                    self.scope.clone(),
+                    entry,
+                ))
+                    as Arc<dyn DirectoryEntry>)))
             }
         }
 

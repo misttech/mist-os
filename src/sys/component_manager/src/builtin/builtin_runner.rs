@@ -14,7 +14,7 @@ use futures::{Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
-use sandbox::{Capability, Dict, Open, RemotableCapability};
+use sandbox::{Capability, Dict, DirEntry, RemotableCapability};
 use std::sync::{Arc, Weak};
 use thiserror::Error;
 use tracing::warn;
@@ -282,8 +282,8 @@ impl ElfRunnerProgram {
     /// Serves requests coming from `outgoing_dir` using `self.output`.
     fn serve_outgoing(&self, outgoing_dir: ServerEnd<fio::DirectoryMarker>) {
         let output = self.output.clone();
-        let open = Open::new(output.try_into_directory_entry().unwrap());
-        open.open(
+        let dir_entry = DirEntry::new(output.try_into_directory_entry().unwrap());
+        dir_entry.open(
             self.execution_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,
             ".".to_string(),

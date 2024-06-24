@@ -38,7 +38,7 @@ type Connector = resource struct {
 };
 
 @available(added=HEAD)
-type Open = resource struct {
+type DirEntry = resource struct {
     token Token;
 };
 
@@ -51,7 +51,7 @@ type Capability = flexible resource union {
     5: connector Connector;
     6: directory client_end:fuchsia.io.Directory;
     7: router client_end:Router;
-    8: open Open;
+    8: dir_entry DirEntry;
 };
 
 /// The maximum length of a dictionary key. This should coincide with
