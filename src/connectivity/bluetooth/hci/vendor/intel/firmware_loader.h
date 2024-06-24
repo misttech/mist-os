@@ -11,7 +11,7 @@
 
 #include "vendor_hci.h"
 
-namespace btintel {
+namespace bt_hci_intel {
 
 // Secure boot engine type. The algorithm used to sign the firmware binary.
 enum class SecureBootEngineType {
@@ -64,6 +64,6 @@ class FirmwareLoader {
   VendorHci hci_acl_;
 };
 
-}  // namespace btintel
+}  // namespace bt_hci_intel
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_INTEL_FIRMWARE_LOADER_H_

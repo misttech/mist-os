@@ -43,14 +43,13 @@ source_set("common") {
 
   deps = [
     ":bt_hci_intel_bind",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp:cpp",
     "//src/connectivity/bluetooth/core/bt-host/common",
     "//src/connectivity/bluetooth/core/bt-host/hci-spec",
     "//src/connectivity/bluetooth/core/bt-host/transport",
-    "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
@@ -108,16 +107,22 @@ executable("tests_executable") {
 
   output_name = "bt-hci-intel-tests"
 
-  sources = [ "vendor_hci_unittest.cc" ]
+  sources = [
+    "bt_hci_intel_unittest.cc",
+    "vendor_hci_unittest.cc",
+  ]
 
   deps = [
     ":common",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//sdk/lib/fdio",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/storage/lib/vfs/cpp",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zircon-internal",

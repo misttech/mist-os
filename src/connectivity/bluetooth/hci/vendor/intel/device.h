@@ -8,46 +8,39 @@
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
 #include <optional>
 
-#include <ddktl/device.h>
-
 #include "fidl/fuchsia.hardware.bluetooth/cpp/markers.h"
 #include "vendor_hci.h"
 
-namespace btintel {
+namespace bt_hci_intel {
 
-class Device;
-
-using DeviceType = ddk::Device<Device, ddk::Initializable, ddk::GetProtocolable, ddk::Unbindable>;
-
-class Device : public DeviceType,
-               public ddk::BtHciProtocol<Device, ddk::base_protocol>,
+class Device : public fdf::DriverBase,
+               public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
+               public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
                public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor>,
                public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
  public:
-  Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure, bool legacy_firmware_loading);
-
-  static zx_status_t bt_intel_bind(void* ctx, zx_device_t* device);
-
-  // Bind the device, invisibly.
-  zx_status_t Bind();
+  Device(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
   // Load the firmware and complete device initialization.
-  // if firmware is loaded, the device will be made visible.
-  // otherwise the device will be removed and devhost will
-  // unbind.
   // If |secure| is true, use the "secure" firmware method.
-  zx_status_t LoadFirmware(ddk::InitTxn init_txn, bool secure);
+  zx_status_t Init(bool secure);
 
-  // ddk::Device methods
-  void DdkInit(ddk::InitTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_proto);
+  zx_status_t AddNode();
+
+  // fdf::DriverBase overrides
+  void Start(fdf::StartCompleter completer) override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::Node> metadata) override {}
 
   zx_status_t BtHciOpenCommandChannel(zx::channel in);
   zx_status_t BtHciOpenAclDataChannel(zx::channel in);
@@ -88,14 +81,14 @@ class Device : public DeviceType,
 
   void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
 
-  zx_status_t LoadSecureFirmware(zx::channel* cmd, zx::channel* acl);
-  zx_status_t LoadLegacyFirmware(zx::channel* cmd, zx::channel* acl);
+  zx_status_t LoadSecureFirmware();
+  zx_status_t LoadLegacyFirmware();
 
   // Informs the device manager that device initialization has failed,
   // which will unbind the device, and leaves an error on the kernel log
   // prepended with |note|.
   // Returns |status|.
-  zx_status_t InitFailed(ddk::InitTxn init_txn, zx_status_t status, const char* note);
+  zx_status_t InitFailed(zx_status_t status, const char* note);
 
   // Maps the firmware refrenced by |name| into memory.
   // Returns the vmo that the firmware is loaded into or ZX_HANDLE_INVALID if it
@@ -110,13 +103,18 @@ class Device : public DeviceType,
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_binding_group_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
 
+  fidl::WireClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
+  fidl::WireClient<fuchsia_driver_framework::Node> child_node_;
+
+  zx::channel cmd_;
+  zx::channel acl_;
   ddk::BtHciProtocolClient hci_;
-  bool secure_;
-  bool firmware_loaded_;
-  bool legacy_firmware_loading_;  // true to use legacy way to load firmware
-  std::thread init_thread_;
+  bool secure_{false};
+  bool firmware_loaded_{false};
+  bool legacy_firmware_loading_{false};  // true to use legacy way to load firmware
 };
 
-}  // namespace btintel
+}  // namespace bt_hci_intel
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_INTEL_DEVICE_H_

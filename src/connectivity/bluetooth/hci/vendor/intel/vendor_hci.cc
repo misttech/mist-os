@@ -16,7 +16,7 @@
 
 #include "logging.h"
 
-namespace btintel {
+namespace bt_hci_intel {
 
 using ::bt::hci::CommandPacket;
 
@@ -436,4 +436,4 @@ std::unique_ptr<bt::hci::EventPacket> VendorHci::WaitForEventPacket(
   return nullptr;
 }
 
-}  // namespace btintel
+}  // namespace bt_hci_intel

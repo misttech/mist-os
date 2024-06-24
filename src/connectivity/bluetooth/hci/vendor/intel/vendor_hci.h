@@ -15,7 +15,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/control_packets.h"
 
-namespace btintel {
+namespace bt_hci_intel {
 
 constexpr bt::hci_spec::OpCode kReadVersion = bt::hci_spec::VendorOpCode(0x0005);
 
@@ -192,6 +192,6 @@ class VendorHci {
       zx::duration timeout = zx::sec(5), bt::hci_spec::EventCode expected_event = 0) const;
 };
 
-}  // namespace btintel
+}  // namespace bt_hci_intel
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_INTEL_VENDOR_HCI_H_
