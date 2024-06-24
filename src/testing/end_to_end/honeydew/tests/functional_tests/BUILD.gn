@@ -137,10 +137,7 @@ group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
 group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
   testonly = true
   public_deps = [
-    "affordance_tests/test_session:test_session",
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "affordance_tests/test_ui:test_screenshot",
-    "affordance_tests/test_ui:test_user_input",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test_fc($host_toolchain)",
     "transport_tests/test_ffx:test_ffx_on_vim3",
