@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/host.gni")
+import("//build/python/host.gni")
 import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 import("//build/testing/host_test_data.gni")
@@ -128,15 +128,8 @@ if (is_host) {
     deps = [ "//scripts/fxtest/scripts:install" ]
   }
 
-  # Rename the resulting .pyz for the host tool
-  copy("copy") {
-    deps = [ ":fxtest-rewrite" ]
-    sources = [ "${target_out_dir}/fxtest_rewrite.pyz" ]
-    outputs = [ "${root_out_dir}/test2" ]
-  }
-
-  install_host_tools("install") {
-    deps = [ ":copy" ]
-    outputs = [ "test2" ]
+  install_python_tool("install") {
+    name = "test2"
+    binary = ":fxtest-rewrite"
   }
 }
