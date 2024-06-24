@@ -149,8 +149,6 @@ class SimpleDisplay : public DeviceType,
 zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
                                     DisplayProperties properties);
 
-zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar);
-
 }  // namespace simple_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_

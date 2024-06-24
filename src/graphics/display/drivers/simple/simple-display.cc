@@ -23,7 +23,6 @@
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
-#include <limits>
 #include <memory>
 #include <utility>
 
@@ -602,37 +601,6 @@ void SimpleDisplay::OnPeriodicVSync() {
   }
   next_vsync_time_ += kVSyncInterval;
   async::PostTaskForTime(loop_.dispatcher(), [this]() { OnPeriodicVSync(); }, next_vsync_time_);
-}
-
-zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar) {
-  zbi_pixel_format_t format;
-  uint32_t width, height, stride;
-  zx_status_t status =
-      zx_framebuffer_get_info(get_framebuffer_resource(dev), &format, &width, &height, &stride);
-  if (status != ZX_OK) {
-    printf("%s: failed to get bootloader dimensions: %d\n", name, status);
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  ZX_DEBUG_ASSERT(width <= std::numeric_limits<int32_t>::max());
-  ZX_DEBUG_ASSERT(height <= std::numeric_limits<int32_t>::max());
-  ZX_DEBUG_ASSERT(stride <= std::numeric_limits<int32_t>::max());
-
-  auto sysmem2_format_type_result = ImageFormatConvertZbiToSysmemPixelFormat_v2(format);
-  if (!sysmem2_format_type_result.is_ok()) {
-    zxlogf(ERROR, "%s: failed to convert framebuffer format: %" PRIu32, name,
-           static_cast<uint32_t>(format));
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  fuchsia_images2::wire::PixelFormat sysmem2_format = sysmem2_format_type_result.take_value();
-
-  const DisplayProperties properties = {
-      .width_px = static_cast<int32_t>(width),
-      .height_px = static_cast<int32_t>(height),
-      .row_stride_px = static_cast<int32_t>(stride),
-      .pixel_format = sysmem2_format,
-  };
-  return bind_simple_pci_display(dev, name, bar, properties);
 }
 
 zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
