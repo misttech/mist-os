@@ -3296,10 +3296,9 @@ Consider the following example from a fictitious
      }
 
      # Build the installer with Bazel.
-     bazel_action("build_installer") {
-       command = "build"
+     bazel_build_action("build_installer") {
        bazel_targets = "//vendor/acme/proprietary/installer"
-       bazel_inputs = [ ":acme_firmware" ]
+       deps = [ ":acme_firmware" ]
        copy_outputs = [
          {
            bazel = "vendor/acme/proprietary/installer/installer"
@@ -3322,7 +3321,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:128
+From //build/bazel/legacy_ninja_build_outputs.gni:127
 
 ### extra_package_labels
 
