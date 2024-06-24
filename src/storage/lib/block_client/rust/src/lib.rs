@@ -25,8 +25,7 @@ pub use cache::Cache;
 
 pub use block::Flag as BlockFlags;
 
-pub mod fifo;
-pub use fifo::*;
+pub use block_protocol::*;
 
 pub mod cache;
 
@@ -762,12 +761,16 @@ mod tests {
         BlockClient, BlockFifoRequest, BlockFifoResponse, BufferSlice, MutableBufferSlice,
         RemoteBlockClient, RemoteBlockClientSync,
     };
+    use block_server::{BlockServer, PartitionInfo};
+    use fidl::endpoints::RequestStream as _;
     use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
     use futures::future::{AbortHandle, Abortable, TryFutureExt as _};
     use futures::join;
     use futures::stream::futures_unordered::FuturesUnordered;
     use futures::stream::StreamExt as _;
     use ramdevice_client::RamdiskClient;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
     use {fidl_fuchsia_hardware_block as block, fuchsia_zircon as zx};
 
     const RAMDISK_BLOCK_SIZE: u64 = 1024;
@@ -1171,7 +1174,53 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_block_flush_is_called() {
-        let (proxy, server) = fidl::endpoints::create_proxy().expect("create_proxy failed");
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<block::BlockMarker>()
+            .expect("create_proxy failed");
+
+        struct Interface {
+            partition_info: PartitionInfo,
+            flush_called: Arc<AtomicBool>,
+        }
+        impl block_server::Interface for Interface {
+            fn info(&self) -> &block_server::PartitionInfo {
+                &self.partition_info
+            }
+
+            async fn read(
+                &self,
+                _device_block_offset: u64,
+                _block_count: u32,
+                _vmo: &Arc<zx::Vmo>,
+                _vmo_offset: u64,
+            ) -> Result<(), zx::Status> {
+                unreachable!();
+            }
+
+            async fn write(
+                &self,
+                _device_block_offset: u64,
+                _block_count: u32,
+                _vmo: &Arc<zx::Vmo>,
+                _vmo_offset: u64,
+            ) -> Result<(), zx::Status> {
+                unreachable!();
+            }
+
+            async fn flush(&self) -> Result<(), zx::Status> {
+                self.flush_called.store(true, Ordering::Relaxed);
+                Ok(())
+            }
+
+            async fn trim(
+                &self,
+                _device_block_offset: u64,
+                _block_count: u32,
+            ) -> Result<(), zx::Status> {
+                unreachable!();
+            }
+        }
+
+        let flush_called = Arc::new(AtomicBool::new(false));
 
         futures::join!(
             async {
@@ -1180,21 +1229,21 @@ mod tests {
                 remote_block_device.flush().await.expect("flush failed");
             },
             async {
-                let flush_called = std::sync::Mutex::new(false);
-                let fifo_handler = |request: BlockFifoRequest| -> BlockFifoResponse {
-                    *flush_called.lock().unwrap() = true;
-                    assert_eq!(request.command.opcode, super::BlockOpcode::Flush.into_primitive());
-                    BlockFifoResponse {
-                        status: zx::Status::OK.into_raw(),
-                        reqid: request.reqid,
-                        ..Default::default()
-                    }
-                };
-                FakeBlockServer::new(server, |_| false, fifo_handler).run().await;
-                // After the server has finished running, we can check to see that close was called.
-                assert!(*flush_called.lock().unwrap());
+                let block_server = BlockServer::new(Interface {
+                    partition_info: PartitionInfo {
+                        block_count: 1000,
+                        block_size: 512,
+                        type_guid: [0; 16],
+                        instance_guid: [0; 16],
+                        name: "foo".to_string(),
+                    },
+                    flush_called: flush_called.clone(),
+                });
+                block_server.handle_requests(stream.cast_stream()).await.unwrap();
             }
         );
+
+        assert!(flush_called.load(Ordering::Relaxed));
     }
 
     #[fuchsia::test]
