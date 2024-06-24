@@ -68,6 +68,7 @@ def _fuchsia_product_assembly_impl(ctx):
             "--output",
             platform_aibs_file.path,
         ],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     # Calculate the path to the board configuration file, if it's not directly
@@ -168,6 +169,7 @@ def _fuchsia_product_assembly_impl(ctx):
         ],
         command = "\n".join(shell_src),
         progress_message = "Product Assembly for %s" % ctx.label.name,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     cache_package_list = ctx.actions.declare_file(ctx.label.name + "/bazel_cache_package_manifests.list")
