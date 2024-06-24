@@ -23,6 +23,7 @@ config("variant-libprefix") {
 template("sanitizer_rustflags") {
   if (is_mac) {
     extension = "_osx_dynamic.dylib"
+    not_needed(invoker, [ "shared_runtime" ])
   } else if (invoker.shared_runtime) {
     extension = ".so"
   } else {
