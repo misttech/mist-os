@@ -71,6 +71,8 @@ open protocol Topology {
     /// Called by a Power Element owner to register a new Power Element and
     /// open control channels for that element.
     flexible AddElement(ElementSchema) -> (resource struct {
+        // TODO(b/346997964): Remove this return struct once all callers have
+        // migrated to pass their ElementControl channel via ElementSchema.
         /// ElementControl channel for this element.
         /// When this channel is dropped, the element will be removed from the
         /// topology. All channels associated with this element will be
@@ -109,6 +111,12 @@ type ElementSchema = resource table {
     /// Optional. If passed, this will be treated as a consumer element and
     /// Leases for this element can be requested via this channel.
     8: lessor_channel server_end:Lessor;
+    /// Caller-provided ElementControl channel to be passed to Power Broker.
+    /// When this channel is dropped, the element will be removed from the
+    /// topology. All channels associated with this element will be
+    /// closed and all tokens registered to this element will be
+    /// unregistered.
+    9: element_control server_end:ElementControl;
 };
 
 type LevelControlChannels = resource struct {
