@@ -97,9 +97,15 @@ async fn mmap_anonymous() {
     // - The system task (PID 2).
     // - The test program we just launched (PID > 2), and its name should
     //   match regex "PID (.*): mmap_anonymous_then_sleep".
+    let program_name = Regex::new(r"PID (.*): mmap_anonymous_then_sleep").unwrap();
     loop {
         tree = attribution.next().await.unwrap();
-        if tree.children.len() == 1 && tree.children[0].children.len() == 3 {
+        let container = &tree.children[0];
+        if container
+            .children
+            .iter()
+            .any(|child| program_name.is_match(child.name.as_str()) && child.resources.len() > 0)
+        {
             break;
         }
     }
@@ -109,18 +115,22 @@ async fn mmap_anonymous() {
         .children
         .remove(container.children.iter().position(|c| c.name == "PID 1: init").unwrap());
     assert_eq!(init.children.len(), 0);
-    assert_eq!(init.resources.len(), 0);
+    assert_eq!(init.resources.len(), 1, "init task should have one restricted VMAR");
     let system_task = container
         .children
         .remove(container.children.iter().position(|c| c.name == "PID 2: [system task]").unwrap());
     assert_eq!(system_task.children.len(), 0);
-    assert_eq!(system_task.resources.len(), 0);
+    assert_eq!(system_task.resources.len(), 0, "system task should have zero restricted VMARs");
     let test_program = container.children.pop().unwrap();
-    assert!(Regex::new(r"PID (.*): mmap_anonymous_then_sleep")
-        .unwrap()
-        .is_match(test_program.name.as_str()));
+    assert!(program_name.is_match(test_program.name.as_str()));
     assert_eq!(test_program.children.len(), 0);
-    assert_eq!(test_program.resources.len(), 0);
+    assert_eq!(test_program.resources.len(), 1, "test program should have one restricted VMAR");
+
+    // There is no good way to check that the resource KOID is indeed a restricted VMAR,
+    // because there is no API to get the VMAR of a process. We can at least test that
+    // the KOID is a valid one.
+    let koid = test_program.resources[0];
+    assert!(koid.raw_koid() >= fuchsia_zircon::sys::ZX_KOID_FIRST);
 
     // If we terminate the program, the tree should eventually no longer contain the program.
     drop(program);

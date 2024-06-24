@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::collections::{HashMap, HashSet};
+use std::iter;
 use std::sync::{mpsc, Arc, Weak};
 
 use attribution::{AttributionServer, AttributionServerHandle};
@@ -12,7 +13,7 @@ use starnix_sync::Mutex;
 use starnix_uapi::pid_t;
 use {fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx};
 
-use crate::task::{Kernel, ThreadGroup};
+use crate::task::{Kernel, Task, ThreadGroup};
 
 const PID_TABLE_POLLING_INTERVAL: zx::Duration = zx::Duration::from_seconds(5);
 
@@ -45,10 +46,13 @@ impl MemoryAttributionManager {
                 let mut processes: HashSet<pid_t> = HashSet::new();
                 let mut process_names: HashMap<pid_t, String> = HashMap::new();
                 for thread_group in pids.get_thread_groups() {
-                    let name = get_thread_group_identifier(&thread_group);
-                    events.append(&mut attribution_info_for_thread_group(name.clone()));
-                    processes.insert(thread_group.leader);
-                    process_names.insert(thread_group.leader, name);
+                    if let Some(leader) = pids.get_task(thread_group.leader).upgrade() {
+                        let name = get_thread_group_identifier(&thread_group);
+                        events
+                            .append(&mut attribution_info_for_thread_group(name.clone(), &leader));
+                        processes.insert(thread_group.leader);
+                        process_names.insert(thread_group.leader, name);
+                    }
                 }
 
                 // Spawn the pid table monitoring thread once.
@@ -94,11 +98,14 @@ impl MemoryAttributionManager {
             for thread_group in &thread_groups {
                 let pid = thread_group.leader;
                 if !processes.contains(&pid) {
-                    let name = get_thread_group_identifier(&thread_group);
-                    let mut update = attribution_info_for_thread_group(name.clone());
-                    processes.insert(pid);
-                    process_names.insert(pid, name);
-                    updates.append(&mut update);
+                    if let Some(leader) = kernel.pids.read().get_task(thread_group.leader).upgrade()
+                    {
+                        let name = get_thread_group_identifier(&thread_group);
+                        let mut update = attribution_info_for_thread_group(name.clone(), &leader);
+                        processes.insert(pid);
+                        process_names.insert(pid, name);
+                        updates.append(&mut update);
+                    }
                 }
             }
 
@@ -131,17 +138,36 @@ fn get_thread_group_identifier(thread_group: &ThreadGroup) -> String {
     name
 }
 
-fn attribution_info_for_thread_group(name: String) -> Vec<fattribution::AttributionUpdate> {
-    // NewPrincipal message
+fn attribution_info_for_thread_group(
+    name: String,
+    leader: &Task,
+) -> Vec<fattribution::AttributionUpdate> {
+    let new = new_principal(name.clone());
+    let updated = updated_principal(leader, name);
+    iter::once(new).chain(updated.into_iter()).collect()
+}
+
+/// Builds a `NewPrincipal` event.
+fn new_principal(name: String) -> fattribution::AttributionUpdate {
     let new = fattribution::AttributionUpdate::Add(fattribution::NewPrincipal {
         identifier: Some(fattribution::Identifier::Part(name)),
         type_: Some(fattribution::Type::Runnable),
         detailed_attribution: None,
         ..Default::default()
     });
+    new
+}
 
-    // TODO(https://fxbug.dev/337865227): Report the VMOs referenced by this process
-    // in an UpdatedPrincipal message.
-
-    vec![new]
+/// Builds an `UpdatedPrincipal` event. If the task has an invalid root VMAR, returns `None`.
+fn updated_principal(leader: &Task, name: String) -> Option<fattribution::AttributionUpdate> {
+    let mm = leader.mm();
+    let Some(vmar_koid) = mm.root_vmar.get_koid().ok() else { return None };
+    let update = fattribution::AttributionUpdate::Update(fattribution::UpdatedPrincipal {
+        identifier: Some(fattribution::Identifier::Part(name)),
+        resources: Some(fattribution::Resources::Data(vec![fattribution::Resource::KernelObject(
+            vmar_koid.raw_koid(),
+        )])),
+        ..Default::default()
+    });
+    Some(update)
 }
