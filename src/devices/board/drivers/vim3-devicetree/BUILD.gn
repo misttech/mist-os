@@ -97,8 +97,8 @@ bazel_fuchsia_test_package("vim3-devicetree-test-package") {
   ]
 }
 
-bazel_input_resource("vim3-dtb") {
-  sources = [ "$target_out_dir/vim3.dtb" ]
-  outputs = [ "{{source_file_part}}" ]
-  deps = [ ":vim3" ]
+bazel_input_file("vim3-dtb") {
+  generator = ":vim3"
+  outputs = [ "$target_out_dir/vim3.dtb" ]
+  gn_targets_name = "vim3-dtb"
 }

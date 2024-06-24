@@ -25,11 +25,11 @@ legacy_assembly_input_bundle("test") {
   additional_boot_args = []
 }
 
-bazel_input_resource_directory("test_wrapped") {
+bazel_input_directory("test_wrapped") {
   testonly = true
-  source_dir = "${target_out_dir}/legacy"
-  dest_dir = rebase_path("${target_out_dir}/test_wrapped", root_build_dir)
-  deps = [ ":test" ]
+  generator = ":test"
+  output_directory = "${target_out_dir}/legacy"
+  gn_targets_name = "test_wrapped"
 }
 
 bazel_product_bundle("product_bundle") {
