@@ -50,10 +50,10 @@ rustc_library("sandbox") {
     "src/fidl/connector.rs",
     "src/fidl/data.rs",
     "src/fidl/dict.rs",
+    "src/fidl/dir_entry.rs",
     "src/fidl/directory.rs",
     "src/fidl/handle.rs",
     "src/fidl/mod.rs",
-    "src/fidl/open.rs",
     "src/fidl/router.rs",
     "src/fidl/unit.rs",
     "src/handle.rs",
@@ -72,8 +72,8 @@ rustc_library("sandbox") {
       "//third_party/rust_crates:tracing",
     ]
     sources += [
+      "src/dir_entry.rs",
       "src/fidl/registry.rs",
-      "src/open.rs",
     ]
   }
 
