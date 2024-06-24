@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/compat/cpp/logging.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
@@ -81,9 +80,8 @@ void set_hw_mode(MMIO_PTR void* regs, uint16_t width, uint16_t height, uint16_t 
 
 class SimpleBochsDisplayDriver final : public SimpleDisplayDriver {
  public:
-  static zx::result<> Create(zx_device_t* parent);
-
-  explicit SimpleBochsDisplayDriver(zx_device_t* parent);
+  explicit SimpleBochsDisplayDriver(fdf::DriverStartArgs start_args,
+                                    fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
   SimpleBochsDisplayDriver(const SimpleBochsDisplayDriver&) = delete;
   SimpleBochsDisplayDriver(SimpleBochsDisplayDriver&&) = delete;
@@ -96,41 +94,35 @@ class SimpleBochsDisplayDriver final : public SimpleDisplayDriver {
   zx::result<> ConfigureHardware() override;
   zx::result<fdf::MmioBuffer> GetFrameBufferMmioBuffer() override;
   zx::result<DisplayProperties> GetDisplayProperties() override;
+
+ private:
+  zx::result<ddk::Pci> GetPciClient();
 };
 
-zx::result<> SimpleBochsDisplayDriver::Create(zx_device_t* parent) {
-  fbl::AllocChecker alloc_checker;
-  auto simple_bochs_display_driver =
-      fbl::make_unique_checked<SimpleBochsDisplayDriver>(&alloc_checker, parent);
-  if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for SimpleBochsDisplayDriver");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  zx::result<> init_result = simple_bochs_display_driver->Initialize();
-  if (init_result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize SimpleBochsDisplayDriver: %s", init_result.status_string());
-    return init_result.take_error();
-  }
-
-  // `simple_bochs_display_driver` is now managed by the driver manager.
-  [[maybe_unused]] SimpleBochsDisplayDriver* driver_released =
-      simple_bochs_display_driver.release();
-
-  return zx::ok();
-}
-
-SimpleBochsDisplayDriver::SimpleBochsDisplayDriver(zx_device_t* parent)
-    : SimpleDisplayDriver(parent, "bochs-vbe") {}
+SimpleBochsDisplayDriver::SimpleBochsDisplayDriver(
+    fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : SimpleDisplayDriver("bochs-vbe", std::move(start_args), std::move(driver_dispatcher)) {}
 
 SimpleBochsDisplayDriver::~SimpleBochsDisplayDriver() = default;
 
-zx::result<> SimpleBochsDisplayDriver::ConfigureHardware() {
-  ddk::Pci pci(parent(), "pci");
-  if (!pci.is_valid()) {
-    zxlogf(ERROR, "Failed to get pci protocol");
-    return zx::error(ZX_ERR_INTERNAL);
+zx::result<ddk::Pci> SimpleBochsDisplayDriver::GetPciClient() {
+  zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
+      incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
+  if (pci_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to PCI protocol: %s", pci_result.status_string());
+    return pci_result.take_error();
   }
+  ddk::Pci pci(std::move(pci_result).value());
+  ZX_DEBUG_ASSERT(pci.is_valid());
+  return zx::ok(std::move(pci));
+}
+
+zx::result<> SimpleBochsDisplayDriver::ConfigureHardware() {
+  zx::result<ddk::Pci> pci_result = GetPciClient();
+  if (pci_result.is_error()) {
+    return pci_result.take_error();
+  }
+  ddk::Pci pci = std::move(pci_result).value();
 
   std::optional<fdf::MmioBuffer> mmio;
   // map register window
@@ -138,7 +130,7 @@ zx::result<> SimpleBochsDisplayDriver::ConfigureHardware() {
   zx_status_t status =
       pci.MapMmio(kQemuBochsRegisterMmioBarIndex, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map pci config: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to map PCI config: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -147,18 +139,18 @@ zx::result<> SimpleBochsDisplayDriver::ConfigureHardware() {
 }
 
 zx::result<fdf::MmioBuffer> SimpleBochsDisplayDriver::GetFrameBufferMmioBuffer() {
-  ddk::Pci pci(parent(), "pci");
-  if (!pci.is_valid()) {
-    zxlogf(ERROR, "Failed to get PCI protocol");
-    return zx::error(ZX_ERR_INTERNAL);
+  zx::result<ddk::Pci> pci_result = GetPciClient();
+  if (pci_result.is_error()) {
+    return pci_result.take_error();
   }
+  ddk::Pci pci = std::move(pci_result).value();
 
   std::optional<fdf::MmioBuffer> framebuffer_mmio;
   static constexpr uint32_t kFramebufferPciBarIndex = 0;
   zx_status_t status =
       pci.MapMmio(kFramebufferPciBarIndex, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map pci bar %" PRIu32 ": %s", kFramebufferPciBarIndex,
+    zxlogf(ERROR, "Failed to map PCI bar %" PRIu32 ": %s", kFramebufferPciBarIndex,
            zx_status_get_string(status));
     return zx::error(status);
   }
@@ -177,16 +169,8 @@ zx::result<DisplayProperties> SimpleBochsDisplayDriver::GetDisplayProperties() {
   return zx::ok(kDisplayProperties);
 }
 
-constexpr zx_driver_ops_t kBochsVesaBiosExtensionDriverOps = {
-    .version = DRIVER_OPS_VERSION,
-    .bind =
-        [](void* ctx, zx_device_t* parent) {
-          return SimpleBochsDisplayDriver::Create(parent).status_value();
-        },
-};
-
 }  // namespace
 
 }  // namespace simple_display
 
-ZIRCON_DRIVER(bochs_vbe, simple_display::kBochsVesaBiosExtensionDriverOps, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(simple_display::SimpleBochsDisplayDriver);

@@ -10,7 +10,9 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/compat/cpp/logging.h>
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/fit/defer.h>
 #include <lib/zx/object.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -231,6 +233,18 @@ class FakeMmio {
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
 };
 
+class SimpleDisplayTest : public ::testing::Test {
+ public:
+  void SetUp() override { fdf::Logger::SetGlobalInstance(&logger_); }
+  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+
+ private:
+  // TODO(https://fxbug.dev/348954412): Create a logger that connects to the
+  // component LogSink service.
+  fdf::Logger logger_{"test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                      fidl::WireClient<fuchsia_logger::LogSink>{}};
+};
+
 void ExpectHandlesArePaired(zx_handle_t lhs, zx_handle_t rhs) {
   auto [lhs_koid, lhs_related_koid] = fsl::GetKoids(lhs);
   auto [rhs_koid, rhs_related_koid] = fsl::GetKoids(rhs);
@@ -249,7 +263,7 @@ void ExpectObjectsArePaired(zx::unowned<T> lhs, zx::unowned<T> rhs) {
   return ExpectHandlesArePaired(lhs->get(), rhs->get());
 }
 
-TEST(SimpleDisplay, ImportBufferCollection) {
+TEST_F(SimpleDisplayTest, ImportBufferCollection) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FakeSysmem fake_sysmem(loop.dispatcher(), /*framebuffer_vmo=*/{}, 0);
   FakeMmio fake_mmio;
@@ -332,7 +346,15 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   loop.Shutdown();
 }
 
-TEST(SimpleDisplay, ImportKernelFramebufferImage) {
+TEST_F(SimpleDisplayTest, ImportKernelFramebufferImage) {
+  // TODO(https://fxbug.dev/348954412): Create a logger that connects to the
+  // component LogSink service.
+  fdf::Logger logger("test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                     fidl::WireClient<fuchsia_logger::LogSink>{});
+  fdf::Logger::SetGlobalInstance(&logger);
+  fit::deferred_action unset_global_instance =
+      fit::defer([&] { fdf::Logger::SetGlobalInstance(nullptr); });
+
   constexpr int32_t kWidthPx = 800;
   constexpr int32_t kHeightPx = 600;
   constexpr int32_t kStridePx = 800;

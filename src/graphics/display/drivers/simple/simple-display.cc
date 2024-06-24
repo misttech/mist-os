@@ -8,8 +8,8 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/async-loop/default.h>
-#include <lib/ddk/debug.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/compat/cpp/logging.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zbi-format/graphics.h>

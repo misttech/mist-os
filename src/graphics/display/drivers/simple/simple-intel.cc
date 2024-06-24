@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/compat/cpp/logging.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/image-format/image_format.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zx/result.h>
@@ -22,9 +21,8 @@ namespace {
 
 class SimpleIntelDisplayDriver final : public SimpleDisplayDriver {
  public:
-  static zx::result<> Create(zx_device_t* parent);
-
-  explicit SimpleIntelDisplayDriver(zx_device_t* parent);
+  explicit SimpleIntelDisplayDriver(fdf::DriverStartArgs start_args,
+                                    fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
   SimpleIntelDisplayDriver(const SimpleIntelDisplayDriver&) = delete;
   SimpleIntelDisplayDriver(SimpleIntelDisplayDriver&&) = delete;
@@ -37,50 +35,35 @@ class SimpleIntelDisplayDriver final : public SimpleDisplayDriver {
   zx::result<> ConfigureHardware() override;
   zx::result<fdf::MmioBuffer> GetFrameBufferMmioBuffer() override;
   zx::result<DisplayProperties> GetDisplayProperties() override;
+
+ private:
+  zx::result<zx::resource> GetFramebufferResource();
 };
 
-zx::result<> SimpleIntelDisplayDriver::Create(zx_device_t* parent) {
-  fbl::AllocChecker alloc_checker;
-  auto simple_intel_display_driver =
-      fbl::make_unique_checked<SimpleIntelDisplayDriver>(&alloc_checker, parent);
-  if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for SimpleIntelDisplayDriver");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  zx::result<> init_result = simple_intel_display_driver->Initialize();
-  if (init_result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize SimpleIntelDisplayDriver: %s", init_result.status_string());
-    return init_result.take_error();
-  }
-
-  // `simple_intel_display_driver` is now managed by the driver manager.
-  [[maybe_unused]] SimpleIntelDisplayDriver* driver_released =
-      simple_intel_display_driver.release();
-
-  return zx::ok();
-}
-
-SimpleIntelDisplayDriver::SimpleIntelDisplayDriver(zx_device_t* parent)
-    : SimpleDisplayDriver(parent, "intel") {}
+SimpleIntelDisplayDriver::SimpleIntelDisplayDriver(
+    fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : SimpleDisplayDriver("intel", std::move(start_args), std::move(driver_dispatcher)) {}
 
 SimpleIntelDisplayDriver::~SimpleIntelDisplayDriver() = default;
 
 zx::result<> SimpleIntelDisplayDriver::ConfigureHardware() { return zx::ok(); }
 
 zx::result<fdf::MmioBuffer> SimpleIntelDisplayDriver::GetFrameBufferMmioBuffer() {
-  ddk::Pci pci(parent(), "pci");
-  if (!pci.is_valid()) {
-    zxlogf(ERROR, "Failed to get PCI protocol");
-    return zx::error(ZX_ERR_INTERNAL);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
+      incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
+  if (pci_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to PCI protocol: %s", pci_result.status_string());
+    return pci_result.take_error();
   }
+  ddk::Pci pci(std::move(pci_result).value());
+  ZX_DEBUG_ASSERT(pci.is_valid());
 
   std::optional<fdf::MmioBuffer> framebuffer_mmio;
   static constexpr uint32_t kIntelFramebufferPciBarIndex = 2;
   zx_status_t status =
       pci.MapMmio(kIntelFramebufferPciBarIndex, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map pci bar %" PRIu32 ": %s", kIntelFramebufferPciBarIndex,
+    zxlogf(ERROR, "Failed to map PCI bar %" PRIu32 ": %s", kIntelFramebufferPciBarIndex,
            zx_status_get_string(status));
     return zx::error(status);
   }
@@ -89,11 +72,36 @@ zx::result<fdf::MmioBuffer> SimpleIntelDisplayDriver::GetFrameBufferMmioBuffer()
   return zx::ok(std::move(framebuffer_mmio).value());
 }
 
+zx::result<zx::resource> SimpleIntelDisplayDriver::GetFramebufferResource() {
+  zx::result framebuffer_resource_result =
+      incoming()->Connect<fuchsia_kernel::FramebufferResource>();
+  if (framebuffer_resource_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to framebuffer resource: %s",
+           framebuffer_resource_result.status_string());
+    return framebuffer_resource_result.take_error();
+  }
+  fidl::WireSyncClient<fuchsia_kernel::FramebufferResource> framebuffer_resource =
+      fidl::WireSyncClient(std::move(framebuffer_resource_result).value());
+  fidl::WireResult<fuchsia_kernel::FramebufferResource::Get> get_result =
+      framebuffer_resource->Get();
+  if (!get_result.ok()) {
+    zxlogf(ERROR, "Failed to get framebuffer resource: %s", get_result.status_string());
+    return zx::error(get_result.status());
+  }
+  return zx::ok(std::move(std::move(get_result).value()).resource);
+}
+
 zx::result<DisplayProperties> SimpleIntelDisplayDriver::GetDisplayProperties() {
+  zx::result<zx::resource> framebuffer_resource_result = GetFramebufferResource();
+  if (framebuffer_resource_result.is_error()) {
+    return framebuffer_resource_result.take_error();
+  }
+  zx::resource framebuffer_resource = std::move(framebuffer_resource_result).value();
+
   zbi_pixel_format_t format;
   uint32_t width, height, stride;
-  zx_status_t status = zx_framebuffer_get_info(get_framebuffer_resource(parent()), &format, &width,
-                                               &height, &stride);
+  zx_status_t status =
+      zx_framebuffer_get_info(framebuffer_resource.get(), &format, &width, &height, &stride);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to get bootloader dimensions: %s", zx_status_get_string(status));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -120,16 +128,8 @@ zx::result<DisplayProperties> SimpleIntelDisplayDriver::GetDisplayProperties() {
   return zx::ok(properties);
 }
 
-constexpr zx_driver_ops_t kIntelDisplayDriverOps = {
-    .version = DRIVER_OPS_VERSION,
-    .bind =
-        [](void* ctx, zx_device_t* parent) {
-          return SimpleIntelDisplayDriver::Create(parent).status_value();
-        },
-};
-
 }  // namespace
 
 }  // namespace simple_display
 
-ZIRCON_DRIVER(intel_disp, simple_display::kIntelDisplayDriverOps, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(simple_display::SimpleIntelDisplayDriver);

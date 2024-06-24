@@ -5,25 +5,23 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_DRIVER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_DRIVER_H_
 
-#include <lib/ddk/driver.h>
+#include <lib/driver/compat/cpp/banjo_server.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <memory>
-
-#include <ddktl/device.h>
-#include <fbl/mutex.h>
+#include <optional>
 
 #include "src/graphics/display/drivers/simple/simple-display.h"
 
 namespace simple_display {
 
-class SimpleDisplayDriver;
-using DeviceType = ddk::Device<SimpleDisplayDriver, ddk::GetProtocolable>;
-
 // Integration between display drivers and the Driver Framework (v1).
-class SimpleDisplayDriver : public DeviceType {
+class SimpleDisplayDriver : public fdf::DriverBase {
  public:
-  explicit SimpleDisplayDriver(zx_device_t* parent, std::string device_name);
+  explicit SimpleDisplayDriver(std::string_view device_name, fdf::DriverStartArgs start_args,
+                               fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
   SimpleDisplayDriver(const SimpleDisplayDriver&) = delete;
   SimpleDisplayDriver(SimpleDisplayDriver&&) = delete;
@@ -32,11 +30,9 @@ class SimpleDisplayDriver : public DeviceType {
 
   virtual ~SimpleDisplayDriver();
 
-  // ddk::Device:
-  void DdkRelease();
-
-  // ddk::GetProtocolable:
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_proto);
+  // fdf::DriverBase:
+  zx::result<> Start() override;
+  void Stop() override;
 
   // Called exactly once before the driver acquires any resource.
   virtual zx::result<> ConfigureHardware() = 0;
@@ -45,15 +41,17 @@ class SimpleDisplayDriver : public DeviceType {
 
   virtual zx::result<DisplayProperties> GetDisplayProperties() = 0;
 
-  // Initialize hardware resources and binds the driver to the device node.
-  zx::result<> Initialize();
-
  private:
   zx::result<std::unique_ptr<SimpleDisplay>> CreateAndInitializeSimpleDisplay();
 
-  std::string device_name_;
+  // Must be called after `simple_display_` is initialized.
+  zx::result<> InitializeBanjoServerNode();
 
   std::unique_ptr<SimpleDisplay> simple_display_;
+
+  std::optional<compat::BanjoServer> banjo_server_;
+  compat::SyncInitializedDeviceServer compat_server_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 };
 
 }  // namespace simple_display

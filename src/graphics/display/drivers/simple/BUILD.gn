@@ -21,15 +21,19 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/compat/cpp:logging",
+    "//sdk/lib/driver/component/cpp",
     "//sdk/lib/zbi-format",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
-    "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
     "//src/graphics/display/lib/api-types-cpp",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -47,7 +51,6 @@ test("simple-display-test-bin") {
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
     "//src/devices/testing/fake-mmio-reg",
-    "//src/devices/testing/no_ddk",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
@@ -72,12 +75,12 @@ fuchsia_unittest_package("simple-display-test") {
 #
 # Parameters
 #
-#   is_fallback (optional)
-#     Whether or not the driver is a fallback driver
-#     Type: boolean
-#     Default: false
+#   deps (optional)
+#     Additional dependencies of the driver library.
+#     Type: list of GN labels
+#     Default: []
+#
 template("simple_fuchsia_driver") {
-  not_needed(invoker, "*")
   driver_name = target_name
   driver_bind_rules("simple-${driver_name}-bind") {
     rules = "simple-${driver_name}.bind"
@@ -92,19 +95,23 @@ template("simple_fuchsia_driver") {
   }
 
   fuchsia_driver("simple.${driver_name}-driver") {
+    forward_variables_from(invoker, [ "deps" ])
+    if (!defined(deps)) {
+      deps = []
+    }
+
     output_name = "simple.${driver_name}"
     configs += [
       "//build/config:all_source",
       "//build/config/fuchsia:enable_zircon_asserts",
     ]
     sources = [ "simple-${driver_name}.cc" ]
-    deps = [
+
+    deps += [
       ":shared",
       ":simple-${driver_name}-bind",
-      "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
       "//src/devices/pci/lib/device-protocol-pci",
       "//src/devices/pci/lib/pci",
-      "//src/lib/ddk",
     ]
   }
 
@@ -123,7 +130,9 @@ template("simple_fuchsia_driver") {
 
 simple_fuchsia_driver("bochs") {
 }
+
 simple_fuchsia_driver("intel") {
+  deps = [ "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp" ]
 }
 
 group("tests") {
