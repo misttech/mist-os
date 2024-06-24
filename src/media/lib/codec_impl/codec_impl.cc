@@ -1582,9 +1582,17 @@ void CodecImpl::EnsureUnbindCompleted() {
     ZX_DEBUG_ASSERT(!port_settings_[kInputPort]);
     ZX_DEBUG_ASSERT(!port_settings_[kOutputPort]);
 
-    // Unbind the sysmem_ fuchsia::sysmem2::Allocator connection - this also
-    // ensures that any in-flight requests' completions will not run.
-    (void)sysmem_.UnbindMaybeGetEndpoint();
+    // Unbind the sysmem_ fuchsia::sysmem2::Allocator connection - this also ensures that any
+    // in-flight requests' completions will not run.
+    //
+    // We check sysmem_.is_valid() here because the current fidl_thread work item can be be running
+    // ~CodecImpl (or fidl_thread part of UnbindLocked) before the remainder of BindAsync that would
+    // make sysmem_ valid. In that case, the current work item will finish running, but remaining
+    // work items on shared_fidl_queue_ won't run because of the shared_fidl_queue_.StopAndClear()
+    // below. So in that case, sysmem_ will remain ~is_valid() until destruction.
+    if (sysmem_.is_valid()) {
+      (void)sysmem_.UnbindMaybeGetEndpoint();
+    }
   }  // ~lock
 
   // Any previously-posted tasks via shared_fidl_queue_ are deleted here without running.

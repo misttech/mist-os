@@ -135,10 +135,13 @@ TEST_F(CodecImplLifetime, CreateDelete) {
 }
 
 TEST_F(CodecImplLifetime, CreateBindDelete) {
-  Create();
-  codec_impl_ = nullptr;
-  RunLoopUntilIdle();
-  EXPECT_FALSE(error_handler_ran_);
+  // This exercises BindAsync vs. ~CodecImpl, so run several times.
+  for (uint32_t i = 0; i < 200; ++i) {
+    Create();
+    codec_impl_ = nullptr;
+    RunLoopUntilIdle();
+    EXPECT_FALSE(error_handler_ran_);
+  }
 }
 
 TEST_F(CodecImplLifetime, CreateBindChannelClose) {
@@ -196,15 +199,21 @@ TEST_F(CodecImplLifetime, CreateBindChannelCloseDeleteAsyncWithOngoingSyncs) {
 }
 
 TEST_F(CodecImplLifetime, CreateBindDeleteEncoder) {
-  Create(true, false, CreateEncoderParams());
-  codec_impl_ = nullptr;
-  RunLoopUntilIdle();
-  EXPECT_FALSE(error_handler_ran_);
+  // This exercises BindAsync vs. ~CodecImpl, so run several times.
+  for (uint32_t i = 0; i < 200; ++i) {
+    Create(true, false, CreateEncoderParams());
+    codec_impl_ = nullptr;
+    RunLoopUntilIdle();
+    EXPECT_FALSE(error_handler_ran_);
+  }
 }
 
 TEST_F(CodecImplLifetime, CreateBindDeleteDecryptor) {
-  Create(true, false, CreateDecryptorParams());
-  codec_impl_ = nullptr;
-  RunLoopUntilIdle();
-  EXPECT_FALSE(error_handler_ran_);
+  // This exercises BindAsync vs. ~CodecImpl, so run several times.
+  for (uint32_t i = 0; i < 200; ++i) {
+    Create(true, false, CreateDecryptorParams());
+    codec_impl_ = nullptr;
+    RunLoopUntilIdle();
+    EXPECT_FALSE(error_handler_ran_);
+  }
 }
