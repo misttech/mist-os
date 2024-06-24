@@ -4809,11 +4809,14 @@ where
         })
     }
 
-    /// Updates the socket's sharing state to `new_sharing`.
+    /// Updates the socket's sharing state to the result of `f`.
+    ///
+    /// `f` is given mutable access to the sharing state and is called under the
+    /// socket lock, allowing for atomic updates to the sharing state.
     pub fn update_sharing(
         &mut self,
         id: &DatagramApiSocketId<I, C, S>,
-        new_sharing: S::SharingState,
+        f: impl FnOnce(&mut S::SharingState),
     ) -> Result<(), ExpectedUnboundError> {
         self.core_ctx().with_socket_state_mut(id, |_core_ctx, state| {
             let state = match state {
@@ -4821,8 +4824,7 @@ where
                 SocketState::Unbound(state) => state,
             };
 
-            let UnboundSocketState { device: _, sharing, ip_options: _ } = state;
-            *sharing = new_sharing;
+            f(&mut state.sharing);
             Ok(())
         })
     }

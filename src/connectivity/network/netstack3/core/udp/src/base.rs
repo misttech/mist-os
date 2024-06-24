@@ -1857,11 +1857,9 @@ where
         id: &UdpApiSocketId<I, C>,
         reuse_addr: bool,
     ) -> Result<(), ExpectedUnboundError> {
-        // TODO(https://fxbug.dev/345740748): This is racy, change to do
-        // everything under lock.
-        let mut sharing = self.datagram().get_sharing(id);
-        sharing.reuse_addr = reuse_addr;
-        self.datagram().update_sharing(id, sharing)
+        self.datagram().update_sharing(id, |sharing| {
+            sharing.reuse_addr = reuse_addr;
+        })
     }
 
     /// Gets the POSIX `SO_REUSEADDR` option for the specified socket.
@@ -1879,11 +1877,9 @@ where
         id: &UdpApiSocketId<I, C>,
         reuse_port: bool,
     ) -> Result<(), ExpectedUnboundError> {
-        // TODO(https://fxbug.dev/345740748): This is racy, change to do
-        // everything under lock.
-        let mut sharing = self.datagram().get_sharing(id);
-        sharing.reuse_port = reuse_port;
-        self.datagram().update_sharing(id, sharing)
+        self.datagram().update_sharing(id, |sharing| {
+            sharing.reuse_port = reuse_port;
+        })
     }
 
     /// Gets the POSIX `SO_REUSEPORT` option for the specified socket.
