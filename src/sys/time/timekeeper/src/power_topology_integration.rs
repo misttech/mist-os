@@ -63,8 +63,6 @@ where
                     initial_current_level: Some(POWER_ON),
                     valid_levels: Some(vec![POWER_ON, POWER_OFF]),
                     dependencies: Some(deps),
-                    assertive_dependency_tokens_to_register: Some(vec![]),
-                    opportunistic_dependency_tokens_to_register: Some(vec![]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_level_channel,
                         required: required_level_channel,
