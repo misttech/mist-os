@@ -11,6 +11,7 @@
 
 #include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
+#include "src/lib/files/path.h"
 
 class NmfsTest : public ::testing::Test {
  public:
@@ -295,4 +296,43 @@ TEST_F(NmfsTest, NmfsNetworkFileWriteSuccessV6Addresses) {
       << "Network file should be readable";
   EXPECT_TRUE(files::WriteFile("/sys/fs/nmfs/5", network_info))
       << "Contents from read should be writeable to the same file";
+}
+
+TEST_F(NmfsTest, NmfsDefaultNetworkFile) {
+  EXPECT_FALSE(files::WriteFile("/sys/fs/nmfs/default", "6"))
+      << "The associated network file must be populated first prior to writing to the default file";
+
+  std::string empty_default;
+  EXPECT_FALSE(files::ReadFileToString("/sys/fs/nmfs/default", &empty_default))
+      << "The default network id file must not be readable";
+
+  // Create the network and set it as the default.
+  EXPECT_TRUE(files::WriteFile("/sys/fs/nmfs/6",
+                               R"({
+    "version": "V1",
+    "netid": 6,
+    "mark": 56,
+    "handle": 78,
+    "dnsv4": [],
+    "dnsv6": []
+  })"))
+      << "All JSON fields must be provided with proper formatting";
+  EXPECT_FALSE(files::WriteFile("/sys/fs/nmfs/default", "9999"))
+      << "The default network id file must not accept a network id that does not exist";
+  EXPECT_FALSE(files::WriteFile("/sys/fs/nmfs/default", "null"))
+      << "The default network id file must not accept a null network id";
+  EXPECT_TRUE(files::WriteFile("/sys/fs/nmfs/default", "6"))
+      << "The default network id file must accept the network id of a populated network";
+
+  std::string populated_default;
+  EXPECT_TRUE(files::ReadFileToString("/sys/fs/nmfs/default", &populated_default))
+      << "The default network id file must be readable";
+  EXPECT_EQ(populated_default, "6") << "The default network id must be the network id that was set";
+
+  EXPECT_FALSE(files::DeletePath("/sys/fs/nmfs/6", /*recursive=*/false))
+      << "The default network id must be unset before the network can be removed";
+  EXPECT_TRUE(files::DeletePath("/sys/fs/nmfs/default", /*recursive=*/false))
+      << "The default network id must be removable";
+  EXPECT_TRUE(files::DeletePath("/sys/fs/nmfs/6", /*recursive=*/false))
+      << "The default network id must be removable now that it is not the default";
 }
