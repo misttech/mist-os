@@ -11,6 +11,7 @@ import re
 import shutil
 import sys
 import tarfile
+from typing import Any
 
 
 class GatherPackageDeps:
@@ -25,7 +26,13 @@ class GatherPackageDeps:
     Raises: ValueError if any parameter is empty.
     """
 
-    def __init__(self, package_json, meta_far, output_tar, depfile):
+    def __init__(
+        self,
+        package_json: str | None,
+        meta_far: str | None,
+        output_tar: str | None,
+        depfile: str | None,
+    ) -> None:
         if package_json and os.path.exists(package_json):
             self.package_json = package_json
         else:
@@ -46,7 +53,9 @@ class GatherPackageDeps:
         else:
             raise ValueError("depfile cannot be empty")
 
-    def parse_package_json(self):
+    def parse_package_json(
+        self,
+    ) -> tuple[list[tuple[str, str]], dict[str, Any]]:
         manifest_paths = []
         with open(self.package_json) as f:
             data = json.load(f)
@@ -59,7 +68,11 @@ class GatherPackageDeps:
                 file["source_path"] = file["path"]
         return manifest_paths, data
 
-    def create_archive(self, manifest_paths, package_json_data):
+    def create_archive(
+        self,
+        manifest_paths: list[tuple[str, str]],
+        package_json_data: dict[str, Any],
+    ) -> None:
         # Explicitly use the GNU_FORMAT because the current dart library
         # (v.3.0.0) does not support parsing other tar formats that allow for
         # filenames longer than 100 characters.
@@ -79,7 +92,7 @@ class GatherPackageDeps:
                 tarinfo.size = len(manifest.getvalue())
                 tar.addfile(tarinfo, fileobj=manifest)
 
-    def run(self):
+    def run(self) -> None:
         manifest_paths, package_json_data = self.parse_package_json()
         self.create_archive(manifest_paths, package_json_data)
         with open(self.depfile, "w") as f:
@@ -94,7 +107,7 @@ class GatherPackageDeps:
             )
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--package_json",
@@ -114,7 +127,7 @@ def main():
     )
     args = parser.parse_args()
 
-    gatherer = GatherPackageDeps(
+    GatherPackageDeps(
         args.package_json, args.meta_far, args.output_tar, args.depfile
     ).run()
 

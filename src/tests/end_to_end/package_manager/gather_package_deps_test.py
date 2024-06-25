@@ -14,15 +14,7 @@ from gather_package_deps import GatherPackageDeps
 
 
 class GatherPackageDepsTests(unittest.TestCase):
-    source_dir = None
-    package_json = None
-    meta_far = None
-
-    output_dir = None
-    output_tar = None
-    depfile = None
-
-    def setUp(self):
+    def setUp(self) -> None:
         self.source_dir = tempfile.TemporaryDirectory()
         self.package_json = os.path.join(self.source_dir.name, "pkg.json")
         self.meta_far = os.path.join(self.source_dir.name, "meta.far")
@@ -35,11 +27,11 @@ class GatherPackageDepsTests(unittest.TestCase):
         open(self.package_json, "a").close()
         open(self.meta_far, "a").close()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.source_dir.cleanup()
         self.output_dir.cleanup()
 
-    def test_init(self):
+    def test_init(self) -> None:
         GatherPackageDeps(
             self.package_json, self.meta_far, self.output_tar, self.depfile
         )
@@ -78,7 +70,7 @@ class GatherPackageDepsTests(unittest.TestCase):
                 self.package_json, self.meta_far, self.output_tar, None
             )
 
-    def test_parse_package_json(self):
+    def test_parse_package_json(self) -> None:
         gatherer = GatherPackageDeps(
             self.package_json, self.meta_far, self.output_tar, self.depfile
         )
@@ -168,11 +160,11 @@ class GatherPackageDepsTests(unittest.TestCase):
             },
         )
 
-    def test_create_archive(self):
+    def test_create_archive(self) -> None:
         gatherer = GatherPackageDeps(
             self.package_json, self.meta_far, self.output_tar, self.depfile
         )
-        gatherer.create_archive({}, {})
+        gatherer.create_archive([], {})
         self.assertTrue(os.path.isfile(self.output_tar))
 
         file_a = os.path.join(self.source_dir.name, "fileA")
@@ -192,7 +184,7 @@ class GatherPackageDepsTests(unittest.TestCase):
             ("path/B", file_b),
             ("path/C", file_c),
         }
-        gatherer.create_archive(manifest_paths, {})
+        gatherer.create_archive(list(manifest_paths), {})
         self.assertTrue(os.path.isfile(self.output_tar))
 
         # Main thing we need to check here is that the paths within the archive
@@ -210,7 +202,7 @@ class GatherPackageDepsTests(unittest.TestCase):
                 observed_size_index[member.name] = member.size
         self.assertDictEqual(observed_size_index, expected_size_index)
 
-    def test_run(self):
+    def test_run(self) -> None:
         backup_cwd = os.getcwd()
         os.chdir(self.source_dir.name)
 
@@ -257,10 +249,12 @@ class GatherPackageDepsTests(unittest.TestCase):
             for member in tar.getmembers():
                 observed_files.add(member.name)
                 if member.name == "package_manifest.json":
-                    self.assertEqual(
-                        tar.extractfile(member).read(),
-                        expected_manifest.encode(),
-                    )
+                    package_data = tar.extractfile(member)
+                    if package_data is not None:
+                        self.assertEqual(
+                            package_data.read(),
+                            expected_manifest.encode(),
+                        )
         self.assertEqual(observed_files, expected_files)
 
         with open(self.depfile, "r") as f:
