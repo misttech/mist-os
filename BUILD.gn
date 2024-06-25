@@ -354,7 +354,7 @@ build_api_module("args") {
 build_api_module("bazel_sdk_info") {
   testonly = true
   data_keys = [ "bazel_sdk_info" ]
-  deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
+  deps = [ "//sdk:final_fuchsia_sdk" ]
 }
 
 # Describes the location of Bazel build events log files
