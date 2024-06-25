@@ -7,7 +7,6 @@
 #include "kernel/idle_power_thread.h"
 
 #include <assert.h>
-#include <lib/affine/ratio.h>
 #include <lib/fit/defer.h>
 #include <lib/ktrace.h>
 #include <platform.h>
@@ -58,18 +57,6 @@ void IdlePowerThread::FlushAndHalt() {
   state_.store({State::Offline, State::Offline}, ktl::memory_order_release);
 
   arch_flush_state_and_halt(&complete_);
-}
-
-void IdlePowerThread::WakeEvent::DumpPending(FILE* f) {
-  Guard<SpinLock, IrqSave> guard(WakeEventListLock::Get());
-  for (const IdlePowerThread::WakeEvent& w : list_) {
-    const zx_koid_t koid = w.owner_koid_;
-    const zx_ticks_t ticks = w.last_trigger_ticks_.load(ktl::memory_order_relaxed);
-    if (ticks != ZX_TIME_INFINITE_PAST) {
-      const zx_time_t time = timer_get_ticks_to_time_ratio().Scale(ticks);
-      fprintf(f, "koid %" PRIu64 ", time %" PRIi64 "\n", koid, time);
-    }
-  }
 }
 
 int IdlePowerThread::Run(void* arg) {
@@ -217,12 +204,6 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
       const uint64_t pending_wake_events = expected & SystemSuspendStateWakeEventPendingMask;
       dprintf(INFO, "Aborting suspend due to %" PRIu64 " pending wake events\n",
               pending_wake_events);
-
-      // TODO(https://fxbug.dev/348668110): Revisit this logging.  Still needed?
-      printf("begin dump of pending wake events\n");
-      WakeEvent::DumpPending(stdout);
-      printf("end dump of pending wake events\n");
-
       return ZX_ERR_BAD_STATE;
     }
   }
@@ -405,7 +386,7 @@ IdlePowerThread::WakeResult IdlePowerThread::WakeBootCpu() {
   return WakeResult::Resumed;
 }
 
-IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWakeEvent() {
+IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWakeEvent(zx_koid_t koid) {
   DEBUG_ASSERT(arch_ints_disabled());
   DEBUG_ASSERT(Thread::Current::Get()->preemption_state().PreemptIsEnabled() == false);
 
@@ -416,6 +397,10 @@ IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWakeEvent() {
   DEBUG_ASSERT_MSG(previous_pending_wake_events != SystemSuspendStateWakeEventPendingMask,
                    "Pending wake event count overflow!");
 
+  // TODO(https://fxbug.dev/348668110): Revisit this logging.  Still needed?
+  dprintf(INFO, "triggered system wake event, koid %" PRIu64 " suspend state %" PRIx64 "\n", koid,
+          previous + 1);
+
   // Wake the boot CPU if the system is suspended and this is the first pending wake event.
   if (suspended && previous_pending_wake_events == 0) {
     return WakeBootCpu();
@@ -423,10 +408,14 @@ IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWakeEvent() {
   return suspended ? WakeResult::Resumed : WakeResult::Active;
 }
 
-void IdlePowerThread::AcknowledgeSystemWakeEvent() {
+void IdlePowerThread::AcknowledgeSystemWakeEvent(zx_koid_t koid) {
   const uint64_t previous = system_suspend_state_.fetch_add(-1, ktl::memory_order_relaxed);
   const uint64_t previous_pending_wake_events = previous & SystemSuspendStateWakeEventPendingMask;
   DEBUG_ASSERT_MSG(previous_pending_wake_events != 0, "Pending wake event count underflow!");
+
+  // TODO(https://fxbug.dev/348668110): Revisit this logging.  Still needed?
+  dprintf(INFO, "acknowledged system wake event, koid %" PRIu64 " suspend state %" PRIx64 "\n",
+          koid, previous - 1);
 }
 
 #include <lib/console.h>
