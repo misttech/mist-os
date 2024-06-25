@@ -849,7 +849,7 @@ struct NewWatcher {
 }
 
 #[derive(thiserror::Error, Debug)]
-#[error("Connection to interfaces worker closed")]
+#[error("connection to interfaces worker closed")]
 pub(crate) struct WorkerClosedError {}
 
 #[derive(Clone)]

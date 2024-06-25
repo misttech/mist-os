@@ -177,7 +177,7 @@ pub enum IpSockSendError {
     #[error("a maximum transmission unit (MTU) was exceeded")]
     Mtu,
     /// The socket is currently unroutable.
-    #[error("the socket is currently unroutable: {}", _0)]
+    #[error("the socket is currently unroutable: {0}")]
     Unroutable(#[from] ResolveRouteError),
     /// The socket operation would've resulted in illegal loopback addresses on
     /// a non-loopback device.
@@ -222,10 +222,10 @@ impl IpSockSendError {
 #[derive(Error, Copy, Clone, Debug)]
 pub enum IpSockCreateAndSendError {
     /// Cannot send via temporary socket.
-    #[error("cannot send via temporary socket: {}", _0)]
+    #[error("cannot send via temporary socket: {0}")]
     Send(#[from] IpSockSendError),
     /// The temporary socket could not be created.
-    #[error("the temporary socket could not be created: {}", _0)]
+    #[error("the temporary socket could not be created: {0}")]
     Create(#[from] IpSockCreationError),
 }
 
@@ -263,11 +263,11 @@ impl Mms {
 pub enum MmsError {
     /// Cannot find the device that is used for the ip socket, possibly because
     /// there is no route.
-    #[error("cannot find the device: {}", _0)]
+    #[error("cannot find the device: {0}")]
     NoDevice(#[from] ResolveRouteError),
     /// The MTU provided by the device is too small such that there is no room
     /// for a transport message at all.
-    #[error("invalid MTU: {:?}", _0)]
+    #[error("invalid MTU: {0:?}")]
     MTUTooSmall(Mtu),
 }
 
@@ -289,7 +289,7 @@ pub trait DeviceIpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 #[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum IpSockCreationError {
     /// An error occurred while looking up a route.
-    #[error("a route cannot be determined: {}", _0)]
+    #[error("a route cannot be determined: {0}")]
     Route(#[from] ResolveRouteError),
 }
 

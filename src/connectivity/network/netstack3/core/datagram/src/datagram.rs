@@ -2473,7 +2473,7 @@ fn listen_inner<
 #[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ConnectError {
     /// An error was encountered creating an IP socket.
-    #[error("{}", _0)]
+    #[error(transparent)]
     Ip(#[from] IpSockCreationError),
     /// No local port was specified, and none could be automatically allocated.
     #[error("a local port could not be allocated")]
@@ -2483,7 +2483,7 @@ pub enum ConnectError {
     #[error("the socket's IP address and port conflict with an existing socket")]
     SockAddrConflict,
     /// There was a problem with the provided address relating to its zone.
-    #[error("{}", _0)]
+    #[error(transparent)]
     Zone(#[from] ZonedAddressError),
     /// The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
     /// socket is not dual-stack enabled.

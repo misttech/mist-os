@@ -1646,14 +1646,14 @@ pub enum SendToError {
     NotWriteable,
     /// An error was encountered while trying to create a temporary IP socket
     /// to use for the send operation.
-    #[error("could not create a temporary connection socket: {}", _0)]
+    #[error("could not create a temporary connection socket: {0}")]
     CreateSock(IpSockCreationError),
     /// An error was encountered while trying to send via the temporary IP
     /// socket.
-    #[error("could not send via temporary socket: {}", _0)]
+    #[error("could not send via temporary socket: {0}")]
     Send(IpSockSendError),
     /// There was a problem with the remote address relating to its zone.
-    #[error("zone error: {}", _0)]
+    #[error("zone error: {0}")]
     Zone(ZonedAddressError),
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.

@@ -495,7 +495,7 @@ pub enum AddIpAddrSubnetError {
 #[derive(Error, Debug, PartialEq)]
 pub enum SetIpAddressPropertiesError {
     /// The address we tried to set properties on was not found.
-    #[error("{0}")]
+    #[error(transparent)]
     NotFound(#[from] NotFoundError),
 
     /// We tried to set properties on a non-manually-configured address.

@@ -4764,28 +4764,28 @@ pub enum SetReuseAddrError {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ConnectError {
     /// Cannot allocate a local port for the connection.
-    #[error("Unable to allocate a port")]
+    #[error("unable to allocate a port")]
     NoPort,
     /// Cannot find a route to the remote host.
-    #[error("No route to remote host")]
+    #[error("no route to remote host")]
     NoRoute,
     /// There was a problem with the provided address relating to its zone.
-    #[error("{}", _0)]
+    #[error(transparent)]
     Zone(#[from] ZonedAddressError),
     /// There is an existing connection with the same 4-tuple.
-    #[error("There is already a connection at the address requested")]
+    #[error("there is already a connection at the address requested")]
     ConnectionExists,
     /// Doesn't support `connect` for a listener.
-    #[error("Called connect on a listener")]
+    #[error("called connect on a listener")]
     Listener,
     /// The handshake is still going on.
-    #[error("The handshake has already started")]
+    #[error("the handshake has already started")]
     Pending,
     /// Cannot call connect on a connection that is already established.
-    #[error("The handshake is completed")]
+    #[error("the handshake is completed")]
     Completed,
     /// The handshake is refused by the remote host.
-    #[error("The handshake is aborted")]
+    #[error("the handshake is aborted")]
     Aborted,
 }
 
@@ -4794,7 +4794,7 @@ pub enum ConnectError {
 #[generic_over_ip()]
 pub enum BindError {
     /// The socket was already bound.
-    #[error("The socket was already bound")]
+    #[error("the socket was already bound")]
     AlreadyBound,
     /// The socket cannot bind to the local address.
     #[error(transparent)]
