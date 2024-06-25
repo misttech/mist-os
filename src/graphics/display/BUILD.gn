@@ -8,7 +8,6 @@ group("drivers") {
   testonly = true
   deps = [
     "drivers/aml-canvas",
-    "drivers/amlogic-display:amlogic-display-dfv1",
     "drivers/amlogic-display:amlogic-display-dfv2",
     "drivers/coordinator",
     "drivers/goldfish-display",
