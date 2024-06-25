@@ -5656,7 +5656,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:331
+From //build/assembly/developer_overrides.gni:336
 
 ### product_bootfs_packages
 
