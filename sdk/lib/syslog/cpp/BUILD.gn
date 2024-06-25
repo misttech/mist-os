@@ -30,9 +30,7 @@ sdk_source_set("cpp") {
 
   sources = [
     "log_level.h",
-    "log_settings.cc",
     "log_settings.h",
-    "logging_backend.h",
     "macros.cc",
     "macros.h",
   ]

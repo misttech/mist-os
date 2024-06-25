@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/syslog/cpp/log_settings.h>
-#include <lib/syslog/cpp/logging_backend.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdarg.h>
 #include <stdio.h>

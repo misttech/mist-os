@@ -11,7 +11,6 @@
 
 #include "lib/syslog/cpp/log_level.h"
 #include "lib/syslog/cpp/log_settings.h"
-#include "lib/syslog/cpp/logging_backend.h"
 
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;

@@ -14,7 +14,7 @@
 #include <lib/stdcompat/variant.h>
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/log_level.h>
-#include <lib/syslog/cpp/logging_backend.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/logging_backend_fuchsia_globals.h>
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #include <lib/zx/channel.h>

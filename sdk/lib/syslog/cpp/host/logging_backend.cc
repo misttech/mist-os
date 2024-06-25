@@ -6,7 +6,8 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <lib/syslog/cpp/log_level.h>
-#include <lib/syslog/cpp/logging_backend.h>
+#include <lib/syslog/cpp/log_settings.h>
+#include <lib/syslog/cpp/macros.h>
 #include <unistd.h>
 
 #include <iostream>
