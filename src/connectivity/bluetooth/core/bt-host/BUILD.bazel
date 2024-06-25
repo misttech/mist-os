@@ -374,12 +374,28 @@ fuchsia_cc_test(
 )
 
 fuchsia_unittest_package(
-    name = "test_pkg",
-    package_name = "host_tests",
+    name = "bazel_test_pkg",
+    package_name = "bt_host_tests",
     testonly = True,
     fuchsia_api_level = "HEAD",
     unit_tests = [
-        ":host_test",
+        "//src/connectivity/bluetooth/core/bt-host:host_test",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap:l2cap_test",
+        "//src/connectivity/bluetooth/core/bt-host/att:att_test",
+        "//src/connectivity/bluetooth/core/bt-host/common:common_test",
+        "//src/connectivity/bluetooth/core/bt-host/controllers:controllers_test",
+        "//src/connectivity/bluetooth/core/bt-host/fidl:fidl_test",
+        "//src/connectivity/bluetooth/core/bt-host/gap:gap_test",
+        "//src/connectivity/bluetooth/core/bt-host/gatt:gatt_test",
+        "//src/connectivity/bluetooth/core/bt-host/hci:hci_test",
+        "//src/connectivity/bluetooth/core/bt-host/hci-spec:hci_spec_test",
+        "//src/connectivity/bluetooth/core/bt-host/iso:iso_test",
+        "//src/connectivity/bluetooth/core/bt-host/sco:sco_test",
+        "//src/connectivity/bluetooth/core/bt-host/sdp:sdp_test",
+        "//src/connectivity/bluetooth/core/bt-host/sm:sm_test",
+        "//src/connectivity/bluetooth/core/bt-host/socket:socket_test",
+        "//src/connectivity/bluetooth/core/bt-host/testing:testing_test",
+        "//src/connectivity/bluetooth/core/bt-host/transport:transport_test",
     ],
     visibility = ["//visibility:public"],
 )

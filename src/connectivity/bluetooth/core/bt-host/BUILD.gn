@@ -174,11 +174,6 @@ fuchsia_fuzzer_package("fuzzers") {
   ]
 }
 
-bazel_fuchsia_test_package("test_pkg") {
-  test_package_name = "host_tests"
-  test_component_names = [ "host_test_autogen_cml" ]
-}
-
 bt_gtest_package("bt-host-transport-tests") {
   with_death_tests = true
   deps = [ "transport:tests.lib" ]
@@ -261,33 +256,33 @@ group("gn_tests") {
   ]
 }
 
-group("bazel_tests") {
-  testonly = true
-  deps = [
-    ":test_pkg",
-    "att:test_pkg",
-    "common:test_pkg",
-    "controllers:test_pkg",
-    "fidl:test_pkg",
-    "gap:test_pkg",
-    "gatt:test_pkg",
-    "hci:test_pkg",
-    "hci-spec:test_pkg",
-    "iso:test_pkg",
-    "l2cap:test_pkg",
-    "sco:test_pkg",
-    "sdp:test_pkg",
-    "sm:test_pkg",
-    "socket:test_pkg",
-    "testing:test_pkg",
-    "transport:test_pkg",
+bazel_fuchsia_test_package("bazel_test_pkg") {
+  test_package_name = "bt_host_tests"
+  test_component_names = [
+    "host_test_autogen_cml",
+    "l2cap_test_autogen_cml",
+    "att_test_autogen_cml",
+    "common_test_autogen_cml",
+    "controllers_test_autogen_cml",
+    "fidl_test_autogen_cml",
+    "gap_test_autogen_cml",
+    "gatt_test_autogen_cml",
+    "hci_test_autogen_cml",
+    "hci_spec_test_autogen_cml",
+    "iso_test_autogen_cml",
+    "sco_test_autogen_cml",
+    "sdp_test_autogen_cml",
+    "sm_test_autogen_cml",
+    "socket_test_autogen_cml",
+    "testing_test_autogen_cml",
+    "transport_test_autogen_cml",
   ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":bazel_tests",
+    ":bazel_test_pkg",
     ":gn_tests",
   ]
 }
