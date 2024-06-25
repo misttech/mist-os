@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import os
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -12,17 +13,17 @@ import gen_helpdocs
 
 
 class GenReferenceDocsTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         # Create a temporary directory
         self.temp_dir = tempfile.mkdtemp()
 
-    def test_run_helpdocs(self):
+    def test_run_helpdocs(self) -> None:
         out_path = os.path.join(self.temp_dir, "gen", "test.tar.gz")
         src_dir = os.path.join(self.temp_dir, "scripts")
         depfile = os.path.join(self.temp_dir, "depfile")
 
         fx_bin = os.path.join(src_dir, "scripts/fx")
-        with mock.patch.object(gen_helpdocs.subprocess, "run") as mock_run:
+        with mock.patch.object(subprocess, "run") as mock_run:
             gen_helpdocs.run_fx_helpdoc(src_dir, out_path, depfile)
             mock_run.assert_called_once_with(
                 [

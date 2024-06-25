@@ -14,20 +14,25 @@ import os
 import subprocess
 
 
-def run_fx_helpdoc(src_dir, out_path, dep_file, log_to_file=None):
+def run_fx_helpdoc(
+    src_dir: str, out_path: str, dep_file: str, log_to_file: str | None = None
+) -> int:
     fx_bin = os.path.join(src_dir, "scripts/fx")
+    log_file = None
     if log_to_file:
-        log_to_file = open(log_to_file, "w")
+        log_file = open(log_to_file, "w")
     gen_helpdocs = subprocess.run(
         [fx_bin, "helpdoc", "--depfile", dep_file, "--archive", out_path],
-        stdout=log_to_file,
+        stdout=log_file,
     )
     if gen_helpdocs.returncode:
         print(gen_helpdocs.stderr)
         return 1
 
+    return 0
 
-def main():
+
+def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,  # Prepend helpdoc with this file's docstring.
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -55,6 +60,8 @@ def main():
     run_fx_helpdoc(
         args.src_dir, args.out_path, args.depfile.name, args.log_to_file
     )
+
+    return 0
 
 
 if __name__ == "__main__":

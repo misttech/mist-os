@@ -3,6 +3,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import glob
+import os
 import unittest
 from unittest import mock
 
@@ -48,8 +50,8 @@ hahaha
 
 """
 
-    def test_add_markdown_footer_and_header_ref(self):
-        with mock.patch.object(docsgen_transforms.glob, "glob") as mock_glob:
+    def test_add_markdown_footer_and_header_ref(self) -> None:
+        with mock.patch.object(glob, "glob") as mock_glob:
             with mock.patch(
                 "builtins.open", mock.mock_open(read_data=self.SAMPLE_MD)
             ) as mock_open:
@@ -60,8 +62,8 @@ hahaha
                 handle = mock_open()
                 handle.write.assert_called_once_with(self.UPDATED_REF)
 
-    def test_add_markdown_footer_and_header_reg(self):
-        with mock.patch.object(docsgen_transforms.glob, "glob") as mock_glob:
+    def test_add_markdown_footer_and_header_reg(self) -> None:
+        with mock.patch.object(glob, "glob") as mock_glob:
             with mock.patch(
                 "builtins.open", mock.mock_open(read_data=self.SAMPLE_MD)
             ) as mock_open:
@@ -72,8 +74,8 @@ hahaha
                 handle = mock_open()
                 handle.write.assert_called_once_with(self.UPDATED_REG)
 
-    def test_remove_toc(self):
-        with mock.patch.object(docsgen_transforms.glob, "glob") as mock_glob:
+    def test_remove_toc(self) -> None:
+        with mock.patch.object(glob, "glob") as mock_glob:
             with mock.patch(
                 "builtins.open", mock.mock_open(read_data=self.SAMPLE_MD)
             ) as mock_open:
@@ -84,11 +86,9 @@ hahaha
                     "# Diagnostics Selectors\n<!-- commented [TOC] -->\n## Listener {#Listener}\nblah blah blah\n### OnGesture {#Listener.OnGesture}\nhahaha"
                 )
 
-    def test_rename_readme(self):
-        with mock.patch.object(docsgen_transforms.glob, "glob") as mock_glob:
-            with mock.patch.object(
-                docsgen_transforms.os, "rename"
-            ) as mock_rename:
+    def test_rename_readme(self) -> None:
+        with mock.patch.object(glob, "glob") as mock_glob:
+            with mock.patch.object(os, "rename") as mock_rename:
                 mock_glob.return_value = [
                     "path/to/fake/README.md",
                     "README.md",
@@ -99,8 +99,8 @@ hahaha
                 )
                 mock_rename.assert_any_call("README.md", "index.md")
 
-    def test_canonical_header_anchorid(self):
-        with mock.patch.object(docsgen_transforms.glob, "glob") as mock_glob:
+    def test_canonical_header_anchorid(self) -> None:
+        with mock.patch.object(glob, "glob") as mock_glob:
             with mock.patch(
                 "builtins.open", mock.mock_open(read_data=self.SAMPLE_MD)
             ) as mock_open:
@@ -111,8 +111,8 @@ hahaha
                     '# Diagnostics Selectors\n[TOC]\n## Listener {:#Listener transformation="converted"}\nblah blah blah\n### OnGesture {:#Listener.OnGesture transformation="converted"}\nhahaha'
                 )
 
-    def test_transform_toc_files_regular(self):
-        with mock.patch.object(docsgen_transforms.glob, "glob") as mock_glob:
+    def test_transform_toc_files_regular(self) -> None:
+        with mock.patch.object(glob, "glob") as mock_glob:
             with mock.patch(
                 "builtins.open", mock.mock_open(read_data=self.SAMPLE_TOC)
             ) as mock_open:
@@ -129,8 +129,8 @@ hahaha
                     ]
                 )
 
-    def test_transform_toc_files_reference(self):
-        with mock.patch.object(docsgen_transforms.glob, "glob") as mock_glob:
+    def test_transform_toc_files_reference(self) -> None:
+        with mock.patch.object(glob, "glob") as mock_glob:
             with mock.patch(
                 "builtins.open", mock.mock_open(read_data=self.SAMPLE_TOC)
             ) as mock_open:

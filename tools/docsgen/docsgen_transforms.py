@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 """Transform references docs and regular docs for fuchsia.dev.
 
-This script implements a number of different transforms to 
-prepare reference docs and regular docs for doc_checker, 
+This script implements a number of different transforms to
+prepare reference docs and regular docs for doc_checker,
 mdlint and ultimately fuchsia.dev.
 """
 
@@ -67,7 +67,7 @@ FILES_AT_ROOT = [
 ]
 
 
-def _add_markdown_header_and_footer(is_regular_docs):
+def _add_markdown_header_and_footer(is_regular_docs: bool) -> None:
     if is_regular_docs:
         root_url = ORIGIN_USER_FRIENDLY_URI
         edit_root_url = ORIGIN_EDIT_SOURCE_URI
@@ -105,7 +105,7 @@ def _add_markdown_header_and_footer(is_regular_docs):
             )
 
 
-def _remove_toc():
+def _remove_toc() -> None:
     for f in glob.glob("**.md"):
         matching_file = open(f, "r")
         file_contents = matching_file.read()
@@ -119,7 +119,7 @@ def _remove_toc():
 
 
 # Rename README.md to index.md
-def _rename_readme():
+def _rename_readme() -> None:
     glob_patterns = ["README.md", "**/README.md"]
     new_filename = "index.md"
     files_grabbed = []
@@ -130,7 +130,7 @@ def _rename_readme():
         os.rename(file_path, new_path)
 
 
-def _canonical_header_anchorid():
+def _canonical_header_anchorid() -> None:
     for f in glob.glob("**.md"):
         matching_file = open(f, "r")
         file_contents = matching_file.read()
@@ -146,7 +146,7 @@ def _canonical_header_anchorid():
                 updated_file.write(mod_file_contents)
 
 
-def _transform_toc_files(is_regular_docs):
+def _transform_toc_files(is_regular_docs: bool) -> None:
     for f in glob.glob("**/_toc.yaml"):
         matching_file = open(f, "r")
         file_lines = matching_file.readlines()
@@ -184,11 +184,11 @@ def _transform_toc_files(is_regular_docs):
 
 
 # TODO(https://fxbug.dev/42173239) To refactor and streamline
-def referencedocs_transforms():
+def referencedocs_transforms() -> None:
     _add_markdown_header_and_footer(False)
     _remove_toc()
     _canonical_header_anchorid()
     _rename_readme()
-    os.rename("tools", os.join(REFERENCEDOCS_OUT, "tools"))
-    os.rename("sdk", os.join(REFERENCEDOCS_OUT, "tools"))
+    os.rename("tools", os.path.join(REFERENCEDOCS_OUT, "tools"))
+    os.rename("sdk", os.path.join(REFERENCEDOCS_OUT, "tools"))
     _transform_toc_files(False)
