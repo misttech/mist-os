@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/amlogic-display/display-device-driver-dfv2.h"
+#include "src/graphics/display/drivers/amlogic-display/display-device-driver.h"
 
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
@@ -40,14 +40,14 @@
 
 namespace amlogic_display {
 
-DisplayDeviceDriverDfv2::DisplayDeviceDriverDfv2(
-    fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+DisplayDeviceDriver::DisplayDeviceDriver(fdf::DriverStartArgs start_args,
+                                         fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : fdf::DriverBase("amlogic-display", std::move(start_args), std::move(driver_dispatcher)) {}
 
-void DisplayDeviceDriverDfv2::Stop() {}
+void DisplayDeviceDriver::Stop() {}
 
 zx::result<std::unique_ptr<inspect::ComponentInspector>>
-DisplayDeviceDriverDfv2::CreateComponentInspector(inspect::Inspector inspector) {
+DisplayDeviceDriver::CreateComponentInspector(inspect::Inspector inspector) {
   zx::result<fidl::ClientEnd<fuchsia_inspect::InspectSink>> inspect_sink_connect_result =
       incoming()->Connect<fuchsia_inspect::InspectSink>();
   if (inspect_sink_connect_result.is_error()) {
@@ -68,8 +68,8 @@ DisplayDeviceDriverDfv2::CreateComponentInspector(inspect::Inspector inspector) 
   return zx::ok(std::move(component_inspector));
 }
 
-zx::result<DisplayDeviceDriverDfv2::DriverFrameworkMigrationUtils>
-DisplayDeviceDriverDfv2::CreateDriverFrameworkMigrationUtils() {
+zx::result<DisplayDeviceDriver::DriverFrameworkMigrationUtils>
+DisplayDeviceDriver::CreateDriverFrameworkMigrationUtils() {
   zx::result<std::unique_ptr<display::Namespace>> create_namespace_result =
       display::NamespaceDfv2::Create(incoming().get());
   if (create_namespace_result.is_error()) {
@@ -107,8 +107,8 @@ DisplayDeviceDriverDfv2::CreateDriverFrameworkMigrationUtils() {
   });
 }
 
-zx::result<> DisplayDeviceDriverDfv2::Start() {
-  zx::result<DisplayDeviceDriverDfv2::DriverFrameworkMigrationUtils>
+zx::result<> DisplayDeviceDriver::Start() {
+  zx::result<DisplayDeviceDriver::DriverFrameworkMigrationUtils>
       create_driver_framework_migration_utils_result = CreateDriverFrameworkMigrationUtils();
   if (create_driver_framework_migration_utils_result.is_error()) {
     FDF_LOG(ERROR, "Failed to create driver framework migration utilities: %s",
@@ -170,4 +170,4 @@ zx::result<> DisplayDeviceDriverDfv2::Start() {
 
 }  // namespace amlogic_display
 
-FUCHSIA_DRIVER_EXPORT(amlogic_display::DisplayDeviceDriverDfv2);
+FUCHSIA_DRIVER_EXPORT(amlogic_display::DisplayDeviceDriver);

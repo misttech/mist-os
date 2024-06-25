@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_DFV2_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_DFV2_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <lib/driver/compat/cpp/banjo_server.h>
@@ -26,16 +26,16 @@ namespace amlogic_display {
 // Driver instance that binds to the amlogic-display board device.
 //
 // This class is responsible for interfacing with the Fuchsia Driver Framework.
-class DisplayDeviceDriverDfv2 : public fdf::DriverBase {
+class DisplayDeviceDriver : public fdf::DriverBase {
  public:
-  explicit DisplayDeviceDriverDfv2(fdf::DriverStartArgs start_args,
-                                   fdf::UnownedSynchronizedDispatcher driver_dispatcher);
-  ~DisplayDeviceDriverDfv2() override = default;
+  explicit DisplayDeviceDriver(fdf::DriverStartArgs start_args,
+                               fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+  ~DisplayDeviceDriver() override = default;
 
-  DisplayDeviceDriverDfv2(const DisplayDeviceDriverDfv2&) = delete;
-  DisplayDeviceDriverDfv2(DisplayDeviceDriverDfv2&&) = delete;
-  DisplayDeviceDriverDfv2& operator=(const DisplayDeviceDriverDfv2&) = delete;
-  DisplayDeviceDriverDfv2& operator=(DisplayDeviceDriverDfv2&&) = delete;
+  DisplayDeviceDriver(const DisplayDeviceDriver&) = delete;
+  DisplayDeviceDriver(DisplayDeviceDriver&&) = delete;
+  DisplayDeviceDriver& operator=(const DisplayDeviceDriver&) = delete;
+  DisplayDeviceDriver& operator=(DisplayDeviceDriver&&) = delete;
 
   // fdf::DriverBase:
   zx::result<> Start() override;
@@ -72,4 +72,4 @@ class DisplayDeviceDriverDfv2 : public fdf::DriverBase {
 
 }  // namespace amlogic_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_DFV2_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DISPLAY_DEVICE_DRIVER_H_

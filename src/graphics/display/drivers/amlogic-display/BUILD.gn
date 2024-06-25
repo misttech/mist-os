@@ -131,11 +131,11 @@ source_set("common_srcs") {
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
-fuchsia_driver("amlogic-display-dfv2-driver") {
-  output_name = "amlogic-display-dfv2"
+fuchsia_driver("amlogic-display-driver") {
+  output_name = "amlogic-display"
   sources = [
-    "display-device-driver-dfv2.cc",
-    "display-device-driver-dfv2.h",
+    "display-device-driver.cc",
+    "display-device-driver.h",
   ]
   deps = [
     ":amlogic_display_bind",
@@ -154,16 +154,16 @@ fuchsia_driver("amlogic-display-dfv2-driver") {
   ]
 }
 
-fuchsia_driver_component("amlogic-display-dfv2") {
+fuchsia_driver_component("amlogic-display") {
   component_name = "amlogic-display"
   info = "amlogic-display-info.json"
-  deps = [ ":amlogic-display-dfv2-driver" ]
-  manifest = "meta/amlogic-display-dfv2.cml"
+  deps = [ ":amlogic-display-driver" ]
+  manifest = "meta/amlogic-display.cml"
 }
 
 fuchsia_driver_package("package") {
   package_name = "amlogic-display"
-  driver_components = [ ":amlogic-display-dfv2" ]
+  driver_components = [ ":amlogic-display" ]
 }
 
 test("amlogic-display-test") {
