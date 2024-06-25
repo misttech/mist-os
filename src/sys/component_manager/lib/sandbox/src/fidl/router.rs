@@ -15,7 +15,7 @@ impl From<Request> for fsandbox::RouteRequest {
         request.target.register(token.get_koid().unwrap(), server);
         fsandbox::RouteRequest {
             availability: Some(availability),
-            requesting: Some(fsandbox::ComponentToken { token }),
+            requesting: Some(fsandbox::InstanceToken { token }),
             ..Default::default()
         }
     }
@@ -51,7 +51,7 @@ impl Router {
             let capability =
                 crate::fidl::registry::get(token.token.as_handle_ref().get_koid().unwrap());
             let component = match capability {
-                Some(crate::Capability::Component(c)) => c,
+                Some(crate::Capability::Instance(c)) => c,
                 Some(_) => return Err(fsandbox::RouterError::InvalidArgs),
                 None => return Err(fsandbox::RouterError::InvalidArgs),
             };
@@ -106,20 +106,20 @@ fn from_cm_type(value: cm_types::Availability) -> fsandbox::Availability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Receiver, WeakComponentToken};
+    use crate::{Receiver, WeakInstanceToken};
     use assert_matches::assert_matches;
     use std::sync::Arc;
 
     #[derive(Debug)]
-    struct FakeComponentToken {}
+    struct FakeInstanceToken {}
 
-    impl FakeComponentToken {
-        fn new() -> WeakComponentToken {
-            WeakComponentToken { inner: Arc::new(FakeComponentToken {}) }
+    impl FakeInstanceToken {
+        fn new() -> WeakInstanceToken {
+            WeakInstanceToken { inner: Arc::new(FakeInstanceToken {}) }
         }
     }
 
-    impl crate::WeakComponentTokenAny for FakeComponentToken {
+    impl crate::WeakInstanceTokenAny for FakeInstanceToken {
         fn as_any(&self) -> &dyn std::any::Any {
             self
         }
@@ -127,7 +127,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn serve_router() {
-        let component = FakeComponentToken::new();
+        let component = FakeInstanceToken::new();
         let (component_client, server) = EventPair::create();
         let koid = server.basic_info().unwrap().related_koid;
         component.register(koid, server);
@@ -141,7 +141,7 @@ mod tests {
         let capability = client
             .route(fsandbox::RouteRequest {
                 availability: Some(fsandbox::Availability::Required),
-                requesting: Some(fsandbox::ComponentToken { token: component_client }),
+                requesting: Some(fsandbox::InstanceToken { token: component_client }),
                 ..Default::default()
             })
             .await
@@ -169,7 +169,7 @@ mod tests {
             .unwrap();
         assert_matches!(capability, Err(fsandbox::RouterError::InvalidArgs));
 
-        let component = FakeComponentToken::new();
+        let component = FakeInstanceToken::new();
         let (component_client, server) = EventPair::create();
         let koid = server.basic_info().unwrap().related_koid;
         component.register(koid, server);
@@ -178,7 +178,7 @@ mod tests {
         let capability = client
             .route(fsandbox::RouteRequest {
                 availability: None,
-                requesting: Some(fsandbox::ComponentToken { token: component_client }),
+                requesting: Some(fsandbox::InstanceToken { token: component_client }),
                 ..Default::default()
             })
             .await
@@ -200,7 +200,7 @@ mod tests {
         let capability = client
             .route(fsandbox::RouteRequest {
                 availability: Some(fsandbox::Availability::Required),
-                requesting: Some(fsandbox::ComponentToken { token: component_client }),
+                requesting: Some(fsandbox::InstanceToken { token: component_client }),
                 ..Default::default()
             })
             .await

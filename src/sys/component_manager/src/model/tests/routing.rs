@@ -21,7 +21,7 @@ use {
                 StopAction,
             },
             component::{IncomingCapabilities, StartReason},
-            routing::router_ext::WeakComponentTokenExt,
+            routing::router_ext::WeakInstanceTokenExt,
             routing::{Route, RouteRequest, RouteSource, RoutingError},
             testing::{
                 echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
@@ -65,7 +65,7 @@ use {
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
-    sandbox::{Routable, WeakComponentToken},
+    sandbox::{Routable, WeakInstanceToken},
     std::{
         collections::HashSet,
         pin::pin,
@@ -3420,7 +3420,7 @@ async fn source_component_stopping_when_routing() {
             .unwrap()
             .route(sandbox::Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new_component(root.as_weak()),
+                target: WeakInstanceToken::new_component(root.as_weak()),
                 debug: false,
             })
             .await
@@ -3485,7 +3485,7 @@ async fn source_component_stopped_after_routing_before_open() {
         .unwrap()
         .route(sandbox::Request {
             availability: Availability::Required,
-            target: WeakComponentToken::new_component(root.as_weak()),
+            target: WeakInstanceToken::new_component(root.as_weak()),
             debug: false,
         })
         .await
@@ -3555,7 +3555,7 @@ async fn source_component_shutdown_after_routing_before_open() {
         .unwrap()
         .route(sandbox::Request {
             availability: Availability::Required,
-            target: WeakComponentToken::new_component(root.as_weak()),
+            target: WeakInstanceToken::new_component(root.as_weak()),
             debug: false,
         })
         .await

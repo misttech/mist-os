@@ -5,12 +5,12 @@
 //! Component sandbox traits and capability types.
 
 mod capability;
-mod component;
 mod connector;
 mod data;
 mod dict;
 mod directory;
 mod handle;
+mod instance_token;
 mod receiver;
 mod router;
 mod unit;
@@ -24,12 +24,12 @@ mod dir_entry;
 mod fidl;
 
 pub use self::capability::{Capability, ConversionError, RemoteError};
-pub use self::component::{WeakComponentToken, WeakComponentTokenAny};
 pub use self::connector::{Connectable, Connector, Message};
 pub use self::data::Data;
 pub use self::dict::{Dict, Key as DictKey};
 pub use self::directory::Directory;
 pub use self::handle::OneShotHandle;
+pub use self::instance_token::{WeakInstanceToken, WeakInstanceTokenAny};
 pub use self::receiver::Receiver;
 pub use self::router::{Request, Routable, Router};
 pub use self::unit::Unit;

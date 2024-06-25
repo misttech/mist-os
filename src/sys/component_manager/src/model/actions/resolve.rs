@@ -6,7 +6,7 @@ use crate::model::actions::{Action, ActionKey};
 use crate::model::component::instance::{InstanceState, ResolvedInstanceState};
 use crate::model::component::{Component, ComponentInstance, WeakComponentInstance};
 use crate::model::resolver::Resolver;
-use crate::model::routing::router_ext::WeakComponentTokenExt;
+use crate::model::routing::router_ext::WeakInstanceTokenExt;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::resolving::ComponentAddress;
 use async_trait::async_trait;
@@ -134,7 +134,7 @@ async fn do_resolve(
         state.set(InstanceState::Resolved(resolved_state));
     }
 
-    let weak = sandbox::WeakComponentToken::new_component(WeakComponentInstance::new(component));
+    let weak = sandbox::WeakInstanceToken::new_component(WeakComponentInstance::new(component));
     let event = component
         .new_event(EventPayload::Resolved { component: weak, decl: component_info.decl.clone() });
     component.hooks.dispatch(&event).await;

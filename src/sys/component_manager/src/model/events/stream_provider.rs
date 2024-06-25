@@ -5,7 +5,7 @@
 use crate::model::component::WeakExtendedInstance;
 use crate::model::events::registry::{EventRegistry, EventSubscription};
 use crate::model::events::stream::EventStream;
-use crate::model::routing::router_ext::WeakComponentTokenExt;
+use crate::model::routing::router_ext::WeakInstanceTokenExt;
 use async_trait::async_trait;
 use cm_rust::{ComponentDecl, UseDecl, UseEventStreamDecl};
 use errors::{EventsError, ModelError};

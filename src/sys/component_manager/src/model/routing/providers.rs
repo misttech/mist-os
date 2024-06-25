@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use crate::capability::CapabilityProvider;
 use crate::model::component::WeakComponentInstance;
-use crate::model::routing::router_ext::WeakComponentTokenExt;
+use crate::model::routing::router_ext::WeakInstanceTokenExt;
 use ::routing::error::RoutingError;
 use ::routing::DictExt;
 use async_trait::async_trait;
@@ -13,7 +13,7 @@ use cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS};
 use cm_util::TaskGroup;
 use errors::{CapabilityProviderError, OpenError};
 use router_error::RouterError;
-use sandbox::{RemotableCapability, Request, WeakComponentToken};
+use sandbox::{RemotableCapability, Request, WeakInstanceToken};
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path as VfsPath;
@@ -51,7 +51,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 // request to run hooks.
                 Request {
                     availability: Availability::Transitional,
-                    target: WeakComponentToken::new_component(self.target.clone()),
+                    target: WeakInstanceToken::new_component(self.target.clone()),
                     debug: false,
                 },
             )

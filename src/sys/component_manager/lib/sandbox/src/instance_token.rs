@@ -7,8 +7,8 @@ use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-/// The trait that `WeakComponentToken` holds.
-pub trait WeakComponentTokenAny: Debug + Send + Sync {
+/// The trait that `WeakInstanceToken` holds.
+pub trait WeakInstanceTokenAny: Debug + Send + Sync {
     fn as_any(&self) -> &dyn Any;
 }
 
@@ -16,12 +16,12 @@ pub trait WeakComponentTokenAny: Debug + Send + Sync {
 /// This is type erased because the bedrock library shouldn't depend on
 /// Component Manager types.
 #[derive(Clone, Debug)]
-pub struct WeakComponentToken {
-    pub inner: Arc<dyn WeakComponentTokenAny>,
+pub struct WeakInstanceToken {
+    pub inner: Arc<dyn WeakInstanceTokenAny>,
 }
 
-impl From<WeakComponentToken> for fsandbox::Capability {
-    fn from(_component: WeakComponentToken) -> Self {
-        todo!("b/337284929: Decide on if Component should be in Capability");
+impl From<WeakInstanceToken> for fsandbox::Capability {
+    fn from(_component: WeakInstanceToken) -> Self {
+        todo!("b/337284929: Decide on if InstanceToken should be in Capability");
     }
 }

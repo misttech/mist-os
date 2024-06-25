@@ -29,7 +29,7 @@ impl From<Capability> for fsandbox::Capability {
             Capability::Unit(s) => s.into(),
             Capability::Directory(s) => s.into(),
             Capability::OneShotHandle(s) => s.into(),
-            Capability::Component(s) => s.into(),
+            Capability::Instance(s) => s.into(),
         }
     }
 }
@@ -105,7 +105,7 @@ impl RemotableCapability for Capability {
             Self::Unit(s) => s.try_into_directory_entry(),
             Self::Directory(s) => s.try_into_directory_entry(),
             Self::OneShotHandle(s) => s.try_into_directory_entry(),
-            Self::Component(s) => s.try_into_directory_entry(),
+            Self::Instance(s) => s.try_into_directory_entry(),
         }
     }
 }

@@ -81,7 +81,7 @@ pub enum Capability {
     Directory(crate::Directory),
     OneShotHandle(crate::OneShotHandle),
     Router(crate::Router),
-    Component(crate::WeakComponentToken),
+    Instance(crate::WeakInstanceToken),
 
     #[cfg(target_os = "fuchsia")]
     DirEntry(crate::DirEntry),
@@ -104,7 +104,7 @@ impl Capability {
             Self::Unit(_) => "Unit",
             Self::Directory(_) => "Directory",
             Self::OneShotHandle(_) => "Handle",
-            Self::Component(_) => "Component",
+            Self::Instance(_) => "Instance",
 
             #[cfg(target_os = "fuchsia")]
             Self::DirEntry(_) => "DirEntry",

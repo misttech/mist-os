@@ -11,7 +11,7 @@ use futures::future::BoxFuture;
 use moniker::ExtendedMoniker;
 use router_error::{Explain, RouterError};
 use sandbox::{
-    Capability, Dict, DirEntry, RemotableCapability, Request, Routable, Router, WeakComponentToken,
+    Capability, Dict, DirEntry, RemotableCapability, Request, Routable, Router, WeakInstanceToken,
 };
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
@@ -34,7 +34,7 @@ pub trait RouterExt: Send + Sync {
     /// This is an alternative to [Dict::try_into_open] when the [Dict] contains [Router]s, since
     /// [Router] is not currently a type defined by the sandbox library.
     fn dict_routers_to_open(
-        weak_component: &WeakComponentToken,
+        weak_component: &WeakInstanceToken,
         scope: &ExecutionScope,
         dict: &Dict,
     ) -> Dict;
@@ -70,7 +70,7 @@ impl RouterExt for Router {
     }
 
     fn dict_routers_to_open(
-        weak_component: &WeakComponentToken,
+        weak_component: &WeakInstanceToken,
         scope: &ExecutionScope,
         dict: &Dict,
     ) -> Dict {
@@ -221,13 +221,13 @@ impl Routable for PolicyCheckRouter {
 
 /// A trait to add functions WeakComponentInstancethat know about the component
 /// manager types.
-pub trait WeakComponentTokenExt {
+pub trait WeakInstanceTokenExt {
     /// Create a new token for a component instance or component_manager.
-    fn new(instance: WeakExtendedInstance) -> WeakComponentToken;
+    fn new(instance: WeakExtendedInstance) -> WeakInstanceToken;
 
     /// Create a new token for a component instance.
-    fn new_component(instance: WeakComponentInstance) -> WeakComponentToken {
-        WeakComponentToken::new(WeakExtendedInstance::Component(instance))
+    fn new_component(instance: WeakComponentInstance) -> WeakInstanceToken {
+        WeakInstanceToken::new(WeakExtendedInstance::Component(instance))
     }
 
     /// Upgrade this token to the underlying instance.
@@ -243,24 +243,24 @@ pub trait WeakComponentTokenExt {
     fn moniker(&self) -> moniker::ExtendedMoniker;
 
     #[cfg(test)]
-    fn invalid() -> WeakComponentToken {
-        WeakComponentToken::new_component(WeakComponentInstance::invalid())
+    fn invalid() -> WeakInstanceToken {
+        WeakInstanceToken::new_component(WeakComponentInstance::invalid())
     }
 }
 
 // We need this extra struct because WeakComponentInstance isn't defined in this
-// crate so we can't implement WeakComponentTokenAny for it.
+// crate so we can't implement WeakInstanceTokenAny for it.
 #[derive(Debug)]
 pub struct WeakComponentInstanceExt {
     inner: WeakExtendedInstance,
 }
-impl sandbox::WeakComponentTokenAny for WeakComponentInstanceExt {
+impl sandbox::WeakInstanceTokenAny for WeakComponentInstanceExt {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 }
 
-impl WeakComponentTokenExt for WeakComponentToken {
+impl WeakInstanceTokenExt for WeakInstanceToken {
     fn new(instance: WeakExtendedInstance) -> Self {
         Self { inner: Arc::new(WeakComponentInstanceExt { inner: instance }) }
     }

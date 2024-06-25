@@ -5,7 +5,7 @@
 use crate::model::component::{
     ComponentInstance, ExtendedInstance, WeakComponentInstance, WeakExtendedInstance,
 };
-use crate::model::routing::router_ext::{RouterExt, WeakComponentTokenExt};
+use crate::model::routing::router_ext::{RouterExt, WeakInstanceTokenExt};
 use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::{ComponentInstanceError, RoutingError};
@@ -20,7 +20,7 @@ use futures::FutureExt;
 use router_error::RouterError;
 use sandbox::{
     Capability, Connectable, Connector, DirEntry, Message, Request, Routable, Router,
-    WeakComponentToken,
+    WeakInstanceToken,
 };
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -39,7 +39,7 @@ pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::Requ
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
 /// handle each new message from the receiver.
 pub struct LaunchTaskOnReceive {
-    source: WeakComponentToken,
+    source: WeakInstanceToken,
     task_to_launch: Arc<
         dyn Fn(zx::Channel, WeakComponentInstance) -> BoxFuture<'static, Result<(), anyhow::Error>>
             + Sync
@@ -81,7 +81,7 @@ impl LaunchTaskOnReceive {
         >,
     ) -> Self {
         Self {
-            source: WeakComponentToken::new(source),
+            source: WeakInstanceToken::new(source),
             task_to_launch,
             task_group,
             policy,
@@ -121,7 +121,7 @@ impl LaunchTaskOnReceive {
                 if !request.debug {
                     Ok(cap)
                 } else {
-                    Ok(Capability::Component(self.inner.source.clone()))
+                    Ok(Capability::Instance(self.inner.source.clone()))
                 }
             }
         }
@@ -314,7 +314,7 @@ pub mod tests {
     use moniker::Moniker;
     use router_error::DowncastErrorForTest;
     use routing::{DictExt, LazyGet};
-    use sandbox::{Data, Dict, Receiver, RemotableCapability, WeakComponentToken};
+    use sandbox::{Data, Dict, Receiver, RemotableCapability, WeakInstanceToken};
     use std::pin::pin;
     use std::sync::Weak;
     use std::task::Poll;
@@ -398,7 +398,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar/data").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentToken::invalid(),
+                    target: WeakInstanceToken::invalid(),
                     debug: false,
                 },
             )
@@ -419,7 +419,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentToken::invalid(),
+                    target: WeakInstanceToken::invalid(),
                     debug: false,
                 },
             )
@@ -442,7 +442,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentToken::invalid(),
+                    target: WeakInstanceToken::invalid(),
                     debug: false,
                 },
             )
@@ -463,7 +463,7 @@ pub mod tests {
                 &RelativePath::new("foo").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentToken::invalid(),
+                    target: WeakInstanceToken::invalid(),
                     debug: false,
                 },
             )
@@ -475,7 +475,7 @@ pub mod tests {
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
-                    target: WeakComponentToken::invalid(),
+                    target: WeakInstanceToken::invalid(),
                     debug: false,
                 },
             )
@@ -529,7 +529,7 @@ pub mod tests {
         let capability = router
             .route(Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new_component(component.as_weak()),
+                target: WeakInstanceToken::new_component(component.as_weak()),
                 debug: false,
             })
             .await
@@ -581,7 +581,7 @@ pub mod tests {
         let capability = router
             .route(Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new_component(component.as_weak()),
+                target: WeakInstanceToken::new_component(component.as_weak()),
                 debug: false,
             })
             .await
@@ -626,7 +626,7 @@ pub mod tests {
             async move {
                 assert!(router.debug);
                 let res: Result<Capability, RouterError> =
-                    Ok(Capability::Component(WeakComponentToken::new(source2.clone())));
+                    Ok(Capability::Instance(WeakInstanceToken::new(source2.clone())));
                 res
             }
             .boxed()
@@ -643,14 +643,14 @@ pub mod tests {
         let capability = router
             .route(Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new_component(target.as_weak()),
+                target: WeakInstanceToken::new_component(target.as_weak()),
                 debug: true,
             })
             .await
             .unwrap();
         assert_matches!(
             capability,
-            Capability::Component(c) if c.moniker() == source.extended_moniker()
+            Capability::Instance(c) if c.moniker() == source.extended_moniker()
         );
     }
 
@@ -669,7 +669,7 @@ pub mod tests {
         let capability = downscoped_router
             .route(Request {
                 availability: Availability::Optional,
-                target: WeakComponentToken::invalid(),
+                target: WeakInstanceToken::invalid(),
                 debug: false,
             })
             .await
@@ -708,7 +708,7 @@ pub mod tests {
         let capability = downscoped_router
             .route(Request {
                 availability: Availability::Optional,
-                target: WeakComponentToken::invalid(),
+                target: WeakInstanceToken::invalid(),
                 debug: false,
             })
             .await

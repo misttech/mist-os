@@ -15,7 +15,7 @@ use crate::model::environment::Environment;
 use crate::model::escrow::{self, EscrowedState};
 use crate::model::namespace::create_namespace;
 use crate::model::routing::legacy::RouteRequestExt;
-use crate::model::routing::router_ext::{RouterExt, WeakComponentTokenExt};
+use crate::model::routing::router_ext::{RouterExt, WeakInstanceTokenExt};
 use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
 use crate::model::routing::{self, RoutingError};
 use crate::model::start::Start;
@@ -54,7 +54,7 @@ use hooks::{CapabilityReceiver, EventPayload};
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::RouterError;
 use sandbox::{
-    Capability, Dict, DirEntry, RemotableCapability, Request, Routable, Router, WeakComponentToken,
+    Capability, Dict, DirEntry, RemotableCapability, Request, Routable, Router, WeakInstanceToken,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -601,7 +601,7 @@ impl ResolvedInstanceState {
     pub async fn make_exposed_dict(&self) -> Dict {
         let component = self.weak_component.upgrade().unwrap();
         let dict = Router::dict_routers_to_open(
-            &WeakComponentToken::new_component(self.weak_component.clone()),
+            &WeakInstanceToken::new_component(self.weak_component.clone()),
             &component.execution_scope,
             &self.sandbox.component_output_dict,
         );
@@ -1279,7 +1279,7 @@ impl Routable for CapabilityRequestedHook {
         if !request.debug {
             Ok(capability)
         } else {
-            Ok(Capability::Component(WeakComponentToken::new_component(self.source.clone())))
+            Ok(Capability::Instance(WeakInstanceToken::new_component(self.source.clone())))
         }
     }
 }

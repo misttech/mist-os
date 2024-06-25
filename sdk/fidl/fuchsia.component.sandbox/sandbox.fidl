@@ -180,9 +180,10 @@ open protocol DictionaryKeyIterator {
     });
 };
 
-/// This represents a component within the framework.
+/// Represents an instance in the component tree, either a component
+/// instance or component manager's instance.
 @available(added=HEAD)
-type ComponentToken = resource struct {
+type InstanceToken = resource struct {
     token Token;
 };
 
@@ -192,7 +193,7 @@ type RouteRequest = resource table {
     /// The requested availability for this capability.
     1: availability Availability;
     /// The component that is requesting the capability.
-    2: requesting ComponentToken;
+    2: requesting InstanceToken;
 };
 
 @available(added=HEAD)

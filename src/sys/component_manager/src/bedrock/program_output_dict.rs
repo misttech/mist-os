@@ -5,7 +5,7 @@
 use crate::capability::CapabilitySource;
 use crate::model::component::instance::ResolvedInstanceState;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
-use crate::model::routing::router_ext::{RouterExt, WeakComponentTokenExt};
+use crate::model::routing::router_ext::{RouterExt, WeakInstanceTokenExt};
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::capability_source::ComponentCapability;
 use ::routing::component_instance::ComponentInstanceInterface;
@@ -20,7 +20,7 @@ use futures::FutureExt;
 use itertools::Itertools;
 use moniker::ChildName;
 use router_error::RouterError;
-use sandbox::{Capability, Dict, Request, Routable, Router, WeakComponentToken};
+use sandbox::{Capability, Dict, Request, Routable, Router, WeakInstanceToken};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::warn;
@@ -192,8 +192,8 @@ fn extend_dict_with_dictionary(
                         if !debug {
                             Ok(capability)
                         } else {
-                            let source = WeakComponentToken::new_component(component.as_weak());
-                            Ok(Capability::Component(source))
+                            let source = WeakInstanceToken::new_component(component.as_weak());
+                            Ok(Capability::Instance(source))
                         }
                     }
                 }
@@ -205,7 +205,7 @@ fn extend_dict_with_dictionary(
         };
         router = make_dict_extending_router(
             dict.clone(),
-            WeakComponentToken::new_component(component.as_weak()),
+            WeakInstanceToken::new_component(component.as_weak()),
             source_dict_router,
         );
     } else {
@@ -227,7 +227,7 @@ fn extend_dict_with_dictionary(
 /// This algorithm returns a new [Dict] each time, leaving `dict` unmodified.
 fn make_dict_extending_router(
     dict: Dict,
-    dict_source: WeakComponentToken,
+    dict_source: WeakInstanceToken,
     source_dict_router: Router,
 ) -> Router {
     let route_fn = move |request: Request| {
@@ -241,7 +241,7 @@ fn make_dict_extending_router(
                 // Optional from void.
                 cap @ Capability::Unit(_) => return Ok(cap),
                 // Debug source token.
-                Capability::Component(_) if debug => None,
+                Capability::Instance(_) if debug => None,
                 cap => {
                     return Err(RoutingError::BedrockWrongCapabilityType {
                         actual: cap.debug_typename().into(),
@@ -251,7 +251,7 @@ fn make_dict_extending_router(
                 }
             };
             if debug {
-                return Ok(Capability::Component(dict_source.clone()));
+                return Ok(Capability::Instance(dict_source.clone()));
             }
             let source_dict = source_dict.unwrap();
             let out_dict = dict.shallow_copy();

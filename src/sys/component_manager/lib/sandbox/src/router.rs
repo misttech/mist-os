@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Capability, Dict, WeakComponentToken};
+use crate::{Capability, Dict, WeakInstanceToken};
 use async_trait::async_trait;
 use cm_types::Availability;
 use futures::future::BoxFuture;
@@ -25,7 +25,7 @@ pub struct Request {
     pub availability: Availability,
 
     /// A reference to the requesting component.
-    pub target: WeakComponentToken,
+    pub target: WeakInstanceToken,
 
     /// If true, debug information is requested instead of the actual capabilithy.
     pub debug: bool,
@@ -129,15 +129,15 @@ mod tests {
     use fidl::handle::Channel;
 
     #[derive(Debug)]
-    struct FakeComponentToken {}
+    struct FakeInstanceToken {}
 
-    impl FakeComponentToken {
-        fn new() -> WeakComponentToken {
-            WeakComponentToken { inner: Arc::new(FakeComponentToken {}) }
+    impl FakeInstanceToken {
+        fn new() -> WeakInstanceToken {
+            WeakInstanceToken { inner: Arc::new(FakeInstanceToken {}) }
         }
     }
 
-    impl crate::WeakComponentTokenAny for FakeComponentToken {
+    impl crate::WeakInstanceTokenAny for FakeInstanceToken {
         fn as_any(&self) -> &dyn std::any::Any {
             self
         }
@@ -153,7 +153,7 @@ mod tests {
         let capability = router
             .route(Request {
                 availability: Availability::Required,
-                target: FakeComponentToken::new(),
+                target: FakeInstanceToken::new(),
                 debug: false,
             })
             .await
