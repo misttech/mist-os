@@ -149,6 +149,7 @@ cc_library(
         "//src/connectivity/bluetooth/core/bt-host/transport",
         "@com_google_googletest//:gtest",
         "@fuchsia_sdk//pkg/async-cpp",
+        "@fuchsia_sdk//pkg/fidl_cpp",
         "@fuchsia_sdk//pkg/zx",
         "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     ],

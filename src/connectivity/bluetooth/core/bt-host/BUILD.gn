@@ -30,7 +30,6 @@ source_set("sources") {
   ]
 
   public_deps = [
-    ":bt_host_config",
     ":stack",
     "fidl",
     "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_hlcpp",
@@ -59,15 +58,6 @@ group("config") {
     ":config_enable_inspect",
     ":config_enable_trace",
   ]
-}
-
-fuchsia_component_manifest("manifest") {
-  component_name = "bt-host"
-  manifest = "meta/bt-host.cml"
-}
-
-fuchsia_structured_config_cpp_elf_lib("bt_host_config") {
-  cm_label = ":manifest"
 }
 
 # This is the OOT built bt-host component.
@@ -277,6 +267,7 @@ group("bazel_tests") {
     ":test_pkg",
     "att:test_pkg",
     "common:test_pkg",
+    "controllers:test_pkg",
     "fidl:test_pkg",
     "gap:test_pkg",
     "gatt:test_pkg",
