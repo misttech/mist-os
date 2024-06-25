@@ -25,7 +25,7 @@ essential information for its own use in the early stages of booting.
 ## BOOTFS
 
 One of the items embedded in the Zircon Boot Image is an initial RAM disk
-filesystem image.  The image is usually compressed using the **LZ4**
+filesystem image.  The image is usually compressed using the **zstd**
 format.  Once decompressed, the image is in **BOOTFS** format.  This is a
 trivial read-only filesystem format that simply lists file names, and for
 each file the offset and size within the BOOTFS image (both values must be
@@ -43,7 +43,7 @@ component manager).
 
 ## Kernel loads userboot
 
-The kernel does not include any code for decompressing LZ4 format, nor
+The kernel does not include any code for decompressing zstd format, nor
 any code for interpreting the BOOTFS format.  Instead, all of this work
 is done by the first userspace process, called `userboot`.
 
@@ -116,7 +116,7 @@ boot loader.  `userboot` reads the ZBI headers from this VMO
 looking for the first item with type `ZBI_TYPE_STORAGE_BOOTFS`.  That
 contains the [BOOTFS](#BOOTFS) image.  The item's ZBI header
 indicates if it's compressed, which it usually is.  `userboot` maps in
-this portion of the VMO.  `userboot` contains LZ4 format support code,
+this portion of the VMO.  `userboot` contains zstd format support code,
 which it uses to decompress the item into a fresh VMO.
 
 ## userboot loads the first "real" user process from BOOTFS
