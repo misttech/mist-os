@@ -822,7 +822,7 @@ impl<A: IpAddress, O: InnerPacketBuilder> PacketBuilder for TcpSegmentBuilderWit
 // NOTE(joshlf): In order to ensure that the checksum is always valid, we don't
 // expose any setters for the fields of the TCP segment; the only way to set
 // them is via TcpSegmentBuilder. This, combined with checksum validation
-// performed in TcpSegment::parse, provides the invariant that a UdpPacket
+// performed in TcpSegment::parse, provides the invariant that a TcpSegment
 // always has a valid checksum.
 
 /// A builder for TCP segments.
