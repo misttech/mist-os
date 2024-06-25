@@ -321,8 +321,10 @@ fuchsia_structured_config_cpp_elf_lib("scenic_structured_config") {
   cm_label = ":scenic_manifest"
 }
 
-fuchsia_structured_config_values("scenic_config") {
+fuchsia_structured_config_values2("scenic_config") {
+  testonly = true
   cm_label = ":scenic_manifest"
+  output_component_name = "config"
   values_source = "config/default_for_test.json5"
 }
 
@@ -333,6 +335,7 @@ fuchsia_package("scenic_pkg") {
 }
 
 group("scenic_with_default_config") {
+  testonly = true
   deps = [
     ":component_v2",
     ":scenic_config",

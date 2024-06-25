@@ -19,7 +19,7 @@ namespace {
 
 // Name for the scenic component.
 constexpr auto kScenic = "scenic";
-constexpr auto kScenicRealmUrl = "#meta/scenic_only.cm";
+constexpr auto kScenicRealmUrl = "#meta/scenic_no_config.cm";
 
 }  // namespace
 
@@ -38,7 +38,7 @@ ScenicRealmBuilder::ScenicRealmBuilder(RealmBuilderArgs args)
 }
 
 ScenicRealmBuilder& ScenicRealmBuilder::Init(RealmBuilderArgs args) {
-  // Only fuchsia.media.ProfileProvider is not already included by scenic_only.cml.
+  // Only fuchsia.media.ProfileProvider is not already included by scenic_with_config.cml.
   realm_builder_.AddRoute(Route{.capabilities =
                                     {
                                         Protocol{fuchsia::media::ProfileProvider::Name_},
@@ -63,18 +63,51 @@ ScenicRealmBuilder& ScenicRealmBuilder::Init(RealmBuilderArgs args) {
                                   .targets = {ChildRef{config.name}}});
   }
 
-  realm_builder_.InitMutableConfigFromPackage(kScenic);
+  // Configure scenic's configuration.
+  realm_builder_.AddChild("config", "#meta/config.cm", {});
+  realm_builder_.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.scenic.DisplayComposition"},
+              component_testing::Config{
+                  .name = "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs"},
+              component_testing::Config{.name = "fuchsia.scenic.ICanHazDisplayId"},
+              component_testing::Config{.name = "fuchsia.scenic.ICanHazDisplayMode"},
+              component_testing::Config{.name = "fuchsia.scenic.MaxDisplayHorizontalResolutionPx"},
+              component_testing::Config{.name = "fuchsia.scenic.MaxDisplayRefreshRateMillihertz"},
+              component_testing::Config{.name = "fuchsia.scenic.MaxDisplayVerticalResolutionPx"},
+              component_testing::Config{.name = "fuchsia.scenic.MinDisplayHorizontalResolutionPx"},
+              component_testing::Config{.name = "fuchsia.scenic.MinDisplayRefreshRateMillihertz"},
+              component_testing::Config{.name = "fuchsia.scenic.MinDisplayVerticalResolutionPx"},
+              component_testing::Config{.name = "fuchsia.scenic.PointerAutoFocus"},
+          },
+      .source = {component_testing::ChildRef{"config"}},
+      .targets = {component_testing::ChildRef{kScenic}},
+  });
 
-  // Configure the renderer type for Scenic.
-  if (args.renderer_type_config.has_value()) {
-    realm_builder_.SetConfigValue(kScenic, "renderer",
-                                  ConfigValue(args.renderer_type_config.value()));
-  }
-
-  if (args.display_rotation.has_value()) {
-    realm_builder_.SetConfigValue(kScenic, "display_rotation",
-                                  ConfigValue::Uint64(args.display_rotation.value()));
-  }
+  std::vector<component_testing::ConfigCapability> configurations;
+  configurations.push_back({
+      .name = "fuchsia.scenic.Renderer",
+      .value = args.renderer_type_config.has_value()
+                   ? ConfigValue(args.renderer_type_config.value())
+                   : "vulkan",
+  });
+  configurations.push_back({
+      .name = "fuchsia.scenic.DisplayRotation",
+      .value = args.display_rotation.has_value()
+                   ? ConfigValue::Uint64(args.display_rotation.value())
+                   : ConfigValue::Uint64(270),
+  });
+  realm_builder_.AddConfiguration(std::move(configurations));
+  realm_builder_.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.scenic.DisplayRotation"},
+              component_testing::Config{.name = "fuchsia.scenic.Renderer"},
+          },
+      .source = component_testing::SelfRef{},
+      .targets = {component_testing::ChildRef{kScenic}},
+  });
 
   return *this;
 }
