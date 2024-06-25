@@ -1995,6 +1995,9 @@ group("root_targets") {
     # Required by `fx fidldoc` as well as the Fuchsia controller ffx plugin
     # at runtime!
     "//build/fidl:all_fidl_json",
+
+    # Required for local developer overrides to be found by the bazel workspace.
+    "//build/bazel:assembly_developer_overrides",
   ]
 
   # Required by `fx publish` at runtime. Only included when package serving processes are needed.

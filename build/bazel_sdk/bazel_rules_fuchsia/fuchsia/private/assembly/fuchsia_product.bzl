@@ -7,6 +7,7 @@
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
+    "FuchsiaAssemblyDeveloperOverridesInfo",
     "FuchsiaAssemblyDeveloperOverridesListInfo",
     "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
@@ -142,9 +143,9 @@ def _fuchsia_product_assembly_impl(ctx):
 
     # Add developer overrides manifest and inputs if necessary.
     overrides_maps = ctx.attr._developer_overrides_list[FuchsiaAssemblyDeveloperOverridesListInfo].maps
-    for pattern_string, overrides_info in overrides_maps:
+    for (pattern_string, overrides_label) in overrides_maps.items():
         if _match_assembly_pattern_string(ctx.label, pattern_string):
-            print("Found assembly developer overrides: %s" % overrides_info)
+            overrides_info = overrides_label[FuchsiaAssemblyDeveloperOverridesInfo]
             ffx_inputs += overrides_info.inputs
             ffx_invocation.extend([
                 "--developer-overrides",

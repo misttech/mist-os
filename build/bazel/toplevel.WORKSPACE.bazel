@@ -333,3 +333,13 @@ compact_python_runtime_repository(
 )
 
 register_toolchains("@prebuilt_python//:py_toolchain")
+
+load(
+    "//build/bazel/assembly:developer_overrides/repository_rules.bzl",
+    "assembly_developer_overrides_repository",
+)
+
+assembly_developer_overrides_repository(
+    name = "assembly_developer_overrides",
+    overrides_map_from_gn = "fuchsia_build_generated/assembly_developer_overrides.json",
+)
