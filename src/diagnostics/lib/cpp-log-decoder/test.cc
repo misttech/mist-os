@@ -18,11 +18,13 @@ namespace log_decoder {
 namespace {
 
 TEST(LogDecoder, DecodesCorrectly) {
-  syslog_runtime::LogBuffer buffer;
   zx::socket logger_socket, our_socket;
   zx::socket::create(ZX_SOCKET_DATAGRAM, &logger_socket, &our_socket);
-  syslog_runtime::BeginRecordWithSocket(&buffer, fuchsia_logging::LOG_INFO, __FILE__, __LINE__,
-                                        "test message", nullptr, logger_socket.release());
+  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LOG_INFO);
+  auto buffer = builder.WithSocket(logger_socket.release())
+                    .WithMsg("test message")
+                    .WithFile(__FILE__, __LINE__)
+                    .Build();
   buffer.WriteKeyValue("tag", "some tag");
   buffer.WriteKeyValue("tag", "some other tag");
   buffer.WriteKeyValue("user property", 5.2);

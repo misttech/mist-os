@@ -243,6 +243,13 @@ void WriteLog(fuchsia_logging::LogSeverity severity, const char* file, unsigned 
   std::cerr.flush();
 }
 
+LogBuffer LogBufferBuilder::Build() {
+  LogBuffer buffer;
+  BeginRecord(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_), line_,
+              NullSafeStringView::CreateFromOptional(msg_),
+              NullSafeStringView::CreateFromOptional(condition_));
+  return buffer;
+}
 }  // namespace syslog_runtime
 
 namespace fuchsia_logging {

@@ -70,17 +70,6 @@ class NullSafeStringView final {
   cpp17::optional<cpp17::string_view> string_view_;
 };
 
-#ifdef __Fuchsia__
-void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                           NullSafeStringView file_name, unsigned int line, NullSafeStringView msg,
-                           NullSafeStringView condition, zx_handle_t socket);
-void SetInterestChangedListener(void (*callback)(void* context,
-                                                 fuchsia_logging::LogSeverity severity),
-                                void* context);
-#endif
-void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
-                 unsigned int line, NullSafeStringView msg, NullSafeStringView condition);
-
 template <typename... Args>
 constexpr size_t ArgsSize(Args... args) {
   return sizeof...(args);
@@ -248,31 +237,10 @@ class LogBufferBuilder {
     socket_ = socket;
     return *this;
   }
-
-  /// Builds the LogBuffer
-  LogBuffer Build() {
-    LogBuffer buffer;
-    if (socket_) {
-      BeginRecordWithSocket(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_),
-                            line_, NullSafeStringView::CreateFromOptional(msg_),
-                            NullSafeStringView::CreateFromOptional(condition_), socket_);
-    } else {
-      BeginRecord(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_), line_,
-                  NullSafeStringView::CreateFromOptional(msg_),
-                  NullSafeStringView::CreateFromOptional(condition_));
-    }
-    return buffer;
-  }
-#else
-  /// Builds the LogBuffer
-  LogBuffer Build() {
-    LogBuffer buffer;
-    BeginRecord(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_), line_,
-                NullSafeStringView::CreateFromOptional(msg_),
-                NullSafeStringView::CreateFromOptional(condition_));
-    return buffer;
-  }
 #endif
+  /// Builds the LogBuffer
+  LogBuffer Build();
+
  private:
   cpp17::optional<cpp17::string_view> file_name_;
   unsigned int line_ = 0;

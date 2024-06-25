@@ -58,8 +58,10 @@ struct LogSettings {
   // Allows to define the LogSink handle to use. When no handle is provided, the default LogSink
   // in the pogram incoming namespace will be used.
   zx_handle_t log_sink = ZX_HANDLE_INVALID;
-#endif
+  // Interest listener callback, or nullptr
+  void (*severity_change_callback)(fuchsia_logging::LogSeverity severity) = nullptr;
   fuchsia_logging::InterestListenerBehavior interest_listener_config_ = fuchsia_logging::Enabled;
+#endif
 };
 static_assert(std::is_copy_constructible<LogSettings>::value);
 
@@ -91,6 +93,9 @@ class LogSettingsBuilder {
 
   // Configures the interest listener settings.
   LogSettingsBuilder& WithInterestListenerConfiguration(InterestListenerBehavior config);
+
+  LogSettingsBuilder& WithSeverityChangedListener(
+      void (*callback)(fuchsia_logging::LogSeverity severity));
 #endif
 
   // Configures the log settings with the specified tags

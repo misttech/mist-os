@@ -141,9 +141,6 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
                                          const char* file, uint32_t line, const char* msg,
                                          va_list args, bool perform_format) {
   if (this->socket_.is_valid()) {
-    std::unique_ptr<syslog_runtime::LogBuffer> buf_ptr =
-        std::make_unique<syslog_runtime::LogBuffer>();
-    syslog_runtime::LogBuffer& buffer = *buf_ptr;
     constexpr size_t kFormatStringLength = 1024;
     char fmt_string[kFormatStringLength];
     fmt_string[kFormatStringLength - 1] = 0;
@@ -170,8 +167,9 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
     if (file) {
       file = syslog::internal::StripFile(file, severity);
     }
-    syslog_runtime::BeginRecordWithSocket(&buffer, severity, file, line, fmt_string, nullptr,
-                                          this->socket_.get());
+    auto builder = syslog_runtime::LogBufferBuilder(severity);
+    auto buffer =
+        builder.WithFile(file, line).WithMsg(fmt_string).WithSocket(this->socket_.get()).Build();
     {
       fbl::AutoLock tag_lock(&tags_mutex_);
       for (const auto& tag : tags_) {

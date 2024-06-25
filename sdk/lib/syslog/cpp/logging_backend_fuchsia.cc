@@ -57,11 +57,6 @@ class LogState {
   static void Set(const fuchsia_logging::LogSettings& settings, const GlobalStateLock& lock);
   static void Set(const fuchsia_logging::LogSettings& settings,
                   const std::initializer_list<std::string>& tags, const GlobalStateLock& lock);
-  void set_severity_handler(void (*callback)(void* context, fuchsia_logging::LogSeverity severity),
-                            void* context) {
-    handler_ = callback;
-    handler_context_ = context;
-  }
 
   fuchsia_logging::LogSeverity min_severity() const { return min_severity_; }
 
@@ -82,8 +77,7 @@ class LogState {
   void HandleInterest(fuchsia_diagnostics::wire::Interest interest);
 
   fidl::WireSharedClient<fuchsia_logger::LogSink> log_sink_;
-  void (*handler_)(void* context, fuchsia_logging::LogSeverity severity);
-  void* handler_context_;
+  void (*on_severity_changed_)(fuchsia_logging::LogSeverity severity);
   async::Loop loop_;
   std::atomic<fuchsia_logging::LogSeverity> min_severity_;
   const fuchsia_logging::LogSeverity default_severity_;
@@ -155,7 +149,7 @@ void LogState::PollInterest() {
           return;
         }
         HandleInterest(interest_result->value()->data);
-        handler_(handler_context_, min_severity_);
+        on_severity_changed_(min_severity_);
         PollInterest();
       });
 }
@@ -173,7 +167,6 @@ void LogState::Connect() {
     if (!interest_listener_dispatcher_) {
       loop_.StartThread("log-interest-listener-thread");
     }
-    handler_ = [](void* ctx, fuchsia_logging::LogSeverity severity) {};
   }
   // Regardless of whether or not we need to do anything async, FIDL async bindings
   // require a valid dispatcher or they panic.
@@ -196,7 +189,7 @@ void LogState::Connect() {
     if (interest_result->is_ok()) {
       HandleInterest(interest_result->value()->data);
     }
-    handler_(handler_context_, min_severity_);
+    on_severity_changed_(min_severity_);
   }
 
   zx::socket local, remote;
@@ -210,13 +203,6 @@ void LogState::Connect() {
     PollInterest();
   }
   logsink_socket_ = std::move(local);
-}
-
-void SetInterestChangedListener(void (*callback)(void* context,
-                                                 fuchsia_logging::LogSeverity severity),
-                                void* context) {
-  GlobalStateLock log_state;
-  log_state->set_severity_handler(callback, context);
 }
 
 void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
@@ -329,6 +315,10 @@ LogState::LogState(const fuchsia_logging::LogSettings& settings,
   if (settings.log_sink) {
     provided_log_sink_ = fidl::ClientEnd<fuchsia_logger::LogSink>(zx::channel(settings.log_sink));
   }
+  on_severity_changed_ = settings.severity_change_callback;
+  if (!on_severity_changed_) {
+    on_severity_changed_ = [](fuchsia_logging::LogSeverity severity) {};
+  }
   for (auto& tag : tags) {
     tags_[num_tags_++] = tag;
     if (num_tags_ >= kMaxTags)
@@ -351,6 +341,20 @@ void SetLogSettings(const fuchsia_logging::LogSettings& settings,
 fuchsia_logging::LogSeverity GetMinLogSeverity() {
   GlobalStateLock lock;
   return lock->min_severity();
+}
+
+LogBuffer LogBufferBuilder::Build() {
+  LogBuffer buffer;
+  if (socket_) {
+    BeginRecordWithSocket(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_),
+                          line_, NullSafeStringView::CreateFromOptional(msg_),
+                          NullSafeStringView::CreateFromOptional(condition_), socket_);
+  } else {
+    BeginRecord(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_), line_,
+                NullSafeStringView::CreateFromOptional(msg_),
+                NullSafeStringView::CreateFromOptional(condition_));
+  }
+  return buffer;
 }
 
 }  // namespace syslog_runtime
@@ -377,6 +381,12 @@ LogSettingsBuilder& LogSettingsBuilder::DisableWaitForInitialInterest() {
   if (settings_.interest_listener_config_ == fuchsia_logging::Enabled) {
     WithInterestListenerConfiguration(fuchsia_logging::EnabledNonBlocking);
   }
+  return *this;
+}
+
+LogSettingsBuilder& LogSettingsBuilder::WithSeverityChangedListener(
+    void (*callback)(fuchsia_logging::LogSeverity severity)) {
+  settings_.severity_change_callback = callback;
   return *this;
 }
 

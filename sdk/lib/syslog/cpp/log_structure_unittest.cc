@@ -97,12 +97,15 @@ TEST(StructuredLogging, ThreadInitialization) {
 }
 
 TEST(StructuredLogging, BackendDirect) {
-  syslog_runtime::LogBuffer buffer;
-  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
-                              "condition");
-  buffer.Flush();
-  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
-                              "condition");
+  {
+    syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LOG_WARNING);
+    auto buffer =
+        builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
+    buffer.Flush();
+  }
+  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LOG_WARNING);
+  auto buffer =
+      builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
   buffer.WriteKeyValue("foo", static_cast<int64_t>(42));
   buffer.WriteKeyValue("bar", true);
   ASSERT_TRUE(buffer.Flush());
@@ -114,12 +117,15 @@ TEST(StructuredLogging, Overflow) {
   very_large_string.resize(1000 * 1000);
   memset(very_large_string.data(), 5, very_large_string.size());
   very_large_string[very_large_string.size() - 1] = 0;
-  syslog_runtime::LogBuffer buffer;
-  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
-                              "condition");
-  buffer.Flush();
-  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_WARNING, "foo.cc", 42, "fake tag",
-                              "condition");
+  {
+    syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LOG_WARNING);
+    auto buffer =
+        builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
+    buffer.Flush();
+  }
+  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LOG_WARNING);
+  auto buffer =
+      builder.WithFile("foo.cc", 42).WithCondition("condition").WithMsg("fake tag").Build();
   buffer.WriteKeyValue("foo", static_cast<int64_t>(42));
   buffer.WriteKeyValue("bar", very_large_string.data());
 
