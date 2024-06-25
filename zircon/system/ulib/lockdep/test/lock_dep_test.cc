@@ -236,7 +236,7 @@ TEST(LockDep, LockableObjectLockAssertHeld) {
   SecretlyTakeLock(&lockable.lock);
   EXPECT_TRUE(lockable.lock.lock().acquired);
 
-  // Call AssertHeld() on the lock. Clang should be satisifed we have
+  // Call AssertHeld() on the lock. Clang should be satisfied we have
   // the lock, and let us modify the guarded field.
   lockable.lock.lock().assert_held_called = false;
   AssertHeld(lockable.lock);
