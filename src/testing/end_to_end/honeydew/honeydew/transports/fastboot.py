@@ -10,9 +10,7 @@ import logging
 import os
 import shutil
 import stat
-import subprocess
 import tempfile
-from collections.abc import Iterable
 from importlib import resources
 from typing import Any
 
@@ -20,7 +18,7 @@ from honeydew import errors
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import fastboot as fastboot_interface
 from honeydew.interfaces.transports import ffx as ffx_interface
-from honeydew.utils import common, properties
+from honeydew.utils import common, host_shell, properties
 
 _FASTBOOT_PATH_ENV_VAR = "HONEYDEW_FASTBOOT_OVERRIDE"
 
@@ -125,12 +123,12 @@ class Fastboot(fastboot_interface.Fastboot):
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FastbootCommandError: Failed to boot the device to fastboot
+            errors.FuchsiaDeviceError: Failed to boot the device to fastboot
                 mode.
         """
         try:
             self.wait_for_fuchsia_mode()
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.FuchsiaDeviceError as err:
             raise errors.FuchsiaStateError(
                 f"'{self._device_name}' is not in fuchsia mode to perform "
                 f"this operation."
@@ -143,23 +141,19 @@ class Fastboot(fastboot_interface.Fastboot):
         )
         # LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go)
         try:
-            self._ffx_transport.run(
-                cmd=_FFX_CMDS["BOOT_TO_FASTBOOT_MODE"],
-                exceptions_to_skip=[subprocess.CalledProcessError],
-            )
-            self.wait_for_fastboot_mode()
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FastbootCommandError(
-                f"Failed to reboot {self._device_name} to fastboot mode from "
-                f"fuchsia mode"
-            ) from err
+            self._ffx_transport.run(cmd=_FFX_CMDS["BOOT_TO_FASTBOOT_MODE"])
+        except errors.FfxCommandError:
+            # Command is expected to fail as device reboots immediately
+            pass
+
+        self.wait_for_fastboot_mode()
 
     def boot_to_fuchsia_mode(self) -> None:
         """Boot the device to fuchsia mode from fastboot mode.
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FastbootCommandError: Failed to boot the device to fuchsia
+            errors.FuchsiaDeviceError: Failed to boot the device to fuchsia
                 mode.
         """
         if not self.is_in_fastboot_mode():
@@ -175,7 +169,7 @@ class Fastboot(fastboot_interface.Fastboot):
             self._reboot_affordance.on_device_boot()
 
         except Exception as err:  # pylint: disable=broad-except
-            raise errors.FastbootCommandError(
+            raise errors.FuchsiaDeviceError(
                 f"Failed to reboot {self._device_name} to fuchsia mode from "
                 f"fastboot mode"
             ) from err
@@ -185,19 +179,10 @@ class Fastboot(fastboot_interface.Fastboot):
 
         Returns:
             True if in fastboot mode, False otherwise.
-
-        Raises:
-            errors.FastbootCommandError: If failed to check the fastboot mode.
         """
-        try:
-            target_info: dict[
-                str, Any
-            ] = self._ffx_transport.get_target_info_from_target_list()
-        except errors.FfxCommandError as err:
-            raise errors.FastbootCommandError(
-                f"Failed to check if {self._device_name} is in fastboot mode "
-                f"or not"
-            ) from err
+        target_info: dict[
+            str, Any
+        ] = self._ffx_transport.get_target_info_from_target_list()
 
         return (
             target_info["nodename"],
@@ -205,28 +190,23 @@ class Fastboot(fastboot_interface.Fastboot):
             target_info["target_state"],
         ) == (self._device_name, "N", "Fastboot")
 
-    # pylint: disable=missing-raises-doc
-    # To handle below pylint warning:
-    #   W9006: "Exception" not documented as being raised (missing-raises-doc)
     def run(
         self,
         cmd: list[str],
         timeout: float = fastboot_interface.TIMEOUTS["FASTBOOT_CLI"],
-        exceptions_to_skip: Iterable[type[Exception]] | None = None,
     ) -> list[str]:
         """Executes and returns the output of `fastboot -s {node} {cmd}`.
 
         Args:
             cmd: Fastboot command to run.
             timeout: Timeout to wait for the fastboot command to return.
-            exceptions_to_skip: Any non fatal exceptions to be ignored.
 
         Returns:
             Output of `fastboot -s {node} {cmd}`.
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
-            subprocess.TimeoutExpired: Timeout running a fastboot command.
+            errors.HoneydewTimeoutError: Timeout running a fastboot command.
             errors.FastbootCommandError: In case of failure.
         """
         if not self.is_in_fastboot_mode():
@@ -235,49 +215,28 @@ class Fastboot(fastboot_interface.Fastboot):
                 f"this operation."
             )
 
-        exceptions_to_skip = tuple(exceptions_to_skip or [])
         fastboot_cmd: list[str] = [
             self._fastboot_binary,
             "-s",
             self.node_id,
         ] + cmd
+
         try:
-            _LOGGER.debug("Executing command `%s`", " ".join(fastboot_cmd))
             output: str = (
-                subprocess.check_output(
-                    fastboot_cmd, stderr=subprocess.STDOUT, timeout=timeout
+                host_shell.run(
+                    cmd=fastboot_cmd,
+                    timeout=timeout,
+                    # fastboot cmd output is coming in stderr instead of stdout
+                    capture_error_in_output=True,
                 )
-                .decode()
-                .strip()
+                or ""
             )
-
-            _LOGGER.debug("`%s` returned: %s", " ".join(fastboot_cmd), output)
-
             # Remove the last entry which will contain command execution time
             # 'Finished. Total time: 0.001s'
-            return output.split("\n")[:-1]
-        except Exception as err:  # pylint: disable=broad-except
-            # Catching all exceptions into this broad one because of
-            # `exceptions_to_skip` argument
+            return output.strip().split("\n")[:-1]
 
-            if isinstance(err, exceptions_to_skip):
-                return []
-
-            if isinstance(err, subprocess.TimeoutExpired):
-                _LOGGER.debug(err, exc_info=True)
-                raise
-
-            if isinstance(err, subprocess.CalledProcessError) and err.stdout:
-                _LOGGER.debug(
-                    "stdout/stderr returned by the command is: %s",
-                    err.stdout,
-                )
-
-            raise errors.FastbootCommandError(
-                f"`{fastboot_cmd}` command failed"
-            ) from err
-
-    # pylint: enable=missing-raises-doc
+        except errors.HostCmdError as err:
+            raise errors.FastbootCommandError(err) from err
 
     def wait_for_fastboot_mode(
         self, timeout: float = fastboot_interface.TIMEOUTS["FASTBOOT_MODE"]
@@ -321,7 +280,11 @@ class Fastboot(fastboot_interface.Fastboot):
         try:
             self._ffx_transport.wait_for_rcs_connection(timeout=timeout)
             _LOGGER.info("%s is in fuchsia mode...", self._device_name)
-        except errors.HoneydewTimeoutError as err:
+        except (
+            errors.FfxCommandError,
+            errors.DeviceNotConnectedError,
+            errors.FfxTimeoutError,
+        ) as err:
             raise errors.FuchsiaDeviceError(
                 f"'{self._device_name}' failed to go into fuchsia mode in "
                 f"{timeout}sec."
@@ -378,9 +341,6 @@ class Fastboot(fastboot_interface.Fastboot):
         Returns:
             True if "address" field of `ffx target show` has one ip address,
             False otherwise.
-
-        Raises:
-            errors.FfxCommandError: If target is not connected to host.
         """
         target: dict[
             str, Any

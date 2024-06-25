@@ -9,7 +9,6 @@ import ipaddress
 import json
 import logging
 import subprocess
-from collections.abc import Iterable
 from typing import Any
 
 import fuchsia_controller_py as fuchsia_controller
@@ -18,7 +17,7 @@ from honeydew import errors
 from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.typing import custom_types
 from honeydew.typing.ffx import TargetInfoData
-from honeydew.utils import properties
+from honeydew.utils import host_shell, properties
 
 _FFX_BINARY: str = "ffx"
 
@@ -222,25 +221,15 @@ class FfxConfig:
         ffx_cmd: list[str] = [self._ffx_binary] + ffx_args + cmd
 
         try:
-            _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
-            subprocess.check_call(ffx_cmd, timeout=timeout)
-            _LOGGER.debug("`%s` finished executing", " ".join(ffx_cmd))
-            return
-        except subprocess.TimeoutExpired as err:
-            raise errors.FfxTimeoutError(
-                f"`{cmd} timed out after {timeout}sec."
-            ) from err
-        except subprocess.CalledProcessError as err:
-            message: str = (
-                f"Command '{ffx_cmd}' failed. returncode = {err.returncode}"
+            host_shell.run(
+                cmd=ffx_cmd,
+                timeout=timeout,
             )
-            if err.stdout:
-                message += f", stdout = {err.stdout}"
-            if err.stderr:
-                message += f", stderr = {err.stderr}."
-            _LOGGER.debug(message)
-
-            raise errors.FfxConfigError(f"`{cmd}` command failed") from err
+            return
+        except errors.HostCmdError as err:
+            raise errors.FfxConfigError(err) from err
+        except errors.HoneydewTimeoutError as err:
+            raise errors.FfxTimeoutError(err) from err
 
 
 class FFX(ffx_interface.FFX):
@@ -313,8 +302,9 @@ class FFX(ffx_interface.FFX):
             timeout: How long in seconds to wait for FFX command to complete.
 
         Raises:
-            errors.FfxTimeoutError: In case of timeout.
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TARGET_ADD"] + [str(self._target_ip_port)]
         ffx_cmd: list[str] = self._generate_ffx_cmd(
@@ -322,30 +312,18 @@ class FFX(ffx_interface.FFX):
         )
 
         try:
-            _LOGGER.debug("Adding target '%s'", self._target_ip_port)
-            _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
-            output: str = subprocess.check_output(
-                ffx_cmd, stderr=subprocess.STDOUT, timeout=timeout
-            ).decode()
-            _LOGGER.debug("`%s` returned: %s", " ".join(ffx_cmd), output)
-        except subprocess.TimeoutExpired as err:
-            raise errors.FfxTimeoutError(
-                f"`{cmd} command timed out after {timeout}sec."
-            ) from err
-        except subprocess.CalledProcessError as err:
-            message: str = (
-                f"Command '{ffx_cmd}' failed. returncode = {err.returncode}"
+            host_shell.run(
+                cmd=ffx_cmd,
+                timeout=timeout,
             )
-            if err.stdout:
-                message += f", stdout = {err.stdout}"
-            if err.stderr:
-                message += f", stderr = {err.stderr}."
-            _LOGGER.debug(message)
-
-            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
-
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
+        except errors.HostCmdError as err:
+            if _DEVICE_NOT_CONNECTED in str(err):
+                raise errors.DeviceNotConnectedError(
+                    f"{self._target_name} is not connected to host"
+                ) from err
+            raise errors.FfxCommandError(err) from err
+        except errors.HoneydewTimeoutError as err:
+            raise errors.FfxTimeoutError(err) from err
 
     def check_connection(
         self,
@@ -379,25 +357,17 @@ class FFX(ffx_interface.FFX):
             Output of `ffx -t {target} target show`.
 
         Raises:
-            FfxTimeoutError: In case of timeout.
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TARGET_SHOW"]
-        try:
-            output: str = self.run(cmd=cmd, timeout=timeout)
+        output: str = self.run(cmd=cmd, timeout=timeout)
 
-            target_info = TargetInfoData(**json.loads(output))
-            _LOGGER.debug("`%s` returned: %s", " ".join(cmd), target_info)
+        target_info = TargetInfoData(**json.loads(output))
+        _LOGGER.debug("`%s` returned: %s", " ".join(cmd), target_info)
 
-            return target_info
-        except subprocess.TimeoutExpired as err:
-            raise errors.FfxTimeoutError(
-                f"`{cmd} command timed out after {timeout}sec."
-            ) from err
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(
-                f"Failed to get the target information of {self._target_name}"
-            ) from err
+        return target_info
 
     def get_target_info_from_target_list(
         self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
@@ -412,31 +382,27 @@ class FFX(ffx_interface.FFX):
             Output of `ffx --machine json target list <target>`.
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TARGET_LIST"] + [self._target]
-        try:
-            output: str = self.run(
-                cmd=cmd,
-                timeout=timeout,
-                include_target=False,
-            )
+        output: str = self.run(
+            cmd=cmd,
+            timeout=timeout,
+            include_target=False,
+        )
 
-            target_info_from_target_list: list[dict[str, Any]] = json.loads(
-                output
-            )
-            _LOGGER.debug(
-                "`%s` returned: %s", " ".join(cmd), target_info_from_target_list
-            )
+        target_info_from_target_list: list[dict[str, Any]] = json.loads(output)
+        _LOGGER.debug(
+            "`%s` returned: %s", " ".join(cmd), target_info_from_target_list
+        )
 
-            if len(target_info_from_target_list) == 1:
-                return target_info_from_target_list[0]
-            else:
-                raise errors.FfxCommandError(
-                    f"'{self._target_name}' is not connected to host"
-                )
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
+        if len(target_info_from_target_list) == 1:
+            return target_info_from_target_list[0]
+        else:
+            raise errors.FfxCommandError(
+                f"'{self._target_name}' is not connected to host"
+            )
 
     def get_target_name(
         self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
@@ -450,17 +416,14 @@ class FFX(ffx_interface.FFX):
             Target name.
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
-        try:
-            ffx_target_show_info: TargetInfoData = self.get_target_information(
-                timeout
-            )
-            return ffx_target_show_info.target.name
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(
-                f"Failed to get the target name of {self._target_name}"
-            ) from err
+        ffx_target_show_info: TargetInfoData = self.get_target_information(
+            timeout
+        )
+        return ffx_target_show_info.target.name
 
     def get_target_ssh_address(
         self, timeout: float | None = ffx_interface.TIMEOUTS["FFX_CLI"]
@@ -474,27 +437,22 @@ class FFX(ffx_interface.FFX):
             (Target SSH IP Address, Target SSH Port)
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TARGET_SSH_ADDRESS"]
-        try:
-            output: str = self.run(cmd=cmd, timeout=timeout)
-            output = output.strip()
-            _LOGGER.debug("`%s` returned: %s", " ".join(cmd), output)
+        output: str = self.run(cmd=cmd, timeout=timeout)
 
-            # in '[fe80::6a47:a931:1e84:5077%qemu]:22', ":22" is SSH port.
-            # Ports can be 1-5 chars, clip off everything after the last ':'.
-            ssh_info: list[str] = output.rsplit(":", 1)
-            ssh_ip: str = ssh_info[0].replace("[", "").replace("]", "")
-            ssh_port: int = int(ssh_info[1])
+        # in '[fe80::6a47:a931:1e84:5077%qemu]:22', ":22" is SSH port.
+        # Ports can be 1-5 chars, clip off everything after the last ':'.
+        ssh_info: list[str] = output.rsplit(":", 1)
+        ssh_ip: str = ssh_info[0].replace("[", "").replace("]", "")
+        ssh_port: int = int(ssh_info[1])
 
-            return custom_types.TargetSshAddress(
-                ip=ipaddress.ip_address(ssh_ip), port=ssh_port
-            )
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(
-                f"Failed to get the SSH address of {self._target_name}"
-            ) from err
+        return custom_types.TargetSshAddress(
+            ip=ipaddress.ip_address(ssh_ip), port=ssh_port
+        )
 
     def get_target_board(
         self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
@@ -508,7 +466,9 @@ class FFX(ffx_interface.FFX):
             Target's board.
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
         target_show_info: TargetInfoData = self.get_target_information(
             timeout=timeout
@@ -529,7 +489,9 @@ class FFX(ffx_interface.FFX):
             Target's product.
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
         target_show_info: TargetInfoData = self.get_target_information(
             timeout=timeout
@@ -540,14 +502,10 @@ class FFX(ffx_interface.FFX):
             else ""
         )
 
-    # pylint: disable=missing-raises-doc
-    # To handle below pylint warning:
-    #   W9006: "Exception" not documented as being raised (missing-raises-doc)
     def run(
         self,
         cmd: list[str],
         timeout: float | None = ffx_interface.TIMEOUTS["FFX_CLI"],
-        exceptions_to_skip: Iterable[type[Exception]] | None = None,
         capture_output: bool = True,
         log_output: bool = True,
         include_target: bool = True,
@@ -557,7 +515,6 @@ class FFX(ffx_interface.FFX):
         Args:
             cmd: FFX command to run.
             timeout: Timeout to wait for the ffx command to return.
-            exceptions_to_skip: Any non fatal exceptions to be ignored.
             capture_output: When True, the stdout/err from the command will be
                 captured and returned. When False, the output of the command
                 will be streamed to stdout/err accordingly and it won't be
@@ -577,64 +534,36 @@ class FFX(ffx_interface.FFX):
             errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
-        exceptions_to_skip = tuple(exceptions_to_skip or [])
-
         ffx_cmd: list[str] = self._generate_ffx_cmd(
             cmd=cmd,
             include_target=include_target,
         )
         try:
-            _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
-            if capture_output:
-                output: str = subprocess.check_output(
-                    ffx_cmd, stderr=subprocess.PIPE, timeout=timeout
-                ).decode()
-                if log_output:
-                    _LOGGER.debug(
-                        "`%s` returned: %s", " ".join(ffx_cmd), output
-                    )
-                return output
-            else:
-                subprocess.check_call(ffx_cmd, timeout=timeout)
-                _LOGGER.debug("`%s` finished executing", " ".join(ffx_cmd))
-                return ""
-        except Exception as err:  # pylint: disable=broad-except
-            # Catching all exceptions into this broad one because of
-            # `exceptions_to_skip` argument
-
-            if isinstance(err, exceptions_to_skip):
-                return ""
-
-            if isinstance(err, subprocess.TimeoutExpired):
-                raise errors.FfxTimeoutError(
-                    f"`{cmd} command timed out after {timeout}sec."
+            return (
+                host_shell.run(
+                    cmd=ffx_cmd,
+                    capture_output=capture_output,
+                    log_output=log_output,
+                    timeout=timeout,
                 )
-
-            if isinstance(err, subprocess.CalledProcessError):
-                message: str = (
-                    f"Command '{ffx_cmd}' failed. returncode = {err.returncode}"
-                )
-                if err.stdout:
-                    message += f", stdout = {err.stdout}"
-                if err.stderr:
-                    message += f", stderr = {err.stderr}."
-                _LOGGER.debug(message)
-
-                if _DEVICE_NOT_CONNECTED in str(err.output):
-                    raise errors.DeviceNotConnectedError(
-                        f"{self._target_name} is not connected to host"
-                    ) from err
-
-            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
-
-    # pylint: enable=missing-raises-doc
+                or ""
+            )
+        except errors.HostCmdError as err:
+            if _DEVICE_NOT_CONNECTED in str(err):
+                raise errors.DeviceNotConnectedError(
+                    f"{self._target_name} is not connected to host"
+                ) from err
+            raise errors.FfxCommandError(err) from err
+        except errors.HoneydewTimeoutError as err:
+            raise errors.FfxTimeoutError(err) from err
 
     def popen(  # type: ignore[no-untyped-def]
         self,
         cmd: list[str],
         **kwargs,
-    ) -> subprocess.Popen[Any]:
-        """Executes the command `ffx -t {target} ... {cmd}` via `subprocess.Popen`.
+    ) -> subprocess.Popen[custom_types.AnyString]:
+        """Starts a new process to run the FFX cmd and returns the corresponding
+        process.
 
         Intended for executing daemons or processing streamed output. Given
         the raw nature of this API, it is up to callers to detect and handle
@@ -648,16 +577,14 @@ class FFX(ffx_interface.FFX):
 
         Returns:
             The Popen object of `ffx -t {target} {cmd}`.
-
-        Raises:
-            errors.FfxCommandError: On failure.
+            If text arg of subprocess.Popen is set to True,
+            subprocess.Popen[str] will be returned. Otherwise,
+            subprocess.Popen[bytes] will be returned.
         """
-        ffx_cmd: list[str] = self._generate_ffx_cmd(cmd=cmd)
-        _LOGGER.info("Opening ffx process `%s`...", " ".join(ffx_cmd))
-        try:
-            return subprocess.Popen(ffx_cmd, **kwargs)
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
+        return host_shell.popen(
+            cmd=self._generate_ffx_cmd(cmd=cmd),
+            **kwargs,
+        )
 
     def run_test_component(
         self,
@@ -758,25 +685,14 @@ class FFX(ffx_interface.FFX):
         _LOGGER.info("Waiting for %s to connect to host...", self._target_name)
 
         cmd: list[str] = _FFX_CMDS["TARGET_WAIT"] + [str(timeout)]
-        try:
-            self.run(
-                cmd=cmd,
-                # check_output timeout should be > rcs_connection timeout passed
-                timeout=timeout + 5,
-            )
-            _LOGGER.info("%s is connected to host", self._target_name)
-            return
-        except errors.DeviceNotConnectedError:
-            raise
-        except subprocess.TimeoutExpired as err:
-            raise errors.FfxTimeoutError(
-                f"`{cmd} command timed out after {timeout}sec."
-            ) from err
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(
-                f"'{self._target_name}' is still not connected to host even "
-                f"after {timeout}sec."
-            ) from err
+        self.run(
+            cmd=cmd,
+            # check_output timeout should be > rcs_connection timeout passed
+            timeout=timeout + 5,
+        )
+
+        _LOGGER.info("%s is connected to host", self._target_name)
+        return
 
     def wait_for_rcs_disconnection(
         self,
@@ -797,27 +713,16 @@ class FFX(ffx_interface.FFX):
         _LOGGER.info(
             "Waiting for %s to disconnect from host...", self._target_name
         )
-        cmd: list[str] = _FFX_CMDS["TARGET_WAIT_DOWN"] + [str(timeout)]
 
-        try:
-            self.run(
-                cmd=cmd,
-                # check_output timeout should be > rcs_disconnect timeout passed
-                timeout=timeout + 5,
-            )
-            _LOGGER.info("%s is not connected to host", self._target_name)
-            return
-        except errors.DeviceNotConnectedError:
-            raise
-        except subprocess.TimeoutExpired as err:
-            raise errors.FfxTimeoutError(
-                f"`{cmd} command timed out after {timeout}sec."
-            ) from err
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(
-                f"'{self._target_name}' is still connected to host even after"
-                f" {timeout}sec."
-            ) from err
+        cmd: list[str] = _FFX_CMDS["TARGET_WAIT_DOWN"] + [str(timeout)]
+        self.run(
+            cmd=cmd,
+            # check_output timeout should be > rcs_disconnect timeout passed
+            timeout=timeout + 5,
+        )
+
+        _LOGGER.info("%s is not connected to host", self._target_name)
+        return
 
     # List all private methods
     def _generate_ffx_cmd(
@@ -825,8 +730,7 @@ class FFX(ffx_interface.FFX):
         cmd: list[str],
         include_target: bool = True,
     ) -> list[str]:
-        """Generates the FFX command that need to be passed
-        subprocess.check_output.
+        """Generates the FFX command that need to be run.
 
         Args:
             cmd: FFX command.

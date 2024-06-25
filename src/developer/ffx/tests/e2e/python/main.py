@@ -52,7 +52,9 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
     def test_target_echo_repeat(self) -> None:
         """Test `ffx target echo --repeat` is resilient to daemon failure."""
         with self.dut.ffx.popen(
-            ["target", "echo", "--repeat"], stdout=subprocess.PIPE
+            ["target", "echo", "--repeat"],
+            stdout=subprocess.PIPE,
+            text=False,
         ) as process:
             try:
                 line = process.stdout.readline()
