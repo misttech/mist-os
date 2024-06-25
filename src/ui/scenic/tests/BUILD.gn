@@ -194,7 +194,12 @@ fuchsia_test_component("flatland_view_integration_test") {
 
 executable("cpu_renderer_integration_test_bin") {
   testonly = true
-  sources = [ "flatland_integration_tests/cpu_renderer_integration_test.cc" ]
+
+  # TODO(https://fxbug.dev/42075218): Re-enable this test once zx_cache_flush is implemented on
+  # riscv64.
+  if (target_cpu != "riscv64") {
+    sources = [ "flatland_integration_tests/cpu_renderer_integration_test.cc" ]
+  }
   deps = [
     ":common_deps",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
