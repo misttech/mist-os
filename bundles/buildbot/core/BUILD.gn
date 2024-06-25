@@ -38,6 +38,7 @@ group("core") {
   assert_no_deps = [ "//bundles/platform/*" ]
 
   deps = [
+    ":examples",
     ":no_e2e",
 
     # Add in e2e tests excluded from `no_e2e`.
@@ -82,6 +83,21 @@ group("no_e2e") {
   }
 }
 
+# This group contains examples that are built but don't execute any tests.
+group("examples") {
+  testonly = true
+  deps = [
+    "//build/bazel/examples",
+    "//examples",
+    "//src/lib/ui/carnelian:examples",
+    "//src/media/bundles:examples",
+  ]
+  metadata = {
+    # Disallow test bundles to add shell commands to the main image.
+    shell_commands_barrier = []
+  }
+}
+
 # This group contains tests that don't depend on any known e2e test libraries.
 # This happens to exclude unit tests for these e2e libraries, so this group is
 # not meant to be used directly. It serves as an intermediate group for
@@ -92,14 +108,10 @@ group("no_e2e_dep") {
 
   deps = [
     "//build:tests",
-    "//build/bazel/examples",
-    "//examples",
     "//examples:tests",
     "//scripts:tests",
     "//scripts/sdk/gn:tests",
     "//src/diagnostics:tests",
-    "//src/lib/ui/carnelian:examples",
-    "//src/media/bundles:examples",
     "//src/media/bundles:services",
     "//src/media/bundles:tools",
     "//third_party:tests",
