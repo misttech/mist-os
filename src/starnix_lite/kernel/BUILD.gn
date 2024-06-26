@@ -413,11 +413,36 @@ rustc_library("starnix_kernel_runner") {
     "hwasan",
   ]
 
-  sources = [ "runner/lib.rs" ]
+  sources = [
+    "runner/container.rs",
+    "runner/features.rs",
+    "runner/lib.rs",
+  ]
 
-  deps = []
+  deps = [
+    ":starnix_core",
+    ":starnix_kernel_config",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
+    "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/kernel:starnix_logging",
+    "//src/starnix/kernel:starnix_sync",
+    "//src/starnix/lib/selinux/core",
+    "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:bstr",
+    "//third_party/rust_crates:futures",
+  ]
 
-  test_deps = []
+  test_deps = [ "//src/lib/fuchsia" ]
+
+  features = [ "starnix_lite" ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
@@ -639,6 +664,17 @@ resource("vdso-data") {
 }
 
 # Components
+
+# The starnix kernel manifest, used by all containers.
+fuchsia_component_manifest("starnix_kernel_manifest") {
+  manifest = "meta/starnix_lite_kernel.cml"
+  component_name = "starnix_lite_kernel"
+}
+
+# The starnix kernel configuration library, used by the Rust binary to parse configuration.
+fuchsia_structured_config_rust_lib("starnix_kernel_config") {
+  cm_label = ":starnix_kernel_manifest"
+}
 
 # ZBIs
 
