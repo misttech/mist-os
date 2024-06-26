@@ -137,6 +137,12 @@ template("generate_fuchsia_bazel_sdk") {
 #       Override the global `enable_bazel_remote_rbe` setting for building.
 #       Set to false to prevent use of remote services for building.
 #
+#    remote_build_strategy: (optional)
+#       Override the global `bazel_rbe_exec_strategy` setting for building.
+#       Valid choices:
+#         "remote": execute cache-misses remotely
+#         "local": execute cache-misses locally
+#
 template("run_fuchsia_bazel_sdk_tests") {
   _use_idk_exported = defined(invoker.idk_exported_path)
   if (_use_idk_exported) {
@@ -205,6 +211,10 @@ template("run_fuchsia_bazel_sdk_tests") {
     if (defined(invoker.remote_build)) {
       _remote_build = invoker.remote_build
     }
+    _remote_build_strategy = bazel_rbe_exec_strategy
+    if (defined(invoker.remote_build_strategy)) {
+      _remote_build_strategy = invoker.remote_build_strategy
+    }
     if (_remote_build || bazel_upload_build_events != "") {
       _remote_services_bazelrc_target = "//build/bazel:remote_services_bazelrc"
       _remote_services_bazelrc_path =
@@ -217,7 +227,13 @@ template("run_fuchsia_bazel_sdk_tests") {
       deps += [ _remote_services_bazelrc_target ]
     }
     if (_remote_build) {
-      args += [ "--bazel-config=remote" ]
+      if (_remote_build_strategy == "remote") {
+        args += [ "--bazel-config=remote" ]
+      } else if (_remote_build_strategy == "local") {
+        args += [ "--bazel-config=remote_cache_only" ]
+      }
+    } else {
+      not_needed([ "_remote_build_strategy" ])
     }
     if (bazel_upload_build_events != "") {
       args += [ "--bazel-config=" + bazel_upload_build_events ]

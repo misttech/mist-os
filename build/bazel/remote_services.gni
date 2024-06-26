@@ -15,6 +15,14 @@ declare_args() {
   # For an overview of remote execution for Bazel, see https://bazel.build/remote/rbe
   enable_bazel_remote_rbe = rbe_settings.bazel_enable
 
+  # When bazel is configured to use RBE, this controls the execution strategy
+  # that is used.
+  #
+  # Supported options:
+  #   "remote": on cache-miss, build remotely (default)
+  #   "local": on cache-miss, build locally
+  bazel_rbe_exec_strategy = rbe_settings.bazel_exec_strategy
+
   # Configure bazel to stream build events and results to a service.
   # This is useful for sharing build results and invocation details
   # for reproducing and triaging issues.

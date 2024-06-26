@@ -831,6 +831,7 @@ def main() -> int:
         ("resultstore", "BAZEL_resultstore_socket_path", "--bes_proxy"),
         ("resultstore_infra", "BAZEL_resultstore_socket_path", "--bes_proxy"),
         ("remote", "BAZEL_rbe_socket_path", "--remote_proxy"),
+        ("remote_cache_only", "BAZEL_rbe_socket_path", "--remote_proxy"),
     ):
         if f"--config={config_arg}" in bazel_config_args:
             env_value = os.environ.get(env_var)
@@ -842,6 +843,8 @@ def main() -> int:
         cpus = os.cpu_count()
         if cpus:
             jobs = 10 * cpus
+        # "--config=remote_cache_only" uses local resources to execute on cache-misses,
+        # so conservatively leave `jobs` default to `cpus`.
     else:
         # RBE documentation states that --disk_cache 'does not mix'
         # with it, so only support it when remote config is not used.

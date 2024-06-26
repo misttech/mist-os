@@ -73,7 +73,7 @@ do
       [[ "${{BAZEL_resultstore_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_resultstore_socket_path" )
       ;;
-    --config=remote) # Remote build execution service
+    --config=remote | --config=remote_cache_only)  # Remote build execution service
       has_remote_config=true
       [[ "${{BAZEL_rbe_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--remote_proxy=unix://$BAZEL_rbe_socket_path" )

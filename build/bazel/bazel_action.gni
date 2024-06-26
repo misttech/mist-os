@@ -584,7 +584,14 @@ template("bazel_action") {
       _remote_build = invoker.remote_build
     }
     if (_remote_build) {
-      args += [ "--config=remote" ]
+      if (bazel_rbe_exec_strategy == "remote") {
+        args += [ "--config=remote" ]
+      } else if (bazel_rbe_exec_strategy == "local") {
+        args += [ "--config=remote_cache_only" ]
+      } else {
+        assert(false,
+               "Unknown bazel_rbe_exec_strategy: $bazel_rbe_exec_strategy")
+      }
     }
 
     if (bazel_upload_build_events != "") {
