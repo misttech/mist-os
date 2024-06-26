@@ -48,16 +48,10 @@ class DisplayDeviceDriver : public fdf::DriverBase {
     std::unique_ptr<display::DispatcherFactory> dispatcher_factory;
   };
 
-  // Creates a ComponentInspector that serves the `inspector` to the driver
-  // component's Inspect sink.
-  zx::result<std::unique_ptr<inspect::ComponentInspector>> CreateComponentInspector(
-      inspect::Inspector inspector);
-
   // Creates a set of `DriverFrameworkMigrationUtils` using the resources
   // provided by the driver component.
   zx::result<DriverFrameworkMigrationUtils> CreateDriverFrameworkMigrationUtils();
 
-  std::unique_ptr<inspect::ComponentInspector> component_inspector_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 

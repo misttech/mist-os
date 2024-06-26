@@ -316,11 +316,6 @@ zx_status_t AmlGpu::ProcessMetadata(
 }
 
 zx::result<> AmlGpu::Start() {
-  component_inspector_ = std::make_unique<inspect::ComponentInspector>(
-      dispatcher(), inspect::PublishOptions{
-                        .inspector = inspector_,
-                        .client_end = incoming()->Connect<fuchsia_inspect::InspectSink>().value()});
-
   auto loop_dispatcher = fdf::UnsynchronizedDispatcher::Create(
       fdf::UnsynchronizedDispatcher::Options{}, "aml-gpu-thread",
       [this](fdf_dispatcher_t* dispatcher) { loop_shutdown_completion_.Signal(); },
@@ -331,7 +326,7 @@ zx::result<> AmlGpu::Start() {
     return loop_dispatcher.take_error();
   }
   loop_dispatcher_ = *std::move(loop_dispatcher);
-  root_ = inspector_.GetRoot().CreateChild("aml-gpu");
+  root_ = inspector().root().CreateChild("aml-gpu");
   current_clk_source_property_ = root_.CreateUint("current_clk_source", current_clk_source_);
   current_clk_mux_source_property_ = root_.CreateUint("current_clk_mux_source", 0);
   current_clk_freq_hz_property_ = root_.CreateUint("current_clk_freq_hz", 0);

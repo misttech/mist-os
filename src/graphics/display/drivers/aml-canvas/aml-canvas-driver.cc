@@ -10,7 +10,6 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/bti.h>
@@ -38,28 +37,6 @@ void AmlCanvasDriver::Stop() {
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to remove the Node: %s", result.status_string());
   }
-}
-
-zx::result<std::unique_ptr<inspect::ComponentInspector>>
-AmlCanvasDriver::CreateComponentInspector() {
-  zx::result<fidl::ClientEnd<fuchsia_inspect::InspectSink>> inspect_sink_connect_result =
-      incoming()->Connect<fuchsia_inspect::InspectSink>();
-  if (inspect_sink_connect_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to InspectSink protocol: %s",
-            inspect_sink_connect_result.status_string());
-    return inspect_sink_connect_result.take_error();
-  }
-
-  fbl::AllocChecker alloc_checker;
-  auto component_inspector = fbl::make_unique_checked<inspect::ComponentInspector>(
-      &alloc_checker, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-      inspect::PublishOptions{.inspector = inspect::Inspector{},
-                              .client_end = std::move(inspect_sink_connect_result).value()});
-  if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for ComponentInspector");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  return zx::ok(std::move(component_inspector));
 }
 
 zx::result<std::unique_ptr<AmlCanvas>> AmlCanvasDriver::CreateAndServeCanvas(
@@ -143,21 +120,13 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AmlCanvasD
 }
 
 zx::result<> AmlCanvasDriver::Start() {
-  zx::result<std::unique_ptr<inspect::ComponentInspector>> inspector_result =
-      CreateComponentInspector();
-  if (inspector_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create component inspector: %s", inspector_result.status_string());
-    return inspector_result.take_error();
-  }
-  component_inspector_ = std::move(inspector_result).value();
-
   zx::result<> compat_server_init_result =
       compat_server_.Initialize(incoming(), outgoing(), node_name(), name());
   if (compat_server_init_result.is_error()) {
     return compat_server_init_result.take_error();
   }
 
-  auto canvas_result = CreateAndServeCanvas(component_inspector_->inspector());
+  auto canvas_result = CreateAndServeCanvas(inspector().inspector());
   if (canvas_result.is_error()) {
     FDF_LOG(ERROR, "Failed to create AmlCanvas and set up service: %s",
             canvas_result.status_string());

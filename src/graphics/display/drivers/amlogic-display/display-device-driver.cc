@@ -46,28 +46,6 @@ DisplayDeviceDriver::DisplayDeviceDriver(fdf::DriverStartArgs start_args,
 
 void DisplayDeviceDriver::Stop() {}
 
-zx::result<std::unique_ptr<inspect::ComponentInspector>>
-DisplayDeviceDriver::CreateComponentInspector(inspect::Inspector inspector) {
-  zx::result<fidl::ClientEnd<fuchsia_inspect::InspectSink>> inspect_sink_connect_result =
-      incoming()->Connect<fuchsia_inspect::InspectSink>();
-  if (inspect_sink_connect_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to InspectSink protocol: %s",
-            inspect_sink_connect_result.status_string());
-    return inspect_sink_connect_result.take_error();
-  }
-
-  fbl::AllocChecker alloc_checker;
-  auto component_inspector = fbl::make_unique_checked<inspect::ComponentInspector>(
-      &alloc_checker, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-      inspect::PublishOptions{.inspector = std::move(inspector),
-                              .client_end = std::move(inspect_sink_connect_result).value()});
-  if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for ComponentInspector");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  return zx::ok(std::move(component_inspector));
-}
-
 zx::result<DisplayDeviceDriver::DriverFrameworkMigrationUtils>
 DisplayDeviceDriver::CreateDriverFrameworkMigrationUtils() {
   zx::result<std::unique_ptr<display::Namespace>> create_namespace_result =
@@ -129,13 +107,7 @@ zx::result<> DisplayDeviceDriver::Start() {
   }
   display_engine_ = std::move(create_display_engine_result).value();
 
-  zx::result<std::unique_ptr<inspect::ComponentInspector>> inspector_result =
-      CreateComponentInspector(display_engine_->inspector());
-  if (inspector_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create component inspector: %s", inspector_result.status_string());
-    return inspector_result.take_error();
-  }
-  component_inspector_ = std::move(inspector_result).value();
+  InitInspectorExactlyOnce(display_engine_->inspector());
 
   // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
   // over the compatibility server.
