@@ -4582,6 +4582,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
         let _: Option<_> = bindings_ctx.cancel_timer(timer);
     }
 
+    debug!("aborting pending socket {sock_id:?}");
     if let Some(reset) = core_ctx.with_counters(|counters| state.abort(counters)) {
         let ConnAddr { ip, device: _ } = conn_addr;
         send_tcp_segment(core_ctx, bindings_ctx, Some(sock_id), Some(ip_sock), *ip, reset.into());

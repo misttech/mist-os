@@ -2659,7 +2659,11 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 smss: _,
                 rcv_wnd_scale: _,
                 snd_wnd_scale: _,
-            }) => Some(Segment::rst_ack(*iss, *irs + 1)),
+            }) => {
+                // When we're in SynRcvd we already sent out SYN-ACK with iss,
+                // so a RST must have iss+1.
+                Some(Segment::rst_ack(*iss + 1, *irs + 1))
+            }
             State::Established(Established { snd, rcv }) => {
                 Some(Segment::rst_ack(snd.nxt, rcv.nxt()))
             }
@@ -3081,6 +3085,27 @@ mod test {
         }
     }
 
+    impl State<FakeInstant, RingBuffer, NullBuffer, ()> {
+        fn new_syn_rcvd(instant: FakeInstant) -> Self {
+            State::SynRcvd(SynRcvd {
+                iss: ISS_2,
+                irs: ISS_1,
+                timestamp: Some(instant),
+                retrans_timer: RetransTimer::new(
+                    instant,
+                    Estimator::RTO_INIT,
+                    DEFAULT_USER_TIMEOUT,
+                    DEFAULT_MAX_RETRIES,
+                ),
+                simultaneous_open: Some(()),
+                buffer_sizes: Default::default(),
+                smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+                rcv_wnd_scale: WindowScale::default(),
+                snd_wnd_scale: Some(WindowScale::default()),
+            })
+        }
+    }
+
     #[test_case(Segment::rst(ISS_1) => None; "drop RST")]
     #[test_case(Segment::rst_ack(ISS_1, ISS_2) => None; "drop RST|ACK")]
     #[test_case(Segment::syn(ISS_1, UnscaledWindowSize::from(0), Options { mss: None, window_scale: None }) => Some(Segment::rst_ack(SeqNum::new(0), ISS_1 + 1)); "reset SYN")]
@@ -3315,22 +3340,7 @@ mod test {
     ) -> Option<Segment<()>> {
         let mut clock = FakeInstantCtx::default();
         let counters = TcpCountersInner::default();
-        let mut state = State::SynRcvd(SynRcvd {
-            iss: ISS_2,
-            irs: ISS_1,
-            timestamp: Some(clock.now()),
-            retrans_timer: RetransTimer::new(
-                clock.now(),
-                Estimator::RTO_INIT,
-                DEFAULT_USER_TIMEOUT,
-                DEFAULT_MAX_RETRIES,
-            ),
-            simultaneous_open: Some(()),
-            buffer_sizes: Default::default(),
-            smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            rcv_wnd_scale: WindowScale::default(),
-            snd_wnd_scale: Some(WindowScale::default()),
-        });
+        let mut state = State::new_syn_rcvd(clock.now());
         clock.sleep(RTT);
         let (seg, _passive_open) = state
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(
@@ -3343,6 +3353,17 @@ mod test {
             None => assert_matches!(state, State::SynRcvd(_)),
         };
         seg
+    }
+
+    #[test]
+    fn abort_when_syn_rcvd() {
+        let clock = FakeInstantCtx::default();
+        let counters = TcpCountersInner::default();
+        let mut state = State::new_syn_rcvd(clock.now());
+        let segment = state.abort(&counters).unwrap();
+        assert_eq!(segment.contents.control(), Some(Control::RST));
+        assert_eq!(segment.seq, ISS_2 + 1);
+        assert_eq!(segment.ack, Some(ISS_1 + 1));
     }
 
     #[test_case(
