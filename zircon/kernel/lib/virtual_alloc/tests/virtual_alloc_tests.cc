@@ -492,6 +492,13 @@ bool virtual_alloc_aligned_alloc_test() {
 bool vritual_alloc_large_allocs_are_contiguous_test() {
   BEGIN_TEST;
 
+  if (true) {
+    // TODO(https://fxbug.dev/349402040): Test is disabled because it can fail spuriously.  See
+    // https://fxbug.dev/349402040 for details.
+    printf("Test disabled due to https://fxbug.dev/349402040\n");
+    END_TEST;
+  }
+
   TestVmar vmar;
 
   VirtualAlloc alloc(vm_page_state::ALLOC);
