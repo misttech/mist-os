@@ -226,8 +226,10 @@ zx_status_t SdioControllerDevice::AddDevice() {
              inspect_sink.status_string());
     return inspect_sink.status_value();
   }
-  exposed_inspector_.emplace(inspect::ComponentInspector(
-      dispatcher_, {.inspector = inspector_, .client_end = std::move(inspect_sink.value())}));
+  exposed_inspector_.emplace(
+      inspect::ComponentInspector(dispatcher_, {.inspector = inspector_,
+                                                .tree_name = "sdio-controller-device",
+                                                .client_end = std::move(inspect_sink.value())}));
 
   auto [controller_client_end, controller_server_end] =
       fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
