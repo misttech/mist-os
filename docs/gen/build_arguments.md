@@ -115,17 +115,6 @@ Path to the amlogic decoder firmware file. Overrides the default in the build.
 
 From //src/media/drivers/amlogic_decoder/BUILD.gn:12
 
-### amlogic_display_is_dfv2
-
-If true, the driver component `fuchsia://fuchsia.com/amlogic-display#
-meta/amlogic-display.cm` will be the DFv2 version of the driver component
-(`:amlogic-display-dfv2`). Otherwise, it will be the DFv1 version of the
-driver component (`:amlogic-display-dfv1`).
-
-**Current value (from the default):** `true`
-
-From //src/graphics/display/drivers/amlogic-display/BUILD.gn:16
-
 ### api_compatibility_testing
 
 **Current value (from the default):** `true`
@@ -7606,7 +7595,7 @@ derives an ABI revision from the latest integration.git hash.
 TODO(https://fxbug.dev/324892812): Delete this option after a transition
 period.
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //build/sdk/config.gni:20
 
