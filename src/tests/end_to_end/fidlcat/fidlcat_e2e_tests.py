@@ -11,6 +11,7 @@ import sys
 import tempfile
 import textwrap
 from threading import Event, Thread
+from typing import Any
 import unittest
 
 TEST_DATA_DIR = "host_x64/test_data/fidlcat_e2e_tests"  # relative to $PWD
@@ -50,14 +51,14 @@ class Ffx:
     # The target address will be in environment variables and determined at initialization.
     _target = ["--target"]
     # The actual ffx command to run.
-    _command = []
+    _command: list[str] = []
 
-    def __init__(self, *args: str):
+    def __init__(self, *args: str) -> None:
         self._command = list(args)
         self._target.append(self.get_target())
 
     @staticmethod
-    def get_target():
+    def get_target() -> str:
         if not "FUCHSIA_DEVICE_ADDR" in os.environ.keys():
             raise RuntimeError("FUCHSIA_DEVICE_ADDR must be specified.")
 
@@ -79,7 +80,7 @@ class Ffx:
 
     # Initialize the ffx isolate with the connected target device indicated by the environment
     # variables FUCHSIA_DEVICE_ADDR and FUCHSIA_SSH_PORT.
-    def init_isolate(self, addr):
+    def init_isolate(self, addr: str) -> None:
         # Add the target to the isolate.
         target_add_process = subprocess.Popen(
             [self._path] + self._isolate_args + ["target", "add", addr],
@@ -89,11 +90,12 @@ class Ffx:
 
         if target_add_process.returncode != 0:
             raise RuntimeError(
-                "Failed to spawn FFX isolate " + target_add_process.returncode
+                "Failed to spawn FFX isolate "
+                + str(target_add_process.returncode)
             )
 
     # Run the requested ffx command.
-    def start(self):
+    def start(self) -> None:
         self.init_isolate(self._target[-1])
 
         self.process = subprocess.Popen(
@@ -107,18 +109,18 @@ class Ffx:
             stderr=subprocess.PIPE,
         )
 
-    def wait(self):
+    def wait(self) -> int:
         self.process.communicate()
         return self.process.returncode
 
 
 class Fidlcat:
     _path = "host_x64/fidlcat"
-    _args = []
+    _arg: list[str] = []
     _ffx_bridge = None
     _debug_agent_socket_path = None
 
-    def __init__(self, *args, merge_stderr=False):
+    def __init__(self, *args: str, merge_stderr: bool = False) -> None:
         """
         merge_stderr: whether to merge stderr to stdout.
         """
@@ -126,25 +128,27 @@ class Fidlcat:
         stderr = subprocess.PIPE
         if merge_stderr:
             stderr = subprocess.STDOUT
-        self.process = subprocess.Popen(
+        self.process: subprocess.Popen[str] = subprocess.Popen(
             [self._path] + self._args + list(args),
             text=True,
             stdout=subprocess.PIPE,
             stderr=stderr,
         )
-        self.stdout = ""  # Contains both stdout and stderr, if merge_stderr.
-        self.stderr = ""
-        self._timeout_cancel = Event()
+        self.stdout: str = (
+            ""  # Contains both stdout and stderr, if merge_stderr.
+        )
+        self.stderr: str = ""
+        self._timeout_cancel: Event = Event()
         Thread(target=self._timeout_thread).start()
 
-    def _timeout_thread(self):
+    def _timeout_thread(self) -> None:
         self._timeout_cancel.wait(FIDLCAT_TIMEOUT)
         if not self._timeout_cancel.is_set():
             self.process.kill()
             self.wait()
             raise TimeoutError("Fidlcat timeouts\n" + self.get_diagnose_msg())
 
-    def wait(self):
+    def wait(self) -> int:
         """Wait for the process to terminate, assert the returncode, fill the stdout and stderr."""
         (stdout, stderr) = self.process.communicate()
         self.stdout += stdout
@@ -153,22 +157,26 @@ class Fidlcat:
         self._timeout_cancel.set()
         return self.process.returncode
 
-    def read_until(self, pattern: str):
+    def read_until(self, pattern: str) -> bool:
         """
         Read the stdout until EOF or a line contains pattern. Returns whether the pattern matches.
 
         Note: A deadlock could happen if we only read from stdout but the stderr buffer is full.
               Consider setting merge_stderr if you want to use this function.
         """
+        stdout = self.process.stdout
+        if not stdout:
+            return False
+
         while True:
-            line = self.process.stdout.readline()
+            line = stdout.readline()
             if not line:
                 return False
             self.stdout += line
             if pattern in line:
                 return True
 
-    def get_diagnose_msg(self):
+    def get_diagnose_msg(self) -> str:
         return (
             "\n=== stdout ===\n"
             + self.stdout
@@ -178,11 +186,13 @@ class Fidlcat:
         )
 
     @classmethod
-    def setup(cls):
+    def setup(cls: Any) -> None:
         cls._ffx_bridge = Ffx("debug", "connect", "--agent-only")
         cls._ffx_bridge.start()
         cls._debug_agent_socket_path = (
             cls._ffx_bridge.process.stdout.readline().strip()
+            if cls._ffx_bridge.process.stdout is not None
+            else ""
         )
 
         assert os.path.exists(cls._debug_agent_socket_path)
@@ -197,8 +207,12 @@ class Fidlcat:
         ]
 
     @classmethod
-    def teardown(cls):
-        cls._ffx_bridge.process.terminate()
+    def teardown(cls: Any) -> None:
+        if cls._ffx_bridge:
+            cls._ffx_bridge.process.terminate()
+
+        if cls._debug_agent_socket_path is None:
+            return
 
         socket_path = pathlib.Path(cls._debug_agent_socket_path)
 
@@ -221,15 +235,15 @@ ECHO_REALM_MONIKER = "/core/ffx-laboratory:fidlcat_test_echo_realm"
 
 class FidlcatE2eTests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls: Any) -> None:
         Fidlcat.setup()
 
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls: Any) -> None:
         Fidlcat.teardown()
 
     # Ensure debug_agent exits correctly after each test case. See https://fxbug.dev/42051863.
-    def tearDown(self):
+    def tearDown(self) -> None:
         # FUCHSIA_DEVICE_ADDR and FUCHSIA_SSH_KEY must be defined.
         # FUCHSIA_SSH_PORT is only defined when invoked from `fx test`.
         cmd = [
@@ -260,7 +274,7 @@ class FidlcatE2eTests(unittest.TestCase):
             # The return code will be 255 if no task found so don't check it.
             assert "no tasks found" in res.stdout, res.stdout
 
-    def test_run_echo(self):
+    def test_run_echo(self) -> None:
         fidlcat = Fidlcat(
             "--remote-component=echo_client.cm", "run", ECHO_REALM_URL
         )
@@ -275,7 +289,7 @@ class FidlcatE2eTests(unittest.TestCase):
 
     # TODO(https://fxbug.dev/42064761): This test flakes on core.x64-debug, where fidlcat fails to exit after
     # receiving the SIGTERM signal.
-    def disabled_test_stay_alive(self):
+    def disabled_test_stay_alive(self) -> None:
         fidlcat = Fidlcat(
             "--remote-name=echo_client", "--stay-alive", merge_stderr=True
         )
@@ -295,7 +309,7 @@ class FidlcatE2eTests(unittest.TestCase):
         fidlcat.process.terminate()
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
-    def test_extra_component(self):
+    def test_extra_component(self) -> None:
         fidlcat = Fidlcat(
             "--remote-component=echo_client.cm",
             "--extra-component=echo_server.cm",
@@ -306,7 +320,7 @@ class FidlcatE2eTests(unittest.TestCase):
 
         self.assertIn("Monitoring echo_server.cm koid=", fidlcat.stdout)
 
-    def test_trigger(self):
+    def test_trigger(self) -> None:
         fidlcat = Fidlcat(
             "--remote-component=echo_client.cm",
             "--trigger=.*EchoString",
@@ -321,7 +335,7 @@ class FidlcatE2eTests(unittest.TestCase):
             "sent request test.placeholders/Echo.EchoString = {", lines[2]
         )
 
-    def test_messages(self):
+    def test_messages(self) -> None:
         fidlcat = Fidlcat(
             "--remote-component=echo_client.cm",
             "--messages=.*EchoString",
@@ -346,7 +360,7 @@ class FidlcatE2eTests(unittest.TestCase):
             lines[3],
         )
 
-    def test_save_replay(self):
+    def test_save_replay(self) -> None:
         save_path = tempfile.NamedTemporaryFile(suffix="_save.pb")
         fidlcat = Fidlcat(
             "--remote-component=echo_client.cm",
@@ -372,7 +386,7 @@ class FidlcatE2eTests(unittest.TestCase):
             fidlcat.stdout,
         )
 
-    def test_with_summary(self):
+    def test_with_summary(self) -> None:
         fidlcat = Fidlcat(
             "--with=summary", "--from", TEST_DATA_DIR + "/echo.pb"
         )
@@ -505,7 +519,7 @@ class FidlcatE2eTests(unittest.TestCase):
 """,
         )
 
-    def test_with_top(self):
+    def test_with_top(self) -> None:
         fidlcat = Fidlcat("--with=top", "--from", TEST_DATA_DIR + "/echo.pb")
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
@@ -544,7 +558,7 @@ class FidlcatE2eTests(unittest.TestCase):
 """,
         )
 
-    def test_with_top_and_unknown_message(self):
+    def test_with_top_and_unknown_message(self) -> None:
         fidlcat = Fidlcat(
             "--with=top", "--from", TEST_DATA_DIR + "/snapshot.pb"
         )
@@ -557,7 +571,7 @@ class FidlcatE2eTests(unittest.TestCase):
             fidlcat.stdout,
         )
 
-    def test_with_messages_and_unknown_message(self):
+    def test_with_messages_and_unknown_message(self) -> None:
         fidlcat = Fidlcat(
             "--messages=.*x.*", "--from", TEST_DATA_DIR + "/snapshot.pb"
         )
