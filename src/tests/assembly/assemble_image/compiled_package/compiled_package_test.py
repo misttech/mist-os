@@ -16,7 +16,7 @@ class CompiledPackageTest(unittest.TestCase):
     Validate the assembly outputs when using a compiled package
     """
 
-    def test_assembly_has_core_package(self):
+    def test_assembly_has_core_package(self) -> None:
         outdir = os.path.join(assembly_outdir, "outdir")
         manifest = json.load(open(os.path.join(outdir, "image_assembly.json")))
         self.assertIn(
@@ -25,7 +25,7 @@ class CompiledPackageTest(unittest.TestCase):
             "The image assembly config should have 'core' in the base set",
         )
 
-    def test_assembly_has_compiled_packages(self):
+    def test_assembly_has_compiled_packages(self) -> None:
         outdir = os.path.join(assembly_outdir, "outdir")
         manifest = json.load(open(os.path.join(outdir, "image_assembly.json")))
 
@@ -45,7 +45,7 @@ class CompiledPackageTest(unittest.TestCase):
             "The baz component should have been compiled",
         )
 
-    def test_assembly_has_bootfs_compiled_packages(self):
+    def test_assembly_has_bootfs_compiled_packages(self) -> None:
         outdir = os.path.join(assembly_outdir, "outdir")
         manifest = json.load(open(os.path.join(outdir, "image_assembly.json")))
 
