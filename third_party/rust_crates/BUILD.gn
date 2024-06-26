@@ -6523,36 +6523,26 @@ rust_library("heck-v0_4_1") {
   applicable_licenses = [ ":heck-v0_4_1.license" ]
 }
 
-license("hermit-abi-v0_1_8.license") {
-  public_package_name = "hermit_abi"
-  license_files = [
-    "//third_party/rust_crates/vendor/hermit-abi-0.1.8/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/hermit-abi-0.1.8/LICENSE-MIT",
-  ]
-}
-
-rust_library("hermit-abi-v0_1_8") {
+rust_library("hermit-abi-v0_3_9") {
   crate_name = "hermit_abi"
-  crate_root = "//third_party/rust_crates/vendor/hermit-abi-0.1.8/src/lib.rs"
-  output_name = "hermit_abi-f84c675d3602a4e4"
+  crate_root = "//third_party/rust_crates/empty/hermit-abi/src/lib.rs"
+  output_name = "hermit_abi-e35941ed7a2874b2"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":libc-v0_2_149" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=f84c675d3602a4e4",
-    "-Cextra-filename=-f84c675d3602a4e4",
-    "--cfg=feature=\"default\"",
+    "-Cmetadata=e35941ed7a2874b2",
+    "-Cextra-filename=-e35941ed7a2874b2",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":hermit-abi-v0_1_8.license" ]
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
 license("hex-v0_3_2.license") {
@@ -9265,24 +9255,26 @@ rust_library("num-complex-v0_4_0") {
   applicable_licenses = [ ":num-complex-v0_4_0.license" ]
 }
 
-license("num_cpus-v1_13_0.license") {
+license("num_cpus-v1_16_0.license") {
   public_package_name = "num_cpus"
   license_files = [
-    "//third_party/rust_crates/vendor/num_cpus-1.13.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/num_cpus-1.13.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/num_cpus-1.16.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/num_cpus-1.16.0/LICENSE-MIT",
   ]
 }
 
-rust_library("num_cpus-v1_13_0") {
+rust_library("num_cpus-v1_16_0") {
   crate_name = "num_cpus"
-  crate_root = "//third_party/rust_crates/vendor/num_cpus-1.13.0/src/lib.rs"
-  output_name = "num_cpus-2a33e47c2187c1d3"
+  crate_root = "//third_party/rust_crates/vendor/num_cpus-1.16.0/src/lib.rs"
+  output_name = "num_cpus-a19523bee9466ca1"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":libc-v0_2_149" ]
-  if ((current_cpu == "x64" || current_cpu == "arm64") && false) {
-    deps += [ ":hermit-abi-v0_1_8" ]
+  if (!false) {
+    deps += [ ":libc-v0_2_149" ]
+  }
+  if (false) {
+    deps += [ ":hermit-abi-v0_3_9" ]
   }
 
   rustenv = []
@@ -9290,13 +9282,13 @@ rust_library("num_cpus-v1_13_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=2a33e47c2187c1d3",
-    "-Cextra-filename=-2a33e47c2187c1d3",
+    "-Cmetadata=a19523bee9466ca1",
+    "-Cextra-filename=-a19523bee9466ca1",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":num_cpus-v1_13_0.license" ]
+  applicable_licenses = [ ":num_cpus-v1_16_0.license" ]
 }
 
 license("num-derive-v0_4_2.license") {
@@ -12257,7 +12249,7 @@ rust_library("rayon-core-v1_7_1") {
   deps += [ ":crossbeam-queue-v0_2_3" ]
   deps += [ ":crossbeam-utils-v0_7_2" ]
   deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":num_cpus-v1_13_0" ]
+  deps += [ ":num_cpus-v1_16_0" ]
 
   rustenv = []
 
@@ -16044,7 +16036,7 @@ rust_library("tokio-v1_32_1") {
     deps += [ ":libc-v0_2_149" ]
     deps += [ ":memchr-v2_7_1" ]
     deps += [ ":mio-v0_8_9" ]
-    deps += [ ":num_cpus-v1_13_0" ]
+    deps += [ ":num_cpus-v1_16_0" ]
     deps += [ ":signal-hook-registry-v1_4_1" ]
     deps += [ ":socket2-v0_5_5" ]
   }

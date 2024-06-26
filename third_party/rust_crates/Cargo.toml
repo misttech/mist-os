@@ -347,6 +347,7 @@ backtrace = { path = "empty/backtrace" }
 cc = { path = "empty/cc" }
 crossterm_winapi = { path = "empty/crossterm_winapi" }
 ctor = { path = "empty/ctor" }
+hermit-abi = { path = "empty/hermit-abi" }
 iana-time-zone-haiku = { path = "empty/iana-time-zone-haiku" }
 js-sys = { path = "empty/js-sys" }
 miow = { path = "empty/miow" }
@@ -902,7 +903,7 @@ deps = [
   ":libc-v0_2_149",
   ":memchr-v2_7_1",
   ":mio-v0_8_9",
-  ":num_cpus-v1_13_0",
+  ":num_cpus-v1_16_0",
   ":signal-hook-registry-v1_4_1",
   ":socket2-v0_5_5",
 ]
