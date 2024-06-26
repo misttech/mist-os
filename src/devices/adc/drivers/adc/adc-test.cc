@@ -9,9 +9,10 @@
 
 #include <gtest/gtest.h>
 
+#include "src/devices/adc/metadata/metadata.h"
 #include "src/devices/lib/fidl-metadata/adc.h"
 
-namespace {
+namespace adc {
 
 class FakeAdcImplServer : public fdf::Server<fuchsia_hardware_adcimpl::Device> {
  public:
@@ -57,16 +58,31 @@ class AdcTestEnvironment : fdf_testing::Environment {
     device_server_.Init(component::kDefaultInstance, "");
     device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
 
-    return to_driver_vfs.AddService<fuchsia_hardware_adcimpl::Service>(
+    zx::result result = to_driver_vfs.AddService<fuchsia_hardware_adcimpl::Service>(
         fake_adc_impl_server_.GetInstanceHandler());
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    zx_status_t status =
+        metadata_server_.Serve(to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    return zx::ok();
   }
 
   void Init(std::vector<fidl_metadata::adc::Channel> kAdcChannels) {
-    auto metadata = fidl_metadata::adc::AdcChannelsToFidl(kAdcChannels);
-    ASSERT_TRUE(metadata.is_ok());
-    auto status =
-        device_server_.AddMetadata(DEVICE_METADATA_ADC, metadata->data(), metadata->size());
-    ASSERT_EQ(ZX_OK, status);
+    std::vector<fuchsia_hardware_adcimpl::AdcChannel> channels;
+    std::transform(
+        kAdcChannels.begin(), kAdcChannels.end(), std::back_inserter(channels),
+        [](const auto& channel) {
+          return fuchsia_hardware_adcimpl::AdcChannel{{.idx = channel.idx, .name = channel.name}};
+        });
+    fuchsia_hardware_adcimpl::Metadata metadata{{.channels = std::move(channels)}};
+
+    ASSERT_EQ(ZX_OK, metadata_server_.SetMetadata(metadata));
   }
 
   FakeAdcImplServer& fake_adc_impl_server() { return fake_adc_impl_server_; }
@@ -74,6 +90,7 @@ class AdcTestEnvironment : fdf_testing::Environment {
  private:
   compat::DeviceServer device_server_;
   FakeAdcImplServer fake_adc_impl_server_;
+  MetadataServer metadata_server_;
 };
 
 class AdcTestConfig final {
@@ -167,4 +184,4 @@ TEST_F(AdcTest, ChannelOutOfBoundsTest) {
   ASSERT_FALSE(resolution.ok());
 }
 
-}  // namespace
+}  // namespace adc

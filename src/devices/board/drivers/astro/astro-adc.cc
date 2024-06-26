@@ -4,11 +4,11 @@
 
 #include "src/devices/board/drivers/astro/astro-adc.h"
 
+#include <fidl/fuchsia.hardware.adcimpl/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
@@ -46,29 +46,29 @@ static const fidl_metadata::adc::Channel kAdcChannels[] = {
 };
 
 zx::result<> Astro::AdcInit() {
-  fuchsia_hardware_platform_bus::Node dev;
-  dev.name() = "adc";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_ADC;
-  dev.mmio() = saradc_mmios;
-  dev.irq() = saradc_irqs;
+  fuchsia_hardware_platform_bus::Node node;
+  node.name() = "adc";
+  node.vid() = PDEV_VID_AMLOGIC;
+  node.pid() = PDEV_PID_GENERIC;
+  node.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_ADC;
+  node.mmio() = saradc_mmios;
+  node.irq() = saradc_irqs;
 
   auto metadata_bytes = fidl_metadata::adc::AdcChannelsToFidl(kAdcChannels);
   if (metadata_bytes.is_error()) {
     zxlogf(ERROR, "Failed to FIDL encode adc metadata: %s", metadata_bytes.status_string());
     return metadata_bytes.take_error();
   }
-  dev.metadata() = std::vector<fuchsia_hardware_platform_bus::Metadata>{
+  node.metadata() = std::vector<fuchsia_hardware_platform_bus::Metadata>{
       {{
-          .type = DEVICE_METADATA_ADC,
+          .type = fuchsia_hardware_adcimpl::kPdevMetadataType,
           .data = metadata_bytes.value(),
       }},
   };
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('ADC_');
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, dev));
+  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, node));
   if (!result.ok()) {
     zxlogf(ERROR, "NodeAdd (adc) request failed: %s", result.FormatDescription().data());
     return result->take_error();

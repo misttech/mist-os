@@ -424,12 +424,12 @@ the driver's `DeviceServer` object:
   with `ForwardMetadata Some(std::unordered_set<MetadataKey> filter)` and pass
   this object to the parameter.
 
-  The example below forwards metadata with the `DEVICE_METADATA_ADC` key only:
+  The example below forwards metadata with the `DEVICE_METADATA_GPT_INFO` key only:
 
   ```cpp
   zx::result<> result = compat_server_.Initialize(
          incoming(), outgoing(), node_name(), child_name,
-         compat::ForwardMetadata::Some({DEVICE_METADATA_ADC}));
+         compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}));
   ```
 
 - If you don't want to forward metadata, set the parameter to

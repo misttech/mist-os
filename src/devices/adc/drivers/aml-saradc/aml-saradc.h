@@ -6,13 +6,14 @@
 #define SRC_DEVICES_ADC_DRIVERS_AML_SARADC_AML_SARADC_H_
 
 #include <fidl/fuchsia.hardware.adcimpl/cpp/driver/fidl.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
 
 #include <fbl/mutex.h>
+
+#include "src/devices/adc/metadata/metadata.h"
 
 namespace aml_saradc {
 
@@ -66,6 +67,7 @@ class AmlSaradc : public fdf::DriverBase {
   fdf::ServerBindingGroup<fuchsia_hardware_adcimpl::Device> bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   compat::SyncInitializedDeviceServer compat_server_;
+  adc::MetadataServer metadata_server_;
 };
 
 }  // namespace aml_saradc

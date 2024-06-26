@@ -16,12 +16,17 @@
         fallback: "false",
     },
     capabilities: [
-        { service: 'fuchsia.hardware.adcimpl.Service' },
+        { service: "fuchsia.hardware.adcimpl.Service" },
+        { service: "fuchsia.hardware.adcimpl.Metadata" },
     ],
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },
     ],
     expose: [
+        {
+            service: "fuchsia.hardware.adcimpl.Metadata",
+            from: "self",
+        },
         {
             service: "fuchsia.hardware.adcimpl.Service",
             from: "self",

@@ -148,9 +148,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // Type: FIDL fuchsia.hardware.trippoint/TripDeviceMetadata
 #define DEVICE_METADATA_TRIP 0x50495254  // TRIP
 
-// type: FIDL fuchsia.hardware.adcimpl/Metadata
-#define DEVICE_METADATA_ADC 0x00434441  // ADC\0
-
 // type: FIDL fuchsia.scheduler/RoleName
 #define DEVICE_METADATA_SCHEDULER_ROLE_NAME 0x454C4F52  // ROLE
 

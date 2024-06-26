@@ -40,22 +40,26 @@ class FakeMmio {
 class AmlSaradcTestEnvironment : fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    static constexpr uint8_t kAdcChannels[] = {};
     device_server_.Init(component::kDefaultInstance, "");
-    auto status =
-        device_server_.AddMetadata(DEVICE_METADATA_ADC, &kAdcChannels, sizeof(kAdcChannels));
-    EXPECT_EQ(ZX_OK, status);
     device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
 
     fake_pdev::FakePDevFidl::Config config;
     config.irqs[0] = {};
-    status = zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]);
+    zx_status_t status =
+        zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]);
     EXPECT_EQ(ZX_OK, status);
     config.mmios[0] = mmio_[0].mmio();
     config.mmios[1] = mmio_[1].mmio();
     irq_ = config.irqs[0].borrow();
 
     pdev_server_.SetConfig(std::move(config));
+
+    fuchsia_hardware_adcimpl::Metadata metadata{{.channels = {}}};
+
+    auto raw_metadata = fidl::Persist(metadata);
+    EXPECT_TRUE(raw_metadata.is_ok());
+    pdev_server_.set_metadata(
+        {{fuchsia_hardware_adcimpl::kPdevMetadataType, std::move(raw_metadata.value())}});
     return to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
         pdev_server_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()));
   }

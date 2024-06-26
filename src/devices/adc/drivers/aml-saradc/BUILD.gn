@@ -25,6 +25,7 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//src/devices/adc/metadata",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
