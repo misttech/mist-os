@@ -24,54 +24,54 @@ use {fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as depre
 
 #[derive(Debug, Clone)]
 pub enum InspectHandle {
-    Tree(TreeProxy, Option<InspectHandleName>),
-    Directory(fio::DirectoryProxy),
+    Tree { proxy: TreeProxy, name: Option<InspectHandleName> },
+    Directory { proxy: fio::DirectoryProxy },
 }
 
 impl InspectHandle {
     pub fn is_closed(&self) -> bool {
         match self {
-            Self::Directory(proxy) => proxy.as_channel().is_closed(),
-            Self::Tree(proxy, _) => proxy.as_channel().is_closed(),
+            Self::Directory { proxy } => proxy.as_channel().is_closed(),
+            Self::Tree { proxy, .. } => proxy.as_channel().is_closed(),
         }
     }
 
     pub async fn on_closed(&self) -> Result<zx::Signals, zx::Status> {
         match self {
-            Self::Tree(proxy, _) => proxy.on_closed().await,
-            Self::Directory(proxy) => proxy.on_closed().await,
+            Self::Tree { proxy, .. } => proxy.on_closed().await,
+            Self::Directory { proxy, .. } => proxy.on_closed().await,
         }
     }
 
     pub fn koid(&self) -> zx::Koid {
         match self {
-            Self::Directory(proxy) => {
+            Self::Directory { proxy } => {
                 proxy.as_channel().as_handle_ref().get_koid().expect("DirectoryProxy has koid")
             }
-            Self::Tree(proxy, _) => {
+            Self::Tree { proxy, .. } => {
                 proxy.as_channel().as_handle_ref().get_koid().expect("TreeProxy has koid")
             }
         }
     }
 
     pub fn from_named_tree_proxy(proxy: TreeProxy, name: Option<String>) -> Self {
-        InspectHandle::Tree(proxy, name.map(InspectHandleName::name))
+        InspectHandle::Tree { proxy, name: name.map(InspectHandleName::name) }
     }
 
     pub fn is_tree(&self) -> bool {
-        matches!(self, Self::Tree(_, _))
+        matches!(self, Self::Tree { .. })
     }
 }
 
 impl From<fio::DirectoryProxy> for InspectHandle {
     fn from(proxy: fio::DirectoryProxy) -> Self {
-        InspectHandle::Directory(proxy)
+        InspectHandle::Directory { proxy }
     }
 }
 
 impl From<TreeProxy> for InspectHandle {
     fn from(proxy: TreeProxy) -> Self {
-        InspectHandle::Tree(proxy, None)
+        InspectHandle::Tree { proxy, name: None }
     }
 }
 
@@ -109,7 +109,7 @@ impl InspectArtifactsContainer {
         new_handle: impl Into<InspectHandle>,
     ) -> Option<oneshot::Receiver<zx::Koid>> {
         let handle = new_handle.into();
-        if !self.inspect_handles.is_empty() && matches!(handle, InspectHandle::Directory(_)) {
+        if !self.inspect_handles.is_empty() && matches!(handle, InspectHandle::Directory { .. }) {
             return None;
         }
 
@@ -138,7 +138,7 @@ impl InspectArtifactsContainer {
 
         match handle.as_ref() {
             // there can only be one Directory, semantically
-            InspectHandle::Directory(dir) if self.inspect_handles.len() == 1 => {
+            InspectHandle::Directory { proxy: dir } if self.inspect_handles.len() == 1 => {
                 fuchsia_fs::directory::clone_no_describe(dir, None).ok().map(|directory| {
                     UnpopulatedInspectDataContainer {
                         identity: Arc::clone(identity),
@@ -148,7 +148,7 @@ impl InspectArtifactsContainer {
                 })
             }
 
-            InspectHandle::Tree(_, _) => Some(UnpopulatedInspectDataContainer {
+            InspectHandle::Tree { .. } => Some(UnpopulatedInspectDataContainer {
                 identity: Arc::clone(identity),
                 inspect_matcher: matcher,
                 inspect_handles: self

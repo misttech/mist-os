@@ -323,7 +323,7 @@ mod tests {
         test.assert(&identity, [koid], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -357,7 +357,7 @@ mod tests {
         test.assert(&identity, [koid0, koid1], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, ..} => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -366,7 +366,7 @@ mod tests {
 
             assert_matches!(
                 &handles[1],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        double: 1.24,
@@ -392,7 +392,7 @@ mod tests {
         test.assert(&identity, [koid], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -407,7 +407,7 @@ mod tests {
         test.assert(&identity, [koid], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, ..} => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -445,7 +445,7 @@ mod tests {
         test.assert(&identities[0], [koid_component_0], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -457,7 +457,7 @@ mod tests {
         test.assert(&identities[1], [koid_component_1], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        is_insp2: true,
