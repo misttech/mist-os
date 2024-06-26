@@ -162,61 +162,6 @@ CodecImpl::CodecImpl(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
                                                 : &decryptor_params().input_details();
 }
 
-// This constructor is deprecated, and will be removed when all clients are using the other
-// constructor.
-CodecImpl::CodecImpl(fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem,
-                     std::unique_ptr<CodecAdmission> codec_admission,
-                     async_dispatcher_t* shared_fidl_dispatcher, thrd_t shared_fidl_thread,
-                     StreamProcessorParams params,
-                     fidl::InterfaceRequest<fuchsia::media::StreamProcessor> request)
-    // The parameters to CodecAdapter constructor here aren't important.
-    : CodecAdapter(lock_, this),
-      codec_admission_(std::move(codec_admission)),
-      shared_fidl_dispatcher_(shared_fidl_dispatcher),
-      shared_fidl_thread_(shared_fidl_thread),
-      shared_fidl_queue_(shared_fidl_dispatcher, shared_fidl_thread),
-      params_(std::move(params)),
-      tmp_interface_request_(std::move(request)),
-      binding_(this),
-      stream_control_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
-  ZX_DEBUG_ASSERT(thrd_current() == fidl_thread());
-
-  // Get the V2 allocator from the V1 allocator and drop the v1 allocator.
-  auto v1_sysmem =
-      fidl::SyncClient(fidl::ClientEnd<fuchsia_sysmem::Allocator>(sysmem.TakeChannel()));
-  auto v2_sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
-  ZX_ASSERT(v2_sysmem_endpoints.is_ok());
-  fuchsia_sysmem::AllocatorConnectToSysmem2AllocatorRequest connect_request;
-  connect_request.allocator_request() = std::move(v2_sysmem_endpoints->server);
-  auto connect_result = v1_sysmem->ConnectToSysmem2Allocator(std::move(connect_request));
-  // sysmem must work
-  ZX_ASSERT(connect_result.is_ok());
-  tmp_sysmem_ = std::move(v2_sysmem_endpoints->client);
-  // ~sysmem will drop the v1 allocator at the end of this constructor
-
-  ZX_DEBUG_ASSERT(tmp_sysmem_);
-  ZX_DEBUG_ASSERT(tmp_interface_request_);
-
-  if (codec_admission_) {
-    codec_admission_->SetChannelToWaitOn(tmp_interface_request_.channel());
-  }
-
-  // This is the binding_'s error handler, not the owner_error_handler_ which
-  // is related but separate.
-  //
-  // If client code instead does ~CodecImpl, this error handler is prevented from running by
-  // synchronously unbinding in ~CodecImpl.
-  binding_.set_error_handler([this](zx_status_t status) {
-    // This handler can't run until after binding_ is bound.
-    ZX_DEBUG_ASSERT(was_logically_bound_);
-    Unbind();
-  });
-
-  initial_input_format_details_ = IsDecoder()   ? &decoder_params().input_details()
-                                  : IsEncoder() ? &encoder_params().input_details()
-                                                : &decryptor_params().input_details();
-}
-
 CodecImpl::~CodecImpl() {
   // We need ~binding_ to run on fidl_thread() else it's not safe to
   // un-bind unilaterally.  We could potentially relax this if BindAsync() was
@@ -4087,12 +4032,6 @@ void CodecImpl::CoreCodecSetSecureMemoryMode(
   codec_adapter_->CoreCodecSetSecureMemoryMode(port, secure_memory_mode);
 }
 
-fuchsia::sysmem::BufferCollectionConstraints CodecImpl::CoreCodecGetBufferCollectionConstraints(
-    CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
-    const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
-  ZX_PANIC("call CoreCodecGetBufferCollectionConstraints2 instead");
-}
-
 fuchsia_sysmem2::BufferCollectionConstraints CodecImpl::CoreCodecGetBufferCollectionConstraints2(
     CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
     const fuchsia::media::StreamBufferPartialSettings& partial_settings) {
@@ -4105,11 +4044,6 @@ fuchsia_sysmem2::BufferCollectionConstraints CodecImpl::CoreCodecGetBufferCollec
   ZX_DEBUG_ASSERT(!partial_settings.has_sysmem_token());
   return codec_adapter_->CoreCodecGetBufferCollectionConstraints2(port, stream_buffer_constraints,
                                                                   partial_settings);
-}
-
-void CodecImpl::CoreCodecSetBufferCollectionInfo(
-    CodecPort port, const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) {
-  ZX_PANIC("call CoreCodecSetBufferCollectionInfo(fuchsia_sysmem2::BufferCollectionInfo) instead");
 }
 
 void CodecImpl::CoreCodecSetBufferCollectionInfo(

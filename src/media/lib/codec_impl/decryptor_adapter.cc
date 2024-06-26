@@ -372,32 +372,21 @@ void DecryptorAdapter::CoreCodecMidStreamOutputBufferReConfigFinish() {
   // For this adapter, nothing to do here.
 }
 
-fuchsia::sysmem::BufferMemoryConstraints DecryptorAdapter::GetSecureOutputMemoryConstraints()
+fuchsia_sysmem2::BufferMemoryConstraints DecryptorAdapter::GetSecureOutputMemoryConstraints2()
     const {
-  fuchsia::sysmem::BufferMemoryConstraints constraints;
-  constraints.physically_contiguous_required = true;
-  constraints.secure_required = true;
-  constraints.ram_domain_supported = false;
-  constraints.cpu_domain_supported = false;
-  constraints.inaccessible_domain_supported = true;
+  fuchsia_sysmem2::BufferMemoryConstraints constraints;
+  constraints.physically_contiguous_required() = true;
+  constraints.secure_required() = true;
+  constraints.ram_domain_supported() = false;
+  constraints.cpu_domain_supported() = false;
+  constraints.inaccessible_domain_supported() = true;
 
   // This is only the default in the base class; actual decryptors that only output to secure heaps
   // should only list those secure heaps.
-  constraints.heap_permitted_count = 1;
-  constraints.heap_permitted[0] = fuchsia::sysmem::HeapType::SYSTEM_RAM;
+  constraints.permitted_heaps() = {
+      sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0)};
 
   return constraints;
-}
-
-fuchsia_sysmem2::BufferMemoryConstraints DecryptorAdapter::GetSecureOutputMemoryConstraints2()
-    const {
-  fuchsia::sysmem::BufferMemoryConstraints v1_constraints = GetSecureOutputMemoryConstraints();
-  auto constraints_result =
-      sysmem::V2CopyFromV1BufferMemoryConstraints(fidl::HLCPPToNatural(v1_constraints));
-  // DecryptorAdapter sub-class must provide valid v1 constraints (or preferably, provide valid
-  // v2 constraints by overriding GetSecureOutputMemoryConstraints2 instead).
-  ZX_ASSERT(constraints_result.is_ok());
-  return std::move(constraints_result.value());
 }
 
 void DecryptorAdapter::PostSerial(async_dispatcher_t* dispatcher, fit::closure to_run) {

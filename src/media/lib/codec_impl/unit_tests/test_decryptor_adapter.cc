@@ -8,6 +8,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/testing/cpp/inspect.h>
@@ -206,9 +207,9 @@ class DecryptorAdapterTest : public gtest::RealLoopFixture {
   }
 
   void ConnectDecryptor(bool is_secure) {
-    fidl::InterfaceHandle<fuchsia::sysmem::Allocator> allocator;
-
-    ASSERT_EQ(ZX_OK, context_->svc()->Connect(allocator.NewRequest()));
+    auto allocator_result = component::Connect<fuchsia_sysmem2::Allocator>();
+    ZX_ASSERT(allocator_result.is_ok());
+    auto allocator = std::move(allocator_result.value());
     codec_impl_ =
         std::make_unique<CodecImpl>(std::move(allocator), nullptr, dispatcher(), thrd_current(),
                                     CreateDecryptorParams(is_secure), decryptor_.NewRequest());
