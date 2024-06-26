@@ -72,10 +72,6 @@ License File: share/doc/clippy/LICENSE-MIT
  -> License File Format: Single License
  -> License Classifications: Copyright, MIT
 
-License File: share/doc/rust-analyzer/LICENSE-APACHE
- -> License File Format: Single License
- -> License Classifications: Apache-2.0
-
 License File: share/doc/rust-analyzer/LICENSE-MIT
  -> License File Format: Single License
  -> License Classifications: MIT
