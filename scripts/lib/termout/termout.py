@@ -27,13 +27,13 @@ Typical Usage:
 """
 
 import atexit
-from dataclasses import dataclass
 import io
 import os
 import shutil
 import sys
 import termios
 import threading
+from dataclasses import dataclass
 
 import colorama
 

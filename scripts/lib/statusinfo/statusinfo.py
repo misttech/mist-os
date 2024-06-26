@@ -2,11 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from dataclasses import dataclass
 import datetime
 import os
 import re
 import typing
+from dataclasses import dataclass
 
 import colorama
 

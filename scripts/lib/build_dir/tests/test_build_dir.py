@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import unittest
-import build_dir
 import unittest.mock as mock
+
+import build_dir
 
 
 class TestBuildDir(unittest.TestCase):

@@ -23,13 +23,12 @@ pipes using non-blocking async readers, we do not hang.
 
 import asyncio
 import atexit
-from dataclasses import dataclass
-from dataclasses import field
-from io import StringIO
 import os
 import signal
 import time
 import typing
+from dataclasses import dataclass, field
+from io import StringIO
 
 
 @dataclass

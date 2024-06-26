@@ -10,12 +10,11 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 import contextlib
-from typing import cast, IO
 import unittest
-
-import termsim
+from typing import IO, cast
 
 import termout
+import termsim
 
 
 class TestTermout(unittest.TestCase):
