@@ -78,12 +78,26 @@ mod socket_ip_ext_test {
 /// Note that this type is not optimally type-safe, because `T` and `O` are not
 /// bound by `IP` and `IP::OtherVersion`, respectively. In many cases it may be
 /// more appropriate to define a one-off enum parameterized over `I: Ip`.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum EitherStack<T, O> {
     /// In the current stack version.
     ThisStack(T),
     /// In the other version of the stack.
     OtherStack(O),
+}
+
+impl<T, O> Clone for EitherStack<T, O>
+where
+    T: Clone,
+    O: Clone,
+{
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    fn clone(&self) -> Self {
+        match self {
+            Self::ThisStack(t) => Self::ThisStack(t.clone()),
+            Self::OtherStack(t) => Self::OtherStack(t.clone()),
+        }
+    }
 }
 
 /// Control flow type containing either a dual-stack or non-dual-stack context.

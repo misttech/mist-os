@@ -102,7 +102,9 @@ pub fn ip_test(attr: TokenStream, input: TokenStream) -> TokenStream {
             .into();
     }
 
-    if emit_test.unwrap_or_else(|| !attrs.iter().any(|a| a.path.is_ident("test_case"))) {
+    if emit_test.unwrap_or_else(|| {
+        !attrs.iter().any(|a| a.path.is_ident("test_case") || a.path.is_ident("test_matrix"))
+    }) {
         attrs.push(Attribute {
             path: syn::parse_quote!(test),
             bracket_token: Default::default(),

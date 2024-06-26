@@ -1396,6 +1396,7 @@ struct ConnAddrState<S> {
 }
 
 impl<S: SpecSocketId> ConnAddrState<S> {
+    #[cfg_attr(feature = "instrumented", track_caller)]
     pub(crate) fn id(&self) -> S {
         self.id.clone()
     }
@@ -3197,6 +3198,7 @@ where
                             core_ctx: &mut CC,
                             bindings_ctx: &mut BC,
                             id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                            demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
                             conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
                             addr: &ConnAddr<
                                 ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
@@ -3212,6 +3214,7 @@ where
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
                         {
+                            let was_closed = matches!(conn.state, State::Closed(_));
                             match core_ctx.with_counters(|counters| {
                                 conn.state.close(
                                     counters,
@@ -3220,7 +3223,21 @@ where
                                 )
                             }) {
                                 Ok(()) => {
+                                    // We should not be here if we were already closed.
+                                    assert!(!was_closed);
                                     do_send_inner(id, conn, addr, timer, core_ctx, bindings_ctx);
+                                    if matches!(conn.state, State::Closed(_)) {
+                                        // Uphold the invariant that we remove
+                                        // ourselves from the demux when moving
+                                        // to the closed state.
+                                        core_ctx.with_demux_mut(|DemuxState { socketmap }| {
+                                            socketmap
+                                                .conns_mut()
+                                                .remove(demux_id, addr)
+                                                .expect("failed to remove from socketmap");
+                                        });
+                                        let _: Option<_> = bindings_ctx.cancel_timer(timer);
+                                    }
                                     Ok(())
                                 }
                                 Err(CloseError::NoConnection) => Err(NoConnection),
@@ -3230,16 +3247,36 @@ where
                         match core_ctx {
                             MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                                 let (conn, addr) = converter.convert(conn);
-                                do_shutdown(core_ctx, bindings_ctx, id, conn, addr, timer)?
+                                do_shutdown(
+                                    core_ctx,
+                                    bindings_ctx,
+                                    id,
+                                    &I::into_demux_socket_id(id.clone()),
+                                    conn,
+                                    addr,
+                                    timer,
+                                )?
                             }
                             MaybeDualStack::DualStack((core_ctx, converter)) => {
                                 match converter.convert(conn) {
-                                    EitherStack::ThisStack((conn, addr)) => {
-                                        do_shutdown(core_ctx, bindings_ctx, id, conn, addr, timer)?
-                                    }
-                                    EitherStack::OtherStack((conn, addr)) => {
-                                        do_shutdown(core_ctx, bindings_ctx, id, conn, addr, timer)?
-                                    }
+                                    EitherStack::ThisStack((conn, addr)) => do_shutdown(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        id,
+                                        &I::into_demux_socket_id(id.clone()),
+                                        conn,
+                                        addr,
+                                        timer,
+                                    )?,
+                                    EitherStack::OtherStack((conn, addr)) => do_shutdown(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        id,
+                                        &core_ctx.into_other_demux_socket_id(id.clone()),
+                                        conn,
+                                        addr,
+                                        timer,
+                                    )?,
                                 }
                             }
                         };
@@ -4743,9 +4780,8 @@ pub enum ListenError {
 }
 
 /// Possible error for calling `shutdown` on a not-yet connected socket.
-#[derive(Debug, GenericOverIp)]
+#[derive(Debug, GenericOverIp, Eq, PartialEq)]
 #[generic_over_ip()]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NoConnection;
 
 /// Error returned when attempting to set the ReuseAddress option.
