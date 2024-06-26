@@ -1,30 +1,59 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(not(feature = "starnix_lite"))]
 use anyhow::{anyhow, Context, Error};
+#[cfg(feature = "starnix_lite")]
+use anyhow::{anyhow, Error};
+#[cfg(not(feature = "starnix_lite"))]
 use bstr::BString;
+#[cfg(not(feature = "starnix_lite"))]
 use fuchsia_zircon as zx;
+#[cfg(not(feature = "starnix_lite"))]
 use gpu::gpu_device_init;
+#[cfg(not(feature = "starnix_lite"))]
 use gralloc::gralloc_device_init;
+#[cfg(not(feature = "starnix_lite"))]
 use input_device::uinput::register_uinput_device;
+#[cfg(not(feature = "starnix_lite"))]
 use input_device::InputDevice;
+#[cfg(not(feature = "starnix_lite"))]
+use input_device::InputDevice;
+#[cfg(not(feature = "starnix_lite"))]
 use magma_device::magma_device_init;
 use selinux::security_server;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::ashmem::ashmem_device_init;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::perfetto_consumer::start_perfetto_consumer_thread;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::remote_block_device::remote_block_device_init;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::touch_power_policy_device::TouchPowerPolicyDevice;
+#[cfg(feature = "starnix_lite")]
+use starnix_core::task::KernelFeatures;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::vfs::FsString;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_sync::{Locked, Unlocked};
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::error;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::errors::Errno;
+#[cfg(not(feature = "starnix_lite"))]
 use std::sync::mpsc::channel;
+#[cfg(not(feature = "starnix_lite"))]
 use std::sync::Arc;
 
+#[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_sysinfo as fsysinfo, fidl_fuchsia_ui_composition as fuicomposition,
     fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
@@ -39,29 +68,39 @@ pub struct Features {
     /// Configures whether SELinux is fully enabled, faked, or unavailable.
     pub selinux: Option<security_server::Mode>,
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub ashmem: bool,
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub framebuffer: bool,
+    #[cfg(not(feature = "starnix_lite"))]
     pub framebuffer2: bool,
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub gralloc: bool,
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub magma: bool,
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub gfxstream: bool,
 
     pub test_data: bool,
 
     pub custom_artifacts: bool,
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub android_serialno: bool,
 
     pub self_profile: bool,
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub aspect_ratio: Option<AspectRatio>,
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub perfetto: Option<FsString>,
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub android_fdr: bool,
 }
 
@@ -74,8 +113,11 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
         match (raw_flag, raw_args) {
+            #[cfg(not(feature = "starnix_lite"))]
             ("android_fdr", _) => features.android_fdr = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("android_serialno", _) => features.android_serialno = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("aspect_ratio", Some(args)) => {
                 let e = anyhow!("Invalid aspect_ratio: {:?}", args);
                 let components: Vec<_> = args.split(':').collect();
@@ -86,22 +128,32 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
                 let height: u32 = components[1].parse().map_err(|_| anyhow!("Invalid aspect ratio height"))?;
                 features.aspect_ratio = Some(AspectRatio { width, height });
             }
+            #[cfg(not(feature = "starnix_lite"))]
             ("aspect_ratio", None) => {
                 return Err(anyhow!(
                     "Aspect ratio feature must contain the aspect ratio in the format: aspect_ratio:w:h"
                 ))
             }
             ("custom_artifacts", _) => features.custom_artifacts = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("ashmem", _) => features.ashmem = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("framebuffer", _) => features.framebuffer = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("framebuffer2", _) => features.framebuffer2 = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("gralloc", _) => features.gralloc = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("magma", _) => features.magma = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("gfxstream", _) => features.gfxstream = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
+            #[cfg(not(feature = "starnix_lite"))]
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.into());
             }
+            #[cfg(not(feature = "starnix_lite"))]
             ("perfetto", None) => {
                 return Err(anyhow!("Perfetto feature must contain a socket path"));
             }
@@ -125,13 +177,15 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
 
 /// Runs all the features that are enabled in `system_task.kernel()`.
 pub fn run_container_features(
-    locked: &mut Locked<'_, Unlocked>,
-    system_task: &CurrentTask,
+    #[cfg(not(feature = "starnix_lite"))] locked: &mut Locked<'_, Unlocked>,
+    #[cfg(not(feature = "starnix_lite"))] system_task: &CurrentTask,
     features: &Features,
 ) -> Result<(), Error> {
+    #[cfg(not(feature = "starnix_lite"))]
     let kernel = system_task.kernel();
 
     let mut enabled_profiling = false;
+    #[cfg(not(feature = "starnix_lite"))]
     if features.framebuffer || features.framebuffer2 {
         fb_device_init(locked, system_task);
 
@@ -194,6 +248,7 @@ pub fn run_container_features(
                 .expect("Failed to start framebuffer server");
         }
     }
+    #[cfg(not(feature = "starnix_lite"))]
     if features.gralloc {
         // The virtgralloc0 device allows vulkan_selector to indicate to gralloc
         // whether swiftshader or magma will be used. This is separate from the
@@ -206,12 +261,15 @@ pub fn run_container_features(
         // fail.
         gralloc_device_init(locked, system_task);
     }
+    #[cfg(not(feature = "starnix_lite"))]
     if features.magma {
         magma_device_init(locked, system_task);
     }
+    #[cfg(not(feature = "starnix_lite"))]
     if features.gfxstream {
         gpu_device_init(locked, system_task);
     }
+    #[cfg(not(feature = "starnix_lite"))]
     if let Some(socket_path) = features.perfetto.clone() {
         start_perfetto_consumer_thread(kernel, socket_path)
             .context("Failed to start perfetto consumer thread")?;
@@ -224,12 +282,14 @@ pub fn run_container_features(
         );
         fuchsia_inspect_contrib::start_self_profiling();
     }
+    #[cfg(not(feature = "starnix_lite"))]
     if features.ashmem {
         ashmem_device_init(locked, system_task);
     }
     if !enabled_profiling {
         fuchsia_inspect_contrib::stop_self_profiling();
     }
+    #[cfg(not(feature = "starnix_lite"))]
     if features.android_fdr {
         android_bootloader_message_store_init(locked, system_task);
         remote_block_device_init(locked, system_task);
@@ -239,6 +299,7 @@ pub fn run_container_features(
 }
 
 /// Runs features requested by individual components inside the container.
+#[cfg(not(feature = "starnix_lite"))]
 pub fn run_component_features(
     kernel: &Arc<Kernel>,
     entries: &Vec<String>,
@@ -260,6 +321,7 @@ pub fn run_component_features(
     Ok(())
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 pub async fn get_serial_number() -> anyhow::Result<BString> {
     let sysinfo = fuchsia_component::client::connect_to_protocol::<fsysinfo::SysInfoMarker>()?;
     let serial = sysinfo.get_serial_number().await?.map_err(zx::Status::from_raw)?;
