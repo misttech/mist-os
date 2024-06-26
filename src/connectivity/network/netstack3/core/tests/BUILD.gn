@@ -46,5 +46,11 @@ rustc_test("netstack3_core_threading_test") {
 
 group("tests") {
   testonly = true
-  deps = [ ":netstack3_core_threading_test" ]
+  deps = []
+
+  # The threading tests take a long time to run, and exceed the capabilities of
+  # Fuchsia's coverage builders in CI.
+  if (!is_coverage) {
+    deps += [ ":netstack3_core_threading_test" ]
+  }
 }
