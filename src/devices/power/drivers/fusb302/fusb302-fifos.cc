@@ -92,6 +92,12 @@ zx::result<std::optional<usb_pd::Message>> Fusb302Fifos::ReadReceivedMessage() {
   // after logging (in case it aids debugging).
   FDF_LOG(TRACE, "Received CRC - 0x%08x", data_objects[header.data_object_count()]);
 
+  // This driver does not currently support Cable Plug communications.
+  if (token_type != ReceiveTokenType::kSop) {
+    FDF_LOG(WARNING, "Dropping non-SOP token type %s", ReceiveTokenTypeToString(token_type));
+    return zx::ok(std::nullopt);
+  }
+
   return zx::ok(
       usb_pd::Message(header, cpp20::span(data_objects.data(), header.data_object_count())));
 }
