@@ -256,9 +256,12 @@ class Pool {
   // otherwise, the returned type is indicates how the input type should be
   // normalized. Adjacent ranges of the same normalized type are merged before
   // being passed to the callback.
+  //
+  // The callback itself is expected to return a boolean indicating whether it
+  // should continue to be called.
   template <typename RangeCallback, typename NormalizeTypeFn>
   void NormalizeRanges(RangeCallback&& cb, NormalizeTypeFn&& normalize_type) const {
-    static_assert(std::is_invocable_v<RangeCallback, const Range&>);
+    static_assert(std::is_invocable_r_v<bool, RangeCallback, const Range&>);
     static_assert(std::is_invocable_r_v<std::optional<Type>, NormalizeTypeFn, Type>);
 
     std::optional<Range> prev;
@@ -274,7 +277,9 @@ class Pool {
       } else if (prev->end() == normalized.addr && prev->type == normalized.type) {
         prev->size += normalized.size;
       } else {
-        cb(*prev);
+        if (!cb(*prev)) {
+          return;
+        }
         prev = normalized;
       }
     }

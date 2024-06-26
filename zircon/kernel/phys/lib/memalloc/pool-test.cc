@@ -2155,15 +2155,34 @@ TEST(MemallocPoolTests, NormalizeRanges) {
   // Normalize away all ranges.
   {
     std::vector<Range> normalized;
-    ctx.pool.NormalizeRanges([&normalized](const Range& range) { normalized.push_back(range); },
-                             [](Type) { return std::nullopt; });
+    ctx.pool.NormalizeRanges(
+        [&normalized](const Range& range) {
+          normalized.push_back(range);
+          return true;
+        },
+        [](Type) { return std::nullopt; });
     EXPECT_TRUE(normalized.empty());
+  }
+
+  // Bail after the first range.
+  {
+    std::vector<Range> normalized;
+    ctx.pool.NormalizeRanges(
+        [&normalized](const Range& range) {
+          normalized.push_back(range);
+          return false;
+        },
+        [](Type type) { return type; });
+    EXPECT_EQ(1u, normalized.size());
   }
 
   // Normalize just RAM.
   {
     std::vector<Range> normalized;
-    ctx.pool.NormalizeRam([&normalized](const Range& range) { normalized.push_back(range); });
+    ctx.pool.NormalizeRam([&normalized](const Range& range) {
+      normalized.push_back(range);
+      return true;
+    });
 
     constexpr Range kExpected[] = {
         {
@@ -2183,12 +2202,15 @@ TEST(MemallocPoolTests, NormalizeRanges) {
   // Discard RAM.
   {
     std::vector<Range> normalized;
-    ctx.pool.NormalizeRanges([&normalized](const Range& range) { normalized.push_back(range); },
-                             [](Type type) {
-                               return (IsExtendedType(type) || type == Type::kFreeRam)
-                                          ? std::nullopt
-                                          : std::make_optional(type);
-                             });
+    ctx.pool.NormalizeRanges(
+        [&normalized](const Range& range) {
+          normalized.push_back(range);
+          return true;
+        },
+        [](Type type) {
+          return (IsExtendedType(type) || type == Type::kFreeRam) ? std::nullopt
+                                                                  : std::make_optional(type);
+        });
 
     constexpr Range kExpected[] = {
         {
@@ -2204,7 +2226,10 @@ TEST(MemallocPoolTests, NormalizeRanges) {
   {
     std::vector<Range> normalized;
     ctx.pool.NormalizeRanges(
-        [&normalized](const Range& range) { normalized.push_back(range); },
+        [&normalized](const Range& range) {
+          normalized.push_back(range);
+          return true;
+        },
         [](Type type) {
           return (type == Type::kPoolBookkeeping || type == Type::kPoolTestPayload)
                      ? std::make_optional(type)

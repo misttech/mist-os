@@ -87,7 +87,7 @@ void AddressSpace::IdentityMapRam() {
     uint64_t addr, size;
     if (last_aligned_end && *last_aligned_end > range.addr) {
       if (*last_aligned_end >= range.end()) {
-        return;
+        return true;
       }
       addr = *last_aligned_end;
       size = range.end() - *last_aligned_end;
@@ -112,6 +112,7 @@ void AddressSpace::IdentityMapRam() {
     }
 
     last_aligned_end = addr + size;
+    return true;
   });
 }
 
