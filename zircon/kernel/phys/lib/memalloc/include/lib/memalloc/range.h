@@ -115,6 +115,8 @@ constexpr bool IsExtendedType(Type type) {
   return static_cast<uint64_t>(type) >= kMinExtendedTypeValue;
 }
 
+constexpr bool IsRamType(Type type) { return type == Type::kFreeRam || IsExtendedType(type); }
+
 // A memory range type that is layout-compatible to zbi_mem_range_t, but with
 // the benefit of being able to use extended types.
 struct Range {

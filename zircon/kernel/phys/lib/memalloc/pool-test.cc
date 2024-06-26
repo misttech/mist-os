@@ -1846,6 +1846,218 @@ TEST(MemallocPoolTests, Resizing) {
   }
 }
 
+TEST(MemallocPoolTests, TotalRamRestriction) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // free RAM: [0, 2*kChunkSize)
+      {
+          .addr = 0,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  //
+  // Restriction to the current amount of RAM should be a no-op.
+  //
+
+  ctx.pool.RestrictTotalRam(2 * kChunkSize);
+
+  constexpr Range kUnrestricted[] = {
+      // bookkeeping: [0, kChunkSize)
+      {
+          .addr = 0,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      // free RAM: [kChunkSize, 2*kChunkSize)
+      {
+          .addr = kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kUnrestricted}));
+
+  //
+  // Restriction by a half of a chunk should result in the second half of the
+  // free RAM range being removed.
+  //
+
+  ctx.pool.RestrictTotalRam(3 * kChunkSize / 2);
+
+  constexpr Range kChunkPartlyShavedOff[] = {
+      // bookkeeping: [0, kChunkSize)
+      {
+          .addr = 0,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      // free RAM: kChunkSize, 3*kChunkSize/2)
+      {
+          .addr = kChunkSize,
+          .size = kChunkSize / 2,
+          .type = Type::kFreeRam,
+      },
+  };
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kChunkPartlyShavedOff}));
+
+  //
+  // Restriction by another half chunk should just remove the remaining RAM
+  // range, even if allocated.
+  //
+
+  ASSERT_NO_FATAL_FAILURE(
+      TestPoolAllocation(ctx.pool, Type::kPoolTestPayload, kChunkSize / 2, kChunkSize / 2));
+
+  ctx.pool.RestrictTotalRam(kChunkSize);
+
+  constexpr Range kChunkShavedOff[] = {
+      // bookkeeping: [0, kChunkSize)
+      {
+          .addr = 0,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+  };
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kChunkShavedOff}));
+
+  //
+  // Even parts of bookkeeping space may be removed.
+  //
+
+  ctx.pool.RestrictTotalRam(kChunkSize / 2);
+
+  constexpr Range kBookkeepingPartlyShaved[] = {
+      // bookkeeping: [0, kChunkSize/2)
+      {
+          .addr = 0,
+          .size = kChunkSize / 2,
+          .type = Type::kPoolBookkeeping,
+      },
+  };
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kBookkeepingPartlyShaved}));
+
+  //
+  // Even all of bookkeeping space may be removed.
+  //
+
+  ctx.pool.RestrictTotalRam(0);
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {}));
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolAllocation(ctx.pool, Type::kPhysScratch, kChunkSize, kChunkSize,
+                                             {}, {}, /*alloc_error=*/true));
+}
+
+TEST(MemallocPoolTests, TotalRamRestrictionWithPeripheralRanges) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // free RAM: [0, 2*kChunkSize)
+      {
+          .addr = 0,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // peripheral: [2*kChunkSize, 3*kChunkSize)
+      {
+          .addr = 2 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPeripheral,
+      },
+      // test payload: [10*kChunkSize, 12*kChunkSize)
+      {
+          .addr = 10 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kPoolTestPayload,
+      },
+      // free RAM: [12*kChunkSize, 13*kChunkSize)
+      {
+          .addr = 12 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // peripheral: [20*kChunkSize, 21*kChunkSize)
+      {
+          .addr = 20 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPeripheral,
+      },
+      // free RAM: [30*kChunkSize, 31*kChunkSize)
+      {
+          .addr = 30 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  //
+  // Restricting to 3 chunks should result in the following set of ranges,
+  // leaving the peripheral ranges in place and removing all RAM midway through
+  // the test payload.
+  //
+
+  ctx.pool.RestrictTotalRam(3 * kChunkSize);
+
+  constexpr Range kExpected[] = {
+      {
+          .addr = 0,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      // free RAM: [kChunkSize, 2*kChunkSize)
+      {
+          .addr = kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // peripheral: [2*kChunkSize, 3*kChunkSize)
+      {
+          .addr = 2 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPeripheral,
+      },
+      // test payload: [10*kChunkSize, 11*kChunkSize)
+      {
+          .addr = 10 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolTestPayload,
+      },
+      // peripheral: [20*kChunkSize, 21*kChunkSize)
+      {
+          .addr = 20 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPeripheral,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kExpected}));
+
+  //
+  // Even after removing all RAM, we should still track the peripheral ranges.
+  //
+  ctx.pool.RestrictTotalRam(0);
+
+  constexpr Range kJustPeripheral[] = {
+
+      // peripheral: [2*kChunkSize, 3*kChunkSize)
+      {
+          .addr = 2 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPeripheral,
+      },
+      // peripheral: [20*kChunkSize, 21*kChunkSize)
+      {
+          .addr = 20 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPeripheral,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {kJustPeripheral}));
+}
+
 TEST(MemallocPoolTests, OutOfMemory) {
   PoolContext ctx;
   Range ranges[] = {
