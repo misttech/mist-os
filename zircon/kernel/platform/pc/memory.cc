@@ -9,7 +9,6 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <lib/arch/x86/boot-cpuid.h>
-#include <lib/memory_limit.h>
 #include <lib/zbitl/items/mem-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -77,9 +76,6 @@ void mark_pio_region_to_reserve(uint64_t base, size_t len) {
 
 // Populate global memory arenas from the given memory ranges.
 static zx_status_t mem_arena_init(ktl::span<const zbi_mem_range_t> ranges) {
-  // Determine if the user has given us an artificial limit on the amount of memory we can use.
-  bool have_limit = (memory_limit_init() == ZX_OK);
-
   // Create the kernel's singleton for address space management.
   pmm_arena_info_t base_arena;
   snprintf(base_arena.name, sizeof(base_arena.name), "%s", "memory");
@@ -120,30 +116,17 @@ static zx_status_t mem_arena_init(ktl::span<const zbi_mem_range_t> ranges) {
     }
 
     mark_mmio_region_to_reserve(base, static_cast<size_t>(size));
-    zx_status_t status = ZX_OK;
-    if (have_limit) {
-      status = memory_limit_add_range(base, size, base_arena);
+    auto arena = base_arena;
+    arena.base = base;
+    arena.size = size;
+
+    LTRACEF("Adding pmm range at %#" PRIxPTR " of %#zx bytes.\n", arena.base, arena.size);
+    zx_status_t status = pmm_add_arena(&arena);
+
+    // print a warning and continue
+    if (status != ZX_OK) {
+      printf("MEM: Failed to add pmm range at %#" PRIxPTR " size %#zx\n", arena.base, arena.size);
     }
-
-    // If there is no limit, or we failed to add arenas from processing
-    // ranges then add the original range.
-    if (!have_limit || status != ZX_OK) {
-      auto arena = base_arena;
-      arena.base = base;
-      arena.size = size;
-
-      LTRACEF("Adding pmm range at %#" PRIxPTR " of %#zx bytes.\n", arena.base, arena.size);
-      status = pmm_add_arena(&arena);
-
-      // print a warning and continue
-      if (status != ZX_OK) {
-        printf("MEM: Failed to add pmm range at %#" PRIxPTR " size %#zx\n", arena.base, arena.size);
-      }
-    }
-  }
-
-  if (have_limit) {
-    memory_limit_add_arenas(base_arena);
   }
 
   return ZX_OK;

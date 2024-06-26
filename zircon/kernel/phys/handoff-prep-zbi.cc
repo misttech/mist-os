@@ -24,6 +24,7 @@
 #include <fbl/algorithm.h>
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
+#include <ktl/limits.h>
 #include <ktl/span.h>
 #include <ktl/type_traits.h>
 #include <ktl/variant.h>
@@ -100,7 +101,7 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
         // Pass the original incoming data on for mexec verbatim.
         SaveForMexec(*header, payload);
 
-        // TODO(https://fxbug.dev/42164859): Hand off the incoming ZBI item data directly
+        // TODO(https://fxbug.dev/347766366): Hand off the incoming ZBI item data directly
         // rather than using normalized data from memalloc::Pool so that the
         // kernel's ingestion of RAM vs RESERVED regions is unperturbed.
         // Later this will be replaced by proper memory handoff.
@@ -180,10 +181,10 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
               // longer be contiguous.
             case ZBI_MEM_TYPE_RAM: {
               // It is possible to generate a 0 sized range here.
-              uintptr_t aligned_start = fbl::round_up(mem_range.paddr, ZX_PAGE_SIZE);
-              mem_range.length =
-                  fbl::round_down(mem_range.paddr + mem_range.length, ZX_PAGE_SIZE) - aligned_start;
-              mem_range.paddr = aligned_start;
+              uintptr_t start = fbl::round_up(mem_range.paddr, ZX_PAGE_SIZE);
+              uintptr_t end = fbl::round_down(mem_range.paddr + mem_range.length, ZX_PAGE_SIZE);
+              mem_range.length = start <= end ? end - start : 0;
+              mem_range.paddr = start;
               break;
             }
 
@@ -191,10 +192,10 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
             // it may leave out registers that are required for operation. This is harmless,
             // since the page will just be mapped uncached.
             case ZBI_MEM_TYPE_PERIPHERAL: {
-              uintptr_t aligned_start = fbl::round_down(mem_range.paddr, ZX_PAGE_SIZE);
-              mem_range.length =
-                  fbl::round_up(mem_range.paddr + mem_range.length, ZX_PAGE_SIZE) - aligned_start;
-              mem_range.paddr = aligned_start;
+              uintptr_t start = fbl::round_down(mem_range.paddr, ZX_PAGE_SIZE);
+              uintptr_t end = fbl::round_down(mem_range.paddr + mem_range.length, ZX_PAGE_SIZE);
+              mem_range.length = end - start;
+              mem_range.paddr = start;
               break;
             }
 
@@ -212,7 +213,45 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
         }
 
         // Adjust the size of valid ranges.
-        handoff_->mem_config.size_ = current;
+        handoff_mem_config = handoff_mem_config.subspan(0, current);
+        handoff_->mem_config.size_ = handoff_mem_config.size();
+
+        // If kernel.memory-limit-mb is set, we handle that by simply truncating
+        // the RAM specified. Since RestrictTotalRam() was called in
+        // InitMemory() we have guarantees that no memory that we wish to hand
+        // off to the kernel was allocated outside of the truncated range.
+        if (gBootOptions->memory_limit_mb == 0) {
+          break;
+        }
+
+        // Consult the Pool to straightforwardly determine where the RAM cut-off
+        // should be.
+        constexpr uint64_t kBytesPerMib = 0x100'000;
+        const uint64_t limit_mb = ktl::min(ktl::numeric_limits<uint64_t>::max() / kBytesPerMib,
+                                           gBootOptions->memory_limit_mb);
+        uint64_t limit_end = 0;
+        Allocation::GetPool().NormalizeRam(
+            [&limit_end, left = kBytesPerMib * limit_mb](const auto& range) mutable {
+              uint64_t keep = ktl::min(left, range.size);
+              left -= keep;
+              limit_end = range.addr + keep;
+              return left > 0;
+            });
+
+        // Perform the truncation in place.
+        size_t w = 0;  // The write index, as opposed to `r`, the read index.
+        for (size_t r = 0; r < handoff_mem_config.size(); ++r) {
+          zbi_mem_range_t& range = handoff_mem_config[r];
+          if (range.type == ZBI_MEM_TYPE_RAM) {
+            if (range.paddr >= limit_end) {
+              continue;
+            }
+            range.length = ktl::min(range.length, limit_end - range.paddr);
+          }
+          handoff_mem_config[w++] = range;
+        }
+        handoff_mem_config = handoff_mem_config.subspan(0, w);
+        handoff_->mem_config.size_ = handoff_mem_config.size();
         break;
       }
 

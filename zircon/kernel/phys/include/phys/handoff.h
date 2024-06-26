@@ -118,6 +118,9 @@ struct PhysHandoff {
   static_assert(ktl::is_default_constructible_v<ArchPhysHandoff>);
 
   // ZBI_TYPE_MEM_CONFIG payload.
+  //
+  // TODO(https://fxbug.dev/347766366): Replace this with a span of normalized
+  // memalloc::Range.
   PhysHandoffTemporarySpan<const zbi_mem_range_t> mem_config;
 
   // ZBI_TYPE_CPU_TOPOLOGY payload (or translated legacy equivalents).

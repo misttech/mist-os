@@ -31,7 +31,6 @@ source_set("generic-riscv64") {
     "//zircon/kernel/lib/init",
     "//zircon/kernel/lib/jtrace",
     "//zircon/kernel/lib/lockdep",
-    "//zircon/kernel/lib/memory_limit",
     "//zircon/kernel/lib/persistent-debuglog",
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/object",
