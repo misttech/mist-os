@@ -11,6 +11,7 @@
 
 #include <arch/mp_unplug_event.h>
 #include <kernel/mutex.h>
+#include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <kernel/timer.h>
 #include <ktl/atomic.h>
@@ -122,13 +123,22 @@ class IdlePowerThread final {
   // acknowledged. A pending wake event is automatically acknowledged when the WakeEvent instance is
   // destroyed to prevent missing an acknowledgement that would render the system unable to suspend.
   //
+  // WakeEvent maintains a global (singleton) list of all instances.  Constructing or destroying an
+  // instance adds/removes it from the list.  See also |Dump|.
   class WakeEvent {
    public:
     // Construct a WakeEvent owned by |koid|.
     //
     // |koid| is used for logging.
-    explicit WakeEvent(zx_koid_t koid) : owner_koid_(koid) {}
-    ~WakeEvent() { Acknowledge(); }
+    explicit WakeEvent(zx_koid_t koid) : owner_koid_(koid) {
+      Guard<SpinLock, IrqSave> guard(WakeEventListLock::Get());
+      WakeEvent::list_.push_front(this);
+    }
+    ~WakeEvent() {
+      Acknowledge();
+      Guard<SpinLock, IrqSave> guard(WakeEventListLock::Get());
+      WakeEvent::list_.erase(*this);
+    }
 
     // Triggers a wakeup that resumes the system, or aborts an incomplete suspend sequence, and
     // prevents the system from starting a new suspend sequence.
@@ -144,9 +154,11 @@ class IdlePowerThread final {
     WakeResult Trigger() {
       DEBUG_ASSERT(arch_ints_disabled());
       DEBUG_ASSERT(Thread::Current::Get()->preemption_state().PreemptIsEnabled() == false);
-      if (!pending_) {
-        pending_ = true;
-        return TriggerSystemWakeEvent(owner_koid_);
+      const bool pending =
+          last_trigger_ticks_.load(ktl::memory_order_relaxed) != ZX_TIME_INFINITE_PAST;
+      if (!pending) {
+        last_trigger_ticks_.store(current_ticks(), ktl::memory_order_relaxed);
+        return TriggerSystemWakeEvent();
       }
       return WakeResult::BadState;
     }
@@ -154,15 +166,38 @@ class IdlePowerThread final {
     // Acknowledges a pending wake event, allowing the system to enter suspend when all other
     // suspend conditions are met.
     void Acknowledge() {
-      if (pending_) {
-        pending_ = false;
-        AcknowledgeSystemWakeEvent(owner_koid_);
+      const bool pending =
+          last_trigger_ticks_.load(ktl::memory_order_relaxed) != ZX_TIME_INFINITE_PAST;
+      if (pending) {
+        last_trigger_ticks_.store(ZX_TIME_INFINITE_PAST, ktl::memory_order_relaxed);
+        AcknowledgeSystemWakeEvent();
       }
     }
 
+    // Walk the global list of all instances and dump diagnostic information about the pendings ones
+    // to |f|
+    //
+    // Safe to call concurrently with any and all methods, including ctors and dtors.
+    static void DumpPending(FILE* f);
+
+    using NodeState = fbl::DoublyLinkedListNodeState<WakeEvent*>;
+    struct NodeListTraits {
+      static NodeState& node_state(WakeEvent& w) { return w.node_state_; }
+    };
+
    private:
+    using WakeEventList = fbl::DoublyLinkedListCustomTraits<WakeEvent*, WakeEvent::NodeListTraits>;
+
+    DECLARE_SINGLETON_SPINLOCK(WakeEventListLock);
+    inline static WakeEventList list_ TA_GUARDED(WakeEventListLock::Get());
+
+    NodeState node_state_ TA_GUARDED(WakeEventListLock::Get());
     const zx_koid_t owner_koid_;
-    bool pending_{false};
+    // Indicates whether this WakeEvent is pending and if so, at what time it became pending.
+    // ZX_TIME_INFINITE_PAST means not pending.  This is an atomic because it may be accessed a
+    // thread calling |Dump| concurrent with another thread calling either |Trigger| or
+    // |Acknowledge|.
+    ktl::atomic<zx_ticks_t> last_trigger_ticks_{ZX_TIME_INFINITE_PAST};
   };
 
   // Implements the run loop executed by the CPU's idle/power thread.
@@ -212,8 +247,8 @@ class IdlePowerThread final {
       TA_REQ(TransitionLock::Get());
 
   static WakeResult WakeBootCpu();
-  static WakeResult TriggerSystemWakeEvent(zx_koid_t koid);
-  static void AcknowledgeSystemWakeEvent(zx_koid_t koid);
+  static WakeResult TriggerSystemWakeEvent();
+  static void AcknowledgeSystemWakeEvent();
 
   ktl::atomic<StateMachine> state_{};
   AutounsignalMpUnplugEvent complete_;
