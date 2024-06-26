@@ -10,7 +10,7 @@ use fidl_fuchsia_net_filter_ext::{
     AddressMatcher, AddressMatcherType, DeviceClass, InterfaceMatcher, Matchers, PortMatcher,
     TransportProtocolMatcher,
 };
-use net_types::ip::{Ip, IpInvariant};
+use net_types::ip::{Ip, IpVersion};
 use {
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
@@ -510,12 +510,10 @@ impl Matcher for Icmp {
     ) -> Matchers {
         Matchers {
             transport_protocol: Some({
-                let IpInvariant(matcher) = I::map_ip(
-                    (),
-                    |()| IpInvariant(TransportProtocolMatcher::Icmp),
-                    |()| IpInvariant(TransportProtocolMatcher::Icmpv6),
-                );
-                matcher
+                match I::VERSION {
+                    IpVersion::V4 => TransportProtocolMatcher::Icmp,
+                    IpVersion::V6 => TransportProtocolMatcher::Icmpv6,
+                }
             }),
             ..Default::default()
         }

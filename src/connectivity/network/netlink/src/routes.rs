@@ -2189,9 +2189,9 @@ mod tests {
         );
 
         let (RouteSetStreamWrapper(route_set_stream), IpInvariant(route_set_background_work)) =
-            I::map_ip(
-                IpInvariant((v4_routes_set_provider, v6_routes_set_provider)),
-                |IpInvariant((main_set_provider, other_set_provider))| {
+            I::map_ip_out(
+                (v4_routes_set_provider, v6_routes_set_provider),
+                |(main_set_provider, other_set_provider)| {
                     let main_stream = fnet_routes_ext::testutil::admin::serve_all_route_sets::<Ipv4>(
                         main_set_provider,
                     );
@@ -2205,7 +2205,7 @@ mod tests {
                         ),
                     )
                 },
-                |IpInvariant((other_set_provider, main_set_provider))| {
+                |(other_set_provider, main_set_provider)| {
                     let main_stream = fnet_routes_ext::testutil::admin::serve_all_route_sets::<Ipv6>(
                         main_set_provider,
                     );
@@ -2310,7 +2310,7 @@ mod tests {
         stream
             .zip(futures::stream::iter(updates.into_iter()))
             .for_each(|(request, update)| async move {
-                I::map_ip::<_, ()>(
+                I::map_ip_in(
                     HandleInputs { request, update },
                     |HandleInputs { request, update }| match request
                         .expect("failed to receive `Watch` request")

@@ -22,7 +22,7 @@ use std::fmt::{Debug, Display};
 use async_utils::fold;
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
 use futures::{Future, Stream, StreamExt as _, TryStreamExt as _};
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Ipv6Addr, Subnet};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use net_types::{SpecifiedAddr, UnicastAddress, Witness as _};
 use thiserror::Error;
 use {
@@ -487,14 +487,10 @@ impl<I: Ip> TryFrom<Route<I>> for fnet_stack::ForwardingEntry {
             RouteAction::Forward(target) => target,
         };
 
-        let IpInvariant(next_hop) = I::map_ip(
+        let next_hop = I::map_ip_in(
             next_hop,
-            |next_hop| {
-                IpInvariant(next_hop.map(|addr| fnet::IpAddress::Ipv4(addr.get().into_ext())))
-            },
-            |next_hop| {
-                IpInvariant(next_hop.map(|addr| fnet::IpAddress::Ipv6(addr.get().into_ext())))
-            },
+            |next_hop| next_hop.map(|addr| fnet::IpAddress::Ipv4(addr.get().into_ext())),
+            |next_hop| next_hop.map(|addr| fnet::IpAddress::Ipv6(addr.get().into_ext())),
         );
 
         Ok(fnet_stack::ForwardingEntry {
@@ -851,13 +847,13 @@ pub fn get_watcher<I: FidlRouteIpExt>(
         state_proxy: &'a <I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
         options: WatcherOptions,
     }
-    let IpInvariant(result) = I::map_ip::<GetWatcherInputs<'_, I>, _>(
+    let result = I::map_ip_in(
         GetWatcherInputs::<'_, I> { watcher_server_end, state_proxy, options },
         |GetWatcherInputs { watcher_server_end, state_proxy, options }| {
-            IpInvariant(state_proxy.get_watcher_v4(watcher_server_end, &options.into()))
+            state_proxy.get_watcher_v4(watcher_server_end, &options.into())
         },
         |GetWatcherInputs { watcher_server_end, state_proxy, options }| {
-            IpInvariant(state_proxy.get_watcher_v6(watcher_server_end, &options.into()))
+            state_proxy.get_watcher_v6(watcher_server_end, &options.into())
         },
     );
 

@@ -11,7 +11,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy as _};
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
 use futures::future::Either;
 use futures::{Stream, StreamExt as _, TryStreamExt as _};
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Subnet};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Subnet};
 use thiserror::Error;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
@@ -816,13 +816,13 @@ pub fn new_rule_set<I: Ip + FidlRuleAdminIpExt>(
         rule_set_server_end: fidl::endpoints::ServerEnd<I::RuleSetMarker>,
         rule_table_proxy: &'a <I::RuleTableMarker as ProtocolMarker>::Proxy,
     }
-    let IpInvariant(result) = I::map_ip::<NewRuleSetInput<'_, I>, _>(
+    let result = I::map_ip_in(
         NewRuleSetInput::<'_, I> { rule_set_server_end, rule_table_proxy },
         |NewRuleSetInput { rule_set_server_end, rule_table_proxy }| {
-            IpInvariant(rule_table_proxy.new_rule_set(priority.into(), rule_set_server_end))
+            rule_table_proxy.new_rule_set(priority.into(), rule_set_server_end)
         },
         |NewRuleSetInput { rule_set_server_end, rule_table_proxy }| {
-            IpInvariant(rule_table_proxy.new_rule_set(priority.into(), rule_set_server_end))
+            rule_table_proxy.new_rule_set(priority.into(), rule_set_server_end)
         },
     );
 
@@ -846,24 +846,16 @@ pub async fn add_rule<I: Ip + FidlRuleAdminIpExt>(
         action: RuleAction,
     }
 
-    let IpInvariant(result_fut) = I::map_ip(
+    I::map_ip_in(
         AddRuleInput { rule_set, index, selector, action },
         |AddRuleInput { rule_set, index, selector, action }| {
-            IpInvariant(Either::Left(rule_set.add_rule(
-                index.into(),
-                &selector.into(),
-                &action.into(),
-            )))
+            Either::Left(rule_set.add_rule(index.into(), &selector.into(), &action.into()))
         },
         |AddRuleInput { rule_set, index, selector, action }| {
-            IpInvariant(Either::Right(rule_set.add_rule(
-                index.into(),
-                &selector.into(),
-                &action.into(),
-            )))
+            Either::Right(rule_set.add_rule(index.into(), &selector.into(), &action.into()))
         },
-    );
-    result_fut.await
+    )
+    .await
 }
 
 /// Dispatches `remove_rule` on either the `RuleSetV4` or `RuleSetV6` proxy.
@@ -878,16 +870,12 @@ pub async fn remove_rule<I: Ip + FidlRuleAdminIpExt>(
         index: RuleIndex,
     }
 
-    let IpInvariant(result_fut) = I::map_ip(
+    I::map_ip_in(
         RemoveRuleInput { rule_set, index },
-        |RemoveRuleInput { rule_set, index }| {
-            IpInvariant(Either::Left(rule_set.remove_rule(index.into())))
-        },
-        |RemoveRuleInput { rule_set, index }| {
-            IpInvariant(Either::Right(rule_set.remove_rule(index.into())))
-        },
-    );
-    result_fut.await
+        |RemoveRuleInput { rule_set, index }| Either::Left(rule_set.remove_rule(index.into())),
+        |RemoveRuleInput { rule_set, index }| Either::Right(rule_set.remove_rule(index.into())),
+    )
+    .await
 }
 
 /// Dispatches `close` on either the `RuleSetV4` or `RuleSetV6` proxy.
@@ -902,10 +890,10 @@ pub async fn close_rule_set<I: Ip + FidlRuleAdminIpExt>(
         rule_set: &'a <I::RuleSetMarker as ProtocolMarker>::Proxy,
     }
 
-    let IpInvariant(result) = I::map_ip(
+    let result = I::map_ip_in(
         CloseInput { rule_set: &rule_set },
-        |CloseInput { rule_set }| IpInvariant(rule_set.close()),
-        |CloseInput { rule_set }| IpInvariant(rule_set.close()),
+        |CloseInput { rule_set }| rule_set.close(),
+        |CloseInput { rule_set }| rule_set.close(),
     );
 
     assert!(rule_set

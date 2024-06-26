@@ -38,7 +38,7 @@ use anyhow::{anyhow, Context as _};
 use futures::future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _};
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::fidl_subnet;
-use net_types::ip::{GenericOverIp, Ip, IpInvariant};
+use net_types::ip::{GenericOverIp, Ip};
 
 type Result<T = ()> = std::result::Result<T, anyhow::Error>;
 
@@ -1135,15 +1135,15 @@ impl<'a> TestInterface<'a> {
             LocalBoxFuture<'a, <I::RouteSetMarker as ProtocolMarker>::Proxy>,
         );
 
-        let Out(proxy_fut) = I::map_ip::<_, Out<'_, _>>(
-            IpInvariant(self),
-            |IpInvariant(this)| {
+        let Out(proxy_fut) = I::map_ip_out(
+            self,
+            |this| {
                 Out(this
                     .get_global_route_set_v4()
                     .map(|result| result.expect("get global route set"))
                     .boxed_local())
             },
-            |IpInvariant(this)| {
+            |this| {
                 Out(this
                     .get_global_route_set_v6()
                     .map(|result| result.expect("get global route set"))

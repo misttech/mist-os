@@ -3608,7 +3608,7 @@ mod test {
                             expected_request: routes::RequestArgs<I>,
                         }
 
-                        let () = I::map_ip(
+                        I::map_ip_in(
                             EqualityInputs {
                                 args: args,
                                 expected_request: routes::RequestArgs::Route(expected_request),

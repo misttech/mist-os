@@ -20,7 +20,7 @@ use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use heck::SnakeCase as _;
 use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6};
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::SpecifiedAddr;
 use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
@@ -627,14 +627,14 @@ struct SockAddrsIpSpecific<I: ping::IpExt> {
 
 impl<I: ping::IpExt> From<SockAddrs> for SockAddrsIpSpecific<I> {
     fn from(sock_addrs: SockAddrs) -> Self {
-        I::map_ip(
-            IpInvariant(sock_addrs),
-            |IpInvariant(SockAddrs { client, server })| {
+        I::map_ip_out(
+            sock_addrs,
+            |SockAddrs { client, server }| {
                 let client = assert_matches!(client, std::net::SocketAddr::V4(addr) => addr);
                 let server = assert_matches!(server, std::net::SocketAddr::V4(addr) => addr);
                 SockAddrsIpSpecific { client, server }
             },
-            |IpInvariant(SockAddrs { client, server })| {
+            |SockAddrs { client, server }| {
                 let client = assert_matches!(client, std::net::SocketAddr::V6(addr) => addr);
                 let server = assert_matches!(server, std::net::SocketAddr::V6(addr) => addr);
                 SockAddrsIpSpecific { client, server }

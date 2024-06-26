@@ -96,7 +96,7 @@ fn update_transport_checksum_pseudo_header<I: Ip>(
     proto: u8,
     transport_len: usize,
 ) -> Result<(), TryFromIntError> {
-    I::map_ip::<_, Result<(), IpInv<TryFromIntError>>>(
+    I::map_ip_in(
         (IpInv(checksum), src_ip, dst_ip, IpInv(proto), IpInv(transport_len)),
         |(IpInv(checksum), src_ip, dst_ip, IpInv(proto), IpInv(transport_len))| {
             let pseudo_header = {
@@ -106,10 +106,7 @@ fn update_transport_checksum_pseudo_header<I: Ip>(
                 (&mut pseudo_header[..4]).copy_from_slice(src_ip.bytes());
                 (&mut pseudo_header[4..8]).copy_from_slice(dst_ip.bytes());
                 pseudo_header[9] = proto;
-                NetworkEndian::write_u16(
-                    &mut pseudo_header[10..12],
-                    transport_len.try_into().map_err(IpInv)?,
-                );
+                NetworkEndian::write_u16(&mut pseudo_header[10..12], transport_len.try_into()?);
                 pseudo_header
             };
             // add_bytes contains some branching logic at the beginning which is
@@ -127,10 +124,7 @@ fn update_transport_checksum_pseudo_header<I: Ip>(
                 let mut pseudo_header = [0u8; 40];
                 (&mut pseudo_header[..16]).copy_from_slice(src_ip.bytes());
                 (&mut pseudo_header[16..32]).copy_from_slice(dst_ip.bytes());
-                NetworkEndian::write_u32(
-                    &mut pseudo_header[32..36],
-                    transport_len.try_into().map_err(IpInv)?,
-                );
+                NetworkEndian::write_u32(&mut pseudo_header[32..36], transport_len.try_into()?);
                 pseudo_header[39] = proto;
                 pseudo_header
             };
@@ -143,7 +137,6 @@ fn update_transport_checksum_pseudo_header<I: Ip>(
             Ok(())
         },
     )
-    .map_err(|IpInv(err)| err)
 }
 
 /// Compute the checksum used by TCP and UDP.

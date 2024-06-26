@@ -19,9 +19,7 @@ use fidl_fuchsia_net_ext::IntoExt;
 use fuchsia_async::TimeoutExt;
 use futures::{FutureExt, StreamExt};
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6};
-use net_types::ip::{
-    GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use netemul::{InStack, InterfaceConfig};
 use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::realms::{
@@ -574,16 +572,16 @@ async fn watcher_existing<
     struct RoutesHolder<I: fnet_routes_ext::FidlRouteIpExt>(
         Vec<fnet_routes_ext::InstalledRoute<I>>,
     );
-    let RoutesHolder(expected_routes) = I::map_ip(
-        IpInvariant((loopback_id, interface_id)),
-        |IpInvariant((loopback_id, interface_id))| {
+    let RoutesHolder(expected_routes) = I::map_ip_out(
+        (loopback_id, interface_id),
+        |(loopback_id, interface_id)| {
             RoutesHolder(
                 initial_loopback_routes_v4::<N>(loopback_id.get(), main_table_id)
                     .chain(initial_ethernet_routes_v4(interface_id, main_table_id))
                     .collect::<Vec<_>>(),
             )
         },
-        |IpInvariant((loopback_id, interface_id))| {
+        |(loopback_id, interface_id)| {
             RoutesHolder(
                 initial_loopback_routes_v6::<N>(loopback_id.get(), main_table_id)
                     .chain(initial_ethernet_routes_v6(interface_id, main_table_id))
@@ -853,13 +851,13 @@ async fn watcher_multiple_instances<
         watchers.push(event_stream);
 
         // Add a test route whose subnet is unique based on `i`.
-        let subnet: net_types::ip::Subnet<I::Addr> = I::map_ip(
-            IpInvariant(i),
-            |IpInvariant(i)| {
+        let subnet: net_types::ip::Subnet<I::Addr> = I::map_ip_out(
+            i,
+            |i| {
                 net_types::ip::Subnet::new(net_types::ip::Ipv4Addr::new([192, 168, i, 0]), 24)
                     .unwrap()
             },
-            |IpInvariant(i)| {
+            |i| {
                 net_types::ip::Subnet::new(
                     net_types::ip::Ipv6Addr::from_bytes([
                         0xfd, 0, i, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

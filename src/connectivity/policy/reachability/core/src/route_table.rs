@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_net_ext::IntoExt;
-use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv6};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6};
 use std::collections::HashSet;
 use tracing::error;
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes_ext as fnet_routes_ext};
@@ -85,10 +85,10 @@ impl RouteTable {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct TableHolder<'a, I: Ip>(&'a mut HashSet<fnet_routes_ext::InstalledRoute<I>>);
-        let TableHolder(ip_specific_table) = I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(route_table)| TableHolder(&mut route_table.v4_routes),
-            |IpInvariant(route_table)| TableHolder(&mut route_table.v6_routes),
+        let TableHolder(ip_specific_table) = I::map_ip_out(
+            self,
+            |route_table| TableHolder(&mut route_table.v4_routes),
+            |route_table| TableHolder(&mut route_table.v6_routes),
         );
         ip_specific_table
     }

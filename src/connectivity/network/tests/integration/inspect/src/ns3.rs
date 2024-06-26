@@ -16,7 +16,7 @@ use std::time::Duration;
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use net_declare::{fidl_mac, fidl_subnet, std_ip_v4, std_ip_v6};
-use net_types::ip::{Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
 use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
 use netstack_testing_common::{constants, get_inspect_data};
@@ -111,29 +111,24 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
         TcpSocketState::Unbound | TcpSocketState::Bound => {}
         TcpSocketState::Listener => tcp_socket.listen(BACKLOG.try_into().unwrap()).expect("listen"),
         TcpSocketState::Connected => {
-            let IpInvariant((default_subnet, peer_addr)) = I::map_ip(
-                (),
-                |()| {
-                    IpInvariant((
-                        fidl_subnet!("0.0.0.0/0"),
-                        std::net::SocketAddr::from(std::net::SocketAddrV4::new(
-                            std_ip_v4!("192.0.2.2"),
-                            REMOTE_PORT,
-                        )),
-                    ))
-                },
-                |()| {
-                    IpInvariant((
-                        fidl_subnet!("::/0"),
-                        std::net::SocketAddr::from(std::net::SocketAddrV6::new(
-                            std_ip_v6!("2001:db8::2"),
-                            REMOTE_PORT,
-                            0,
-                            0,
-                        )),
-                    ))
-                },
-            );
+            let (default_subnet, peer_addr) = match I::VERSION {
+                IpVersion::V4 => (
+                    fidl_subnet!("0.0.0.0/0"),
+                    std::net::SocketAddr::from(std::net::SocketAddrV4::new(
+                        std_ip_v4!("192.0.2.2"),
+                        REMOTE_PORT,
+                    )),
+                ),
+                IpVersion::V6 => (
+                    fidl_subnet!("::/0"),
+                    std::net::SocketAddr::from(std::net::SocketAddrV6::new(
+                        std_ip_v6!("2001:db8::2"),
+                        REMOTE_PORT,
+                        0,
+                        0,
+                    )),
+                ),
+            };
             // Add a default route to the device, allowing the connection to
             // begin. Note that because there is no peer end to accept the
             // connection we setup the socket as non-blocking, and give a large

@@ -206,25 +206,25 @@ pub fn new_route_table<I: Ip + FidlRouteAdminIpExt>(
         name: Option<String>,
     }
 
-    let IpInvariant(result) = I::map_ip::<NewRouteTableInput<'_, I>, _>(
+    let result = I::map_ip_in(
         NewRouteTableInput::<'_, I> { route_table_server_end, route_table_provider_proxy, name },
         |NewRouteTableInput { route_table_server_end, route_table_provider_proxy, name }| {
-            IpInvariant(route_table_provider_proxy.new_route_table(
+            route_table_provider_proxy.new_route_table(
                 route_table_server_end,
                 &fnet_routes_admin::RouteTableOptionsV4 {
                     name,
                     ..fnet_routes_admin::RouteTableOptionsV4::default()
                 },
-            ))
+            )
         },
         |NewRouteTableInput { route_table_server_end, route_table_provider_proxy, name }| {
-            IpInvariant(route_table_provider_proxy.new_route_table(
+            route_table_provider_proxy.new_route_table(
                 route_table_server_end,
                 &fnet_routes_admin::RouteTableOptionsV6 {
                     name,
                     ..fnet_routes_admin::RouteTableOptionsV6::default()
                 },
-            ))
+            )
         },
     );
 
@@ -247,13 +247,13 @@ pub fn new_route_set<I: Ip + FidlRouteAdminIpExt>(
         route_set_server_end: fidl::endpoints::ServerEnd<I::RouteSetMarker>,
         route_table_proxy: &'a <I::RouteTableMarker as ProtocolMarker>::Proxy,
     }
-    let IpInvariant(result) = I::map_ip::<NewRouteSetInput<'_, I>, _>(
+    let result = I::map_ip_in(
         NewRouteSetInput::<'_, I> { route_set_server_end, route_table_proxy },
         |NewRouteSetInput { route_set_server_end, route_table_proxy }| {
-            IpInvariant(route_table_proxy.new_route_set(route_set_server_end))
+            route_table_proxy.new_route_set(route_set_server_end)
         },
         |NewRouteSetInput { route_set_server_end, route_table_proxy }| {
-            IpInvariant(route_table_proxy.new_route_set(route_set_server_end))
+            route_table_proxy.new_route_set(route_set_server_end)
         },
     );
 
@@ -276,13 +276,13 @@ pub fn new_global_route_set<I: Ip + FidlRouteAdminIpExt>(
         route_set_server_end: fidl::endpoints::ServerEnd<I::RouteSetMarker>,
         route_table_proxy: &'a <I::GlobalRouteTableMarker as ProtocolMarker>::Proxy,
     }
-    let IpInvariant(result) = I::map_ip::<NewRouteSetInput<'_, I>, _>(
+    let result = I::map_ip_in(
         NewRouteSetInput::<'_, I> { route_set_server_end, route_table_proxy },
         |NewRouteSetInput { route_set_server_end, route_table_proxy }| {
-            IpInvariant(route_table_proxy.global_route_set(route_set_server_end))
+            route_table_proxy.global_route_set(route_set_server_end)
         },
         |NewRouteSetInput { route_set_server_end, route_table_proxy }| {
-            IpInvariant(route_table_proxy.global_route_set(route_set_server_end))
+            route_table_proxy.global_route_set(route_set_server_end)
         },
     );
 
@@ -302,12 +302,12 @@ pub async fn add_route<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
         route: &'a I::Route,
     }
 
-    let IpInvariant(result_fut) = I::map_ip(
+    I::map_ip_in(
         AddRouteInput { route_set, route },
-        |AddRouteInput { route_set, route }| IpInvariant(Either::Left(route_set.add_route(route))),
-        |AddRouteInput { route_set, route }| IpInvariant(Either::Right(route_set.add_route(route))),
-    );
-    result_fut.await
+        |AddRouteInput { route_set, route }| Either::Left(route_set.add_route(route)),
+        |AddRouteInput { route_set, route }| Either::Right(route_set.add_route(route)),
+    )
+    .await
 }
 
 /// Dispatches `remove_route` on either the `RouteSetV4` or `RouteSetV6` proxy.
@@ -322,16 +322,12 @@ pub async fn remove_route<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
         route: &'a I::Route,
     }
 
-    let IpInvariant(result_fut) = I::map_ip(
+    I::map_ip_in(
         RemoveRouteInput { route_set, route },
-        |RemoveRouteInput { route_set, route }| {
-            IpInvariant(Either::Left(route_set.remove_route(route)))
-        },
-        |RemoveRouteInput { route_set, route }| {
-            IpInvariant(Either::Right(route_set.remove_route(route)))
-        },
-    );
-    result_fut.await
+        |RemoveRouteInput { route_set, route }| Either::Left(route_set.remove_route(route)),
+        |RemoveRouteInput { route_set, route }| Either::Right(route_set.remove_route(route)),
+    )
+    .await
 }
 
 /// Dispatches `authenticate_for_interface` on either the `RouteSetV4` or
@@ -347,16 +343,16 @@ pub async fn authenticate_for_interface<I: Ip + FidlRouteAdminIpExt + FidlRouteI
         credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
     }
 
-    let IpInvariant(result_fut) = I::map_ip(
+    I::map_ip_in(
         AuthenticateForInterfaceInput { route_set, credential },
         |AuthenticateForInterfaceInput { route_set, credential }| {
-            IpInvariant(Either::Left(route_set.authenticate_for_interface(credential)))
+            Either::Left(route_set.authenticate_for_interface(credential))
         },
         |AuthenticateForInterfaceInput { route_set, credential }| {
-            IpInvariant(Either::Right(route_set.authenticate_for_interface(credential)))
+            Either::Right(route_set.authenticate_for_interface(credential))
         },
-    );
-    result_fut.await
+    )
+    .await
 }
 
 #[derive(GenericOverIp)]
