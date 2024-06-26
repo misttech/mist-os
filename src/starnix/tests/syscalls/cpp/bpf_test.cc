@@ -29,7 +29,7 @@ TEST(BpfTest, ArraySizeOverflow) {
                                                                   .max_entries = INT_MAX / 8,
                                                               }));
   EXPECT_EQ(result, -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(errno, ENOMEM);
 }
 
 class BpfMapTest : public testing::Test {

@@ -361,7 +361,7 @@ fn compute_storage_size(schema: &MapSchema) -> Result<usize, Errno> {
         .value_size
         .checked_mul(schema.max_entries)
         .map(|v| v as usize)
-        .ok_or_else(|| errno!(EINVAL))
+        .ok_or_else(|| errno!(ENOMEM))
 }
 
 struct HashStorage {
