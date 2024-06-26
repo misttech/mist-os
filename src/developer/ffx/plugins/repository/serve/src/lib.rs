@@ -38,7 +38,8 @@ use std::time::Duration;
 use timeout::timeout;
 use tuf::metadata::RawSignedMetadata;
 
-const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
+const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 15;
 const MAX_CONSECUTIVE_CONNECT_ATTEMPTS: u8 = 10;
 const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
 const REPO_FOREGROUND_FEATURE_FLAG: &str = "repository.foreground.enabled";
@@ -87,12 +88,13 @@ async fn connect_to_target(
     aliases: Option<Vec<String>>,
     storage_type: Option<RepositoryStorageType>,
     repo_server_listen_addr: std::net::SocketAddr,
+    connect_timeout: std::time::Duration,
     repo_manager: Arc<RepositoryManager>,
     rcs_proxy: &RemoteControlProxy,
     alias_conflict_mode: FfxRepositoryRegistrationAliasConflictMode,
 ) -> Result<(), anyhow::Error> {
     let repo_proxy = rcs::connect_to_protocol::<RepositoryManagerMarker>(
-        TIMEOUT,
+        connect_timeout,
         REPOSITORY_MANAGER_MONIKER,
         &rcs_proxy,
     )
@@ -100,7 +102,7 @@ async fn connect_to_target(
     .with_context(|| format!("connecting to repository manager on {:?}", target_spec))?;
 
     let engine_proxy =
-        rcs::connect_to_protocol::<EngineMarker>(TIMEOUT, ENGINE_MONIKER, &rcs_proxy)
+        rcs::connect_to_protocol::<EngineMarker>(connect_timeout, ENGINE_MONIKER, &rcs_proxy)
             .await
             .with_context(|| format!("binding engine to stream on {:?}", target_spec))?;
 
@@ -163,6 +165,7 @@ async fn main_connect_loop(
     cmd: &ServeCommand,
     repo_path: &Utf8Path,
     server_addr: core::net::SocketAddr,
+    connect_timeout: std::time::Duration,
     repo_manager: Arc<RepositoryManager>,
     mut loop_stop_rx: futures::channel::mpsc::Receiver<()>,
     rcs_proxy: Connector<RemoteControlProxy>,
@@ -187,7 +190,7 @@ async fn main_connect_loop(
 
         let mut target_spec_from_rcs_proxy: Option<String> = None;
         let rcs_proxy = timeout(
-            TIMEOUT,
+            connect_timeout,
             rcs_proxy.try_connect(|target| {
                 tracing::info!(
                     "Waiting for target '{}' to return",
@@ -248,6 +251,7 @@ async fn main_connect_loop(
             Some(cmd.alias.clone()),
             cmd.storage_type,
             server_addr,
+            connect_timeout,
             Arc::clone(&repo_manager),
             &rcs_proxy,
             cmd.alias_conflict_mode.into(),
@@ -333,6 +337,10 @@ $ ffx doctor --restart-daemon"#,
             REPO_FOREGROUND_FEATURE_FLAG,
         );
     }
+
+    let connect_timeout =
+        context.get(REPO_CONNECT_TIMEOUT_CONFIG).unwrap_or(DEFAULT_CONNECTION_TIMEOUT_SECS);
+    let connect_timeout = std::time::Duration::from_secs(connect_timeout);
 
     let repo_manager: Arc<RepositoryManager> = RepositoryManager::new();
 
@@ -428,6 +436,7 @@ $ ffx doctor --restart-daemon"#,
             &cmd,
             &repo_path,
             server_addr,
+            connect_timeout,
             repo_manager,
             loop_stop_rx,
             rcs_proxy,
