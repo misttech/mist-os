@@ -196,6 +196,11 @@
                 // These tests fail when an init is run in the container to set up /apex.
                 // TODO(https://fxbug.dev/42080241) re-enable these tests
                 "mmapstress04",
+
+                // TODO(https://fxbug.dev/349188105) these need CLOCK_{PROCESS,THREAD}_CPUTIME_ID
+                "timer_create01",
+                "timer_delete01",
+                "timer_settime02",
             ],
         },
         {

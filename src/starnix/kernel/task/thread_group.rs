@@ -17,7 +17,6 @@ use crate::task::{
     Session, StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo,
     TaskPersistentInfoState, TimerId, TimerTable, WaitQueue, ZombiePtraces,
 };
-use crate::time::utc;
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use macro_rules_attribute::apply;
@@ -31,7 +30,7 @@ use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::resource_limits::{Resource, ResourceLimits};
 use starnix_uapi::signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU};
 use starnix_uapi::stats::TaskTimeStats;
-use starnix_uapi::time::{duration_from_timeval, timeval_from_duration};
+use starnix_uapi::time::{itimerspec_from_itimerval, timeval_from_duration};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     errno, error, itimerval, pid_t, rlimit, uid_t, CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL,
@@ -800,9 +799,9 @@ impl ThreadGroup {
             itimer_real.arm(
                 &self.kernel,
                 Arc::downgrade(self),
-                utc::utc_now() + duration_from_timeval(value.it_value)?,
-                duration_from_timeval(value.it_interval)?,
-            );
+                itimerspec_from_itimerval(value),
+                false,
+            )?;
         } else {
             itimer_real.disarm();
         }

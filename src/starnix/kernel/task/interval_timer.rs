@@ -7,11 +7,15 @@ use crate::task::timers::{ClockId, TimerId};
 use crate::task::{Kernel, ThreadGroup};
 use crate::time::utc;
 use futures::stream::AbortHandle;
-use starnix_logging::{log_warn, track_stub};
+use starnix_logging::{log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;
+use starnix_uapi::errors::{error, Errno};
 use starnix_uapi::ownership::TempRef;
-use starnix_uapi::time::timespec_from_duration;
-use starnix_uapi::{itimerspec, SI_TIMER};
+use starnix_uapi::time::{duration_from_timespec, time_from_timespec, timespec_from_duration};
+use starnix_uapi::{
+    itimerspec, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_PROCESS_CPUTIME_ID,
+    CLOCK_REALTIME, CLOCK_REALTIME_ALARM, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, SI_TIMER,
+};
 use std::sync::{Arc, Weak};
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
@@ -32,12 +36,73 @@ impl From<TimerRemaining> for itimerspec {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Timeline {
+    RealTime,
+    Monotonic,
+    BootTime,
+}
+
+impl TryFrom<ClockId> for Timeline {
+    type Error = Errno;
+    fn try_from(id: ClockId) -> Result<Self, Errno> {
+        match id as u32 {
+            CLOCK_REALTIME => Ok(Self::RealTime),
+            CLOCK_MONOTONIC => Ok(Self::Monotonic),
+            CLOCK_BOOTTIME => Ok(Self::BootTime),
+            CLOCK_REALTIME_ALARM => {
+                track_stub!(TODO("https://fxbug.dev/349190823"), "timers w/ CLOCK_REALTIME_ALARM");
+                error!(ENOTSUP)
+            }
+            CLOCK_BOOTTIME_ALARM => {
+                track_stub!(TODO("https://fxbug.dev/349191846"), "timers w/ CLOCK_BOOTTIME_ALARM");
+                error!(ENOTSUP)
+            }
+            CLOCK_TAI => {
+                track_stub!(TODO("https://fxbug.dev/349191834"), "timers w/ TAI");
+                error!(ENOTSUP)
+            }
+            CLOCK_PROCESS_CPUTIME_ID => {
+                track_stub!(
+                    TODO("https://fxbug.dev/349188105"),
+                    "timers w/ calling process cpu time"
+                );
+                error!(ENOTSUP)
+            }
+            CLOCK_THREAD_CPUTIME_ID => {
+                track_stub!(
+                    TODO("https://fxbug.dev/349188105"),
+                    "timers w/ calling thread cpu time"
+                );
+                error!(ENOTSUP)
+            }
+            _ => {
+                track_stub!(
+                    TODO("https://fxbug.dev/349188105"),
+                    "timers w/ dynamic process clocks"
+                );
+                error!(ENOTSUP)
+            }
+        }
+    }
+}
+
+impl Timeline {
+    /// Returns the current time on this timeline.
+    fn now(&self) -> zx::Time {
+        match self {
+            // TODO(https://fxbug.dev/328306129) handle boot and monotonic time separately
+            Self::BootTime | Self::Monotonic => zx::Time::get_monotonic(),
+            Self::RealTime => utc::utc_now(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct IntervalTimer {
     pub timer_id: TimerId,
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/42074034)
-    clock_id: ClockId,
+    timeline: Timeline,
 
     pub signal_event: SignalEvent,
 
@@ -51,7 +116,7 @@ struct IntervalTimerMutableState {
     abort_handle: Option<AbortHandle>,
     /// If the timer is armed (started).
     armed: bool,
-    /// Absolute UTC time of the next expiration.
+    /// Time of the next expiration on the requested timeline.
     target_time: zx::Time,
     /// Interval for periodic timer.
     interval: zx::Duration,
@@ -83,8 +148,13 @@ impl IntervalTimer {
         timer_id: TimerId,
         clock_id: ClockId,
         signal_event: SignalEvent,
-    ) -> IntervalTimerHandle {
-        Arc::new(Self { timer_id, clock_id, signal_event, state: Default::default() })
+    ) -> Result<IntervalTimerHandle, Errno> {
+        Ok(Arc::new(Self {
+            timer_id,
+            timeline: clock_id.try_into()?,
+            signal_event,
+            state: Default::default(),
+        }))
     }
 
     fn signal_info(self: &IntervalTimerHandle) -> Option<SignalInfo> {
@@ -98,8 +168,12 @@ impl IntervalTimer {
                 // We may have to issue multiple sleeps if the target time in the timer is
                 // updated while we are sleeping or if our estimation of the target time
                 // relative to the monotonic clock is off.
-                let target_monotonic =
-                    utc::estimate_monotonic_deadline_from_utc(self.state.lock().target_time);
+                let target_time = self.state.lock().target_time;
+                let target_monotonic = match self.timeline {
+                    // TODO(https://fxbug.dev/328306129) handle boot and monotonic time separately
+                    Timeline::BootTime | Timeline::Monotonic => target_time,
+                    Timeline::RealTime => utc::estimate_monotonic_deadline_from_utc(target_time),
+                };
                 if zx::Time::get_monotonic() >= target_monotonic {
                     break target_monotonic;
                 }
@@ -131,6 +205,11 @@ impl IntervalTimer {
                 match self.signal_event.notify {
                     SignalEventNotify::Signal => {
                         if let Some(signal_info) = self.signal_info() {
+                            log_trace!(
+                                signal = signal_info.signal.number(),
+                                pid = thread_group.leader,
+                                "sending signal for timer"
+                            );
                             thread_group.write().send_signal(signal_info);
                         }
                     }
@@ -142,6 +221,11 @@ impl IntervalTimer {
                         // Check if the target thread exists in the thread group.
                         thread_group.read().get_task(tid).map(TempRef::into_static).map(|target| {
                             if let Some(signal_info) = self.signal_info() {
+                                log_trace!(
+                                    signal = signal_info.signal.number(),
+                                    tid,
+                                    "sending signal for timer"
+                                );
                                 send_signal(&target, signal_info).unwrap_or_else(|e| {
                                     log_warn!("Failed to queue timer signal: {}", e)
                                 });
@@ -155,7 +239,7 @@ impl IntervalTimer {
             // specified by `target_time`.
             let mut guard = self.state.lock();
             if guard.interval != zx::Duration::default() {
-                guard.target_time = utc::utc_now() + guard.interval;
+                guard.target_time = self.timeline.now() + guard.interval;
             } else {
                 guard.disarm();
                 return;
@@ -173,24 +257,29 @@ impl IntervalTimer {
         self: &IntervalTimerHandle,
         kernel: &Kernel,
         thread_group: Weak<ThreadGroup>,
-        target_time: zx::Time,
-        interval: zx::Duration,
-    ) {
+        new_value: itimerspec,
+        is_absolute: bool,
+    ) -> Result<(), Errno> {
         let mut guard = self.state.lock();
+
+        let target_time = if is_absolute {
+            time_from_timespec(new_value.it_value)?
+        } else {
+            self.timeline.now() + duration_from_timespec(new_value.it_value)?
+        };
+        let interval = duration_from_timespec(new_value.it_interval)?;
 
         // Stop the current running task;
         guard.disarm();
 
         if target_time == zx::Time::ZERO {
-            return;
+            return Ok(());
         }
 
         guard.armed = true;
         guard.target_time = target_time;
         guard.interval = interval;
         guard.on_setting_changed();
-
-        // TODO(https://fxbug.dev/42074034): check on clock_id to see if the clock supports creating a timer.
 
         let self_ref = self.clone();
         kernel.kthreads.spawn_future(async move {
@@ -211,6 +300,8 @@ impl IntervalTimer {
             }
             .await;
         });
+
+        Ok(())
     }
 
     pub fn disarm(&self) {
@@ -225,7 +316,10 @@ impl IntervalTimer {
             return TimerRemaining::default();
         }
 
-        TimerRemaining { remainder: guard.target_time - utc::utc_now(), interval: guard.interval }
+        TimerRemaining {
+            remainder: guard.target_time - self.timeline.now(),
+            interval: guard.interval,
+        }
     }
 
     pub fn overrun_cur(&self) -> i32 {

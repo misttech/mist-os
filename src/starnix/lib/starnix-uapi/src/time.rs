@@ -5,6 +5,7 @@
 use crate::errors::{error, Errno};
 use crate::{itimerspec, timespec, timeval};
 use fuchsia_zircon as zx;
+use linux_uapi::itimerval;
 use static_assertions::const_assert_eq;
 
 const MICROS_PER_SECOND: i64 = 1000 * 1000;
@@ -66,6 +67,17 @@ pub fn duration_from_poll_timeout(timeout_ms: i32) -> Result<zx::Duration, Errno
     }
 
     Ok(zx::Duration::from_millis(timeout_ms.into()))
+}
+
+pub fn itimerspec_from_itimerval(tv: itimerval) -> itimerspec {
+    itimerspec {
+        it_interval: timespec_from_timeval(tv.it_interval),
+        it_value: timespec_from_timeval(tv.it_value),
+    }
+}
+
+pub fn timespec_from_timeval(tv: timeval) -> timespec {
+    timespec { tv_sec: tv.tv_sec, tv_nsec: tv.tv_usec * 1000 }
 }
 
 pub fn time_from_timeval(tv: timeval) -> Result<zx::Time, Errno> {

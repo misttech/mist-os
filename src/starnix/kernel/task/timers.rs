@@ -8,10 +8,8 @@ use std::collections::HashMap;
 use crate::signals::{SignalEvent, SignalEventNotify, SignalEventValue};
 use crate::task::interval_timer::{IntervalTimer, IntervalTimerHandle};
 use crate::task::CurrentTask;
-use crate::time::utc;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGALRM;
-use starnix_uapi::time::{duration_from_timespec, time_from_timespec};
 use starnix_uapi::{__kernel_timer_t, error, itimerspec, uapi, TIMER_ABSTIME};
 
 // Table for POSIX timers from timer_create() that deliver timers via signals (not new-style
@@ -75,7 +73,7 @@ impl TimerTable {
                     SIGALRM,
                     SignalEventNotify::Signal,
                 )),
-            ),
+            )?,
         );
 
         Ok(timer_id)
@@ -117,17 +115,13 @@ impl TimerTable {
         let itimer = self.get_timer(id)?;
         let old_value: itimerspec = itimer.time_remaining().into();
         if new_value.it_value.tv_sec != 0 || new_value.it_value.tv_nsec != 0 {
-            let target_time = if flags == TIMER_ABSTIME as i32 {
-                time_from_timespec(new_value.it_value)?
-            } else {
-                utc::utc_now() + duration_from_timespec(new_value.it_value)?
-            };
+            let is_absolute = flags == TIMER_ABSTIME as i32;
             itimer.arm(
                 &current_task.kernel(),
                 std::sync::Arc::downgrade(&current_task.thread_group),
-                target_time,
-                duration_from_timespec(new_value.it_interval)?,
-            );
+                new_value,
+                is_absolute,
+            )?;
         } else {
             itimer.disarm();
         }
