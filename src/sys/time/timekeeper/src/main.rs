@@ -229,8 +229,8 @@ async fn main() -> Result<()> {
         CobaltDiagnostics::new(cobalt_experiment, &primary_track, &monitor_track),
     ));
 
-    info!("connecting to real time clock");
-    let optional_rtc = match RtcImpl::only_device() {
+    info!("connecting to RTC");
+    let optional_rtc = match RtcImpl::only_device().await {
         Ok(rtc) => Some(rtc),
         Err(err) => {
             match err {
