@@ -84,19 +84,19 @@ fit::result<Error, std::vector<fuchsia_power_broker::LevelDependency>> ConvertPo
 /// |svcs_dir|. |dependencies| is consumed by this function.
 ///
 /// Returns Error::IO if there is a problem talking to capabilities.
-fit::result<Error, bool> GetTokensFromParents(ElementDependencyMap& dependencies, TokenMap& tokens,
-                                              fidl::ClientEnd<fuchsia_io::Directory>& svcs_dir) {
+fit::result<Error, bool> GetTokensFromParents(
+    ElementDependencyMap& dependencies, TokenMap& tokens,
+    const fidl::ClientEnd<fuchsia_io::Directory>& svcs_dir) {
   const uint64_t dir_read_page_size = static_cast<const uint64_t>(8 * 1024);
 
   std::vector<std::string> service_instances;
-  fidl::WireSyncClient<fuchsia_io::Directory> svcs_dir_client(std::move(svcs_dir));
 
   // Enumerate the list os service instances.
   {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
     // Open the directory containing the services instances
-    fidl::OneWayStatus status = svcs_dir_client->Open(
+    fidl::OneWayStatus status = fidl::WireCall(svcs_dir)->Open(
         ::fuchsia_io::wire::OpenFlags::kDirectory, ::fuchsia_io::wire::ModeType::kDoNotUse,
         fuchsia_hardware_power::PowerTokenService::Name, std::move(server_end));
 
@@ -146,9 +146,6 @@ fit::result<Error, bool> GetTokensFromParents(ElementDependencyMap& dependencies
 
       offset += name_len;
     }
-
-    // Take back the client end so we can use it later.
-    svcs_dir = svcs_dir_client.TakeClientEnd();
   }
 
   if (service_instances.size() == 0) {
