@@ -13,7 +13,6 @@ fidl("fuchsia.hardware.network") {
     "device.fidl",
     "diagnostics.fidl",
     "frames.fidl",
-    "history.fidl",
     "instance.fidl",
     "mac.fidl",
     "overview.fidl",
