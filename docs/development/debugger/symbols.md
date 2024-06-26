@@ -114,7 +114,7 @@ currently attached process and the corresponding symbol file if found.
 
 Zxdb can load symbols for prebuilt libraries from Google servers or upstream debuginfod servers.
 This is how symbols arrive for SDK users for anything not built locally. See [Downloading
-symbols](attaching.md#downloading_symbols) for more.
+symbols](advanced.md#download-symbols) for more.
 
 For large binaries, symbols can be several gigabytes so the download process can take many minutes.
 The `sym-stat` command will display "Downloading..." during this time.

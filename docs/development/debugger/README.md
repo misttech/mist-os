@@ -123,7 +123,6 @@ Once you have successfully connected to the `zxdb` debugger, you may want to:
 
 * [Review commands and the interaction model][zxdb-commands]
 * [Debug tests using zxdb][zxdb-tests]
-* [Debug a process, component, or crash dump][zxdb-attaching]
 * [Control thread execution][zxdb-execution] (pausing, stepping, and resuming)
 * [Use breakpoints][zxdb-breakpoints]
 * [Evaluate and print expressions][zxdb-printing]
@@ -132,11 +131,12 @@ Once you have successfully connected to the `zxdb` debugger, you may want to:
 * [Look at handles][zxdb-kernel-objects]
 * [Diagnose symbol problems][zxdb-symbols]
 * [Work with exceptions][zxdb-exceptions]
+* [See advanced zxdb topics][zxdb-advanced]
 
 
 [zxdb-troubleshooting]: /docs/development/debugger/troubleshooting.md
 [zxdb-commands]: /docs/development/debugger/commands.md
-[zxdb-attaching]: /docs/development/debugger/attaching.md
+[zxdb-advanced]: /docs/development/debugger/advanced.md
 [zxdb-execution]: /docs/development/debugger/execution.md
 [zxdb-breakpoints]: /docs/development/debugger/breakpoints.md
 [zxdb-printing]: /docs/development/debugger/printing.md

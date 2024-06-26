@@ -12,8 +12,6 @@ toc:
   path: /docs/development/debugger/commands.md
 - title: "Debug tests using zxdb"
   path: /docs/development/debugger/tests.md
-- title: "Debugging a process, component, or crash dump"
-  path: /docs/development/debugger/attaching.md
 - title: "Controlling thread execution"
   path: /docs/development/debugger/execution.md
 - title: "Using breakpoints"
@@ -32,5 +30,7 @@ toc:
   path: /docs/development/debugger/exceptions.md
 - title: "Developing and debugging the debugger"
   path: /docs/development/debugger/developing.md
+- title: "Advanced topics"
+  path: /docs/development/debugger/advanced.md
 - title: "Troubleshooting zxdb"
   path: /docs/development/debugger/troubleshooting.md
