@@ -85,25 +85,6 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
             fio::DirectoryRequest::Sync { responder } => {
                 responder.send(this.base.directory.sync().await.map_err(Status::into_raw))?;
             }
-            request @ (fio::DirectoryRequest::AdvisoryLock { .. }
-            | fio::DirectoryRequest::Clone { .. }
-            | fio::DirectoryRequest::Close { .. }
-            | fio::DirectoryRequest::GetConnectionInfo { .. }
-            | fio::DirectoryRequest::GetAttr { .. }
-            | fio::DirectoryRequest::GetAttributes { .. }
-            | fio::DirectoryRequest::GetFlags { .. }
-            | fio::DirectoryRequest::Link { .. }
-            | fio::DirectoryRequest::Open { .. }
-            | fio::DirectoryRequest::Open2 { .. }
-            | fio::DirectoryRequest::Query { .. }
-            | fio::DirectoryRequest::QueryFilesystem { .. }
-            | fio::DirectoryRequest::ReadDirents { .. }
-            | fio::DirectoryRequest::Reopen { .. }
-            | fio::DirectoryRequest::Rewind { .. }
-            | fio::DirectoryRequest::SetFlags { .. }
-            | fio::DirectoryRequest::Watch { .. }) => {
-                return this.as_mut().base.handle_request(request).await;
-            }
             fio::DirectoryRequest::CreateSymlink {
                 responder, name, target, connection, ..
             } => {
@@ -170,6 +151,9 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
                 }
                 .trace(trace::trace_future_args!(c"storage", c"Directory::UpdateAttributes"))
                 .await?;
+            }
+            request => {
+                return this.as_mut().base.handle_request(request).await;
             }
         }
         Ok(ConnectionState::Alive)

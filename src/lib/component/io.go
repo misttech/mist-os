@@ -368,6 +368,12 @@ func (dirState *directoryState) Open2(ctx fidl.Context, path string, protocols i
 	return nil
 }
 
+func (dirState *directoryState) Open3(ctx fidl.Context, path string, flags io.Flags, options io.Options, channel zx.Channel) error {
+	// TODO(https://fxbug.dev/348698584): implement.
+	_ = channel.Close()
+	return nil
+}
+
 func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.Directory2UnlinkResult, error) {
 	return io.Directory2UnlinkResultWithErr(int32(zx.ErrNotSupported)), nil
 }

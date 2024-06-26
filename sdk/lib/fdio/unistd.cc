@@ -29,6 +29,7 @@
 #include <sys/uio.h>
 #include <threads.h>
 #include <utime.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
@@ -59,13 +60,23 @@ static_assert(IOFLAG_CLOEXEC == FD_CLOEXEC, "Unexpected fdio flags value");
 
 // non-thread-safe emulation of unistd io functions using the fdio transports
 
-// Verify sub-set of fuchsia.io OpenFlags that have a 1:1 mapping with POSIX O_* flags.
+// Verify sub-set of fuchsia.io constants that have a 1:1 mapping with POSIX O_* flags.
+// fuchisa.io/OpenFlags:
 static_assert(O_PATH == static_cast<uint32_t>(fio::OpenFlags::kNodeReference));
 static_assert(O_CREAT == static_cast<uint32_t>(fio::OpenFlags::kCreate));
 static_assert(O_EXCL == static_cast<uint32_t>(fio::OpenFlags::kCreateIfAbsent));
 static_assert(O_TRUNC == static_cast<uint32_t>(fio::OpenFlags::kTruncate));
 static_assert(O_DIRECTORY == static_cast<uint32_t>(fio::OpenFlags::kDirectory));
 static_assert(O_APPEND == static_cast<uint32_t>(fio::OpenFlags::kAppend));
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+// fuchisa.io/Flags:
+static_assert(O_PATH == static_cast<uint64_t>(fio::Flags::kProtocolNode));
+static_assert(O_CREAT == static_cast<uint64_t>(fio::Flags::kFlagMaybeCreate));
+static_assert(O_EXCL == static_cast<uint64_t>(fio::Flags::kFlagMustCreate));
+static_assert(O_TRUNC == static_cast<uint64_t>(fio::Flags::kFileTruncate));
+static_assert(O_DIRECTORY == static_cast<uint64_t>(fio::Flags::kProtocolDirectory));
+static_assert(O_APPEND == static_cast<uint64_t>(fio::Flags::kFileAppend));
+#endif
 
 // Mask of all fuchsia.io OpenFlags that have a 1:1 mapping to the POSIX O_* flags above.
 constexpr fio::OpenFlags kZxioFsMask = fio::OpenFlags::kNodeReference | fio::OpenFlags::kCreate |
