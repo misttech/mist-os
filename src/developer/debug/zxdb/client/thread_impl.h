@@ -48,8 +48,11 @@ class ThreadImpl final : public Thread, public Stack::Delegate {
 
   // Updates the thread metadata with new state from the agent. Does not issue any notifications.
   // When an exception is hit for example, everything needs to be updated first to a consistent
-  // state and then we issue notifications.
-  void SetMetadata(const debug_ipc::ThreadRecord& record);
+  // state and then we issue notifications. Callers may set |skip_frames| to true, which will not
+  // set the stack of this thread to |record|. This can be useful when the client decides to fully
+  // synchronize the stack from the Agent before setting the rest of the metadata from an exception
+  // that should be kept when control is returned to the user.
+  void SetMetadata(const debug_ipc::ThreadRecord& record, bool skip_frames = false);
 
   // Notification of an exception. Call after SetMetadata() in cases where a stop may be required.
   // This function will check controllers and will either stop (dispatching notifications) or

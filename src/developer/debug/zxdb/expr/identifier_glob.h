@@ -42,7 +42,7 @@ namespace zxdb {
 //    any type, but "Foo<int*>" is a literal. This is important because "*" occurs in many type
 //    definitions but never by itself in a language we support.
 //
-//  - It does not work recursively so wile "Foo<*>" is "Foo<Bar<*>>" is currently a literal. This
+//  - It does not work recursively so while "Foo<*>" is "Foo<Bar<*>>" is currently a literal. This
 //    could be changed in the future if needed.
 //
 //  - Global qualifications "::Foo" are ignored. Everything is assumed to be fully-qualified.
