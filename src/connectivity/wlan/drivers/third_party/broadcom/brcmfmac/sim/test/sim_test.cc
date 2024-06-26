@@ -185,7 +185,7 @@ void SimInterface::AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& c
 }
 
 void SimInterface::DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) {
-  auto builder = wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(test_arena_);
   if (request->has_peer_sta_address()) {
     builder.peer_sta_address(request->peer_sta_address());
     const auto& peer_sta_address = request->peer_sta_address().data();
@@ -215,7 +215,7 @@ void SimInterface::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync
 
 void SimInterface::DisassocConf(DisassocConfRequestView request,
                                 DisassocConfCompleter::Sync& completer) {
-  const auto disassoc_conf = wlan_fullmac_wire::WlanFullmacImplIfcBaseDisassocConfRequest{
+  const auto disassoc_conf = wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest{
       .resp = {.status = request->resp.status}};
   stats_.disassoc_results.emplace_back(disassoc_conf);
   assoc_ctx_.state = AssocContext::kNone;
@@ -341,7 +341,7 @@ void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee802
   assoc_ctx_.channel = channel;
 
   // Send connect request
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseConnectRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplConnectRequest::Builder(test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   memcpy(bss.bssid.data(), bssid.byte, ETH_ALEN);
   auto ies =
@@ -378,7 +378,7 @@ void SimInterface::DisassociateFrom(const common::MacAddr& bssid,
   // This should only be performed on a Client interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseDisassocRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplDisassocRequest::Builder(test_arena_);
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), bssid.byte, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
@@ -393,7 +393,7 @@ void SimInterface::DeauthenticateFrom(const common::MacAddr& bssid,
   // This should only be performed on a Client interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseDeauthRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplDeauthRequest::Builder(test_arena_);
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), bssid.byte, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
@@ -411,7 +411,7 @@ void SimInterface::StartScan(uint64_t txn_id, bool active,
   const std::vector<uint8_t> channels =
       channels_arg.has_value() ? channels_arg.value() : kDefaultScanChannels;
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(test_arena_);
 
   builder.txn_id(txn_id);
   builder.scan_type(scan_type);
@@ -453,7 +453,7 @@ void SimInterface::StartSoftAp(const wlan_ieee80211::CSsid& ssid,
   // This should only be performed on an AP interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStartBssRequest::Builder(test_arena_)
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStartBssRequest::Builder(test_arena_)
                      .bss_type(fuchsia_wlan_common_wire::BssType::kInfrastructure)
                      .beacon_period(beacon_period)
                      .dtim_period(dtim_period)
@@ -474,7 +474,7 @@ void SimInterface::StopSoftAp() {
   // This should only be performed on an AP interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStopBssRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStopBssRequest::Builder(test_arena_);
   // Use the ssid from the last call to StartSoftAp
   builder.ssid(soft_ap_ctx_.ssid);
 

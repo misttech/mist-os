@@ -25,7 +25,7 @@ async fn test_get_iface_counter_stats() {
 
     let driver_fut = async {
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImplBridgeRequest::GetIfaceCounterStats { responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::GetIfaceCounterStats { responder } => {
                 responder.send(Ok(&driver_counter_stats))
                     .expect("Could not respond to GetIfaceHistogramStats");
         });
@@ -110,7 +110,7 @@ async fn test_get_iface_histogram_stats() {
 
     let driver_fut = async {
         assert_variant!(fullmac_driver.request_stream.next().await,
-            fidl_fullmac::WlanFullmacImplBridgeRequest::GetIfaceHistogramStats { responder } => {
+            fidl_fullmac::WlanFullmacImpl_Request::GetIfaceHistogramStats { responder } => {
                 responder.send(Ok(&driver_iface_histogram_stats))
                     .expect("Could not respond to GetIfaceHistogramStats");
         });

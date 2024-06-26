@@ -429,10 +429,8 @@ type WlanFullmacPmkInfo = struct {
 };
 
 /// Protocol definition for communication from the fullmac vendor driver to the platform.
-///
-/// This base protocol is composed into WlanFullmacImplIfc and WlanFullmacImplIfcBridge
-/// below to share common methods definitions.
-closed protocol WlanFullmacImplIfcBase {
+@discoverable
+closed protocol WlanFullmacImplIfc {
     // MLME operations
     strict OnScanResult(struct {
         result WlanFullmacScanResult;
@@ -500,32 +498,25 @@ closed protocol WlanFullmacImplIfcBase {
     }) -> ();
 };
 
-@discoverable
-closed protocol WlanFullmacImplIfcBridge {
-    compose WlanFullmacImplIfcBase;
-};
-
-@discoverable
-closed protocol WlanFullmacImplIfc {
-    compose WlanFullmacImplIfcBase;
-};
-
 // TODO(https://g-issues.fuchsia.dev/313442116): This is needed to continue generating
 // the Banjo bindings and will be removed after the Banjo FFI is fully removed.
 @transport("Banjo")
 @layout("ddk_interface")
 closed protocol WlanFullmacImplIfcBanjo {
-    compose WlanFullmacImplIfcBase;
+    compose WlanFullmacImplIfc;
 };
 
 /// Protocol definition for communication from the platform to the fullmac
 /// vendor driver.
-///
-/// This base protocol is composed into WlanFullmacImpl and WlanFullmacImplBridge
-/// below to share common methods definitions.
 @discoverable
-closed protocol WlanFullmacImplBase {
+closed protocol WlanFullmacImpl {
+
     // Lifecycle operations
+    strict Start(resource struct {
+        ifc client_end:WlanFullmacImplIfc;
+    }) -> (resource struct {
+        sme_channel zx.Handle:CHANNEL;
+    }) error zx.Status;
     strict Stop() -> ();
 
     // State operation
@@ -676,28 +667,6 @@ closed protocol WlanFullmacImplBase {
     strict OnLinkStateChanged(struct {
         online bool;
     }) -> ();
-};
-
-@discoverable
-closed protocol WlanFullmacImplBridge {
-    compose WlanFullmacImplBase;
-
-    strict Start(resource struct {
-        ifc client_end:WlanFullmacImplIfcBridge;
-    }) -> (resource struct {
-        sme_channel zx.Handle:CHANNEL;
-    }) error zx.Status;
-};
-
-@discoverable
-closed protocol WlanFullmacImpl {
-    compose WlanFullmacImplBase;
-
-    strict Start(resource struct {
-        ifc client_end:WlanFullmacImplIfc;
-    }) -> (resource struct {
-        sme_channel zx.Handle:CHANNEL;
-    }) error zx.Status;
 };
 
 service Service {

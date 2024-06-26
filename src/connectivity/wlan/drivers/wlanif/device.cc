@@ -123,7 +123,7 @@ void Device::PrepareStop(fdf::PrepareStopCompleter completer) {
 
 zx_status_t Device::Bind() {
   ltrace_fn(*logger_);
-  // The MLME interface has no start/stop commands, so we will start the wlan_fullmac_impl_base
+  // The MLME interface has no start/stop commands, so we will start the wlan_fullmac_impl
   // device immediately
 
   // Connect to the device which serves WlanFullmacImpl protocol service.
@@ -247,13 +247,13 @@ void Device::handle_unknown_event(
            metadata.event_ordinal);
 }
 
-void Device::StartScan(const wlan_fullmac_impl_base_start_scan_request_t* req) {
+void Device::StartScan(const wlan_fullmac_impl_start_scan_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
     return;
   }
-  fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest scan_req;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest scan_req;
   ConvertScanReq(*req, &scan_req, *arena);
 
   auto result = client_.sync()->StartScan(scan_req);
@@ -264,7 +264,7 @@ void Device::StartScan(const wlan_fullmac_impl_base_start_scan_request_t* req) {
   }
 }
 
-void Device::Connect(const wlan_fullmac_impl_base_connect_request_t* req) {
+void Device::Connect(const wlan_fullmac_impl_connect_request_t* req) {
   OnLinkStateChanged(false);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
@@ -272,7 +272,7 @@ void Device::Connect(const wlan_fullmac_impl_base_connect_request_t* req) {
     return;
   }
 
-  fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest connect_req;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest connect_req;
   ConvertConnectReq(*req, &connect_req, *arena);
 
   auto result = client_.sync()->Connect(connect_req);
@@ -283,13 +283,13 @@ void Device::Connect(const wlan_fullmac_impl_base_connect_request_t* req) {
   }
 }
 
-void Device::Reconnect(const wlan_fullmac_impl_base_reconnect_request_t* req) {
+void Device::Reconnect(const wlan_fullmac_impl_reconnect_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
     return;
   }
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseReconnectRequest::Builder(*arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplReconnectRequest::Builder(*arena);
   // peer_sta_address
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
@@ -303,14 +303,14 @@ void Device::Reconnect(const wlan_fullmac_impl_base_reconnect_request_t* req) {
   }
 }
 
-void Device::AuthenticateResp(const wlan_fullmac_impl_base_auth_resp_request_t* resp) {
+void Device::AuthenticateResp(const wlan_fullmac_impl_auth_resp_request_t* resp) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
     return;
   }
 
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseAuthRespRequest::Builder(*arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplAuthRespRequest::Builder(*arena);
   // peer_sta_address
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), resp->peer_sta_address, ETH_ALEN);
@@ -327,14 +327,14 @@ void Device::AuthenticateResp(const wlan_fullmac_impl_base_auth_resp_request_t* 
   }
 }
 
-void Device::Deauthenticate(const wlan_fullmac_impl_base_deauth_request_t* req) {
+void Device::Deauthenticate(const wlan_fullmac_impl_deauth_request_t* req) {
   OnLinkStateChanged(false);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
     return;
   }
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseDeauthRequest::Builder(*arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(*arena);
 
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
@@ -349,13 +349,13 @@ void Device::Deauthenticate(const wlan_fullmac_impl_base_deauth_request_t* req) 
   }
 }
 
-void Device::AssociateResp(const wlan_fullmac_impl_base_assoc_resp_request_t* resp) {
+void Device::AssociateResp(const wlan_fullmac_impl_assoc_resp_request_t* resp) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
     return;
   }
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseAssocRespRequest::Builder(*arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplAssocRespRequest::Builder(*arena);
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), resp->peer_sta_address, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
@@ -370,7 +370,7 @@ void Device::AssociateResp(const wlan_fullmac_impl_base_assoc_resp_request_t* re
   }
 }
 
-void Device::Disassociate(const wlan_fullmac_impl_base_disassoc_request_t* req) {
+void Device::Disassociate(const wlan_fullmac_impl_disassoc_request_t* req) {
   OnLinkStateChanged(false);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
@@ -378,7 +378,7 @@ void Device::Disassociate(const wlan_fullmac_impl_base_disassoc_request_t* req) 
     return;
   }
 
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseDisassocRequest::Builder(*arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplDisassocRequest::Builder(*arena);
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
@@ -392,7 +392,7 @@ void Device::Disassociate(const wlan_fullmac_impl_base_disassoc_request_t* req) 
   }
 }
 
-void Device::Reset(const wlan_fullmac_impl_base_reset_request_t* req) {
+void Device::Reset(const wlan_fullmac_impl_reset_request_t* req) {
   OnLinkStateChanged(false);
 
   auto arena = fdf::Arena::Create(0, 0);
@@ -400,7 +400,7 @@ void Device::Reset(const wlan_fullmac_impl_base_reset_request_t* req) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
     return;
   }
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseResetRequest::Builder(*arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplResetRequest::Builder(*arena);
 
   ::fidl::Array<uint8_t, ETH_ALEN> sta_address;
   std::memcpy(sta_address.data(), req->sta_address, ETH_ALEN);
@@ -414,14 +414,14 @@ void Device::Reset(const wlan_fullmac_impl_base_reset_request_t* req) {
   }
 }
 
-void Device::StartBss(const wlan_fullmac_impl_base_start_bss_request_t* req) {
+void Device::StartBss(const wlan_fullmac_impl_start_bss_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
     return;
   }
 
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartBssRequest::Builder(*arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest::Builder(*arena);
 
   fuchsia_wlan_ieee80211::wire::CSsid ssid;
   ConvertCSsid(req->ssid, &ssid);
@@ -444,13 +444,13 @@ void Device::StartBss(const wlan_fullmac_impl_base_start_bss_request_t* req) {
   }
 }
 
-void Device::StopBss(const wlan_fullmac_impl_base_stop_bss_request_t* req) {
+void Device::StopBss(const wlan_fullmac_impl_stop_bss_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
     return;
   }
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStopBssRequest::Builder(*arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStopBssRequest::Builder(*arena);
   fuchsia_wlan_ieee80211::wire::CSsid ssid;
   ConvertCSsid(req->ssid, &ssid);
   builder.ssid(ssid);
@@ -536,7 +536,7 @@ void Device::DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req) {
   }
 }
 
-void Device::EapolTx(const wlan_fullmac_impl_base_eapol_tx_request_t* req) {
+void Device::EapolTx(const wlan_fullmac_impl_eapol_tx_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
@@ -551,7 +551,7 @@ void Device::EapolTx(const wlan_fullmac_impl_base_eapol_tx_request_t* req) {
   auto data = fidl::VectorView(
       *arena, std::vector<uint8_t>(req->data_list, req->data_list + req->data_count));
 
-  auto eapol_req = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseEapolTxRequest::Builder(*arena)
+  auto eapol_req = fuchsia_wlan_fullmac::wire::WlanFullmacImplEapolTxRequest::Builder(*arena)
                        .src_addr(src_addr)
                        .dst_addr(dst_addr)
                        .data(data)
@@ -743,7 +743,7 @@ void Device::WmmStatusReq() {
   }
 }
 
-// Implementation of fuchsia_wlan_fullmac::WlanFullmacImplBaseIfc.
+// Implementation of fuchsia_wlan_fullmac::WlanFullmacImplIfc.
 void Device::OnScanResult(OnScanResultRequestView request, OnScanResultCompleter::Sync& completer) {
   wlan_fullmac_scan_result_t scan_result;
   ConvertFullmacScanResult(request->result, &scan_result);

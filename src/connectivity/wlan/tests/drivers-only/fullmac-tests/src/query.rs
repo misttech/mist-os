@@ -32,7 +32,7 @@ async fn test_generic_sme_query() {
 
     let driver_fut = async {
         assert_variant!(request_stream.next().await,
-        fidl_fullmac::WlanFullmacImplBridgeRequest::Query { responder } => {
+        fidl_fullmac::WlanFullmacImpl_Request::Query { responder } => {
             responder.send(Ok(&fullmac_driver.config.query_info))
                 .expect("Failed to respondt to Query");
         });

@@ -26,7 +26,7 @@ mod telemetry;
 struct FullmacDriverFixture {
     id: fidl_testcontroller::FullmacId,
     config: FullmacDriverConfig,
-    ifc_proxy: fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
+    ifc_proxy: fidl_fullmac::WlanFullmacImplIfcProxy,
     request_stream: RecordedRequestStream,
     generic_sme_proxy: fidl_sme::GenericSmeProxy,
     realm: DriversOnlyTestRealm,

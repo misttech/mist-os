@@ -26,14 +26,14 @@ using ::wlan::drivers::fidl_bridge::FidlErrorToStatus;
 using ::wlan::drivers::fidl_bridge::ForwardResult;
 
 // Server that forwards WlanFullmacImplIfc calls from the test suite to wlanif.
-class WlanFullmacImplIfcToDriverBridge
-    : public fidl::Server<fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge> {
+class WlanFullmacImplIfcBridgeServer
+    : public fidl::Server<fuchsia_wlan_fullmac::WlanFullmacImplIfc> {
   using WlanFullmacImplIfc = fuchsia_wlan_fullmac::WlanFullmacImplIfc;
 
  public:
-  explicit WlanFullmacImplIfcToDriverBridge(
+  explicit WlanFullmacImplIfcBridgeServer(
       async_dispatcher_t* async_dispatcher,
-      fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge> server_end,
+      fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc> server_end,
       fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc> bridge_client_end)
       : binding_(async_dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure),
         bridge_client_(std::move(bridge_client_end), async_dispatcher) {
@@ -135,23 +135,23 @@ class WlanFullmacImplIfcToDriverBridge
   }
 
  private:
-  fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge> binding_;
+  fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfc> binding_;
   fidl::Client<fuchsia_wlan_fullmac::WlanFullmacImplIfc> bridge_client_;
 };
 
 // Server that forwards WlanFullmacImpl calls from wlanif to the test suite.
-class WlanFullmacImplToChannelBridge : public fidl::Server<fuchsia_wlan_fullmac::WlanFullmacImpl> {
+class WlanFullmacImplBridgeServer : public fidl::Server<fuchsia_wlan_fullmac::WlanFullmacImpl> {
  private:
-  using WlanFullmacImplBridge = fuchsia_wlan_fullmac::WlanFullmacImplBridge;
+  using WlanFullmacImpl = fuchsia_wlan_fullmac::WlanFullmacImpl;
 
  public:
-  explicit WlanFullmacImplToChannelBridge(
+  explicit WlanFullmacImplBridgeServer(
       async_dispatcher_t* async_dispatcher,
       fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end,
-      fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImplBridge> bridge_client_end,
+      fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> bridge_client_end,
       fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_client_end)
       : binding_(async_dispatcher, std::move(server_end), this,
-                 std::mem_fn(&WlanFullmacImplToChannelBridge::OnUnbind)),
+                 std::mem_fn(&WlanFullmacImplBridgeServer::OnUnbind)),
         bridge_client_(std::move(bridge_client_end), async_dispatcher),
         async_dispatcher_(async_dispatcher),
         controller_(std::move(controller_client_end), async_dispatcher_) {
@@ -161,13 +161,13 @@ class WlanFullmacImplToChannelBridge : public fidl::Server<fuchsia_wlan_fullmac:
   void OnUnbind(fidl::UnbindInfo info) {
     WLAN_TRACE_DURATION();
     if (!info.is_peer_closed()) {
-      FDF_SLOG(WARNING, "WlanFullmacImplToChannelBridge unbinding due to unexpected reason",
+      FDF_SLOG(WARNING, "WlanFullmacImplBridge unbinding due to unexpected reason",
                KV("reason", info.FormatDescription()));
     }
     if (!unbind_callback_.has_value()) {
       FDF_SLOG(
           ERROR,
-          "Unexpected server unbinding: WlanFullmacImplToChannelBridge does not have an unbind callback",
+          "Unexpected server unbinding: WlanFullmacImplBridge does not have an unbind callback",
           KV("reason", info.FormatDescription()));
       return;
     }
@@ -177,26 +177,26 @@ class WlanFullmacImplToChannelBridge : public fidl::Server<fuchsia_wlan_fullmac:
   void Start(StartRequest& request, StartCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     // Start has to swap out the fdf::ClientEnd and instead pass along a fidl::ClientEnd to the
-    // bridge server. This is necessary because the test case runs in a non-driver component, which
-    // cannot use the fdf::ClientEnd.
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge>();
+    // bridge server. This is necessary because the test case runs in a non-driver component,
+    // which cannot use the fdf::ClientEnd.
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
     if (endpoints.is_error()) {
-      FDF_LOG(ERROR, "Could not create WlanFullmacImplIfcBridge endpoints: %s",
+      FDF_LOG(ERROR, "Could not create WlanFullmacImplIfc endpoints: %s",
               endpoints.status_string());
       completer.Reply(endpoints.take_error());
       return;
     }
 
     // Create and bind fic bridge server.
-    ifc_bridge_server_ = std::make_unique<WlanFullmacImplIfcToDriverBridge>(
+    ifc_bridge_server_ = std::make_unique<WlanFullmacImplIfcBridgeServer>(
         async_dispatcher_, std::move(endpoints->server), std::move(request.ifc()));
 
     bridge_client_->Start(std::move(endpoints->client))
-        .Then([completer = completer.ToAsync()](
-                  fidl::Result<WlanFullmacImplBridge::Start>& result) mutable {
-          WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImplBridge::Start callback");
+        .Then([completer =
+                   completer.ToAsync()](fidl::Result<WlanFullmacImpl::Start>& result) mutable {
+          WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImpl::Start callback");
           // Unlike all the other methods in WlanFullmacImpl,
-          // WlanFullmacImpl::Start and WlanFullmacImplBridge::Start results are
+          // WlanFullmacImpl::Start and WlanFullmacImpl::Start results are
           // considered different types by the compiler. So we need to convert between the two
           // types manually here.
           if (result.is_error()) {
@@ -213,86 +213,86 @@ class WlanFullmacImplToChannelBridge : public fidl::Server<fuchsia_wlan_fullmac:
   void Stop(StopCompleter::Sync& completer) override {}
   void Query(QueryCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
-    bridge_client_->Query().Then(ForwardResult<WlanFullmacImplBridge::Query>(completer.ToAsync()));
+    bridge_client_->Query().Then(ForwardResult<WlanFullmacImpl::Query>(completer.ToAsync()));
   }
   void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->QueryMacSublayerSupport().Then(
-        ForwardResult<WlanFullmacImplBridge::QueryMacSublayerSupport>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::QueryMacSublayerSupport>(completer.ToAsync()));
   }
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->QuerySecuritySupport().Then(
-        ForwardResult<WlanFullmacImplBridge::QuerySecuritySupport>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::QuerySecuritySupport>(completer.ToAsync()));
   }
   void QuerySpectrumManagementSupport(
       QuerySpectrumManagementSupportCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->QuerySpectrumManagementSupport().Then(
-        ForwardResult<WlanFullmacImplBridge::QuerySpectrumManagementSupport>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::QuerySpectrumManagementSupport>(completer.ToAsync()));
   }
   void StartScan(StartScanRequest& request, StartScanCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->StartScan(request).Then(
-        ForwardResult<WlanFullmacImplBridge::StartScan>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::StartScan>(completer.ToAsync()));
   }
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->Connect(request).Then(
-        ForwardResult<WlanFullmacImplBridge::Connect>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::Connect>(completer.ToAsync()));
   }
   void Reconnect(ReconnectRequest& request, ReconnectCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->Reconnect(request).Then(
-        ForwardResult<WlanFullmacImplBridge::Reconnect>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::Reconnect>(completer.ToAsync()));
   }
   void AuthResp(AuthRespRequest& request, AuthRespCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->AuthResp(request).Then(
-        ForwardResult<WlanFullmacImplBridge::AuthResp>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::AuthResp>(completer.ToAsync()));
   }
   void Deauth(DeauthRequest& request, DeauthCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->Deauth(request).Then(
-        ForwardResult<WlanFullmacImplBridge::Deauth>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::Deauth>(completer.ToAsync()));
   }
   void AssocResp(AssocRespRequest& request, AssocRespCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->AssocResp(request).Then(
-        ForwardResult<WlanFullmacImplBridge::AssocResp>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::AssocResp>(completer.ToAsync()));
   }
   void Disassoc(DisassocRequest& request, DisassocCompleter::Sync& completer) override {}
   void Reset(ResetRequest& request, ResetCompleter::Sync& completer) override {}
   void StartBss(StartBssRequest& request, StartBssCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->StartBss(request).Then(
-        ForwardResult<WlanFullmacImplBridge::StartBss>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::StartBss>(completer.ToAsync()));
   }
   void StopBss(StopBssRequest& request, StopBssCompleter ::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->StopBss(request).Then(
-        ForwardResult<WlanFullmacImplBridge::StopBss>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::StopBss>(completer.ToAsync()));
   }
   void SetKeysReq(SetKeysReqRequest& request, SetKeysReqCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->SetKeysReq(request).Then(
-        ForwardResult<WlanFullmacImplBridge::SetKeysReq>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::SetKeysReq>(completer.ToAsync()));
   }
   void DelKeysReq(DelKeysReqRequest& request, DelKeysReqCompleter::Sync& completer) override {}
   void EapolTx(EapolTxRequest& request, EapolTxCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->EapolTx(request).Then(
-        ForwardResult<WlanFullmacImplBridge::EapolTx>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::EapolTx>(completer.ToAsync()));
   }
   void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->GetIfaceCounterStats().Then(
-        ForwardResult<WlanFullmacImplBridge::GetIfaceCounterStats>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::GetIfaceCounterStats>(completer.ToAsync()));
   }
   void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->GetIfaceHistogramStats().Then(
-        ForwardResult<WlanFullmacImplBridge::GetIfaceHistogramStats>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::GetIfaceHistogramStats>(completer.ToAsync()));
   }
   void SetMulticastPromisc(SetMulticastPromiscRequest& request,
                            SetMulticastPromiscCompleter::Sync& completer) override {}
@@ -300,23 +300,23 @@ class WlanFullmacImplToChannelBridge : public fidl::Server<fuchsia_wlan_fullmac:
                         SaeHandshakeRespCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->SaeHandshakeResp(request).Then(
-        ForwardResult<WlanFullmacImplBridge::SaeHandshakeResp>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::SaeHandshakeResp>(completer.ToAsync()));
   }
   void SaeFrameTx(SaeFrameTxRequest& request, SaeFrameTxCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->SaeFrameTx(request).Then(
-        ForwardResult<WlanFullmacImplBridge::SaeFrameTx>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::SaeFrameTx>(completer.ToAsync()));
   }
   void WmmStatusReq(WmmStatusReqCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->WmmStatusReq().Then(
-        ForwardResult<WlanFullmacImplBridge::WmmStatusReq>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::WmmStatusReq>(completer.ToAsync()));
   }
   void OnLinkStateChanged(OnLinkStateChangedRequest& request,
                           OnLinkStateChangedCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->OnLinkStateChanged(request).Then(
-        ForwardResult<WlanFullmacImplBridge::OnLinkStateChanged>(completer.ToAsync()));
+        ForwardResult<WlanFullmacImpl::OnLinkStateChanged>(completer.ToAsync()));
   }
 
   // Calling |RemoveChild| will cause this server to eventually unbind.
@@ -337,9 +337,9 @@ class WlanFullmacImplToChannelBridge : public fidl::Server<fuchsia_wlan_fullmac:
 
  private:
   fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImpl> binding_;
-  fidl::Client<fuchsia_wlan_fullmac::WlanFullmacImplBridge> bridge_client_;
+  fidl::Client<fuchsia_wlan_fullmac::WlanFullmacImpl> bridge_client_;
   async_dispatcher_t* async_dispatcher_{};
-  std::unique_ptr<WlanFullmacImplIfcToDriverBridge> ifc_bridge_server_;
+  std::unique_ptr<WlanFullmacImplIfcBridgeServer> ifc_bridge_server_;
   fidl::Client<fuchsia_driver_framework::NodeController> controller_;
 
   // Callback that runs when the bridge server is unbound.
@@ -478,16 +478,16 @@ class TestController : public fdf::DriverBase,
       return;
     }
 
-    WlanFullmacImplToChannelBridge& bridge = bridge_iter->second;
+    WlanFullmacImplBridgeServer& bridge = bridge_iter->second;
     auto node_remove_result = bridge.RemoveChild(
         // After the bridge server unbinds, we know that wlanif is fully torn down.
         // It is then safe to delete the bridge server and reply to the FIDL call.
         [this, id = request.id(), completer = completer.ToAsync()]() mutable {
           // This callback posts a task on |dispatcher()| because the |completer| has to run on this
-          // thread. The bridge server's unbind callback does not run on this thread and will fail
-          // an assert if we reply to the |completer| directly in the unbind callback.
+          // thread. The bridge server's unbind callback does not run on this thread and will
+          // fail an assert if we reply to the |completer| directly in the unbind callback.
           async::PostTask(dispatcher(), [this, id, completer = std::move(completer)]() mutable {
-            WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImplToChannelBridge unbind callback");
+            WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImplBridge unbind callback");
             ZX_ASSERT(fullmac_bridges_.find(id) != fullmac_bridges_.end());
             fullmac_bridges_.erase(id);
             completer.Reply(zx::ok());
@@ -530,7 +530,7 @@ class TestController : public fdf::DriverBase,
 
   // Maps from id -> bridge server.
   // This should only be accessed from the default dispatcher.
-  std::map<test_wlan_testcontroller::FullmacId, WlanFullmacImplToChannelBridge> fullmac_bridges_;
+  std::map<test_wlan_testcontroller::FullmacId, WlanFullmacImplBridgeServer> fullmac_bridges_;
 };
 
 }  // namespace wlan_testcontroller

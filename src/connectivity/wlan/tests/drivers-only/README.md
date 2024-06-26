@@ -6,7 +6,7 @@ allowed as long as only platform driver code is under test.
 
 Concretely, generally these tests use [`testcontroller-driver`](//src/connectivity/wlan/tests/helpers/testcontroller-driver) to create some number of platform
 drivers and test them using the `fuchsia.wlan.sme/GenericSme` and
-`fuchsia.wlan.fullmac/WlanFullmacImplBridge` or `fuchsia.wlan.softmac/WlanSoftmacBridge`
+`fuchsia.wlan.fullmac/WlanFullmacImpl` or `fuchsia.wlan.softmac/WlanSoftmacBridge`
 protocols.
 
 The tests provide coverage for the following parts of the platform drivers:

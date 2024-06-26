@@ -39,7 +39,7 @@ void EscanArgsIfc::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::S
 class EscanArgsTest : public SimTest {
  public:
   void Init();
-  void RunScanTest(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest& req);
+  void RunScanTest(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest& req);
 
  protected:
   EscanArgsIfc client_ifc_;
@@ -50,7 +50,7 @@ void EscanArgsTest::Init() {
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 }
 
-void EscanArgsTest::RunScanTest(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest& req) {
+void EscanArgsTest::RunScanTest(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest& req) {
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->StartScan(req);
   ASSERT_TRUE(result.ok());
   env_->Run(kSimulatedClockDuration);
@@ -62,7 +62,7 @@ TEST_F(EscanArgsTest, BadScanArgs) {
   Init();
   {
     auto builder =
-        wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+        wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
 
     builder.txn_id(kScanTxnId);
     builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
@@ -79,7 +79,7 @@ TEST_F(EscanArgsTest, BadScanArgs) {
   // min dwell time > max dwell time
   {
     auto builder =
-        wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+        wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
 
     builder.txn_id(kScanTxnId);
     builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
@@ -97,7 +97,7 @@ TEST_F(EscanArgsTest, BadScanArgs) {
 TEST_F(EscanArgsTest, EmptyChannelList) {
   Init();
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
 
   builder.txn_id(kScanTxnId), builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive),
       builder.min_channel_time(SimInterface::kDefaultActiveScanDwellTimeMs + 1);
