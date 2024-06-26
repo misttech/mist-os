@@ -46,6 +46,10 @@
 
                 // https://fxbug.dev/42166160
                 "AllInetTests/SimpleTcpSocketTest.ShutdownReadWriteConnectingSocket/*",
+
+                // See https://fxbug.dev/42078010#comment17 for an explanation of why this test
+                // flakes.
+                "AllInetTests/SimpleTcpSocketTest.SelfConnectSendShutdownWrite/*",
             ],
         },
         {
