@@ -87,6 +87,12 @@ rustc_binary("starnix_kernel_bin") {
     "main.rs",
   ]
 
+  data_deps = [
+    ":starnix-test-files",
+    "//build/info/bootfs:minimum_utc_stamp",
+    "//src/starnix/examples/hello_starnix:bin",
+  ]
+
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 

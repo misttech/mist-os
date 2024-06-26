@@ -56,26 +56,6 @@ extern "C" fn zxio_fault_catching_disabled() -> bool {
     false
 }
 
-/// Overrides the `zxio_maybe_faultable_copy` weak symbol found in zxio.
-#[no_mangle]
-extern "C" fn zxio_maybe_faultable_copy(
-    dest: *mut u8,
-    src: *const u8,
-    count: usize,
-    ret_dest: bool,
-) -> bool {
-    // SAFETY: we know that we are either copying from or to a buffer that
-    // zxio (and thus Starnix) owns per `zxio_maybe_faultable_copy`'s
-    // documentation.
-    unsafe { zxio_maybe_faultable_copy_impl(dest, src, count, ret_dest) }
-}
-
-/// Overrides the `zxio_fault_catching_disabled` weak symbol found in zxio.
-#[no_mangle]
-extern "C" fn zxio_fault_catching_disabled() -> bool {
-    false
-}
-
 async fn build_container(
     config: Config,
     returned_config: &mut Option<ContainerServiceConfig>,
@@ -147,9 +127,6 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .unwrap()
         .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
         .expect("Failed to ingest bootfs");
-    let _ = bootfs_svc.create_and_bind_vfs();
-
-    //let mut executor = fasync::SendExecutor::new(1);
 
     let _ = bootfs_svc.create_and_bind_vfs().expect("failed to bind");
 
