@@ -1,16 +1,22 @@
 # FIDL library zx
 
-FIDL library `zx` describes Fuchsia's syscall interface. The modeling of the
-interface is currently experimental and undergoing a slow evolution. Described
-in [RFC 190][rfc], [https://fxbug.dev/42061412][110021] tracks the process of realizing
-`zx` as non-experimental, _pure_ FIDL.
+FIDL library `zx` describes Fuchsia's syscall interface.
 
-The current version of the library - dubbed "v2" - purposefully overfits to
-modeling the C vDSO interface. [https://fxbug.dev/42061642][110294] describes the
-reasoning and methodology of this approach, which is ultimately an expedient
-and temporary measure. As proposed in the RFC, the ultimate modeling will
-expressly avoid this and attempt to frame things in a more general way with
-[_"bring your own runtime"_][byor] in mind.
+This library is used internally to generate syscall definitions used by other
+code. For the public library imported by `using zx;`, see
+[`//zircon/vdso/zx/`](/zircon/vdso/zx/).
+
+The modeling of the syscall interface is currently undergoing a slow evolution
+toward the design described in [RFC 0190][rfc-0190]. This will involve migrating
+more of the APIs in this library to the public library.
+
+The current version of this library - an expedient and temporary measure dubbed
+"v2" - purposefully overfits to modeling the C vDSO interface.
+[issue 42061642][42061642] describes the reasoning and methodology of the
+current "v2" approach. [Issue 42061412][42061412] tracks the process of
+realizing `zx` as _pure_ FIDL (without experimental language features - see
+[issue 42061642][42061642]) as described in [RFC 0190][rfc-0190] and framing
+things in a more general way with [_"bring your own runtime"_][byor] in mind.
 
 ## Conventions & Quirks
 
@@ -76,7 +82,7 @@ See [@embedded_alias](#embedded_aliasalias_name), [@size32](#size32), and
 [@voidptr](#voidptr) for possible annotations.
 
 Syscall buffer specification should be holistically designed in the context
-of [https://fxbug.dev/42061412][110021].
+of [issue 42061412][42061412].
 
 ### Documentation
 
@@ -97,7 +103,7 @@ Annotates a syscall declaration to indicate that the calling thread is blocked
 until the call returns.
 
 This should be formalized as something known to and validated by `fidlc` - or
-redesigned altogether - in the context of [https://fxbug.dev/42061412][110021].
+redesigned altogether - in the context of [issue 42061412][42061412].
 
 
 #### @const
@@ -107,7 +113,7 @@ function is "const" in the sense of `__attribute__((__const__))`.
 
 This information is not a part of public ABI - relevant only to implementation
 details - and should be designed away in the context of
-[https://fxbug.dev/42061412][110021].
+[issue 42061412][42061412].
 
 
 #### @embedded_alias("<alias_name>">)
@@ -115,7 +121,7 @@ details - and should be designed away in the context of
 Annotates a `vector` or `experimental_pointer` whose element/pointee type is an
 alias. This attribute serves to expediently inject the name of the alias into
 the related IR. Only a full resolution of an alias survives into the IR today,
-a bug which is tracked by [https://fxbug.dev/42057022][105758]. Once resolved, this
+a bug which is tracked by [issue 42057022][42057022]. Once resolved, this
 attribute should be straightforwardly removed.
 
 
@@ -125,7 +131,7 @@ Annotates a handle as a syscall parameter to indicate that it is
 released/consumed by that call. Similarly so for a vector of handles.
 
 This should be formalized as something known to and validated by `fidlc` - or
-redesigned altogether - in the context of [https://fxbug.dev/42061412][110021].
+redesigned altogether - in the context of [issue 42061412][42061412].
 
 
 #### @inout
@@ -136,7 +142,7 @@ vector, the implicit data parameter is regarded as an out parameter, while the
 implicit size parameter as regarded as an 'in'.
 
 This notion should be redesigned more holistically in the context of
-[https://fxbug.dev/42061412][110021].
+[issue 42061412][42061412].
 
 
 #### @internal
@@ -146,7 +152,7 @@ public ABI and describes internal vDSO logic.
 
 This information is not a part of public ABI - relevant only to implementation
 details - and should be designed away in the context of
-[https://fxbug.dev/42061412][110021].
+[issue 42061412][42061412].
 
 
 #### @next
@@ -155,7 +161,7 @@ Annotates an element to indicate that the feature is not yet 'well-baked' and
 whose should not be unconditionally distributed in the SDK.
 
 This should be formalized as something known to and validated by `fidlc` - or
-redesigned altogether - in the context of [https://fxbug.dev/42061412][110021].
+redesigned altogether - in the context of [issue 42061412][42061412].
 
 
 #### @no_protocol_prefix
@@ -201,7 +207,7 @@ protocol ClockFuncs {  // An arbitrary name.
 ```
 
 This is a hack and the collisions in question should be whittled down over the
-course of [https://fxbug.dev/42061412][110021]. At that point, this attribute should go
+course of [issue 42061412][42061412]. At that point, this attribute should go
 away.
 
 
@@ -210,7 +216,7 @@ away.
 Annotates a syscall declaration to indicate that the call will not return.
 
 This should be formalized as something known to and validated by `fidlc` - or
-redesigned altogether - in the context of [https://fxbug.dev/42061412][110021].
+redesigned altogether - in the context of [issue 42061412][42061412].
 
 
 #### @out
@@ -219,7 +225,7 @@ Annotates a syscall parameter in the request struct to indicate - with the C
 bindings in mind - that it actually should be treated as an 'out' parameter.
 
 This notion should be redesigned more holistically in the context of
-[https://fxbug.dev/42061412][110021].
+[issue 42061412][42061412].
 
 #### @release
 
@@ -227,7 +233,7 @@ Annotates a handle as a syscall parameter to indicate that it is
 released/consumed by that call. Similarly so for a vector of handles.
 
 This should be formalized as something known to and validated by `fidlc` - or
-redesigned altogether - in the context of [https://fxbug.dev/42061412][110021].
+redesigned altogether - in the context of [issue 42061412][42061412].
 
 
 #### @size32
@@ -236,13 +242,13 @@ Annotates vector syscall parameters to indicate that the implicit size
 parameter is 32-bit.
 
 Syscall buffer specification should be holistically designed in the context
-of [https://fxbug.dev/42061412][110021].
+of [issue 42061412][42061412].
 
 
 #### @testonly, @test_category1, @test_category2
 
 These are test-specific and it should be rethought in the context of
-[https://fxbug.dev/42061412][110021] whether these elements should be defined in `zx`
+[issue 42061412][42061412] whether these elements should be defined in `zx`
 proper.
 
 
@@ -253,7 +259,7 @@ enter the kernel and is properly defined within the vDSO.
 
 This information is not a part of public ABI - relevant only to implementation
 details - and should be designed away in the context of
-[https://fxbug.dev/42061412][110021].
+[issue 42061412][42061412].
 
 
 #### @voidptr
@@ -262,7 +268,7 @@ Annotates `experimental_pointer<byte>` or `vector<byte>` to indicate to C
 backends that the mapped types should be represented with `void*`.
 
 This should be redesigned altogether in the context of
-[https://fxbug.dev/42061412][110021].
+[issue 42061412][42061412].
 
 #### @wrapped_return
 
@@ -286,12 +292,12 @@ protocol System {
 This gives a workaround the limitation of protocol methods only being able to
 return a struct and should be sidestepped an ultimate design for syscall
 specification that does not have to piggy back off of protocols
-([https://fxbug.dev/42061412][110021]).
+([issue 42061412][42061412]).
 
 
-[105758]: https://fxbug.dev/42057022
-[110021]: https://fxbug.dev/42061412
-[110294]: https://fxbug.dev/42061642
-[byor]: https://fuchsia.dev/fuchsia-src/concepts/principles/simple?hl=en
+[42057022]: https://fxbug.dev/42057022
+[42061412]: https://fxbug.dev/42061412
+[42061642]: https://fxbug.dev/42061642
+[byor]: https://fuchsia.dev/fuchsia-src/concepts/principles/simple
 [fidl-naming]: https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/style#names
-[rfc]: https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/style?#names
+[rfc-0190]: https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0190_fidl_support_for_syscalls
