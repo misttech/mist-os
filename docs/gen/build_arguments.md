@@ -1214,7 +1214,7 @@ that we want the legacy AIB packaged and archived for a given product:
 
 **Current value (from the default):** `false`
 
-From //build/images/fuchsia/BUILD.gn:27
+From //build/images/fuchsia/BUILD.gn:26
 
 ### current_cpu
 
@@ -7586,7 +7586,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"21.99991231.0.1"`
+**Current value (from the default):** `"22.99991231.0.1"`
 
 From //sdk/config.gni:7
 
