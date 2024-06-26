@@ -20,11 +20,12 @@ board_configuration("x64") {
   }
 
   provided_features = [
-    "fuchsia::pmm_checker_auto",
-    "fuchsia::wlan_softmac",
+    "fuchsia::intel_hda",
     "fuchsia::paravirtualization",
     "fuchsia::paver",
-    "fuchsia::intel_hda",
+    "fuchsia::pmm_checker_auto",
+    "fuchsia::real_time_clock",
+    "fuchsia::wlan_softmac",
   ]
 
   input_bundles = [
