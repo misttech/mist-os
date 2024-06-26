@@ -14,7 +14,6 @@ import("//build/zbi/zbi.gni")
 import("//build/zbi/zbi_input.gni")
 import("//src/starnix/kernel/args.gni")
 import("//src/starnix/kernel/starnix.gni")
-import("//src/starnix/lib/gzip/gzip.gni")
 import("//tools/protobuf/rust_proto_library.gni")
 
 group("kernel") {
@@ -48,17 +47,48 @@ rustc_binary("starnix_kernel_bin") {
   source_root = "main.rs"
   deps = [
     ":starnix_core",
-    ":starnix_logging",
+    ":starnix_kernel_config",
+    ":starnix_kernel_runner",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
+    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/mistos-bootfs",
+    "//src/lib/fuchsia-sync",
     "//src/lib/mistos-logger",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/kernel:starnix_logging",
+    "//src/storage/lib/vfs/rust:vfs",
+    "//src/sys/component_manager/lib/builtins",
+    "//src/sys/lib/fuchsia-bootfs",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-lock",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-mutex",
   ]
 
   non_rust_deps = [ ":restricted_trampoline" ]
 
-  sources = [ "main.rs" ]
+  sources = [
+    "bootfs.rs",
+    "builtin/mod.rs",
+    "builtin/svc_controller.rs",
+    "builtin/time.rs",
+    "main.rs",
+  ]
+
+  data_deps = [
+    ":starnix-test-files",
+    "//build/info/bootfs:minimum_utc_stamp",
+    "//src/starnix/examples/hello_starnix:bin",
+  ]
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
