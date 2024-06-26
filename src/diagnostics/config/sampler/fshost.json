@@ -494,6 +494,16 @@
             "metric_id": 9005,
             "metric_type": "Occurrence",
             "selector": "bootstrap/fshost:root/migration_status:other_error"
+        },
+        {
+            "metric_id": 9006,
+            "metric_type": "IntHistogram",
+            "selector": "bootstrap/fshost/fxfs:root/allocator:allocation_size_histogram"
+        },
+        {
+            "metric_id": 9007,
+            "metric_type": "IntHistogram",
+            "selector": "bootstrap/fshost/fxfs:root/allocator:rebuild_strategy_triggers"
         }
     ],
     "poll_rate_sec": 600,

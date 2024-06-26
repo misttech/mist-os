@@ -116,7 +116,7 @@ use async_trait::async_trait;
 use either::Either::{Left, Right};
 use event_listener::EventListener;
 use fprint::TypeFingerprint;
-use fuchsia_inspect::ArrayProperty;
+use fuchsia_inspect::{ArrayProperty, HistogramProperty};
 use futures::FutureExt;
 use merge::{filter_marked_for_deletion, filter_tombstones, merge};
 use serde::{Deserialize, Serialize};
@@ -551,8 +551,7 @@ struct Inner {
     strategy: Box<strategy::BestFit>,
 
     /// Tracks the number of allocations of size 1,2,...63,>=64.
-    histogram: [u64; 64],
-
+    allocation_size_histogram: [u64; 64],
     /// Tracks which size bucket triggers rebuild_strategy.
     rebuild_strategy_trigger_histogram: [u64; 64],
 
@@ -740,7 +739,7 @@ impl Allocator {
                 trim_reserved_bytes: 0,
                 trim_listener: None,
                 strategy,
-                histogram: [0; 64],
+                allocation_size_histogram: [0; 64],
                 rebuild_strategy_trigger_histogram: [0; 64],
                 marked_for_deletion: HashSet::new(),
                 volumes_deleted_pending_sync: HashSet::new(),
@@ -781,8 +780,8 @@ impl Allocator {
     /// A histogram of allocation request sizes.
     /// The index into the array is 'number of blocks'.
     /// The last bucket is a catch-all for larger allocation requests.
-    pub fn histogram(&self) -> [u64; 64] {
-        self.inner.lock().unwrap().histogram
+    pub fn allocation_size_histogram(&self) -> [u64; 64] {
+        self.inner.lock().unwrap().allocation_size_histogram
     }
 
     /// Creates a new (empty) allocator.
@@ -1177,18 +1176,35 @@ impl Allocator {
                     }
                     root.record(sizes);
 
-                    let allocator_data = this.histogram();
-                    let alloc_sizes =
-                        root.create_uint_array("allocation_size_histogram", allocator_data.len());
-                    for (i, count) in allocator_data.iter().enumerate() {
-                        alloc_sizes.set(i, *count);
+                    let data = this.allocation_size_histogram();
+                    let alloc_sizes = root.create_uint_linear_histogram(
+                        "allocation_size_histogram",
+                        fuchsia_inspect::LinearHistogramParams {
+                            floor: 1,
+                            step_size: 1,
+                            buckets: 64,
+                        },
+                    );
+                    for (i, count) in data.iter().enumerate() {
+                        if i != 0 {
+                            alloc_sizes.insert_multiple(i as u64, *count as usize);
+                        }
                     }
                     root.record(alloc_sizes);
 
                     let data = this.inner.lock().unwrap().rebuild_strategy_trigger_histogram;
-                    let triggers = root.create_uint_array("rebuild_strategy_triggers", data.len());
+                    let triggers = root.create_uint_linear_histogram(
+                        "rebuild_strategy_triggers",
+                        fuchsia_inspect::LinearHistogramParams {
+                            floor: 1,
+                            step_size: 1,
+                            buckets: 64,
+                        },
+                    );
                     for (i, count) in data.iter().enumerate() {
-                        triggers.set(i, *count);
+                        if i != 0 {
+                            triggers.insert_multiple(i as u64, *count as usize);
+                        }
                     }
                     root.record(triggers);
                 }
@@ -1348,7 +1364,7 @@ impl Allocator {
         let mut trim_listener = None;
         {
             let mut inner = self.inner.lock().unwrap();
-            inner.histogram[std::cmp::min(63, len / self.block_size) as usize] += 1;
+            inner.allocation_size_histogram[std::cmp::min(63, len / self.block_size) as usize] += 1;
 
             // If trimming would be the reason that this allocation gets cut short, wait for
             // trimming to complete before proceeding.
