@@ -30,26 +30,9 @@
 
 namespace syslog_runtime {
 
-bool HasStructuredBackend() { return true; }
-
 using log_word_t = uint64_t;
 
-zx_koid_t GetKoid(zx_handle_t handle) {
-  zx_info_handle_basic_t info;
-  // We need to use _zx_object_get_info to avoid breaking the driver ABI.
-  // fake_ddk can fake out this method, which results in us deadlocking
-  // when used in certain drivers because the fake doesn't properly pass-through
-  // to the real syscall in this case.
-  zx_status_t status =
-      _zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
-}
-
-static zx_koid_t pid = GetKoid(zx_process_self());
-static thread_local zx_koid_t tid = FuchsiaLogGetCurrentThreadKoid();
-
-const size_t kMaxTags = 4;  // Legacy from ulib/syslog. Might be worth rethinking.
-const char kTagFieldName[] = "tag";
+static const size_t kMaxTags = 4;  // Legacy from ulib/syslog. Might be worth rethinking.
 
 class GlobalStateLock;
 class LogState {
@@ -115,8 +98,9 @@ class GlobalStateLock {
 
   ~GlobalStateLock() { FuchsiaLogReleaseState(); }
 };
+namespace {
 
-static fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia_diagnostics::wire::Severity severity) {
+fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia_diagnostics::wire::Severity severity) {
   switch (severity) {
     case fuchsia_diagnostics::Severity::kTrace:
       return fuchsia_logging::LOG_TRACE;
@@ -138,6 +122,90 @@ static fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia_diagnostics::wire::S
       break;
   }
 }
+
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  // We need to use _zx_object_get_info to avoid breaking the driver ABI.
+  // fake_ddk can fake out this method, which results in us deadlocking
+  // when used in certain drivers because the fake doesn't properly pass-through
+  // to the real syscall in this case.
+  zx_status_t status =
+      _zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
+zx_koid_t pid = GetKoid(zx_process_self());
+thread_local zx_koid_t tid = FuchsiaLogGetCurrentThreadKoid();
+const char kTagFieldName[] = "tag";
+
+void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                         cpp17::optional<cpp17::string_view> file_name, unsigned int line,
+                         cpp17::optional<cpp17::string_view> msg,
+                         cpp17::optional<cpp17::string_view> condition, zx_handle_t socket) {
+  // Ensure we have log state
+  GlobalStateLock log_state;
+  // Optional so no allocation overhead
+  // occurs if condition isn't set.
+  std::optional<std::string> modified_msg;
+  if (condition) {
+    std::stringstream s;
+    s << "Check failed: " << *condition << ". ";
+    if (msg) {
+      s << *msg;
+    }
+    modified_msg = s.str();
+    if (severity == fuchsia_logging::LOG_FATAL) {
+      // We're crashing -- so leak the string in order to prevent
+      // use-after-free of the maybe_fatal_string.
+      // We need this to prevent a use-after-free in FlushRecord.
+      auto new_msg = new char[modified_msg->size() + 1];
+      strcpy(const_cast<char*>(new_msg), modified_msg->c_str());
+      msg = new_msg;
+    } else {
+      msg = modified_msg->data();
+    }
+  }
+  buffer->raw_severity = severity;
+  if (socket == ZX_HANDLE_INVALID) {
+    socket = std::get<0>(log_state->descriptor()).get();
+  }
+  if (severity == fuchsia_logging::LOG_FATAL) {
+    buffer->maybe_fatal_string = msg->data();
+  }
+  buffer->inner.BeginRecord(severity, file_name, line, msg, zx::unowned_socket(socket), 0, pid,
+                            tid);
+  for (size_t i = 0; i < log_state->tag_count(); i++) {
+    buffer->inner.WriteKeyValue(kTagFieldName, log_state->tags()[i]);
+  }
+}
+
+void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
+                 unsigned int line, NullSafeStringView msg, NullSafeStringView condition) {
+  BeginRecordInternal(buffer, severity, file, line, msg, condition, ZX_HANDLE_INVALID);
+}
+
+void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                           NullSafeStringView file_name, unsigned int line, NullSafeStringView msg,
+                           NullSafeStringView condition, zx_handle_t socket) {
+  BeginRecordInternal(buffer, severity, file_name, line, msg, condition, socket);
+}
+
+void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
+  GlobalStateLock lock(false);
+  LogState::Set(settings, lock);
+}
+
+void SetLogSettings(const fuchsia_logging::LogSettings& settings,
+                    const std::initializer_list<std::string>& tags) {
+  GlobalStateLock lock(false);
+  LogState::Set(settings, tags, lock);
+}
+
+fuchsia_logging::LogSeverity GetMinLogSeverity() {
+  GlobalStateLock lock;
+  return lock->min_severity();
+}
+}  // namespace
 
 void LogState::PollInterest() {
   log_sink_->WaitForInterestChange().Then(
@@ -203,58 +271,6 @@ void LogState::Connect() {
     PollInterest();
   }
   logsink_socket_ = std::move(local);
-}
-
-void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                         cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                         cpp17::optional<cpp17::string_view> msg,
-                         cpp17::optional<cpp17::string_view> condition, zx_handle_t socket) {
-  // Ensure we have log state
-  GlobalStateLock log_state;
-  // Optional so no allocation overhead
-  // occurs if condition isn't set.
-  std::optional<std::string> modified_msg;
-  if (condition) {
-    std::stringstream s;
-    s << "Check failed: " << *condition << ". ";
-    if (msg) {
-      s << *msg;
-    }
-    modified_msg = s.str();
-    if (severity == fuchsia_logging::LOG_FATAL) {
-      // We're crashing -- so leak the string in order to prevent
-      // use-after-free of the maybe_fatal_string.
-      // We need this to prevent a use-after-free in FlushRecord.
-      auto new_msg = new char[modified_msg->size() + 1];
-      strcpy(const_cast<char*>(new_msg), modified_msg->c_str());
-      msg = new_msg;
-    } else {
-      msg = modified_msg->data();
-    }
-  }
-  buffer->raw_severity = severity;
-  if (socket == ZX_HANDLE_INVALID) {
-    socket = std::get<0>(log_state->descriptor()).get();
-  }
-  if (severity == fuchsia_logging::LOG_FATAL) {
-    buffer->maybe_fatal_string = msg->data();
-  }
-  buffer->inner.BeginRecord(severity, file_name, line, msg, zx::unowned_socket(socket), 0, pid,
-                            tid);
-  for (size_t i = 0; i < log_state->tag_count(); i++) {
-    buffer->inner.WriteKeyValue(kTagFieldName, log_state->tags()[i]);
-  }
-}
-
-void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
-                 unsigned int line, NullSafeStringView msg, NullSafeStringView condition) {
-  BeginRecordInternal(buffer, severity, file, line, msg, condition, ZX_HANDLE_INVALID);
-}
-
-void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                           NullSafeStringView file_name, unsigned int line, NullSafeStringView msg,
-                           NullSafeStringView condition, zx_handle_t socket) {
-  BeginRecordInternal(buffer, severity, file_name, line, msg, condition, socket);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) {
@@ -325,22 +341,6 @@ LogState::LogState(const fuchsia_logging::LogSettings& settings,
       break;
   }
   Connect();
-}
-
-void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
-  GlobalStateLock lock(false);
-  LogState::Set(settings, lock);
-}
-
-void SetLogSettings(const fuchsia_logging::LogSettings& settings,
-                    const std::initializer_list<std::string>& tags) {
-  GlobalStateLock lock(false);
-  LogState::Set(settings, tags, lock);
-}
-
-fuchsia_logging::LogSeverity GetMinLogSeverity() {
-  GlobalStateLock lock;
-  return lock->min_severity();
 }
 
 LogBuffer LogBufferBuilder::Build() {
