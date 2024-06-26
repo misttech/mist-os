@@ -4,6 +4,9 @@
 
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <syscall.h>
 #include <unistd.h>
 
@@ -16,6 +19,50 @@
 #include <linux/bpf.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
+
+#define BPF_LOAD_MAP(reg, value)                               \
+  bpf_insn{                                                    \
+      .code = BPF_LD | BPF_DW,                                 \
+      .dst_reg = reg,                                          \
+      .src_reg = 1,                                            \
+      .off = 0,                                                \
+      .imm = static_cast<int32_t>(value),                      \
+  },                                                           \
+      bpf_insn {                                               \
+    .code = 0, .dst_reg = 0, .src_reg = 0, .off = 0, .imm = 0, \
+  }
+
+#define BPF_MOV_IMM(reg, value)                                                    \
+  bpf_insn {                                                                       \
+    .code = BPF_ALU64 | BPF_MOV | BPF_IMM, .dst_reg = reg, .src_reg = 0, .off = 0, \
+    .imm = static_cast<int32_t>(value),                                            \
+  }
+
+#define BPF_MOV_REG(dst, src)                                                                \
+  bpf_insn {                                                                                 \
+    .code = BPF_ALU64 | BPF_MOV | BPF_X, .dst_reg = dst, .src_reg = src, .off = 0, .imm = 0, \
+  }
+
+#define BPF_CALL_EXTERNAL(function)                                   \
+  bpf_insn {                                                          \
+    .code = BPF_JMP | BPF_CALL, .dst_reg = 0, .src_reg = 0, .off = 0, \
+    .imm = static_cast<int32_t>(function),                            \
+  }
+
+#define BPF_STORE(ptr, value)                                                 \
+  bpf_insn {                                                                  \
+    .code = BPF_ST | BPF_B | BPF_MEM, .dst_reg = ptr, .src_reg = 0, .off = 0, \
+    .imm = static_cast<int32_t>(value),                                       \
+  }
+
+#define BPF_RETURN() \
+  bpf_insn { .code = BPF_JMP | BPF_EXIT, .dst_reg = 0, .src_reg = 0, .off = 0, .imm = 0, }
+
+#define BPF_JNE_IMM(dst, value, offset)                                     \
+  bpf_insn {                                                                \
+    .code = BPF_JMP | BPF_JNE, .dst_reg = dst, .src_reg = 0, .off = offset, \
+    .imm = static_cast<int32_t>(value),                                     \
+  }
 
 namespace {
 
@@ -47,6 +94,13 @@ class BpfMapTest : public testing::Test {
                                                                  .value_size = sizeof(int),
                                                                  .max_entries = 10,
                                                              }));
+    ringbuf_fd_ = SAFE_SYSCALL_SKIP_ON_EPERM(
+        bpf(BPF_MAP_CREATE, (union bpf_attr){
+                                .map_type = BPF_MAP_TYPE_RINGBUF,
+                                .key_size = 0,
+                                .value_size = 0,
+                                .max_entries = static_cast<uint32_t>(getpagesize()),
+                            }));
 
     CheckMapInfo();
   }
@@ -149,12 +203,38 @@ class BpfMapTest : public testing::Test {
     return BpfLock(BpfFdGet(pathname, BPF_F_WRONLY), F_WRLCK);
   }
 
-  int map_fd() const { return map_fd_; }
+  // Run the given bpf program.
+  void Run(const bpf_insn* program, size_t len) {
+    char buffer[4096];
+    union bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.prog_type = BPF_PROG_TYPE_SOCKET_FILTER;
+    attr.insns = reinterpret_cast<uint64_t>(program);
+    attr.insn_cnt = static_cast<uint32_t>(len);
+    attr.license = reinterpret_cast<uint64_t>("N/A");
+    attr.log_buf = reinterpret_cast<uint64_t>(buffer);
+    attr.log_size = 4096;
+    attr.log_level = 1;
+    bpf(BPF_PROG_LOAD, attr);
+
+    fbl::unique_fd prog_fd(SAFE_SYSCALL(bpf(BPF_PROG_LOAD, attr)));
+    int sk[2];
+    SAFE_SYSCALL(socketpair(AF_UNIX, SOCK_DGRAM, 0, sk));
+    fbl::unique_fd sk0(sk[0]);
+    fbl::unique_fd sk1(sk[1]);
+    int fd = prog_fd.get();
+    SAFE_SYSCALL(setsockopt(sk1.get(), SOL_SOCKET, SO_ATTACH_BPF, &fd, sizeof(int)));
+    SAFE_SYSCALL(write(sk0.get(), "", 1));
+  }
+
   int array_fd() const { return array_fd_; }
+  int map_fd() const { return map_fd_; }
+  int ringbuf_fd() const { return ringbuf_fd_; }
 
  private:
   int array_fd_ = -1;
   int map_fd_ = -1;
+  int ringbuf_fd_ = -1;
 };
 
 TEST_F(BpfMapTest, Map) {
@@ -245,6 +325,33 @@ TEST_F(BpfMapTest, LockTest) {
   ASSERT_TRUE(fd7.is_valid());  // no lock taken
   fbl::unique_fd fd8(MapRetrieveExclusiveRW(m2));
   ASSERT_FALSE(fd8.is_valid());  // busy due to fd6
+}
+
+TEST_F(BpfMapTest, MMapRingBufTest) {
+  // Can map the first page of the ringbuffer R/W
+  ASSERT_TRUE(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ | PROT_WRITE,
+                                            MAP_SHARED, ringbuf_fd(), 0)
+                  .is_ok());
+  // Cannot mmap the second page of the ringbuffer R/W
+  ASSERT_EQ(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ | PROT_WRITE,
+                                          MAP_SHARED, ringbuf_fd(), getpagesize())
+                .error_value(),
+            EPERM);
+  // Cannot mmap the second page, 3rd and 4th page RO
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_TRUE(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ, MAP_SHARED,
+                                              ringbuf_fd(), (i + 1) * getpagesize())
+                    .is_ok());
+  }
+  // Can mmap the 4 pages in a single mapping.
+  ASSERT_TRUE(test_helper::ScopedMMap::MMap(nullptr, 4 * getpagesize(), PROT_READ, MAP_SHARED,
+                                            ringbuf_fd(), 0)
+                  .is_ok());
+  // Cannot mmap 5 pages.
+  ASSERT_EQ(test_helper::ScopedMMap::MMap(nullptr, 5 * getpagesize(), PROT_READ, MAP_SHARED,
+                                          ringbuf_fd(), 0)
+                .error_value(),
+            EINVAL);
 }
 
 }  // namespace
