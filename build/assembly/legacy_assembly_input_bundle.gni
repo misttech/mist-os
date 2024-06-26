@@ -4,10 +4,12 @@
 
 import("//build/assembly/assembly_input_bundle.gni")
 import("//build/assembly/bootfs_files_for_assembly.gni")
+import("//build/assembly/generated_assembly_inputs.gni")
 import("//build/assembly/package_manifests_list.gni")
 import("//build/config.gni")
 import("//build/dist/distribution_manifest.gni")
 import("//build/python/python_action.gni")
+import("//build/security.gni")
 import("//build/zbi/kernel_cmdline.gni")
 
 # Create a "legacy" assembly input bundle from an image assembly configuration,
@@ -69,6 +71,9 @@ import("//build/zbi/kernel_cmdline.gni")
 #
 #   bootfs_labels [required]
 #     [list of labels] The set of labels to walk to find bootfs files.
+#
+#   include_assembly_inputs [optional; default=false]
+#     [bool] Whether to declare the assembly inputs metadata.
 #
 template("legacy_assembly_input_bundle") {
   assert(
@@ -133,7 +138,13 @@ template("legacy_assembly_input_bundle") {
     _core_realm_definition = invoker.core_realm_definition
   }
 
+  _include_assembly_inputs = false
+  if (defined(invoker.include_assembly_inputs)) {
+    _include_assembly_inputs = invoker.include_assembly_inputs
+  }
+
   labels = {
+    assembly_inputs = "${target_name}_assembly_inputs.json"
     base_package_list = "${target_name}_package_manifest_list.base"
     cache_package_list = "${target_name}_package_manifest_list.cache"
     bootfs_package_list = "${target_name}_bootfs_package_list"
@@ -164,6 +175,7 @@ template("legacy_assembly_input_bundle") {
   }
 
   files = {
+    assembly_inputs = "$target_out_dir/${target_name}_assembly_inputs.json"
     base_package_list = "$target_out_dir/package_lists/${target_name}_base"
     cache_package_list = "$target_out_dir/package_lists/${target_name}_cache"
     bootfs_package_list = "$target_out_dir/package_lists/${target_name}_bootfs"
@@ -572,6 +584,27 @@ template("legacy_assembly_input_bundle") {
     }
   }
 
+  if (_include_assembly_inputs) {
+    generated_assembly_inputs(labels.assembly_inputs) {
+      testonly = fuchsia_zbi_testonly
+      output_path = files.assembly_inputs
+      sources = [ "${files.assembly_input_bundle_dir}" ]
+      deps = [ ":${labels.assembly_input_bundle}" ]
+
+      metadata = {
+        package_barrier = []
+        config_package_barrier = []
+        distribution_entries_barrier = []
+        images = []
+        assembly_inputs = [
+          {
+            path = rebase_path(files.assembly_inputs, root_build_dir)
+          },
+        ]
+      }
+    }
+  }
+
   group(target_name) {
     forward_variables_from(invoker,
                            [
@@ -579,6 +612,9 @@ template("legacy_assembly_input_bundle") {
                              "visibility",
                            ])
     public_deps = [ ":${labels.assembly_input_bundle}" ]
+    if (_include_assembly_inputs) {
+      public_deps += [ ":${labels.assembly_inputs}" ]
+    }
     if (create_package) {
       public_deps += [ ":${labels.assembly_input_bundle_package}" ]
     }
