@@ -78,6 +78,10 @@ use starnix_logging::{
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
+#[cfg(feature = "starnix_lite")]
+use starnix_logging::{
+    log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
+};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 #[cfg(feature = "starnix_lite")]
 use starnix_uapi::errno;
