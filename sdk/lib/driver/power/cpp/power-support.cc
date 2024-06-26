@@ -84,9 +84,8 @@ fit::result<Error, std::vector<fuchsia_power_broker::LevelDependency>> ConvertPo
 /// |svcs_dir|. |dependencies| is consumed by this function.
 ///
 /// Returns Error::IO if there is a problem talking to capabilities.
-fit::result<Error, bool> GetTokensFromParents(
-    ElementDependencyMap& dependencies, TokenMap& tokens,
-    const fidl::ClientEnd<fuchsia_io::Directory>& svcs_dir) {
+std::optional<Error> GetTokensFromParents(ElementDependencyMap& dependencies, TokenMap& tokens,
+                                          const fidl::ClientEnd<fuchsia_io::Directory>& svcs_dir) {
   const uint64_t dir_read_page_size = static_cast<const uint64_t>(8 * 1024);
 
   std::vector<std::string> service_instances;
@@ -101,7 +100,7 @@ fit::result<Error, bool> GetTokensFromParents(
         fuchsia_hardware_power::PowerTokenService::Name, std::move(server_end));
 
     if (!status.ok()) {
-      return fit::error(Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND);
+      return Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND;
     }
 
     fidl::WireSyncClient<fuchsia_io::Directory> svcs(
@@ -114,13 +113,13 @@ fit::result<Error, bool> GetTokensFromParents(
     // Peer closed is what we get if the service directory doesn't exist, we
     // consider this okay
     if (read_result.is_peer_closed()) {
-      return fit::error(Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND);
+      return Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND;
     }
 
     if (read_result.status() != ZX_OK) {
       // Some non-closed error happened indicating the service directory
       // existed, but we couldn't access it
-      return fit::error(Error::READ_INSTANCES);
+      return Error::READ_INSTANCES;
     }
 
     // Build up the list of parent names which we can then match against parent
@@ -149,7 +148,7 @@ fit::result<Error, bool> GetTokensFromParents(
   }
 
   if (service_instances.size() == 0) {
-    return fit::error(Error::NO_TOKEN_SERVICE_INSTANCES);
+    return Error::NO_TOKEN_SERVICE_INSTANCES;
   }
 
   // Go through the service instances we have and ask for a token. For all
@@ -162,12 +161,12 @@ fit::result<Error, bool> GetTokensFromParents(
       zx::result<fuchsia_hardware_power::PowerTokenService::ServiceClient> svc_instance =
           component::OpenServiceAt<fuchsia_hardware_power::PowerTokenService>(svcs_dir, instance);
       if (svc_instance.is_error()) {
-        return fit::error(Error::TOKEN_REQUEST);
+        return Error::TOKEN_REQUEST;
       }
       zx::result<fidl::ClientEnd<fuchsia_hardware_power::PowerTokenProvider>>
           token_provider_channel = svc_instance.value().connect_token_provider();
       if (token_provider_channel.is_error()) {
-        return fit::error(Error::TOKEN_REQUEST);
+        return Error::TOKEN_REQUEST;
       }
       token_client.Bind(std::move(token_provider_channel.value()));
     }
@@ -176,7 +175,7 @@ fit::result<Error, bool> GetTokensFromParents(
     fidl::WireResult<fuchsia_hardware_power::PowerTokenProvider::GetToken> token_resp =
         token_client->GetToken();
     if (!token_resp.ok() || token_resp->is_error()) {
-      return fit::error(Error::TOKEN_REQUEST);
+      return Error::TOKEN_REQUEST;
     }
 
     fuchsia_hardware_power::wire::PowerTokenProviderGetTokenResponse* resp_val =
@@ -197,8 +196,7 @@ fit::result<Error, bool> GetTokensFromParents(
     // Check this dependency off by removing it from the set of ones we need
     dependencies.erase(parent);
   }
-
-  return fit::success(true);
+  return std::nullopt;
 }
 
 }  // namespace
@@ -322,9 +320,9 @@ fit::result<Error, TokenMap> GetDependencyTokens(
   }
 
   if (have_driver_dep) {
-    auto parent_tokens_result = GetTokensFromParents(dependencies, tokens, svcs_dir);
-    if (parent_tokens_result.is_error()) {
-      return fit::error(parent_tokens_result.take_error());
+    std::optional parent_tokens_error = GetTokensFromParents(dependencies, tokens, svcs_dir);
+    if (parent_tokens_error.has_value()) {
+      return fit::error(parent_tokens_error.value());
     }
   }
 
