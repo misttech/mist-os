@@ -395,6 +395,19 @@ to stdout/stderr during the Ninja build.
 
 From //build/bazel/bazel_action.gni:18
 
+### bazel_rbe_exec_strategy
+
+When bazel is configured to use RBE, this controls the execution strategy
+that is used.
+
+Supported options:
+  "remote": on cache-miss, build remotely (default)
+  "local": on cache-miss, build locally
+
+**Current value (from the default):** `"remote"`
+
+From //build/bazel/remote_services.gni:24
+
 ### bazel_upload_build_events
 
 Configure bazel to stream build events and results to a service.
@@ -414,7 +427,7 @@ Valid options:
 
 **Current value (from the default):** `""`
 
-From //build/bazel/remote_services.gni:32
+From //build/bazel/remote_services.gni:40
 
 ### blobfs_capacity
 
