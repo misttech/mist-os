@@ -271,12 +271,12 @@ mod tests {
         let proxy_clone = proxy.clone();
         inspect_repo.add_inspect_handle(
             Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test".into())),
+            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
         );
 
         inspect_repo.add_inspect_handle(
             Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy_clone, Some("test".into())),
+            InspectHandle::from_named_tree_proxy(proxy_clone, Some("test")),
         );
 
         let guard = inspect_repo.inner.read();
@@ -293,7 +293,7 @@ mod tests {
             .expect("create directory proxy");
         data_repo.add_inspect_handle(
             Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test".into())),
+            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
         );
         assert!(data_repo.inner.read().get(&identity).is_some());
         drop(server_end);
@@ -314,7 +314,7 @@ mod tests {
             .expect("create directory proxy");
         data_repo.add_inspect_handle(
             Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test".into())),
+            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
         );
         assert!(data_repo.inner.read().get(&identity).is_some());
         assert!(pipeline.static_selectors_matchers().unwrap().contains_key(&moniker));
@@ -339,7 +339,7 @@ mod tests {
             .expect("create directory proxy");
         data_repo.add_inspect_handle(
             Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test".into())),
+            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
         );
 
         let moniker2 = ExtendedMoniker::parse_str("./a/b/foo2").unwrap();
@@ -348,7 +348,7 @@ mod tests {
             .expect("create directory proxy");
         data_repo.add_inspect_handle(
             Arc::clone(&identity2),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test".into())),
+            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
         );
 
         assert_eq!(2, data_repo.inner.read().fetch_inspect_data(&None, None).len());

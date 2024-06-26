@@ -55,8 +55,8 @@ impl InspectHandle {
         }
     }
 
-    pub fn from_named_tree_proxy(proxy: TreeProxy, name: Option<String>) -> Self {
-        InspectHandle::Tree { proxy, name: name.map(FlyStr::from) }
+    pub fn from_named_tree_proxy<T: Into<FlyStr>>(proxy: TreeProxy, name: Option<T>) -> Self {
+        InspectHandle::Tree { proxy, name: name.map(|n| n.into()) }
     }
 
     pub fn is_tree(&self) -> bool {
