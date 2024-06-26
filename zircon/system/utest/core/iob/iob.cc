@@ -516,12 +516,13 @@ TEST(Iob, GetSetNames) {
   ASSERT_OK(
       zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, nullptr, 0, nullptr, &avail));
 
-  zx_info_vmo_t vmo_infos[avail];
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, vmo_infos,
+  auto vmo_infos = std::make_unique<zx_info_vmo_t[]>(avail);
+  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, vmo_infos.get(),
                                sizeof(zx_info_vmo_t) * avail, nullptr, nullptr));
 
   bool found_vmo = false;
-  for (zx_info_vmo_t vmo_info : vmo_infos) {
+  for (size_t i = 0; i < avail; ++i) {
+    zx_info_vmo_t& vmo_info = vmo_infos[i];
     if (0 == strcmp("TestIob2", vmo_info.name)) {
       EXPECT_TRUE(vmo_info.flags & ZX_INFO_VMO_VIA_IOB_HANDLE);
       found_vmo = true;
@@ -566,71 +567,80 @@ TEST(Iob, GetInfoProcessVmos) {
               },
       }};
 
-  size_t before_vmo_count;
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, nullptr, 0, nullptr,
-                               &before_vmo_count));
+  // Create the IOB and set the name we will use to identify the VMOs it creates.
   ASSERT_OK(zx_iob_create(0, config, 3, &ep0, &ep1));
-  size_t after_vmo_count;
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, nullptr, 0, nullptr,
-                               &after_vmo_count));
-
   zx_object_set_property(ep0, ZX_PROP_NAME, "TestIob", 8);
 
-  // The vmos are counted twice: once for each handle
-  EXPECT_EQ(before_vmo_count + 6, after_vmo_count);
+  // Introduce a helper lambda used to find the VMOs which should have been created when we created
+  // our IOB.  We will use this to verify all of the expected VMOs were created, and that the proper
+  // ones go away when we close each endpoint.
+  bool saw_ep0_1_page, saw_ep0_2_page, saw_ep0_3_page;
+  bool saw_ep1_1_page, saw_ep1_2_page, saw_ep1_3_page;
+  auto FindTestVmos = [&]() -> void {
+    saw_ep0_1_page = false;
+    saw_ep0_2_page = false;
+    saw_ep0_3_page = false;
+    saw_ep1_1_page = false;
+    saw_ep1_2_page = false;
+    saw_ep1_3_page = false;
 
-  zx_info_vmo_t vmo_infos[after_vmo_count];
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, vmo_infos,
-                               sizeof(zx_info_vmo_t) * after_vmo_count, nullptr, nullptr));
+    size_t vmo_count{0};
+    std::unique_ptr<zx_info_vmo_t[]> vmo_infos;
+    ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, nullptr, 0, nullptr,
+                                 &vmo_count));
+    if (vmo_count) {
+      vmo_infos = std::make_unique<zx_info_vmo_t[]>(vmo_count);
+      ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, vmo_infos.get(),
+                                   sizeof(zx_info_vmo_t) * vmo_count, nullptr, nullptr));
 
-  bool saw_ep0_1_page = false;
-  bool saw_ep0_2_page = false;
-  bool saw_ep0_3_page = false;
-  bool saw_ep1_1_page = false;
-  bool saw_ep1_2_page = false;
-  bool saw_ep1_3_page = false;
-
-  for (zx_info_vmo_t vmo_info : vmo_infos) {
-    if (0 == strcmp("TestIob", vmo_info.name)) {
-      switch (vmo_info.size_bytes) {
-        case ZX_PAGE_SIZE * 1:
-          if ((vmo_info.handle_rights & ZX_RIGHT_READ) == 0) {
-            // This is ep1 and we shouldn't have WRITE rights either
-            EXPECT_FALSE(vmo_info.handle_rights & ZX_RIGHT_WRITE);
-            EXPECT_FALSE(saw_ep1_1_page);
-            saw_ep1_1_page = true;
-          } else {
-            // This is ep0 and we should have write rights
-            EXPECT_EQ(ZX_RIGHT_WRITE, vmo_info.handle_rights & ZX_RIGHT_WRITE);
-            EXPECT_FALSE(saw_ep0_1_page);
-            saw_ep0_1_page = true;
+      for (size_t i = 0; i < vmo_count; ++i) {
+        zx_info_vmo_t& vmo_info = vmo_infos[i];
+        if (0 == strcmp("TestIob", vmo_info.name)) {
+          switch (vmo_info.size_bytes) {
+            case ZX_PAGE_SIZE * 1:
+              if ((vmo_info.handle_rights & ZX_RIGHT_READ) == 0) {
+                // This is ep1 and we shouldn't have WRITE rights either
+                EXPECT_FALSE(vmo_info.handle_rights & ZX_RIGHT_WRITE);
+                EXPECT_FALSE(saw_ep1_1_page);
+                saw_ep1_1_page = true;
+              } else {
+                // This is ep0 and we should have write rights
+                EXPECT_EQ(ZX_RIGHT_WRITE, vmo_info.handle_rights & ZX_RIGHT_WRITE);
+                EXPECT_FALSE(saw_ep0_1_page);
+                saw_ep0_1_page = true;
+              }
+              break;
+            case ZX_PAGE_SIZE * 2:
+              if ((vmo_info.handle_rights & ZX_RIGHT_READ) == 0) {
+                EXPECT_FALSE(vmo_info.handle_rights & ZX_RIGHT_WRITE);
+                EXPECT_FALSE(saw_ep1_2_page);
+                saw_ep1_2_page = true;
+              } else {
+                EXPECT_EQ(ZX_RIGHT_WRITE, vmo_info.handle_rights & ZX_RIGHT_WRITE);
+                EXPECT_FALSE(saw_ep0_2_page);
+                saw_ep0_2_page = true;
+              }
+              break;
+            case ZX_PAGE_SIZE * 3:
+              if ((vmo_info.handle_rights & ZX_RIGHT_READ) == 0) {
+                EXPECT_FALSE(vmo_info.handle_rights & ZX_RIGHT_WRITE);
+                EXPECT_FALSE(saw_ep1_3_page);
+                saw_ep1_3_page = true;
+              } else {
+                EXPECT_EQ(ZX_RIGHT_WRITE, vmo_info.handle_rights & ZX_RIGHT_WRITE);
+                EXPECT_FALSE(saw_ep0_3_page);
+                saw_ep0_3_page = true;
+              }
+              break;
           }
-          break;
-        case ZX_PAGE_SIZE * 2:
-          if ((vmo_info.handle_rights & ZX_RIGHT_READ) == 0) {
-            EXPECT_FALSE(vmo_info.handle_rights & ZX_RIGHT_WRITE);
-            EXPECT_FALSE(saw_ep1_2_page);
-            saw_ep1_2_page = true;
-          } else {
-            EXPECT_EQ(ZX_RIGHT_WRITE, vmo_info.handle_rights & ZX_RIGHT_WRITE);
-            EXPECT_FALSE(saw_ep0_2_page);
-            saw_ep0_2_page = true;
-          }
-          break;
-        case ZX_PAGE_SIZE * 3:
-          if ((vmo_info.handle_rights & ZX_RIGHT_READ) == 0) {
-            EXPECT_FALSE(vmo_info.handle_rights & ZX_RIGHT_WRITE);
-            EXPECT_FALSE(saw_ep1_3_page);
-            saw_ep1_3_page = true;
-          } else {
-            EXPECT_EQ(ZX_RIGHT_WRITE, vmo_info.handle_rights & ZX_RIGHT_WRITE);
-            EXPECT_FALSE(saw_ep0_3_page);
-            saw_ep0_3_page = true;
-          }
-          break;
+        }
       }
     }
-  }
+  };
+
+  // Enumerate all of the VMOs in this process and find our test VMOs.  We have not closed any
+  // endpoints yet, should be able to find all of them.
+  FindTestVmos();
   EXPECT_TRUE(saw_ep0_1_page);
   EXPECT_TRUE(saw_ep0_2_page);
   EXPECT_TRUE(saw_ep0_3_page);
@@ -638,17 +648,26 @@ TEST(Iob, GetInfoProcessVmos) {
   EXPECT_TRUE(saw_ep1_2_page);
   EXPECT_TRUE(saw_ep1_3_page);
 
-  EXPECT_OK(zx_handle_close(ep0));
-  size_t after_close_one;
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, nullptr, 0, nullptr,
-                               &after_close_one));
-  EXPECT_EQ(before_vmo_count + 3, after_close_one);
+  // Now close Ep0.  We have not mapped any of these VMOs, so we expect all of the Ep0 VMOs to
+  // disappear, while the Ep1 VMOs remain.
+  zx_handle_close(ep0);
+  FindTestVmos();
+  EXPECT_FALSE(saw_ep0_1_page);
+  EXPECT_FALSE(saw_ep0_2_page);
+  EXPECT_FALSE(saw_ep0_3_page);
+  EXPECT_TRUE(saw_ep1_1_page);
+  EXPECT_TRUE(saw_ep1_2_page);
+  EXPECT_TRUE(saw_ep1_3_page);
 
-  EXPECT_OK(zx_handle_close(ep1));
-  size_t after_close_two;
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_VMOS, nullptr, 0, nullptr,
-                               &after_close_two));
-  EXPECT_EQ(before_vmo_count, after_close_two);
+  // Now close Ep1 as well.  All of our test VMOs should be gone after this.
+  zx_handle_close(ep1);
+  FindTestVmos();
+  EXPECT_FALSE(saw_ep0_1_page);
+  EXPECT_FALSE(saw_ep0_2_page);
+  EXPECT_FALSE(saw_ep0_3_page);
+  EXPECT_FALSE(saw_ep1_1_page);
+  EXPECT_FALSE(saw_ep1_2_page);
+  EXPECT_FALSE(saw_ep1_3_page);
 }
 
 TEST(Iob, GetInfoProcessMaps) {
@@ -680,8 +699,8 @@ TEST(Iob, GetInfoProcessMaps) {
 
   EXPECT_EQ(num_mappings_after, num_mappings_before + 1);
 
-  zx_info_maps_t map_infos[num_mappings_after];
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_MAPS, map_infos,
+  auto map_infos = std::make_unique<zx_info_maps_t[]>(num_mappings_after);
+  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_MAPS, map_infos.get(),
                                sizeof(zx_info_vmo_t) * num_mappings_after, nullptr, nullptr));
 
   zx_iob_region_info_t ep0_info[1];
@@ -690,7 +709,8 @@ TEST(Iob, GetInfoProcessMaps) {
 
   zx_koid_t iob_koid = ep0_info[0].koid;
   bool saw_iob_mapping = false;
-  for (auto mapping : map_infos) {
+  for (size_t i = 0; i < num_mappings_after; ++i) {
+    zx_info_maps_t& mapping = map_infos[i];
     if (mapping.u.mapping.vmo_koid == iob_koid) {
       EXPECT_EQ(mapping.size, ZX_PAGE_SIZE);
       saw_iob_mapping = true;
