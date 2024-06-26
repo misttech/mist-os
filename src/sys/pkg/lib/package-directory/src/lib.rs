@@ -16,7 +16,6 @@ use vfs::ObjectRequestRef;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 mod meta_as_dir;
-mod meta_file;
 mod meta_subdir;
 mod non_meta_subdir;
 mod root_dir;
@@ -289,12 +288,6 @@ pub async fn serve_path(
 
 fn usize_to_u64_safe(u: usize) -> u64 {
     let ret: u64 = u.try_into().unwrap();
-    static_assertions::assert_eq_size_val!(u, ret);
-    ret
-}
-
-fn u64_to_usize_safe(u: u64) -> usize {
-    let ret: usize = u.try_into().unwrap();
     static_assertions::assert_eq_size_val!(u, ret);
     ret
 }

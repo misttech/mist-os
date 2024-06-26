@@ -377,9 +377,7 @@ async fn get_backing_memory_per_package_source(source: PackageSource) {
     let file = open_file(root_dir, "meta", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
     let result =
         file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().map_err(zx::Status::from_raw);
-    // TODO(https://fxbug.dev/327633753) MetaAsFile doesn't support GetBackingMemory but VmoFile
-    // does.
-    assert_matches!(result, Err(zx::Status::NOT_SUPPORTED) | Ok(_));
+    assert_matches!(result, Ok(_));
 
     // For files NOT under meta, calls with unsupported flags should successfully return the FIDL
     // call with a failure status.
