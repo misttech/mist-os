@@ -126,7 +126,12 @@ fn race_connect_close<I: IpExt>(which: ServerOrClient, close_or_shutdown: CloseO
 
         // Clean up all resources.
         cleanup();
-        ctx.bindings_ctx.state_mut().rx_available.clear();
+        {
+            let mut state = ctx.bindings_ctx.state_mut();
+            state.rx_available.clear();
+            // Ensure that all the deferred resource removals have completed.
+            state.deferred_receivers.iter().for_each(|r| r.assert_signalled());
+        }
         ctx.test_api().clear_routes_and_remove_device(lo);
     })
 }

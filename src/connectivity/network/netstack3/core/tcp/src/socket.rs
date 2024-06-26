@@ -1014,8 +1014,7 @@ impl<S: SpecSocketId> SocketMapAddrStateSpec for ListenerAddrState<S> {
 
     fn contains_id(&self, id: &Self::Id) -> bool {
         match self {
-            Self::ExclusiveBound(x) => id == x,
-            Self::ExclusiveListener(x) => id == x,
+            Self::ExclusiveBound(x) | Self::ExclusiveListener(x) => id == x,
             Self::Shared { listener, bound } => {
                 listener.as_ref().is_some_and(|x| id == x) || bound.contains(id)
             }
@@ -4420,8 +4419,8 @@ fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsConte
             hash_map::Entry::Vacant(v) => {
                 let id = v.key();
                 let TcpSocketId(rc) = id;
-                if StrongRc::marked_for_destruction(rc) {
-                    // Socket is already marked for destruction, we've raced
+                if !StrongRc::marked_for_destruction(rc) {
+                    // Socket is not yet marked for destruction, we've raced
                     // this removal with the addition to the socket set. Mark
                     // the entry as DOA.
                     debug!(
@@ -4453,7 +4452,10 @@ fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsConte
             BC::unwrap_or_notify_with_new_reference_notifier(primary, |state| state);
         match remove_result {
             RemoveResourceResult::Removed(state) => debug!("destroyed {weak:?} {state:?}"),
-            RemoveResourceResult::Deferred(receiver) => bindings_ctx.defer_removal(receiver),
+            RemoveResourceResult::Deferred(receiver) => {
+                debug!("deferred removal {weak:?}");
+                bindings_ctx.defer_removal(receiver)
+            }
         }
     })
 }

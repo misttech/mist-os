@@ -458,6 +458,9 @@ pub struct FakeBindingsCtxState {
     pub rx_available: Vec<LoopbackDeviceId<FakeBindingsCtx>>,
     /// IDs with tx queue signaled available.
     pub tx_available: Vec<DeviceId<FakeBindingsCtx>>,
+    /// Deferred resource removals.
+    #[cfg(loom)]
+    pub deferred_receivers: Vec<loom_notifiers::LoomReceiver>,
 }
 
 impl FakeBindingsCtxState {
@@ -821,24 +824,48 @@ mod fake_notifiers {
 mod loom_notifiers {
     use super::*;
 
-    use netstack3_sync::rc::ArcNotifier;
+    use core::sync::atomic::{self, AtomicBool};
+    use netstack3_sync::rc::Notifier;
+
+    #[derive(Debug)]
+    pub struct LoomNotifier(Arc<AtomicBool>);
+
+    #[derive(Debug)]
+    pub struct LoomReceiver {
+        pub debug_refs: DynDebugReferences,
+        pub signal: Arc<AtomicBool>,
+    }
+
+    impl LoomReceiver {
+        #[track_caller]
+        pub fn assert_signalled(&self) {
+            let Self { debug_refs, signal } = self;
+            assert!(signal.load(atomic::Ordering::SeqCst), "pending references: {debug_refs:?}")
+        }
+    }
+
+    impl<T> Notifier<T> for LoomNotifier {
+        fn notify(&mut self, _data: T) {
+            let Self(signal) = self;
+            signal.store(true, atomic::Ordering::SeqCst);
+        }
+    }
 
     impl ReferenceNotifiers for FakeBindingsCtx {
-        type ReferenceReceiver<T: 'static> = ArcNotifier<T>;
-        type ReferenceNotifier<T: Send + 'static> = ArcNotifier<T>;
+        type ReferenceReceiver<T: 'static> = LoomReceiver;
+        type ReferenceNotifier<T: Send + 'static> = LoomNotifier;
 
         fn new_reference_notifier<T: Send + 'static>(
-            _debug_references: DynDebugReferences,
+            debug_refs: DynDebugReferences,
         ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
-            let notifier = ArcNotifier::new();
-            let receiver = notifier.clone();
-            (notifier, receiver)
+            let signal = Arc::new(AtomicBool::default());
+            (LoomNotifier(Arc::clone(&signal)), LoomReceiver { debug_refs, signal })
         }
     }
 
     impl DeferredResourceRemovalContext for FakeBindingsCtx {
-        fn defer_removal<T: Send + 'static>(&mut self, _receiver: Self::ReferenceReceiver<T>) {
-            // Do nothing.
+        fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
+            self.state_mut().deferred_receivers.push(receiver);
         }
     }
 }
