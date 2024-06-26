@@ -72,6 +72,8 @@ void mark_pio_region_to_reserve(uint64_t base, size_t len) {
   reserved_pio_count++;
 }
 
+#define DEFAULT_MEMEND (16UL * 1024 * 1024)
+
 // Populate global memory arenas from the given memory ranges.
 static zx_status_t mem_arena_init(ktl::span<const zbi_mem_range_t> ranges) {
   // Create the kernel's singleton for address space management.
@@ -133,6 +135,16 @@ static zx_status_t mem_arena_init(ktl::span<const zbi_mem_range_t> ranges) {
 // Discover the basic memory map.
 void pc_mem_init(ktl::span<const zbi_mem_range_t> ranges) {
   pmm_checker_init_from_cmdline();
+
+  // If no ranges were provided, use a fixed-size fallback range.
+  if (ranges.empty()) {
+    printf("MEM: no arena range source: falling back to fixed size\n");
+    static zbi_mem_range_t entry = {};
+    entry.paddr = 0;
+    entry.length = DEFAULT_MEMEND;
+    entry.type = ZBI_MEM_TYPE_RAM;
+    ranges = ktl::span<zbi_mem_range_t>(&entry, 1);
+  }
 
   // Initialize memory from the ranges provided in the ZBI.
   if (zx_status_t status = mem_arena_init(ranges); status != ZX_OK) {
