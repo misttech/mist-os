@@ -18,7 +18,7 @@ pub use error::Error as ObexError;
 pub mod header;
 
 /// Types and interfaces associated with the supported OBEX operations.
-mod operation;
+pub mod operation;
 
 /// Helpers for interacting with the `fuchsia.bluetooth.bredr.Profile` resource.
 pub mod profile;

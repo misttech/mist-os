@@ -114,11 +114,11 @@ impl ObexClient {
         self.connected = status;
     }
 
-    fn is_connected(&self) -> bool {
+    pub fn is_connected(&self) -> bool {
         matches!(self.connected, ConnectionStatus::Connected { .. })
     }
 
-    fn connection_id(&self) -> &Option<ConnectionIdentifier> {
+    pub fn connection_id(&self) -> &Option<ConnectionIdentifier> {
         match &self.connected {
             ConnectionStatus::Connected { id } => id,
             _ => &None,

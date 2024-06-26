@@ -196,7 +196,6 @@ where
         &self.data
     }
 
-    #[cfg(test)]
     pub fn headers(&self) -> &HeaderSet {
         &self.headers
     }
