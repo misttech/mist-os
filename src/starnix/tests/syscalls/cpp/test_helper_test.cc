@@ -39,7 +39,7 @@ TEST(ScopedTestDirTest, DoesntLeakFileDescriptors) {
 
     for (size_t i = 0; i <= new_limit.rlim_cur; i++) {
       test_helper::ScopedTempDir scoped_dir;
-      test_helper::ScopedFD mem_fd(test_helper::MemFdCreate("try_create", O_WRONLY));
+      fbl::unique_fd mem_fd(test_helper::MemFdCreate("try_create", O_WRONLY));
       EXPECT_TRUE(mem_fd.is_valid()) << "memfd_create: " << std::strerror(errno);
     }
   });

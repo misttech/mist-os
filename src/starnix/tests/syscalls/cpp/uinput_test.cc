@@ -33,13 +33,13 @@ class UinputTest : public ::testing::Test {
       GTEST_SKIP() << "Can only be run as root.";
     }
 
-    uinput_fd_ = test_helper::ScopedFD(open("/dev/uinput", O_RDWR));
+    uinput_fd_ = fbl::unique_fd(open("/dev/uinput", O_RDWR));
     ASSERT_TRUE(uinput_fd_.is_valid())
         << "open(\"/dev/uinput\") failed: " << strerror(errno) << "(" << errno << ")";
   }
 
  protected:
-  test_helper::ScopedFD uinput_fd_;
+  fbl::unique_fd uinput_fd_;
 };
 
 std::set<std::string> lsDir(const char* dir) {
@@ -181,8 +181,7 @@ TEST_F(UinputTest, UiDevCreateDestroyTouchscreenEvIoGid) {
   EXPECT_EQ(new_device_name.substr(0, std::string("event").length()), "event");
 
   {
-    auto new_device_fd =
-        test_helper::ScopedFD(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
+    auto new_device_fd = fbl::unique_fd(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
     ASSERT_TRUE(new_device_fd.is_valid());
     input_id got_input_id;
     res = ioctl(new_device_fd.get(), EVIOCGID, &got_input_id);
@@ -219,8 +218,7 @@ TEST_F(UinputTest, UiDevCreateDestroyKeyboardEvIoGid) {
   EXPECT_EQ(new_device_name.substr(0, std::string("event").length()), "event");
 
   {
-    auto new_device_fd =
-        test_helper::ScopedFD(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
+    auto new_device_fd = fbl::unique_fd(open(("/dev/input/" + new_device_name).c_str(), O_RDWR));
     ASSERT_TRUE(new_device_fd.is_valid());
     input_id got_input_id;
     res = ioctl(new_device_fd.get(), EVIOCGID, &got_input_id);

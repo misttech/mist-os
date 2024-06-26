@@ -15,6 +15,7 @@
 #include <string_view>
 #include <vector>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <linux/genetlink.h>
 #include <linux/netlink.h>
@@ -123,40 +124,6 @@ class SignalMaskHelper {
   sigset_t _sigmaskCopy;
 };
 
-class ScopedFD {
- public:
-  explicit ScopedFD(int fd = -1) : fd_(fd) {}
-  ScopedFD(ScopedFD &&other) noexcept {
-    fd_ = -1;
-    *this = std::move(other);
-  }
-  ~ScopedFD() {
-    if (is_valid())
-      close(fd_);
-  }
-
-  ScopedFD &operator=(ScopedFD &&other) noexcept {
-    reset();
-    fd_ = other.fd_;
-    other.fd_ = -1;
-    return *this;
-  }
-
-  bool is_valid() const { return fd_ != -1; }
-  void reset() {
-    if (is_valid()) {
-      close(fd_);
-    }
-    fd_ = -1;
-  }
-  explicit operator bool() const { return is_valid(); }
-
-  int get() const { return fd_; }
-
- private:
-  int fd_;
-};
-
 class ScopedTempFD {
  public:
   ScopedTempFD();
@@ -170,7 +137,7 @@ class ScopedTempFD {
 
  public:
   std::string name_;
-  ScopedFD fd_;
+  fbl::unique_fd fd_;
 };
 
 class ScopedTempDir {

@@ -25,8 +25,8 @@ class AshmemTest : public ::testing::Test {
   }
 
  protected:
-  static test_helper::ScopedFD Open() {
-    test_helper::ScopedFD ashmem_fd(open("/dev/ashmem", O_RDWR));
+  static fbl::unique_fd Open() {
+    fbl::unique_fd ashmem_fd(open("/dev/ashmem", O_RDWR));
     return ashmem_fd;
   }
 };

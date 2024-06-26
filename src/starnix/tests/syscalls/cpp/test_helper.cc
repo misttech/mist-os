@@ -152,7 +152,7 @@ void SignalMaskHelper::restoreSigmask() { sigprocmask(SIG_SETMASK, &this->_sigma
 
 ScopedTempFD::ScopedTempFD() : name_("/tmp/proc_test_file_XXXXXX") {
   char *mut_name = const_cast<char *>(name_.c_str());
-  fd_ = ScopedFD(mkstemp(mut_name));
+  fd_ = fbl::unique_fd(mkstemp(mut_name));
 }
 
 ScopedTempDir::ScopedTempDir() {
@@ -317,7 +317,7 @@ int MemFdCreate(const char *name, unsigned int flags) {
 // Attempts to read a byte from the given memory address.
 // Returns whether the read succeeded or not.
 bool TryRead(uintptr_t addr) {
-  test_helper::ScopedFD mem_fd(MemFdCreate("try_read", O_WRONLY));
+  fbl::unique_fd mem_fd(MemFdCreate("try_read", O_WRONLY));
   EXPECT_TRUE(mem_fd.is_valid());
 
   return write(mem_fd.get(), reinterpret_cast<void *>(addr), 1) == 1;
@@ -326,7 +326,7 @@ bool TryRead(uintptr_t addr) {
 // Attempts to write a zero byte to the given memory address.
 // Returns whether the write succeeded or not.
 bool TryWrite(uintptr_t addr) {
-  test_helper::ScopedFD zero_fd(open("/dev/zero", O_RDONLY));
+  fbl::unique_fd zero_fd(open("/dev/zero", O_RDONLY));
   EXPECT_TRUE(zero_fd.is_valid());
 
   return read(zero_fd.get(), reinterpret_cast<void *>(addr), 1) == 1;

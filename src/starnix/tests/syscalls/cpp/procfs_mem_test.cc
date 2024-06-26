@@ -33,7 +33,7 @@ TEST_P(ProcSelfMemProts, CanWriteToPrivateAnonymousMappings) {
   ASSERT_NE(mapped, MAP_FAILED) << "mmap: " << std::strerror(errno);
   auto cleanup = fit::defer([mapped, page_size]() { EXPECT_EQ(munmap(mapped, page_size), 0); });
 
-  test_helper::ScopedFD fd = test_helper::ScopedFD(open("/proc/self/mem", O_RDWR));
+  fbl::unique_fd fd = fbl::unique_fd(open("/proc/self/mem", O_RDWR));
   ASSERT_TRUE(fd.is_valid()) << "open /proc/self/mem: " << std::strerror(errno);
 
   const off_t offset = reinterpret_cast<off_t>(mapped);
