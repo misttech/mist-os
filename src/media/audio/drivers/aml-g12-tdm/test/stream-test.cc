@@ -429,11 +429,13 @@ struct AmlG12PcmOutTest : public AmlG12I2sOutTest {
     metadata_.bus = metadata::AmlBus::TDM_A;
     metadata_.ring_buffer.number_of_channels = 1;
     metadata_.lanes_enable_mask[0] = 1;
-    metadata_.dai.type = metadata::DaiType::Tdm1;
+    metadata_.dai.type = metadata::DaiType::Custom;
+    metadata_.dai.custom_sclk_on_raising = true;
+    metadata_.dai.custom_frame_sync_sclks_offset = 1;
+    metadata_.dai.custom_frame_sync_size = 1;
     metadata_.dai.number_of_channels = 1;
     metadata_.dai.bits_per_slot = 16;
     metadata_.codecs.number_of_codecs = 0;
-    metadata_.dai.sclk_on_raising = true;
     aml_audio_ = std::make_unique<AmlTdmConfigDevice>(metadata_, region.GetMmioBuffer());
   }
 };
@@ -1691,9 +1693,12 @@ struct AmlG12PcmInTest : public AmlG12I2sInTest {
     metadata_.ring_buffer.number_of_channels = 1;
     metadata_.dai.number_of_channels = 1;
     metadata_.lanes_enable_mask[0] = 1;
-    metadata_.dai.type = metadata::DaiType::Tdm1;
+    metadata_.dai.type = metadata::DaiType::Custom;
+    metadata_.dai.custom_sclk_on_raising = true;
+    metadata_.dai.custom_frame_sync_sclks_offset = 1;
+    metadata_.dai.custom_frame_sync_size = 1;
+    metadata_.dai.number_of_channels = 1;
     metadata_.dai.bits_per_slot = 16;
-    metadata_.dai.sclk_on_raising = true;
     aml_audio_ = std::make_unique<AmlTdmConfigDevice>(metadata_, region.GetMmioBuffer());
   }
 };

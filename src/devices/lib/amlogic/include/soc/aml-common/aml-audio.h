@@ -121,6 +121,7 @@ enum class DaiType : uint32_t {
   Tdm1,
   Tdm2,
   Tdm3,
+  Custom,
 };
 
 enum class SampleFormat : uint32_t {
@@ -151,7 +152,25 @@ struct Dai {
   SampleFormat sample_format;  // Defaults to PcmSigned.
   uint8_t bits_per_sample;     // If not specified (set to 0), then 16 bits.
   uint8_t bits_per_slot;       // If not specified (set to 0), then 32 bits.
-  bool sclk_on_raising;        // Invert the usual clocking out on falling edge.
+
+  // Fields below as the same as in //sdk/fidl/fuchsia.hardware.audio/dai_format.fidl
+
+  // Clocking of data samples and frame sync output on either raising or falling sclk.
+  // If true then the sclk raises on the raising edge of the data and frame sync, i.e.
+  // the data will be sampled on the falling edge of sclk (the middle of the sclk cycle).
+  // Hence, if false then data will be sampled on the raising edge of sclk.
+  // This value overrides the DaiType.
+  bool custom_sclk_on_raising;
+
+  // Number of sclks between the beginning of a frame sync change and audio samples.
+  // For example, for I2S set to 1 and for stereo left justified set to 0.
+  // This value is only applicable if DaiType is Custom.
+  int8_t custom_frame_sync_sclks_offset;
+
+  // Number of sclks the frame sync is high within a frame.
+  // For example, for I2S with 32 bits slots set to 32, for TDM usually set to 1.
+  // This value is only applicable if DaiType is Custom.
+  uint8_t custom_frame_sync_size;
 };
 
 struct Codecs {

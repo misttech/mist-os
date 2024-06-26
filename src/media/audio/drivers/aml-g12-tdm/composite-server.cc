@@ -172,11 +172,14 @@ zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, b
 
   // Vector with number_of_channels empty attributes supported in Ring Buffer
   // equal to the number of channels supported on DAI.
-  std::vector<fuchsia_hardware_audio::ChannelAttributes> attributes(
-      supported_dai_formats_[dai_index].number_of_channels()[0]);
-  fuchsia_hardware_audio::ChannelSet channel_set;
-  channel_set.attributes(std::move(attributes));
-  pcm_formats.channel_sets(std::vector{channel_set});
+  std::vector<fuchsia_hardware_audio::ChannelSet> channel_sets;
+  for (auto& number_of_channels : supported_dai_formats_[dai_index].number_of_channels()) {
+    std::vector<fuchsia_hardware_audio::ChannelAttributes> attributes(number_of_channels);
+    fuchsia_hardware_audio::ChannelSet channel_set;
+    channel_set.attributes(std::move(attributes));
+    channel_sets.emplace_back(std::move(channel_set));
+  }
+  pcm_formats.channel_sets(std::move(channel_sets));
 
   // Frame rates supported on DAI are supported in Ring Buffer.
   pcm_formats.frame_rates(supported_dai_formats_[dai_index].frame_rates());
@@ -228,21 +231,50 @@ zx_status_t AudioCompositeServer::ResetEngine(size_t index) {
   auto& dai_type = engines_[index].config.dai.type;
   using StandardFormat = fuchsia_hardware_audio::DaiFrameFormatStandard;
   using DaiType = metadata::DaiType;
-  switch (dai_format.frame_format().frame_format_standard().value()) {
-      // clang-format off
-    case StandardFormat::kI2S:        dai_type = DaiType::I2s;                 break;
-    case StandardFormat::kStereoLeft: dai_type = DaiType::StereoLeftJustified; break;
-    case StandardFormat::kTdm1:       dai_type = DaiType::Tdm1;                break;
-    case StandardFormat::kTdm2:       dai_type = DaiType::Tdm2;                break;
-    case StandardFormat::kTdm3:       dai_type = DaiType::Tdm3;                break;
-      // clang-format on
-    case StandardFormat::kNone:
-      [[fallthrough]];
-    case StandardFormat::kStereoRight:
-      [[fallthrough]];
-    default:
-      FDF_LOG(ERROR, "Frame format not supported");
+  if (dai_format.frame_format().frame_format_standard().has_value()) {
+    switch (dai_format.frame_format().frame_format_standard().value()) {
+        // clang-format off
+     case StandardFormat::kI2S:        dai_type = DaiType::I2s;                 break;
+     case StandardFormat::kStereoLeft: dai_type = DaiType::StereoLeftJustified; break;
+     case StandardFormat::kTdm1:       dai_type = DaiType::Tdm1;                break;
+     case StandardFormat::kTdm2:       dai_type = DaiType::Tdm2;                break;
+     case StandardFormat::kTdm3:       dai_type = DaiType::Tdm3;                break;
+        // clang-format on
+      case StandardFormat::kNone:
+        [[fallthrough]];
+      case StandardFormat::kStereoRight:
+        [[fallthrough]];
+      default:
+        FDF_LOG(ERROR, "Frame format not supported");
+        return ZX_ERR_NOT_SUPPORTED;
+    }
+  } else if (dai_format.frame_format().frame_format_custom().has_value()) {
+    dai_type = DaiType::Custom;
+    if (!dai_format.frame_format().frame_format_custom()->left_justified()) {
+      FDF_LOG(ERROR, "Non-left justified custom formats not supported");
       return ZX_ERR_NOT_SUPPORTED;
+    }
+    engines_[index].config.dai.custom_sclk_on_raising =
+        dai_format.frame_format().frame_format_custom()->sclk_on_raising();
+
+    engines_[index].config.dai.custom_frame_sync_sclks_offset =
+        dai_format.frame_format().frame_format_custom()->frame_sync_sclks_offset();
+    if (engines_[index].config.dai.custom_frame_sync_sclks_offset !=
+        AmlTdmConfigDevice::GetSupportedCustomFrameSyncSclksOffset()) {
+      FDF_LOG(ERROR, "Sync sclks offset not supported");
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
+    engines_[index].config.dai.custom_frame_sync_size =
+        dai_format.frame_format().frame_format_custom()->frame_sync_size();
+    if (engines_[index].config.dai.custom_frame_sync_size !=
+        AmlTdmConfigDevice::GetSupportedCustomFrameSyncSize()) {
+      FDF_LOG(ERROR, "Frame sync size not supported");
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+  } else {
+    FDF_LOG(ERROR, "No standard or custom frame format");
+    return ZX_ERR_NOT_SUPPORTED;
   }
   engines_[index].config.dai.bits_per_sample = dai_format.bits_per_sample();
   engines_[index].config.dai.bits_per_slot = dai_format.bits_per_slot();

@@ -579,11 +579,12 @@ class AmlG12CompositeTest : public testing::Test {
     ASSERT_TRUE(dai_formats_result.is_ok());
     ASSERT_EQ(1, dai_formats_result->dai_formats().size());
     auto& dai_formats = dai_formats_result->dai_formats()[0];
-    ASSERT_EQ(1, dai_formats.number_of_channels().size());
-    ASSERT_EQ(2, dai_formats.number_of_channels()[0]);
+    ASSERT_EQ(2, dai_formats.number_of_channels().size());
+    ASSERT_EQ(1, dai_formats.number_of_channels()[0]);
+    ASSERT_EQ(2, dai_formats.number_of_channels()[1]);
     ASSERT_EQ(1, dai_formats.sample_formats().size());
     ASSERT_EQ(fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned, dai_formats.sample_formats()[0]);
-    ASSERT_EQ(5, dai_formats.frame_formats().size());
+    ASSERT_EQ(7, dai_formats.frame_formats().size());
     ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                   fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
               dai_formats.frame_formats()[0]);
@@ -599,6 +600,12 @@ class AmlG12CompositeTest : public testing::Test {
     ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                   fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoLeft),
               dai_formats.frame_formats()[4]);
+    ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+                  fuchsia_hardware_audio::DaiFrameFormatCustom(true, true, 1, 1)),
+              dai_formats.frame_formats()[5]);
+    ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+                  fuchsia_hardware_audio::DaiFrameFormatCustom(true, false, 1, 1)),
+              dai_formats.frame_formats()[6]);
     ASSERT_EQ(5, dai_formats.frame_rates().size());
     ASSERT_EQ(8'000, dai_formats.frame_rates()[0]);
     ASSERT_EQ(16'000, dai_formats.frame_rates()[1]);
@@ -642,6 +649,18 @@ class AmlG12CompositeTest : public testing::Test {
     auto format = GetDefaultDaiFormat();
     format.bits_per_sample(bits_per_sample);
     format.bits_per_slot(bits_per_slot);
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_TRUE(dai_formats_result.is_ok());
+  }
+
+  void SetDaiFormatFrameFormatNumberOfChannels(uint64_t id,
+                                               fuchsia_hardware_audio::DaiFrameFormat frame_format,
+                                               uint32_t number_of_channels) {
+    auto format = GetDefaultDaiFormat();
+    format.number_of_channels(number_of_channels);
+    format.channels_to_use_bitmask((1 << number_of_channels) - 1);
+    format.frame_format(std::move(frame_format));
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
     ASSERT_TRUE(dai_formats_result.is_ok());
@@ -1014,6 +1033,37 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsValid) {
   ASSERT_EQ(0x3001'803F, platform_device_.mmio()[0x500 / 4]);
   // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 4
   ASSERT_EQ(0x3004'001F, platform_device_.mmio()[0x300 / 4]);
+
+  // Custom with sclk_on_raising=true, 1 channel.
+  SetDaiFormatFrameFormatNumberOfChannels(
+      1,
+      fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+          fuchsia_hardware_audio::DaiFrameFormatCustom(true, true, 1, 1)),
+      1);
+  // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 2
+  // (same as TDM2 for frame_sync_sclks_offset=1).
+  ASSERT_EQ(0x3001'001F, platform_device_.mmio()[0x500 / 4]);
+  // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 3
+  // (same as TDM2 for frame_sync_sclks_offset=1).
+  ASSERT_EQ(0x3003'001F, platform_device_.mmio()[0x300 / 4]);
+  // SCLK CTRL, clk in/out enabled, 24 sdiv, 1 lrduty, 16 lrdiv (1 channel).
+  ASSERT_EQ(0xc180'001f, platform_device_.mmio()[0x040 / 4]);
+  // SCLK CTRL, no clk_inv (sclk_on_raising=true)
+  ASSERT_EQ(0x0000'0000, platform_device_.mmio()[0x044 / 4]);
+
+  // Custom with sclk_on_raising=false, 2 channels.
+  SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+                                 fuchsia_hardware_audio::DaiFrameFormatCustom(true, false, 1, 1)));
+  // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 2
+  // (same as TDM2 for frame_sync_sclks_offset=1).
+  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 3
+  // (same as TDM2 for frame_sync_sclks_offset=1).
+  ASSERT_EQ(0x3003'001F, platform_device_.mmio()[0x300 / 4]);
+  // SCLK CTRL, clk in/out enabled, 24 sdiv, 1 lrduty, 32 lrdiv (2x16 bits channels).
+  ASSERT_EQ(0xc180'003f, platform_device_.mmio()[0x040 / 4]);
+  // SCLK CTRL, clk_inv ph0 (sclk_on_raising=false).
+  ASSERT_EQ(0x0000'0001, platform_device_.mmio()[0x044 / 4]);
 
   SetDaiFormatFrameRate(1, 8'000);
   EXPECT_EQ(0x8400'003b, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 60.

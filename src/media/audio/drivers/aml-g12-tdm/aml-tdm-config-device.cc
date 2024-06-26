@@ -113,9 +113,10 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& config, uint64
     case metadata::DaiType::Tdm3:
       bitoffset -= 2;
       break;
-  }
-  if (config.dai.sclk_on_raising) {
-    bitoffset--;
+
+    case metadata::DaiType::Custom:
+      bitoffset -= config.dai.custom_frame_sync_sclks_offset;
+      break;
   }
 
   // Configure lanes mute masks based on channels_to_use and lane enable mask.
@@ -193,11 +194,14 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& config, uint64
       case metadata::DaiType::Tdm3:
         frame_sync_clks = 1;
         break;
+      case metadata::DaiType::Custom:
+        frame_sync_clks = config.dai.custom_frame_sync_size;
+        break;
     }
     device_->SetSclkPad(ToSclkPadId(config.spad_sel), config.is_custom_tdm_spad_sel);
     status = device_->SetSclkDiv(config.sClockDivFactor - 1, frame_sync_clks - 1,
                                  (config.dai.bits_per_slot * config.dai.number_of_channels) - 1,
-                                 !config.dai.sclk_on_raising);
+                                 !config.dai.custom_sclk_on_raising);
     if (status != ZX_OK) {
       return status;
     }

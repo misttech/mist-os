@@ -369,8 +369,10 @@ zx_status_t Nelson::AudioInit() {
     metadata.unique_id = AUDIO_STREAM_UNIQUE_ID_BUILTIN_BT;
     metadata.bus = metadata::AmlBus::TDM_A;
     metadata.version = metadata::AmlVersion::kS905D3G;
-    metadata.dai.type = metadata::DaiType::Tdm1;
-    metadata.dai.sclk_on_raising = true;
+    metadata.dai.type = metadata::DaiType::Custom;
+    metadata.dai.custom_sclk_on_raising = true;
+    metadata.dai.custom_frame_sync_sclks_offset = 1;
+    metadata.dai.custom_frame_sync_size = 1;
     metadata.dai.bits_per_sample = 16;
     metadata.dai.bits_per_slot = 16;
     metadata.ring_buffer.number_of_channels = 1;
@@ -433,8 +435,10 @@ zx_status_t Nelson::AudioInit() {
     metadata.unique_id = AUDIO_STREAM_UNIQUE_ID_BUILTIN_BT;
     metadata.bus = metadata::AmlBus::TDM_A;
     metadata.version = metadata::AmlVersion::kS905D3G;
-    metadata.dai.type = metadata::DaiType::Tdm1;
-    metadata.dai.sclk_on_raising = true;
+    metadata.dai.type = metadata::DaiType::Custom;
+    metadata.dai.custom_sclk_on_raising = true;
+    metadata.dai.custom_frame_sync_sclks_offset = 1;
+    metadata.dai.custom_frame_sync_size = 1;
     metadata.dai.bits_per_sample = 16;
     metadata.dai.bits_per_slot = 16;
     metadata.ring_buffer.number_of_channels = 1;
