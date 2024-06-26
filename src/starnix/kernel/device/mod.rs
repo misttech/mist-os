@@ -32,6 +32,7 @@ pub mod remote_block_device;
 pub mod sync_fence_registry;
 pub mod sync_file;
 pub mod terminal;
+#[cfg(not(feature = "starnix_lite"))]
 pub mod touch_power_policy_device;
 pub mod tun;
 pub mod zram;
