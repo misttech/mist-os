@@ -6,7 +6,7 @@
 
 use alloc::collections::btree_map::Entry;
 use alloc::collections::{BTreeMap, HashMap};
-use core::fmt::Debug;
+use core::fmt::{self, Debug, Display};
 use core::num::NonZeroU8;
 use derivative::Derivative;
 use log::debug;
@@ -17,9 +17,9 @@ use netstack3_base::socket::{
 };
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, DeviceIdContext, ReferenceNotifiers, ReferenceNotifiersExt as _,
-    RemoveResourceResultWithContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
-    ZonedAddressError,
+    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, ReferenceNotifiers,
+    ReferenceNotifiersExt as _, RemoveResourceResultWithContext, StrongDeviceIdentifier,
+    WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
@@ -314,6 +314,54 @@ where
             state.hop_limits.get_limits_with_defaults(&DEFAULT_HOP_LIMITS).multicast
         })
     }
+
+    /// Provides inspect data for raw IP sockets.
+    pub fn inspect<N>(&mut self, inspector: &mut N)
+    where
+        N: Inspector
+            + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    {
+        self.core_ctx().with_socket_map_and_state_ctx(|socket_map, core_ctx| {
+            socket_map.iter_sockets().for_each(|socket| {
+                inspector.record_debug_child(socket, |node| {
+                    node.record_display("TransportProtocol", socket.protocol().proto());
+                    node.record_str("NetworkProtocol", I::NAME);
+                    // TODO(https://fxbug.dev/342579393): Support `bind`.
+                    node.record_local_socket_addr::<
+                        N,
+                        I::Addr,
+                        <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+                        NoPortMarker,
+                    >(None);
+                    // TODO(https://fxbug.dev/342577389): Support `connect`.
+                    node.record_remote_socket_addr::<
+                        N,
+                        I::Addr,
+                        <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+                        NoPortMarker,
+                    >(None);
+                    core_ctx.with_locked_state(socket, |state| {
+                        let RawIpSocketLockedState {
+                            bound_device,
+                            icmp_filter,
+                            hop_limits: _,
+                            system_checksums: _,
+                        } = state;
+                        if let Some(bound_device) = bound_device {
+                            N::record_device(node, "BoundDevice", bound_device);
+                        } else {
+                            node.record_str("BoundDevice", "None");
+                        }
+                        if let Some(icmp_filter) = icmp_filter {
+                            node.record_display("IcmpFilter", icmp_filter);
+                        } else {
+                            node.record_str("IcmpFilter", "None");
+                        }
+                    })
+                })
+            })
+        })
+    }
 }
 
 /// Errors that may occur when calling [`RawIpSocketApi::send_to`].
@@ -526,6 +574,11 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSock
         }
     }
 
+    fn iter_sockets(&self) -> impl Iterator<Item = &RawIpSocketId<I, D, BT>> {
+        let RawIpSocketMap { sockets } = self;
+        sockets.values().flat_map(|sockets_by_protocol| sockets_by_protocol.keys())
+    }
+
     fn iter_sockets_for_protocol(
         &self,
         protocol: &RawIpSocketProtocol<I>,
@@ -670,6 +723,15 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
     fn multicast_loop(&self) -> bool {
         // TODO(https://fxbug.dev/344645667): Support IP_MULTICAST_LOOP.
         false
+    }
+}
+
+/// A marker type capturing that raw IP sockets don't have ports.
+struct NoPortMarker {}
+
+impl Display for NoPortMarker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "NoPort")
     }
 }
 

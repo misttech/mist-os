@@ -22,10 +22,11 @@ use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
 use netstack_testing_common::{constants, get_inspect_data};
 use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
+use packet_formats::ip::IpProto;
 use test_case::test_case;
 use {
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
 };
 
 enum TcpSocketState {
@@ -157,8 +158,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
 
     // NB: The sockets are keyed by an opaque debug identifier; get that here.
     let sockets = data.get_child("Sockets").unwrap();
-    assert_eq!(sockets.children.len(), 1);
-    let sock_name = sockets.children[0].name.clone();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
 
     match (I::VERSION, socket_state) {
         (IpVersion::V4, TcpSocketState::Unbound) => {
@@ -357,8 +357,7 @@ async fn inspect_datagram_sockets<I: TestIpExt>(
     println!("Got inspect data: {:#?}", data);
     // NB: The sockets are keyed by an opaque debug identifier.
     let sockets = data.get_child("Sockets").unwrap();
-    assert_eq!(sockets.children.len(), 1);
-    let sock_name = sockets.children[0].name.clone();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         Sockets: {
             sock_name => {
@@ -366,6 +365,46 @@ async fn inspect_datagram_sockets<I: TestIpExt>(
                 RemoteAddress: want_remote,
                 TransportProtocol: want_proto,
                 NetworkProtocol: I::NAME,
+            },
+        }
+    })
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn inspect_raw_ip_sockets<I: TestIpExt>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+
+    // Ensure ns3 has started and that there is a Socket to collect inspect data about.
+    let _raw_socket = realm
+        .raw_socket(
+            I::DOMAIN,
+            fposix_socket_raw::ProtocolAssociation::Associated(u8::from(IpProto::Tcp)),
+        )
+        .await
+        .expect("create raw socket");
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    // NB: The sockets are keyed by an opaque debug identifier.
+    let sockets = data.get_child("Sockets").unwrap();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        Sockets: {
+            sock_name => {
+                LocalAddress: "[NOT BOUND]",
+                RemoteAddress: "[NOT CONNECTED]",
+                TransportProtocol: "TCP",
+                NetworkProtocol: I::NAME,
+                BoundDevice: "None",
+                IcmpFilter: "None",
             },
         }
     })
