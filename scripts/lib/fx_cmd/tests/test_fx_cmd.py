@@ -5,11 +5,17 @@
 import asyncio
 import pathlib
 import tempfile
+import typing
 import unittest
 import unittest.mock as mock
 
 import fx_cmd
-from async_utils.command import StderrEvent, StdoutEvent
+from async_utils.command import (
+    CommandEvent,
+    CommandOutput,
+    StderrEvent,
+    StdoutEvent,
+)
 
 real_subprocess_exec = asyncio.create_subprocess_exec
 
@@ -18,16 +24,15 @@ class TestFxCmd(unittest.TestCase):
     @mock.patch.dict("os.environ", {"FUCHSIA_BUILD_DIR": "/tmp/fuchsia/global"})
     def test_command_line(self) -> None:
         """command line respects build directory specification"""
-        cmd = fx_cmd.FxCmd("format-code")
+        cmd = fx_cmd.FxCmd()
         self.assertEqual(
-            cmd.command_line,
+            cmd.command_line("format-code"),
             ["fx", "--dir", "/tmp/fuchsia/global", "format-code"],
         )
-        cmd = fx_cmd.FxCmd(
-            "format-code", build_directory=pathlib.Path("/fuchsia")
-        )
+        cmd = fx_cmd.FxCmd(build_directory=pathlib.Path("/fuchsia"))
         self.assertEqual(
-            cmd.command_line, ["fx", "--dir", "/fuchsia", "format-code"]
+            cmd.command_line("format-code"),
+            ["fx", "--dir", "/fuchsia", "format-code"],
         )
 
     # This mock captures the --dir argument to an `fx` command and lists
@@ -54,8 +59,8 @@ class TestFxCmd(unittest.TestCase):
             def callback(x: StdoutEvent) -> None:
                 lines.append(x.text.decode(errors="ignore").strip())
 
-            result = fx_cmd.FxCmd("build", build_directory=path).sync(
-                stdout_callback=callback
+            result = fx_cmd.FxCmd(build_directory=path).sync(
+                "build", stdout_callback=callback
             )
             self.assertEqual(result.return_code, 0)
 
@@ -83,9 +88,48 @@ class TestFxCmd(unittest.TestCase):
         def callback(x: StderrEvent) -> None:
             lines.append(x.text.decode(errors="ignore").strip())
 
-        result = fx_cmd.FxCmd(
-            "build", build_directory=pathlib.Path("/missing")
-        ).sync(stderr_callback=callback)
+        result = fx_cmd.FxCmd(build_directory=pathlib.Path("/missing")).sync(
+            "build", stderr_callback=callback
+        )
         self.assertNotEqual(result.return_code, 0)
 
         self.assertNotEqual(lines, [])
+
+
+class TestCommandTransformers(unittest.TestCase):
+    class OutputCountTransformer(fx_cmd.CommandTransformer[str, int]):
+        """Simple transformer that counts the number of lines in a test execution."""
+
+        def _handle_event(
+            self, event: CommandEvent, callback: typing.Callable[[str], None]
+        ) -> None:
+            if isinstance(event, StdoutEvent):
+                callback(event.text.decode(errors="ignore").strip())
+
+        def _to_output(self, output: CommandOutput) -> int:
+            return output.stdout.count("\n")
+
+    @mock.patch(
+        "asyncio.subprocess.create_subprocess_exec",
+        mock.Mock(
+            side_effect=lambda *args, **kwargs: real_subprocess_exec(
+                "ls", args[2], **kwargs
+            ),
+        ),
+    )
+    def test_counting_transformer(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            path = pathlib.Path(td)
+            f1 = path / "foo.txt"
+            f2 = path / "bar.txt"
+            f1.touch()
+            f2.touch()
+
+            lines: list[str] = []
+
+            result = self.OutputCountTransformer(
+                "ignored", inner=fx_cmd.FxCmd(build_directory=path)
+            ).sync(event_callback=lambda x: lines.append(x))
+            self.assertEqual(result, 2)
+
+            self.assertSetEqual(set(lines), {"bar.txt", "foo.txt"})

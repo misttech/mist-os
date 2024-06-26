@@ -4,6 +4,8 @@
 
 import asyncio
 import typing
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 
 from async_utils.command import (
@@ -16,26 +18,60 @@ from async_utils.command import (
 from build_dir import get_build_directory
 
 
-class FxCmd:
+class ExecutableCommand(ABC):
+    """Abstract base class for wrappers that can asynchronously execute."""
+
+    @abstractmethod
+    async def start(self, *args: str) -> AsyncCommand:
+        """Start this command with the given arguments.
+
+        Returns:
+            AsyncCommand: Wrapper for the started command.
+        """
+
+
+class SynchronousCommand(ABC):
+    """Abstract base class for wrappers that can execute synchronously."""
+
+    @abstractmethod
+    def sync(
+        self,
+        *args: str,
+        stdout_callback: typing.Callable[[StdoutEvent], None] | None = None,
+        stderr_callback: typing.Callable[[StderrEvent], None] | None = None,
+    ) -> CommandOutput:
+        """Run the command with the given arguments to completion synchronously.
+
+        Args:
+            stdout_callback (typing.Callable[[StdoutEvent], None] | None, optional): If set, receives one message per line of stdout.
+            stderr_callback (typing.Callable[[StderrEvent], None] | None, optional): If set, receives one message per line of stderr.
+
+        Returns:
+            CommandOutput: The result of running the command to completion.
+        """
+
+
+class FxCmd(ExecutableCommand, SynchronousCommand):
     """Wrapper for executing `fx` commands through Python.
 
     Usage (async):
-        execution = FxCmd("build", timeout=30.0).start()
+        execution = FxCmd(timeout=30.0).start("build")
         result = await execution.run_to_completion()
 
     Usage (sync):
         def callback(line: StdoutEvent):
           print(line.text)
-        FxCmd("build", timeout=30.0).sync(stdout_callback=callback)
+        FxCmd(timeout=30.0).sync("build", stdout_callback=callback)
     """
 
     def __init__(
         self,
-        *args: str,
-        build_directory: Path | None = None,
+        build_directory: str | Path | None = None,
         timeout: float | None = None,
     ):
         """Entry-point for running `fx` commands.
+
+        This creates and configures a wrapper for running any fx command.
 
         Args:
             build_directory (Path | None, optional): If set, use
@@ -44,20 +80,20 @@ class FxCmd:
             timeout (float | None, optional): Timeout for the command
                 in seconds. Default is no timeout.
         """
-        self._argss: list[str] = list(args)
-        self._build_directory: Path | None = build_directory
+        if build_directory is not None:
+            build_directory = str(build_directory)
+        self._build_directory: str | None = build_directory
         self._timeout: float | None = timeout
 
-    @property
-    def command_line(self) -> list[str]:
-        """The formatted command line this command will execute."""
+    def command_line(self, *args: str) -> list[str]:
+        """The formatted command line this command will execute for the given args."""
         build_directory = self._build_directory
         if build_directory is None:
-            build_directory = get_build_directory()
+            build_directory = str(get_build_directory())
 
-        return ["fx", "--dir", str(build_directory)] + self._argss
+        return ["fx", "--dir", build_directory] + list(args)
 
-    async def start(self) -> AsyncCommand:
+    async def start(self, *args: str) -> AsyncCommand:
         """Start an invocation of fx asynchronously.
 
         The returned command can be iterated over for output of the
@@ -67,13 +103,14 @@ class FxCmd:
         Returns:
             AsyncCommand: An asynchronously running invocation of fx.
         """
-        args = self.command_line
+        new_args = self.command_line(*args)
         return await AsyncCommand.create(
-            args[0], *args[1:], timeout=self._timeout
+            new_args[0], *new_args[1:], timeout=self._timeout
         )
 
     def sync(
         self,
+        *args: str,
         stdout_callback: typing.Callable[[StdoutEvent], None] | None = None,
         stderr_callback: typing.Callable[[StderrEvent], None] | None = None,
     ) -> CommandOutput:
@@ -94,9 +131,127 @@ class FxCmd:
                 stderr_callback(event)
 
         async def operation() -> CommandOutput:
-            running_command = await self.start()
+            running_command = await self.start(*args)
             return await running_command.run_to_completion(
                 callback=local_callback
             )
 
         return asyncio.run(operation())
+
+
+EventType = typing.TypeVar("EventType")
+ReturnType = typing.TypeVar("ReturnType")
+
+
+class QueueFinished:
+    """Sentinel value to determine a queue is finished."""
+
+
+@dataclass
+class RunningCommand(typing.Generic[EventType, ReturnType]):
+    """Container for the output of a running command."""
+
+    # The command being executed.
+    command: AsyncCommand
+
+    # Task computing the result of the command execution.
+    # This must be awaited.
+    result: asyncio.Task[ReturnType]
+
+    # Queue of events during the execution of the command.
+    events: asyncio.Queue[EventType | QueueFinished]
+
+
+class CommandTransformer(typing.Generic[EventType, ReturnType], ABC):
+    """Generic transformer of command output."""
+
+    def __init__(self, *args: str, inner: ExecutableCommand):
+        """Create a transformer that executes a command with the given args
+        and configured executor.
+
+        Args:
+            inner (ExecutableCommand): A configured wrapper around running
+                a command.
+        """
+        self._args: list[str] = list(args)
+        self._inner: ExecutableCommand = inner
+
+    async def start(self) -> RunningCommand[EventType, ReturnType]:
+        """Start the command asynchronously.
+
+        Returns:
+            RunningCommand[EventType, ReturnType]: Control object for the command.
+        """
+        cmd = await self._inner.start(*self._args)
+        events = asyncio.Queue[EventType | QueueFinished]()
+
+        async def task() -> ReturnType:
+            def do_event_add(event: EventType) -> None:
+                events.put_nowait(event)
+
+            def event_callback(event: CommandEvent) -> None:
+                self._handle_event(event, do_event_add)
+
+            final = await cmd.run_to_completion(callback=event_callback)
+            events.put_nowait(QueueFinished())
+            return self._to_output(final)
+
+        t = asyncio.create_task(task())
+        return RunningCommand(cmd, t, events)
+
+    def sync(
+        self, event_callback: typing.Callable[[EventType], None] | None = None
+    ) -> ReturnType:
+        """Run the command to completion synchronously.
+
+        Args:
+            event_callback (typing.Callable[[EventType], None] | None, optional):
+            Optional receiver for bespoke command events.
+
+        Returns:
+            ReturnType: The return value for the wrapped command.
+        """
+
+        async def task() -> ReturnType:
+            running_command = await self.start()
+
+            async def drain_events() -> None:
+                while event := await running_command.events.get():
+                    if isinstance(event, QueueFinished):
+                        return
+
+                    if event_callback is not None:
+                        event_callback(event)
+
+            res = await asyncio.gather(running_command.result, drain_events())
+            return res[0]
+
+        return asyncio.run(task())
+
+    def _handle_event(
+        self, event: CommandEvent, callback: typing.Callable[[EventType], None]
+    ) -> None:
+        """Optional method to override to convert command output into events.
+
+        Args:
+            event (CommandEvent): The incoming event.
+            callback (typing.Callable[[EventType], None]): A callback
+                to publish a new event in the bespoke event type for
+                this transformer.
+        """
+        pass
+
+    @abstractmethod
+    def _to_output(
+        self,
+        output: CommandOutput,
+    ) -> ReturnType:
+        """Abstract method that must be implemented to turn command
+        output into the declared return type.
+
+        Args:
+            output (CommandOutput): Output of the command.
+
+        Returns:
+            ReturnType: The output of the command.
+        """

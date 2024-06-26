@@ -25,7 +25,7 @@ if (is_host) {
 
     main_source = "tests/test_fx_cmd.py"
     sources = [ "tests/test_fx_cmd.py" ]
-
+    extra_args = [ "-v" ]
     libraries = [ ":fx_cmd" ]
   }
 }
