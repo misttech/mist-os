@@ -4,7 +4,7 @@
 
 use fuchsia_inspect::Node;
 use fuchsia_inspect_contrib::nodes::NodeExt;
-use fuchsia_inspect_derive::{Inspect, Unit, WithInspect};
+use fuchsia_inspect_derive::Unit;
 
 /// A Inspect node that holds a mapping of ID to data. The list of IDs is limited
 /// to between 0 and `capacity - 1`. Each item is recorded with the current
@@ -46,7 +46,7 @@ impl<T: Unit> InspectBoundedSetNode<T> {
     /// If the item had already exited in the node, this operation is a no-op.
     /// Otherwise, either a new entry is created (if an ID is still available),
     /// or the oldest entry is evicted to make room for the new item.
-    pub fn record_item(&mut self, mut item: T) -> u64 {
+    pub fn record_item(&mut self, item: T) -> u64 {
         for (i, (recorded_item, _node, _data)) in self.items.iter().enumerate() {
             if (self.eq_fn)(&item, recorded_item) {
                 return i as u64;
@@ -75,7 +75,6 @@ mod tests {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyNumericProperty};
     use fuchsia_inspect::Inspector;
-    use fuchsia_inspect_derive::IValue;
 
     #[fuchsia::test]
     fn test_record_items() {

@@ -21,5 +21,15 @@
             from: "#wlandevicemonitor",
             to: "#wlanix",
         },
+        {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "#cobalt",
+            to: "#wlanix",
+        },
+        {
+            protocol: "fuchsia.diagnostics.persist.DataPersistence-wlan",
+            from: "#diagnostics",
+            to: "#wlanix",
+        },
     ],
 }
