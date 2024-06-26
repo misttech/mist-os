@@ -10,6 +10,7 @@ use diagnostics_data::{self as schema, InspectHandleName};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_inspect::TreeProxy;
+use flyweights::FlyStr;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
 use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -24,7 +25,7 @@ use {fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as depre
 
 #[derive(Debug, Clone)]
 pub enum InspectHandle {
-    Tree { proxy: TreeProxy, name: Option<InspectHandleName> },
+    Tree { proxy: TreeProxy, name: Option<FlyStr> },
     Directory { proxy: fio::DirectoryProxy },
 }
 
@@ -55,7 +56,7 @@ impl InspectHandle {
     }
 
     pub fn from_named_tree_proxy(proxy: TreeProxy, name: Option<String>) -> Self {
-        InspectHandle::Tree { proxy, name: name.map(InspectHandleName::name) }
+        InspectHandle::Tree { proxy, name: name.map(FlyStr::from) }
     }
 
     pub fn is_tree(&self) -> bool {
