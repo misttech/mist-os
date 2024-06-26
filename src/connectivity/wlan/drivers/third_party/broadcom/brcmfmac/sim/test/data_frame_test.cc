@@ -112,18 +112,13 @@ class DataFrameTest;
 
 class DataFrameInterface : public SimInterface {
  public:
-  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                 DeauthIndCompleter::Sync& completer) override;
-  void ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
-                   ConnectConfCompleter::Sync& completer) override;
-  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
-                   DisassocIndCompleter::Sync& completer) override;
-  void EapolConf(EapolConfRequestView request, fdf::Arena& arena,
-                 EapolConfCompleter::Sync& completer) override;
-  void SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+  void DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) override;
+  void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override;
+  void DisassocInd(DisassocIndRequestView request, DisassocIndCompleter::Sync& completer) override;
+  void EapolConf(EapolConfRequestView request, EapolConfCompleter::Sync& completer) override;
+  void SignalReport(SignalReportRequestView request,
                     SignalReportCompleter::Sync& completer) override;
-  void EapolInd(EapolIndRequestView request, fdf::Arena& arena,
-                EapolIndCompleter::Sync& completer) override;
+  void EapolInd(EapolIndRequestView request, EapolIndCompleter::Sync& completer) override;
 
   DataFrameTest* test_;
 };
@@ -240,35 +235,34 @@ class DataFrameTest : public SimTest {
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
 };
 
-void DataFrameInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+void DataFrameInterface::DeauthInd(DeauthIndRequestView request,
                                    DeauthIndCompleter::Sync& completer) {
   test_->OnDeauthInd(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void DataFrameInterface::ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
+void DataFrameInterface::ConnectConf(ConnectConfRequestView request,
                                      ConnectConfCompleter::Sync& completer) {
   test_->OnConnectConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void DataFrameInterface::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+void DataFrameInterface::DisassocInd(DisassocIndRequestView request,
                                      DisassocIndCompleter::Sync& completer) {
   test_->OnDisassocInd(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void DataFrameInterface::EapolConf(EapolConfRequestView request, fdf::Arena& arena,
+void DataFrameInterface::EapolConf(EapolConfRequestView request,
                                    EapolConfCompleter::Sync& completer) {
   test_->OnEapolConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void DataFrameInterface::SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+void DataFrameInterface::SignalReport(SignalReportRequestView request,
                                       SignalReportCompleter::Sync& completer) {
   test_->OnSignalReport(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void DataFrameInterface::EapolInd(EapolIndRequestView request, fdf::Arena& arena,
-                                  EapolIndCompleter::Sync& completer) {
+void DataFrameInterface::EapolInd(EapolIndRequestView request, EapolIndCompleter::Sync& completer) {
   test_->OnEapolInd(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
 // Create our device instance and hook up the callbacks

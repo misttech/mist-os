@@ -77,21 +77,16 @@ const int8_t kDefaultSimFwRssi = -20;
 class ConnectTest;
 class ConnectInterface : public SimInterface {
  public:
-  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+  void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override;
-  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                 OnScanEndCompleter::Sync& completer) override;
-  void ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
-                   ConnectConfCompleter::Sync& completer) override;
-  void DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+  void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override;
+  void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override;
+  void DisassocConf(DisassocConfRequestView request,
                     DisassocConfCompleter::Sync& completer) override;
-  void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
-                  DeauthConfCompleter::Sync& completer) override;
-  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                 DeauthIndCompleter::Sync& completer) override;
-  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
-                   DisassocIndCompleter::Sync& completer) override;
-  void SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+  void DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) override;
+  void DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) override;
+  void DisassocInd(DisassocIndRequestView request, DisassocIndCompleter::Sync& completer) override;
+  void SignalReport(SignalReportRequestView request,
                     SignalReportCompleter::Sync& completer) override;
 
   ConnectTest* test_;
@@ -240,45 +235,45 @@ class ConnectTest : public SimTest {
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
 };
 
-void ConnectInterface::OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+void ConnectInterface::OnScanResult(OnScanResultRequestView request,
                                     OnScanResultCompleter::Sync& completer) {
   // Ignore and reply.
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
+void ConnectInterface::OnScanEnd(OnScanEndRequestView request,
                                  OnScanEndCompleter::Sync& completer) {
   // Ignore and reply.
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
+void ConnectInterface::ConnectConf(ConnectConfRequestView request,
                                    ConnectConfCompleter::Sync& completer) {
   test_->OnConnectConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+void ConnectInterface::DisassocConf(DisassocConfRequestView request,
                                     DisassocConfCompleter::Sync& completer) {
   test_->OnDisassocConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
+void ConnectInterface::DeauthConf(DeauthConfRequestView request,
                                   DeauthConfCompleter::Sync& completer) {
   test_->OnDeauthConf(request);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+void ConnectInterface::DeauthInd(DeauthIndRequestView request,
                                  DeauthIndCompleter::Sync& completer) {
   test_->OnDeauthInd(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+void ConnectInterface::DisassocInd(DisassocIndRequestView request,
                                    DisassocIndCompleter::Sync& completer) {
   test_->OnDisassocInd(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+void ConnectInterface::SignalReport(SignalReportRequestView request,
                                     SignalReportCompleter::Sync& completer) {
   test_->OnSignalReport(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
 void ConnectTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,

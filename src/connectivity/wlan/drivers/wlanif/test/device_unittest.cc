@@ -76,142 +76,124 @@ rust_wlan_fullmac_ifc_protocol_ops_copy_t EmptyRustProtoOps() {
   };
 }
 
-class FakeFullmacParent : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImpl> {
+class FakeFullmacParent : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacImpl> {
  public:
-  void ServiceConnectHandler(fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) {
-    fdf::BindServer(fdf_dispatcher_get_current_dispatcher(), std::move(server_end), this);
+  void ServiceConnectHandler(fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) {
+    fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server_end),
+                     this);
   }
   FakeFullmacParent() { memcpy(peer_sta_addr_, kPeerStaAddress, ETH_ALEN); }
-  void Start(StartRequestView request, fdf::Arena& arena,
-             StartCompleter::Sync& completer) override {
+  void Start(StartRequestView request, StartCompleter::Sync& completer) override {
     client_ =
-        fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(std::move(request->ifc));
+        fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(std::move(request->ifc));
 
     // Create and send a mock channel up here since the sme_channel field is required in the reply
     // of Start().
     auto [local, remote] = make_channel();
-    completer.buffer(arena).ReplySuccess(std::move(local));
+    completer.ReplySuccess(std::move(local));
   }
-  void Stop(fdf::Arena& arena, StopCompleter::Sync& completer) override {}
-  void Query(fdf::Arena& arena, QueryCompleter::Sync& completer) override {
+  void Stop(StopCompleter::Sync& completer) override {}
+  void Query(QueryCompleter::Sync& completer) override {
     fuchsia_wlan_fullmac::wire::WlanFullmacQueryInfo info = {};
     info.role = fuchsia_wlan_common::wire::WlanMacRole::kClient;
     info.band_cap_count = 0;
-    completer.buffer(arena).ReplySuccess(info);
+    completer.ReplySuccess(info);
   }
-  void QueryMacSublayerSupport(fdf::Arena& arena,
-                               QueryMacSublayerSupportCompleter::Sync& completer) override {
+  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
     fuchsia_wlan_common::wire::MacSublayerSupport mac_sublayer_support;
     mac_sublayer_support.data_plane.data_plane_type = data_plane_type_;
     mac_sublayer_support.device.mac_implementation_type =
         fuchsia_wlan_common::wire::MacImplementationType::kFullmac;
-    completer.buffer(arena).ReplySuccess(mac_sublayer_support);
+    completer.ReplySuccess(mac_sublayer_support);
   }
-  void QuerySecuritySupport(fdf::Arena& arena,
-                            QuerySecuritySupportCompleter::Sync& completer) override {}
+  void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {}
   void QuerySpectrumManagementSupport(
-      fdf::Arena& arena, QuerySpectrumManagementSupportCompleter::Sync& completer) override {}
-  void StartScan(StartScanRequestView request, fdf::Arena& arena,
-                 StartScanCompleter::Sync& completer) override {
+      QuerySpectrumManagementSupportCompleter::Sync& completer) override {}
+  void StartScan(StartScanRequestView request, StartScanCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_scan_type(), true);
     EXPECT_EQ(request->has_channels(), true);
     EXPECT_EQ(request->has_min_channel_time(), true);
     EXPECT_EQ(request->has_max_channel_time(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void Connect(ConnectRequestView request, fdf::Arena& arena,
-               ConnectCompleter::Sync& completer) override {
+  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_selected_bss(), true);
     EXPECT_EQ(request->has_auth_type(), true);
     EXPECT_EQ(request->has_connect_failure_timeout(), true);
     EXPECT_EQ(request->has_security_ie(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void Reconnect(ReconnectRequestView request, fdf::Arena& arena,
-                 ReconnectCompleter::Sync& completer) override {
+  void Reconnect(ReconnectRequestView request, ReconnectCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_peer_sta_address(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void AuthResp(AuthRespRequestView request, fdf::Arena& arena,
-                AuthRespCompleter::Sync& completer) override {
+  void AuthResp(AuthRespRequestView request, AuthRespCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_peer_sta_address(), true);
     EXPECT_EQ(request->has_result_code(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void Deauth(DeauthRequestView request, fdf::Arena& arena,
-              DeauthCompleter::Sync& completer) override {
+  void Deauth(DeauthRequestView request, DeauthCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_peer_sta_address(), true);
     EXPECT_EQ(request->has_reason_code(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void AssocResp(AssocRespRequestView request, fdf::Arena& arena,
-                 AssocRespCompleter::Sync& completer) override {
+  void AssocResp(AssocRespRequestView request, AssocRespCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_peer_sta_address(), true);
     EXPECT_EQ(request->has_result_code(), true);
     EXPECT_EQ(request->has_association_id(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void Disassoc(DisassocRequestView request, fdf::Arena& arena,
-                DisassocCompleter::Sync& completer) override {
+  void Disassoc(DisassocRequestView request, DisassocCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_peer_sta_address(), true);
     EXPECT_EQ(request->has_reason_code(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void Reset(ResetRequestView request, fdf::Arena& arena,
-             ResetCompleter::Sync& completer) override {
+  void Reset(ResetRequestView request, ResetCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_sta_address(), true);
     EXPECT_EQ(request->has_set_default_mib(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void StartBss(StartBssRequestView request, fdf::Arena& arena,
-                StartBssCompleter::Sync& completer) override {
+  void StartBss(StartBssRequestView request, StartBssCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_beacon_period(), true);
     EXPECT_EQ(request->has_bss_type(), true);
     EXPECT_EQ(request->has_channel(), true);
     EXPECT_EQ(request->has_dtim_period(), true);
     EXPECT_EQ(request->has_ssid(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void StopBss(StopBssRequestView request, fdf::Arena& arena,
-               StopBssCompleter::Sync& completer) override {
+  void StopBss(StopBssRequestView request, StopBssCompleter::Sync& completer) override {
     EXPECT_EQ(request->has_ssid(), true);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void SetKeysReq(SetKeysReqRequestView request, fdf::Arena& arena,
-                  SetKeysReqCompleter::Sync& completer) override {
+  void SetKeysReq(SetKeysReqRequestView request, SetKeysReqCompleter::Sync& completer) override {
     EXPECT_GE(request->req.num_keys, 1ul);
     fuchsia_wlan_fullmac::wire::WlanFullmacSetKeysResp resp = {};
     resp.num_keys = request->req.num_keys;
-    completer.buffer(arena).Reply(resp);
+    completer.Reply(resp);
   }
-  void DelKeysReq(DelKeysReqRequestView request, fdf::Arena& arena,
-                  DelKeysReqCompleter::Sync& completer) override {
+  void DelKeysReq(DelKeysReqRequestView request, DelKeysReqCompleter::Sync& completer) override {
     EXPECT_GE(request->req.num_keys, 1ul);
     del_key_request_received_ = true;
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void EapolTx(EapolTxRequestView request, fdf::Arena& arena,
-               EapolTxCompleter::Sync& completer) override {
+  void EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& completer) override {
     EXPECT_GE(request->data().count(), 1ul);
     eapol_tx_request_received_ = true;
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void GetIfaceCounterStats(fdf::Arena& arena,
-                            GetIfaceCounterStatsCompleter::Sync& completer) override {}
-  void GetIfaceHistogramStats(fdf::Arena& arena,
-                              GetIfaceHistogramStatsCompleter::Sync& completer) override {}
-  void SetMulticastPromisc(SetMulticastPromiscRequestView request, fdf::Arena& arena,
+  void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override {}
+  void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override {}
+  void SetMulticastPromisc(SetMulticastPromiscRequestView request,
                            SetMulticastPromiscCompleter::Sync& completer) override {}
-  void SaeHandshakeResp(SaeHandshakeRespRequestView request, fdf::Arena& arena,
+  void SaeHandshakeResp(SaeHandshakeRespRequestView request,
                         SaeHandshakeRespCompleter::Sync& completer) override {}
-  void SaeFrameTx(SaeFrameTxRequestView request, fdf::Arena& arena,
-                  SaeFrameTxCompleter::Sync& completer) override {}
-  void WmmStatusReq(fdf::Arena& arena, WmmStatusReqCompleter::Sync& completer) override {}
-  void OnLinkStateChanged(OnLinkStateChangedRequestView request, fdf::Arena& arena,
+  void SaeFrameTx(SaeFrameTxRequestView request, SaeFrameTxCompleter::Sync& completer) override {}
+  void WmmStatusReq(WmmStatusReqCompleter::Sync& completer) override {}
+  void OnLinkStateChanged(OnLinkStateChangedRequestView request,
                           OnLinkStateChangedCompleter::Sync& completer) override {
     EXPECT_EQ(request->online, expected_online_);
     link_state_changed_called_ = true;
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
 
   void SendDeauthConf() {
@@ -299,7 +281,7 @@ class FakeFullmacParent : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullm
   bool GetEapolTxRequestReceived() { return eapol_tx_request_received_; }
 
   // Client to fire WlanFullmacImplIfc FIDL requests to wlanif driver.
-  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> client_;
+  fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> client_;
 
   fuchsia_wlan_common::wire::DataPlaneType data_plane_type_ =
       fuchsia_wlan_common::wire::DataPlaneType::kGenericNetworkDevice;
@@ -329,7 +311,7 @@ class WlanifDeviceTest : public ::testing::Test {
     EXPECT_EQ(ZX_OK, init_result.status_value());
 
     auto wlanfullmacimpl =
-        [this](fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) {
+        [this](fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) {
           fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::ServiceConnectHandler,
                                             std::move(server_end));
         };

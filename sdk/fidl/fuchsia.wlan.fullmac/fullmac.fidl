@@ -506,9 +506,15 @@ closed protocol WlanFullmacImplIfcBridge {
 };
 
 @discoverable
-@transport("Driver")
-@banjo_layout("ddk-interface")
 closed protocol WlanFullmacImplIfc {
+    compose WlanFullmacImplIfcBase;
+};
+
+// TODO(https://g-issues.fuchsia.dev/313442116): This is needed to continue generating
+// the Banjo bindings and will be removed after the Banjo FFI is fully removed.
+@transport("Banjo")
+@layout("ddk_interface")
+closed protocol WlanFullmacImplIfcBanjo {
     compose WlanFullmacImplIfcBase;
 };
 
@@ -684,7 +690,6 @@ closed protocol WlanFullmacImplBridge {
 };
 
 @discoverable
-@transport("Driver")
 closed protocol WlanFullmacImpl {
     compose WlanFullmacImplBase;
 
@@ -694,7 +699,6 @@ closed protocol WlanFullmacImpl {
         sme_channel zx.Handle:CHANNEL;
     }) error zx.Status;
 };
-
 
 service Service {
     wlan_fullmac_impl client_end:WlanFullmacImpl;

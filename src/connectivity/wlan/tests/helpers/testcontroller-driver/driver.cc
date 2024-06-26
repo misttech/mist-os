@@ -25,20 +25,18 @@ namespace wlan_testcontroller {
 using ::wlan::drivers::fidl_bridge::FidlErrorToStatus;
 using ::wlan::drivers::fidl_bridge::ForwardResult;
 
-// Server that forwards calls from WlanFullmacImplIfcChannel to WlanFullmacImplIfc.
+// Server that forwards WlanFullmacImplIfc calls from the test suite to wlanif.
 class WlanFullmacImplIfcToDriverBridge
     : public fidl::Server<fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge> {
-  using WlanFullmacImplIfcBridge = fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge;
   using WlanFullmacImplIfc = fuchsia_wlan_fullmac::WlanFullmacImplIfc;
 
  public:
   explicit WlanFullmacImplIfcToDriverBridge(
-      fdf_dispatcher_t* driver_dispatcher,
+      async_dispatcher_t* async_dispatcher,
       fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge> server_end,
-      fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc> bridge_client_end)
-      : binding_(fdf_dispatcher_get_async_dispatcher(driver_dispatcher), std::move(server_end),
-                 this, fidl::kIgnoreBindingClosure),
-        bridge_client_(std::move(bridge_client_end), driver_dispatcher) {
+      fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc> bridge_client_end)
+      : binding_(async_dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure),
+        bridge_client_(std::move(bridge_client_end), async_dispatcher) {
     WLAN_TRACE_DURATION();
   }
 
@@ -138,27 +136,25 @@ class WlanFullmacImplIfcToDriverBridge
 
  private:
   fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfcBridge> binding_;
-  fdf::Client<fuchsia_wlan_fullmac::WlanFullmacImplIfc> bridge_client_;
+  fidl::Client<fuchsia_wlan_fullmac::WlanFullmacImplIfc> bridge_client_;
 };
 
-// Server that forwards calls from WlanFullmacImpl to WlanFullmacImplBridge.
-class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::WlanFullmacImpl> {
+// Server that forwards WlanFullmacImpl calls from wlanif to the test suite.
+class WlanFullmacImplToChannelBridge : public fidl::Server<fuchsia_wlan_fullmac::WlanFullmacImpl> {
  private:
   using WlanFullmacImplBridge = fuchsia_wlan_fullmac::WlanFullmacImplBridge;
 
  public:
   explicit WlanFullmacImplToChannelBridge(
-      fdf_dispatcher_t* driver_dispatcher,
-      fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end,
+      async_dispatcher_t* async_dispatcher,
+      fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end,
       fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImplBridge> bridge_client_end,
       fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_client_end)
-      : binding_(driver_dispatcher, std::move(server_end), this,
+      : binding_(async_dispatcher, std::move(server_end), this,
                  std::mem_fn(&WlanFullmacImplToChannelBridge::OnUnbind)),
-        bridge_client_(std::move(bridge_client_end),
-                       fdf_dispatcher_get_async_dispatcher(driver_dispatcher)),
-        driver_dispatcher_(driver_dispatcher),
-        controller_(std::move(controller_client_end),
-                    fdf_dispatcher_get_async_dispatcher(driver_dispatcher_)) {
+        bridge_client_(std::move(bridge_client_end), async_dispatcher),
+        async_dispatcher_(async_dispatcher),
+        controller_(std::move(controller_client_end), async_dispatcher_) {
     WLAN_TRACE_DURATION();
   }
 
@@ -193,7 +189,7 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
 
     // Create and bind fic bridge server.
     ifc_bridge_server_ = std::make_unique<WlanFullmacImplIfcToDriverBridge>(
-        driver_dispatcher_, std::move(endpoints->server), std::move(request.ifc()));
+        async_dispatcher_, std::move(endpoints->server), std::move(request.ifc()));
 
     bridge_client_->Start(std::move(endpoints->client))
         .Then([completer = completer.ToAsync()](
@@ -340,11 +336,10 @@ class WlanFullmacImplToChannelBridge : public fdf::Server<fuchsia_wlan_fullmac::
   }
 
  private:
-  fdf::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImpl> binding_;
+  fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImpl> binding_;
   fidl::Client<fuchsia_wlan_fullmac::WlanFullmacImplBridge> bridge_client_;
-  fdf_dispatcher_t* driver_dispatcher_{};
+  async_dispatcher_t* async_dispatcher_{};
   std::unique_ptr<WlanFullmacImplIfcToDriverBridge> ifc_bridge_server_;
-
   fidl::Client<fuchsia_driver_framework::NodeController> controller_;
 
   // Callback that runs when the bridge server is unbound.
@@ -418,9 +413,7 @@ class TestController : public fdf::DriverBase,
     auto protocol_handler =
         [this, async_completer, id, bridge_client = std::move(request.bridge_client()),
          controller_client = std::move(controller_endpoints->client)](
-            fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) mutable {
-          WLAN_LAMBDA_TRACE_DURATION("WlanFullmacImpl::Service protocol handler");
-
+            fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) mutable {
           // It's assumed that this protocol handler runs exactly once, meaning that each call to
           // CreateFullmac should result in exactly one call to this protocol handler.
           // It's also assumed that this protocol handler runs on the same dispatcher as
@@ -433,7 +426,7 @@ class TestController : public fdf::DriverBase,
           // exist. This ensures that once this callback runs we can drop async_completer.
           ZX_ASSERT(async_completer && async_completer.use_count() == 1);
 
-          fullmac_bridges_.try_emplace(id, driver_dispatcher()->get(), std::move(server_end),
+          fullmac_bridges_.try_emplace(id, dispatcher(), std::move(server_end),
                                        std::move(bridge_client), std::move(controller_client));
           async_completer->Reply(zx::ok(id));
           async_completer.reset();

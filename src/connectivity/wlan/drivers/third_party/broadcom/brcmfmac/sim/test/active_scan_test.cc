@@ -38,15 +38,14 @@ struct ApInfo {
 
 struct ClientIfc : public SimInterface {
  public:
-  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+  void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override {
     on_scan_result_(&request->result);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                 OnScanEndCompleter::Sync& completer) override {
+  void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override {
     on_scan_end_(&request->end);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
 
   std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult*)> on_scan_result_;
@@ -153,7 +152,7 @@ void ActiveScanTest::StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80
 
 // Tell the DUT to run a scan
 void ActiveScanTest::StartScan(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req) {
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->StartScan(*req);
+  ASSERT_OK(client_ifc_.client_->StartScan(*req));
 }
 
 // Called when simulation time has run out. Takes down all fake APs and the simulated DUT.

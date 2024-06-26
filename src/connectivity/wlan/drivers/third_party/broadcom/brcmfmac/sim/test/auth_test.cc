@@ -79,25 +79,23 @@ class AuthTest;
 
 class AuthInterface : public SimInterface {
  public:
-  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+  void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override {
     on_scan_result_(&request->result);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
-                   ConnectConfCompleter::Sync& completer) override {
+  void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override {
     on_connect_confirm_(&request->resp);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void SaeHandshakeInd(SaeHandshakeIndRequestView request, fdf::Arena& arena,
+  void SaeHandshakeInd(SaeHandshakeIndRequestView request,
                        SaeHandshakeIndCompleter::Sync& completer) override {
     on_sae_handshake_ind_(&request->ind);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void SaeFrameRx(SaeFrameRxRequestView request, fdf::Arena& arena,
-                  SaeFrameRxCompleter::Sync& completer) override {
+  void SaeFrameRx(SaeFrameRxRequestView request, SaeFrameRxCompleter::Sync& completer) override {
     on_sae_frame_(&request->frame);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
 
   std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult*)> on_scan_result_;

@@ -90,7 +90,7 @@ zx::result<> Device::Start() {
     }
     client_dispatcher_ = *std::move(dispatcher);
   }
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImpl>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImpl>();
   if (endpoints.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Creating end point error: %s",
              zx_status_get_string(endpoints.status_value()));
@@ -136,7 +136,7 @@ zx_status_t Device::Bind() {
     return ZX_ERR_INTERNAL;
   }
 
-  auto mac_sublayer_result = client_.sync().buffer(*mac_sublayer_arena)->QueryMacSublayerSupport();
+  auto mac_sublayer_result = client_.sync()->QueryMacSublayerSupport();
 
   if (!mac_sublayer_result.ok()) {
     FDF_LOGL(ERROR, *logger_, "QueryMacSublayerSupport failed  FIDL error: %s",
@@ -160,14 +160,15 @@ zx_status_t Device::Bind() {
 }
 
 zx_status_t Device::ConnectToWlanFullmacImpl() {
-  zx::result<fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl>> client_end =
+  zx::result<fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl>> client_end =
       incoming()->Connect<fuchsia_wlan_fullmac::Service::WlanFullmacImpl>();
   if (client_end.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Connect to FullmacImpl failed: %s", client_end.status_string());
     return client_end.status_value();
   }
 
-  client_ = fdf::WireSharedClient(std::move(client_end.value()), client_dispatcher_.get());
+  client_ =
+      fidl::WireSharedClient(std::move(client_end.value()), client_dispatcher_.async_dispatcher());
   if (!client_.is_valid()) {
     FDF_LOGL(ERROR, *logger_, "WlanFullmacImpl Client is not valid");
     return ZX_ERR_BAD_HANDLE;
@@ -179,7 +180,7 @@ zx_status_t Device::StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* if
                                  zx::channel* out_sme_channel) {
   // We manually populate the protocol ops here so that we can verify at compile time that our rust
   // bindings have the expected parameters.
-  wlan_fullmac_impl_ifc_protocol_ops_.reset(new wlan_fullmac_impl_ifc_protocol_ops_t{
+  wlan_fullmac_impl_ifc_protocol_ops_.reset(new wlan_fullmac_impl_ifc_banjo_protocol_ops_t{
       .on_scan_result = ifc->ops->on_scan_result,
       .on_scan_end = ifc->ops->on_scan_end,
       .connect_conf = ifc->ops->connect_conf,
@@ -202,27 +203,21 @@ zx_status_t Device::StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* if
       .on_wmm_status_resp = ifc->ops->on_wmm_status_resp,
   });
 
-  wlan_fullmac_impl_ifc_protocol_ = std::make_unique<wlan_fullmac_impl_ifc_protocol_t>();
+  wlan_fullmac_impl_ifc_protocol_ = std::make_unique<wlan_fullmac_impl_ifc_banjo_protocol_t>();
   wlan_fullmac_impl_ifc_protocol_->ops = wlan_fullmac_impl_ifc_protocol_ops_.get();
   wlan_fullmac_impl_ifc_protocol_->ctx = ifc->ctx;
 
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
   if (endpoints.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Creating endpoints error: %s",
              zx_status_get_string(endpoints.status_value()));
     return endpoints.status_value();
   }
 
-  fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this,
-                  std::mem_fn(&Device::OnUnbound));
+  fidl::BindServer(server_dispatcher_.async_dispatcher(), std::move(endpoints->server), this,
+                   std::mem_fn(&Device::OnUnbound));
 
-  auto start_result = client_.sync().buffer(*arena)->Start(std::move(endpoints->client));
+  auto start_result = client_.sync()->Start(std::move(endpoints->client));
 
   if (!start_result.ok()) {
     FDF_LOGL(ERROR, *logger_, "Start failed, FIDL error: %s", start_result.status_string());
@@ -240,7 +235,7 @@ zx_status_t Device::StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* if
 }
 
 void Device::OnUnbound(fidl::UnbindInfo info,
-                       fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc>) {
+                       fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc>) {
   if (!info.is_user_initiated()) {
     FDF_LOGL(INFO, *logger_, "Wlanif shutting down: %s", info.FormatDescription().c_str());
   }
@@ -261,7 +256,7 @@ void Device::StartScan(const wlan_fullmac_impl_base_start_scan_request_t* req) {
   fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest scan_req;
   ConvertScanReq(*req, &scan_req, *arena);
 
-  auto result = client_.sync().buffer(*arena)->StartScan(scan_req);
+  auto result = client_.sync()->StartScan(scan_req);
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "StartScan failed, FIDL error: %s", result.status_string());
@@ -280,7 +275,7 @@ void Device::Connect(const wlan_fullmac_impl_base_connect_request_t* req) {
   fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest connect_req;
   ConvertConnectReq(*req, &connect_req, *arena);
 
-  auto result = client_.sync().buffer(*arena)->Connect(connect_req);
+  auto result = client_.sync()->Connect(connect_req);
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "ConnectReq failed FIDL error: %s", result.status_string());
@@ -300,7 +295,7 @@ void Device::Reconnect(const wlan_fullmac_impl_base_reconnect_request_t* req) {
   std::memcpy(peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
 
-  auto result = client_.sync().buffer(*arena)->Reconnect(builder.Build());
+  auto result = client_.sync()->Reconnect(builder.Build());
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "ReconnectReq failed FIDL error: %s", result.status_string());
@@ -324,7 +319,7 @@ void Device::AuthenticateResp(const wlan_fullmac_impl_base_auth_resp_request_t* 
   // result_code
   builder.result_code(ConvertAuthResult(resp->result_code));
 
-  auto result = client_.sync().buffer(*arena)->AuthResp(builder.Build());
+  auto result = client_.sync()->AuthResp(builder.Build());
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "AuthResp failed FIDL error: %s", result.status_string());
@@ -346,7 +341,7 @@ void Device::Deauthenticate(const wlan_fullmac_impl_base_deauth_request_t* req) 
   builder.peer_sta_address(peer_sta_address);
   builder.reason_code(fuchsia_wlan_ieee80211::ReasonCode(req->reason_code));
 
-  auto result = client_.sync().buffer(*arena)->Deauth(builder.Build());
+  auto result = client_.sync()->Deauth(builder.Build());
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "DeauthReq failed FIDL error: %s", result.status_string());
@@ -367,7 +362,7 @@ void Device::AssociateResp(const wlan_fullmac_impl_base_assoc_resp_request_t* re
   builder.result_code(ConvertAssocResult(resp->result_code));
   builder.association_id(resp->association_id);
 
-  auto result = client_.sync().buffer(*arena)->AssocResp(builder.Build());
+  auto result = client_.sync()->AssocResp(builder.Build());
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "AssocResp failed FIDL error: %s", result.status_string());
@@ -389,7 +384,7 @@ void Device::Disassociate(const wlan_fullmac_impl_base_disassoc_request_t* req) 
   builder.peer_sta_address(peer_sta_address);
   builder.reason_code(static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(req->reason_code));
 
-  auto result = client_.sync().buffer(*arena)->Disassoc(builder.Build());
+  auto result = client_.sync()->Disassoc(builder.Build());
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "DisassocReq failed FIDL error: %s", result.status_string());
@@ -412,7 +407,7 @@ void Device::Reset(const wlan_fullmac_impl_base_reset_request_t* req) {
   builder.sta_address(sta_address);
   builder.set_default_mib(req->set_default_mib);
 
-  auto result = client_.sync().buffer(*arena)->Reset(builder.Build());
+  auto result = client_.sync()->Reset(builder.Build());
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "ResetReq failed FIDL error: %s", result.status_string());
     return;
@@ -441,7 +436,7 @@ void Device::StartBss(const wlan_fullmac_impl_base_start_bss_request_t* req) {
       std::vector<uint8_t>(req->vendor_ie_list, req->vendor_ie_list + req->vendor_ie_count);
   builder.vendor_ie(fidl::VectorView<uint8_t>(*arena, vendor_ie));
 
-  auto result = client_.sync().buffer(*arena)->StartBss(builder.Build());
+  auto result = client_.sync()->StartBss(builder.Build());
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "StartBss failed FIDL error: %s", result.status_string());
@@ -460,7 +455,7 @@ void Device::StopBss(const wlan_fullmac_impl_base_stop_bss_request_t* req) {
   ConvertCSsid(req->ssid, &ssid);
   builder.ssid(ssid);
 
-  auto result = client_.sync().buffer(*arena)->StopBss(builder.Build());
+  auto result = client_.sync()->StopBss(builder.Build());
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "StopBss failed FIDL error: %s", result.status_string());
@@ -496,7 +491,7 @@ void Device::SetKeysReq(const wlan_fullmac_set_keys_req_t* req,
     set_keys_req.keylist[desc_ndx] = ConvertWlanKeyConfig(req->keylist[desc_ndx], *arena);
   }
 
-  auto result = client_.sync().buffer(*arena)->SetKeysReq(set_keys_req);
+  auto result = client_.sync()->SetKeysReq(set_keys_req);
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "SetKeyReq failed FIDL error: %s", result.status_string());
@@ -532,13 +527,7 @@ void Device::DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req) {
   for (size_t desc_ndx = 0; desc_ndx < delete_key_req.num_keys; desc_ndx++) {
     ConvertDeleteKeyDescriptor(req->keylist[desc_ndx], &delete_key_req.keylist[desc_ndx]);
 
-    auto arena = fdf::Arena::Create(0, 0);
-    if (arena.is_error()) {
-      FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-      return;
-    }
-
-    auto result = client_.sync().buffer(*arena)->DelKeysReq(delete_key_req);
+    auto result = client_.sync()->DelKeysReq(delete_key_req);
 
     if (!result.ok()) {
       FDF_LOGL(ERROR, *logger_, "DelKeysReq failed FIDL error: %s", result.status_string());
@@ -568,7 +557,7 @@ void Device::EapolTx(const wlan_fullmac_impl_base_eapol_tx_request_t* req) {
                        .data(data)
                        .Build();
 
-  auto result = client_.sync().buffer(*arena)->EapolTx(eapol_req);
+  auto result = client_.sync()->EapolTx(eapol_req);
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "EapolTx failed FIDL error: %s", result.status_string());
@@ -577,13 +566,7 @@ void Device::EapolTx(const wlan_fullmac_impl_base_eapol_tx_request_t* req) {
 }
 
 void Device::QueryDeviceInfo(wlan_fullmac_query_info_t* out_resp) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return;
-  }
-
-  auto result = client_.sync().buffer(*arena)->Query();
+  auto result = client_.sync()->Query();
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "Query failed FIDL error: %s", result.status_string());
@@ -599,13 +582,7 @@ void Device::QueryDeviceInfo(wlan_fullmac_query_info_t* out_resp) {
 }
 
 void Device::QueryMacSublayerSupport(mac_sublayer_support_t* out_resp) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return;
-  }
-
-  auto result = client_.sync().buffer(*arena)->QueryMacSublayerSupport();
+  auto result = client_.sync()->QueryMacSublayerSupport();
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "Query failed FIDL error: %s", result.status_string());
@@ -620,13 +597,7 @@ void Device::QueryMacSublayerSupport(mac_sublayer_support_t* out_resp) {
 }
 
 void Device::QuerySecuritySupport(security_support_t* out_resp) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return;
-  }
-
-  auto result = client_.sync().buffer(*arena)->QuerySecuritySupport();
+  auto result = client_.sync()->QuerySecuritySupport();
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "QuerySecuritySupport failed FIDL error: %s", result.status_string());
@@ -643,13 +614,7 @@ void Device::QuerySecuritySupport(security_support_t* out_resp) {
 }
 
 void Device::QuerySpectrumManagementSupport(spectrum_management_support_t* out_resp) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return;
-  }
-
-  auto result = client_.sync().buffer(*arena)->QuerySpectrumManagementSupport();
+  auto result = client_.sync()->QuerySpectrumManagementSupport();
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "QuerySpectrumManagementSupport failed FIDL error: %s",
@@ -667,13 +632,7 @@ void Device::QuerySpectrumManagementSupport(spectrum_management_support_t* out_r
 }
 
 zx_status_t Device::GetIfaceCounterStats(wlan_fullmac_iface_counter_stats_t* out_stats) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return arena.status_value();
-  }
-
-  auto result = client_.sync().buffer(*arena)->GetIfaceCounterStats();
+  auto result = client_.sync()->GetIfaceCounterStats();
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "GetIfaceCounterStats failed FIDL error: %s", result.status_string());
@@ -692,13 +651,7 @@ zx_status_t Device::GetIfaceCounterStats(wlan_fullmac_iface_counter_stats_t* out
 zx_status_t Device::GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t* out_stats) {
   std::lock_guard<std::mutex> lock(get_iface_histogram_stats_lock_);
 
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return arena.status_value();
-  }
-
-  auto result = client_.sync().buffer(*arena)->GetIfaceHistogramStats();
+  auto result = client_.sync()->GetIfaceHistogramStats();
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "GetIfaceHistogramStats failed FIDL error: %s",
@@ -738,16 +691,10 @@ zx_status_t Device::GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t*
 }
 
 void Device::OnLinkStateChanged(bool online) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return;
-  }
-
   // TODO(https://fxbug.dev/42128153): Let SME handle these changes.
   if (online != device_online_) {
     device_online_ = online;
-    auto result = client_.sync().buffer(*arena)->OnLinkStateChanged(online);
+    auto result = client_.sync()->OnLinkStateChanged(online);
 
     if (!result.ok()) {
       FDF_LOGL(ERROR, *logger_, "OnLinkStateChanged failed FIDL error: %s", result.status_string());
@@ -761,13 +708,7 @@ void Device::SaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp) {
 
   ConvertSaeHandshakeResp(*resp, &handshake_resp);
 
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return;
-  }
-
-  auto result = client_.sync().buffer(*arena)->SaeHandshakeResp(handshake_resp);
+  auto result = client_.sync()->SaeHandshakeResp(handshake_resp);
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "SaeHandshakeResp failed FIDL error: %s", result.status_string());
@@ -785,7 +726,7 @@ void Device::SaeFrameTx(const wlan_fullmac_sae_frame_t* frame) {
 
   ConvertSaeFrame(*frame, &sae_frame, *arena);
 
-  auto result = client_.sync().buffer(*arena)->SaeFrameTx(sae_frame);
+  auto result = client_.sync()->SaeFrameTx(sae_frame);
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "SaeFrameTx failed FIDL error: %s", result.status_string());
@@ -794,13 +735,7 @@ void Device::SaeFrameTx(const wlan_fullmac_sae_frame_t* frame) {
 }
 
 void Device::WmmStatusReq() {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
-    return;
-  }
-
-  auto result = client_.sync().buffer(*arena)->WmmStatusReq();
+  auto result = client_.sync()->WmmStatusReq();
 
   if (!result.ok()) {
     FDF_LOGL(ERROR, *logger_, "WmmStatusReq failed FIDL error: %s", result.status_string());
@@ -809,146 +744,131 @@ void Device::WmmStatusReq() {
 }
 
 // Implementation of fuchsia_wlan_fullmac::WlanFullmacImplBaseIfc.
-void Device::OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
-                          OnScanResultCompleter::Sync& completer) {
+void Device::OnScanResult(OnScanResultRequestView request, OnScanResultCompleter::Sync& completer) {
   wlan_fullmac_scan_result_t scan_result;
   ConvertFullmacScanResult(request->result, &scan_result);
   wlan_fullmac_impl_ifc_protocol_ops_->on_scan_result(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                       &scan_result);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                       OnScanEndCompleter::Sync& completer) {
+void Device::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) {
   wlan_fullmac_scan_end_t scan_end;
   ConvertScanEnd(request->end, &scan_end);
   wlan_fullmac_impl_ifc_protocol_ops_->on_scan_end(wlan_fullmac_impl_ifc_protocol_->ctx, &scan_end);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
-                         ConnectConfCompleter::Sync& completer) {
+void Device::ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) {
   wlan_fullmac_connect_confirm_t connect_conf;
   ConvertConnectConfirm(request->resp, &connect_conf);
   wlan_fullmac_impl_ifc_protocol_ops_->connect_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                     &connect_conf);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::RoamConf(RoamConfRequestView request, fdf::Arena& arena,
-                      RoamConfCompleter::Sync& completer) {
+void Device::RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) {
   wlan_fullmac_roam_confirm_t roam_conf;
   ConvertRoamConfirm(request->resp, &roam_conf);
   wlan_fullmac_impl_ifc_protocol_ops_->roam_conf(wlan_fullmac_impl_ifc_protocol_->ctx, &roam_conf);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::AuthInd(AuthIndRequestView request, fdf::Arena& arena,
-                     AuthIndCompleter::Sync& completer) {
+void Device::AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) {
   wlan_fullmac_auth_ind_t auth_ind;
   ConvertAuthInd(request->resp, &auth_ind);
   wlan_fullmac_impl_ifc_protocol_ops_->auth_ind(wlan_fullmac_impl_ifc_protocol_->ctx, &auth_ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
-                        DeauthConfCompleter::Sync& completer) {
+void Device::DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) {
   ZX_ASSERT(request->has_peer_sta_address());
   ZX_ASSERT(request->peer_sta_address().size() == ETH_ALEN);
   wlan_fullmac_impl_ifc_protocol_ops_->deauth_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                    request->peer_sta_address().data());
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                       DeauthIndCompleter::Sync& completer) {
+void Device::DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) {
   wlan_fullmac_deauth_indication_t deauth_ind;
   ConvertDeauthInd(request->ind, &deauth_ind);
   wlan_fullmac_impl_ifc_protocol_ops_->deauth_ind(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                   &deauth_ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::AssocInd(AssocIndRequestView request, fdf::Arena& arena,
-                      AssocIndCompleter::Sync& completer) {
+void Device::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) {
   wlan_fullmac_assoc_ind_t assoc_ind;
   ConvertAssocInd(request->resp, &assoc_ind);
   wlan_fullmac_impl_ifc_protocol_ops_->assoc_ind(wlan_fullmac_impl_ifc_protocol_->ctx, &assoc_ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
-                          DisassocConfCompleter::Sync& completer) {
+void Device::DisassocConf(DisassocConfRequestView request, DisassocConfCompleter::Sync& completer) {
   wlan_fullmac_disassoc_confirm_t disassoc_conf;
   disassoc_conf.status = request->resp.status;
   wlan_fullmac_impl_ifc_protocol_ops_->disassoc_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                      &disassoc_conf);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
-                         DisassocIndCompleter::Sync& completer) {
+void Device::DisassocInd(DisassocIndRequestView request, DisassocIndCompleter::Sync& completer) {
   wlan_fullmac_disassoc_indication_t disassoc_ind;
   ConvertDisassocInd(request->ind, &disassoc_ind);
   wlan_fullmac_impl_ifc_protocol_ops_->disassoc_ind(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                     &disassoc_ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::StartConf(StartConfRequestView request, fdf::Arena& arena,
-                       StartConfCompleter::Sync& completer) {
+void Device::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
   wlan_fullmac_start_confirm_t start_conf;
   start_conf.result_code = ConvertStartResultCode(request->resp.result_code);
   wlan_fullmac_impl_ifc_protocol_ops_->start_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                   &start_conf);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::StopConf(StopConfRequestView request, fdf::Arena& arena,
-                      StopConfCompleter::Sync& completer) {
+void Device::StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) {
   wlan_fullmac_stop_confirm_t stop_conf;
   stop_conf.result_code = ConvertStopResultCode(request->resp.result_code);
   wlan_fullmac_impl_ifc_protocol_ops_->stop_conf(wlan_fullmac_impl_ifc_protocol_->ctx, &stop_conf);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::EapolConf(EapolConfRequestView request, fdf::Arena& arena,
-                       EapolConfCompleter::Sync& completer) {
+void Device::EapolConf(EapolConfRequestView request, EapolConfCompleter::Sync& completer) {
   wlan_fullmac_eapol_confirm_t eapol_conf;
   ConvertEapolConf(request->resp, &eapol_conf);
   wlan_fullmac_impl_ifc_protocol_ops_->eapol_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                   &eapol_conf);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::OnChannelSwitch(OnChannelSwitchRequestView request, fdf::Arena& arena,
+void Device::OnChannelSwitch(OnChannelSwitchRequestView request,
                              OnChannelSwitchCompleter::Sync& completer) {
   wlan_fullmac_channel_switch_info channel_switch_info;
   channel_switch_info.new_channel = request->ind.new_channel;
   wlan_fullmac_impl_ifc_protocol_ops_->on_channel_switch(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                          &channel_switch_info);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::SignalReport(SignalReportRequestView request, fdf::Arena& arena,
-                          SignalReportCompleter::Sync& completer) {
+void Device::SignalReport(SignalReportRequestView request, SignalReportCompleter::Sync& completer) {
   wlan_fullmac_signal_report_indication_t signal_report_ind;
   signal_report_ind.rssi_dbm = request->ind.rssi_dbm;
   signal_report_ind.snr_db = request->ind.snr_db;
   wlan_fullmac_impl_ifc_protocol_ops_->signal_report(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                      &signal_report_ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::EapolInd(EapolIndRequestView request, fdf::Arena& arena,
-                      EapolIndCompleter::Sync& completer) {
+void Device::EapolInd(EapolIndRequestView request, EapolIndCompleter::Sync& completer) {
   wlan_fullmac_eapol_indication_t eapol_ind;
   ConvertEapolIndication(request->ind, &eapol_ind);
   wlan_fullmac_impl_ifc_protocol_ops_->eapol_ind(wlan_fullmac_impl_ifc_protocol_->ctx, &eapol_ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena,
+void Device::OnPmkAvailable(OnPmkAvailableRequestView request,
                             OnPmkAvailableCompleter::Sync& completer) {
   wlan_fullmac_pmk_info_t pmk_info;
   pmk_info.pmk_list = request->info.pmk.data();
@@ -957,34 +877,33 @@ void Device::OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena
   pmk_info.pmkid_count = request->info.pmkid.count();
   wlan_fullmac_impl_ifc_protocol_ops_->on_pmk_available(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                         &pmk_info);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::SaeHandshakeInd(SaeHandshakeIndRequestView request, fdf::Arena& arena,
+void Device::SaeHandshakeInd(SaeHandshakeIndRequestView request,
                              SaeHandshakeIndCompleter::Sync& completer) {
   wlan_fullmac_sae_handshake_ind_t sae_handshake_ind;
   memcpy(sae_handshake_ind.peer_sta_address, request->ind.peer_sta_address.data(), ETH_ALEN);
   wlan_fullmac_impl_ifc_protocol_ops_->sae_handshake_ind(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                          &sae_handshake_ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::SaeFrameRx(SaeFrameRxRequestView request, fdf::Arena& arena,
-                        SaeFrameRxCompleter::Sync& completer) {
+void Device::SaeFrameRx(SaeFrameRxRequestView request, SaeFrameRxCompleter::Sync& completer) {
   wlan_fullmac_sae_frame_t sae_frame;
   ConvertSaeFrame(request->frame, &sae_frame);
   wlan_fullmac_impl_ifc_protocol_ops_->sae_frame_rx(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                     &sae_frame);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void Device::OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
+void Device::OnWmmStatusResp(OnWmmStatusRespRequestView request,
                              OnWmmStatusRespCompleter::Sync& completer) {
   wlan_wmm_parameters_t wmm_params;
   ConvertWmmParams(request->wmm_params, &wmm_params);
   wlan_fullmac_impl_ifc_protocol_ops_->on_wmm_status_resp(wlan_fullmac_impl_ifc_protocol_->ctx,
                                                           request->status, &wmm_params);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
 }  // namespace wlanif

@@ -64,14 +64,11 @@ class ArpTest;
 
 struct GenericIfc : public SimInterface {
  public:
-  void AssocInd(AssocIndRequestView request, fdf::Arena& arena,
-                AssocIndCompleter::Sync& completer) override;
+  void AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) override;
 
-  void StartConf(StartConfRequestView request, fdf::Arena& arena,
-                 StartConfCompleter::Sync& completer) override;
+  void StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) override;
 
-  void StopConf(StopConfRequestView request, fdf::Arena& arena,
-                StopConfCompleter::Sync& completer) override;
+  void StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) override;
 
   ArpTest* test_;
 };
@@ -109,22 +106,19 @@ class ArpTest : public SimTest {
   GenericIfc sim_ifc_;
 };
 
-void GenericIfc::AssocInd(AssocIndRequestView request, fdf::Arena& arena,
-                          AssocIndCompleter::Sync& completer) {
+void GenericIfc::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) {
   test_->OnAssocInd(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void GenericIfc::StartConf(StartConfRequestView request, fdf::Arena& arena,
-                           StartConfCompleter::Sync& completer) {
+void GenericIfc::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
   test_->OnStartConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void GenericIfc::StopConf(StopConfRequestView request, fdf::Arena& arena,
-                          StopConfCompleter::Sync& completer) {
+void GenericIfc::StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) {
   test_->OnStopConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
 void ArpTest::OnAssocInd(const wlan_fullmac_wire::WlanFullmacAssocInd* ind) {

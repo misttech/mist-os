@@ -4,8 +4,8 @@
 
 using fuchsia.wlan.fullmac;
 
-if fuchsia.wlan.fullmac.WlanFullmacImpl == fuchsia.wlan.fullmac.WlanFullmacImpl.DriverTransport {
+if fuchsia.wlan.fullmac.WlanFullmacImpl == fuchsia.wlan.fullmac.WlanFullmacImpl.ZirconTransport {
     true;
 } else {
-    fuchsia.wlan.fullmac.Service == fuchsia.wlan.fullmac.Service.DriverTransport;
+    fuchsia.wlan.fullmac.Service == fuchsia.wlan.fullmac.Service.ZirconTransport;
 }

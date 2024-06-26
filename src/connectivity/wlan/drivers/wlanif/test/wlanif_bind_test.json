@@ -3,28 +3,28 @@
         "name": "ProtocolFail",
         "expected": "abort",
         "device": {
-            "fuchsia.wlan.fullmac.WlanFullmacImpl": "fuchsia.wlan.fullmac.WlanFullmacImpl.ChannelTransport"
+            "fuchsia.wlan.fullmac.WlanFullmacImpl": "fuchsia.wlan.fullmac.WlanFullmacImpl.DriverTransport"
         }
     },
     {
         "name": "ServiceFail",
         "expected": "abort",
         "device": {
-            "fuchsia.wlan.fullmac.Service": "fuchsia.wlan.fullmac.Service.ChannelTransport"
+            "fuchsia.wlan.fullmac.Service": "fuchsia.wlan.fullmac.Service.DriverTransport"
         }
     },
     {
         "name": "ProtocolMatch",
         "expected": "match",
         "device": {
-            "fuchsia.wlan.fullmac.WlanFullmacImpl": "fuchsia.wlan.fullmac.WlanFullmacImpl.DriverTransport"
+            "fuchsia.wlan.fullmac.WlanFullmacImpl": "fuchsia.wlan.fullmac.WlanFullmacImpl.ZirconTransport"
         }
     },
     {
         "name": "ServiceMatch",
         "expected": "match",
         "device": {
-            "fuchsia.wlan.fullmac.Service": "fuchsia.wlan.fullmac.Service.DriverTransport"
+            "fuchsia.wlan.fullmac.Service": "fuchsia.wlan.fullmac.Service.ZirconTransport"
         }
     }
 ]

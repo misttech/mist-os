@@ -6,7 +6,7 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANIF_DEVICE_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
-#include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.fullmac/cpp/wire.h>
 #include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 #include <lib/ddk/driver.h>
@@ -34,7 +34,7 @@ namespace wlanif {
 
 class Device final : public fdf::DriverBase,
                      public fidl::WireAsyncEventHandler<fdf::NodeController>,
-                     public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImplIfc> {
+                     public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacImplIfc> {
  public:
   explicit Device(fdf::DriverStartArgs start_args,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher);
@@ -53,7 +53,7 @@ class Device final : public fdf::DriverBase,
   zx_status_t StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
                            zx::channel* out_sme_channel);
 
-  void OnUnbound(fidl::UnbindInfo info, fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc>);
+  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc>);
   void handle_unknown_event(
       fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override;
   void StartScan(const wlan_fullmac_impl_base_start_scan_request_t* req);
@@ -82,45 +82,32 @@ class Device final : public fdf::DriverBase,
   void OnLinkStateChanged(bool online);
 
   // Implementation of fuchsia_wlan_fullmac::WlanFullmacImplIfc.
-  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+  void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override;
-  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                 OnScanEndCompleter::Sync& completer) override;
-  void ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
-                   ConnectConfCompleter::Sync& completer) override;
-  void RoamConf(RoamConfRequestView request, fdf::Arena& arena,
-                RoamConfCompleter::Sync& completer) override;
-  void AuthInd(AuthIndRequestView request, fdf::Arena& arena,
-               AuthIndCompleter::Sync& completer) override;
-  void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
-                  DeauthConfCompleter::Sync& completer) override;
-  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                 DeauthIndCompleter::Sync& completer) override;
-  void AssocInd(AssocIndRequestView request, fdf::Arena& arena,
-                AssocIndCompleter::Sync& completer) override;
-  void DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+  void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override;
+  void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override;
+  void RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) override;
+  void AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) override;
+  void DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) override;
+  void DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) override;
+  void AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) override;
+  void DisassocConf(DisassocConfRequestView request,
                     DisassocConfCompleter::Sync& completer) override;
-  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
-                   DisassocIndCompleter::Sync& completer) override;
-  void StartConf(StartConfRequestView request, fdf::Arena& arena,
-                 StartConfCompleter::Sync& completer) override;
-  void StopConf(StopConfRequestView request, fdf::Arena& arena,
-                StopConfCompleter::Sync& completer) override;
-  void EapolConf(EapolConfRequestView request, fdf::Arena& arena,
-                 EapolConfCompleter::Sync& completer) override;
-  void OnChannelSwitch(OnChannelSwitchRequestView request, fdf::Arena& arena,
+  void DisassocInd(DisassocIndRequestView request, DisassocIndCompleter::Sync& completer) override;
+  void StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) override;
+  void StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) override;
+  void EapolConf(EapolConfRequestView request, EapolConfCompleter::Sync& completer) override;
+  void OnChannelSwitch(OnChannelSwitchRequestView request,
                        OnChannelSwitchCompleter::Sync& completer) override;
-  void SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+  void SignalReport(SignalReportRequestView request,
                     SignalReportCompleter::Sync& completer) override;
-  void EapolInd(EapolIndRequestView request, fdf::Arena& arena,
-                EapolIndCompleter::Sync& completer) override;
-  void OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena,
+  void EapolInd(EapolIndRequestView request, EapolIndCompleter::Sync& completer) override;
+  void OnPmkAvailable(OnPmkAvailableRequestView request,
                       OnPmkAvailableCompleter::Sync& completer) override;
-  void SaeHandshakeInd(SaeHandshakeIndRequestView request, fdf::Arena& arena,
+  void SaeHandshakeInd(SaeHandshakeIndRequestView request,
                        SaeHandshakeIndCompleter::Sync& completer) override;
-  void SaeFrameRx(SaeFrameRxRequestView request, fdf::Arena& arena,
-                  SaeFrameRxCompleter::Sync& completer) override;
-  void OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
+  void SaeFrameRx(SaeFrameRxRequestView request, SaeFrameRxCompleter::Sync& completer) override;
+  void OnWmmStatusResp(OnWmmStatusRespRequestView request,
                        OnWmmStatusRespCompleter::Sync& completer) override;
 
  protected:
@@ -144,13 +131,13 @@ class Device final : public fdf::DriverBase,
 
   // Manages the lifetime of the protocol struct we pass down to the vendor driver. Actual
   // calls to this protocol should only be performed by the vendor driver.
-  std::unique_ptr<wlan_fullmac_impl_ifc_protocol_ops_t> wlan_fullmac_impl_ifc_protocol_ops_;
-  std::unique_ptr<wlan_fullmac_impl_ifc_protocol_t> wlan_fullmac_impl_ifc_protocol_;
+  std::unique_ptr<wlan_fullmac_impl_ifc_banjo_protocol_ops_t> wlan_fullmac_impl_ifc_protocol_ops_;
+  std::unique_ptr<wlan_fullmac_impl_ifc_banjo_protocol_t> wlan_fullmac_impl_ifc_protocol_;
   std::unique_ptr<FullmacMlme> mlme_;
 
   bool device_online_ = false;
   // The FIDL Client to communicate with WlanIf device
-  fdf::WireSharedClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;
+  fidl::WireSharedClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;
 
   // Dispatcher for making requests to the vendor driver over WlanFullmacImpl.
   fdf::Dispatcher client_dispatcher_;

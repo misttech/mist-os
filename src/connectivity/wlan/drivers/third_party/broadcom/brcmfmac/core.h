@@ -283,7 +283,7 @@ struct net_device {
   uint32_t scan_num_results;
   std::mutex scan_sync_id_mutex;  // Used to ensure that sync_id is stored before processing results
   std::shared_mutex if_proto_lock;  // Used as RW-lock for if_proto.
-  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> if_proto;
+  fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> if_proto;
   uint8_t dev_addr[ETH_ALEN];
   char name[NET_DEVICE_NAME_MAX_LEN];
   void* priv;

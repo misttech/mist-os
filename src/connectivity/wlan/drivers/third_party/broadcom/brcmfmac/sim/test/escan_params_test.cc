@@ -20,8 +20,7 @@ const uint8_t kDefaultChannelsList[11] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 // For this test, we don't want to use the default scan handlers provided by SimInterface
 class EscanArgsIfc : public SimInterface {
  public:
-  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                 OnScanEndCompleter::Sync& completer) override;
+  void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override;
   bool ScanCompleted() { return scan_completed_; }
   wlan_fullmac_wire::WlanScanResult ScanResult() { return scan_result_; }
 
@@ -30,12 +29,11 @@ class EscanArgsIfc : public SimInterface {
   wlan_fullmac_wire::WlanScanResult scan_result_;
 };
 
-void EscanArgsIfc::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                             OnScanEndCompleter::Sync& completer) {
+void EscanArgsIfc::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) {
   EXPECT_EQ(request->end.txn_id, kScanTxnId);
   scan_completed_ = true;
   scan_result_ = request->end.code;
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
 class EscanArgsTest : public SimTest {

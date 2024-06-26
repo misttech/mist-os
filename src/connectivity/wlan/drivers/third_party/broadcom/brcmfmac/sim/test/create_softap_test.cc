@@ -37,23 +37,16 @@ class CreateSoftAPTest;
 
 class SoftApInterface : public SimInterface {
  public:
-  void AuthInd(AuthIndRequestView request, fdf::Arena& arena,
-               AuthIndCompleter::Sync& completer) override;
-  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                 DeauthIndCompleter::Sync& completer) override;
-  void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
-                  DeauthConfCompleter::Sync& completer) override;
-  void AssocInd(AssocIndRequestView request, fdf::Arena& arena,
-                AssocIndCompleter::Sync& completer) override;
-  void DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+  void AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) override;
+  void DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) override;
+  void DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) override;
+  void AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) override;
+  void DisassocConf(DisassocConfRequestView request,
                     DisassocConfCompleter::Sync& completer) override;
-  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
-                   DisassocIndCompleter::Sync& completer) override;
-  void StartConf(StartConfRequestView request, fdf::Arena& arena,
-                 StartConfCompleter::Sync& completer) override;
-  void StopConf(StopConfRequestView request, fdf::Arena& arena,
-                StopConfCompleter::Sync& completer) override;
-  void OnChannelSwitch(OnChannelSwitchRequestView request, fdf::Arena& arena,
+  void DisassocInd(DisassocIndRequestView request, DisassocIndCompleter::Sync& completer) override;
+  void StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) override;
+  void StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) override;
+  void OnChannelSwitch(OnChannelSwitchRequestView request,
                        OnChannelSwitchCompleter::Sync& completer) override;
 
   CreateSoftAPTest* test_;
@@ -132,50 +125,45 @@ class CreateSoftAPTest : public SimTest {
   uint16_t CreateRsneIe(uint8_t* buffer);
 };
 
-void SoftApInterface::AuthInd(AuthIndRequestView request, fdf::Arena& arena,
-                              AuthIndCompleter::Sync& completer) {
+void SoftApInterface::AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) {
   test_->OnAuthInd(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void SoftApInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                                DeauthIndCompleter::Sync& completer) {
+void SoftApInterface::DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) {
   test_->OnDeauthInd(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void SoftApInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
+void SoftApInterface::DeauthConf(DeauthConfRequestView request,
                                  DeauthConfCompleter::Sync& completer) {
   test_->OnDeauthConf(request);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void SoftApInterface::AssocInd(AssocIndRequestView request, fdf::Arena& arena,
-                               AssocIndCompleter::Sync& completer) {
+void SoftApInterface::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) {
   test_->OnAssocInd(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void SoftApInterface::DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+void SoftApInterface::DisassocConf(DisassocConfRequestView request,
                                    DisassocConfCompleter::Sync& completer) {
   test_->OnDisassocConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void SoftApInterface::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+void SoftApInterface::DisassocInd(DisassocIndRequestView request,
                                   DisassocIndCompleter::Sync& completer) {
   test_->OnDisassocInd(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void SoftApInterface::StartConf(StartConfRequestView request, fdf::Arena& arena,
-                                StartConfCompleter::Sync& completer) {
+void SoftApInterface::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
   test_->OnStartConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void SoftApInterface::StopConf(StopConfRequestView request, fdf::Arena& arena,
-                               StopConfCompleter::Sync& completer) {
+void SoftApInterface::StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) {
   test_->OnStopConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void SoftApInterface::OnChannelSwitch(OnChannelSwitchRequestView request, fdf::Arena& arena,
+void SoftApInterface::OnChannelSwitch(OnChannelSwitchRequestView request,
                                       OnChannelSwitchCompleter::Sync& completer) {
   test_->OnChannelSwitch(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
 void CreateSoftAPTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
