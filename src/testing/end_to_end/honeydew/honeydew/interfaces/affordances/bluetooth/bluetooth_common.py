@@ -9,9 +9,6 @@ from typing import Any
 
 from honeydew.typing import bluetooth
 
-BluetoothAcceptPairing = bluetooth.BluetoothAcceptPairing
-BluetoothConnectionType = bluetooth.BluetoothConnectionType
-
 
 class BluetoothCommon(abc.ABC):
     """Abstract base class for BluetoothCommon affordance."""
@@ -24,8 +21,8 @@ class BluetoothCommon(abc.ABC):
     @abc.abstractmethod
     def accept_pairing(
         self,
-        input_mode: BluetoothAcceptPairing,
-        output_mode: BluetoothAcceptPairing,
+        input_mode: bluetooth.BluetoothAcceptPairing,
+        output_mode: bluetooth.BluetoothAcceptPairing,
     ) -> None:
         """Sets device to accept Bluetooth pairing.
 
@@ -39,7 +36,9 @@ class BluetoothCommon(abc.ABC):
 
     @abc.abstractmethod
     def connect_device(
-        self, identifier: str, connection_type: BluetoothConnectionType
+        self,
+        identifier: str,
+        connection_type: bluetooth.BluetoothConnectionType,
     ) -> None:
         """Connect device to target remote device via Bluetooth.
 
@@ -82,7 +81,9 @@ class BluetoothCommon(abc.ABC):
 
     @abc.abstractmethod
     def pair_device(
-        self, identifier: str, connection_type: BluetoothConnectionType
+        self,
+        identifier: str,
+        connection_type: bluetooth.BluetoothConnectionType,
     ) -> None:
         """Pair device to target remote device via Bluetooth.
 

@@ -8,55 +8,61 @@ A utility class for python scripts writing to terminal output.
 
 import os
 import sys
+from typing import Any
 
 
 class Terminal:
     suppress = False
 
-    def bold(text: str) -> str:
-        return Terminal._style(text, 1)
+    @classmethod
+    def bold(cls, text: str) -> str:
+        return cls._style(text, 1)
 
-    def red(text: str) -> str:
-        return Terminal._style(text, 91)
+    @classmethod
+    def red(cls, text: str) -> str:
+        return cls._style(text, 91)
 
-    def green(text: str) -> str:
-        return Terminal._style(text, 92)
+    @classmethod
+    def green(cls, text: str) -> str:
+        return cls._style(text, 92)
 
-    def yellow(text: str) -> str:
-        return Terminal._style(text, 93)
+    @classmethod
+    def yellow(cls, text: str) -> str:
+        return cls._style(text, 93)
 
-    def supports_color() -> bool:
+    @classmethod
+    def supports_color(cls) -> bool:
         return (
             sys.stdout.isatty()
             and sys.stderr.isatty()
             and not os.environ.get("NO_COLOR")
         )
 
-    def _print(*args, **kwargs) -> None:
-        if not Terminal.suppress:
-            print(*args, **kwargs)
+    @classmethod
+    def _print(cls, *args: Any, **kwargs: Any) -> None:
+        if not cls.suppress:
+            print(args, kwargs)
 
-    def fatal(text: str) -> int:
-        Terminal._print(
-            Terminal.red(Terminal.bold("FATAL: ")) + text, file=sys.stderr
-        )
+    @classmethod
+    def fatal(cls, text: str) -> int:
+        cls._print(cls.red(cls.bold("FATAL: ")) + text, file=sys.stderr)
         sys.exit(1)
 
-    def error(text: str) -> None:
-        Terminal._print(
-            Terminal.red(Terminal.bold("ERROR: ")) + text, file=sys.stderr
-        )
+    @classmethod
+    def error(cls, text: str) -> None:
+        cls._print(cls.red(cls.bold("ERROR: ")) + text, file=sys.stderr)
 
-    def warn(text: str) -> None:
-        Terminal._print(
-            Terminal.yellow(Terminal.bold("WARNING: ")) + text, file=sys.stderr
-        )
+    @classmethod
+    def warn(cls, text: str) -> None:
+        cls._print(cls.yellow(cls.bold("WARNING: ")) + text, file=sys.stderr)
 
-    def info(text: str) -> None:
-        Terminal._print(Terminal.green(Terminal.bold("INFO: ")) + text)
+    @classmethod
+    def info(cls, text: str) -> None:
+        cls._print(cls.green(cls.bold("INFO: ")) + text)
 
-    def _style(text: str, escape_code: int) -> str:
-        if Terminal.supports_color():
+    @classmethod
+    def _style(cls, text: str, escape_code: int) -> str:
+        if cls.supports_color():
             return f"\033[{escape_code}m{text}\033[0m"
         else:
             # If neither stdout nor stderr is not a tty then any styles likely

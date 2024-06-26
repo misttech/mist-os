@@ -41,8 +41,10 @@ def copy_build_output(output_dir: Path, build_output: Path) -> None:
             shutil.rmtree(dest)
 
         # Perform copy.
-        copy_func = shutil.copytree if dest.is_dir() else shutil.copy
-        copy_func(src, dest)
+        if dest.is_dir():
+            shutil.copytree(src, dest)
+        else:
+            shutil.copy(src, dest)
     else:
         # Keep action_tracer happy since we did a file comparison.
         INPUTS.append(dest)
@@ -85,7 +87,7 @@ def copy_packages(working_dir: Path) -> None:
         add_package(Path(package_manifest))
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Copies assembly_cache_packages.list with all transitively referenced files, and package-tool."
     )
