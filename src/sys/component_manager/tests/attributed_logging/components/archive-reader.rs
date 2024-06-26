@@ -18,9 +18,8 @@ async fn main() {
     treasure.insert(
         "routing-tests/offers-to-children-unavailable/child-for-offer-from-parent".to_string(),
         vec![vec![
-            "Required",
             "protocol `fidl.test.components.Trigger`",
-            "not available for target component \
+            "not available for target \
             `root/routing-tests/offers-to-children-unavailable/child-for-offer-from-parent`",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/offers-to-children-unavailable` by parent",
@@ -31,7 +30,7 @@ async fn main() {
         vec![vec![
             "Optional",
             "protocol `fidl.test.components.Trigger`",
-            "not available for target component \
+            "not available for target \
             `root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-parent`",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/offers-to-children-unavailable-but-optional` by parent",
@@ -40,9 +39,8 @@ async fn main() {
     treasure.insert(
         "routing-tests/child".to_string(),
         vec![vec![
-            "Required",
             "protocol `fidl.test.components.Trigger`",
-            "not available for target component \
+            "not available for target \
             `root/routing-tests/child`",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/child` by parent",
@@ -53,7 +51,7 @@ async fn main() {
         vec![vec![
             "Optional",
             "protocol `fidl.test.components.Trigger`",
-            "not available for target component \
+            "not available for target \
             `root/routing-tests/child-with-optional-use`",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/child-with-optional-use` by parent",
@@ -62,12 +60,11 @@ async fn main() {
     treasure.insert(
         "routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling".to_string(),
         vec![vec![
-            "Required",
             "protocol `fidl.test.components.Trigger`",
-            "not available for target component \
+            "not available for target \
             `root/routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling`",
             "`fidl.test.components.Trigger` was not exposed to `root/routing-tests/offers-to-children-unavailable`",
-            "from child `#child-that-doesnt-expose`"
+            "from `#child-that-doesnt-expose`"
         ]],
     );
     treasure.insert(
@@ -75,10 +72,10 @@ async fn main() {
         vec![vec![
             "Optional",
             "protocol `fidl.test.components.Trigger`",
-            "not available for target component \
+            "not available for target \
             `root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-sibling`",
             "`fidl.test.components.Trigger` was not exposed to `root/routing-tests/offers-to-children-unavailable-but-optional`",
-            "from child `#child-that-doesnt-expose`"
+            "from `#child-that-doesnt-expose`"
         ]],
     );
     treasure.insert(

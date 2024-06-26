@@ -1144,7 +1144,7 @@ mod tests {
                                             }
                                         }
                                     },
-                                    "message": "`bad_dir` was not offered to `child` by parent.",
+                                    "message": "`bad_dir` was not offered to `child` by parent",
                                 },
                                 "using_node": "child",
                                 "route": [
@@ -1192,7 +1192,7 @@ mod tests {
                                             }
                                         }
                                     },
-                                    "message": "`.` does not have child `#missing_child`.",
+                                    "message": "`.` does not have child `#missing_child`",
                                 },
                                 "using_node": "child",
                                 "route": [
@@ -1277,7 +1277,7 @@ mod tests {
                                       }
                                   }
                               },
-                              "message": "`bad_dir` was not offered to `child` by parent.",
+                              "message": "`bad_dir` was not offered to `child` by parent",
                           },
                           "using_node": "child",
                           "route": [
@@ -1373,7 +1373,7 @@ mod tests {
                                     }
                                 }
                             },
-                            "message": "`.` does not have child `#missing_child`.",
+                            "message": "`.` does not have child `#missing_child`",
                         },
                         "using_node": "child",
                         "route": [
@@ -1460,7 +1460,7 @@ mod tests {
                                             },
                                         },
                                     },
-                                    "message": "`bad_dir` was not offered to `child` by parent.",
+                                    "message": "`bad_dir` was not offered to `child` by parent",
                                 },
                                 "using_node": "child",
                                 "route": [
@@ -1503,7 +1503,7 @@ mod tests {
                                             },
                                         },
                                     },
-                                    "message": "`.` does not have child `#missing_child`.",
+                                    "message": "`.` does not have child `#missing_child`",
                                 },
                                 "route": [
                                     {
@@ -1587,7 +1587,7 @@ mod tests {
                                       }
                                   }
                               },
-                              "message": "`bad_dir` was not offered to `child` by parent.",
+                              "message": "`bad_dir` was not offered to `child` by parent",
                           },
                           "using_node": "child",
                           "route": [

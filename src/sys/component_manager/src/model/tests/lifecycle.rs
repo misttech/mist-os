@@ -644,9 +644,8 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
 #[fuchsia::test]
 #[should_panic(expected = "Component with on_terminate=REBOOT terminated, but triggering \
                           reboot failed. Crashing component_manager instead: \
-                          StateControl Admin protocol encountered FIDL error: A FIDL client's \
-                          channel to the protocol fuchsia.hardware.power.statecontrol.Admin was \
-                          closed: NOT_FOUND")]
+                          StateControl Admin FIDL:\n\tA FIDL client's channel to the protocol \
+                          fuchsia.hardware.power.statecontrol.Admin was closed: NOT_FOUND")]
 async fn on_terminate_with_missing_reboot_protocol_panics() {
     // Create a topology with a reboot-on-terminate component but no reboot protocol routed to root.
     let components = vec![
@@ -679,7 +678,7 @@ async fn on_terminate_with_missing_reboot_protocol_panics() {
 #[fuchsia::test]
 #[should_panic(expected = "Component with on_terminate=REBOOT terminated, but triggering \
                           reboot failed. Crashing component_manager instead: \
-                          StateControl Admin responded with status: INTERNAL")]
+                          StateControl Admin: INTERNAL")]
 async fn on_terminate_with_failed_reboot_panics() {
     // Create a topology with a reboot-on-terminate component and a fake reboot protocol
     const REBOOT_PROTOCOL: &str = fstatecontrol::AdminMarker::DEBUG_NAME;
