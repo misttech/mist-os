@@ -223,13 +223,17 @@ pub fn set_procattr(
     attr: ProcAttr,
     context: &[u8],
 ) -> Result<(), Errno> {
-    use bstr::ByteSlice;
+    use std::ffi::CStr;
+
+    // Userspace may write C-style null-terminated strings, which is the only
+    // way to write an "empty" value since POSIX doesn't allow zero-length writes.
+    let context =
+        CStr::from_bytes_until_nul(context).and_then(|x| Ok(x.to_bytes())).unwrap_or(context);
 
     // Attempt to convert the Security Context string to a SID.
-    // Writes that consist of a single NUL or a newline clear the SID.
-    let context = context.trim_end_with(|c| c == '\0');
+    // Empty writes, or those containing a single newline, clear the SID.
     let sid = match context {
-        b"\x0a" => None,
+        b"\x0a" | b"" => None,
         slice => Some(security_server.security_context_to_sid(slice).map_err(|_| errno!(EINVAL))?),
     };
 
