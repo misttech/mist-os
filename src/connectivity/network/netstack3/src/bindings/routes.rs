@@ -21,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 use assert_matches::assert_matches;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
-use fidl_fuchsia_net_routes_ext::rules::RuleSetPriority;
+use fidl_fuchsia_net_routes_ext::rules::{InstalledRule, RuleSetPriority};
 use futures::channel::{mpsc, oneshot};
 use futures::{stream, Future, FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
@@ -36,6 +36,7 @@ use crate::bindings::{BindingsCtx, Ctx, IpExt};
 
 pub(crate) mod admin;
 pub(crate) mod rules_admin;
+mod rules_state;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
 use rules_admin::{NewRuleSet, RuleOp, RuleTable, RuleWorkItem, SetPriorityConflict};
 
@@ -397,7 +398,7 @@ pub(crate) struct State<I: Ip> {
     new_rule_set_receiver: mpsc::UnboundedReceiver<NewRuleSet<I>>,
     tables: HashMap<TableId<I>, Table<I::Addr>>,
     rules: RuleTable<I>,
-    update_dispatcher: state::RouteUpdateDispatcher<I>,
+    dispatchers: Dispatchers<I>,
 }
 
 #[derive(derivative::Derivative)]
@@ -429,7 +430,7 @@ where
             new_rule_set_receiver,
             tables,
             rules,
-            update_dispatcher,
+            dispatchers: Dispatchers { route_update_dispatcher, rule_update_dispatcher },
             last_table_id,
         } = self;
         let mut rule_set_work_receivers = stream::FuturesUnordered::new();
@@ -447,7 +448,11 @@ where
                     if removing {
                         rest.close();
                     }
-                    Self::handle_route_change(&mut ctx, tables, update_dispatcher, route_work_item);
+                    Self::handle_route_change(
+                        &mut ctx,
+                        tables,
+                        route_update_dispatcher,
+                        route_work_item);
                     if removing {
                         rest.filter_map(|RouteWorkItem {
                             change: _,
@@ -494,7 +499,7 @@ where
                         continue;
                     };
                     let is_removal = matches!(op, RuleOp::RemoveSet { .. });
-                    let result = Self::handle_rule_op(rules, op);
+                    let result = Self::handle_rule_op(rules, op, rule_update_dispatcher);
                     if is_removal {
                         // We must close the channel so that the rule set
                         // can no longer send RuleOps. Note that we make
@@ -577,15 +582,37 @@ where
     fn handle_rule_op(
         table: &mut RuleTable<I>,
         op: RuleOp<I>,
+        rules_update_dispatcher: &rules_state::RuleUpdateDispatcher<I>,
     ) -> Result<(), fnet_routes_admin::RuleSetError> {
         match op {
             RuleOp::RemoveSet { priority } => {
-                return Ok(table.remove_rule_set(priority));
+                let removed = table.remove_rule_set(priority);
+                for rule in removed {
+                    rules_update_dispatcher
+                        .notify(watcher::Update::Removed(rule))
+                        .expect("failed to notify a removed rule");
+                }
+                Ok(())
             }
             RuleOp::Add { priority, index, selector, action } => {
-                table.add_rule(priority, index, selector, action)
+                table.add_rule(priority, index, selector.clone(), action)?;
+                rules_update_dispatcher
+                    .notify(watcher::Update::Added(InstalledRule {
+                        priority,
+                        index,
+                        selector,
+                        action,
+                    }))
+                    .expect("failed to notify an added rule");
+                Ok(())
             }
-            RuleOp::Remove { priority, index } => table.remove_rule(priority, index),
+            RuleOp::Remove { priority, index } => {
+                let removed = table.remove_rule(priority, index)?;
+                rules_update_dispatcher
+                    .notify(watcher::Update::Removed(removed))
+                    .expect("failed to notify a removed rule");
+                Ok(())
+            }
         }
     }
 }
@@ -867,12 +894,16 @@ pub(crate) struct ChangeRunner {
     v6: State<Ipv6>,
 }
 
+#[derive(Default, Clone)]
+pub(crate) struct Dispatchers<I: Ip> {
+    pub(crate) route_update_dispatcher: state::RouteUpdateDispatcher<I>,
+    pub(crate) rule_update_dispatcher: rules_state::RuleUpdateDispatcher<I>,
+}
+
 impl ChangeRunner {
-    pub(crate) fn route_update_dispatchers(
-        &self,
-    ) -> (state::RouteUpdateDispatcher<Ipv4>, state::RouteUpdateDispatcher<Ipv6>) {
+    pub(crate) fn update_dispatchers(&self) -> (Dispatchers<Ipv4>, Dispatchers<Ipv6>) {
         let Self { v4, v6 } = self;
-        (v4.update_dispatcher.clone(), v6.update_dispatcher.clone())
+        (v4.dispatchers.clone(), v6.dispatchers.clone())
     }
 
     pub(crate) async fn run(&mut self, ctx: Ctx) {
@@ -903,10 +934,10 @@ pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
             new_table_receiver,
             tables,
             rules: Default::default(),
-            update_dispatcher: Default::default(),
             route_work_receivers,
             new_rule_set_receiver,
             last_table_id: main_table_id,
+            dispatchers: Default::default(),
         };
         (Changes { new_table_sink, main_table_route_work_sink, new_rule_set_sink }, state)
     }

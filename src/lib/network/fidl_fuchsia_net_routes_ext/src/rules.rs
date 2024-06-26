@@ -10,6 +10,7 @@ use std::ops::RangeInclusive;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy as _};
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
 use futures::future::Either;
+use futures::{Stream, StreamExt as _, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Subnet};
 use thiserror::Error;
 use {
@@ -17,7 +18,233 @@ use {
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
 };
 
-use crate::admin::{impl_responder, Responder};
+use crate::{impl_responder, FidlRouteIpExt, Responder, SliceResponder, WatcherCreationError};
+
+/// Observation extension for the rules part of `fuchsia.net.routes` FIDL API.
+pub trait FidlRuleIpExt: Ip {
+    /// The "rules watcher" protocol to use for this IP version.
+    type RuleWatcherMarker: ProtocolMarker<RequestStream = Self::RuleWatcherRequestStream>;
+    /// The "rules watcher" request stream.
+    type RuleWatcherRequestStream: fidl::endpoints::RequestStream<Ok: Send, ControlHandle: Send>;
+    /// The rule event to be watched.
+    type RuleEvent: From<RuleEvent<Self>>
+        + TryInto<RuleEvent<Self>, Error = RuleFidlConversionError>
+        + Unpin;
+    /// The responder to the watch request.
+    type RuleWatcherWatchResponder: SliceResponder<Self::RuleEvent>;
+
+    /// Turns a FIDL rule watcher request into the extension type.
+    fn into_rule_watcher_request(
+        request: fidl::endpoints::Request<Self::RuleWatcherMarker>,
+    ) -> RuleWatcherRequest<Self>;
+}
+
+impl_responder!(fnet_routes::RuleWatcherV4WatchResponder, &[fnet_routes::RuleEventV4]);
+impl_responder!(fnet_routes::RuleWatcherV6WatchResponder, &[fnet_routes::RuleEventV6]);
+
+impl FidlRuleIpExt for Ipv4 {
+    type RuleWatcherMarker = fnet_routes::RuleWatcherV4Marker;
+    type RuleWatcherRequestStream = fnet_routes::RuleWatcherV4RequestStream;
+    type RuleEvent = fnet_routes::RuleEventV4;
+    type RuleWatcherWatchResponder = fnet_routes::RuleWatcherV4WatchResponder;
+
+    fn into_rule_watcher_request(
+        request: fidl::endpoints::Request<Self::RuleWatcherMarker>,
+    ) -> RuleWatcherRequest<Self> {
+        RuleWatcherRequest::from(request)
+    }
+}
+
+impl FidlRuleIpExt for Ipv6 {
+    type RuleWatcherMarker = fnet_routes::RuleWatcherV6Marker;
+    type RuleWatcherRequestStream = fnet_routes::RuleWatcherV6RequestStream;
+    type RuleEvent = fnet_routes::RuleEventV6;
+    type RuleWatcherWatchResponder = fnet_routes::RuleWatcherV6WatchResponder;
+
+    fn into_rule_watcher_request(
+        request: fidl::endpoints::Request<Self::RuleWatcherMarker>,
+    ) -> RuleWatcherRequest<Self> {
+        RuleWatcherRequest::from(request)
+    }
+}
+
+/// The request for the rules watchers.
+pub enum RuleWatcherRequest<I: FidlRuleIpExt> {
+    /// Hanging-Get style API for observing routing rule changes.
+    Watch {
+        /// Responder for the events.
+        responder: I::RuleWatcherWatchResponder,
+    },
+}
+
+impl From<fnet_routes::RuleWatcherV4Request> for RuleWatcherRequest<Ipv4> {
+    fn from(req: fnet_routes::RuleWatcherV4Request) -> Self {
+        match req {
+            fnet_routes::RuleWatcherV4Request::Watch { responder } => {
+                RuleWatcherRequest::Watch { responder }
+            }
+        }
+    }
+}
+
+impl From<fnet_routes::RuleWatcherV6Request> for RuleWatcherRequest<Ipv6> {
+    fn from(req: fnet_routes::RuleWatcherV6Request) -> Self {
+        match req {
+            fnet_routes::RuleWatcherV6Request::Watch { responder } => {
+                RuleWatcherRequest::Watch { responder }
+            }
+        }
+    }
+}
+
+/// An installed IPv4 routing rule.
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct InstalledRule<I: Ip> {
+    /// Rule sets are ordered by the rule set priority, rule sets are disjoint
+    /// and don’t have interleaving rules among them.
+    pub priority: RuleSetPriority,
+    /// Rules within a rule set are locally ordered, together with the rule set
+    /// priority, this defines a global order for all installed rules.
+    pub index: RuleIndex,
+    /// The selector part of the rule, the rule is a no-op if the selector does
+    /// not match the packet.
+    pub selector: RuleSelector<I>,
+    /// The action part of the rule that describes what to do if the selector
+    /// matches the packet.
+    pub action: RuleAction,
+}
+
+impl TryFrom<fnet_routes::InstalledRuleV4> for InstalledRule<Ipv4> {
+    type Error = RuleFidlConversionError;
+    fn try_from(
+        fnet_routes::InstalledRuleV4 {
+        rule_set_priority,
+        rule_index,
+        selector,
+        action,
+    }: fnet_routes::InstalledRuleV4,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            priority: rule_set_priority.into(),
+            index: rule_index.into(),
+            selector: selector.try_into()?,
+            action: action.into(),
+        })
+    }
+}
+
+impl TryFrom<fnet_routes::InstalledRuleV6> for InstalledRule<Ipv6> {
+    type Error = RuleFidlConversionError;
+    fn try_from(
+        fnet_routes::InstalledRuleV6 {
+        rule_set_priority,
+        rule_index,
+        selector,
+        action,
+    }: fnet_routes::InstalledRuleV6,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self {
+            priority: rule_set_priority.into(),
+            index: rule_index.into(),
+            selector: selector.try_into()?,
+            action: action.into(),
+        })
+    }
+}
+
+impl From<InstalledRule<Ipv4>> for fnet_routes::InstalledRuleV4 {
+    fn from(InstalledRule { priority, index, selector, action }: InstalledRule<Ipv4>) -> Self {
+        Self {
+            rule_set_priority: priority.into(),
+            rule_index: index.into(),
+            selector: selector.into(),
+            action: action.into(),
+        }
+    }
+}
+
+impl From<InstalledRule<Ipv6>> for fnet_routes::InstalledRuleV6 {
+    fn from(InstalledRule { priority, index, selector, action }: InstalledRule<Ipv6>) -> Self {
+        Self {
+            rule_set_priority: priority.into(),
+            rule_index: index.into(),
+            selector: selector.into(),
+            action: action.into(),
+        }
+    }
+}
+
+/// A rules watcher event.
+#[derive(Debug, Clone)]
+pub enum RuleEvent<I: Ip> {
+    /// A rule that already existed when watching started.
+    Existing(InstalledRule<I>),
+    /// Sentinel value indicating no more `existing` events will be
+    /// received.
+    Idle,
+    /// A rule that was added while watching.
+    Added(InstalledRule<I>),
+    /// A rule that was removed while watching.
+    Removed(InstalledRule<I>),
+}
+
+impl TryFrom<fnet_routes::RuleEventV4> for RuleEvent<Ipv4> {
+    type Error = RuleFidlConversionError;
+    fn try_from(event: fnet_routes::RuleEventV4) -> Result<Self, Self::Error> {
+        match event {
+            fnet_routes::RuleEventV4::Existing(rule) => Ok(RuleEvent::Existing(rule.try_into()?)),
+            fnet_routes::RuleEventV4::Idle(fnet_routes::Empty) => Ok(RuleEvent::Idle),
+            fnet_routes::RuleEventV4::Added(rule) => Ok(RuleEvent::Added(rule.try_into()?)),
+            fnet_routes::RuleEventV4::Removed(rule) => Ok(RuleEvent::Removed(rule.try_into()?)),
+            fnet_routes::RuleEventV4::__SourceBreaking { unknown_ordinal } => {
+                Err(RuleFidlConversionError::UnknownOrdinal {
+                    name: "RuleEventV4",
+                    unknown_ordinal,
+                })
+            }
+        }
+    }
+}
+
+impl TryFrom<fnet_routes::RuleEventV6> for RuleEvent<Ipv6> {
+    type Error = RuleFidlConversionError;
+    fn try_from(event: fnet_routes::RuleEventV6) -> Result<Self, Self::Error> {
+        match event {
+            fnet_routes::RuleEventV6::Existing(rule) => Ok(RuleEvent::Existing(rule.try_into()?)),
+            fnet_routes::RuleEventV6::Idle(fnet_routes::Empty) => Ok(RuleEvent::Idle),
+            fnet_routes::RuleEventV6::Added(rule) => Ok(RuleEvent::Added(rule.try_into()?)),
+            fnet_routes::RuleEventV6::Removed(rule) => Ok(RuleEvent::Removed(rule.try_into()?)),
+            fnet_routes::RuleEventV6::__SourceBreaking { unknown_ordinal } => {
+                Err(RuleFidlConversionError::UnknownOrdinal {
+                    name: "RuleEventV6",
+                    unknown_ordinal,
+                })
+            }
+        }
+    }
+}
+
+impl From<RuleEvent<Ipv4>> for fnet_routes::RuleEventV4 {
+    fn from(event: RuleEvent<Ipv4>) -> Self {
+        match event {
+            RuleEvent::Existing(r) => Self::Existing(r.into()),
+            RuleEvent::Idle => Self::Idle(fnet_routes::Empty),
+            RuleEvent::Added(r) => Self::Added(r.into()),
+            RuleEvent::Removed(r) => Self::Removed(r.into()),
+        }
+    }
+}
+
+impl From<RuleEvent<Ipv6>> for fnet_routes::RuleEventV6 {
+    fn from(event: RuleEvent<Ipv6>) -> Self {
+        match event {
+            RuleEvent::Existing(r) => Self::Existing(r.into()),
+            RuleEvent::Idle => Self::Idle(fnet_routes::Empty),
+            RuleEvent::Added(r) => Self::Added(r.into()),
+            RuleEvent::Removed(r) => Self::Removed(r.into()),
+        }
+    }
+}
 
 /// Admin extension for the rules part of `fuchsia.net.routes.admin` FIDL API.
 pub trait FidlRuleAdminIpExt: Ip {
@@ -167,11 +394,11 @@ pub enum RuleFidlConversionError {
 }
 
 /// The priority of the rule set, all rule sets are linearized based on this.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RuleSetPriority(u32);
 
 /// The index of a rule within a provided rule set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RuleIndex(u32);
 
 impl RuleIndex {
@@ -209,7 +436,7 @@ impl From<u32> for RuleIndex {
 ///
 /// The default selector is the one that matches every packets, i.e., all the
 /// fields are none.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
 pub struct RuleSelector<I: Ip> {
     /// Matches whether the source address of the packet is from the subnet.
     pub from: Option<Subnet<I::Addr>>,
@@ -334,7 +561,7 @@ impl From<RuleSelector<Ipv6>> for fnet_routes::RuleSelectorV6 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 /// A selector to be used against the mark value.
 pub enum MarkSelector {
     /// This mark domain does not have a mark.
@@ -385,7 +612,7 @@ impl From<MarkSelector> for fnet_routes::MarkSelector {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 /// Actions of a rule if the selector matches.
 pub enum RuleAction {
     /// Return network is unreachable.
@@ -688,6 +915,114 @@ pub async fn close_rule_set<I: Ip + FidlRuleAdminIpExt>(
         .contains(fidl::Signals::CHANNEL_PEER_CLOSED));
 
     result
+}
+
+/// Dispatches either `GetRuleWatcherV4` or `GetRuleWatcherV6` on the state proxy.
+pub fn get_rule_watcher<I: FidlRuleIpExt + FidlRouteIpExt>(
+    state_proxy: &<I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+) -> Result<<I::RuleWatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy, WatcherCreationError>
+{
+    let (watcher_proxy, watcher_server_end) =
+        fidl::endpoints::create_proxy::<I::RuleWatcherMarker>()
+            .map_err(WatcherCreationError::CreateProxy)?;
+
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct GetWatcherInputs<'a, I: FidlRuleIpExt + FidlRouteIpExt> {
+        watcher_server_end: fidl::endpoints::ServerEnd<I::RuleWatcherMarker>,
+        state_proxy: &'a <I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+    }
+    let result = I::map_ip_in(
+        GetWatcherInputs::<'_, I> { watcher_server_end, state_proxy },
+        |GetWatcherInputs { watcher_server_end, state_proxy }| {
+            state_proxy.get_rule_watcher_v4(
+                watcher_server_end,
+                &fnet_routes::RuleWatcherOptionsV4::default(),
+            )
+        },
+        |GetWatcherInputs { watcher_server_end, state_proxy }| {
+            state_proxy.get_rule_watcher_v6(
+                watcher_server_end,
+                &fnet_routes::RuleWatcherOptionsV6::default(),
+            )
+        },
+    );
+
+    result.map_err(WatcherCreationError::GetWatcher)?;
+    Ok(watcher_proxy)
+}
+
+/// Calls `Watch()` on the provided `RuleWatcherV4` or `RuleWatcherV6` proxy.
+pub async fn watch<'a, I: FidlRuleIpExt>(
+    watcher_proxy: &'a <I::RuleWatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+) -> Result<Vec<I::RuleEvent>, fidl::Error> {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct WatchInputs<'a, I: FidlRuleIpExt> {
+        watcher_proxy: &'a <I::RuleWatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+    }
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct WatchOutputs<I: FidlRuleIpExt> {
+        watch_fut: fidl::client::QueryResponseFut<Vec<I::RuleEvent>>,
+    }
+    let WatchOutputs { watch_fut } = net_types::map_ip_twice!(
+        I,
+        WatchInputs { watcher_proxy },
+        |WatchInputs { watcher_proxy }| { WatchOutputs { watch_fut: watcher_proxy.watch() } }
+    );
+    watch_fut.await
+}
+
+/// Route watcher `Watch` errors.
+#[derive(Clone, Debug, Error)]
+pub enum RuleWatchError {
+    /// The call to `Watch` returned a FIDL error.
+    #[error("the call to `Watch()` failed: {0}")]
+    Fidl(fidl::Error),
+    /// The event returned by `Watch` encountered a conversion error.
+    #[error("failed to convert event returned by `Watch()`: {0}")]
+    Conversion(RuleFidlConversionError),
+    /// The server returned an empty batch of events.
+    #[error("the call to `Watch()` returned an empty batch of events")]
+    EmptyEventBatch,
+}
+
+/// Creates a rules event stream from the state proxy.
+pub fn rule_event_stream_from_state<I: FidlRuleIpExt + FidlRouteIpExt>(
+    state: &<I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+) -> Result<impl Stream<Item = Result<RuleEvent<I>, RuleWatchError>>, WatcherCreationError> {
+    let watcher = get_rule_watcher::<I>(state)?;
+    rule_event_stream_from_watcher(watcher)
+}
+
+/// Turns the provided watcher client into a [`RuleEvent`] stream by applying
+/// Hanging-Get watch.
+///
+/// Each call to `Watch` returns a batch of events, which are flattened into a
+/// single stream. If an error is encountered while calling `Watch` or while
+/// converting the event, the stream is immediately terminated.
+pub fn rule_event_stream_from_watcher<I: FidlRuleIpExt>(
+    watcher: <I::RuleWatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+) -> Result<impl Stream<Item = Result<RuleEvent<I>, RuleWatchError>>, WatcherCreationError> {
+    Ok(futures::stream::try_unfold(watcher, |watcher| async {
+        let events_batch = watch::<I>(&watcher).await.map_err(RuleWatchError::Fidl)?;
+        if events_batch.is_empty() {
+            return Err(RuleWatchError::EmptyEventBatch);
+        }
+        // Convert the `I::RuleEvent` into an `RuleEvent<I>` and return any
+        // error.
+        let events_batch = events_batch
+            .into_iter()
+            .map(|event| event.try_into())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(RuleWatchError::Conversion)?;
+        // Below, `try_flatten` requires that the inner stream yields `Result`s.
+        let event_stream = futures::stream::iter(events_batch).map(Ok);
+        Ok(Some((event_stream, watcher)))
+    })
+    // Flatten the stream of event streams into a single event stream.
+    .try_flatten())
 }
 
 #[cfg(test)]

@@ -149,7 +149,8 @@ pub mod admin {
     use futures::{Stream, StreamExt as _};
     use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 
-    use crate::admin::{FidlRouteAdminIpExt, Responder, RouteSetRequest};
+    use crate::admin::{FidlRouteAdminIpExt, RouteSetRequest};
+    use crate::Responder;
 
     /// Provides a RouteTable implementation that provides one RouteSet and
     /// then panics on subsequent invocations. Returns the request stream for

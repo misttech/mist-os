@@ -762,6 +762,45 @@ impl FidlRouteIpExt for Ipv6 {
     type Route = fnet_routes::RouteV6;
 }
 
+/// Abstracts over AddRoute and RemoveRoute RouteSet method responders.
+pub trait Responder: fidl::endpoints::Responder + Debug + Send {
+    /// The payload of the response.
+    type Payload;
+
+    /// Sends a FIDL response.
+    fn send(self, result: Self::Payload) -> Result<(), fidl::Error>;
+}
+
+/// A trait for responding with a slice of objects.
+///
+/// This is similar to [`Responder`], but it allows the sender to send a slice
+/// of objects.
+// These two traits can be merged into one with GATs.
+pub trait SliceResponder<Payload>: fidl::endpoints::Responder + Debug + Send {
+    /// Sends a FIDL response.
+    fn send(self, payload: &[Payload]) -> Result<(), fidl::Error>;
+}
+
+macro_rules! impl_responder {
+    ($resp:ty, &[$payload:ty] $(,)?) => {
+        impl $crate::SliceResponder<$payload> for $resp {
+            fn send(self, result: &[$payload]) -> Result<(), fidl::Error> {
+                <$resp>::send(self, result)
+            }
+        }
+    };
+    ($resp:ty, $payload:ty $(,)?) => {
+        impl $crate::Responder for $resp {
+            type Payload = $payload;
+
+            fn send(self, result: Self::Payload) -> Result<(), fidl::Error> {
+                <$resp>::send(self, result)
+            }
+        }
+    };
+}
+pub(crate) use impl_responder;
+
 /// Options for getting a route watcher.
 #[derive(Default, Clone)]
 pub struct WatcherOptions {

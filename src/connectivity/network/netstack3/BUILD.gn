@@ -113,6 +113,7 @@ common_sources = [
   "src/bindings/routes.rs",
   "src/bindings/routes/admin.rs",
   "src/bindings/routes/rules_admin.rs",
+  "src/bindings/routes/rules_state.rs",
   "src/bindings/routes/state.rs",
   "src/bindings/routes/watcher.rs",
   "src/bindings/routes/witness.rs",

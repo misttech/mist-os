@@ -15,7 +15,7 @@ use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
 };
 
-use crate::FidlRouteIpExt;
+use crate::{impl_responder, FidlRouteIpExt, Responder};
 
 /// Route set creation errors.
 #[derive(Clone, Debug, Error)]
@@ -144,28 +144,6 @@ impl FidlRouteAdminIpExt for Ipv6 {
         RouteTableRequest::from(request)
     }
 }
-
-/// Abstracts over AddRoute and RemoveRoute RouteSet method responders.
-pub trait Responder: fidl::endpoints::Responder + Debug + Send {
-    /// The payload of the response.
-    type Payload;
-
-    /// Sends a FIDL response.
-    fn send(self, result: Self::Payload) -> Result<(), fidl::Error>;
-}
-
-macro_rules! impl_responder {
-    ($resp:ty, $payload:ty $(,)?) => {
-        impl Responder for $resp {
-            type Payload = $payload;
-
-            fn send(self, result: Self::Payload) -> Result<(), fidl::Error> {
-                <$resp>::send(self, result)
-            }
-        }
-    };
-}
-pub(crate) use impl_responder;
 
 impl_responder!(
     fnet_routes_admin::RouteSetV4AddRouteResponder,

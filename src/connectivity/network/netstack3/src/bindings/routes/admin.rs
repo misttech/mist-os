@@ -12,10 +12,8 @@ use fidl::endpoints::{
     ControlHandle as _, ProtocolMarker as _, RequestStream as _, Responder as _,
 };
 use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
-use fnet_routes_ext::admin::{
-    FidlRouteAdminIpExt, Responder as _, RouteSetRequest, RouteTableRequest,
-};
-use fnet_routes_ext::FidlRouteIpExt;
+use fnet_routes_ext::admin::{FidlRouteAdminIpExt, RouteSetRequest, RouteTableRequest};
+use fnet_routes_ext::{FidlRouteIpExt, Responder as _};
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased as _};
 use futures::channel::{mpsc, oneshot};
 use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
