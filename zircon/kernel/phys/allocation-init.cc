@@ -20,9 +20,9 @@ void Allocation::Init(ktl::span<memalloc::Range> mem_ranges,
   static fbl::NoDestructor<memalloc::Pool> pool;
 
   ktl::array ranges{mem_ranges, special_ranges};
-  // kAllocationMinAddr is defined in arch-allocation.h.
-  auto init_result = kAllocationMinAddr  // ktl::nullopt if don't care.
-                         ? pool->Init(ranges, *kAllocationMinAddr)
+  // kArchAllocationMinAddr is defined in arch-allocation.h.
+  auto init_result = kArchAllocationMinAddr  // ktl::nullopt if don't care.
+                         ? pool->Init(ranges, *kArchAllocationMinAddr)
                          : pool->Init(ranges);
   ZX_ASSERT(init_result.is_ok());
 
