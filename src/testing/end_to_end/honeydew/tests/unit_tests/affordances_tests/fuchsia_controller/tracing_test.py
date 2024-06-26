@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.fuchsia_controller.tracing.py."""
 
-import logging
 import os
 import tempfile
 import unittest
@@ -363,33 +362,12 @@ class TracingFCTests(unittest.TestCase):
         "terminate_tracing",
         new_callable=mock.AsyncMock,
     )
-    @mock.patch.object(
-        f_tracingcontroller.ControllerTerminateTracingResult,
-        "response",
-        f_tracingcontroller.ControllerTerminateTracingResponse(
-            result=f_tracingcontroller.TerminateResult(
-                provider_stats=[
-                    f_tracingcontroller.ProviderStats(
-                        name="virtual-console.cm",
-                        pid=4566,
-                        buffering_mode=1,
-                        buffer_wrapped_count=0,
-                        records_dropped=10,
-                        percentage_durable_buffer_used=0.0,
-                        non_durable_bytes_written=16,
-                    )
-                ]
-            )
-        ),
-    )
-    def test_terminate_with_warning(
+    def test_terminate_session_init(
         self,
         parameterized_dict: dict[str, Any],
-        mock_tracingcontroller_terminate: mock.Mock,
-        mock_tracingcontroller_response: f_tracingcontroller.ControllerTerminateTracingResponse,
         *unused_args: Any,
     ) -> None:
-        """Test for Tracing.terminate() method with Warning."""
+        """Test for Tracing.terminate() method with session initialization."""
         # Perform setup based on parameters.
         if parameterized_dict.get("session_initialized"):
             self.tracing_obj.initialize()
@@ -401,13 +379,74 @@ class TracingFCTests(unittest.TestCase):
                 self.tracing_obj.terminate()
         else:
             self.tracing_obj.terminate()
-            mock_tracingcontroller_terminate.assert_called()
-            mock_tracingcontroller_response.assert_called()
 
-            with self.assertLogs("Tracing", level="WARNING"):
-                logging.getLogger("Tracing").warning(
-                    "10 records were dropped for 4566!"
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "with_unset_record_dropped",
+                    "dropped": None,
+                    "assert_warning": False,
+                },
+            ),
+            (
+                {
+                    "label": "with_record_dropped",
+                    "dropped": 10,
+                    "assert_warning": True,
+                },
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    @mock.patch.object(
+        f_tracingcontroller.Controller.Client,
+        "initialize_tracing",
+    )
+    @mock.patch.object(
+        f_tracingcontroller.Controller.Client,
+        "terminate_tracing",
+        new_callable=mock.AsyncMock,
+    )
+    def test_terminate_with_warning(
+        self,
+        parameterized_dict: dict[str, Any],
+        mock_tracingcontroller_terminate: mock.Mock,
+        *unused_args: Any,
+    ) -> None:
+        """Test for Tracing.terminate() method with Warning."""
+        # Perform setup based on parameters.
+        records_dropped = parameterized_dict.get("dropped")
+        mock_tracingcontroller_terminate.return_value = mock.Mock(
+            response=f_tracingcontroller.ControllerTerminateTracingResponse(
+                result=f_tracingcontroller.TerminateResult(
+                    provider_stats=[
+                        f_tracingcontroller.ProviderStats(
+                            name="virtual-console.cm",
+                            pid=4566,
+                            buffering_mode=1,
+                            buffer_wrapped_count=0,
+                            records_dropped=records_dropped,
+                            percentage_durable_buffer_used=0.0,
+                            non_durable_bytes_written=16,
+                        )
+                    ]
                 )
+            )
+        )
+
+        self.tracing_obj.initialize()
+        if parameterized_dict.get("assert_warning"):
+            with self.assertLogs(level="WARNING") as lc:
+                self.tracing_obj.terminate()
+                mock_tracingcontroller_terminate.assert_called()
+                self.assertIn(
+                    f"{records_dropped} records were dropped for virtual-console.cm!",
+                    lc.output[0],
+                )
+        else:
+            with self.assertNoLogs(level="WARNING") as lc:
+                self.tracing_obj.terminate()
 
     @mock.patch.object(
         f_tracingcontroller.Controller.Client,
