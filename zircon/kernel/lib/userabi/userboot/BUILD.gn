@@ -109,6 +109,9 @@ if (toolchain_environment == "userboot") {
       "zx_panic.cc",
     ]
     defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
+    if (is_mistos) {
+      defines += [ "__mist_os__" ]
+    }
     ldflags = [
       "-Wl,-e,_start",
       "-nostartfiles",
