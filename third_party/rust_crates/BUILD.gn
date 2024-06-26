@@ -3759,40 +3759,41 @@ rust_library("crossbeam-epoch-v0_9_4") {
   applicable_licenses = [ ":crossbeam-epoch-v0_9_4.license" ]
 }
 
-license("crossbeam-queue-v0_2_1.license") {
+license("crossbeam-queue-v0_2_3.license") {
   public_package_name = "crossbeam_queue"
   license_files = [
-    "//third_party/rust_crates/vendor/crossbeam-queue-0.2.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/crossbeam-queue-0.2.1/LICENSE-MIT",
-    "//third_party/rust_crates/vendor/crossbeam-queue-0.2.1/LICENSE-THIRD-PARTY",
+    "//third_party/rust_crates/vendor/crossbeam-queue-0.2.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/crossbeam-queue-0.2.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/crossbeam-queue-0.2.3/LICENSE-THIRD-PARTY",
   ]
 }
 
-rust_library("crossbeam-queue-v0_2_1") {
+rust_library("crossbeam-queue-v0_2_3") {
   crate_name = "crossbeam_queue"
   crate_root =
-      "//third_party/rust_crates/vendor/crossbeam-queue-0.2.1/src/lib.rs"
-  output_name = "crossbeam_queue-e8eb2d3b2d6a8126"
+      "//third_party/rust_crates/vendor/crossbeam-queue-0.2.3/src/lib.rs"
+  output_name = "crossbeam_queue-7c99bb5f055c9e0e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":cfg-if-v0_1_10" ]
   deps += [ ":crossbeam-utils-v0_7_2" ]
+  deps += [ ":maybe-uninit-v2_0_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=e8eb2d3b2d6a8126",
-    "-Cextra-filename=-e8eb2d3b2d6a8126",
+    "-Cmetadata=7c99bb5f055c9e0e",
+    "-Cextra-filename=-7c99bb5f055c9e0e",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":crossbeam-queue-v0_2_1.license" ]
+  applicable_licenses = [ ":crossbeam-queue-v0_2_3.license" ]
 }
 
 license("crossbeam-queue-v0_3_1.license") {
@@ -12253,7 +12254,7 @@ rust_library("rayon-core-v1_7_1") {
 
   deps = []
   deps += [ ":crossbeam-deque-v0_7_4" ]
-  deps += [ ":crossbeam-queue-v0_2_1" ]
+  deps += [ ":crossbeam-queue-v0_2_3" ]
   deps += [ ":crossbeam-utils-v0_7_2" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":num_cpus-v1_13_0" ]
