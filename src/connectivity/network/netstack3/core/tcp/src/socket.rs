@@ -4389,10 +4389,6 @@ where
     }
 }
 
-/// A type to expose to bindings in the case of deferred resource removal.
-#[derive(Default)]
-struct TcpSocketResource<I: Ip>(IpVersionMarker<I>);
-
 /// Destroys the socket with `id`.
 fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsContext>(
     core_ctx: &mut CC,

@@ -258,16 +258,4 @@ mod example {
             self.write().unwrap()
         }
     }
-
-    struct CharWrapper(char);
-
-    impl UnlockedAccess<char> for CharWrapper {
-        type Data = char;
-        type Guard<'l> = &'l char where Self: 'l;
-
-        fn access(&self) -> Self::Guard<'_> {
-            let Self(c) = self;
-            c
-        }
-    }
 }

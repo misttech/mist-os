@@ -70,23 +70,6 @@ const DISCOVERY_EXPIRE_TARGETS: &str = "discovery.expire_targets";
 /// Whether we should discover targets over USB. Defaults to "false"
 const OVERNET_ENABLE_USB: &str = "overnet.enable_usb";
 
-// This is just for mocking config values for unit testing.
-#[async_trait(?Send)]
-#[allow(dead_code)]
-trait ConfigReader: Send + Sync {
-    async fn get(&self, q: &str) -> Result<Option<String>>;
-}
-
-#[derive(Default)]
-struct DefaultConfigReader {}
-
-#[async_trait(?Send)]
-impl ConfigReader for DefaultConfigReader {
-    async fn get(&self, q: &str) -> Result<Option<String>> {
-        Ok(ffx_config::get(q).await?)
-    }
-}
-
 pub struct DaemonEventHandler {
     node: Arc<overnet_core::Router>,
     target_collection: Rc<TargetCollection>,
