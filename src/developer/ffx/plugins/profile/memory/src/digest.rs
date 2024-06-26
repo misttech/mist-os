@@ -225,6 +225,39 @@ pub mod processed {
     use serde::Serialize;
 
     use std::collections::{HashMap, HashSet};
+    use std::fmt::Display;
+
+    /// Koid of a process.
+    #[derive(Serialize, PartialEq, Eq, Hash, Debug, Clone, Copy, PartialOrd, Ord)]
+    pub struct ProcessKoid(u64);
+
+    impl ProcessKoid {
+        pub fn new(raw_koid: u64) -> Self {
+            ProcessKoid(raw_koid)
+        }
+    }
+
+    impl Display for ProcessKoid {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    /// Koid of a VMO.
+    #[derive(Serialize, PartialEq, Eq, Hash, Debug, Clone, Copy, PartialOrd, Ord)]
+    pub struct VmoKoid(u64);
+
+    impl VmoKoid {
+        pub fn new(raw_koid: u64) -> Self {
+            VmoKoid(raw_koid)
+        }
+    }
+
+    impl Display for VmoKoid {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
 
     /// Per process memory attribution.
     #[derive(Serialize, PartialEq, Debug, Default, Clone)]
@@ -249,7 +282,7 @@ pub mod processed {
         /// Total uncompressed size, in bytes, of the VMOs contributing to `total`.
         pub total_populated: u64,
         /// List of VMOs aggregated in this group.
-        pub vmos: Vec<u64>,
+        pub vmos: Vec<VmoKoid>,
     }
 
     impl RetainedMemory {
@@ -270,22 +303,22 @@ pub mod processed {
     #[derive(Serialize, PartialEq, Debug, Clone)]
     pub struct Process {
         /// Kernel Object ID. See related Fuchsia Kernel concept.
-        pub koid: u64,
+        pub koid: ProcessKoid,
         pub name: String,
         pub memory: RetainedMemory,
         /// Mapping between VMO group names and the retained memory.
         /// VMO are grouped by name matching. See `rename` for more detail.
         pub name_to_vmo_memory: HashMap<String, RetainedMemory>,
         /// Set of vmo koids related to this process.
-        pub vmos: HashSet<u64>,
+        pub vmos: HashSet<VmoKoid>,
     }
 
     /// Holds all the data relevant to a Vmo.
     #[derive(Serialize, PartialEq, Debug)]
     pub struct Vmo {
-        pub koid: u64,
+        pub koid: VmoKoid,
         pub name: String,
-        pub parent_koid: u64,
+        pub parent_koid: VmoKoid,
         pub committed_bytes: u64,
         pub allocated_bytes: u64,
         #[serde(default)]
@@ -373,10 +406,10 @@ pub mod processed {
                     let vmo_name_index = name as usize;
                     let vmo_name_string = capture.vmo_names[vmo_name_index].clone();
                     koid_to_vmo.insert(
-                        koid,
+                        VmoKoid::new(koid),
                         processed::Vmo {
-                            koid,
-                            parent_koid,
+                            koid: VmoKoid::new(koid),
+                            parent_koid: VmoKoid::new(parent_koid),
                             name: vmo_name_string,
                             committed_bytes,
                             allocated_bytes,
@@ -392,11 +425,11 @@ pub mod processed {
             for (koid, process) in koid_to_process {
                 if let raw::Process::Data(raw::ProcessData { name, vmos, .. }) = process {
                     let p = Process {
-                        koid,
+                        koid: ProcessKoid::new(koid),
                         name: name.to_string(),
                         memory: RetainedMemory::default(),
                         name_to_vmo_memory: HashMap::new(),
-                        vmos: HashSet::from_iter(vmos),
+                        vmos: HashSet::from_iter(vmos.into_iter().map(VmoKoid::new)),
                     };
                     if !p.vmos.is_empty() {
                         processes.push(p);
@@ -439,13 +472,15 @@ pub mod processed {
         // this VMO, either directly, or indirectly via related VMOs.
         // Also maps process to VMOs either directly, or indirectly.
         let (vmo_to_charged_processes, process_to_charged_vmos) = {
-            let mut vmo_to_charged_processes: HashMap<u64, HashSet<u64>> = HashMap::new();
-            let mut process_to_charged_vmos: HashMap<u64, HashSet<u64>> = HashMap::new();
+            let mut vmo_to_charged_processes: HashMap<VmoKoid, HashSet<ProcessKoid>> =
+                HashMap::new();
+            let mut process_to_charged_vmos: HashMap<ProcessKoid, HashSet<VmoKoid>> =
+                HashMap::new();
             for process in processes.iter() {
                 for mut vmo_koid in process.vmos.iter() {
                     // In case of related VMOs, follow parents until reaching
                     // the root VMO.
-                    while *vmo_koid != 0 {
+                    while *vmo_koid != VmoKoid::new(0) {
                         vmo_to_charged_processes.entry(*vmo_koid).or_default().insert(process.koid);
                         process_to_charged_vmos.entry(process.koid).or_default().insert(*vmo_koid);
                         if let Some(processed::Vmo { parent_koid, .. }) = koid_to_vmo.get(&vmo_koid)
@@ -617,7 +652,7 @@ mod tests {
         };
         let expected_processes = vec![
             processed::Process {
-                koid: 2,
+                koid: processed::ProcessKoid::new(2),
                 name: "process2".to_string(),
                 memory: processed::RetainedMemory {
                     private: 0,
@@ -639,19 +674,19 @@ mod tests {
                             private_populated: 0,
                             scaled_populated: 100,
                             total_populated: 300,
-                            vmos: vec![1],
+                            vmos: vec![processed::VmoKoid::new(1)],
                         },
                     );
                     result
                 },
                 vmos: {
                     let mut result = HashSet::new();
-                    result.insert(1);
+                    result.insert(processed::VmoKoid::new(1));
                     result
                 },
             },
             processed::Process {
-                koid: 3,
+                koid: processed::ProcessKoid::new(3),
                 name: "process3".to_string(),
                 memory: processed::RetainedMemory {
                     private: 0,
@@ -673,7 +708,7 @@ mod tests {
                             private_populated: 0,
                             scaled_populated: 100,
                             total_populated: 300,
-                            vmos: vec![1],
+                            vmos: vec![processed::VmoKoid::new(1)],
                         },
                     );
                     result.insert(
@@ -685,20 +720,20 @@ mod tests {
                             private_populated: 0,
                             scaled_populated: 50,
                             total_populated: 100,
-                            vmos: vec![2],
+                            vmos: vec![processed::VmoKoid::new(2)],
                         },
                     );
                     result
                 },
                 vmos: {
                     let mut result = HashSet::new();
-                    result.insert(1);
-                    result.insert(2);
+                    result.insert(processed::VmoKoid::new(1));
+                    result.insert(processed::VmoKoid::new(2));
                     result
                 },
             },
             processed::Process {
-                koid: 4,
+                koid: processed::ProcessKoid::new(4),
                 name: "process4".to_string(),
                 memory: processed::RetainedMemory {
                     private: 100,
@@ -720,19 +755,19 @@ mod tests {
                             private_populated: 200,
                             scaled_populated: 200,
                             total_populated: 200,
-                            vmos: vec![3],
+                            vmos: vec![processed::VmoKoid::new(3)],
                         },
                     );
                     result
                 },
                 vmos: {
                     let mut result = HashSet::new();
-                    result.insert(3);
+                    result.insert(processed::VmoKoid::new(3));
                     result
                 },
             },
             processed::Process {
-                koid: 5,
+                koid: processed::ProcessKoid::new(5),
                 name: "process5".to_string(),
                 memory: processed::RetainedMemory {
                     private: 0,
@@ -754,7 +789,7 @@ mod tests {
                             private_populated: 0,
                             scaled_populated: 50,
                             total_populated: 100,
-                            vmos: vec![2],
+                            vmos: vec![processed::VmoKoid::new(2)],
                         },
                     );
                     result.insert(
@@ -766,19 +801,19 @@ mod tests {
                             private_populated: 0,
                             scaled_populated: 100,
                             total_populated: 300,
-                            vmos: vec![1],
+                            vmos: vec![processed::VmoKoid::new(1)],
                         },
                     );
                     result
                 },
                 vmos: {
                     let mut result = HashSet::new();
-                    result.insert(2);
+                    result.insert(processed::VmoKoid::new(2));
                     result
                 },
             },
             processed::Process {
-                koid: 6,
+                koid: processed::ProcessKoid::new(6),
                 name: "process6".to_string(),
                 memory: processed::RetainedMemory {
                     private: 100,
@@ -800,14 +835,14 @@ mod tests {
                             private_populated: 200,
                             scaled_populated: 200,
                             total_populated: 200,
-                            vmos: vec![4],
+                            vmos: vec![processed::VmoKoid::new(4)],
                         },
                     );
                     result
                 },
                 vmos: {
                     let mut result = HashSet::new();
-                    result.insert(4);
+                    result.insert(processed::VmoKoid::new(4));
                     result
                 },
             },
@@ -856,33 +891,33 @@ mod tests {
 
         let expected_vmos = vec![
             processed::Vmo {
-                koid: 1,
+                koid: processed::VmoKoid::new(1),
                 name: "vmo1".to_string(),
-                parent_koid: 0,
+                parent_koid: processed::VmoKoid::new(0),
                 committed_bytes: 300,
                 allocated_bytes: 300,
                 populated_bytes: Some(300),
             },
             processed::Vmo {
-                koid: 2,
+                koid: processed::VmoKoid::new(2),
                 name: "vmo2".to_string(),
-                parent_koid: 1,
+                parent_koid: processed::VmoKoid::new(1),
                 committed_bytes: 100,
                 allocated_bytes: 100,
                 populated_bytes: Some(100),
             },
             processed::Vmo {
-                koid: 3,
+                koid: processed::VmoKoid::new(3),
                 name: "vmo3".to_string(),
-                parent_koid: 0,
+                parent_koid: processed::VmoKoid::new(0),
                 committed_bytes: 100,
                 allocated_bytes: 200,
                 populated_bytes: Some(200),
             },
             processed::Vmo {
-                koid: 4,
+                koid: processed::VmoKoid::new(4),
                 name: "vmo4".to_string(),
-                parent_koid: 0,
+                parent_koid: processed::VmoKoid::new(0),
                 committed_bytes: 100,
                 allocated_bytes: 200,
                 populated_bytes: Some(200),
@@ -900,8 +935,16 @@ mod tests {
         pretty_assertions::assert_eq!(
             buckets,
             Some(vec![
-                Bucket { name: "bucket0".to_string(), size: 400, vmos: HashSet::from([1, 3]) },
-                Bucket { name: "bucket1".to_string(), size: 100, vmos: HashSet::from([2]) }
+                Bucket {
+                    name: "bucket0".to_string(),
+                    size: 400,
+                    vmos: HashSet::from([processed::VmoKoid::new(1), processed::VmoKoid::new(3)])
+                },
+                Bucket {
+                    name: "bucket1".to_string(),
+                    size: 100,
+                    vmos: HashSet::from([processed::VmoKoid::new(2)])
+                }
             ])
         );
 
@@ -967,7 +1010,7 @@ mod tests {
         };
         let expected_processes = vec![
             processed::Process {
-                koid: 2,
+                koid: processed::ProcessKoid::new(2),
                 name: "blobfs.cm".to_string(),
                 memory: processed::RetainedMemory {
                     private: 0,
@@ -989,19 +1032,19 @@ mod tests {
                             private_populated: 0,
                             scaled_populated: 250,
                             total_populated: 500,
-                            vmos: vec![1],
+                            vmos: vec![processed::VmoKoid::new(1)],
                         },
                     );
                     result
                 },
                 vmos: {
                     let mut result = HashSet::new();
-                    result.insert(1);
+                    result.insert(processed::VmoKoid::new(1));
                     result
                 },
             },
             processed::Process {
-                koid: 3,
+                koid: processed::ProcessKoid::new(3),
                 name: "app.cm".to_string(),
                 memory: processed::RetainedMemory {
                     private: 0,
@@ -1023,7 +1066,7 @@ mod tests {
                             private_populated: 50,
                             scaled_populated: 50,
                             total_populated: 50,
-                            vmos: vec![2],
+                            vmos: vec![processed::VmoKoid::new(2)],
                         },
                     );
                     result.insert(
@@ -1035,14 +1078,14 @@ mod tests {
                             private_populated: 0,
                             scaled_populated: 250,
                             total_populated: 500,
-                            vmos: vec![1],
+                            vmos: vec![processed::VmoKoid::new(1)],
                         },
                     );
                     result
                 },
                 vmos: {
                     let mut result = HashSet::new();
-                    result.insert(2);
+                    result.insert(processed::VmoKoid::new(2));
                     result
                 },
             },
@@ -1073,17 +1116,17 @@ mod tests {
 
         let expected_vmos = vec![
             processed::Vmo {
-                koid: 1,
+                koid: processed::VmoKoid::new(1),
                 name: "blob-xxx".to_string(),
-                parent_koid: 0,
+                parent_koid: processed::VmoKoid::new(0),
                 committed_bytes: 500,
                 allocated_bytes: 1000,
                 populated_bytes: Some(500),
             },
             processed::Vmo {
-                koid: 2,
+                koid: processed::VmoKoid::new(2),
                 name: "app.cm".to_string(),
-                parent_koid: 1,
+                parent_koid: processed::VmoKoid::new(1),
                 committed_bytes: 0,
                 allocated_bytes: 1000,
                 populated_bytes: Some(50),

@@ -118,7 +118,7 @@ mod tests {
         ProcessDigest(ProcessesMemoryUsage {
             capture_time: 123000111222,
             process_data: vec![processed::Process {
-                koid: 4,
+                koid: processed::ProcessKoid::new(4),
                 name: "P".to_string(),
                 memory: RetainedMemory {
                     private: 11,
@@ -190,7 +190,7 @@ mod tests {
             total_committed_bytes_in_vmos: 0,
             kernel: Kernel::default(),
             processes: vec![processed::Process {
-                koid: 4,
+                koid: processed::ProcessKoid::new(4),
                 name: "P".to_string(),
                 memory: RetainedMemory {
                     private: 11,

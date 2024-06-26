@@ -97,18 +97,31 @@ fn print_processes_digest<W: Write>(
         // Write the actual content of the table of VMOs.
         for vmo_name in vmo_names {
             if let Some(sizes) = process.name_to_vmo_memory.get(vmo_name) {
-                let extra_info = if sizes.total == sizes.private { "" } else { "(shared)" };
-                writeln!(
-                    w,
-                    "    {:<p1$} {:>p2$} {:>p2$} {:>p2$} {:>p2$}",
-                    vmo_name,
-                    size_formatter(sizes.private),
-                    size_formatter(sizes.scaled),
-                    size_formatter(sizes.total),
-                    extra_info,
-                    p1 = process_name_trailing_padding,
-                    p2 = padding_between_number_columns
-                )?;
+                if sizes.total != sizes.private {
+                    let extra_info = "(shared)";
+                    writeln!(
+                        w,
+                        "    {:<p1$} {:>p2$} {:>p2$} {:>p2$} {:>p2$}",
+                        vmo_name,
+                        size_formatter(sizes.private),
+                        size_formatter(sizes.scaled),
+                        size_formatter(sizes.total),
+                        extra_info,
+                        p1 = process_name_trailing_padding,
+                        p2 = padding_between_number_columns
+                    )?;
+                } else {
+                    writeln!(
+                        w,
+                        "    {:<p1$} {:>p2$} {:>p2$} {:>p2$}",
+                        vmo_name,
+                        size_formatter(sizes.private),
+                        size_formatter(sizes.scaled),
+                        size_formatter(sizes.total),
+                        p1 = process_name_trailing_padding,
+                        p2 = padding_between_number_columns
+                    )?;
+                }
             }
         }
         writeln!(w)?;
@@ -262,7 +275,7 @@ mod tests {
         ProcessDigest(ProcessesMemoryUsage {
             capture_time: 123,
             process_data: vec![processed::Process {
-                koid: 4,
+                koid: processed::ProcessKoid::new(4),
                 name: "P".to_string(),
                 memory: RetainedMemory {
                     private: 11,
@@ -322,7 +335,7 @@ mod tests {
         ProcessDigest(ProcessesMemoryUsage {
             capture_time: 123,
             process_data: vec![processed::Process {
-                koid: 4,
+                koid: processed::ProcessKoid::new(4),
                 name: "P".to_string(),
                 memory: RetainedMemory {
                     private: 11,
@@ -402,7 +415,7 @@ mod tests {
                 zram_fragmentation: Some(0),
             },
             processes: vec![processed::Process {
-                koid: 1,
+                koid: processed::ProcessKoid::new(1),
                 name: "process1".to_owned(),
                 memory: RetainedMemory {
                     private: 100,
@@ -411,7 +424,7 @@ mod tests {
                     scaled_populated: 100,
                     total: 100,
                     total_populated: 100,
-                    vmos: vec![10u64],
+                    vmos: vec![processed::VmoKoid::new(10)],
                 },
                 name_to_vmo_memory: HashMap::from_iter(vec![(
                     "vmo1".to_owned(),
@@ -422,15 +435,15 @@ mod tests {
                         scaled_populated: 100,
                         total: 100,
                         total_populated: 100,
-                        vmos: vec![10u64],
+                        vmos: vec![processed::VmoKoid::new(10)],
                     },
                 )]),
-                vmos: HashSet::from_iter(vec![10u64]),
+                vmos: HashSet::from_iter(vec![processed::VmoKoid::new(10)]),
             }],
             vmos: vec![processed::Vmo {
-                koid: 10,
+                koid: processed::VmoKoid::new(10),
                 name: "vmo1".to_owned(),
-                parent_koid: 0,
+                parent_koid: processed::VmoKoid::new(0),
                 committed_bytes: 100,
                 allocated_bytes: 100,
                 populated_bytes: None,
@@ -438,7 +451,7 @@ mod tests {
             buckets: Some(vec![Bucket {
                 name: "some_bucket".to_owned(),
                 size: 300,
-                vmos: HashSet::from_iter(vec![20u64]),
+                vmos: HashSet::from_iter(vec![processed::VmoKoid::new(20)]),
             }]),
             total_undigested: Some(200),
         })
@@ -532,7 +545,7 @@ Private:              100 B
 PSS:                  100 B (Proportional Set Size)
 Total:                100 B (Private + Shared unscaled)
               Private       Scaled        Total
-    vmo1        100 B        100 B        100 B             
+    vmo1        100 B        100 B        100 B
 
 
 "#;
