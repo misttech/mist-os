@@ -4,6 +4,7 @@
 {
     program: {
         runner: "starnix_container",
-        binary: "/system/bin/reboot",
+        binary: "data/tests/reboot",
+        uid: "0",
     },
 }

@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
+import("//src/starnix/build/starnix_linux_executable.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
 
 group("tests") {
@@ -35,11 +36,33 @@ rustc_test("integration_test") {
   sources = [ source_root ]
 }
 
+if (is_linux) {
+  executable("reboot") {
+    testonly = true
+    sources = [ "reboot.cc" ]
+
+    # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
+    exclude_toolchain_tags = [
+      "asan",
+      "coverage",
+    ]
+  }
+
+  resource("reboot_resource") {
+    testonly = true
+    sources = [ "$root_out_dir/reboot" ]
+    outputs = [ "data/tests/reboot" ]
+    deps = [ ":reboot" ]
+  }
+}
+
 fuchsia_test_component("reboot_no_args") {
   manifest = "meta/reboot_no_args.cml"
+  deps = [ ":reboot_resource($target_linux_toolchain)" ]
 }
 fuchsia_test_component("reboot_ota_update") {
   manifest = "meta/reboot_ota_update.cml"
+  deps = [ ":reboot_resource($target_linux_toolchain)" ]
 }
 
 fuchsia_test_component("realm") {
@@ -61,7 +84,7 @@ fuchsia_test_package("starnix_reboot_integration_tests") {
   ]
 
   subpackages = starnix_test_subpackages +
-                [ "//src/starnix/containers/bionic:bionic_package" ]
+                [ "//src/starnix/containers/debian:debian_package" ]
 
   # TODO(b/295073633): remove when starnix can gracefully shutdown
   test_specs = {

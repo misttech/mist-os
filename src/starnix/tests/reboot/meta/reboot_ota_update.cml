@@ -4,7 +4,8 @@
 {
     program: {
         runner: "starnix_container",
-        binary: "/system/bin/reboot",
+        binary: "data/tests/reboot",
         args: [ "ota_update" ],
+        uid: "0",
     },
 }
