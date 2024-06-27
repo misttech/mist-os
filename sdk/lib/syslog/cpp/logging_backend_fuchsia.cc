@@ -32,8 +32,6 @@ namespace syslog_runtime {
 
 using log_word_t = uint64_t;
 
-static const size_t kMaxTags = 4;  // Legacy from ulib/syslog. Might be worth rethinking.
-
 class GlobalStateLock;
 class LogState {
  public:
@@ -43,8 +41,7 @@ class LogState {
 
   fuchsia_logging::LogSeverity min_severity() const { return min_severity_; }
 
-  const std::string* tags() const { return tags_; }
-  size_t tag_count() const { return num_tags_; }
+  const std::vector<std::string>& tags() const { return tags_; }
 
   // Allowed to be const because descriptor_ is mutable
   cpp17::variant<zx::socket, std::ofstream>& descriptor() const { return logsink_socket_; }
@@ -65,8 +62,7 @@ class LogState {
   std::atomic<fuchsia_logging::LogSeverity> min_severity_;
   const fuchsia_logging::LogSeverity default_severity_;
   mutable cpp17::variant<zx::socket, std::ofstream> logsink_socket_ = zx::socket();
-  std::string tags_[kMaxTags];
-  size_t num_tags_ = 0;
+  std::vector<std::string> tags_;
   async_dispatcher_t* interest_listener_dispatcher_;
   fuchsia_logging::InterestListenerBehavior interest_listener_config_;
   // Handle to a fuchsia.logger.LogSink instance.
@@ -174,7 +170,7 @@ void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severit
   }
   buffer->inner.BeginRecord(severity, file_name, line, msg, zx::unowned_socket(socket), 0, pid,
                             tid);
-  for (size_t i = 0; i < log_state->tag_count(); i++) {
+  for (size_t i = 0; i < log_state->tags().size(); i++) {
     buffer->inner.WriteKeyValue(kTagFieldName, log_state->tags()[i]);
   }
 }
@@ -336,9 +332,7 @@ LogState::LogState(const fuchsia_logging::LogSettings& settings,
     on_severity_changed_ = [](fuchsia_logging::LogSeverity severity) {};
   }
   for (auto& tag : tags) {
-    tags_[num_tags_++] = tag;
-    if (num_tags_ >= kMaxTags)
-      break;
+    tags_.push_back(tag);
   }
   Connect();
 }
