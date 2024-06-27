@@ -1,12 +1,13 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_power_broker as fbroker;
 use fuchsia_inspect::Property;
 use fuchsia_zircon::{HandleBased, Rights};
 use futures::future::{FutureExt, LocalBoxFuture};
+use std::sync::Arc;
+use {fidl_fuchsia_power_broker as fbroker, fuchsia_async as fasync};
 
 /// A well-known set of PowerLevels to be specified as the valid_levels for a
 /// power element. This is the set of levels in fbroker::BinaryPowerLevel.
@@ -247,6 +248,98 @@ pub async fn run_power_element<'a>(
     }
 }
 
+/// A dependency for a lease. It is equivalent to an fbroker::LevelDependency with the dependent
+/// fields omitted.
+pub struct LeaseDependency {
+    pub dependency_type: fbroker::DependencyType,
+    pub requires_token: fbroker::DependencyToken,
+    pub requires_level_by_preference: Vec<fbroker::PowerLevel>,
+}
+
+/// Helper for acquiring leases. Instantiate with LeaseControl::new(), and then acquire a lease with
+/// the lease() method. The lease() call will return only once the lease is satisfied.
+///
+/// A single LeaseHelper may be reused to create leases an arbitrary number of times.
+pub struct LeaseHelper {
+    lessor: fbroker::LessorProxy,
+    _element_runner: fasync::Task<()>,
+}
+
+pub struct Lease {
+    /// This may be used to further monitor the lease status, if desired, beyond the
+    /// await-until-satisfied behavior of LeaseHelper::lease().
+    pub control_proxy: fbroker::LeaseControlProxy,
+
+    // The originating LeaseHelper must be kept alive as long as the lease to keep its associated
+    // power element running.
+    _helper: Arc<LeaseHelper>,
+}
+
+impl LeaseHelper {
+    /// Creates a new LeaseHelper. Returns an error upon failure to register the to-be-leased power
+    /// element with Power Broker.
+    pub async fn new<'a>(
+        topology: &'a fbroker::TopologyProxy,
+        name: &'a str,
+        lease_dependencies: Vec<LeaseDependency>,
+    ) -> Result<Arc<Self>> {
+        let level_dependencies = lease_dependencies
+            .into_iter()
+            .map(|d| fbroker::LevelDependency {
+                dependency_type: d.dependency_type,
+                dependent_level: BINARY_POWER_LEVELS[1],
+                requires_token: d.requires_token,
+                requires_level_by_preference: d.requires_level_by_preference,
+            })
+            .collect();
+
+        let element_context = PowerElementContext::builder(topology, name, &BINARY_POWER_LEVELS)
+            .dependencies(level_dependencies)
+            .initial_current_level(BINARY_POWER_LEVELS[1])
+            .build()
+            .await?;
+
+        let lessor = element_context.lessor.clone();
+
+        let _element_runner = fasync::Task::local(async move {
+            run_power_element(
+                &element_context.name(),
+                &element_context.required_level,
+                BINARY_POWER_LEVELS[0], /* initial_level */
+                None,                   /* inspect_node */
+                basic_update_fn_factory(&element_context),
+            )
+            .await;
+        });
+
+        Ok(Arc::new(Self { lessor, _element_runner }))
+    }
+
+    /// Acquires a lease, completing only once the lease is satisfied. Returns an error if the
+    /// underlying `Lessor.Lease` or `LeaseControl.WatchStatus` call fails.
+    pub async fn lease(self: &Arc<Self>) -> Result<Lease> {
+        let lease = self
+            .lessor
+            .lease(BINARY_POWER_LEVELS[1])
+            .await?
+            .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?;
+
+        // Wait for the lease to be satisfied.
+        let lease = lease.into_proxy()?;
+        let mut status = fbroker::LeaseStatus::Unknown;
+        loop {
+            match lease.watch_status(status).await? {
+                fbroker::LeaseStatus::Satisfied => break,
+                new_status @ _ => status = new_status,
+            }
+        }
+
+        Ok(Lease { control_proxy: lease, _helper: self.clone() })
+    }
+}
+
+// TODO(https://fxbug.dev/349841776): Use this as a demo case for test library support for faking
+// Power Broker interfaces.
 #[cfg(test)]
 mod tests {
     use super::*;
