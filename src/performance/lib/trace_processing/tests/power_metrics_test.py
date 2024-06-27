@@ -6,9 +6,10 @@
 
 import unittest
 import collections.abc
-from trace_processing.metrics import power
-from trace_processing import trace_metrics, trace_model, trace_time
 from typing import Any, Iterable
+
+from trace_processing.metrics import power, suspend
+from trace_processing import trace_metrics, trace_model, trace_time
 
 # Boilerplate-busting constants:
 U = trace_metrics.Unit
@@ -405,25 +406,17 @@ class PowerMetricsTest(unittest.TestCase):
                     tid=6666,
                     name="initial-thread",
                     events=[
-                        trace_model.DurationEvent.from_dict(
-                            {
-                                "cat": "power",
-                                "name": "suspend",
-                                "ts": 900000,  # µs
-                                "pid": 5555,
-                                "tid": 6666,
-                                "dur": 200000,  # µs
-                            }
+                        suspend.make_synthetic_event(
+                            timestamp_usec=900000,
+                            pid=5555,
+                            tid=6666,
+                            duration_usec=200000,
                         ),
-                        trace_model.DurationEvent.from_dict(
-                            {
-                                "cat": "power",
-                                "name": "suspend",
-                                "ts": 1150000,  # µs
-                                "pid": 5555,
-                                "tid": 6666,
-                                "dur": 200000,  # µs
-                            }
+                        suspend.make_synthetic_event(
+                            timestamp_usec=1150000,
+                            pid=5555,
+                            tid=6666,
+                            duration_usec=200000,
                         ),
                     ],
                 )
@@ -478,16 +471,12 @@ class PowerMetricsTest(unittest.TestCase):
                     tid=6666,
                     name="initial-thread",
                     events=[
-                        trace_model.DurationEvent.from_dict(
-                            {
-                                "cat": "power",
-                                "name": "suspend",
-                                "ts": 900000,  # µs
-                                "pid": 5555,
-                                "tid": 6666,
-                                "dur": 200000,  # µs
-                            }
-                        )
+                        suspend.make_synthetic_event(
+                            timestamp_usec=900000,
+                            pid=5555,
+                            tid=6666,
+                            duration_usec=200000,
+                        ),
                     ],
                 )
             ],
