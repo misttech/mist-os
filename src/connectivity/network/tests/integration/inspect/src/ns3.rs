@@ -544,7 +544,11 @@ async fn inspect_devices(name: &str) {
                         "127.0.0.1/8": {
                             ValidUntil: "infinite",
                         }
-                    }
+                    },
+                    Configuration: {
+                        "GmpEnabled": false,
+                        "ForwardingEnabled": false,
+                    },
                 },
                 IPv6: {
                     Addresses: {
@@ -554,7 +558,11 @@ async fn inspect_devices(name: &str) {
                             Deprecated: false,
                             Assigned: true,
                         }
-                    }
+                    },
+                    Configuration: {
+                        "GmpEnabled": false,
+                        "ForwardingEnabled": false,
+                    },
                 },
                 Counters: {
                     Rx: {
@@ -592,7 +600,11 @@ async fn inspect_devices(name: &str) {
                         "192.168.0.1/24": {
                             ValidUntil: "infinite"
                         }
-                    }
+                    },
+                    Configuration: {
+                        "GmpEnabled": true,
+                        "ForwardingEnabled": false,
+                    },
                 },
                 IPv6: {
                     "Addresses": {
@@ -604,7 +616,11 @@ async fn inspect_devices(name: &str) {
                             // the number of DAD transmits to `u16::MAX` above.
                             Assigned: false,
                         }
-                    }
+                    },
+                    Configuration: {
+                        "GmpEnabled": true,
+                        "ForwardingEnabled": false,
+                    },
                 },
                 NetworkDevice: {
                     MacAddress: "02:00:00:00:00:01",
