@@ -24,12 +24,6 @@ fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::Create(
   return CreateAligned(name, sysmem, bti, size, 0, is_secure, is_writable, is_mapping_needed);
 }
 
-fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::Create(
-    const char* name, fuchsia::sysmem::AllocatorSyncPtr* sysmem, const zx::unowned_bti& bti,
-    size_t size, bool is_secure, bool is_writable, bool is_mapping_needed) {
-  return CreateAligned(name, sysmem, bti, size, 0, is_secure, is_writable, is_mapping_needed);
-}
-
 fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::CreateAligned(
     const char* name, fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,
     const zx::unowned_bti& bti, size_t size, size_t alignment, bool is_secure, bool is_writable,
@@ -47,29 +41,6 @@ fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::CreateAligned(
     return fpromise::error(status);
   }
   return fpromise::ok(std::move(local_result));
-}
-
-fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::CreateAligned(
-    const char* name, fuchsia::sysmem::AllocatorSyncPtr* sysmem, const zx::unowned_bti& bti,
-    size_t size, size_t alignment, bool is_secure, bool is_writable, bool is_mapping_needed) {
-  ZX_DEBUG_ASSERT(sysmem);
-  ZX_DEBUG_ASSERT(*sysmem);
-  ZX_DEBUG_ASSERT(*bti);
-  ZX_DEBUG_ASSERT(size);
-  ZX_DEBUG_ASSERT(size % ZX_PAGE_SIZE == 0);
-  ZX_DEBUG_ASSERT(!is_mapping_needed || !is_secure);
-
-  // Get sysmem2 from sysmem(1). This overload of CreateAligned is deprecated and will be removed
-  // once all clients are using the sysmem2 version instead.
-  auto sysmem2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
-  ZX_ASSERT(sysmem2_endpoints.is_ok());
-  zx_status_t status = (*sysmem)->ConnectToSysmem2Allocator(
-      fidl::InterfaceRequest<fuchsia::sysmem2::Allocator>(sysmem2_endpoints->server.TakeChannel()));
-  ZX_ASSERT(status == ZX_OK);
-  auto sysmem2_sync = fidl::SyncClient(std::move(sysmem2_endpoints->client));
-
-  return CreateAligned(name, &sysmem2_sync, bti, size, alignment, is_secure, is_writable,
-                       is_mapping_needed);
 }
 
 InternalBuffer::~InternalBuffer() { DeInit(); }
