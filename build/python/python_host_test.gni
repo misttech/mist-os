@@ -12,7 +12,6 @@ import("//build/testing/host_test_data.gni")
 #
 # ```
 # python_host_test("my_host_test") {
-#   enable_mypy = true
 #   main_source = "my_host_test.py"
 #   sources = [
 #     "test_helpers_foo.py",
@@ -61,7 +60,7 @@ import("//build/testing/host_test_data.gni")
 #   enable_mypy (optional)
 #     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
-#     Default: False
+#     Default: true
 #
 #  test_data_deps (optional)
 #    The dependencies used only at runtime for this test.
@@ -73,18 +72,23 @@ template("python_host_test") {
   assert(defined(invoker.main_source), "main_source is required")
   _python_binary_name = "${target_name}.pyz"
   _python_binary_target = "${target_name}_python_binary"
+
+  _enable_mypy = true
+  if (defined(invoker.enable_mypy)) {
+    _enable_mypy = invoker.enable_mypy
+  }
+
   python_binary(_python_binary_target) {
     forward_variables_from(invoker,
                            [
                              "main_source",
                              "sources",
                              "deps",
-                             "enable_mypy",
                            ])
 
     testonly = true
     visibility = [ ":*" ]
-
+    enable_mypy = _enable_mypy
     output_name = _python_binary_name
     main_callable = "unittest.main"
     if (defined(invoker.main_callable)) {
