@@ -13,6 +13,7 @@
 #include "src/performance/lib/perfmon/controller.h"
 
 int main(int argc, const char** argv) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   if (!fxl::SetLogSettingsFromCommandLine(command_line))
     return 1;
@@ -23,8 +24,6 @@ int main(int argc, const char** argv) {
   }
 
   FX_LOGS(DEBUG) << argv[0] << ": starting";
-
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "cpuperf_provider");
 
   cpuperf_provider::App app(command_line);
