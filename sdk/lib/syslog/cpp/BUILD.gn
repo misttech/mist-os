@@ -49,6 +49,8 @@ sdk_source_set("cpp") {
       "//sdk/lib/fdio",
       "//sdk/lib/stdcompat",
       "//zircon/system/ulib/async:async-cpp",
+      "//zircon/system/ulib/async-default:async-default",
+      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/sync",
     ]
 
