@@ -1568,9 +1568,14 @@ pub fn sys_setpriority(
     // The priority passed into setpriority is actually in the -19...20 range and is not
     // transformed into the 1...40 range. The man page is lying. (I sent a patch, so it might not
     // be lying anymore by the time you read this.)
-    let priority = 20 - priority;
-    let max_priority = std::cmp::min(40, target_task.thread_group.get_rlimit(Resource::NICE));
-    target_task.update_scheduler_nice(priority.clamp(1, max_priority as i32) as u8)?;
+    const MIN_PRIORITY: u8 = 1;
+    const MID_PRIORITY: u8 = 20;
+    const MAX_PRIORITY: u8 = 40;
+    let priority = (MID_PRIORITY as i32).saturating_sub(priority);
+    let max_priority =
+        std::cmp::min(MAX_PRIORITY as u64, target_task.thread_group.get_rlimit(Resource::NICE));
+    target_task
+        .update_scheduler_nice(priority.clamp(MIN_PRIORITY as i32, max_priority as i32) as u8)?;
     Ok(())
 }
 
