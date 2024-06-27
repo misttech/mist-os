@@ -90,7 +90,7 @@ fn main() -> Result<(), Error> {
 
     let config = Config {
         features: Default::default(),
-        init: vec!["/bin/hello_starnix".to_owned()],
+        init: vec![],
         kernel_cmdline: Default::default(),
         mounts: vec!["/:remotefs".to_owned()],
         rlimits: Default::default(),

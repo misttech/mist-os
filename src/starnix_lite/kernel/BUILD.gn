@@ -87,12 +87,6 @@ rustc_binary("starnix_kernel_bin") {
     "main.rs",
   ]
 
-  data_deps = [
-    ":starnix-test-files",
-    "//build/info/bootfs:minimum_utc_stamp",
-    "//src/starnix/examples/hello_starnix:bin",
-  ]
-
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
@@ -427,6 +421,7 @@ rustc_library("starnix_core") {
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
   }
+
   inputs = [ "//src/starnix_lite/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
@@ -709,6 +704,16 @@ fuchsia_structured_config_rust_lib("starnix_kernel_config") {
   cm_label = ":starnix_kernel_manifest"
 }
 
+fuchsia_component("starnix_kernel") {
+  cm_label = ":starnix_kernel_manifest"
+  deps = [ ":starnix_kernel_bin" ]
+}
+
+fuchsia_structured_config_values("kernel_config") {
+  cm_label = ":starnix_kernel_manifest"
+  values_source = "//src/starnix/kernel/meta/config.json5"
+}
+
 # ZBIs
 
 kernel_cmdline("starnix-zbi-cmdline") {
@@ -720,14 +725,15 @@ kernel_cmdline("starnix-zbi-cmdline") {
 
 zbi("starnix_kernel_zbi") {
   deps = [ "//zircon/kernel" ]
-
-  # Order matters here!
-  # NOSORT
   deps += [
-    #":kernel_config",
-    #"//src/starnix/containers:default_init",
+    ":kernel_config",
     ":starnix-zbi-cmdline",
+    ":starnix_kernel",
     ":starnix_kernel_bin",
+    ":starnix_kernel_manifest",
+    "//build/info/bootfs:minimum_utc_stamp",
+    "//src/starnix/containers:default_init",
+    "//src/starnix/examples/hello_starnix:bin",
   ]
 
   output_name = "starnix_kernel"
