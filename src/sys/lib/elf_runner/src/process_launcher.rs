@@ -3,9 +3,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(feature = "mistos")]
+#[cfg(mistos)]
 use crate::vdso_vmo::get_next_vdso_vmo;
-#[cfg(not(feature = "mistos"))]
+#[cfg(not(mistos))]
 use crate::vdso_vmo::get_stable_vdso_vmo;
 use anyhow::Context;
 use cm_types::NamespacePath;
@@ -187,13 +187,13 @@ impl ProcessLauncher {
         let proc_name = CString::new(info.name)
             .map_err(|_| LauncherError::InvalidArg("Process name contained null byte"))?;
 
-        #[cfg(feature = "mistos")]
+        #[cfg(mistos)]
         // TODO(Herrera) Remove this code once the symbols we need to run starnix move to stable.
         let stable_vdso_vmo = get_next_vdso_vmo().map_err(|_| {
             LauncherError::BuilderError(ProcessBuilderError::BadHandle("Failed to get next vDSO"))
         })?;
 
-        #[cfg(not(feature = "mistos"))]
+        #[cfg(not(mistos))]
         let stable_vdso_vmo = get_stable_vdso_vmo().map_err(|_| {
             LauncherError::BuilderError(ProcessBuilderError::BadHandle("Failed to get stable vDSO"))
         })?;

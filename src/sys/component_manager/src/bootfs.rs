@@ -45,6 +45,9 @@ const BOOTFS_EXECUTABLE_PACKAGE_DIRECTORIES: &[&str] = &["bin", "lib"];
 
 // Top level directories in bootfs that are allowed to contain executable files.
 // Every file in these directories will have ZX_RIGHT_EXECUTE.
+#[cfg(mistos)]
+const BOOTFS_EXECUTABLE_DIRECTORIES: &[&str] = &["bin", "lib", "test", "data"];
+#[cfg(not(mistos))]
 const BOOTFS_EXECUTABLE_DIRECTORIES: &[&str] = &["bin", "driver", "lib", "test", "blob"];
 
 #[derive(Debug, Error)]
