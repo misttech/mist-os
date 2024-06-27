@@ -681,8 +681,10 @@ mod tests {
         let rules = DecodedRules::new(bytecode).unwrap();
 
         ResolvedDriver {
-            component_url: url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm")
-                .unwrap(),
+            component_url: cm_types::Url::new(
+                "fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm",
+            )
+            .unwrap(),
             bind_rules: rules,
             bind_bytecode: vec![],
             colocate: false,

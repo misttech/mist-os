@@ -323,17 +323,17 @@ async fn main() -> Result<(), anyhow::Error> {
         None
     };
 
-    let eager_drivers: HashSet<url::Url> = config
+    let eager_drivers: HashSet<cm_types::Url> = config
         .bind_eager
         .iter()
         .filter(|url| !url.is_empty())
-        .filter_map(|url| url::Url::parse(url).ok())
+        .filter_map(|url| cm_types::Url::new(url).ok())
         .collect();
-    let disabled_drivers: HashSet<url::Url> = config
+    let disabled_drivers: HashSet<cm_types::Url> = config
         .disabled_drivers
         .iter()
         .filter(|url| !url.is_empty())
-        .filter_map(|url| url::Url::parse(url).ok())
+        .filter_map(|url| cm_types::Url::new(url).ok())
         .collect();
     for driver in disabled_drivers.iter() {
         tracing::info!("Disabling driver {}", driver);
@@ -715,8 +715,10 @@ mod tests {
 
         // Make our driver.
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
-            component_url: url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm")
-                .unwrap(),
+            component_url: cm_types::Url::new(
+                "fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm"
+            )
+            .unwrap(),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -790,8 +792,10 @@ mod tests {
 
         // Make our driver.
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
-            component_url: url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm")
-                .unwrap(),
+            component_url: cm_types::Url::new(
+                "fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm"
+            )
+            .unwrap(),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -859,7 +863,7 @@ mod tests {
 
         let boot_repo = vec![
             ResolvedDriver {
-                component_url: url::Url::parse("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
+                component_url: cm_types::Url::new("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -871,7 +875,7 @@ mod tests {
                 disabled: false,
             },
             ResolvedDriver {
-                component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
+                component_url: cm_types::Url::new("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -929,7 +933,7 @@ mod tests {
 
         let boot_repo = vec![
             ResolvedDriver {
-                component_url: url::Url::parse("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
+                component_url: cm_types::Url::new("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -941,7 +945,7 @@ mod tests {
                 disabled: false,
             },
             ResolvedDriver {
-                component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
+                component_url: cm_types::Url::new("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1034,7 +1038,7 @@ mod tests {
 
         let boot_repo = vec![
             ResolvedDriver {
-                component_url: url::Url::parse("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
+                component_url: cm_types::Url::new("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1046,7 +1050,7 @@ mod tests {
                 disabled: false,
             },
             ResolvedDriver {
-                component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
+                component_url: cm_types::Url::new("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1180,7 +1184,7 @@ mod tests {
 
         let boot_repo = vec![
             ResolvedDriver {
-                component_url: url::Url::parse(FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
+                component_url: cm_types::Url::new(FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1192,7 +1196,7 @@ mod tests {
                 disabled: false,
             },
             ResolvedDriver {
-                component_url: url::Url::parse(NON_FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
+                component_url: cm_types::Url::new(NON_FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1266,7 +1270,7 @@ mod tests {
         .unwrap();
 
         let boot_repo = vec![ResolvedDriver {
-            component_url: url::Url::parse(FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
+            component_url: cm_types::Url::new(FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -1280,7 +1284,7 @@ mod tests {
 
         let base_repo = BaseRepo::Resolved(std::vec![
             ResolvedDriver {
-                component_url: url::Url::parse(FALLBACK_BASE_DRIVER_COMPONENT_URL).unwrap(),
+                component_url: cm_types::Url::new(FALLBACK_BASE_DRIVER_COMPONENT_URL).unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1292,7 +1296,7 @@ mod tests {
                 disabled: false,
             },
             ResolvedDriver {
-                component_url: url::Url::parse(NON_FALLBACK_BASE_DRIVER_COMPONENT_URL).unwrap(),
+                component_url: cm_types::Url::new(NON_FALLBACK_BASE_DRIVER_COMPONENT_URL).unwrap(),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1377,7 +1381,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_load_eager_fallback_boot_driver() {
-        let eager_driver_component_url = url::Url::parse(
+        let eager_driver_component_url = cm_types::Url::new(
             "fuchsia-boot:///driver-index-unittests#meta/test-fallback-component.cm",
         )
         .unwrap();
@@ -1412,7 +1416,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_load_eager_fallback_base_driver() {
-        let eager_driver_component_url = url::Url::parse(
+        let eager_driver_component_url = cm_types::Url::new(
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-fallback-component.cm",
         )
         .unwrap();
@@ -1467,7 +1471,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_dont_load_disabled_fallback_boot_driver() {
-        let disabled_driver_component_url = url::Url::parse(
+        let disabled_driver_component_url = cm_types::Url::new(
             "fuchsia-boot:///driver-index-unittests#meta/test-fallback-component.cm",
         )
         .unwrap();
@@ -1499,7 +1503,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_dont_load_disabled_fallback_base_driver() {
-        let disabled_driver_component_url = url::Url::parse(
+        let disabled_driver_component_url = cm_types::Url::new(
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-fallback-component.cm",
         )
         .unwrap();
@@ -1550,7 +1554,7 @@ mod tests {
     async fn test_match_driver_when_require_system_true_and_base_repo_not_resolved() {
         let always_match = create_always_match_bind_rules();
         let boot_repo = vec![ResolvedDriver {
-            component_url: url::Url::parse("fuchsia-boot:///#driver/fallback-boot.cm").unwrap(),
+            component_url: cm_types::Url::new("fuchsia-boot:///#driver/fallback-boot.cm").unwrap(),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -1585,7 +1589,7 @@ mod tests {
 
         let always_match = create_always_match_bind_rules();
         let boot_repo = vec![ResolvedDriver {
-            component_url: url::Url::parse(FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
+            component_url: cm_types::Url::new(FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -1939,7 +1943,7 @@ mod tests {
 
         // Make the composite driver.
         let url =
-            url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
+            cm_types::Url::new("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
                 .unwrap();
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url.clone(),
@@ -2142,7 +2146,7 @@ mod tests {
 
         // Make the composite driver.
         let url =
-            url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
+            cm_types::Url::new("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
                 .unwrap();
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url.clone(),
@@ -2345,7 +2349,7 @@ mod tests {
 
         // Make the composite driver.
         let url =
-            url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
+            cm_types::Url::new("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
                 .unwrap();
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url.clone(),
@@ -2500,7 +2504,7 @@ mod tests {
 
         // Make the composite driver.
         let url =
-            url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
+            cm_types::Url::new("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
                 .unwrap();
 
         let (proxy, stream) =
@@ -2705,7 +2709,7 @@ mod tests {
 
         // Make the composite driver.
         let url =
-            url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
+            cm_types::Url::new("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
                 .unwrap();
 
         let (proxy, stream) =
@@ -2910,7 +2914,7 @@ mod tests {
 
         // Make the composite driver.
         let url =
-            url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
+            cm_types::Url::new("fuchsia-pkg://fuchsia.com/package#driver/dg_matched_composite.cm")
                 .unwrap();
 
         let (proxy, stream) =
@@ -3079,8 +3083,10 @@ mod tests {
         .unwrap();
 
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
-            component_url: url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm")
-                .unwrap(),
+            component_url: cm_types::Url::new(
+                "fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm"
+            )
+            .unwrap(),
             bind_rules: always_match,
             bind_bytecode: vec![],
             colocate: false,
@@ -3181,8 +3187,10 @@ mod tests {
         .unwrap();
 
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
-            component_url: url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm")
-                .unwrap(),
+            component_url: cm_types::Url::new(
+                "fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm"
+            )
+            .unwrap(),
             bind_rules: always_match,
             bind_bytecode: vec![],
             colocate: false,
@@ -3408,7 +3416,7 @@ mod tests {
 
         let boot_repo = std::vec![];
         let base_repo = BaseRepo::Resolved(vec![ResolvedDriver {
-            component_url: url::Url::parse(component_manifest_url).unwrap(),
+            component_url: cm_types::Url::new(component_manifest_url).unwrap(),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -3471,7 +3479,7 @@ mod tests {
         let full_resolver = Some(resolver);
 
         let boot_repo = vec![ResolvedDriver {
-            component_url: url::Url::parse(component_manifest_url).unwrap(),
+            component_url: cm_types::Url::new(component_manifest_url).unwrap(),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
