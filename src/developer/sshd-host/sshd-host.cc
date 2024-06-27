@@ -19,14 +19,18 @@ const uint16_t kPort = 22;
 const char* kKeyGenArgs[] = {"/pkg/bin/hostkeygen", nullptr};
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"sshd-host"});
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithDispatcher(loop.dispatcher()).BuildAndInitializeWithTags({"sshd-host"});
   // We need to close PA_DIRECTORY_REQUEST otherwise clients that expect us to
   // offer services won't know that we've started and are not going to offer
   // any services.
   //
   // TODO(abarth): Instead of closing this handle, we should offer some
   // introspection services for debugging.
-  { zx::handle((zx_take_startup_handle(PA_DIRECTORY_REQUEST))); }
+  {
+    zx::handle((zx_take_startup_handle(PA_DIRECTORY_REQUEST)));
+  }
 
   FX_SLOG(INFO, "sshd-host starting up");
 
@@ -43,8 +47,6 @@ int main(int argc, const char** argv) {
     FX_SLOG(WARNING, "Failed to provision authorized_keys",
             FX_KV("status", zx_status_get_string(status)));
   }
-
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
   zx::process process;
   if (zx_status_t status = fdio_spawn(0, FDIO_SPAWN_CLONE_ALL, kKeyGenArgs[0], kKeyGenArgs,
