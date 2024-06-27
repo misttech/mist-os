@@ -480,7 +480,6 @@ mod tests {
     use crate::vfs::FdFlags;
 
     #[::fuchsia::test]
-    #[ignore]
     async fn test_sys_dup2() {
         // Most tests are handled by test_sys_dup3, only test the case where both fds are equals.
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
