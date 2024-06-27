@@ -90,8 +90,16 @@ FuchsiaVirtualDeviceInfo = provider(
     },
 )
 
-FuchsiaProductAssemblyBundleInfo = provider(
-    doc = """A bundle of files used by product assembly.""",
+FuchsiaPlatformArtifactsInfo = provider(
+    doc = """A set of platform artifacts used by product assembly.""",
+    fields = {
+        "root": "The root directory for these artifacts",
+        "files": "All files contained in the bundle",
+    },
+)
+
+FuchsiaLegacyBundleInfo = provider(
+    doc = """A legacy AIB used by product assembly.""",
     fields = {
         "root": "The root directory for these artifacts",
         "files": "All files contained in the bundle",

@@ -4,7 +4,7 @@
 
 """Rules for wrapping prebuilt platform artifacts."""
 
-load(":providers.bzl", "FuchsiaProductAssemblyBundleInfo")
+load(":providers.bzl", "FuchsiaLegacyBundleInfo", "FuchsiaPlatformArtifactsInfo")
 
 def _get_directory(ctx, rule_name):
     for file in ctx.files.files:
@@ -17,23 +17,19 @@ def _get_directory(ctx, rule_name):
          "Use the 'directory' attribute to specify the proper directory.\n\n")
 
 def _fuchsia_platform_artifacts_impl(ctx):
-    if ctx.file.directory:
-        directory = ctx.file.directory.path
-    else:
-        directory = _get_directory(ctx, "fuchsia_platform_artifacts")
-
-    return [FuchsiaProductAssemblyBundleInfo(
-        root = directory,
+    return [FuchsiaPlatformArtifactsInfo(
+        root = ctx.file.directory.path,
         files = ctx.files.files,
     )]
 
 fuchsia_platform_artifacts = rule(
     doc = """Wraps a directory of prebuilt platform artifacts.""",
     implementation = _fuchsia_platform_artifacts_impl,
-    provides = [FuchsiaProductAssemblyBundleInfo],
+    provides = [FuchsiaPlatformArtifactsInfo],
     attrs = {
         "directory": attr.label(
             doc = "The directory of prebuilt platform artifacts.",
+            mandatory = True,
             allow_single_file = True,
         ),
         "files": attr.label(
@@ -50,7 +46,7 @@ def _fuchsia_legacy_bundle_impl(ctx):
     else:
         directory = _get_directory(ctx, "fuchsia_legacy_bundle")
 
-    return [FuchsiaProductAssemblyBundleInfo(
+    return [FuchsiaLegacyBundleInfo(
         root = directory,
         files = ctx.files.files,
     )]
@@ -58,7 +54,7 @@ def _fuchsia_legacy_bundle_impl(ctx):
 fuchsia_legacy_bundle = rule(
     doc = """Declares a target to wrap a prebuilt Assembly Input Bundle (AIB).""",
     implementation = _fuchsia_legacy_bundle_impl,
-    provides = [FuchsiaProductAssemblyBundleInfo],
+    provides = [FuchsiaLegacyBundleInfo],
     attrs = {
         "directory": attr.label(
             doc = "The directory of the prebuilt legacy bundle.",

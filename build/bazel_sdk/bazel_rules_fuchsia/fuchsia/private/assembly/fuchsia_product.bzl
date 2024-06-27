@@ -11,7 +11,8 @@ load(
     "FuchsiaAssemblyDeveloperOverridesListInfo",
     "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
-    "FuchsiaProductAssemblyBundleInfo",
+    "FuchsiaLegacyBundleInfo",
+    "FuchsiaPlatformArtifactsInfo",
     "FuchsiaProductAssemblyInfo",
     "FuchsiaProductConfigInfo",
     "FuchsiaProductImageInfo",
@@ -54,7 +55,7 @@ def _match_assembly_pattern_string(label, pattern):
 def _fuchsia_product_assembly_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     ffx_tool = fuchsia_toolchain.ffx_assembly
-    platform_artifacts = ctx.attr.platform_artifacts[FuchsiaProductAssemblyBundleInfo]
+    platform_artifacts = ctx.attr.platform_artifacts[FuchsiaPlatformArtifactsInfo]
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     platform_aibs_file = ctx.actions.declare_file(ctx.label.name + "_platform_assembly_input_bundles.json")
 
@@ -137,7 +138,7 @@ def _fuchsia_product_assembly_impl(ctx):
         ffx_invocation.extend(["--mode", ctx.attr.package_mode])
 
     if ctx.attr.legacy_bundle:
-        legacy_bundle = ctx.attr.legacy_bundle[FuchsiaProductAssemblyBundleInfo]
+        legacy_bundle = ctx.attr.legacy_bundle[FuchsiaLegacyBundleInfo]
         ffx_invocation.extend(["--legacy-bundle", legacy_bundle.root])
         ffx_inputs += legacy_bundle.files
 
@@ -228,11 +229,11 @@ fuchsia_product_assembly = rule(
         ),
         "legacy_bundle": attr.label(
             doc = "Legacy AIB for this product.",
-            providers = [FuchsiaProductAssemblyBundleInfo],
+            providers = [FuchsiaLegacyBundleInfo],
         ),
         "platform_artifacts": attr.label(
             doc = "Platform artifacts to use for this product.",
-            providers = [FuchsiaProductAssemblyBundleInfo],
+            providers = [FuchsiaPlatformArtifactsInfo],
             mandatory = True,
         ),
         "package_validation": attr.string(

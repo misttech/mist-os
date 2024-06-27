@@ -115,7 +115,8 @@ load(
 )
 load(
     "//fuchsia/private/assembly:providers.bzl",
-    _FuchsiaProductAssemblyBundleInfo = "FuchsiaProductAssemblyBundleInfo",
+    _FuchsiaLegacyBundleInfo = "FuchsiaLegacyBundleInfo",
+    _FuchsiaPlatformArtifactsInfo = "FuchsiaPlatformArtifactsInfo",
     _FuchsiaProductAssemblyInfo = "FuchsiaProductAssemblyInfo",
     _FuchsiaProductImageInfo = "FuchsiaProductImageInfo",
     _FuchsiaScrutinyConfigInfo = "FuchsiaScrutinyConfigInfo",
@@ -163,12 +164,6 @@ fuchsia_product_image = _fuchsia_product
 fuchsia_bootstrap_partition = _fuchsia_bootstrap_partition
 fuchsia_bootloader_partition = _fuchsia_bootloader_partition
 fuchsia_partition = _fuchsia_partition
-
-# Providers
-FuchsiaProductImageInfo = _FuchsiaProductImageInfo
-FuchsiaProductAssemblyBundleInfo = _FuchsiaProductAssemblyBundleInfo
-FuchsiaScrutinyConfigInfo = _FuchsiaScrutinyConfigInfo
-FuchsiaProductAssemblyInfo = _FuchsiaProductAssemblyInfo
 
 # constants
 BUILD_TYPES = _BUILD_TYPES

@@ -207,18 +207,25 @@ template("bazel_product_bundle") {
 
   if (defined(invoker.allow_eng_platform_bundle_use) &&
       invoker.allow_eng_platform_bundle_use) {
-    _aibs_to_use = eng_platform_aib_labels
+    # Some product bundles have eng artifacts in recovery slot and userdebug
+    # artifacts in the main slot.
+    _bazel_inputs += [
+      "//bundles/assembly:eng",
+      "//bundles/assembly:userdebug",
+    ]
     not_needed(invoker, [ "allow_userdebug_platform_bundle_use" ])
   } else {
     if (defined(invoker.allow_userdebug_platform_bundle_use) &&
         invoker.allow_userdebug_platform_bundle_use) {
-      _aibs_to_use = userdebug_platform_aib_labels
+      # Some product bundles have user artifacts in recovery slot and userdebug
+      # artifacts in the main slot.
+      _bazel_inputs += [
+        "//bundles/assembly:user",
+        "//bundles/assembly:userdebug",
+      ]
     } else {
-      _aibs_to_use = user_platform_aib_labels
+      _bazel_inputs += [ "//bundles/assembly:user" ]
     }
-  }
-  foreach(_aib, _aibs_to_use) {
-    _bazel_inputs += [ "${_aib}_bazel_inputs" ]
   }
 
   _generate_image = use_bazel_images_only
