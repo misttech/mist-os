@@ -26,15 +26,15 @@ class DwarfdumpStreamingParser:
     SUBPROGRAM_ATTR_MATCHER = re.compile(r"^\s+(\S+)\s+\((.+)\)")
     SUBPROGRAM_TAG = "DW_TAG_subprogram"
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Instance variables to track parser state from line to line.
-        self._cur_addr = None
+        self._cur_addr: str | None = None
         self._in_subprogram_block = False
 
         # Dict of compilation unit addresses to their respective attributes.
-        self._subprograms_dict = {}
+        self._subprograms_dict: dict[str, dict[str, str]] = {}
 
-    def parse_line(self, line):
+    def parse_line(self, line: str) -> None:
         """Parses a line from `llvm-dwarfdump`'s output.
 
         Args:
@@ -44,7 +44,8 @@ class DwarfdumpStreamingParser:
             m = self.SUBPROGRAM_ATTR_MATCHER.search(line)
             if m:
                 attr, value = m.group(1), m.group(2)
-                self._subprograms_dict[self._cur_addr][attr] = value
+                if self._cur_addr:
+                    self._subprograms_dict[self._cur_addr][attr] = value
             else:
                 # Dwarfdump entries are separated by a newline.
                 # So the first unmatched line after entering a subprogram block
@@ -58,9 +59,10 @@ class DwarfdumpStreamingParser:
             if tag == self.SUBPROGRAM_TAG:
                 self._in_subprogram_block = True
                 self._cur_addr = addr
-                self._subprograms_dict[self._cur_addr] = {}
+                if self._cur_addr:
+                    self._subprograms_dict[self._cur_addr] = {}
 
-    def get_subprograms(self):
+    def get_subprograms(self) -> dict[str, dict[str, str]]:
         """Returns the subprograms that have been successfully parsed.
 
         Returns:
@@ -85,11 +87,15 @@ class FidlApiResolver:
         function names and fully qualified FIDL names.
     """
 
-    def __init__(self, subprograms_dict, api_mapping_dict):
+    def __init__(
+        self,
+        subprograms_dict: dict[str, dict[str, str]],
+        api_mapping_dict: dict[str, str],
+    ) -> None:
         self._subprograms_dict = subprograms_dict
         self._api_mapping_dict = api_mapping_dict
 
-    def add_new_mappings(self):
+    def add_new_mappings(self) -> None:
         """Add new mangled_name to FIDL API mapping if it doesn't already exist.
 
         New mappings are added to `self._api_mapping_dict`.
@@ -118,7 +124,9 @@ class FidlApiResolver:
                     sanitized_mangled_name, sanitized_filepath, line_num
                 )
 
-    def _add_mapping_entry(self, mangled_name, filepath, line_num):
+    def _add_mapping_entry(
+        self, mangled_name: str, filepath: str, line_num: int
+    ) -> None:
         """Resolve mangled_name to FIDL API mapping and add as mapping entry.
 
         Resolve mapping by opening the file where the function is defined, and reading
@@ -142,17 +150,17 @@ class FidlApiResolver:
         # Annotation format: "// cts-coverage-fidl-name:<API_NAME>"
         self._api_mapping_dict[mangled_name] = fidl_api_annotation.split(":")[1]
 
-    def get_mapping(self):
+    def get_mapping(self) -> dict[str, str]:
         """Returns the mangled-name-to-FIDL-API mapping.
 
         Returns:
           A dict(str,str) containing mangled function names and their corresponding fully qualified
             FIDL API names.
         """
-        return self._mapping
+        return self._api_mapping_dict
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input",
@@ -183,22 +191,25 @@ def main():
         f.write("%s: %s" % (args.output, " ".join(sorted(depfile_inputs))))
 
     # Generate mapping.
-    fidl_mangled_name_to_api_mapping = {}
+    fidl_mangled_name_to_api_mapping: dict[str, str] = {}
     for unstripped_binary in depfile_inputs:
         dwarddump_cmd = [args.dwarfdump, unstripped_binary]
-        parser = DwarfdumpStreamingParser()
+        dwarfd_parser = DwarfdumpStreamingParser()
         # TODO(chok): Add multithreaded support for concurrently processing each unstripped binary.
         with subprocess.Popen(dwarddump_cmd, stdout=subprocess.PIPE) as p:
-            for line in p.stdout:
-                parser.parse_line(line.decode())
+            if p.stdout:
+                for line in p.stdout:
+                    dwarfd_parser.parse_line(line.decode())
         resolver = FidlApiResolver(
-            parser.get_subprograms(), fidl_mangled_name_to_api_mapping
+            dwarfd_parser.get_subprograms(), fidl_mangled_name_to_api_mapping
         )
         resolver.add_new_mappings()
 
     # Write output.
     with open(args.output, "w") as f:
         f.write(json.dumps(fidl_mangled_name_to_api_mapping, indent=2))
+
+    return 0
 
 
 if __name__ == "__main__":
