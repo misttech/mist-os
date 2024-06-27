@@ -75,17 +75,9 @@ zx::result<PhysVmo> GetTestPhysVmo(size_t size) {
   auto unmap =
       fit::defer([vaddr, size = ret.size]() { zx::vmar::root_self()->unmap(vaddr, size); });
   res = zx_cache_flush(reinterpret_cast<void*>(vaddr), ret.size, ZX_CACHE_FLUSH_DATA);
+  EXPECT_OK(res);
   if (res != ZX_OK) {
-#if defined(__riscv)
-    // zx_cache_flush is not implemented for riscv so we must fall back to performing a cache op
-    // directly on the VMO. Cannot just always do the VMO cache op as other architectures, like ARM,
-    // do not have the physical VMO mapped into the kernel and so the cache op will not work.
-    res = ret.vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, ret.size, nullptr, 0);
-#endif
-    EXPECT_OK(res);
-    if (res != ZX_OK) {
-      return zx::error_result(res);
-    }
+    return zx::error_result(res);
   }
 
   return zx::ok(std::move(ret));
