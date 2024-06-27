@@ -29,6 +29,7 @@
 namespace hid_driver {
 
 namespace fhidbus = fuchsia_hardware_hidbus;
+namespace finput = fuchsia_hardware_input;
 
 namespace {
 
@@ -100,7 +101,7 @@ size_t HidDevice::GetReportSizeById(input_report_id_t id, fhidbus::ReportType ty
 }
 
 zx::result<fbl::RefPtr<HidInstance>> HidDevice::CreateInstance(
-    async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_hardware_input::Device> session) {
+    async_dispatcher_t* dispatcher, fidl::ServerEnd<finput::Device> session) {
   zx::event fifo_event;
   if (zx_status_t status = zx::event::create(0, &fifo_event); status != ZX_OK) {
     return zx::error(status);
@@ -547,9 +548,37 @@ zx_status_t HidDevice::Bind() {
     // continue anyway
   }
 
-  if (zx_status_t status =
-          DdkAdd(ddk::DeviceAddArgs("hid-device").set_str_props(cpp20::span(props)));
-      status != ZX_OK) {
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  {
+    zx::result<> result = outgoing_.AddService<finput::Service>(finput::Service::InstanceHandler({
+        .controller =
+            [this](fidl::ServerEnd<finput::Controller> server_end) {
+              bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   std::move(server_end), this, fidl::kIgnoreBindingClosure);
+            },
+    }));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to add fuchsia_hardware_input protocol: %s", result.status_string());
+      return result.status_value();
+    }
+  }
+  {
+    zx::result<> result = outgoing_.Serve(std::move(server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to service the outgoing directory");
+      return result.status_value();
+    }
+  }
+
+  std::array offers = {
+      finput::Service::Name,
+  };
+
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("hid-device")
+                                  .set_str_props(cpp20::span(props))
+                                  .set_fidl_service_offers(offers)
+                                  .set_outgoing_dir(client.TakeChannel()));
+  if (status != ZX_OK) {
     zxlogf(ERROR, "hid: device_add failed for HID device: %s", zx_status_get_string(status));
     ReleaseReassemblyBuffer();
     return status;

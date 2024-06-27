@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.hidbus/cpp/wire.h>
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <fuchsia/hardware/hiddevice/cpp/banjo.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -54,6 +55,7 @@ class HidDevice : public HidDeviceType,
  public:
   explicit HidDevice(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hidbus::Hidbus> hidbus)
       : HidDeviceType(parent),
+        outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
         hidbus_(std::move(hidbus), fdf::Dispatcher::GetCurrent()->async_dispatcher(), this) {}
   ~HidDevice() override = default;
 
@@ -109,6 +111,9 @@ class HidDevice : public HidDeviceType,
   zx_status_t SetReportDescriptor();
 
   void ParseUsagePage(const hid::ReportDescriptor* descriptor);
+
+  component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_input::Controller> bindings_;
 
   std::set<HidPageUsage> page_usage_;
   fuchsia_hardware_hidbus::HidInfo info_;
