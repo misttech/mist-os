@@ -12,6 +12,21 @@ declare_args() {
   # for the current build configuration's `target_cpu` value will be generated
   # to save about 3 minutes of build time when they are not needed.
   bazel_fuchsia_sdk_all_cpus = false
+
+  # Set to true to populate the @fuchsia_sdk external repository with prebuilt
+  # binaries for all API levels, or a subset of them. Possible values are:
+  #
+  #   false: The default, which is to only build for the current PLATFORM
+  #       API level, unless `override_target_api_level` is set.
+  #       See //build/config/fuchsia/override_target_api_level.gni.
+  #
+  #   true: To build for all API levels listed in
+  #       platform_version.build_time_supported_api_levels, which defaults to
+  #       all supported API levels, including the PLATFORM one, unless
+  #       `override_build_time_supported_api_levels` is also set.
+  #       See //build/config/fuchsia/platform_versions.gni.
+  #
+  bazel_fuchsia_sdk_all_api_levels = false
 }
 
 # Generate a Fuchsia Bazel SDK directory at build time from the
