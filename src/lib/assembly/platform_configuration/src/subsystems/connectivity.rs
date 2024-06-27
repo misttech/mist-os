@@ -163,10 +163,11 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 ("netstack3", "meta/netstack3.cm"),
                 ("netstack-migration", "meta/netstack-proxy.cm"),
             ] {
-                builder.package(package).component(component)?.field(
-                    "num_threads",
-                    connectivity_config.network.netstack_thread_count.get(),
-                )?;
+                builder
+                    .package(package)
+                    .component(component)?
+                    .field("num_threads", connectivity_config.network.netstack_thread_count.get())?
+                    .field("debug_logs", false)?;
             }
 
             // Add the networking test collection on all eng builds. The test

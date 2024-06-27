@@ -6,5 +6,10 @@
         // Number of threads used by netstack3.
         // 0 is an invalid value and causes the netstack to crash.
         num_threads: { type: "uint8" },
+
+        // Whether to use debug logs. This overrides the common logging
+        // framework and uses DEBUG severity logs. Used in netstack tests when
+        // embedding a hermetic netstack.
+        debug_logs: { type: "bool" },
     },
 }

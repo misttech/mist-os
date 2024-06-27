@@ -11,33 +11,26 @@ mod bindings;
 
 use std::num::NonZeroU8;
 
-use argh::FromArgs;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use log::info;
 
 use bindings::{InspectPublisher, NetstackSeed, Service};
 
-/// Netstack3.
-///
-/// The networking stack for Fuchsia.
-#[derive(FromArgs)]
-struct Options {
-    /// run with debug logging.
-    #[argh(switch)]
-    debug: bool,
-}
-
 /// Runs Netstack3.
 pub fn main() {
     let config = ns3_config::Config::take_from_startup_handle();
-    let ns3_config::Config { num_threads } = &config;
+    let ns3_config::Config { num_threads, debug_logs } = &config;
     let num_threads = NonZeroU8::new(*num_threads).expect("invalid 0 thread count value");
     let mut executor = fuchsia_async::SendExecutor::new(num_threads.get().into());
 
-    let Options { debug } = argh::from_env();
     let mut log_options = diagnostics_log::PublishOptions::default();
-    if debug {
-        log_options = log_options.minimum_severity(diagnostics_log::Severity::Debug);
+    if *debug_logs {
+        // When forcing debug logs, disable all the dynamic features from the
+        // logging framework, we want logs pegged at Severity::Debug.
+        log_options = log_options
+            .minimum_severity(diagnostics_log::Severity::Debug)
+            .wait_for_initial_interest(false)
+            .listen_for_interest_updates(false);
     }
     diagnostics_log::initialize(log_options).expect("failed to initialize log");
 

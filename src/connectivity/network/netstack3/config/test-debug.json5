@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    // Netstack3 structured configuration values for use in tests.
+    // Netstack3 structured configuration values for use in tests that embed the
+    // debug instrumented netstack.
 
     // TODO(https://fxbug.dev/316616750): Update this default once
     // multithreading is stabilized.
     num_threads: 1,
-    debug_logs: false,
+    debug_logs: true,
 }
