@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
+# This script is run from the Rust Project CI to build Fuchsia as a way of
+# catching regressions. If you are a Rust developer, see the comments toward
+# the end of this file for more information about how the Fuchsia build works
+# and how to customize it. More documentation can be found in the Rustc
+# Developer Guide.
 
 set -eu -o pipefail
 
@@ -49,7 +55,8 @@ END
 chmod +x $rust_prefix/bin/rustfmt
 
 # Stub out runtime.json. This will cause the build to produce invalid packages
-# missing libstd, but that's okay because we disable the ELF manifest checker.
+# missing libstd, but that's okay because we don't run an emulator anyway, and
+# we disable the ELF manifest checker in the build.
 cat <<END >$rust_prefix/lib/runtime.json
 [
   {
@@ -93,28 +100,45 @@ $fx metrics disable
 
 print_banner
 
-# Force a rebuild of all Rust targets by providing a unique version string each time.
-version_string="$(date '+%Y/%m/%d %H:%M:%S')"
+# Detect Rust toolchain changes by hashing the entire toolchain.
+version_string="$(find prebuilt/third_party/rust/linux-x64 -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum)"
 
 set -x
 
-# Disabling debuginfo speeds up the build by about 8%.
+# Here are the build arguments used when building Fuchsia.
+#
+# These wire up the compiler from CI and customize the build for the Rust CI
+# environment in a few ways:
+#
+# - Don't fail the build because of new warnings, since we don't use the pinned
+#   compiler version.
+# - Disable debuginfo, which speeds up the build by about 8%.
+# - Disable some rustc wrapper scripts that perform unnecessary build checks.
+# - Build the bundle of unit tests called "minimal".
+#
+# `fx set` creates a file called `out/default/args.gn` with the build arguments
+# and then runs GN, Fuchsia's meta-build system which generates ninja files. You
+# may also modify args.gn directly and rerun the build, which will pick up the
+# changes automatically.
 $fx set \
     --args "rustc_prefix = \"$rust_prefix\"" \
     --args "rustc_version_string = \"$version_string\"" \
     --args 'rust_cap_lints = "warn"' \
-    --args 'disable_elf_checks = true' \
     --args 'rustc_use_response_files = false' \
     --args 'rust_one_rlib_per_dir = false' \
     --args 'restat_rust = false' \
     --args 'verify_depfile = false' \
     --args 'debuginfo = "none"' \
+    --args 'disable_elf_checks = true' \
     --with '//bundles/buildbot/minimal' \
     workbench_eng.x64 \
     ; echo
 
+# Now run the build. We use `fx clippy` to drive the build because it reduces the
+# amount of Rust code that we actually need to produce binaries for. Under the
+# hood `fx clippy` runs ninja.
 set +e
-time $fx clippy --all --quiet
+time $fx clippy --all
 retcode=$?
 set -e
 
