@@ -9,6 +9,7 @@
 #include <lib/virtual_alloc.h>
 #include <lib/zircon-internal/macros.h>
 
+#include <vm/scanner.h>
 #include <vm/vm_address_region.h>
 
 namespace {
@@ -441,12 +442,7 @@ bool virtual_alloc_init_test() {
 bool virtual_alloc_aligned_alloc_test() {
   BEGIN_TEST;
 
-  if (true) {
-    // TODO(https://fxbug.dev/349402040): Test is disabled because it can fail spuriously.  See
-    // https://fxbug.dev/349402040 for details.
-    printf("Test disabled due to https://fxbug.dev/349402040\n");
-    END_TEST;
-  }
+  AutoVmScannerDisable scanner_disable;
 
   TestVmar vmar;
 
@@ -516,12 +512,7 @@ bool virtual_alloc_aligned_alloc_test() {
 bool vritual_alloc_large_allocs_are_contiguous_test() {
   BEGIN_TEST;
 
-  if (true) {
-    // TODO(https://fxbug.dev/349402040): Test is disabled because it can fail spuriously.  See
-    // https://fxbug.dev/349402040 for details.
-    printf("Test disabled due to https://fxbug.dev/349402040\n");
-    END_TEST;
-  }
+  AutoVmScannerDisable scanner_disable;
 
   TestVmar vmar;
 
