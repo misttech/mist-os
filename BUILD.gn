@@ -110,6 +110,7 @@ group("default") {
     "//src/lib/process_builder:tests",
     "//src/lib/zircon:tests",
     "//src/sys/lib/elf_runner:tests",
+    "//src/storage/lib/vfs/rust:tests",
 
     # Produce mist-os libs zbi tests
     "//src/lib/mistos-bootfs:tests",
