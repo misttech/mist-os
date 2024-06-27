@@ -561,6 +561,7 @@ mod tests {
             early_exit: false,
             power_topology_integration_enabled: false,
             serve_test_protocols,
+            has_real_time_clock: true,
         }))
     }
 
