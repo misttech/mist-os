@@ -5,7 +5,9 @@
 #include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/driver.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -112,10 +114,27 @@ zx::result<> VsyncReceiver::Start() {
 
 zx::result<> VsyncReceiver::Stop() {
   ZX_DEBUG_ASSERT(is_receiving_);
-  zx_status_t status = irq_handler_.Cancel();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to cancel the Vsync handler: %s", zx_status_get_string(status));
-    return zx::error(status);
+
+  // DFv2-backed async dispatchers requires all interrupt handlers to be
+  // unbound from the same dispatcher they were bound to.
+  zx_status_t cancel_status;
+  libsync::Completion cancel_completion;
+  zx_status_t post_task_status =
+      async::PostTask(irq_handler_dispatcher_->async_dispatcher(), [&]() {
+        cancel_status = irq_handler_.Cancel();
+        cancel_completion.Signal();
+      });
+
+  if (post_task_status != ZX_OK) {
+    zxlogf(ERROR, "Failed to post the Vsync handler cancel task: %s",
+           zx_status_get_string(post_task_status));
+    return zx::error(post_task_status);
+  }
+
+  cancel_completion.Wait();
+  if (cancel_status != ZX_OK) {
+    zxlogf(ERROR, "Failed to cancel the Vsync handler: %s", zx_status_get_string(cancel_status));
+    return zx::error(cancel_status);
   }
   is_receiving_ = false;
   return zx::ok();

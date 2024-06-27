@@ -119,6 +119,7 @@ source_set("common_srcs") {
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/zx",
   ]
