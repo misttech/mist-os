@@ -48,12 +48,6 @@ declare_args() {
   driver_sysmem_contiguous_guard_pages_unused_fraction_denominator = 128
   driver_sysmem_contiguous_guard_pages_unused_cycle_seconds = 600
   driver_sysmem_protected_ranges_disable_dynamic = false
-
-  # TODO(b/322009732): remove
-  driver_sysmem_contiguous_memory_size_override = -1
-
-  # TODO(b/322009732): remove
-  driver_sysmem_protected_memory_size_override = -1
 }
 
 fuchsia_component_manifest("manifest") {
@@ -182,14 +176,6 @@ fuchsia_structured_config_values("config_values") {
         driver_sysmem_contiguous_guard_pages_unused_cycle_seconds
     protected_ranges_disable_dynamic =
         driver_sysmem_protected_ranges_disable_dynamic
-
-    # TODO(b/322009732): remove
-    deprecated_contiguous_memory_size_override =
-        driver_sysmem_contiguous_memory_size_override
-
-    # TODO(b/322009732): remove
-    deprecated_protected_memory_size_override =
-        driver_sysmem_protected_memory_size_override
   }
 }
 

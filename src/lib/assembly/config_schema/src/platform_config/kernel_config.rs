@@ -5,19 +5,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// Amount of memory.
-///
-/// TODO(b/322009732): remove
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MemorySize {
-    /// Number of bytes.
-    Fixed(u64),
-    /// Percentage of the system's physical memory.
-    /// the value must be stritly positive, and less than 100.
-    Relative(u8),
-}
-
 /// What should happen if the device runs out-of-memory.
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -63,9 +50,4 @@ pub struct PlatformKernelConfig {
     /// address space and uses more memory for page tables. Valid values range
     /// from 0-36. Default value is 30.
     pub aslr_entropy_bits: Option<u8>,
-
-    /// TODO(b/322009732): remove; this currently doesn't do anything
-    pub sysmem_contiguous_memory_size: Option<MemorySize>,
-    /// TODO(b/322009732): remove; this currently doesn't do anything
-    pub sysmem_protected_memory_size: Option<MemorySize>,
 }

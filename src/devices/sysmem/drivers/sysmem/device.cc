@@ -546,12 +546,6 @@ zx_status_t Device::Bind() {
       // the negation is un-done below
       contiguous_memory_size = -config->contiguous_memory_size_percent();
     }
-
-    // TODO(b/322009732): remove
-    if (config->deprecated_contiguous_memory_size_override() >= 0) {
-      contiguous_memory_size = config->deprecated_contiguous_memory_size_override();
-    }
-
     if (config->protected_memory_size() >= 0) {
       protected_memory_size = config->protected_memory_size();
     } else if (config->protected_memory_size_percent() >= 0 &&
@@ -559,12 +553,6 @@ zx_status_t Device::Bind() {
       // the negation is un-done below
       protected_memory_size = -config->protected_memory_size_percent();
     }
-
-    // TODO(b/322009732): remove
-    if (config->deprecated_protected_memory_size_override() >= 0) {
-      protected_memory_size = config->deprecated_protected_memory_size_override();
-    }
-
     protected_ranges_disable_dynamic_ = config->protected_ranges_disable_dynamic();
   }
 
