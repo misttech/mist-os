@@ -44,6 +44,8 @@ rustc_binary("starnix_kernel_bin") {
     "hwasan",
   ]
 
+  configs += [ "//build/config/rust:mistos" ]
+
   source_root = "main.rs"
   deps = [
     ":starnix_core",
@@ -108,6 +110,8 @@ rustc_library("starnix_core") {
     "asan",
     "hwasan",
   ]
+
+  configs += [ "//build/config/rust:mistos" ]
 
   sources = [
     "arch/${current_cpu}/execution.rs",
@@ -432,6 +436,8 @@ rustc_library("starnix_kernel_runner") {
     "asan",
     "hwasan",
   ]
+
+  configs += [ "//build/config/rust:mistos" ]
 
   sources = [
     "runner/container.rs",

@@ -216,6 +216,12 @@ config("coverage") {
   rustflags = [ "-Cinstrument-coverage" ]
 }
 
+if (is_mistos) {
+  config("mistos") {
+    rustflags = [ "--cfg=mistos" ]
+  }
+}
+
 # TODO(https://fxbug.dev/42176241): Eliminate or identify all sources of output dir leaks.
 # This option makes it explicit that a particular build action is sensitive
 # to the output dir path, and informs remote execution to refrain from

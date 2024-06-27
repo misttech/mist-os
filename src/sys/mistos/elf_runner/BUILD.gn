@@ -11,7 +11,10 @@ rustc_binary("bin") {
   name = "mistos_elf_runner"
   edition = "2021"
 
-  configs += [ "//build/config/rust:bootfs" ]
+  configs += [
+    "//build/config/rust:bootfs",
+    "//build/config/rust:mistos",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
