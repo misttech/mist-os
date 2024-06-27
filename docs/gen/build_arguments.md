@@ -2771,14 +2771,6 @@ From //src/devices/sysmem/drivers/sysmem/BUILD.gn:48
 
 From //src/devices/sysmem/drivers/sysmem/BUILD.gn:40
 
-### driver_sysmem_contiguous_memory_size_override
-
-TODO(b/322009732): remove
-
-**Current value (from the default):** `-1`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:53
-
 ### driver_sysmem_contiguous_memory_size_percent
 
 **Current value (from the default):** `5`
@@ -2790,14 +2782,6 @@ From //src/devices/sysmem/drivers/sysmem/BUILD.gn:41
 **Current value (from the default):** `0`
 
 From //src/devices/sysmem/drivers/sysmem/BUILD.gn:42
-
-### driver_sysmem_protected_memory_size_override
-
-TODO(b/322009732): remove
-
-**Current value (from the default):** `-1`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:56
 
 ### driver_sysmem_protected_memory_size_percent
 
@@ -7608,7 +7592,7 @@ derives an ABI revision from the latest integration.git hash.
 TODO(https://fxbug.dev/324892812): Delete this option after a transition
 period.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //build/sdk/config.gni:20
 
