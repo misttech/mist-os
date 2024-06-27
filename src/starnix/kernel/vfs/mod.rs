@@ -104,7 +104,7 @@ pub type BinderDriverReleaser = ObjectReleaser<BinderDriver, BinderDriverRelease
 
 thread_local! {
     /// Container of all `FileObject` that are not used anymore, but have not been closed yet.
-    static RELEASERS: RefCell<LocalReleasers> = RefCell::new(LocalReleasers::default());
+    static RELEASERS: RefCell<Option<LocalReleasers>> = RefCell::new(Some(LocalReleasers::default()));
 }
 
 /// Container for all the types that can be deferred released.
@@ -120,7 +120,7 @@ impl LocalReleasable {
     /// Register the container to be deferred released.
     fn register(self: Self) {
         RELEASERS.with(|cell| {
-            cell.borrow_mut().releasables.push(self);
+            cell.borrow_mut().as_mut().expect("not finalized").releasables.push(self);
         });
     }
 }
@@ -175,11 +175,25 @@ impl DelayedReleaser {
     /// Run all current delayed releases for the current thread.
     pub fn apply(&self, current_task: &CurrentTask) {
         loop {
-            let releasers = RELEASERS.with(|cell| std::mem::take(cell.borrow_mut().deref_mut()));
+            let releasers = RELEASERS.with(|cell| {
+                std::mem::take(cell.borrow_mut().as_mut().expect("not finalized").deref_mut())
+            });
             if releasers.is_empty() {
                 return;
             }
             releasers.release(current_task);
         }
+    }
+
+    /// Prevent any further releasables from being registered on this thread.
+    ///
+    /// This function should be called during thread teardown to ensure that we do not
+    /// register any new releasables on this thread after we have finalized the delayed
+    /// releasables for the last time.
+    pub fn finalize() {
+        RELEASERS.with(|cell| {
+            assert!(cell.borrow().as_ref().expect("not finalized").is_empty());
+            *cell.borrow_mut() = None;
+        });
     }
 }
