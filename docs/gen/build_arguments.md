@@ -322,6 +322,26 @@ remote inputs, and more.
 
 From //build/bazel/logging.gni:9
 
+### bazel_fuchsia_sdk_all_api_levels
+
+Set to true to populate the @fuchsia_sdk external repository with prebuilt
+binaries for all API levels, or a subset of them. Possible values are:
+
+  false: The default, which is to only build for the current PLATFORM
+      API level, unless `override_target_api_level` is set.
+      See //build/config/fuchsia/override_target_api_level.gni.
+
+  true: To build for all API levels listed in
+      platform_version.build_time_supported_api_levels, which defaults to
+      all supported API levels, including the PLATFORM one, unless
+      `override_build_time_supported_api_levels` is also set.
+      See //build/config/fuchsia/platform_versions.gni.
+
+
+**Current value (from the default):** `false`
+
+From //build/bazel/bazel_fuchsia_sdk.gni:29
+
 ### bazel_fuchsia_sdk_all_cpus
 
 Set to true to populate the @fuchsia_sdk external repository with prebuilt
@@ -7448,7 +7468,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"uMZ7FTsDPXul0QhF5rSabB0D1w7qjAGYbarpQUHyERoC"`
+**Current value (from the default):** `"3VvCiWbTMS4xenuM83IRa-G-xU7QLNpdgGqycF2BQegC"`
 
 From //build/rust/config.gni:38
 
