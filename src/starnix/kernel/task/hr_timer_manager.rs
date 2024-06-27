@@ -164,7 +164,11 @@ impl HrTimerManager {
                                 if let Some(file_handle) =
                                     weak_file_handle.and_then(|f| f.upgrade())
                                 {
-                                    file_handle.on_wake(current_task, lease.into_channel());
+                                    let lease_channel = lease.into_channel();
+                                    file_handle.on_wake(current_task, &lease_channel);
+                                    // Drop the baton lease after wake leases in associated epfd
+                                    // are activated.
+                                    drop(lease_channel);
                                 }
                                 // TODO(https://fxbug.dev/340234109): wait on the timer expired
                                 // signal to start the next timer in the heap.

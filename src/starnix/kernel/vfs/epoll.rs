@@ -451,15 +451,20 @@ impl EpollFileObject {
     }
 
     /// Activate the wake lease associated with the `file`.
-    pub fn activate_lease(&self, file: &FileHandle, baton_lease: zx::Channel) -> Result<(), Errno> {
+    ///
+    /// `baton_lease` is passed by reference to ensure that the lease remains on hold until
+    /// this function returns.
+    pub fn activate_lease(
+        &self,
+        file: &FileHandle,
+        _baton_lease: &zx::Channel,
+    ) -> Result<(), Errno> {
         let mut guard = self.state.lock();
         let key = as_epoll_key(file).into();
         let Entry::Occupied(entry) = guard.wait_objects.entry(key) else {
             return error!(EINVAL);
         };
-        let res = entry.get().wake_lease.activate();
-        drop(baton_lease);
-        res
+        entry.get().wake_lease.activate()
     }
 }
 

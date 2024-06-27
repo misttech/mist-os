@@ -1682,28 +1682,19 @@ impl FileObject {
     }
 
     /// Called when the underneath `FileOps` is waken up by the power framework.
-    pub fn on_wake(&self, current_task: &CurrentTask, baton_lease: zx::Channel) {
+    pub fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel) {
         // Activate associated wake leases in registered epfd.
         for epfd in self.epoll_files.lock().iter() {
             if let Ok(file) = current_task.files.get(*epfd) {
                 if let Some(epoll_file) = file.downcast_file::<EpollFileObject>() {
                     if let Some(weak_handle) = self.weak_handle.upgrade() {
-                        if let Ok(dup_baton) = baton_lease
-                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                            .inspect_err(|e| log_error!("Failed to copy baton lease: {e}"))
-                        {
-                            if let Err(e) = epoll_file.activate_lease(&weak_handle, dup_baton) {
-                                log_error!(
-                                    "Failed to activate wake lease in epoll control file: {e}"
-                                );
-                            }
+                        if let Err(e) = epoll_file.activate_lease(&weak_handle, baton_lease) {
+                            log_error!("Failed to activate wake lease in epoll control file: {e}");
                         }
                     }
                 }
             }
         }
-        // Drop the baton lease after wake leases in associated epfd are activated.
-        drop(baton_lease);
     }
 }
 
