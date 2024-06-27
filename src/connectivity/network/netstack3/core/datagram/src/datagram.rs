@@ -875,6 +875,7 @@ pub trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec
         S::AddrSpec,
     >>::BoundSocketId;
 
+    /// Calls the provided callback with mutable access to both the
     /// demultiplexing maps.
     fn with_both_bound_sockets_mut<
         O,
