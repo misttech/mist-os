@@ -5,17 +5,18 @@
 //! Implementations for raw IP sockets that integrate with traits/types from
 //! foreign modules.
 
-use lock_order::lock::LockLevelFor;
+use lock_order::lock::{LockLevelFor, UnlockedAccess};
 use lock_order::relation::LockBefore;
-use lock_order::wrap::LockedWrapperApi;
+use lock_order::wrap::{LockedWrapperApi, LockedWrapperUnlockedApi};
+use netstack3_base::{CounterContext, ResourceCounterContext, WeakDeviceIdentifier};
 use netstack3_device::WeakDeviceId;
 use netstack3_ip::raw::{
-    RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap, RawIpSocketMapContext, RawIpSocketState,
-    RawIpSocketStateContext,
+    RawIpSocketCounters, RawIpSocketId, RawIpSocketLockedState, RawIpSocketMap,
+    RawIpSocketMapContext, RawIpSocketState, RawIpSocketStateContext,
 };
 
 use crate::marker::IpExt;
-use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx};
+use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<lock_ordering::RawIpSocketState<I>>>
@@ -90,4 +91,41 @@ impl<I: IpExt, BT: BindingsTypes> LockLevelFor<RawIpSocketState<I, WeakDeviceId<
     for lock_ordering::RawIpSocketState<I>
 {
     type Data = RawIpSocketLockedState<I, WeakDeviceId<BT>>;
+}
+
+impl<I: IpExt, BC: BindingsContext, L> CounterContext<RawIpSocketCounters<I>>
+    for CoreCtx<'_, BC, L>
+{
+    fn with_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::RawIpSocketCounters<I>>())
+    }
+}
+
+impl<BC: BindingsContext, I: IpExt> UnlockedAccess<crate::lock_ordering::RawIpSocketCounters<I>>
+    for StackState<BC>
+{
+    type Data = RawIpSocketCounters<I>;
+    type Guard<'l> = &'l RawIpSocketCounters<I> where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.inner_ip_state().raw_ip_socket_counters()
+    }
+}
+
+// NB: Implement for any `D` rather than `Self::WeakDeviceId` to avoid a
+// circular dependency (e.g. referencing `Self` in the trait being implemented).
+impl<I: IpExt, BC: BindingsContext, L, D: WeakDeviceIdentifier>
+    ResourceCounterContext<RawIpSocketId<I, D, BC>, RawIpSocketCounters<I>> for CoreCtx<'_, BC, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(
+        &mut self,
+        id: &RawIpSocketId<I, D, BC>,
+        cb: F,
+    ) -> O {
+        // NB: circumvent the lock ordering to access the counters, because it
+        // spares jumping through some hoops, and
+        // `crate::lock_ordering::RawIpSocketCounters<I>>` exists for unlocked
+        // access.
+        cb(id.state().counters())
+    }
 }

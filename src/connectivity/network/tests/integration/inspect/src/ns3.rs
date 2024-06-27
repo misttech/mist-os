@@ -400,6 +400,17 @@ async fn inspect_raw_ip_sockets<I: TestIpExt>(name: &str) {
                 NetworkProtocol: I::NAME,
                 BoundDevice: "None",
                 IcmpFilter: "None",
+                Counters: {
+                    Rx: {
+                        DeliveredPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                        IcmpPacketsFiltered: 0u64,
+                    },
+                    Tx: {
+                        SentPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                    },
+                },
             },
         }
     })
@@ -825,6 +836,30 @@ async fn inspect_counters(name: &str) {
                     NeedMoreFragments: 0u64,
                     InvalidFragment: 0u64,
                     CacheFull: 0u64,
+                },
+            },
+            "RawIpSockets": {
+                "V4": {
+                    "Rx": {
+                        DeliveredPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                        IcmpPacketsFiltered: 0u64,
+                    },
+                    "Tx": {
+                        SentPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                    },
+                },
+                "V6": {
+                    "Rx": {
+                        DeliveredPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                        IcmpPacketsFiltered: 0u64,
+                    },
+                    "Tx": {
+                        SentPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                    },
                 },
             },
             "UDP": {

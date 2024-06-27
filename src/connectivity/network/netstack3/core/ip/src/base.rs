@@ -55,6 +55,7 @@ use crate::internal::icmp::{
 use crate::internal::ipv6;
 use crate::internal::ipv6::Ipv6PacketAction;
 use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
+use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
 use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
@@ -1432,6 +1433,7 @@ pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateB
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
     raw_sockets: RwLock<RawIpSocketMap<I, D::Weak, BT>>,
+    raw_socket_counters: RawIpSocketCounters<I>,
     filter: RwLock<filter::State<I, BT>>,
 }
 
@@ -1439,6 +1441,11 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpSta
     /// Gets the IP counters.
     pub fn counters(&self) -> &IpCounters<I> {
         &self.counters
+    }
+
+    /// Gets the aggregate raw IP socket counters.
+    pub fn raw_ip_socket_counters(&self) -> &RawIpSocketCounters<I> {
+        &self.raw_socket_counters
     }
 
     /// Provides direct access to the path MTU cache.
@@ -1470,6 +1477,7 @@ impl<
             pmtu_cache: Mutex::new(PmtuCache::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx)),
             counters: Default::default(),
             raw_sockets: Default::default(),
+            raw_socket_counters: Default::default(),
             filter: RwLock::new(filter::State::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx)),
         }
     }

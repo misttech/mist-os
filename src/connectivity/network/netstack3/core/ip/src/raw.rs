@@ -18,8 +18,8 @@ use netstack3_base::socket::{
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, ReferenceNotifiers,
-    ReferenceNotifiersExt as _, RemoveResourceResultWithContext, StrongDeviceIdentifier,
-    WeakDeviceIdentifier, ZonedAddressError,
+    ReferenceNotifiersExt as _, RemoveResourceResultWithContext, ResourceCounterContext,
+    StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
@@ -28,6 +28,7 @@ use packet_formats::ip::IpPacket;
 use zerocopy::ByteSlice;
 
 use crate::internal::base::IpExt;
+use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
 use crate::internal::raw::protocol::RawIpSocketProtocol;
 use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
@@ -36,6 +37,7 @@ use crate::socket::{IpSockCreateAndSendError, IpSocketHandler, SendOptions};
 use crate::DEFAULT_HOP_LIMITS;
 
 mod checksum;
+pub(crate) mod counters;
 pub(crate) mod filter;
 pub(crate) mod protocol;
 pub(crate) mod state;
@@ -77,7 +79,8 @@ where
     C: ContextPair,
     C::BindingsContext: RawIpSocketsBindingsTypes + ReferenceNotifiers + 'static,
     C::CoreContext: RawIpSocketMapContext<I, C::BindingsContext>
-        + RawIpSocketStateContext<I, C::BindingsContext>,
+        + RawIpSocketStateContext<I, C::BindingsContext>
+        + ResourceCounterContext<RawIpApiSocketId<I, C>, RawIpSocketCounters<I>>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self { ctx, _ip_mark } = self;
@@ -164,7 +167,7 @@ where
         let protocol = id.protocol().proto();
 
         let (core_ctx, bindings_ctx) = self.contexts();
-        core_ctx.with_locked_state_and_socket_handler(id, |state, core_ctx| {
+        let result = core_ctx.with_locked_state_and_socket_handler(id, |state, core_ctx| {
             let RawIpSocketLockedState {
                 bound_device,
                 icmp_filter: _,
@@ -209,7 +212,16 @@ where
                     }
                     SendOneShotIpPacketError::SerializeError(err) => err,
                 })
-        })
+        });
+        match &result {
+            Ok(()) => {
+                core_ctx.increment(&id, |counters: &RawIpSocketCounters<I>| &counters.tx_packets)
+            }
+            Err(RawIpSocketSendToError::InvalidBody) => core_ctx
+                .increment(&id, |counters: &RawIpSocketCounters<I>| &counters.tx_checksum_errors),
+            Err(_) => {}
+        }
+        result
     }
 
     // TODO(https://fxbug.dev/342577389): Add a `send` function that does not
@@ -357,6 +369,9 @@ where
                         } else {
                             node.record_str("IcmpFilter", "None");
                         }
+                    });
+                    node.record_child("Counters", |node| {
+                        node.delegate_inspectable(socket.state().counters())
                     })
                 })
             })
@@ -429,7 +444,6 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSock
         let Self(rc) = self;
         WeakRawIpSocketId(StrongRc::downgrade(rc))
     }
-
     /// Gets the socket state.
     pub fn state(&self) -> &RawIpSocketState<I, D, BT> {
         let RawIpSocketId(strong_rc) = self;
@@ -594,12 +608,8 @@ pub trait RawIpSocketMapContext<I: IpExt, BT: RawIpSocketsBindingsTypes>:
 {
     /// The implementation of `RawIpSocketStateContext` available after having
     /// accessed the system's socket map.
-    type StateCtx<'a>: RawIpSocketStateContext<
-        I,
-        BT,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
+    type StateCtx<'a>: RawIpSocketStateContext<I, BT, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + ResourceCounterContext<RawIpSocketId<I, Self::WeakDeviceId, BT>, RawIpSocketCounters<I>>;
 
     /// Calls the callback with an immutable reference to the socket map.
     fn with_socket_map_and_state_ctx<
@@ -653,27 +663,56 @@ where
 
         self.with_socket_map_and_state_ctx(|socket_map, core_ctx| {
             socket_map.iter_sockets_for_protocol(&protocol).for_each(|socket| {
-                if core_ctx.with_locked_state(socket, |state| {
-                    should_deliver_to_socket(packet, device, state)
+                match core_ctx.with_locked_state(socket, |state| {
+                    check_packet_for_delivery(packet, device, state)
                 }) {
-                    bindings_ctx.receive_packet(socket, packet, device)
+                    DeliveryOutcome::Deliver => {
+                        core_ctx.increment(&socket, |counters: &RawIpSocketCounters<I>| {
+                            &counters.rx_packets
+                        });
+                        bindings_ctx.receive_packet(socket, packet, device);
+                    }
+                    DeliveryOutcome::WrongChecksum => {
+                        core_ctx.increment(&socket, |counters: &RawIpSocketCounters<I>| {
+                            &counters.rx_checksum_errors
+                        });
+                    }
+                    DeliveryOutcome::WrongIcmpMessageType => {
+                        core_ctx.increment(&socket, |counters: &RawIpSocketCounters<I>| {
+                            &counters.rx_icmp_filtered
+                        });
+                    }
+                    DeliveryOutcome::WrongDevice => {}
                 }
             })
         })
     }
 }
 
-/// Returns 'True' if the given packet should be delivered to the given socket.
-fn should_deliver_to_socket<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
+/// Represents whether an IP packet should be delivered to a socket.
+enum DeliveryOutcome {
+    /// The packet should be delivered.
+    Deliver,
+    /// Don't deliver. The packet was received on an incorrect device.
+    WrongDevice,
+    /// Don't deliver. The packet does not have a valid checksum.
+    WrongChecksum,
+    /// Don't deliver. The packet's inner ICMP message type does not pass the
+    /// socket's ICMP filter.
+    WrongIcmpMessageType,
+}
+
+/// Returns whether the given packet should be delivered to the given socket.
+fn check_packet_for_delivery<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
     packet: &I::Packet<B>,
     device: &D,
     socket: &RawIpSocketLockedState<I, D::Weak>,
-) -> bool {
+) -> DeliveryOutcome {
     let RawIpSocketLockedState { bound_device, icmp_filter, hop_limits: _, system_checksums } =
         socket;
     // Verify the received device matches the socket's bound device, if any.
     if bound_device.as_ref().is_some_and(|bound_device| bound_device != device) {
-        return false;
+        return DeliveryOutcome::WrongDevice;
     }
 
     // Verify the inner message's checksum, if requested.
@@ -681,7 +720,7 @@ fn should_deliver_to_socket<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
     // packets are delivered to raw sockets before the IP layer attempts to
     // parse the inner message.
     if *system_checksums && !checksum::has_valid_checksum::<I, B>(packet) {
-        return false;
+        return DeliveryOutcome::WrongChecksum;
     }
 
     // Verify the packet passes the socket's icmp_filter, if any.
@@ -704,10 +743,10 @@ fn should_deliver_to_socket<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
             Ok(message_type) => !icmp_filter.allows_type(message_type),
         }
     }) {
-        return false;
+        return DeliveryOutcome::WrongIcmpMessageType;
     }
 
-    true
+    DeliveryOutcome::Deliver
 }
 
 /// An implementation of [`SendOptions`] for raw IP sockets.
@@ -752,7 +791,7 @@ mod test {
     use netstack3_base::testutil::{
         FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId, TestIpExt,
     };
-    use netstack3_base::{ContextProvider, CtxPair};
+    use netstack3_base::{ContextProvider, CounterContext, CtxPair};
     use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
     use packet_formats::icmp::{
         IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode, Icmpv6MessageType,
@@ -795,6 +834,8 @@ mod test {
         /// `InnerFakeIpSocketCtx` below, the `FakeCoreCtx` will be eligible for
         /// a blanket impl of `IpSocketHandler`.
         ip_socket_ctx: FakeIpSocketCtx<I, D>,
+        /// The aggregate counters for raw ip sockets.
+        counters: RawIpSocketCounters<I>,
     }
 
     impl<I: IpExt, D: FakeStrongDeviceId> InnerFakeIpSocketCtx<I, D> for FakeCoreCtxState<I, D> {
@@ -864,6 +905,27 @@ mod test {
         }
     }
 
+    impl<I: IpExt, D: FakeStrongDeviceId> CounterContext<RawIpSocketCounters<I>> for FakeCoreCtx<I, D> {
+        fn with_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.state.counters)
+        }
+    }
+
+    impl<I: IpExt, D: FakeStrongDeviceId>
+        ResourceCounterContext<
+            RawIpSocketId<I, D::Weak, FakeBindingsCtx<D>>,
+            RawIpSocketCounters<I>,
+        > for FakeCoreCtx<I, D>
+    {
+        fn with_per_resource_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(
+            &mut self,
+            socket: &RawIpSocketId<I, D::Weak, FakeBindingsCtx<D>>,
+            cb: F,
+        ) -> O {
+            cb(socket.state().counters())
+        }
+    }
+
     impl<I: IpExt, D: FakeStrongDeviceId> RawIpSocketMapContext<I, FakeBindingsCtx<D>>
         for FakeCoreCtx<I, D>
     {
@@ -924,6 +986,7 @@ mod test {
         let state = FakeCoreCtxState {
             socket_map: Default::default(),
             ip_socket_ctx: FakeIpSocketCtx::new(device_configs),
+            counters: Default::default(),
         };
 
         RawIpSocketApi::new(CtxPair::with_core_ctx(FakeCoreCtx::with_state(state)))
@@ -1072,6 +1135,12 @@ mod test {
             core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &DEVICE);
         }
 
+        // Verify the counters were updated.
+        assert_eq!(api.core_ctx().state.counters.rx_packets.get(), 2);
+        assert_eq!(sock1.state().counters().rx_packets.get(), 1);
+        assert_eq!(sock2.state().counters().rx_packets.get(), 1);
+        assert_eq!(wrong_sock.state().counters().rx_packets.get(), 0);
+
         let FakeExternalSocketState { received_packets: sock1_packets } =
             api.close(sock1).into_removed();
         let FakeExternalSocketState { received_packets: sock2_packets } =
@@ -1167,6 +1236,12 @@ mod test {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(I::ICMP_IP_PROTO), Default::default());
 
+        let assert_counters = |core_ctx: &mut FakeCoreCtx<_, _>, count: u64| {
+            assert_eq!(core_ctx.state.counters.rx_icmp_filtered.get(), count);
+            assert_eq!(sock.state().counters().rx_icmp_filtered.get(), count);
+        };
+        assert_counters(api.core_ctx(), 0);
+
         assert_matches!(api.set_icmp_filter(&sock, filter), Ok(None));
 
         // Deliver an arbitrary ICMP message.
@@ -1180,6 +1255,7 @@ mod test {
         }
 
         // Verify the packet was/wasn't received, as expected.
+        assert_counters(api.core_ctx(), should_deliver.then_some(0).unwrap_or(1));
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
         if should_deliver {
             let lock_guard = received_packets.lock();
@@ -1198,6 +1274,12 @@ mod test {
     fn do_not_receive_icmpv6_packet_with_bad_checksum() {
         let mut api = new_raw_ip_socket_api::<Ipv6>();
         let sock = api.create(RawIpSocketProtocol::new(Ipv6Proto::Icmpv6), Default::default());
+
+        let assert_counters = |core_ctx: &mut FakeCoreCtx<_, _>, count: u64| {
+            assert_eq!(core_ctx.state.counters.rx_checksum_errors.get(), count);
+            assert_eq!(sock.state().counters().rx_checksum_errors.get(), count);
+        };
+        assert_counters(api.core_ctx(), 0);
 
         // Use a valid ICMP message, but intentionally corrupt the checksum.
         // The checksum is present at bytes 2 & 3.
@@ -1224,6 +1306,7 @@ mod test {
         }
 
         // Verify the packet wasn't received.
+        assert_counters(api.core_ctx(), 1);
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
         assert_matches!(&received_packets.lock()[..], []);
     }
@@ -1239,6 +1322,12 @@ mod test {
         const PROTO: IpProto = IpProto::Udp;
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(PROTO.into()), Default::default());
+
+        let assert_counters = |core_ctx: &mut FakeCoreCtx<_, _>, count: u64| {
+            assert_eq!(core_ctx.state.counters.tx_packets.get(), count);
+            assert_eq!(sock.state().counters().tx_packets.get(), count);
+        };
+        assert_counters(api.core_ctx(), 0);
 
         assert_eq!(api.set_device(&sock, bound_dev.as_ref()), None);
         let hop_limit = hop_limit.and_then(NonZeroU8::new);
@@ -1260,6 +1349,8 @@ mod test {
         assert_eq!(*proto, <I as IpProtoExt>::Proto::from(PROTO));
         assert_eq!(*mtu, None);
         assert_eq!(*ttl, hop_limit);
+
+        assert_counters(api.core_ctx(), 1);
     }
 
     #[ip_test(I)]
@@ -1323,14 +1414,24 @@ mod test {
     #[test_case(Icmpv6MessageType::DestUnreachable.into(), 4; "header-too-short")]
     #[test_case(0, 8; "message-type-zero-not-supported")]
     fn icmpv6_send_to_invalid_body(message_type: u8, header_len: usize) {
-        let mut body = vec![0; header_len];
-        body[0] = message_type;
         let mut api = new_raw_ip_socket_api::<Ipv6>();
         let sock = api.create(RawIpSocketProtocol::new(Ipv6Proto::Icmpv6), Default::default());
+
+        let assert_counters = |core_ctx: &mut FakeCoreCtx<_, _>, count: u64| {
+            assert_eq!(core_ctx.state.counters.tx_checksum_errors.get(), count);
+            assert_eq!(sock.state().counters().tx_checksum_errors.get(), count);
+        };
+
+        let mut body = vec![0; header_len];
+        body[0] = message_type;
+        assert_counters(api.core_ctx(), 0);
+
         let remote_ip = ZonedAddr::Unzoned(Ipv6::TEST_ADDRS.remote_ip);
         assert_matches!(
             api.send_to(&sock, Some(remote_ip), Buf::new(body, ..)),
             Err(RawIpSocketSendToError::InvalidBody)
         );
+
+        assert_counters(api.core_ctx(), 1);
     }
 }

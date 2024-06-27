@@ -13,6 +13,7 @@ use netstack3_ip::icmp::{
     NdpRxCounters, NdpTxCounters,
 };
 use netstack3_ip::nud::{NudCounters, NudCountersInner};
+use netstack3_ip::raw::RawIpSocketCounters;
 use netstack3_ip::{IpCounters, IpLayerIpExt};
 use netstack3_tcp::{TcpCounters, TcpCountersInner};
 use netstack3_udp::{UdpCounters, UdpCountersInner};
@@ -31,6 +32,8 @@ where
     C: ContextPair,
     C::CoreContext: CounterContext<IpCounters<Ipv4>>
         + CounterContext<IpCounters<Ipv6>>
+        + CounterContext<RawIpSocketCounters<Ipv4>>
+        + CounterContext<RawIpSocketCounters<Ipv6>>
         + CounterContext<UdpCounters<Ipv4>>
         + CounterContext<UdpCounters<Ipv6>>
         + CounterContext<TcpCounters<Ipv4>>
@@ -110,6 +113,18 @@ where
         });
         inspector.record_child("IPv6", |inspector| {
             self.core_ctx().with_counters(|ip| inspect_ip_counters::<Ipv6>(inspector, ip))
+        });
+        inspector.record_child("RawIpSockets", |inspector| {
+            inspector.record_child("V4", |inspector| {
+                self.core_ctx().with_counters(|counters: &RawIpSocketCounters<Ipv4>| {
+                    inspector.delegate_inspectable(counters)
+                })
+            });
+            inspector.record_child("V6", |inspector| {
+                self.core_ctx().with_counters(|counters: &RawIpSocketCounters<Ipv6>| {
+                    inspector.delegate_inspectable(counters)
+                })
+            });
         });
         inspector.record_child("UDP", |inspector| {
             inspector.record_child("V4", |inspector| {
