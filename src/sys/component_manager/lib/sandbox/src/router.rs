@@ -5,11 +5,13 @@
 use crate::{Capability, Dict, WeakInstanceToken};
 use async_trait::async_trait;
 use cm_types::Availability;
+use fuchsia_zircon_status::Status;
 use futures::future::BoxFuture;
-use router_error::RouterError;
+use router_error::{Explain, RouterError};
 use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
+use thiserror::Error;
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
@@ -98,12 +100,28 @@ impl Router {
     }
 }
 
+#[derive(Debug, Error, Clone)]
+struct CapabilityNotCloneableError {}
+
+impl Explain for CapabilityNotCloneableError {
+    fn as_zx_status(&self) -> Status {
+        Status::NOT_FOUND
+    }
+}
+
+impl fmt::Display for CapabilityNotCloneableError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "capability not cloneable")
+    }
+}
+
 #[async_trait]
 impl Routable for Capability {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        match self.clone() {
-            Capability::Router(router) => router.route(request).await,
-            capability => Ok(capability),
+        match self.try_clone() {
+            Ok(Capability::Router(router)) => router.route(request).await,
+            Ok(capability) => Ok(capability),
+            Err(_) => Err(RouterError::NotFound(Arc::new(CapabilityNotCloneableError {}))),
         }
     }
 }

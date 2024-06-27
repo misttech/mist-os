@@ -28,7 +28,7 @@ impl From<Capability> for fsandbox::Capability {
             Capability::Data(s) => s.into(),
             Capability::Unit(s) => s.into(),
             Capability::Directory(s) => s.into(),
-            Capability::OneShotHandle(s) => s.into(),
+            Capability::Handle(s) => s.into(),
             Capability::Instance(s) => s.into(),
         }
     }
@@ -44,9 +44,7 @@ impl TryFrom<fsandbox::Capability> for Capability {
     fn try_from(capability: fsandbox::Capability) -> Result<Self, Self::Error> {
         match capability {
             fsandbox::Capability::Unit(_) => Ok(crate::Unit::default().into()),
-            fsandbox::Capability::Handle(handle) => {
-                try_from_handle_in_registry(handle.token.as_handle_ref())
-            }
+            fsandbox::Capability::Handle(handle) => Ok(crate::Handle::new(handle).into()),
             fsandbox::Capability::Data(data_capability) => {
                 Ok(crate::Data::try_from(data_capability)?.into())
             }
@@ -104,7 +102,7 @@ impl RemotableCapability for Capability {
             Self::Data(s) => s.try_into_directory_entry(),
             Self::Unit(s) => s.try_into_directory_entry(),
             Self::Directory(s) => s.try_into_directory_entry(),
-            Self::OneShotHandle(s) => s.try_into_directory_entry(),
+            Self::Handle(s) => s.try_into_directory_entry(),
             Self::Instance(s) => s.try_into_directory_entry(),
         }
     }

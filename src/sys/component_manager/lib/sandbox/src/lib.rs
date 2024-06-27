@@ -28,7 +28,7 @@ pub use self::connector::{Connectable, Connector, Message};
 pub use self::data::Data;
 pub use self::dict::{Dict, Key as DictKey};
 pub use self::directory::Directory;
-pub use self::handle::OneShotHandle;
+pub use self::handle::Handle;
 pub use self::instance_token::{WeakInstanceToken, WeakInstanceTokenAny};
 pub use self::receiver::Receiver;
 pub use self::router::{Request, Routable, Router};

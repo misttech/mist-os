@@ -1274,8 +1274,11 @@ impl Routable for CapabilityRequestedHook {
             receiver: receiver.clone(),
         });
         source.hooks.dispatch(&event).await;
-        let capability =
-            if receiver.is_taken() { sender.into() } else { self.capability.clone().into() };
+        let capability = if receiver.is_taken() {
+            sender.into()
+        } else {
+            self.capability.try_clone().map_err(|_| RoutingError::BedrockNotCloneable)?
+        };
         if !request.debug {
             Ok(capability)
         } else {

@@ -76,12 +76,15 @@ impl RouterExt for Router {
     ) -> Dict {
         let out = Dict::new();
         for (key, value) in dict.enumerate() {
+            let Ok(value) = value else {
+                // This capability is not cloneable. Skip it.
+                continue;
+            };
             let value = match value {
                 Capability::Dictionary(dict) => {
                     Capability::Dictionary(Self::dict_routers_to_open(weak_component, scope, &dict))
                 }
-                Capability::Router(r) => {
-                    let router = r.clone();
+                Capability::Router(router) => {
                     let request = Request {
                         target: weak_component.clone(),
                         // Use the weakest availability, so that it gets immediately upgraded to
@@ -98,7 +101,7 @@ impl RouterExt for Router {
                         |_| None,
                     )))
                 }
-                other => other.clone(),
+                other => other,
             };
             out.insert(key, value).ok();
         }

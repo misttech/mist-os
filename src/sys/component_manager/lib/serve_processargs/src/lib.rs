@@ -131,11 +131,11 @@ pub enum DeliveryError {
 fn translate_handle(cap: Capability, info: &HandleInfo) -> Result<StartupHandle, DeliveryError> {
     validate_handle_type(info.handle_type())?;
 
-    let one_shot = match cap.clone() {
-        Capability::OneShotHandle(h) => h,
+    let handle = match cap {
+        Capability::Handle(h) => h,
         c => return Err(DeliveryError::UnsupportedCapability(c)),
     };
-    let handle = one_shot.take().ok_or_else(|| DeliveryError::UnsupportedCapability(cap))?;
+    let handle = handle.into();
 
     Ok(StartupHandle { handle, info: *info })
 }
@@ -240,7 +240,7 @@ mod tests {
     use fuchsia_zircon::{AsHandleRef, HandleBased, Peered, Signals, Time};
     use futures::TryStreamExt;
     use maplit::hashmap;
-    use sandbox::OneShotHandle;
+    use sandbox::Handle;
     use std::pin::pin;
     use std::str::FromStr;
     use test_util::{mock_dir, multishot};
@@ -271,7 +271,7 @@ mod tests {
         let dict = Dict::new();
         dict.insert(
             "stdin".parse().unwrap(),
-            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle().into_handle())),
+            Capability::Handle(Handle::from(sock0.into_handle().into_handle())),
         )
         .map_err(|e| anyhow!("{e:?}"))?;
         let delivery_map = hashmap! {
@@ -311,10 +311,7 @@ mod tests {
         // Put a socket at "/handles/stdin". This implements a capability bundling pattern.
         let handles = Dict::new();
         handles
-            .insert(
-                "stdin".parse().unwrap(),
-                Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
-            )
+            .insert("stdin".parse().unwrap(), Capability::Handle(Handle::from(sock0.into_handle())))
             .map_err(|e| anyhow!("{e:?}"))?;
         let dict = Dict::new();
         dict.insert("handles".parse().unwrap(), Capability::Dictionary(handles))
@@ -350,10 +347,7 @@ mod tests {
 
         let handles = Dict::new();
         handles
-            .insert(
-                "stdin".parse().unwrap(),
-                Capability::OneShotHandle(OneShotHandle::from(ep0.into_handle())),
-            )
+            .insert("stdin".parse().unwrap(), Capability::Handle(Handle::from(ep0.into_handle())))
             .map_err(|e| anyhow!("{e:?}"))?;
         let dict = Dict::new();
         dict.insert("handles".parse().unwrap(), Capability::Dictionary(handles))
@@ -396,7 +390,7 @@ mod tests {
         let dict = Dict::new();
         dict.insert(
             "handles".parse().unwrap(),
-            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+            Capability::Handle(Handle::from(sock0.into_handle())),
         )
         .expect("dict entry already exists");
 
@@ -423,7 +417,7 @@ mod tests {
         let dict = Dict::new();
         dict.insert(
             "stdin".parse().unwrap(),
-            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+            Capability::Handle(Handle::from(sock0.into_handle())),
         )
         .expect("dict entry already exists");
         let delivery_map = DeliveryMap::new();
@@ -443,7 +437,7 @@ mod tests {
         let dict = Dict::new();
         dict.insert(
             "stdin".parse().unwrap(),
-            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+            Capability::Handle(Handle::from(sock0.into_handle())),
         )
         .expect("dict entry already exists");
         let delivery_map = hashmap! {
@@ -672,7 +666,7 @@ mod tests {
         let dict = Dict::new();
         dict.insert(
             "stdin".parse().unwrap(),
-            Capability::OneShotHandle(OneShotHandle::from(sock0.into_handle())),
+            Capability::Handle(Handle::from(sock0.into_handle())),
         )
         .expect("dict entry already exists");
         let delivery_map = hashmap! {

@@ -254,9 +254,12 @@ fn make_dict_extending_router(
                 return Ok(Capability::Instance(dict_source.clone()));
             }
             let source_dict = source_dict.unwrap();
-            let out_dict = dict.shallow_copy();
+            let out_dict = dict.shallow_copy().map_err(|_| RoutingError::BedrockNotCloneable)?;
             for (source_key, source_value) in source_dict.enumerate() {
-                if let Err(_) = out_dict.insert(source_key.clone(), source_value.clone()) {
+                let Ok(source_value) = source_value else {
+                    return Err(RoutingError::BedrockNotCloneable.into());
+                };
+                if let Err(_) = out_dict.insert(source_key.clone(), source_value) {
                     return Err(RoutingError::BedrockSourceDictionaryCollision.into());
                 }
             }

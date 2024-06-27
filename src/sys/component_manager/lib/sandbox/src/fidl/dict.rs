@@ -39,11 +39,12 @@ impl Dict {
                         let key =
                             Key::new(key).map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
                         match self.get(&key) {
-                            Some(cap) => Ok(cap.into()),
-                            None => {
+                            Ok(Some(cap)) => Ok(cap.into()),
+                            Ok(None) => {
                                 (self.not_found)(key.as_str());
                                 Err(fsandbox::DictionaryError::NotFound)
                             }
+                            Err(()) => Err(fsandbox::DictionaryError::NotCloneable),
                         }
                     })();
                     responder.send(result)?;
@@ -72,33 +73,39 @@ impl Dict {
                     responder.send(client_end)?;
                 }
                 fsandbox::DictionaryRequest::Copy { responder } => {
-                    let (client_end, server_end) =
-                        endpoints::create_endpoints::<fsandbox::DictionaryMarker>();
-                    // The copy is registered under the koid of the client end.
-                    let koid = client_end.basic_info().unwrap().koid;
-                    let stream = server_end.into_stream().unwrap();
-                    self.shallow_copy().serve_and_register(stream, koid);
-                    responder.send(client_end)?;
+                    let result = (|| {
+                        let (client_end, server_end) =
+                            endpoints::create_endpoints::<fsandbox::DictionaryMarker>();
+                        // The copy is registered under the koid of the client end.
+                        let koid = client_end.basic_info().unwrap().koid;
+                        let stream = server_end.into_stream().unwrap();
+                        let copy = self
+                            .shallow_copy()
+                            .map_err(|_| fsandbox::DictionaryError::NotCloneable)?;
+                        copy.serve_and_register(stream, koid);
+                        Ok(client_end)
+                    })();
+                    responder.send(result)?;
                 }
                 fsandbox::DictionaryRequest::Enumerate { iterator: server_end, .. } => {
-                    let items = self.enumerate().collect();
+                    let items = self.enumerate();
                     let stream = server_end.into_stream().unwrap();
-                    let task = fasync::Task::spawn(serve_dict_item_iterator(items, stream));
+                    let task = fasync::Task::spawn(serve_enumerate_iterator(items, stream));
                     self.iterator_tasks.add(task);
                 }
                 fsandbox::DictionaryRequest::Keys { iterator: server_end, .. } => {
                     let keys = self.keys().collect();
                     let stream = server_end.into_stream().unwrap();
-                    let task = fasync::Task::spawn(serve_dict_key_iterator(keys, stream));
+                    let task = fasync::Task::spawn(serve_keys_iterator(keys, stream));
                     self.iterator_tasks.add(task);
                 }
                 fsandbox::DictionaryRequest::Drain { iterator: server_end, .. } => {
                     // Take out entries, replacing with an empty BTreeMap.
                     // They are dropped if the caller does not request an iterator.
                     if let Some(server_end) = server_end {
-                        let items = self.drain().collect();
+                        let items = self.drain();
                         let stream = server_end.into_stream().unwrap();
-                        let task = fasync::Task::spawn(serve_dict_item_iterator(items, stream));
+                        let task = fasync::Task::spawn(serve_drain_iterator(items, stream));
                         self.iterator_tasks.add(task);
                     }
                 }
@@ -140,6 +147,9 @@ impl RemotableCapability for Dict {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         let dir = pfs::simple();
         for (key, value) in self.enumerate() {
+            let Ok(value) = value else {
+                continue;
+            };
             let remote: Arc<dyn DirectoryEntry> = match value {
                 Capability::Directory(d) => d.into_remote(),
                 value => value.try_into_directory_entry().map_err(|err| {
@@ -162,69 +172,88 @@ impl RemotableCapability for Dict {
     }
 }
 
-async fn serve_dict_item_iterator(
-    items: Vec<(Key, Capability)>,
-    mut stream: fsandbox::DictionaryItemIteratorRequestStream,
+async fn serve_enumerate_iterator(
+    mut items: impl Iterator<Item = (Key, Result<Capability, ()>)>,
+    mut stream: fsandbox::DictionaryEnumerateIteratorRequestStream,
 ) {
-    let mut chunks = items
-        .chunks(fsandbox::MAX_DICTIONARY_ITEMS_CHUNK as usize)
-        .map(|chunk: &[(Key, Capability)]| chunk.to_vec())
-        .collect::<Vec<_>>()
-        .into_iter();
-
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
-            fsandbox::DictionaryItemIteratorRequest::GetNext { responder } => match chunks.next() {
-                Some(chunk) => {
-                    let items = chunk
-                        .into_iter()
-                        .map(|(key, value)| fsandbox::DictionaryItem {
-                            key: key.to_string(),
-                            value: value.into(),
-                        })
-                        .collect();
-                    if let Err(_) = responder.send(items) {
-                        return;
+            fsandbox::DictionaryEnumerateIteratorRequest::GetNext { responder } => {
+                let mut chunk = vec![];
+                for _ in 0..fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK {
+                    match items.next() {
+                        Some((key, value)) => {
+                            chunk.push(fsandbox::DictionaryFallibleItem {
+                                key: key.into(),
+                                value: match value {
+                                    Ok(v) => fsandbox::DictionaryValueResult::Ok(v.into()),
+                                    Err(()) => fsandbox::DictionaryValueResult::Error(
+                                        fsandbox::DictionaryError::NotCloneable,
+                                    ),
+                                },
+                            });
+                        }
+                        None => break,
                     }
                 }
-                None => {
-                    let _ = responder.send(vec![]);
-                    return;
-                }
-            },
-            fsandbox::DictionaryItemIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown DictionaryItemIterator request");
+                let _ = responder.send(chunk);
+            }
+            fsandbox::DictionaryEnumerateIteratorRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown DictionaryEnumerateIterator request");
             }
         }
     }
 }
 
-async fn serve_dict_key_iterator(
-    keys: Vec<Key>,
-    mut stream: fsandbox::DictionaryKeyIteratorRequestStream,
+async fn serve_drain_iterator(
+    mut items: impl Iterator<Item = (Key, Capability)>,
+    mut stream: fsandbox::DictionaryDrainIteratorRequestStream,
 ) {
-    let mut chunks = keys
-        .chunks(fsandbox::MAX_DICTIONARY_KEYS_CHUNK as usize)
-        .map(|chunk: &[Key]| chunk.to_vec())
-        .collect::<Vec<_>>()
-        .into_iter();
-
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
-            fsandbox::DictionaryKeyIteratorRequest::GetNext { responder } => match chunks.next() {
-                Some(chunk) => {
-                    let keys: Vec<_> = chunk.into_iter().map(|k| k.to_string()).collect();
-                    if let Err(_) = responder.send(&keys) {
-                        return;
+            fsandbox::DictionaryDrainIteratorRequest::GetNext { responder } => {
+                let mut chunk = vec![];
+                for _ in 0..fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK {
+                    match items.next() {
+                        Some((key, value)) => {
+                            chunk.push(fsandbox::DictionaryItem {
+                                key: key.into(),
+                                value: value.into(),
+                            });
+                        }
+                        None => break,
                     }
                 }
-                None => {
-                    let _ = responder.send(&[]);
-                    return;
+                let _ = responder.send(chunk);
+            }
+            fsandbox::DictionaryDrainIteratorRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown DictionaryDrainIterator request");
+            }
+        }
+    }
+}
+
+async fn serve_keys_iterator(
+    keys: Vec<Key>,
+    mut stream: fsandbox::DictionaryKeysIteratorRequestStream,
+) {
+    let mut keys = keys.into_iter();
+    while let Ok(Some(request)) = stream.try_next().await {
+        match request {
+            fsandbox::DictionaryKeysIteratorRequest::GetNext { responder } => {
+                let mut chunk = vec![];
+                for _ in 0..fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK {
+                    match keys.next() {
+                        Some(key) => {
+                            chunk.push(key.into());
+                        }
+                        None => break,
+                    }
                 }
-            },
-            fsandbox::DictionaryKeyIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown DictionaryKeyIterator request");
+                let _ = responder.send(&chunk);
+            }
+            fsandbox::DictionaryKeysIteratorRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown DictionaryKeysIterator request");
             }
         }
     }
@@ -234,13 +263,13 @@ async fn serve_dict_key_iterator(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Data, Dict, DirEntry, Directory, Unit};
+    use crate::{Data, Dict, DirEntry, Directory, Handle, Unit};
     use anyhow::{Error, Result};
     use assert_matches::assert_matches;
     use fidl::endpoints::{
         create_endpoints, create_proxy, create_proxy_and_stream, Proxy, ServerEnd,
     };
-    use fidl::handle::{Channel, Status};
+    use fidl::handle::{Channel, HandleBased, Status};
     use fidl_fuchsia_io as fio;
     use fuchsia_fs::directory;
     use futures::try_join;
@@ -328,35 +357,39 @@ mod tests {
 
     /// Tests that `Dict.Get` yields the same capability that was previously inserted.
     #[fuchsia::test]
-    async fn serve_get() -> Result<(), Error> {
+    async fn serve_get() {
         let mut dict = Dict::new();
 
-        // Insert a Unit into the Dict.
+        // Insert a Unit and a Handle into the Dict.
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
         assert_eq!(dict.lock_entries().len(), 1);
+        let (ch, _) = fidl::Channel::create();
+        let handle = Handle::from(ch.into_handle());
+        dict.insert("h".parse().unwrap(), Capability::Handle(handle)).unwrap();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
+        let (dict_proxy, dict_stream) =
+            create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
-            let cap = dict_proxy
-                .get(CAP_KEY.as_str())
-                .await
-                .expect("failed to call Get")
-                .expect("failed to get");
+            let cap = dict_proxy.get(CAP_KEY.as_str()).await.unwrap().unwrap();
 
             // The value should be the same one that was previously inserted.
             assert_eq!(cap, Unit::default().into());
+
+            // Trying to get the handle capability should return NOT_CLONEABLE.
+            assert_matches!(
+                dict_proxy.get("h").await.unwrap(),
+                Err(fsandbox::DictionaryError::NotCloneable)
+            );
 
             Ok(())
         };
 
         try_join!(client, server).unwrap();
 
-        // The capability should remain in the Dict.
-        assert_eq!(dict.lock_entries().len(), 1);
-
-        Ok(())
+        // The capabilities should remain in the Dict.
+        assert_eq!(dict.lock_entries().len(), 2);
     }
 
     /// Tests that `Dict.Insert` returns `ALREADY_EXISTS` when there is already an item with
@@ -412,12 +445,12 @@ mod tests {
 
     /// Tests that `copy` produces a new Dict with cloned entries.
     #[fuchsia::test]
-    async fn copy() -> Result<()> {
+    async fn copy() {
         // Create a Dict with a Unit inside, and copy the Dict.
         let dict = Dict::new();
         dict.insert("unit1".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
 
-        let copy = dict.shallow_copy();
+        let copy = dict.shallow_copy().unwrap();
 
         // Insert a Unit into the copy.
         copy.insert("unit2".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
@@ -431,8 +464,13 @@ mod tests {
         let entries = dict.lock_entries();
         assert_eq!(entries.len(), 1);
         assert!(entries.values().all(|value| matches!(value, Capability::Unit(_))));
+        drop(entries);
 
-        Ok(())
+        // Non-cloneable handle results in error
+        let (ch, _) = fidl::Channel::create();
+        let handle = Handle::from(ch.into_handle());
+        dict.insert("h".parse().unwrap(), Capability::Handle(handle)).unwrap();
+        assert_matches!(dict.shallow_copy(), Err(()));
     }
 
     /// Tests that cloning a Dict results in a Dict that shares the same entries.
@@ -507,37 +545,50 @@ mod tests {
         // Add the Data capabilities to the dict.
         dict_proxy.insert("cap1", data_caps.remove(0).into()).await.unwrap().unwrap();
         dict_proxy.insert("cap2", data_caps.remove(0).into()).await.unwrap().unwrap();
+        // This item is not cloneable so only the key will appear in the results.
+        let (ch, _) = fidl::Channel::create();
+        let handle = ch.into_handle();
+        dict_proxy.insert("cap3", fsandbox::Capability::Handle(handle)).await.unwrap().unwrap();
 
         // Now read the entries back.
         let (iterator, server_end) = endpoints::create_proxy().unwrap();
         dict_proxy.enumerate(server_end).unwrap();
         let mut items = iterator.get_next().await.unwrap();
         assert!(iterator.get_next().await.unwrap().is_empty());
-        assert_eq!(items.len(), 2);
+        assert_eq!(items.len(), 3);
         assert_matches!(
             items.remove(0),
-            fsandbox::DictionaryItem {
+            fsandbox::DictionaryFallibleItem {
                 key,
-                value: fsandbox::Capability::Data(fsandbox::Data::Int64(num))
+                value: fsandbox::DictionaryValueResult::Ok(value),
             }
-            if key == "cap1"
-            && num == 1
+            if key == "cap1" &&
+            value == fsandbox::Capability::Data(fsandbox::Data::Int64(1))
         );
         assert_matches!(
             items.remove(0),
-            fsandbox::DictionaryItem {
+            fsandbox::DictionaryFallibleItem {
                 key,
-                value: fsandbox::Capability::Data(fsandbox::Data::Int64(num))
+                value: fsandbox::DictionaryValueResult::Ok(value),
             }
-            if key == "cap2"
-            && num == 2
+            if key == "cap2" &&
+            value == fsandbox::Capability::Data(fsandbox::Data::Int64(2))
+        );
+        assert_matches!(
+            items.remove(0),
+            fsandbox::DictionaryFallibleItem {
+                key,
+                value: fsandbox::DictionaryValueResult::Error(e),
+            }
+            if key == "cap3" &&
+            e == fsandbox::DictionaryError::NotCloneable
         );
 
         let (iterator, server_end) = endpoints::create_proxy().unwrap();
         dict_proxy.keys(server_end).unwrap();
         let keys = iterator.get_next().await.unwrap();
         assert!(iterator.get_next().await.unwrap().is_empty());
-        assert_eq!(keys, ["cap1", "cap2"]);
+        assert_eq!(keys, ["cap1", "cap2", "cap3"]);
     }
 
     /// Tests batching for Enumerate and Keys iterators.
@@ -546,11 +597,11 @@ mod tests {
         // Number of entries in the Dict that will be enumerated.
         //
         // This value was chosen such that that GetNext returns multiple chunks of different sizes.
-        const NUM_ENTRIES: u32 = fsandbox::MAX_DICTIONARY_ITEMS_CHUNK * 2 + 1;
+        const NUM_ENTRIES: u32 = fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK * 2 + 1;
 
         // Number of items we expect in each chunk, for every chunk we expect to get.
         const EXPECTED_CHUNK_LENGTHS: &[u32] =
-            &[fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, 1];
+            &[fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK, fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK, 1];
 
         // Create a Dict with [NUM_ENTRIES] entries that have Unit values.
         let dict = Dict::new();
@@ -579,7 +630,7 @@ mod tests {
             assert_eq!(*expected_len, keys.len() as u32);
             num_got_items += items.len() as u32;
             for item in items {
-                assert_eq!(item.value, Unit::default().into());
+                assert_eq!(item.value, fsandbox::DictionaryValueResult::Ok(Unit::default().into()));
             }
         }
 

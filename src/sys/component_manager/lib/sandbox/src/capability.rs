@@ -72,14 +72,14 @@ impl Explain for RemoteError {
     }
 }
 
-#[derive(FromEnum, Debug, Clone)]
+#[derive(FromEnum, Debug)]
 pub enum Capability {
     Unit(crate::Unit),
     Connector(crate::Connector),
     Dictionary(crate::Dict),
     Data(crate::Data),
     Directory(crate::Directory),
-    OneShotHandle(crate::OneShotHandle),
+    Handle(crate::Handle),
     Router(crate::Router),
     Instance(crate::WeakInstanceToken),
 
@@ -95,6 +95,22 @@ impl Capability {
         }
     }
 
+    pub fn try_clone(&self) -> Result<Self, ()> {
+        let out = match self {
+            Self::Connector(s) => Self::Connector(s.clone()),
+            Self::Router(s) => Self::Router(s.clone()),
+            Self::Dictionary(s) => Self::Dictionary(s.clone()),
+            Self::Data(s) => Self::Data(s.clone()),
+            Self::Unit(s) => Self::Unit(s.clone()),
+            Self::Directory(s) => Self::Directory(s.clone()),
+            Self::Handle(s) => Self::Handle(s.try_clone()?),
+            Self::Instance(s) => Self::Instance(s.clone()),
+            #[cfg(target_os = "fuchsia")]
+            Self::DirEntry(s) => Self::DirEntry(s.clone()),
+        };
+        Ok(out)
+    }
+
     pub fn debug_typename(&self) -> &'static str {
         match self {
             Self::Connector(_) => "Sender",
@@ -103,7 +119,7 @@ impl Capability {
             Self::Data(_) => "Data",
             Self::Unit(_) => "Unit",
             Self::Directory(_) => "Directory",
-            Self::OneShotHandle(_) => "Handle",
+            Self::Handle(_) => "Handle",
             Self::Instance(_) => "Instance",
 
             #[cfg(target_os = "fuchsia")]

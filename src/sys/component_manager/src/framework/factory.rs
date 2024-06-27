@@ -59,21 +59,6 @@ impl FactoryCapabilityProvider {
 
     async fn handle_request(&self, request: fsandbox::FactoryRequest) -> Result<(), fidl::Error> {
         match request {
-            fsandbox::FactoryRequest::TakeHandle { capability, responder } => {
-                match sandbox::Capability::try_from(fsandbox::Capability::Handle(capability)) {
-                    Ok(capability) => match capability {
-                        sandbox::Capability::OneShotHandle(handle) => {
-                            responder.send(
-                                handle.take().ok_or_else(|| fsandbox::FactoryError::Unavailable),
-                            )?;
-                        }
-                        _ => unreachable!(),
-                    },
-                    Err(err) => {
-                        warn!("Error converting token to capability: {err:?}");
-                    }
-                }
-            }
             fsandbox::FactoryRequest::OpenConnector {
                 capability,
                 server_end,
@@ -94,10 +79,6 @@ impl FactoryCapabilityProvider {
                 let sender = self.create_connector(receiver);
                 responder.send(sender)?;
             }
-            fsandbox::FactoryRequest::CreateOneShotHandle { handle, responder } => {
-                let handle = self.create_one_shot_handle(handle);
-                responder.send(handle)?;
-            }
             fsandbox::FactoryRequest::CreateDictionary { responder } => {
                 let client_end = self.create_dictionary();
                 responder.send(client_end)?;
@@ -107,10 +88,6 @@ impl FactoryCapabilityProvider {
             }
         }
         Ok(())
-    }
-
-    fn create_one_shot_handle(&self, handle: zx::Handle) -> fsandbox::OneShotHandle {
-        fsandbox::OneShotHandle::from(sandbox::OneShotHandle::new(handle))
     }
 
     fn create_connector(
@@ -165,10 +142,8 @@ mod tests {
     use crate::model::component::ComponentInstance;
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;
-    use assert_matches::assert_matches;
-    use fidl_fuchsia_component_sandbox as fsandbox;
-    use fuchsia_zircon::{self as zx, HandleBased};
     use std::sync::{Arc, Weak};
+    use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon as zx};
 
     async fn new_root() -> Arc<ComponentInstance> {
         ComponentInstance::new_root(
@@ -185,30 +160,6 @@ mod tests {
         let (proxy, server) = endpoints::create_proxy::<fsandbox::FactoryMarker>().unwrap();
         capability::open_framework(&host, instance, server.into()).await.unwrap();
         (proxy, host)
-    }
-
-    #[fuchsia::test]
-    async fn create_one_shot_handle() {
-        let root = new_root().await;
-        let (factory_proxy, _host) = factory(&root).await;
-
-        let event = zx::Event::create();
-        let expected_koid = event.get_koid().unwrap();
-
-        let one_shot = factory_proxy.create_one_shot_handle(event.into()).await.unwrap();
-        let one_shot2 = fsandbox::OneShotHandle {
-            token: one_shot.token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-        };
-        assert_matches!(
-            factory_proxy.take_handle(one_shot).await.unwrap(),
-            Ok(handle) if handle.get_koid().unwrap() == expected_koid
-        );
-        assert_matches!(
-            factory_proxy.take_handle(one_shot2).await.unwrap(),
-            Err(fsandbox::FactoryError::Unavailable)
-        );
-
-        drop(factory_proxy);
     }
 
     #[fuchsia::test]

@@ -477,7 +477,8 @@ impl ComponentInstance {
             .collection_inputs
             .get(&Name::new(&collection_name).unwrap())
             .expect("dict missing for declared collection")
-            .shallow_copy();
+            .shallow_copy()
+            .map_err(|_| AddDynamicChildError::InvalidDictionary)?;
 
         // Merge `ChildArgs.dictionary` entries into the child sandbox.
         if let Some(dictionary_client_end) = child_args.dictionary {

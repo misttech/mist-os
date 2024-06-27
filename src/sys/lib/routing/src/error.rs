@@ -261,6 +261,9 @@ pub enum RoutingError {
     #[error("source dictionary was not found in child's exposes")]
     BedrockSourceDictionaryExposeNotFound,
 
+    #[error("Some capability in the routing chain could not be cloned.")]
+    BedrockNotCloneable,
+
     #[error(
         "a capability in a dictionary extended from a source dictionary collides with \
         a capability in the source dictionary that has the same key"
@@ -333,6 +336,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
+            | RoutingError::BedrockNotCloneable { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
             RoutingError::BedrockMemberAccessUnsupported { .. }
             | RoutingError::DictionariesNotSupported { .. } => zx::Status::NOT_SUPPORTED,

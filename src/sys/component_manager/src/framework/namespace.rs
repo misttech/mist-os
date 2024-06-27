@@ -16,7 +16,10 @@ use sandbox::Capability;
 use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
 use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
-use {fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
+    fuchsia_zircon as zx,
+};
 
 lazy_static! {
     static ref CAPABILITY_NAME: Name = fcomponent::NamespaceMarker::PROTOCOL_NAME.parse().unwrap();
@@ -100,7 +103,11 @@ impl NamespaceCapabilityProvider {
                     break;
                 }
                 for item in items {
-                    let capability: Capability = item.value.try_into().unwrap();
+                    let fsandbox::DictionaryValueResult::Ok(value) = item.value else {
+                        // Capability was not cloneable
+                        return Err(fcomponent::NamespaceError::DictionaryRead);
+                    };
+                    let capability: Capability = value.try_into().unwrap();
                     let path = Path::new(format!("{}/{}", path, item.key))
                         .map_err(|_| fcomponent::NamespaceError::BadEntry)?;
                     namespace_builder.add_object(capability, &path).map_err(Self::error_to_fidl)?;

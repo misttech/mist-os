@@ -485,13 +485,13 @@ pub mod tests {
 
     #[derive(Debug, Clone)]
     struct RouteCounter {
-        capability: Capability,
+        capability: Arc<Capability>,
         counter: Arc<test_util::Counter>,
     }
 
     impl RouteCounter {
         fn new(capability: Capability) -> Self {
-            Self { capability, counter: Arc::new(test_util::Counter::new(0)) }
+            Self { capability: Arc::new(capability), counter: Arc::new(test_util::Counter::new(0)) }
         }
 
         fn count(&self) -> usize {
@@ -503,7 +503,7 @@ pub mod tests {
     impl Routable for RouteCounter {
         async fn route(&self, _: Request) -> Result<Capability, RouterError> {
             self.counter.inc();
-            Ok(self.capability.clone())
+            Ok(self.capability.try_clone().unwrap())
         }
     }
 

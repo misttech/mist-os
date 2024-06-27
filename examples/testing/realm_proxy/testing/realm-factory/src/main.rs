@@ -35,7 +35,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     // Get a dict containing the capabilities exposed by the realm.
                     let (expose_dict, server_end) = endpoints::create_proxy().unwrap();
                     realm.root.controller().get_exposed_dictionary(server_end).await?.unwrap();
-                    let dictionary = expose_dict.copy().await?;
+                    let dictionary = expose_dict.copy().await?.unwrap();
                     let dictionary = dictionary.into_proxy().unwrap();
 
                     // Mix in additional capabilities to the dict.

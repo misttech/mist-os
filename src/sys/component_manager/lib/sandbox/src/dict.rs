@@ -84,8 +84,10 @@ impl Dict {
 
     /// Returns a clone of the capability associated with `key`. If there is no
     /// entry for `key`, `None` is returned.
-    pub fn get(&self, key: &Key) -> Option<Capability> {
-        self.lock_entries().get(key).cloned()
+    ///
+    /// If the value could not be cloned, returns an error.
+    pub fn get(&self, key: &Key) -> Result<Option<Capability>, ()> {
+        self.lock_entries().get(key).map(|c| c.try_clone()).transpose().map_err(|_| ())
     }
 
     /// Removes `key` from the entries, returning the capability at `key` if the
@@ -95,8 +97,22 @@ impl Dict {
     }
 
     /// Returns an iterator over a clone of the entries, sorted by key.
-    pub fn enumerate(&self) -> impl Iterator<Item = (Key, Capability)> {
-        self.lock_entries().clone().into_iter()
+    ///
+    /// If a capability is not cloneable, an error returned for the value.
+    pub fn enumerate(&self) -> impl Iterator<Item = (Key, Result<Capability, ()>)> {
+        let entries = {
+            let entries = self.lock_entries();
+            let entries: Vec<_> = entries
+                .iter()
+                .map(|(k, v)| {
+                    let k = k.clone();
+                    let v = v.try_clone();
+                    (k, v)
+                })
+                .collect();
+            entries
+        };
+        entries.into_iter()
     }
 
     /// Returns an iterator over the keys, in sorted order.
@@ -118,9 +134,26 @@ impl Dict {
     ///
     /// This is a shallow copy. Values are cloned, not copied, so are new references to the same
     /// underlying data.
-    pub fn shallow_copy(&self) -> Self {
-        let copy = Dict::new();
-        copy.lock_entries().clone_from(&self.lock_entries());
-        copy
+    ///
+    /// If any value in the dictionary could not be cloned, returns an error.
+    pub fn shallow_copy(&self) -> Result<Self, ()> {
+        let copy = Self::new();
+        let copied_entries = {
+            let entries = self.lock_entries();
+            let res: Result<BTreeMap<_, _>, _> = entries
+                .iter()
+                .map(|(k, v)| {
+                    let k = k.clone();
+                    let v = v.try_clone().map_err(|_| ())?;
+                    Ok((k, v))
+                })
+                .collect();
+            res?
+        };
+        {
+            let mut entries = copy.lock_entries();
+            let _ = std::mem::replace(&mut *entries, copied_entries);
+        }
+        Ok(copy)
     }
 }

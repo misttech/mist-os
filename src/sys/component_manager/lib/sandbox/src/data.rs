@@ -56,7 +56,7 @@ mod tests {
     fn clone() {
         let data: Data = Data::String("abc".to_string());
         let any: Capability = data.into();
-        let clone = any.clone();
+        let clone = any.try_clone().unwrap();
         let data_back = assert_matches!(any, Capability::Data(d) => d);
         let clone_data_back = assert_matches!(clone, Capability::Data(d) => d);
         assert_eq!(data_back, clone_data_back);
