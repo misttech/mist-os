@@ -2366,10 +2366,10 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
           counters->txnoassoc, counters->txnoack);
       BRCMF_INFO(
           "FW Err Counts: Rx: err %u oflo %u nobuf %u runt %u fragerr %u badplcp %u "
-          "crsglitch %u badfcs %u giant %u noscb %u badsrcmac %u",
+          "crsglitch %u badfcs %u giant %u noscb %u badsrcmac %u rxundec %u",
           counters->rxerror, counters->rxoflo, counters->rxnobuf, counters->rxrunt,
           counters->rxfragerr, counters->rxbadplcp, counters->rxcrsglitch, counters->rxbadfcs,
-          counters->rxgiant, counters->rxnoscb, counters->rxbadsrcmac);
+          counters->rxgiant, counters->rxnoscb, counters->rxbadsrcmac, counters->rxundec);
     }
   }
   ndev->client_stats_log_count++;
