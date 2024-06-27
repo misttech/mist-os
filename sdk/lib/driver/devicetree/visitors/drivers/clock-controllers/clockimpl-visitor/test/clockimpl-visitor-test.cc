@@ -81,14 +81,14 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       // Steps expected - Disable for CLK_ID3, SetInput as CLK_ID5, Enable for CLK_ID3
       ASSERT_EQ(init_steps->steps().size(), 3lu);
       EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID3));
-      EXPECT_EQ(init_steps->steps()[0].call().Which(),
+      EXPECT_EQ(init_steps->steps()[0].call()->Which(),
                 fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
       EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID3));
-      EXPECT_EQ(init_steps->steps()[1].call().Which(),
+      EXPECT_EQ(init_steps->steps()[1].call()->Which(),
                 fuchsia_hardware_clockimpl::InitCall::Tag::kInputIdx);
-      EXPECT_EQ(init_steps->steps()[1].call().input_idx().value(), static_cast<uint32_t>(CLK_ID5));
+      EXPECT_EQ(init_steps->steps()[1].call()->input_idx().value(), static_cast<uint32_t>(CLK_ID5));
       EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID3));
-      EXPECT_EQ(init_steps->steps()[2].call().Which(),
+      EXPECT_EQ(init_steps->steps()[2].call()->Which(),
                 fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
 
       node_tested_count++;
@@ -111,15 +111,15 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       // Steps expected - Disable for CLK_ID4, SetRateHz as CLK_ID4_RATE, Enable for CLK_ID4
       ASSERT_EQ(init_steps->steps().size(), 3lu);
       EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID4));
-      EXPECT_EQ(init_steps->steps()[0].call().Which(),
+      EXPECT_EQ(init_steps->steps()[0].call()->Which(),
                 fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
       EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID4));
-      EXPECT_EQ(init_steps->steps()[1].call().Which(),
+      EXPECT_EQ(init_steps->steps()[1].call()->Which(),
                 fuchsia_hardware_clockimpl::InitCall::Tag::kRateHz);
-      EXPECT_EQ(init_steps->steps()[1].call().rate_hz().value(),
+      EXPECT_EQ(init_steps->steps()[1].call()->rate_hz().value(),
                 static_cast<uint32_t>(CLK_ID4_RATE));
       EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID4));
-      EXPECT_EQ(init_steps->steps()[2].call().Which(),
+      EXPECT_EQ(init_steps->steps()[2].call()->Which(),
                 fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
 
       node_tested_count++;

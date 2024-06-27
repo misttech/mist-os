@@ -243,7 +243,7 @@ zx::result<> ClockImplVisitor::ParseInitChild(
   auto clock = ClockCells(specifiers);
 
   if ((clock_rate && clock_rate->AsUint32().value()) || clock_parent) {
-    controller.init_metadata.steps().emplace_back(clock.id(), InitCall::WithDisable({}));
+    controller.init_metadata.steps().push_back({{clock.id(), InitCall::WithDisable({})}});
   }
 
   if (clock_parent) {
@@ -253,8 +253,8 @@ zx::result<> ClockImplVisitor::ParseInitChild(
     }
 
     auto parent_clock = ClockCells(clock_parent->AsReference()->second);
-    controller.init_metadata.steps().emplace_back(clock.id(),
-                                                  InitCall::WithInputIdx(parent_clock.id()));
+    controller.init_metadata.steps().push_back(
+        {{clock.id(), InitCall::WithInputIdx(parent_clock.id())}});
     FDF_LOG(DEBUG, "Clock parent set to %d for clock ID %d by '%s'.", parent_clock.id(), clock.id(),
             child.name().c_str());
   }
@@ -267,14 +267,15 @@ zx::result<> ClockImplVisitor::ParseInitChild(
 
     // Skip setting rates for 0 as per the clock bindings.
     if (clock_rate->AsUint32().value() != 0) {
-      controller.init_metadata.steps().emplace_back(
-          clock.id(), InitCall::WithRateHz(clock_rate->AsUint32().value()));
+      controller.init_metadata.steps().push_back(
+          {{clock.id(), InitCall::WithRateHz(clock_rate->AsUint32().value())}});
+
       FDF_LOG(DEBUG, "Clock initial rate set to %d for clock ID %d by '%s'.",
               clock_rate->AsUint32().value(), clock.id(), child.name().c_str());
     }
   }
 
-  controller.init_metadata.steps().emplace_back(clock.id(), InitCall::WithEnable({}));
+  controller.init_metadata.steps().push_back({{clock.id(), InitCall::WithEnable({})}});
 
   return zx::ok();
 }

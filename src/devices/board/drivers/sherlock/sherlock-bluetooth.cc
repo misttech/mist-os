@@ -54,10 +54,10 @@ static const std::vector<fpbus::BootMetadata> bt_uart_boot_metadata{
 
 zx_status_t Sherlock::BluetoothInit() {
   // set alternate functions to enable Bluetooth UART
-  gpio_init_steps_.push_back({T931_UART_A_TX, GpioSetAltFunction(T931_UART_A_TX_FN)});
-  gpio_init_steps_.push_back({T931_UART_A_RX, GpioSetAltFunction(T931_UART_A_RX_FN)});
-  gpio_init_steps_.push_back({T931_UART_A_CTS, GpioSetAltFunction(T931_UART_A_CTS_FN)});
-  gpio_init_steps_.push_back({T931_UART_A_RTS, GpioSetAltFunction(T931_UART_A_RTS_FN)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_UART_A_TX, T931_UART_A_TX_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_UART_A_RX, T931_UART_A_RX_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_UART_A_CTS, T931_UART_A_CTS_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_UART_A_RTS, T931_UART_A_RTS_FN));
 
   // Bind UART for Bluetooth HCI
   fdf::Arena arena('BLUE');

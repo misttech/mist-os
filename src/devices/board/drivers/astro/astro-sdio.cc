@@ -176,31 +176,31 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
                        kGpioBaseOffset + (S905D2_PERIPHS_PIN_MUX_2 << 2));
 
   // Clear GPIO_X
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D0, GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D1, GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D2, GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D3, GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_CLK, GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_CMD, GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_WAKE_HOST, GpioSetAltFunction(0)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_WIFI_SDIO_D0, 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_WIFI_SDIO_D1, 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_WIFI_SDIO_D2, 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_WIFI_SDIO_D3, 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_WIFI_SDIO_CLK, 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_WIFI_SDIO_CMD, 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_WIFI_SDIO_WAKE_HOST, 0));
 
   // Clear GPIO_C
-  gpio_init_steps_.push_back({S905D2_GPIOC(0), GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_GPIOC(1), GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_GPIOC(2), GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_GPIOC(3), GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_GPIOC(4), GpioSetAltFunction(0)});
-  gpio_init_steps_.push_back({S905D2_GPIOC(5), GpioSetAltFunction(0)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOC(0), 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOC(1), 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOC(2), 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOC(3), 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOC(4), 0));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOC(5), 0));
 
   // Enable output from SDMMC port B on GPIOX_4.
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_CLK, GpioConfigOut(1)});
+  gpio_init_steps_.push_back(GpioConfigOut(S905D2_WIFI_SDIO_CLK, 1));
 
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D0, GpioSetDriveStrength(4'000)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D1, GpioSetDriveStrength(4'000)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D2, GpioSetDriveStrength(4'000)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D3, GpioSetDriveStrength(4'000)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_CLK, GpioSetDriveStrength(4'000)});
-  gpio_init_steps_.push_back({S905D2_WIFI_SDIO_CMD, GpioSetDriveStrength(4'000)});
+  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_WIFI_SDIO_D0, 4'000));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_WIFI_SDIO_D1, 4'000));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_WIFI_SDIO_D2, 4'000));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_WIFI_SDIO_D3, 4'000));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_WIFI_SDIO_CLK, 4'000));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_WIFI_SDIO_CMD, 4'000));
 
   // Configure clock settings
   status = zx::vmo::create_physical(*resource, S905D2_HIU_BASE, S905D2_HIU_LENGTH, &vmo);

@@ -212,43 +212,42 @@ zx_status_t Sherlock::AudioInit() {
     }});
   }
 
-  clock_init_steps_.push_back({g12b_clk::CLK_HIFI_PLL, InitCall::WithDisable({})});
-  clock_init_steps_.push_back(
-      {g12b_clk::CLK_HIFI_PLL, InitCall::WithRateHz(init_arena_, T931_HIFI_PLL_RATE)});
-  clock_init_steps_.push_back({g12b_clk::CLK_HIFI_PLL, InitCall::WithEnable({})});
+  clock_init_steps_.push_back(ClockDisable(g12b_clk::CLK_HIFI_PLL));
+  clock_init_steps_.push_back(ClockSetRate(g12b_clk::CLK_HIFI_PLL, T931_HIFI_PLL_RATE));
+  clock_init_steps_.push_back(ClockEnable(g12b_clk::CLK_HIFI_PLL));
 
   // TDM pin configuration.
-  gpio_init_steps_.push_back({T931_GPIOZ(7), GpioSetAltFunction(T931_GPIOZ_7_TDMC_SCLK_FN)});
-  gpio_init_steps_.push_back({T931_GPIOZ(6), GpioSetAltFunction(T931_GPIOZ_6_TDMC_FS_FN)});
-  gpio_init_steps_.push_back({T931_GPIOZ(2), GpioSetAltFunction(T931_GPIOZ_2_TDMC_D0_FN)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOZ(7), T931_GPIOZ_7_TDMC_SCLK_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOZ(6), T931_GPIOZ_6_TDMC_FS_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOZ(2), T931_GPIOZ_2_TDMC_D0_FN));
   constexpr uint64_t ua = 3000;
-  gpio_init_steps_.push_back({T931_GPIOZ(7), GpioSetDriveStrength(ua)});
-  gpio_init_steps_.push_back({T931_GPIOZ(6), GpioSetDriveStrength(ua)});
-  gpio_init_steps_.push_back({T931_GPIOZ(2), GpioSetDriveStrength(ua)});
-  gpio_init_steps_.push_back({T931_GPIOZ(3), GpioSetAltFunction(T931_GPIOZ_3_TDMC_D1_FN)});
-  gpio_init_steps_.push_back({T931_GPIOZ(3), GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back(GpioSetDriveStrength(T931_GPIOZ(7), ua));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(T931_GPIOZ(6), ua));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(T931_GPIOZ(2), ua));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOZ(3), T931_GPIOZ_3_TDMC_D1_FN));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(T931_GPIOZ(3), ua));
 
-  gpio_init_steps_.push_back({T931_GPIOAO(9), GpioSetAltFunction(T931_GPIOAO_9_MCLK_FN)});
-  gpio_init_steps_.push_back({T931_GPIOAO(9), GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOAO(9), T931_GPIOAO_9_MCLK_FN));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(T931_GPIOAO(9), ua));
 
 #ifdef ENABLE_BT
   // PCM pin assignments.
-  gpio_init_steps_.push_back({T931_GPIOX(8), GpioSetAltFunction(T931_GPIOX_8_TDMA_DIN1_FN)});
-  gpio_init_steps_.push_back({T931_GPIOX(9), GpioSetAltFunction(T931_GPIOX_9_TDMA_D0_FN)});
-  gpio_init_steps_.push_back({T931_GPIOX(10), GpioSetAltFunction(T931_GPIOX_10_TDMA_FS_FN)});
-  gpio_init_steps_.push_back({T931_GPIOX(11), GpioSetAltFunction(T931_GPIOX_11_TDMA_SCLK_FN)});
-  gpio_init_steps_.push_back({T931_GPIOX(9), GpioSetDriveStrength(ua)});
-  gpio_init_steps_.push_back({T931_GPIOX(10), GpioSetDriveStrength(ua)});
-  gpio_init_steps_.push_back({T931_GPIOX(11), GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOX(8), T931_GPIOX_8_TDMA_DIN1_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOX(9), T931_GPIOX_9_TDMA_D0_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOX(10), T931_GPIOX_10_TDMA_FS_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOX(11), T931_GPIOX_11_TDMA_SCLK_FN));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(T931_GPIOX(9), ua));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(T931_GPIOX(10), ua));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(T931_GPIOX(11), ua));
 #endif
 
   // PDM pin assignments.
-  gpio_init_steps_.push_back({T931_GPIOA(7), GpioSetAltFunction(T931_GPIOA_7_PDM_DCLK_FN)});
-  gpio_init_steps_.push_back({T931_GPIOA(8), GpioSetAltFunction(T931_GPIOA_8_PDM_DIN0_FN)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOA(7), T931_GPIOA_7_PDM_DCLK_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOA(8), T931_GPIOA_8_PDM_DIN0_FN));
 
   // Add TDM OUT to the codecs.
   {
-    gpio_init_steps_.push_back({T931_GPIOH(7), GpioConfigOut(1)});  // SOC_AUDIO_EN.
+    gpio_init_steps_.push_back(GpioConfigOut(T931_GPIOH(7), 1));  // SOC_AUDIO_EN.
 
     constexpr uint32_t woofer_instance_count = 1;
     zx_status_t status = AddTas5720Device(pbus_, "audio-tas5720-woofer", woofer_instance_count,
