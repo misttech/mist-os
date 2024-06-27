@@ -105,6 +105,29 @@ __EXPORT zx_status_t _zx_cache_flush(const void* addr, size_t len, uint32_t opti
     __asm__ volatile("isb sy");
   }
 
+#elif defined(__riscv)
+
+  if (options & ZX_CACHE_FLUSH_INSN) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  if (options & ZX_CACHE_FLUSH_DATA) {
+    unsigned cacheline_size = DATA_CONSTANTS.dcache_line_size;
+    // A cache line size of zero is interpreted as the CPU being coherent with external DMA and not
+    // need any sort of cache flushing, so claim success.
+    if (cacheline_size != 0) {
+      if (options & ZX_CACHE_FLUSH_INVALIDATE) {
+        for_each_dcache_line(addr, len, [](uintptr_t p) {
+          __asm__ volatile("cbo.flush 0(%0)" ::"r"(p) : "memory");
+        });
+      } else {
+        for_each_dcache_line(addr, len, [](uintptr_t p) {
+          __asm__ volatile("cbo.clean 0(%0)" ::"r"(p) : "memory");
+        });
+      }
+    }
+  }
+
 #else
 
   return ZX_ERR_NOT_SUPPORTED;
