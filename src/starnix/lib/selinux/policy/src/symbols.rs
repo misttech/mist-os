@@ -8,8 +8,8 @@ use super::parser::ParseStrategy;
 use super::{
     array_type, array_type_validate_deref_both, array_type_validate_deref_data,
     array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec, Array,
-    CategoryId, Counted, Parse, ParseSlice, RoleId, SensitivityId, TypeId, UserId, Validate,
-    ValidateArray,
+    CategoryId, ClassId, Counted, Parse, ParseSlice, RoleId, SensitivityId, TypeId, UserId,
+    Validate, ValidateArray,
 };
 
 use anyhow::Context as _;
@@ -625,10 +625,10 @@ impl<PS: ParseStrategy> Class<PS> {
     /// Returns the id associated with this class. The id is used to index into collections
     /// and bitmaps associated with this class. The id is 1-indexed, whereas most collections and
     /// bitmaps are 0-indexed, so clients of this API will usually use `id - 1`.
-    pub fn id(&self) -> le::U32 {
+    pub fn id(&self) -> ClassId {
         let class_metadata: &ClassMetadata =
             &PS::deref(&self.constraints.metadata.metadata.metadata.metadata);
-        class_metadata.id
+        ClassId(NonZeroU32::new(class_metadata.id.get()).unwrap())
     }
 
     /// Returns whether this class inherits from a named `common` policy statement. For example,
