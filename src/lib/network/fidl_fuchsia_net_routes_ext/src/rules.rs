@@ -7,10 +7,11 @@
 use std::fmt::Debug;
 use std::ops::RangeInclusive;
 
+use async_utils::stream;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy as _};
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
 use futures::future::Either;
-use futures::{Stream, StreamExt as _, TryStreamExt as _};
+use futures::{Stream, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Subnet};
 use thiserror::Error;
 use {
@@ -993,24 +994,21 @@ pub fn rule_event_stream_from_state<I: FidlRuleIpExt + FidlRouteIpExt>(
 pub fn rule_event_stream_from_watcher<I: FidlRuleIpExt>(
     watcher: <I::RuleWatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
 ) -> Result<impl Stream<Item = Result<RuleEvent<I>, RuleWatchError>>, WatcherCreationError> {
-    Ok(futures::stream::try_unfold(watcher, |watcher| async {
-        let events_batch = watch::<I>(&watcher).await.map_err(RuleWatchError::Fidl)?;
-        if events_batch.is_empty() {
-            return Err(RuleWatchError::EmptyEventBatch);
-        }
-        // Convert the `I::RuleEvent` into an `RuleEvent<I>` and return any
-        // error.
-        let events_batch = events_batch
-            .into_iter()
-            .map(|event| event.try_into())
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(RuleWatchError::Conversion)?;
-        // Below, `try_flatten` requires that the inner stream yields `Result`s.
-        let event_stream = futures::stream::iter(events_batch).map(Ok);
-        Ok(Some((event_stream, watcher)))
-    })
-    // Flatten the stream of event streams into a single event stream.
-    .try_flatten())
+    Ok(stream::ShortCircuit::new(
+        futures::stream::try_unfold(watcher, |watcher| async {
+            let events_batch = watch::<I>(&watcher).await.map_err(RuleWatchError::Fidl)?;
+            if events_batch.is_empty() {
+                return Err(RuleWatchError::EmptyEventBatch);
+            }
+            let events_batch = events_batch
+                .into_iter()
+                .map(|event| event.try_into().map_err(RuleWatchError::Conversion));
+            let event_stream = futures::stream::iter(events_batch);
+            Ok(Some((event_stream, watcher)))
+        })
+        // Flatten the stream of event streams into a single event stream.
+        .try_flatten(),
+    ))
 }
 
 #[cfg(test)]

@@ -19,9 +19,9 @@ pub mod testutil;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display};
 
-use async_utils::fold;
+use async_utils::{fold, stream};
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
-use futures::{Future, Stream, StreamExt as _, TryStreamExt as _};
+use futures::{Future, Stream, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use net_types::{SpecifiedAddr, UnicastAddress, Witness as _};
 use thiserror::Error;
@@ -913,23 +913,21 @@ pub fn event_stream_from_state_with_options<I: FidlRouteIpExt>(
 pub fn event_stream_from_watcher<I: FidlRouteIpExt>(
     watcher: <I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
 ) -> Result<impl Stream<Item = Result<Event<I>, WatchError>>, WatcherCreationError> {
-    Ok(futures::stream::try_unfold(watcher, |watcher| async {
-        let events_batch = watch::<I>(&watcher).await.map_err(WatchError::Fidl)?;
-        if events_batch.is_empty() {
-            return Err(WatchError::EmptyEventBatch);
-        }
-        // Convert the `I::WatchEvent` into an `Event<I>` and return any error.
-        let events_batch = events_batch
-            .into_iter()
-            .map(|event| event.try_into())
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(WatchError::Conversion)?;
-        // Below, `try_flatten` requires that the inner stream yields `Result`s.
-        let event_stream = futures::stream::iter(events_batch).map(Ok);
-        Ok(Some((event_stream, watcher)))
-    })
-    // Flatten the stream of event streams into a single event stream.
-    .try_flatten())
+    Ok(stream::ShortCircuit::new(
+        futures::stream::try_unfold(watcher, |watcher| async {
+            let events_batch = watch::<I>(&watcher).await.map_err(WatchError::Fidl)?;
+            if events_batch.is_empty() {
+                return Err(WatchError::EmptyEventBatch);
+            }
+            let events_batch = events_batch
+                .into_iter()
+                .map(|event| event.try_into().map_err(WatchError::Conversion));
+            let event_stream = futures::stream::iter(events_batch);
+            Ok(Some((event_stream, watcher)))
+        })
+        // Flatten the stream of event streams into a single event stream.
+        .try_flatten(),
+    ))
 }
 
 /// Errors returned by [`collect_routes_until_idle`].
@@ -1083,7 +1081,7 @@ mod tests {
     use super::*;
     use crate::testutil::internal as internal_testutil;
     use assert_matches::assert_matches;
-    use futures::FutureExt;
+    use futures::{FutureExt as _, StreamExt as _};
     use ip_test_macro::ip_test;
     use net_declare::{
         fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, net_ip_v4,
