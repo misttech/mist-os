@@ -11,9 +11,8 @@
 #include "src/connectivity/network/mdns/service/services/mdns_service_impl.h"
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"mdns"});
-
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  fuchsia_logging::SetTags({"mdns"});
 
   std::unique_ptr<sys::ComponentContext> component_context =
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
