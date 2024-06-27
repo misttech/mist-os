@@ -25,13 +25,37 @@ constexpr size_t kAlignPages = 1ul << (kTestHeapAlignLog2 - PAGE_SIZE_SHIFT);
 bool CanExpectContiguous() {
   list_node_t pages = LIST_INITIAL_VALUE(pages);
 
+  auto cleanup = fit::defer([&pages]() {
+    if (!list_is_empty(&pages)) {
+      pmm_free(&pages);
+    }
+  });
+
   paddr_t paddr;
   zx_status_t status = pmm_alloc_contiguous(kAlignPages, 0, kTestHeapAlignLog2, &paddr, &pages);
-  if (status == ZX_OK) {
-    pmm_free(&pages);
-    return true;
+  if (status != ZX_OK) {
+    return false;
   }
-  return false;
+
+  // Allocate some additional pages, do not need to be contiguous.
+  status = pmm_alloc_pages(kAlignPages, 0, &pages);
+  if (status != ZX_OK) {
+    return false;
+  }
+
+  // Returns the pages in a jumbled order. This ensures that if, in common case where the pmm is
+  // running in LIFO mode, the test were to use pmm_alloc_pages instead of pmm_alloc_contiguous it
+  // will be guaranteed to *not* get contiguous pages, preventing any spurious success.
+  //
+  // See https://fxbug.dev/349402040 for context.
+  bool heads_tails = true;
+  while (!list_is_empty(&pages)) {
+    vm_page_t* page = heads_tails ? list_remove_head_type(&pages, vm_page_t, queue_node)
+                                  : list_remove_tail_type(&pages, vm_page_t, queue_node);
+    pmm_free_page(page);
+    heads_tails = !heads_tails;
+  }
+  return true;
 }
 
 bool RangeEmpty(vaddr_t base, size_t num_pages) {
@@ -451,7 +475,7 @@ bool virtual_alloc_aligned_alloc_test() {
   // Free a range in the middle such that with padding and alignment taken into account a single
   // large allocation would fit.
   alloc.FreePages(base_test_vaddr + (kAlignPages * 2 - 1) * PAGE_SIZE, kAlignPages + 2);
-  bool contiguous = CanExpectContiguous();
+  bool contiguous = alloc.CanAttemptContiguousMappings() && CanExpectContiguous();
   result = alloc.AllocPages(kAlignPages);
   ASSERT_TRUE(result.is_ok());
   EXPECT_EQ(base_test_vaddr + kAlignPages * 2 * PAGE_SIZE, result.value());
@@ -475,7 +499,7 @@ bool virtual_alloc_aligned_alloc_test() {
   // it crates fragmentation that prevents future allocations.
   alloc.FreePages(base_test_vaddr + kAlignPages * PAGE_SIZE, kAlignPages);
   alloc.FreePages(base_test_vaddr + (kAlignPages * 3 + 2) * PAGE_SIZE, kAlignPages - 2);
-  contiguous = CanExpectContiguous();
+  contiguous = alloc.CanAttemptContiguousMappings() && CanExpectContiguous();
   result = alloc.AllocPages(kAlignPages);
   ASSERT_TRUE(result.is_ok());
   EXPECT_EQ(base_test_vaddr + kAlignPages * 2 * PAGE_SIZE, result.value());
@@ -505,7 +529,7 @@ bool vritual_alloc_large_allocs_are_contiguous_test() {
 
   EXPECT_OK(alloc.Init(vmar->base(), vmar->size(), 1, kTestHeapAlignLog2));
 
-  if (CanExpectContiguous()) {
+  if (alloc.CanAttemptContiguousMappings() && CanExpectContiguous()) {
     auto result = alloc.AllocPages(kAlignPages);
     ASSERT_TRUE(result.is_ok());
     EXPECT_TRUE(RangeContiguous(result.value(), kAlignPages));
