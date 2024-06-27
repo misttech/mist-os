@@ -404,25 +404,8 @@ pub async fn create_component_from_stream(
     bail!("did not receive Start request");
 }
 
-/*
 #[cfg(feature = "starnix_lite")]
-fn namespace_entry(path: &str, flags: fio::OpenFlags) -> ClientEnd<fio::DirectoryMarker> {
-    let ns_dir = fuchsia_fs::directory::open_in_namespace(path, flags).unwrap();
-    // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
-    let client_end = ClientEnd::new(
-        ns_dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
-    );
-    client_end
-}
-
-#[cfg(feature = "starnix_lite")]
-fn boot_dir_namespace_entry() -> ClientEnd<fio::DirectoryMarker> {
-    namespace_entry("/boot", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)
-}
-    */
-
-#[cfg(feature = "starnix_lite")]
-fn create_pkgfs() -> zx::Channel {
+fn open_bootfs() -> zx::Channel {
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
     let (server, client) = zx::Channel::create();
     fdio::open("/boot", rights, server).expect("failed to open /boot");
@@ -433,11 +416,9 @@ fn create_pkgfs() -> zx::Channel {
 pub async fn create_container_from_config(
     config: Config,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
-    //let ns_entry = boot_dir_namespace_entry();
-
     let mut config_wrapper = ConfigWrapper {
         config: config,
-        pkg_dir: Some(create_pkgfs()),
+        pkg_dir: Some(open_bootfs()),
         svc_dir: None,
         data_dir: None,
     };

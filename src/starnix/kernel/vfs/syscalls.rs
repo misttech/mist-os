@@ -2978,7 +2978,6 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    #[ignore]
     async fn test_sys_dup() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let file_handle =
@@ -3061,7 +3060,6 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    #[ignore]
     async fn test_fstat_tmp_file() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
 
@@ -3128,7 +3126,6 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    #[ignore]
     async fn test_rename_noreplace() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
 
