@@ -28,26 +28,6 @@ or the `fdio_spawn` frontend, this approach to creating processes is most
 appropriate for creating processes within your own namespace because you need
 to supply all the kernel objects for the new process.
 
-## fuchsia.sys.Launcher
-
-To create a process in its own namespace, Fuchsia provides the
-`fuchsia.sys.Launcher` service. Rather than providing this process all the
-kernel objects needed to construct the new process, you simply provide the
-service a high-level description of the process you wish to create and the
-`fuchsia.sys.Launcher` implementation supplies the new process with the
-appropriate kernel objects. For example, if you provide the URL of a component
-within a package, `fuchsia.sys.Launcher` will create a process for that
-component in a namespace appropriate for that component with access to its own
-package and whatever other resources are declared in the `sandbox` section of
-its manifest.
-
-Rather than returning a `zx::process` handle directly, `fuchsia.sys.Launcher`
-returns a `fuchsia.sys.ComponentController` interface. This layer of
-abstraction lets `fuchsia.sys.Launcher` create components that are not backed
-by individual processes. For example, if you launch a component written in
-Dart, the component might run in an instance of the Dart VM that is shared
-between a number of components with compatible security constraints.
-
 ## Early boot
 
 Early on in the boot process, the system does create a number of processes
