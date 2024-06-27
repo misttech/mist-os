@@ -2,74 +2,88 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub mod sync;
+
 use std::collections::{HashMap, HashSet};
 use std::iter;
 use std::sync::{mpsc, Arc, Weak};
 
 use attribution::{AttributionServer, AttributionServerHandle};
 use fidl::AsHandleRef;
-use once_cell::sync::OnceCell;
 use starnix_sync::Mutex;
 use starnix_uapi::pid_t;
 use {fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx};
 
 use crate::task::{Kernel, Task, ThreadGroup};
 
-const PID_TABLE_POLLING_INTERVAL: zx::Duration = zx::Duration::from_seconds(5);
+/// If the PID table updates multiple times within this interval, we only rescan
+/// it once, to reduce overhead.
+const MINIMUM_RESCAN_INTERVAL: zx::Duration = zx::Duration::from_millis(100);
+
+/// If a new code path is added which mutates the PID table without notifying
+/// the scanner thread, this timeout ensures we will at least eventually unpark
+/// and process the changes, albeit with a larger latency.
+const MAXIMUM_RESCAN_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
 
 pub struct MemoryAttributionManager {
-    /// The kernel state.
-    kernel: Weak<Kernel>,
-
     /// Holds state for the hanging-get attribution protocol.
-    memory_attribution_server: OnceCell<AttributionServerHandle>,
+    memory_attribution_server: AttributionServerHandle,
+}
+
+struct InitialState {
+    /// The initial set of processes running in this kernel.
+    processes: HashSet<pid_t>,
+
+    /// A mapping from PID to process identifiers.
+    process_names: HashMap<pid_t, String>,
 }
 
 impl MemoryAttributionManager {
     pub fn new(kernel: Weak<Kernel>) -> Self {
-        Self { kernel, memory_attribution_server: Default::default() }
+        let (publisher_tx, publisher_rx) = mpsc::sync_channel(1);
+        let weak_kernel = kernel.clone();
+        let publisher_rx = Arc::new(Mutex::new(Some(publisher_rx)));
+        let memory_attribution_server = AttributionServer::new(Box::new(move || {
+            // Initial scan of the PID table when a client connects.
+            let mut events = vec![];
+            let Some(kernel) = weak_kernel.upgrade() else { return vec![] };
+            let pids = kernel.pids.read();
+            let mut processes: HashSet<pid_t> = HashSet::new();
+            let mut process_names: HashMap<pid_t, String> = HashMap::new();
+            for thread_group in pids.get_thread_groups() {
+                if let Some(leader) = pids.get_task(thread_group.leader).upgrade() {
+                    let name = get_thread_group_identifier(&thread_group);
+                    events.append(&mut attribution_info_for_thread_group(name.clone(), &leader));
+                    processes.insert(thread_group.leader);
+                    process_names.insert(thread_group.leader, name);
+                }
+            }
+            drop(pids);
+
+            // Spawn the pid table monitoring thread once.
+            if let Some(publisher_rx) = publisher_rx.lock().take() {
+                let (initial_state_tx, initial_state_rx) = mpsc::sync_channel(1);
+                initial_state_tx.send(InitialState { processes, process_names }).unwrap();
+                let weak_kernel = weak_kernel.clone();
+                let notifier = sync::spawn_thread(&kernel, move |waiter| {
+                    Self::run(weak_kernel, publisher_rx, initial_state_rx, waiter);
+                });
+                kernel.pids.write().set_thread_group_notifier(notifier);
+            }
+            events
+        }));
+
+        let publisher = memory_attribution_server.new_publisher();
+        _ = publisher_tx.send(publisher);
+
+        Self { memory_attribution_server }
     }
 
     pub fn new_observer(
         &self,
         control_handle: fattribution::ProviderControlHandle,
     ) -> attribution::Observer {
-        // Initialize the attribution server if not already.
-        let server = self.memory_attribution_server.get_or_init(|| {
-            let (publisher_tx, publisher_rx) = mpsc::sync_channel(1);
-            let weak_kernel = self.kernel.clone();
-            let publisher_rx = Arc::new(Mutex::new(Some(publisher_rx)));
-            let server = AttributionServer::new(Box::new(move || {
-                let mut events = vec![];
-                let Some(kernel) = weak_kernel.upgrade() else { return vec![] };
-                let pids = kernel.pids.read();
-                let mut processes: HashSet<pid_t> = HashSet::new();
-                let mut process_names: HashMap<pid_t, String> = HashMap::new();
-                for thread_group in pids.get_thread_groups() {
-                    if let Some(leader) = pids.get_task(thread_group.leader).upgrade() {
-                        let name = get_thread_group_identifier(&thread_group);
-                        events
-                            .append(&mut attribution_info_for_thread_group(name.clone(), &leader));
-                        processes.insert(thread_group.leader);
-                        process_names.insert(thread_group.leader, name);
-                    }
-                }
-
-                // Spawn the pid table monitoring thread once.
-                if let Some(publisher_rx) = publisher_rx.lock().take() {
-                    let weak_kernel = weak_kernel.clone();
-                    kernel.kthreads.spawn(move |_, _| {
-                        Self::run(weak_kernel, publisher_rx, processes, process_names)
-                    });
-                }
-                return events;
-            }));
-            let publisher = server.new_publisher();
-            _ = publisher_tx.send(publisher);
-            server
-        });
-
-        server.new_observer(control_handle)
+        self.memory_attribution_server.new_observer(control_handle)
     }
 
     /// Monitor the kernel for incremental memory attribution updates and
@@ -79,17 +93,22 @@ impl MemoryAttributionManager {
     ///
     /// - kernel: Weak reference to the kernel state.
     /// - publisher: Receiver for a handle used to publish memory attribution updates.
-    /// - processes: The initial set of processes running in this kernel.
-    /// - process_names: A mapping from PID to process identifiers.
+    /// - initial_state: Receiver for the initial state of attribution.
+    /// - waiter: Used to wait for thread group changes.
     ///
     fn run(
         kernel: Weak<Kernel>,
         publisher: mpsc::Receiver<attribution::Publisher>,
-        mut processes: HashSet<pid_t>,
-        mut process_names: HashMap<pid_t, String>,
+        initial_state: mpsc::Receiver<InitialState>,
+        waiter: sync::Waiter,
     ) {
         let publisher = publisher.recv().unwrap();
+        let initial_state = initial_state.recv().unwrap();
+        let InitialState { mut processes, mut process_names } = initial_state;
+
         loop {
+            waiter.wait(MAXIMUM_RESCAN_INTERVAL);
+
             let Some(kernel) = kernel.upgrade() else { break };
             let thread_groups = kernel.pids.read().get_thread_groups();
             let mut updates = vec![];
@@ -124,7 +143,7 @@ impl MemoryAttributionManager {
                 _ = publisher.on_update(updates);
             }
 
-            zx::Time::after(PID_TABLE_POLLING_INTERVAL).sleep();
+            zx::Time::after(MINIMUM_RESCAN_INTERVAL).sleep();
         }
     }
 }

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::memory_attribution;
 use crate::task::{ProcessGroup, Task, ThreadGroup, ZombieProcess};
 use starnix_logging::track_stub;
 use starnix_uapi::ownership::{TempRef, WeakRef};
@@ -50,6 +51,9 @@ pub struct PidTable {
 
     /// The tasks in this table, organized by pid_t.
     table: HashMap<pid_t, PidEntry>,
+
+    /// Used to notify thread group changes.
+    thread_group_notifier: Option<memory_attribution::sync::Notifier>,
 }
 
 impl PidTable {
@@ -74,6 +78,10 @@ impl PidTable {
         if entry.task.is_none() && entry.process.is_none() && entry.process_group.is_none() {
             self.table.remove(&pid);
         }
+    }
+
+    pub fn set_thread_group_notifier(&mut self, notifier: memory_attribution::sync::Notifier) {
+        self.thread_group_notifier = Some(notifier);
     }
 
     pub fn allocate_pid(&mut self) -> pid_t {
@@ -137,6 +145,11 @@ impl PidTable {
         let entry = self.get_entry_mut(thread_group.leader);
         assert!(entry.process.is_none());
         entry.process = ProcessEntry::ThreadGroup(Arc::downgrade(thread_group));
+
+        // Notify thread group changes.
+        if let Some(notifier) = &self.thread_group_notifier {
+            notifier.notify();
+        }
     }
 
     /// Replace process with the specified `pid` with the `zombie`.
@@ -156,6 +169,11 @@ impl PidTable {
             assert!(matches!(entry.process, ProcessEntry::Zombie(_)));
             entry.process = ProcessEntry::None;
         });
+
+        // Notify thread group changes.
+        if let Some(notifier) = &self.thread_group_notifier {
+            notifier.notify();
+        }
     }
 
     pub fn get_process_group(&self, pid: pid_t) -> Option<Arc<ProcessGroup>> {
