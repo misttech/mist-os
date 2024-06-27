@@ -4,6 +4,7 @@
 
 #include <lib/iob/blob-id-allocator.h>
 #include <lib/zx/iob.h>
+#include <lib/zx/process.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmar.h>
 #include <zircon/errors.h>
@@ -727,29 +728,37 @@ TEST(Iob, GetInfoProcessMaps) {
   ASSERT_OK(zx::iob::create(0, config, 1, &ep0, &ep1));
   zx::unowned_vmar vmar = zx::vmar::root_self();
   size_t num_mappings_before;
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_MAPS, nullptr, 0, nullptr,
-                               &num_mappings_before));
+  ASSERT_OK(zx::process::self()->get_info(ZX_INFO_PROCESS_MAPS, nullptr, 0, nullptr,
+                                          &num_mappings_before));
   zx::result<MappingHelper> region =
       MappingHelper::Create(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ep0, 0, 0, ZX_PAGE_SIZE);
   ASSERT_OK(region.status_value());
   ASSERT_NE(0, region->addr());
 
   size_t num_mappings_after;
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_MAPS, nullptr, 0, nullptr,
-                               &num_mappings_after));
+  ASSERT_OK(zx::process::self()->get_info(ZX_INFO_PROCESS_MAPS, nullptr, 0, nullptr,
+                                          &num_mappings_after));
 
   EXPECT_EQ(num_mappings_after, num_mappings_before + 1);
 
-  auto map_infos = std::make_unique<zx_info_maps_t[]>(num_mappings_after);
-  ASSERT_OK(zx_object_get_info(zx_process_self(), ZX_INFO_PROCESS_MAPS, map_infos.get(),
-                               sizeof(zx_info_vmo_t) * num_mappings_after, nullptr, nullptr));
+  // Allocate an array with double the capacity of mappings we saw. This should ensure that if our
+  // allocation itself triggers a mapping or two, there should still be plenty of space available.
+  auto map_infos = std::make_unique<zx_info_maps_t[]>(num_mappings_after * 2);
+  size_t num_map_infos = 0;
+  ASSERT_OK(zx::process::self()->get_info(ZX_INFO_PROCESS_MAPS, map_infos.get(),
+                                          sizeof(zx_info_vmo_t) * num_mappings_after * 2, nullptr,
+                                          &num_map_infos));
+  // Validate that we were able to fit all the mappings to ensure we
+  //   1. cannot have missed our target IOB mapping
+  //   2. the loop below will not do an array overrun.
+  ASSERT_LE(num_map_infos, num_mappings_after * 2);
 
   zx_iob_region_info_t ep0_info[1];
   ASSERT_OK(ep0.get_info(ZX_INFO_IOB_REGIONS, ep0_info, sizeof(ep0_info), nullptr, nullptr));
 
   zx_koid_t iob_koid = ep0_info[0].koid;
   bool saw_iob_mapping = false;
-  for (size_t i = 0; i < num_mappings_after; ++i) {
+  for (size_t i = 0; i < num_map_infos; ++i) {
     zx_info_maps_t& mapping = map_infos[i];
     if (mapping.u.mapping.vmo_koid == iob_koid) {
       EXPECT_EQ(mapping.size, ZX_PAGE_SIZE);
