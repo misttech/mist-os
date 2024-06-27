@@ -30,6 +30,7 @@ namespace system_log_recorder {
 constexpr zx::duration kWritePeriod = zx::sec(1);
 
 int main() {
+  async::Loop main_loop(&kAsyncLoopConfigAttachToCurrentThread);
   fuchsia_logging::SetTags({"forensics", "feedback"});
 
   // We receive a channel that we interpret as a fuchsia.process.lifecycle.Lifecycle
@@ -58,7 +59,6 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  async::Loop main_loop(&kAsyncLoopConfigAttachToCurrentThread);
   async::Loop write_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(main_loop.dispatcher(), "system_log_recorder");
 

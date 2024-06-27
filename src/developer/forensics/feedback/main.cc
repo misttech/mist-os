@@ -29,6 +29,7 @@
 namespace forensics::feedback {
 
 int main() {
+  forensics::component::Component component;
   fuchsia_logging::SetTags({"forensics", "feedback"});
 
   const std::optional<SnapshotConfig> snapshot_config = GetSnapshotConfig();
@@ -49,7 +50,6 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  forensics::component::Component component;
   std::unique_ptr<cobalt::Logger> cobalt = std::make_unique<cobalt::Logger>(
       component.Dispatcher(), component.Services(), component.Clock());
 

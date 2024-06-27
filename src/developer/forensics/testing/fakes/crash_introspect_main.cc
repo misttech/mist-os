@@ -13,11 +13,11 @@
 #include "src/developer/forensics/testing/fakes/crash_introspect.h"
 
 int main(int argc, const char** argv) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   fuchsia_logging::SetTags({"forensics", "test"});
 
   FX_LOGS(INFO) << "Starting FakeCrashIntrospect";
 
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   component::OutgoingDirectory outgoing(loop.dispatcher());
 
   if (const zx::result result = outgoing.ServeFromStartupInfo(); result.is_error()) {

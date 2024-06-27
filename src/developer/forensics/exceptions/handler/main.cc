@@ -63,6 +63,7 @@ std::unique_ptr<WakeLease> CreateWakeLease(async_dispatcher_t* dispatcher,
 }  // namespace
 
 int main(const std::string& process_name, const std::string& suspend_enabled_flag) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   using forensics::exceptions::kComponentLookupTimeout;
   using Binding = fidl::Binding<forensics::exceptions::handler::CrashReporter,
                                 std::unique_ptr<fuchsia::exception::internal::CrashReporter>>;
@@ -81,8 +82,6 @@ int main(const std::string& process_name, const std::string& suspend_enabled_fla
     FX_LOGS(FATAL) << "Received invalid channel";
     return EXIT_FAILURE;
   }
-
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   std::unique_ptr<WakeLease> wake_lease = suspend_enabled_flag == kSuspendEnabledFlag
                                               ? CreateWakeLease(loop.dispatcher(), handler_index)
