@@ -72,6 +72,7 @@ pub async fn log_session_launch_time(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;

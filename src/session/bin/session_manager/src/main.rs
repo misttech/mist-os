@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![warn(clippy::all)]
+#![warn(clippy::all, clippy::unwrap_used)]
 
 use anyhow::Error;
 use fidl_fuchsia_component as fcomponent;

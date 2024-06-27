@@ -183,7 +183,7 @@ async fn set_session(
         })?;
 
     let (controller, controller_server_end) =
-        create_proxy::<fcomponent::ControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ControllerMarker>().expect("creating proxy should not fail");
     let create_child_args = fcomponent::CreateChildArgs {
         controller: Some(controller_server_end),
         ..Default::default()
@@ -219,7 +219,8 @@ async fn set_session(
 
     // Start the component.
     let (execution_controller, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>()
+            .expect("creating proxy should not fail");
     controller
         .start(fcomponent::StartChildArgs::default(), execution_controller_server_end)
         .await
@@ -236,6 +237,7 @@ async fn set_session(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::{set_session, stop_session, SESSION_CHILD_COLLECTION, SESSION_NAME};
     use anyhow::Error;

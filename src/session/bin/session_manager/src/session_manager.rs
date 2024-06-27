@@ -61,7 +61,8 @@ struct PendingSession {
 
 impl PendingSession {
     fn new() -> (fio::DirectoryProxy, Self) {
-        let (exposed_dir, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (exposed_dir, exposed_dir_server_end) =
+            create_proxy::<fio::DirectoryMarker>().expect("creating proxy should not fail");
         (exposed_dir, Self { exposed_dir_server_end })
     }
 }
@@ -203,18 +204,18 @@ impl SessionManagerState {
             Session::Pending(pending) => pending,
             Session::Started(_) => {
                 let (proxy, pending) = PendingSession::new();
-                self.inner.lock().unwrap().exposed_dir = proxy;
+                self.inner.lock().expect("mutex should not be poisoned").exposed_dir = proxy;
                 pending
             }
         };
         if let Err(e) =
             startup::launch_session(&url, pending.exposed_dir_server_end, &self.realm).await
         {
-            self.inner.lock().unwrap().exposed_dir = proxy_on_failure;
+            self.inner.lock().expect("mutex should not be poisoned").exposed_dir = proxy_on_failure;
             return Err(e);
         }
         *session = Session::Started(StartedSession { url });
-        self.inner.lock().unwrap().diagnostics.record_session_start();
+        self.inner.lock().expect("mutex should not be poisoned").diagnostics.record_session_start();
         Ok(())
     }
 
@@ -225,7 +226,7 @@ impl SessionManagerState {
         if let Session::Started(_) = &*session {
             let (proxy, new_pending) = Session::new_pending();
             *session = new_pending;
-            self.inner.lock().unwrap().exposed_dir = proxy;
+            self.inner.lock().expect("mutex should not be poisoned").exposed_dir = proxy;
             startup::stop_session(&self.realm).await?;
         }
         Ok(())
@@ -252,8 +253,9 @@ impl SessionManagerState {
 }
 
 impl vfs::remote::GetRemoteDir for SessionManagerState {
+    #[allow(clippy::unwrap_in_result)]
     fn get_remote_dir(&self) -> Result<fio::DirectoryProxy, zx::Status> {
-        Ok(Clone::clone(&self.inner.lock().unwrap().exposed_dir))
+        Ok(Clone::clone(&self.inner.lock().expect("mutex should not be poisoned").exposed_dir))
     }
 }
 
@@ -531,6 +533,7 @@ impl SessionManager {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::SessionManager;
     use anyhow::{anyhow, Error};
