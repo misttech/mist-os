@@ -12,6 +12,7 @@ use cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource
 use cm_types::{Name, Url};
 use derivative::Derivative;
 use moniker::{ChildName, ExtendedMoniker, Moniker};
+use sandbox::WeakInstanceTokenAny;
 use std::clone::Clone;
 use std::sync::{Arc, Weak};
 
@@ -231,6 +232,14 @@ pub enum ExtendedInstanceInterface<C: ComponentInstanceInterface> {
 pub enum WeakExtendedInstanceInterface<C: ComponentInstanceInterface> {
     Component(WeakComponentInstanceInterface<C>),
     AboveRoot(Weak<C::TopInstance>),
+}
+
+impl<C: ComponentInstanceInterface + 'static> WeakInstanceTokenAny
+    for WeakExtendedInstanceInterface<C>
+{
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 impl<C: ComponentInstanceInterface> WeakExtendedInstanceInterface<C> {

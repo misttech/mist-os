@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::CapabilitySource;
 use crate::model::component::{ExtendedInstance, WeakComponentInstance, WeakExtendedInstance};
-use ::routing::error::{ComponentInstanceError, RoutingError};
-use ::routing::policy::GlobalPolicyChecker;
-use async_trait::async_trait;
+use ::routing::error::ComponentInstanceError;
 use futures::future::BoxFuture;
-use moniker::ExtendedMoniker;
 use router_error::{Explain, RouterError};
 use sandbox::{
-    Capability, Dict, DirEntry, RemotableCapability, Request, Routable, Router, WeakInstanceToken,
+    Capability, Dict, DirEntry, RemotableCapability, Request, Router, WeakInstanceToken,
 };
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
@@ -21,14 +17,6 @@ use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 /// A trait to add functions to Router that know about the component manager
 /// types.
 pub trait RouterExt: Send + Sync {
-    /// Returns a router that ensures the capability request is allowed by the
-    /// policy in [`GlobalPolicyChecker`].
-    fn with_policy_check(
-        self,
-        capability_source: CapabilitySource,
-        policy_checker: GlobalPolicyChecker,
-    ) -> Self;
-
     /// Returns a [Dict] equivalent to `dict`, but with all [Router]s replaced with [Open].
     ///
     /// This is an alternative to [Dict::try_into_open] when the [Dict] contains [Router]s, since
@@ -61,14 +49,6 @@ pub trait RouterExt: Send + Sync {
 }
 
 impl RouterExt for Router {
-    fn with_policy_check(
-        self,
-        capability_source: CapabilitySource,
-        policy_checker: GlobalPolicyChecker,
-    ) -> Self {
-        Router::new(PolicyCheckRouter::new(capability_source, policy_checker, self))
-    }
-
     fn dict_routers_to_open(
         weak_component: &WeakInstanceToken,
         scope: &ExecutionScope,
@@ -190,38 +170,6 @@ impl RouterExt for Router {
     }
 }
 
-pub struct PolicyCheckRouter {
-    capability_source: CapabilitySource,
-    policy_checker: GlobalPolicyChecker,
-    router: Router,
-}
-
-impl PolicyCheckRouter {
-    pub fn new(
-        capability_source: CapabilitySource,
-        policy_checker: GlobalPolicyChecker,
-        router: Router,
-    ) -> Self {
-        PolicyCheckRouter { capability_source, policy_checker, router }
-    }
-}
-
-#[async_trait]
-impl Routable for PolicyCheckRouter {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        let ExtendedMoniker::ComponentInstance(moniker) = request.target.moniker() else {
-            return Err(RoutingError::from(
-                ComponentInstanceError::ComponentManagerInstanceUnexpected {},
-            )
-            .into());
-        };
-        match self.policy_checker.can_route_capability(&self.capability_source, &moniker) {
-            Ok(()) => self.router.route(request).await,
-            Err(policy_error) => Err(RoutingError::PolicyError(policy_error).into()),
-        }
-    }
-}
-
 /// A trait to add functions WeakComponentInstancethat know about the component
 /// manager types.
 pub trait WeakInstanceTokenExt {
@@ -251,21 +199,9 @@ pub trait WeakInstanceTokenExt {
     }
 }
 
-// We need this extra struct because WeakComponentInstance isn't defined in this
-// crate so we can't implement WeakInstanceTokenAny for it.
-#[derive(Debug)]
-pub struct WeakComponentInstanceExt {
-    inner: WeakExtendedInstance,
-}
-impl sandbox::WeakInstanceTokenAny for WeakComponentInstanceExt {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-
 impl WeakInstanceTokenExt for WeakInstanceToken {
     fn new(instance: WeakExtendedInstance) -> Self {
-        Self { inner: Arc::new(WeakComponentInstanceExt { inner: instance }) }
+        Self { inner: Arc::new(instance) }
     }
 
     fn to_instance(self) -> WeakExtendedInstance {
@@ -273,8 +209,8 @@ impl WeakInstanceTokenExt for WeakInstanceToken {
     }
 
     fn as_ref(&self) -> &WeakExtendedInstance {
-        match self.inner.as_any().downcast_ref::<WeakComponentInstanceExt>() {
-            Some(instance) => &instance.inner,
+        match self.inner.as_any().downcast_ref::<WeakExtendedInstance>() {
+            Some(instance) => &instance,
             None => panic!(),
         }
     }

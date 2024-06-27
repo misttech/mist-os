@@ -5,8 +5,9 @@
 use crate::capability::CapabilitySource;
 use crate::model::component::instance::ResolvedInstanceState;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
-use crate::model::routing::router_ext::{RouterExt, WeakInstanceTokenExt};
+use crate::model::routing::router_ext::WeakInstanceTokenExt;
 use ::routing::bedrock::structured_dict::ComponentInput;
+use ::routing::bedrock::with_policy_check::WithPolicyCheck;
 use ::routing::capability_source::ComponentCapability;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::{ComponentInstanceError, RoutingError};

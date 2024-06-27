@@ -650,7 +650,7 @@ pub mod tests {
             .unwrap();
         assert_matches!(
             capability,
-            Capability::Instance(c) if c.moniker() == source.extended_moniker()
+            Capability::Instance(c) if &c.moniker() == &source.extended_moniker()
         );
     }
 
