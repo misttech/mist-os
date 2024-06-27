@@ -11,7 +11,7 @@ from fuchsia_controller_py import IsolateDir
 logging.basicConfig(level=logging.DEBUG)
 
 
-async def echo():
+async def echo() -> None:
     ctx = Context()
     echo_proxy = fd_ffx.Echo.Client(
         ctx.connect_daemon_protocol(fd_ffx.Echo.MARKER)
@@ -20,7 +20,7 @@ async def echo():
     print(f"Echo Result: {result}")
 
 
-async def target_info_multi_target_isolated():
+async def target_info_multi_target_isolated() -> None:
     isolate = IsolateDir()  # Will create a random tmpdir
     ctx = Context(
         config={"sdk.root": "."}, isolate_dir=isolate, target="fuchsia-emulator"
@@ -37,7 +37,7 @@ async def target_info_multi_target_isolated():
     print(f"Target Info Received: {results}")
 
 
-async def multi_echo():
+async def multi_echo() -> None:
     ctx = Context()
     echo_proxy = fd_ffx.Echo.Client(
         ctx.connect_daemon_protocol(fd_ffx.Echo.MARKER)
@@ -51,13 +51,13 @@ async def multi_echo():
     print(f"Multi-echo results: {results}")
 
 
-async def async_main():
+async def async_main() -> None:
     await echo()
     await multi_echo()
     await target_info_multi_target_isolated()
 
 
-def main():
+def main() -> None:
     print("Testing asynchronous calls.")
     asyncio.run(async_main())
     for x in range(5):
