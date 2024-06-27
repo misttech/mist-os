@@ -423,9 +423,6 @@ rustc_library("starnix_core") {
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
   }
-  if (data_filesystem_format == "fxfs") {
-    features += [ "posix_attributes" ]
-  }
   inputs = [ "//src/starnix_lite/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
