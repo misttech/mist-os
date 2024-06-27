@@ -93,7 +93,7 @@ impl From<StartupError> for fsession::LifecycleError {
 const SESSION_NAME: &str = "session";
 
 /// The name of the child collection the session is added to, must match the declaration in
-/// session_manager.cml.
+/// `session_manager.cml`.
 const SESSION_CHILD_COLLECTION: &str = "session";
 
 /// Launches the specified session.
