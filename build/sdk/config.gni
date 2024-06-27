@@ -17,7 +17,7 @@ declare_args() {
   #
   # TODO(https://fxbug.dev/324892812): Delete this option after a transition
   # period.
-  sdk_legacy_unstable_abi_revisions = false
+  sdk_legacy_unstable_abi_revisions = true
 
   # An upper bound on the maximum number of subbuilds that may be running at the
   # same time. A larger number means these good things:
