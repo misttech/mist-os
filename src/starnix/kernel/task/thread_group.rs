@@ -1386,6 +1386,12 @@ impl ThreadGroup {
     }
 }
 
+pub enum WaitableChildResult {
+    ReadyNow(WaitResult),
+    ShouldWait,
+    NoneFound,
+}
+
 #[apply(state_implementation!)]
 impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
     pub fn leader(&self) -> pid_t {
@@ -1517,7 +1523,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         selector: ProcessSelector,
         options: &WaitingOptions,
         pids: &PidTable,
-    ) -> Result<Option<WaitResult>, Errno> {
+    ) -> WaitableChildResult {
         // The children whose pid matches the pid selector queried.
         let filter_children_by_pid_selector = |child: &Arc<ThreadGroup>| match selector {
             ProcessSelector::Any => true,
@@ -1570,10 +1576,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
                     pids.get_process_group(pgid).as_ref() == pids.get_process_group(tracee).as_ref()
                 }
             }) {
-                return Ok(None);
+                return WaitableChildResult::ShouldWait;
             }
 
-            return error!(ECHILD);
+            return WaitableChildResult::NoneFound;
         }
         for child in selected_children {
             let child = child.write();
@@ -1605,19 +1611,19 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
                 };
                 let child_stopped = child.base.load_stopped();
                 if child_stopped == StopState::Awake && options.wait_for_continued {
-                    return Ok(Some(build_wait_result(child, &|siginfo| {
+                    return WaitableChildResult::ReadyNow(build_wait_result(child, &|siginfo| {
                         ExitStatus::Continue(siginfo, PtraceEvent::None)
-                    })));
+                    }));
                 }
                 if child_stopped == StopState::GroupStopped && options.wait_for_stopped {
-                    return Ok(Some(build_wait_result(child, &|siginfo| {
+                    return WaitableChildResult::ReadyNow(build_wait_result(child, &|siginfo| {
                         ExitStatus::Stop(siginfo, PtraceEvent::None)
-                    })));
+                    }));
                 }
             }
         }
 
-        Ok(None)
+        WaitableChildResult::ShouldWait
     }
 
     /// Returns any waitable child matching the given `selector` and `options`. Returns None if no
@@ -1630,7 +1636,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         selector: ProcessSelector,
         options: &WaitingOptions,
         pids: &mut PidTable,
-    ) -> Result<Option<WaitResult>, Errno> {
+    ) -> WaitableChildResult {
         if options.wait_for_exited {
             if let Some(waitable_zombie) = self.get_waitable_zombie(
                 &|state: &mut ThreadGroupMutableState| &mut state.zombie_children,
@@ -1638,7 +1644,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
                 options,
                 pids,
             ) {
-                return Ok(Some(waitable_zombie));
+                return WaitableChildResult::ReadyNow(waitable_zombie);
             }
         }
 

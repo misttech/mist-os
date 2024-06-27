@@ -12,7 +12,7 @@ use crate::signals::{
 };
 use crate::task::{
     CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup, WaitResult,
-    Waiter,
+    WaitableChildResult, Waiter,
 };
 use crate::vfs::{FdFlags, FdNumber};
 use fuchsia_zircon as zx;
@@ -720,13 +720,13 @@ fn wait_on_pid(
                     continue;
                 }
                 match thread_group.get_waitable_child(selector, options, &mut pids) {
-                    Ok(Some(child)) => {
+                    WaitableChildResult::ReadyNow(child) => {
                         return Ok(Some(child));
                     }
-                    Ok(None) => (),
-                    Err(errno) => {
+                    WaitableChildResult::ShouldWait => (),
+                    WaitableChildResult::NoneFound => {
                         if !has_any_tracee {
-                            return Err(errno);
+                            return error!(ECHILD);
                         }
                     }
                 }
