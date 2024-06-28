@@ -186,10 +186,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
             else suspend_power_metrics.to_fuchsiaperf_results(tag="_suspend")
         )
 
-        return (
-            power_metrics.to_fuchsiaperf_results(tag="_by_model")
-            + suspend_results
-        )
+        return power_metrics.to_fuchsiaperf_results() + suspend_results
 
 
 def _find_test_start(model: trace_model.Model) -> trace_time.TimePoint | None:

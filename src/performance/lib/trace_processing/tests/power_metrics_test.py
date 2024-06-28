@@ -154,9 +154,9 @@ class PowerMetricsTest(unittest.TestCase):
         # Power samples should start to count the instant load generation stops, so expect
         # to count the .1A and .6A sample
         expected_results = [
-            TCR(label="MinPower_by_model", unit=U.watts, values=[1.2]),
-            TCR(label="MeanPower_by_model", unit=U.watts, values=[4.2]),
-            TCR(label="MaxPower_by_model", unit=U.watts, values=[7.2]),
+            TCR(label="MinPower", unit=U.watts, values=[1.2]),
+            TCR(label="MeanPower", unit=U.watts, values=[4.2]),
+            TCR(label="MaxPower", unit=U.watts, values=[7.2]),
         ]
         self.assertEqual(expected_results, results)
 
@@ -234,9 +234,9 @@ class PowerMetricsTest(unittest.TestCase):
 
         results = power.PowerMetricsProcessor().process_metrics(model)
         expected_results = [
-            TCR(label="MinPower_by_model", unit=U.watts, values=[1.2]),
-            TCR(label="MeanPower_by_model", unit=U.watts, values=[4.2]),
-            TCR(label="MaxPower_by_model", unit=U.watts, values=[7.2]),
+            TCR(label="MinPower", unit=U.watts, values=[1.2]),
+            TCR(label="MeanPower", unit=U.watts, values=[4.2]),
+            TCR(label="MaxPower", unit=U.watts, values=[7.2]),
         ]
         self.assertEqual(expected_results, results)
 
@@ -304,9 +304,9 @@ class PowerMetricsTest(unittest.TestCase):
         # Power samples should start to count the instant load generation stops, so expect
         # to count the .1A and .6A sample
         expected_results = [
-            TCR(label="MinPower_by_model", unit=U.watts, values=[1.2]),
-            TCR(label="MeanPower_by_model", unit=U.watts, values=[4.2]),
-            TCR(label="MaxPower_by_model", unit=U.watts, values=[7.2]),
+            TCR(label="MinPower", unit=U.watts, values=[1.2]),
+            TCR(label="MeanPower", unit=U.watts, values=[4.2]),
+            TCR(label="MaxPower", unit=U.watts, values=[7.2]),
         ]
         self.assertEqual(expected_results, results)
 
