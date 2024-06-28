@@ -478,9 +478,6 @@ group("config_data_template_allowlist") {
 group("core_realm_shards_allowlist") {
   visibility = []
 
-  # Used by SL4F and infra
-  visibility += [ "//src/testing/sl4f:sl4f_core_shard" ]
-
   # Used by terminal.gni
   visibility += [
     "//products/terminal:tiles_flatland_core_shard",
