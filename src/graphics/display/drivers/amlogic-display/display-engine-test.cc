@@ -28,8 +28,6 @@
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/driver-runtime-backed-dispatcher-factory.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter-dfv2.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -379,18 +377,12 @@ class FakeSysmemTest : public testing::Test {
 
     InitializeTestEnvironment();
 
-    zx::result<std::unique_ptr<display::MetadataGetter>> create_metadata_getter_result =
-        display::MetadataGetterDfv2::Create(incoming_);
-    ASSERT_OK(create_metadata_getter_result.status_value());
-    metadata_getter_ = std::move(create_metadata_getter_result).value();
-
     zx::result<std::unique_ptr<display::DispatcherFactory>> create_dispatcher_factory_result =
         display::DriverRuntimeBackedDispatcherFactory::Create();
     ASSERT_OK(create_dispatcher_factory_result.status_value());
     dispatcher_factory_ = std::move(create_dispatcher_factory_result).value();
 
-    display_engine_ = std::make_unique<DisplayEngine>(incoming_.get(), metadata_getter_.get(),
-                                                      dispatcher_factory_.get());
+    display_engine_ = std::make_unique<DisplayEngine>(incoming_, dispatcher_factory_.get());
     display_engine_->SetFormatSupportCheck([](auto) { return true; });
     display_engine_->SetCanvasForTesting(std::move(endpoints.client));
 
@@ -444,12 +436,10 @@ class FakeSysmemTest : public testing::Test {
   async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
       env_dispatcher_->async_dispatcher(), std::in_place};
 
-  // Must outlive `metadata_getter_`.
   std::shared_ptr<fdf::Namespace> incoming_;
 
   async::Loop loop_;
 
-  std::unique_ptr<display::MetadataGetter> metadata_getter_;
   std::unique_ptr<display::DispatcherFactory> dispatcher_factory_;
 
   ddk_fake::FakeMmioRegRegion vpu_mmio_ =

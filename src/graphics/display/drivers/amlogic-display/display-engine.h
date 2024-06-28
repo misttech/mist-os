@@ -34,7 +34,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 
 namespace amlogic_display {
 
@@ -42,21 +41,18 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
  public:
   // Factory method for production use.
   //
-  // `incoming` must be non-null and outlive `DisplayEngine`.
-  // `metadata_getter` must be non-null and outlive `DisplayEngine`.
+  // `incoming` must be non-null.
   // `dispatcher_factory` must be non-null and outlive `DisplayEngine`.
   static zx::result<std::unique_ptr<DisplayEngine>> Create(
-      fdf::Namespace* incoming, display::MetadataGetter* metadata_getter,
-      display::DispatcherFactory* dispatcher_factory);
+      std::shared_ptr<fdf::Namespace> incoming, display::DispatcherFactory* dispatcher_factory);
 
   // Creates an uninitialized `DisplayEngine` instance.
   //
-  // `incoming` must be non-null and outlive `DisplayEngine`.
-  // `metadata_getter` must be non-null and outlive `DisplayEngine`.
+  // `incoming` must be non-null.
   // `dispatcher_factory` must be non-null and outlive `DisplayEngine`.
   //
   // Production code should use `DisplayEngine::Create()` instead.
-  explicit DisplayEngine(fdf::Namespace* incoming, display::MetadataGetter* metadata_getter,
+  explicit DisplayEngine(std::shared_ptr<fdf::Namespace> incoming,
                          display::DispatcherFactory* dispatcher_factory);
 
   DisplayEngine(const DisplayEngine&) = delete;
@@ -225,8 +221,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   // currently applied to the display.
   bool IsNewDisplayTiming(const display::DisplayTiming& timing) __TA_REQUIRES(display_mutex_);
 
-  fdf::Namespace& incoming_;
-  display::MetadataGetter& metadata_getter_;
+  std::shared_ptr<fdf::Namespace> incoming_;
   display::DispatcherFactory& dispatcher_factory_;
 
   // Zircon handles

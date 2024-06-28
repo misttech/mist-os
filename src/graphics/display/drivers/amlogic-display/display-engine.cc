@@ -16,6 +16,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/image-format/image_format.h>
@@ -50,7 +51,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace amlogic_display {
@@ -1063,7 +1063,7 @@ zx_status_t DisplayEngine::SetupHotplugDisplayDetection() {
   ZX_DEBUG_ASSERT_MSG(!hot_plug_detection_, "HPD already set up");
 
   zx::result<std::unique_ptr<HotPlugDetection>> hot_plug_detection_result =
-      HotPlugDetection::Create(incoming_, dispatcher_factory_,
+      HotPlugDetection::Create(*incoming_, dispatcher_factory_,
                                fit::bind_member<&DisplayEngine::OnHotPlugStateChange>(this));
 
   if (hot_plug_detection_result.is_error()) {
@@ -1078,7 +1078,7 @@ zx_status_t DisplayEngine::InitializeHdmiVout() {
   ZX_DEBUG_ASSERT(vout_ == nullptr);
 
   zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result =
-      Vout::CreateHdmiVout(incoming_, root_node_.CreateChild("vout"));
+      Vout::CreateHdmiVout(*incoming_, root_node_.CreateChild("vout"));
   if (!create_hdmi_vout_result.is_ok()) {
     zxlogf(ERROR, "Failed to initialize HDMI Vout device: %s",
            create_hdmi_vout_result.status_string());
@@ -1097,7 +1097,7 @@ zx_status_t DisplayEngine::InitializeMipiDsiVout(display_panel_t panel_info) {
   {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result =
-        Vout::CreateDsiVout(incoming_, panel_info.panel_type, panel_info.width, panel_info.height,
+        Vout::CreateDsiVout(*incoming_, panel_info.panel_type, panel_info.width, panel_info.height,
                             root_node_.CreateChild("vout"));
     if (!create_dsi_vout_result.is_ok()) {
       zxlogf(ERROR, "Failed to initialize DSI Vout device: %s",
@@ -1116,8 +1116,8 @@ zx_status_t DisplayEngine::InitializeVout() {
   ZX_ASSERT(vout_ == nullptr);
 
   zx::result<std::unique_ptr<display_panel_t>> metadata_result =
-      metadata_getter_.Get<display_panel_t>(DEVICE_METADATA_DISPLAY_PANEL_CONFIG,
-                                            component::kDefaultInstance);
+      compat::GetMetadata<display_panel_t>(incoming_, DEVICE_METADATA_DISPLAY_PANEL_CONFIG,
+                                           component::kDefaultInstance);
   if (metadata_result.is_ok()) {
     display_panel_t panel_info = *std::move(metadata_result).value();
     return InitializeMipiDsiVout(panel_info);
@@ -1139,7 +1139,7 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
 
   static constexpr char kPdevFragmentName[] = "pdev";
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
-      incoming_.Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
+      incoming_->Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
   if (pdev_result.is_error()) {
     zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
     return pdev_result.status_value();
@@ -1152,7 +1152,7 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
   }
 
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_client_result =
-      incoming_.Connect<fuchsia_hardware_sysmem::Service::AllocatorV2>("sysmem");
+      incoming_->Connect<fuchsia_hardware_sysmem::Service::AllocatorV2>("sysmem");
   if (sysmem_client_result.is_error()) {
     zxlogf(ERROR, "Failed to get sysmem protocol: %s", sysmem_client_result.status_string());
     return sysmem_client_result.status_value();
@@ -1160,7 +1160,7 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
   sysmem_.Bind(std::move(sysmem_client_result.value()));
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_amlogiccanvas::Device>> canvas_client_result =
-      incoming_.Connect<fuchsia_hardware_amlogiccanvas::Service::Device>("canvas");
+      incoming_->Connect<fuchsia_hardware_amlogiccanvas::Service::Device>("canvas");
   if (canvas_client_result.is_error()) {
     zxlogf(ERROR, "Failed to get Amlogic canvas protocol: %s",
            canvas_client_result.status_string());
@@ -1302,24 +1302,20 @@ zx_status_t DisplayEngine::Initialize() {
   return ZX_OK;
 }
 
-DisplayEngine::DisplayEngine(fdf::Namespace* incoming, display::MetadataGetter* metadata_getter,
+DisplayEngine::DisplayEngine(std::shared_ptr<fdf::Namespace> incoming,
                              display::DispatcherFactory* dispatcher_factory)
-    : incoming_(*incoming),
-      metadata_getter_(*metadata_getter),
-      dispatcher_factory_(*dispatcher_factory) {
-  ZX_DEBUG_ASSERT(incoming != nullptr);
-  ZX_DEBUG_ASSERT(metadata_getter != nullptr);
+    : incoming_(std::move(incoming)), dispatcher_factory_(*dispatcher_factory) {
+  ZX_DEBUG_ASSERT(incoming_ != nullptr);
   ZX_DEBUG_ASSERT(dispatcher_factory != nullptr);
 }
 DisplayEngine::~DisplayEngine() {}
 
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
-    fdf::Namespace* incoming, display::MetadataGetter* metadata_getter,
-    display::DispatcherFactory* dispatcher_factory) {
+    std::shared_ptr<fdf::Namespace> incoming, display::DispatcherFactory* dispatcher_factory) {
   fbl::AllocChecker alloc_checker;
-  auto display_engine = fbl::make_unique_checked<DisplayEngine>(
-      &alloc_checker, incoming, metadata_getter, dispatcher_factory);
+  auto display_engine = fbl::make_unique_checked<DisplayEngine>(&alloc_checker, std::move(incoming),
+                                                                dispatcher_factory);
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);

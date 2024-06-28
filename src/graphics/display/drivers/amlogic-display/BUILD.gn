@@ -101,6 +101,7 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
@@ -111,7 +112,6 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/device-protocol-display",
     "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
-    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter",
     "//src/graphics/display/lib/mipi-dsi",
     "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",
@@ -151,7 +151,6 @@ fuchsia_driver("amlogic-display-driver") {
     "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
     "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:driver-runtime-backed-dispatcher",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
-    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv2",
   ]
 }
 
@@ -187,6 +186,7 @@ test("amlogic-display-test") {
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
@@ -198,7 +198,6 @@ test("amlogic-display-test") {
     "//src/devices/testing/mock-mmio-range",
     "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:driver-runtime-backed-dispatcher",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
-    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv2",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
