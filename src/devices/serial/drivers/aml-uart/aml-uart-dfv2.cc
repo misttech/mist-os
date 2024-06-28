@@ -250,8 +250,9 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
   timer_dispatcher_.emplace(std::move(timer_dispatcher_result.value()));
   aml_uart_.emplace(std::move(pdev), serial_port_info_, std::move(mmio.value()),
                     irq_dispatcher_->borrow(), timer_dispatcher_->borrow(),
-                    std::move(lessor_client_end_), std::move(current_level_client_end_),
-                    std::move(required_level_client_end_), std::move(element_control_client_end_));
+                    driver_config_.enable_suspend() ? true : false, std::move(lessor_client_end_),
+                    std::move(current_level_client_end_), std::move(required_level_client_end_),
+                    std::move(element_control_client_end_));
 
   // Default configuration for the case that serial_impl_config is not called.
   constexpr uint32_t kDefaultBaudRate = 115200;

@@ -52,7 +52,7 @@ fit::closure DriverTransportWriteOperation::MakeCallback(zx_status_t status) {
 AmlUart::AmlUart(
     ddk::PDevFidl pdev, const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
     fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
-    std::optional<fdf::UnownedSynchronizedDispatcher> timer_dispatcher,
+    std::optional<fdf::UnownedSynchronizedDispatcher> timer_dispatcher, bool power_control_enabled,
     std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end,
     std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_end,
     std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>> required_level_client_end,
@@ -60,7 +60,8 @@ AmlUart::AmlUart(
     : pdev_(std::move(pdev)),
       serial_port_info_(serial_port_info),
       mmio_(std::move(mmio)),
-      irq_dispatcher_(std::move(irq_dispatcher)) {
+      irq_dispatcher_(std::move(irq_dispatcher)),
+      power_control_enabled_(power_control_enabled) {
   if (timer_dispatcher != std::nullopt) {
     timer_dispatcher_ = std::move(*timer_dispatcher);
     // Use ZX_TIMER_SLACK_LATE so that the timer will never fire earlier than the deadline.
@@ -304,10 +305,18 @@ zx_status_t AmlUart::Enable(bool enable) {
   fbl::AutoLock al(&enable_lock_);
 
   if (enable && !enabled_) {
-    zx_status_t status = pdev_.GetInterrupt(0, ZX_INTERRUPT_WAKE_VECTOR, &irq_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: pdev_get_interrupt failed %d", __func__, status);
-      return status;
+    if (power_control_enabled_) {
+      zx_status_t status = pdev_.GetInterrupt(0, ZX_INTERRUPT_WAKE_VECTOR, &irq_);
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "%s: pdev_get_interrupt failed %d", __func__, status);
+        return status;
+      }
+    } else {
+      zx_status_t status = pdev_.GetInterrupt(0, 0, &irq_);
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "%s: pdev_get_interrupt failed %d", __func__, status);
+        return status;
+      }
     }
 
     EnableLocked(true);
