@@ -168,10 +168,10 @@ pub fn run_container_features(
 
         let display_width = framebuffer.xres as i32;
         let display_height = framebuffer.yres as i32;
-        let input_files_node = kernel.inspect_node.create_child("input_files");
 
-        let touch_device = InputDevice::new_touch(display_width, display_height, &input_files_node);
-        let keyboard_device = InputDevice::new_keyboard(&input_files_node);
+        let touch_device =
+            InputDevice::new_touch(display_width, display_height, &kernel.inspect_node);
+        let keyboard_device = InputDevice::new_keyboard(&kernel.inspect_node);
 
         touch_device.clone().register(locked, &kernel.kthreads.system_task());
         keyboard_device.clone().register(locked, &kernel.kthreads.system_task());
