@@ -12,6 +12,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/io-buffer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
