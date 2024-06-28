@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import("//build/components.gni")
+import("//build/cpp/library_headers.gni")
 import("//build/test.gni")
-import("//build/zircon/zx_library.gni")
 
 group("tests") {
   testonly = true
@@ -42,16 +42,29 @@ fuchsia_unittest_package("virtio-backend-test-package") {
   }
 }
 
-zx_library("virtio") {
-  sdk = "static"
-  sdk_headers = [
+library_headers("virtio-headers") {
+  headers = [
     "lib/virtio/driver_utils.h",
     "lib/virtio/device.h",
     "lib/virtio/ring.h",
+    "lib/virtio/backends/backend.h",
     "lib/virtio/backends/fake.h",
     "lib/virtio/backends/pci.h",
   ]
+  public_deps = [
+    "//src/devices/lib/mmio",
+    "//src/devices/pci/lib/device-protocol-pci",
+    "//src/lib/ddk",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/pretty",
+    "//zircon/system/ulib/virtio",
+    "//zircon/system/ulib/zircon-internal",
+    "//zircon/system/ulib/zx",
+  ]
+  visibility = [ ":virtio" ]
+}
 
+source_set("virtio") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "backends/pci.cc",
@@ -62,21 +75,13 @@ zx_library("virtio") {
     "ring.cc",
   ]
   public_deps = [
-    "//sdk/lib/stdcompat",
+    ":virtio-headers",
     "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
-    "//src/devices/pci/lib/device-protocol-pci",
-    "//src/lib/ddk",
+  ]
+  deps = [
+    "//sdk/lib/stdcompat",
     "//src/lib/ddk:ddk-deprecated-mmio-headers",
-    "//src/lib/ddktl",
-    "//src/ui/input/lib/hid",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/pretty",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/virtio",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
