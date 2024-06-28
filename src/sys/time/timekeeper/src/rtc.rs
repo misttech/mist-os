@@ -16,7 +16,7 @@ use lazy_static::lazy_static;
 use std::fs;
 use std::path::PathBuf;
 use thiserror::Error;
-use tracing::{debug, error};
+use tracing::error;
 #[cfg(test)]
 use {fuchsia_sync::Mutex, std::sync::Arc};
 
@@ -60,11 +60,10 @@ pub struct RtcImpl {
 }
 
 impl RtcImpl {
-    fn retryable_rtc_read() -> Result<RtcImpl, RtcCreationError> {
-        let mut iterator = fs::read_dir(&*RTC_PATH).map_err(|_| {
-            debug!("could not read any RTC devices from: {:?}", &*RTC_PATH);
-            RtcCreationError::NoDevices
-        })?;
+    /// Returns a new `RtcImpl` connected to the only available RTC device. Returns an Error if no
+    /// devices were found, multiple devices were found, or the connection failed.
+    pub fn only_device() -> Result<RtcImpl, RtcCreationError> {
+        let mut iterator = fs::read_dir(&*RTC_PATH).map_err(|_| RtcCreationError::NoDevices)?;
         match iterator.next() {
             Some(Ok(first_entry)) => match iterator.count() {
                 0 => RtcImpl::new(first_entry.path()),
@@ -75,31 +74,8 @@ impl RtcImpl {
             Some(Err(err)) => {
                 Err(RtcCreationError::ConnectionFailed(anyhow!("Failed to read entry: {}", err)))
             }
-            None => {
-                debug!("no RTC was found in {:?}", &*RTC_PATH);
-                Err(RtcCreationError::NoDevices)
-            }
+            None => Err(RtcCreationError::NoDevices),
         }
-    }
-
-    /// Returns a new `RtcImpl` connected to the only available RTC device. Returns an Error if no
-    /// devices were found, multiple devices were found, or the connection failed.
-    pub async fn only_device() -> Result<RtcImpl, RtcCreationError> {
-        for _try in 1..2 {
-            let result = Self::retryable_rtc_read();
-            match result {
-                res @ Ok(_) => {
-                    return res;
-                }
-                _ => {
-                    // TODO: b/348530594 - A crude way to retry, but we do not have a significantly
-                    // better approach for retry. There is a better overall approach, though.
-                    debug!("retrying RTC discovery: {}", _try);
-                    fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(1))).await;
-                }
-            }
-        }
-        Self::retryable_rtc_read()
     }
 
     /// Returns a new `RtcImpl` connected to the device at the supplied path.
@@ -107,7 +83,6 @@ impl RtcImpl {
         let path_str = path_buf
             .to_str()
             .ok_or(RtcCreationError::ConnectionFailed(anyhow!("Non unicode path")))?;
-        debug!("RTC at: {}", path_str);
         let (proxy, server) = create_proxy::<frtc::DeviceMarker>().map_err(|err| {
             RtcCreationError::ConnectionFailed(anyhow!("Failed to create proxy: {}", err))
         })?;
