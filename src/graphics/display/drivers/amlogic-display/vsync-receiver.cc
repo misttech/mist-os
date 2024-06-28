@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/driver.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -21,14 +22,12 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
-    display::DispatcherFactory& dispatcher_factory,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
     VsyncHandler on_vsync) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
@@ -41,14 +40,16 @@ zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
 
   static constexpr std::string_view kRoleName =
       "fuchsia.graphics.display.drivers.amlogic-display.vsync";
-  zx::result<std::unique_ptr<display::Dispatcher>> create_dispatcher_result =
-      dispatcher_factory.Create("vsync-interrupt-thread", kRoleName);
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "vsync-interrupt-thread",
+          /*shutdown_handler=*/[](fdf_dispatcher_t*) {}, kRoleName);
   if (create_dispatcher_result.is_error()) {
     zxlogf(ERROR, "Failed to create vsync Dispatcher: %s",
            create_dispatcher_result.status_string());
     return create_dispatcher_result.take_error();
   }
-  std::unique_ptr<display::Dispatcher> dispatcher = std::move(create_dispatcher_result).value();
+  fdf::SynchronizedDispatcher dispatcher = std::move(create_dispatcher_result).value();
 
   fbl::AllocChecker alloc_checker;
   auto vsync_receiver =
@@ -69,7 +70,7 @@ zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
 }
 
 VsyncReceiver::VsyncReceiver(zx::interrupt vsync_irq, VsyncHandler on_vsync,
-                             std::unique_ptr<display::Dispatcher> irq_handler_dispatcher)
+                             fdf::SynchronizedDispatcher irq_handler_dispatcher)
     : vsync_irq_(std::move(vsync_irq)),
       on_vsync_(std::move(on_vsync)),
       irq_handler_dispatcher_(std::move(irq_handler_dispatcher)) {
@@ -102,7 +103,7 @@ zx::result<> VsyncReceiver::SetReceivingState(bool receiving) {
 
 zx::result<> VsyncReceiver::Start() {
   ZX_DEBUG_ASSERT(!is_receiving_);
-  zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_->async_dispatcher());
+  zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind the Vsync handler to the async loop: %s",
            zx_status_get_string(status));
@@ -119,11 +120,10 @@ zx::result<> VsyncReceiver::Stop() {
   // unbound from the same dispatcher they were bound to.
   zx_status_t cancel_status;
   libsync::Completion cancel_completion;
-  zx_status_t post_task_status =
-      async::PostTask(irq_handler_dispatcher_->async_dispatcher(), [&]() {
-        cancel_status = irq_handler_.Cancel();
-        cancel_completion.Signal();
-      });
+  zx_status_t post_task_status = async::PostTask(irq_handler_dispatcher_.async_dispatcher(), [&]() {
+    cancel_status = irq_handler_.Cancel();
+    cancel_completion.Signal();
+  });
 
   if (post_task_status != ZX_OK) {
     zxlogf(ERROR, "Failed to post the Vsync handler cancel task: %s",

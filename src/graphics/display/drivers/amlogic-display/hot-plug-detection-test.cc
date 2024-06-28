@@ -26,7 +26,6 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/driver-runtime-backed-dispatcher.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace amlogic_display {
@@ -80,12 +79,14 @@ class HotPlugDetectionTest : public ::testing::Test {
 
     GpioResources pin_gpio_resources = GetPinGpioResources();
 
-    zx::result<std::unique_ptr<display::Dispatcher>> create_dispatcher_result =
-        display::DriverRuntimeBackedDispatcher::Create("hot-plug-detection-thread",
-                                                       /*scheduler_role=*/{});
+    zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                            "hot-plug-detection-thread",
+                                            /*shutdown_handler=*/[](fdf_dispatcher_t*) {},
+                                            /*scheduler_role=*/{});
     ZX_ASSERT(create_dispatcher_result.status_value() == ZX_OK);
 
-    std::unique_ptr<display::Dispatcher> dispatcher = std::move(create_dispatcher_result).value();
+    fdf::SynchronizedDispatcher dispatcher = std::move(create_dispatcher_result).value();
 
     auto hpd = std::make_unique<HotPlugDetection>(
         std::move(pin_gpio_resources.client), std::move(pin_gpio_resources.interrupt),

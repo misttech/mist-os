@@ -27,7 +27,6 @@
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/driver-runtime-backed-dispatcher-factory.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -377,12 +376,7 @@ class FakeSysmemTest : public testing::Test {
 
     InitializeTestEnvironment();
 
-    zx::result<std::unique_ptr<display::DispatcherFactory>> create_dispatcher_factory_result =
-        display::DriverRuntimeBackedDispatcherFactory::Create();
-    ASSERT_OK(create_dispatcher_factory_result.status_value());
-    dispatcher_factory_ = std::move(create_dispatcher_factory_result).value();
-
-    display_engine_ = std::make_unique<DisplayEngine>(incoming_, dispatcher_factory_.get());
+    display_engine_ = std::make_unique<DisplayEngine>(incoming_);
     display_engine_->SetFormatSupportCheck([](auto) { return true; });
     display_engine_->SetCanvasForTesting(std::move(endpoints.client));
 
@@ -439,8 +433,6 @@ class FakeSysmemTest : public testing::Test {
   std::shared_ptr<fdf::Namespace> incoming_;
 
   async::Loop loop_;
-
-  std::unique_ptr<display::DispatcherFactory> dispatcher_factory_;
 
   ddk_fake::FakeMmioRegRegion vpu_mmio_ =
       ddk_fake::FakeMmioRegRegion(/*reg_size=*/4, /*reg_count=*/0x10000);

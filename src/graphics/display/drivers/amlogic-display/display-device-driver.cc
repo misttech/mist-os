@@ -31,8 +31,6 @@
 
 #include "fidl/fuchsia.driver.framework/cpp/natural_types.h"
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/driver-runtime-backed-dispatcher-factory.h"
 
 namespace amlogic_display {
 
@@ -42,36 +40,31 @@ DisplayDeviceDriver::DisplayDeviceDriver(fdf::DriverStartArgs start_args,
 
 void DisplayDeviceDriver::Stop() {}
 
-zx::result<DisplayDeviceDriver::DriverFrameworkMigrationUtils>
-DisplayDeviceDriver::CreateDriverFrameworkMigrationUtils() {
-  zx::result<std::unique_ptr<display::DispatcherFactory>> create_dispatcher_factory_result =
-      display::DriverRuntimeBackedDispatcherFactory::Create();
-  if (create_dispatcher_factory_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create Dispatcher factory: %s",
-            create_dispatcher_factory_result.status_string());
-    return create_dispatcher_factory_result.take_error();
+zx::result<std::unique_ptr<inspect::ComponentInspector>>
+DisplayDeviceDriver::CreateComponentInspector(inspect::Inspector inspector) {
+  zx::result<fidl::ClientEnd<fuchsia_inspect::InspectSink>> inspect_sink_connect_result =
+      incoming()->Connect<fuchsia_inspect::InspectSink>();
+  if (inspect_sink_connect_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to InspectSink protocol: %s",
+            inspect_sink_connect_result.status_string());
+    return inspect_sink_connect_result.take_error();
   }
-  std::unique_ptr<display::DispatcherFactory> dispatcher_factory =
-      std::move(create_dispatcher_factory_result).value();
 
-  return zx::ok(DriverFrameworkMigrationUtils{
-      .dispatcher_factory = std::move(dispatcher_factory),
-  });
+  fbl::AllocChecker alloc_checker;
+  auto component_inspector = fbl::make_unique_checked<inspect::ComponentInspector>(
+      &alloc_checker, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+      inspect::PublishOptions{.inspector = std::move(inspector),
+                              .client_end = std::move(inspect_sink_connect_result).value()});
+  if (!alloc_checker.check()) {
+    FDF_LOG(ERROR, "Failed to allocate memory for ComponentInspector");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+  return zx::ok(std::move(component_inspector));
 }
 
 zx::result<> DisplayDeviceDriver::Start() {
-  zx::result<DisplayDeviceDriver::DriverFrameworkMigrationUtils>
-      create_driver_framework_migration_utils_result = CreateDriverFrameworkMigrationUtils();
-  if (create_driver_framework_migration_utils_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create driver framework migration utilities: %s",
-            create_driver_framework_migration_utils_result.status_string());
-    return create_driver_framework_migration_utils_result.take_error();
-  }
-  driver_framework_migration_utils_ =
-      std::move(create_driver_framework_migration_utils_result).value();
-
   zx::result<std::unique_ptr<DisplayEngine>> create_display_engine_result =
-      DisplayEngine::Create(incoming(), driver_framework_migration_utils_.dispatcher_factory.get());
+      DisplayEngine::Create(incoming());
   if (create_display_engine_result.is_error()) {
     FDF_LOG(ERROR, "Failed to create DisplayEngine: %s",
             create_display_engine_result.status_string());

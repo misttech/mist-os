@@ -149,7 +149,6 @@ fuchsia_driver("amlogic-display-driver") {
     "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
-    "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:driver-runtime-backed-dispatcher",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
   ]
 }
@@ -196,7 +195,6 @@ test("amlogic-display-test") {
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-range",
-    "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:driver-runtime-backed-dispatcher",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",

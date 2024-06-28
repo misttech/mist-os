@@ -33,7 +33,6 @@
 #include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 
 namespace amlogic_display {
 
@@ -42,18 +41,15 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   // Factory method for production use.
   //
   // `incoming` must be non-null.
-  // `dispatcher_factory` must be non-null and outlive `DisplayEngine`.
   static zx::result<std::unique_ptr<DisplayEngine>> Create(
-      std::shared_ptr<fdf::Namespace> incoming, display::DispatcherFactory* dispatcher_factory);
+      std::shared_ptr<fdf::Namespace> incoming);
 
   // Creates an uninitialized `DisplayEngine` instance.
   //
   // `incoming` must be non-null.
-  // `dispatcher_factory` must be non-null and outlive `DisplayEngine`.
   //
   // Production code should use `DisplayEngine::Create()` instead.
-  explicit DisplayEngine(std::shared_ptr<fdf::Namespace> incoming,
-                         display::DispatcherFactory* dispatcher_factory);
+  explicit DisplayEngine(std::shared_ptr<fdf::Namespace> incoming);
 
   DisplayEngine(const DisplayEngine&) = delete;
   DisplayEngine(DisplayEngine&&) = delete;
@@ -222,7 +218,6 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   bool IsNewDisplayTiming(const display::DisplayTiming& timing) __TA_REQUIRES(display_mutex_);
 
   std::shared_ptr<fdf::Namespace> incoming_;
-  display::DispatcherFactory& dispatcher_factory_;
 
   // Zircon handles
   zx::bti bti_;

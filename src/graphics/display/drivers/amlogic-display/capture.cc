@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/capture.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
@@ -17,14 +18,12 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<Capture>> Capture::Create(
-    display::DispatcherFactory& dispatcher_factory,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
     OnCaptureCompleteHandler on_capture_complete) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
@@ -35,14 +34,17 @@ zx::result<std::unique_ptr<Capture>> Capture::Create(
     return capture_interrupt_result.take_error();
   }
 
-  zx::result<std::unique_ptr<display::Dispatcher>> create_dispatcher_result =
-      dispatcher_factory.Create("capture-interrupt-thread", /*scheduler_role=*/{});
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                          "capture-interrupt-thread",
+                                          /*shutdown_handler=*/[](fdf_dispatcher_t*) {},
+                                          /*scheduler_role=*/{});
   if (create_dispatcher_result.is_error()) {
     zxlogf(ERROR, "Failed to create capture interrupt handler dispatcher: %s",
            create_dispatcher_result.status_string());
     return create_dispatcher_result.take_error();
   }
-  std::unique_ptr<display::Dispatcher> dispatcher = std::move(create_dispatcher_result).value();
+  fdf::SynchronizedDispatcher dispatcher = std::move(create_dispatcher_result).value();
 
   fbl::AllocChecker alloc_checker;
   auto capture =
@@ -64,7 +66,7 @@ zx::result<std::unique_ptr<Capture>> Capture::Create(
 
 Capture::Capture(zx::interrupt capture_finished_interrupt,
                  OnCaptureCompleteHandler on_capture_complete,
-                 std::unique_ptr<display::Dispatcher> irq_handler_dispatcher)
+                 fdf::SynchronizedDispatcher irq_handler_dispatcher)
     : capture_finished_irq_(std::move(capture_finished_interrupt)),
       on_capture_complete_(std::move(on_capture_complete)),
       irq_handler_dispatcher_(std::move(irq_handler_dispatcher)) {
@@ -85,7 +87,7 @@ Capture::~Capture() {
 }
 
 zx::result<> Capture::Init() {
-  zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_->async_dispatcher());
+  zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind the capture interrupt handler to the async loop: %s",
            zx_status_get_string(status));

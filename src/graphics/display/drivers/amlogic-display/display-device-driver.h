@@ -40,19 +40,14 @@ class DisplayDeviceDriver : public fdf::DriverBase {
   void Stop() override;
 
  private:
-  struct DriverFrameworkMigrationUtils {
-    std::unique_ptr<display::DispatcherFactory> dispatcher_factory;
-  };
+  // Creates a ComponentInspector that serves the `inspector` to the driver
+  // component's Inspect sink.
+  zx::result<std::unique_ptr<inspect::ComponentInspector>> CreateComponentInspector(
+      inspect::Inspector inspector);
 
-  // Creates a set of `DriverFrameworkMigrationUtils` using the resources
-  // provided by the driver component.
-  zx::result<DriverFrameworkMigrationUtils> CreateDriverFrameworkMigrationUtils();
-
+  std::unique_ptr<inspect::ComponentInspector> component_inspector_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-
-  // Must outlive `display_engine_`.
-  DriverFrameworkMigrationUtils driver_framework_migration_utils_;
 
   // Must outlive `banjo_server_`.
   std::unique_ptr<DisplayEngine> display_engine_;

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -20,16 +21,13 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
-    fdf::Namespace& incoming, display::DispatcherFactory& dispatcher_factory,
-    HotPlugDetection::OnStateChangeHandler on_state_change) {
+    fdf::Namespace& incoming, HotPlugDetection::OnStateChangeHandler on_state_change) {
   static const char kHpdGpioFragmentName[] = "gpio-hdmi-hotplug-detect";
   zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> pin_gpio_result =
       incoming.Connect<fuchsia_hardware_gpio::Service::Device>(kHpdGpioFragmentName);
@@ -56,14 +54,17 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
   }
 
   static constexpr std::string_view kDispatcherName = "hot-plug-detection-interrupt-thread";
-  zx::result<std::unique_ptr<display::Dispatcher>> create_dispatcher_result =
-      dispatcher_factory.Create(kDispatcherName, /*scheduler_role=*/{});
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                          kDispatcherName,
+                                          /*shutdown_handler=*/[](fdf_dispatcher_t*) {},
+                                          /*scheduler_role=*/{});
   if (create_dispatcher_result.is_error()) {
-    zxlogf(ERROR, "Failed to create hot plug detection interrupt dispatcher: %s",
+    zxlogf(ERROR, "Failed to create vsync Dispatcher: %s",
            create_dispatcher_result.status_string());
     return create_dispatcher_result.take_error();
   }
-  std::unique_ptr<display::Dispatcher> dispatcher = std::move(create_dispatcher_result).value();
+  fdf::SynchronizedDispatcher dispatcher = std::move(create_dispatcher_result).value();
 
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<HotPlugDetection> hot_plug_detection = fbl::make_unique_checked<HotPlugDetection>(
@@ -86,7 +87,7 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
 HotPlugDetection::HotPlugDetection(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> pin_gpio,
                                    zx::interrupt pin_gpio_interrupt,
                                    HotPlugDetection::OnStateChangeHandler on_state_change,
-                                   std::unique_ptr<display::Dispatcher> irq_handler_dispatcher)
+                                   fdf::SynchronizedDispatcher irq_handler_dispatcher)
     : pin_gpio_(std::move(pin_gpio)),
       pin_gpio_irq_(std::move(pin_gpio_interrupt)),
       on_state_change_(std::move(on_state_change)),
@@ -145,7 +146,7 @@ zx::result<> HotPlugDetection::Init() {
     return config_in_response.take_error();
   }
 
-  zx_status_t status = pin_gpio_irq_handler_.Begin(irq_handler_dispatcher_->async_dispatcher());
+  zx_status_t status = pin_gpio_irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to bind the GPIO IRQ to the loop dispatcher: %s",
            zx_status_get_string(status));

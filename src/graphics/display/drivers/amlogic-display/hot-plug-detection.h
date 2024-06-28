@@ -21,9 +21,6 @@
 
 #include <fbl/mutex.h>
 
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
-
 namespace amlogic_display {
 
 // The logical state of a Hot-Plug Detect pin.
@@ -47,9 +44,8 @@ class HotPlugDetection {
   // `on_state_change` is called when the HPD pin state changes. The initial
   // state is HPD not detected. The target call must outlive the newly created
   // HotPlugDetection instance. The target may be called on an arbitrary thread.
-  static zx::result<std::unique_ptr<HotPlugDetection>> Create(
-      fdf::Namespace& incoming, display::DispatcherFactory& dispatcher_factory,
-      OnStateChangeHandler on_state_change);
+  static zx::result<std::unique_ptr<HotPlugDetection>> Create(fdf::Namespace& incoming,
+                                                              OnStateChangeHandler on_state_change);
 
   // Production code should prefer the Create() factory method.
   //
@@ -62,7 +58,7 @@ class HotPlugDetection {
   // instance. The target may be called on an arbitrary thread.
   HotPlugDetection(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> pin_gpio,
                    zx::interrupt pin_gpio_interrupt, OnStateChangeHandler on_state_change,
-                   std::unique_ptr<display::Dispatcher> irq_handler_dispatcher);
+                   fdf::SynchronizedDispatcher irq_handler_dispatcher);
 
   HotPlugDetection(const HotPlugDetection&) = delete;
   HotPlugDetection& operator=(const HotPlugDetection&) = delete;
@@ -106,7 +102,7 @@ class HotPlugDetection {
   // Guaranteed to have a target.
   const OnStateChangeHandler on_state_change_;
 
-  std::unique_ptr<display::Dispatcher> irq_handler_dispatcher_;
+  fdf::SynchronizedDispatcher irq_handler_dispatcher_;
   async::IrqMethod<HotPlugDetection, &HotPlugDetection::InterruptHandler> pin_gpio_irq_handler_{
       this};
 

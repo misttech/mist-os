@@ -49,7 +49,6 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -1063,7 +1062,7 @@ zx_status_t DisplayEngine::SetupHotplugDisplayDetection() {
   ZX_DEBUG_ASSERT_MSG(!hot_plug_detection_, "HPD already set up");
 
   zx::result<std::unique_ptr<HotPlugDetection>> hot_plug_detection_result =
-      HotPlugDetection::Create(*incoming_, dispatcher_factory_,
+      HotPlugDetection::Create(*incoming_,
                                fit::bind_member<&DisplayEngine::OnHotPlugStateChange>(this));
 
   if (hot_plug_detection_result.is_error()) {
@@ -1225,7 +1224,7 @@ zx_status_t DisplayEngine::Initialize() {
 
   video_input_unit_node_ = root_node_.CreateChild("video_input_unit");
   zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_create_result =
-      VideoInputUnit::Create(dispatcher_factory_, pdev_.client_end(), &video_input_unit_node_);
+      VideoInputUnit::Create(pdev_.client_end(), &video_input_unit_node_);
   if (video_input_unit_create_result.is_error()) {
     zxlogf(ERROR, "Failed to create VideoInputUnit instance: %s",
            video_input_unit_create_result.status_string());
@@ -1271,8 +1270,8 @@ zx_status_t DisplayEngine::Initialize() {
   }
 
   {
-    zx::result<std::unique_ptr<VsyncReceiver>> vsync_receiver_result = VsyncReceiver::Create(
-        dispatcher_factory_, pdev_.client_end(), fit::bind_member<&DisplayEngine::OnVsync>(this));
+    zx::result<std::unique_ptr<VsyncReceiver>> vsync_receiver_result =
+        VsyncReceiver::Create(pdev_.client_end(), fit::bind_member<&DisplayEngine::OnVsync>(this));
     if (vsync_receiver_result.is_error()) {
       // Create() already logged the error.
       return vsync_receiver_result.error_value();
@@ -1281,9 +1280,8 @@ zx_status_t DisplayEngine::Initialize() {
   }
 
   {
-    zx::result<std::unique_ptr<Capture>> capture_result =
-        Capture::Create(dispatcher_factory_, pdev_.client_end(),
-                        fit::bind_member<&DisplayEngine::OnCaptureComplete>(this));
+    zx::result<std::unique_ptr<Capture>> capture_result = Capture::Create(
+        pdev_.client_end(), fit::bind_member<&DisplayEngine::OnCaptureComplete>(this));
     if (capture_result.is_error()) {
       // Create() already logged the error.
       return capture_result.error_value();
@@ -1302,20 +1300,18 @@ zx_status_t DisplayEngine::Initialize() {
   return ZX_OK;
 }
 
-DisplayEngine::DisplayEngine(std::shared_ptr<fdf::Namespace> incoming,
-                             display::DispatcherFactory* dispatcher_factory)
-    : incoming_(std::move(incoming)), dispatcher_factory_(*dispatcher_factory) {
+DisplayEngine::DisplayEngine(std::shared_ptr<fdf::Namespace> incoming)
+    : incoming_(std::move(incoming)) {
   ZX_DEBUG_ASSERT(incoming_ != nullptr);
-  ZX_DEBUG_ASSERT(dispatcher_factory != nullptr);
 }
 DisplayEngine::~DisplayEngine() {}
 
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
-    std::shared_ptr<fdf::Namespace> incoming, display::DispatcherFactory* dispatcher_factory) {
+    std::shared_ptr<fdf::Namespace> incoming) {
   fbl::AllocChecker alloc_checker;
-  auto display_engine = fbl::make_unique_checked<DisplayEngine>(&alloc_checker, std::move(incoming),
-                                                                dispatcher_factory);
+  auto display_engine =
+      fbl::make_unique_checked<DisplayEngine>(&alloc_checker, std::move(incoming));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
