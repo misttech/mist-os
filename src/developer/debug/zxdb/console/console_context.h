@@ -24,6 +24,7 @@
 #include "src/developer/debug/zxdb/client/target_observer.h"
 #include "src/developer/debug/zxdb/client/thread_observer.h"
 #include "src/developer/debug/zxdb/console/command.h"
+#include "src/developer/debug/zxdb/console/test_failure_stack_matcher.h"
 #include "src/developer/debug/zxdb/symbols/module_symbol_status.h"
 
 namespace zxdb {
@@ -274,6 +275,8 @@ class ConsoleContext : public ProcessObserver,
   int active_breakpoint_id_ = 0;
   int active_filter_id_ = 0;
   int active_symbol_server_id_ = 0;
+
+  TestFailureStackMatcher test_failure_stack_matcher_;
 
   // A separate thread that handles the console UI while symbols are being loaded and indexed. A new
   // thread is spawned that will take more than a few seconds to process. Once

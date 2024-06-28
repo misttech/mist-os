@@ -892,32 +892,9 @@ void ConsoleContext::OnThreadStopped(Thread* thread, const StopInfo& info) {
                                            ", type `frame` or `help` to get started.");
     Console::get()->Output(out);
 
-    auto stack_manager = fxl::MakeRefCounted<PrettyStackManager>();
-
-    // When running embedded within "fx test" or similar, we want to drop the user into their own
-    // test code, rather than deep in the test failure code that actually produced the stop.
-    //
-    // These match the frame above the actual test code for Rust and gTest failure paths,
-    // respectively. When either of these match a frame in the stack, the user's test code will be
-    // the next frame. The function names are taken from the stack of a failed test from each test
-    // framework. If additional test frameworks need to be added, they should be appended here.
-    // Descriptions may be duplicated so if a particular framework has multiple failure paths, they
-    // may all be added with the same description.
-    stack_manager->SetMatchers({
-        PrettyStackManager::StackGlob("Rust test assertion",
-                                      {PrettyFrameGlob::Func("core::panicking::assert_failed<*>")}),
-        PrettyStackManager::StackGlob(
-            "gTest test assertion",
-            {PrettyFrameGlob::Func("testing::internal::AssertHelper::operator=")}),
-    });
-
-    size_t best_frame_index = 0;
-    for (const auto& entry : stack_manager->ProcessStack(thread->GetStack())) {
-      if (entry.match.match_count > 0) {
-        best_frame_index = entry.begin_index + entry.frames.size();
-      }
-    }
-
+    // Check to see if we can find a test failure frame. If we find a match, set that frame as
+    // "active".
+    size_t best_frame_index = test_failure_stack_matcher_.Match(thread->GetStack());
     if (best_frame_index > 0) {
       // If we found a matching frame, then we don't need to show the exception information in the
       // stop output.
