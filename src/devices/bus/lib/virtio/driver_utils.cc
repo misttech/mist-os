@@ -4,6 +4,7 @@
 
 #include "include/lib/virtio/driver_utils.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/zx/result.h>
 #include <stdio.h>

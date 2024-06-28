@@ -7,6 +7,7 @@
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/debug.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio/mmio.h>
