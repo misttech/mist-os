@@ -643,8 +643,10 @@ func infraToolLogChecks() []FailureModeCheck {
 		// Zircon-related errors to ensure tefmocheck attributes these crashes to
 		// the actual root cause.
 		&stringInLogCheck{
-			String: fmt.Sprintf("botanist ERROR: %s", testrunnerconstants.FailedToReconnectMsg),
-			Type:   swarmingOutputType,
+			String:          fmt.Sprintf("botanist ERROR: %s", testrunnerconstants.FailedToReconnectMsg),
+			Type:            swarmingOutputType,
+			AttributeToTest: true,
+			AddTag:          true,
 		},
 		// For https://fxbug.dev/42157731.
 		&stringInLogCheck{
@@ -658,7 +660,9 @@ func infraToolLogChecks() []FailureModeCheck {
 			// ffx might return this error and then succeed connecting to the target
 			// on a retry, so we should only check for this failure if ffx fails to
 			// connect after all retries and returns a fatal error.
-			SkipPassedTask: true,
+			SkipPassedTask:  true,
+			AttributeToTest: true,
+			AddTag:          true,
 		},
 		// For https://fxbug.dev/321754579.
 		&stringInLogCheck{
@@ -679,8 +683,11 @@ func infraToolLogChecks() []FailureModeCheck {
 		},
 		// For https://fxbug.dev/42083744.
 		&stringInLogCheck{
-			String: "Timed out waiting for the ffx daemon on the Overnet mesh over socket",
-			Type:   swarmingOutputType,
+			String:          "Timed out waiting for the ffx daemon on the Overnet mesh over socket",
+			Type:            swarmingOutputType,
+			AlwaysFlake:     true,
+			AttributeToTest: true,
+			AddTag:          true,
 		},
 		// These errors happen when the ssh keepalive fails, which in turns closes the SSH
 		// connection. It should come before the ProcessTerminatedMsg to distinguish when the
@@ -727,16 +734,20 @@ func infraToolLogChecks() []FailureModeCheck {
 			},
 		},
 		&stringInLogCheck{
-			String:      "remote command exited without exit status or exit signal",
-			Type:        swarmingOutputType,
-			AlwaysFlake: true,
+			String:          "remote command exited without exit status or exit signal",
+			Type:            swarmingOutputType,
+			AlwaysFlake:     true,
+			AttributeToTest: true,
+			AddTag:          true,
 		},
 		// For https://fxbug.dev/317290699.
 		&stringInLogCheck{
-			String:         sshutilconstants.ProcessTerminatedMsg,
-			Type:           swarmingOutputType,
-			SkipPassedTest: true,
-			IgnoreFlakes:   true,
+			String:          sshutilconstants.ProcessTerminatedMsg,
+			Type:            swarmingOutputType,
+			SkipPassedTest:  true,
+			IgnoreFlakes:    true,
+			AttributeToTest: true,
+			AddTag:          true,
 		},
 		// This error happens when `botanist run` exceeds its timeout, e.g.
 		// because many tests are taking too long. If botanist exceeds its timeout,
@@ -747,10 +758,12 @@ func infraToolLogChecks() []FailureModeCheck {
 		},
 		// For https://fxbug.dev/42176228.
 		&stringInLogCheck{
-			String:         ffxutilconstants.ClientChannelClosedMsg,
-			Type:           swarmingOutputType,
-			SkipPassedTest: true,
-			IgnoreFlakes:   true,
+			String:          ffxutilconstants.ClientChannelClosedMsg,
+			Type:            swarmingOutputType,
+			SkipPassedTest:  true,
+			IgnoreFlakes:    true,
+			AttributeToTest: true,
+			AddTag:          true,
 		},
 		// General ffx error check.
 		&stringInLogCheck{
@@ -758,8 +771,9 @@ func infraToolLogChecks() []FailureModeCheck {
 			Type:   swarmingOutputType,
 		},
 		&stringInLogCheck{
-			String: fmt.Sprintf("botanist ERROR: %s", ffxutilconstants.CommandFailedMsg),
-			Type:   swarmingOutputType,
+			String:         fmt.Sprintf("botanist ERROR: %s", ffxutilconstants.CommandFailedMsg),
+			Type:           swarmingOutputType,
+			SkipPassedTask: true,
 		},
 		// For https://fxbug.dev/42134411.
 		// This error usually happens due to an SSH failure, so that error should take precedence.
