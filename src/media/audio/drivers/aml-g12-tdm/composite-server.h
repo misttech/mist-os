@@ -25,18 +25,20 @@ class RingBufferServer;
 class AudioCompositeServer;
 
 struct Engine {
+  size_t ring_buffer_index;
   size_t dai_index;
   std::optional<AmlTdmConfigDevice> device;
   std::unique_ptr<RingBufferServer> ring_buffer;
+  fuchsia_hardware_audio::Format ring_buffer_format;
   metadata::AmlConfig config;
 };
 
 class RingBufferServer : public fidl::Server<fuchsia_hardware_audio::RingBuffer> {
  public:
   static std::unique_ptr<RingBufferServer> CreateRingBufferServer(
-      async_dispatcher_t* dispatcher, AudioCompositeServer& owner, Engine& engine,
+      async_dispatcher_t* dispatcher, AudioCompositeServer& owner, size_t engine_index,
       fidl::ServerEnd<fuchsia_hardware_audio::RingBuffer> ring_buffer);
-  RingBufferServer(async_dispatcher_t* dispatcher, AudioCompositeServer& owner, Engine& engine,
+  RingBufferServer(async_dispatcher_t* dispatcher, AudioCompositeServer& owner, size_t engine_index,
                    fidl::ServerEnd<fuchsia_hardware_audio::RingBuffer> ring_buffer);
   void Unbind(zx_status_t status) { binding_.Close(status); }
 
@@ -62,6 +64,7 @@ class RingBufferServer : public fidl::Server<fuchsia_hardware_audio::RingBuffer>
   void ResetRingBuffer();
 
   Engine& engine_;
+  size_t engine_index_;
   async_dispatcher_t* dispatcher_;
   AudioCompositeServer& owner_;
   fidl::ServerBinding<fuchsia_hardware_audio::RingBuffer> binding_;
@@ -89,6 +92,8 @@ class RingBufferServer : public fidl::Server<fuchsia_hardware_audio::RingBuffer>
 class AudioCompositeServer
     : public fidl::Server<fuchsia_hardware_audio::Composite>,
       public fidl::Server<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
+  friend class RingBufferServer;
+
  public:
   AudioCompositeServer(
       std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios, zx::bti bti,
@@ -136,6 +141,8 @@ class AudioCompositeServer
       kRingBufferIds = {4, 5, 6, 7, 8, 9};
   static constexpr fuchsia_hardware_audio::TopologyId kTopologyId = 1;
 
+  static constexpr zx::duration kTimeToStabilizePll = zx::msec(10);
+
   struct ElementCompleter {
     // One-shot flag that indicates whether or not WatchElementState has been called
     // for this element yet.
@@ -153,7 +160,7 @@ class AudioCompositeServer
   zx_status_t ResetEngine(size_t index);
   zx_status_t ConfigEngine(size_t index, size_t dai_index, bool input, fdf::MmioBuffer mmio,
                            metadata::AmlVersion aml_version);
-  zx_status_t StartSocPower();
+  zx_status_t StartSocPower(bool wait_for_completion);
   zx_status_t StopSocPower();
 
   async_dispatcher_t* dispatcher_;
@@ -165,10 +172,9 @@ class AudioCompositeServer
 
   std::unordered_map<fuchsia_hardware_audio::ElementId, ElementCompleter> element_completers_;
   std::array<Engine, kNumberOfTdmEngines> engines_;
+  std::bitset<kNumberOfTdmEngines> engines_on_;
   std::array<fuchsia_hardware_audio::PcmSupportedFormats, kNumberOfTdmEngines>
       supported_ring_buffer_formats_;
-  std::array<std::optional<fuchsia_hardware_audio::Format>, kNumberOfTdmEngines>
-      current_ring_buffer_formats_;
   std::array<fuchsia_hardware_audio::DaiSupportedFormats, kNumberOfPipelines>
       supported_dai_formats_;
   std::array<std::optional<fuchsia_hardware_audio::DaiFormat>, kNumberOfPipelines>
@@ -178,6 +184,8 @@ class AudioCompositeServer
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_;
   std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients_;
   bool soc_power_started_ = false;
+  zx::time last_started_time_;
+  zx::time last_stopped_time_;
   trace_async_id_t trace_async_id_;
 };
 

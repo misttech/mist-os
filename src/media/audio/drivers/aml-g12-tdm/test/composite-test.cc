@@ -39,7 +39,7 @@ constexpr fuchsia_hardware_audio::ElementId kEngineCRingBufferIdInput = 9;
 constexpr fuchsia_hardware_audio::ElementId kInvalidBufferId0 = 3;
 constexpr fuchsia_hardware_audio::ElementId kInvalidBufferId1 = 10;
 
-constexpr std::array<fuchsia_hardware_audio::ElementId, 6> kAllValidIds{
+constexpr std::array<fuchsia_hardware_audio::ElementId, 6> kAllValidRingBufferIds{
     kEngineARingBufferIdOutput, kEngineBRingBufferIdOutput, kEngineCRingBufferIdOutput,
     kEngineARingBufferIdInput,  kEngineBRingBufferIdInput,  kEngineCRingBufferIdInput,
 };
@@ -432,6 +432,14 @@ class AmlG12CompositeTest : public testing::Test {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
     ASSERT_TRUE(dai_formats_result.is_ok());
+  }
+
+  void TestPowerState(bool on) {
+    EXPECT_EQ(IsTdmASclkSet(), on);
+    EXPECT_EQ(IsTdmBSclkSet(), on);
+    EXPECT_EQ(IsTdmCSclkSet(), on);
+    EXPECT_EQ(IsFakeClockGateEnabled(), on);
+    EXPECT_EQ(IsFakeClockPllEnabled(), on);
   }
 
   fidl::SyncClient<fuchsia_hardware_audio::Composite> client_;
@@ -971,7 +979,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
  protected:
   void SetUp() override { AmlG12CompositeTest::SetUp(); }
 
-  fidl::SyncClient<fuchsia_hardware_audio::RingBuffer> GetClient(
+  fidl::SyncClient<fuchsia_hardware_audio::RingBuffer> GetRingBufferClient(
       fuchsia_hardware_audio::ElementId id) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
@@ -981,8 +989,28 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     return fidl::SyncClient<fuchsia_hardware_audio::RingBuffer>(std::move(endpoints->client));
   }
 
+  fidl::SyncClient<fuchsia_hardware_audio::RingBuffer> GetRingBufferClientReadyForSetActiveChannels(
+      fuchsia_hardware_audio::ElementId id, uint32_t number_of_channels) {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
+    fuchsia_hardware_audio::Format format = GetDefaultRingBufferFormat();
+    format.pcm_format()->number_of_channels(number_of_channels);
+    fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(id, format,
+                                                                     std::move(endpoints->server));
+    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    ZX_ASSERT(ring_buffer_result.is_ok());
+    auto ring_buffer_client =
+        fidl::SyncClient<fuchsia_hardware_audio::RingBuffer>(std::move(endpoints->client));
+
+    constexpr uint32_t kMinFrames = 8192;
+    auto get_vmo_result =
+        ring_buffer_client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
+    ZX_ASSERT(get_vmo_result.is_ok());
+
+    return ring_buffer_client;
+  }
+
   void TestProperties(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     fidl::Result result = client->GetProperties();
     ASSERT_TRUE(result.is_ok());
     ASSERT_TRUE(result->properties().needs_cache_flush_or_invalidate().has_value());
@@ -991,7 +1019,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestGetVmo(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 1;
     auto get_vmo_result =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1000,7 +1028,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestGetVmoMultipleTimes(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 1;
     auto get_vmo_result0 =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1013,19 +1041,19 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestStartRingBufferNoVmo(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     auto start_result = client->Start();
     ASSERT_FALSE(start_result.is_ok());  // Not ok to start a ring buffer with no VMO.
   }
 
   void TestStopRingBufferNoVmo(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     auto stop_result = client->Stop();
     ASSERT_FALSE(stop_result.is_ok());  // Not ok to stop a ring buffer with no VMO.
   }
 
   void TestCreationAndStartStop(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 8192;
     auto get_vmo_result =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1039,7 +1067,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestStartStartedRingBuffer(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 8192;
     auto get_vmo_result =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1053,7 +1081,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestStopStoppedRingBuffer(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 8192;
     auto get_vmo_result =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1070,39 +1098,90 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestGetDelay(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     auto delay_result = client->WatchDelayInfo();
     ASSERT_TRUE(delay_result.is_ok());
     ASSERT_TRUE(delay_result->delay_info().internal_delay().has_value());  // Some delay reported.
   }
+
+  void TestSetActiveChannels(fuchsia_hardware_audio::ElementId id, uint64_t mask) {
+    auto client = GetRingBufferClientReadyForSetActiveChannels(id, 2);
+    auto set_active_channels_result = client->SetActiveChannels(mask);
+    ASSERT_TRUE(set_active_channels_result.is_ok());
+  }
+
+  void TestInvalidActiveChannelsFor1Channel(fuchsia_hardware_audio::ElementId id) {
+    auto client = GetRingBufferClientReadyForSetActiveChannels(id, 1);
+
+    {
+      // Bit 0 is a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(1);
+      ASSERT_TRUE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 1 is not a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(2);
+      ASSERT_FALSE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 2 is not a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(4);
+      ASSERT_FALSE(set_active_channels_result.is_ok());
+    }
+  }
+
+  void TestInvalidActiveChannelsFor2Channels(fuchsia_hardware_audio::ElementId id) {
+    auto client = GetRingBufferClientReadyForSetActiveChannels(id, 2);
+
+    {
+      // Bit 0 is a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(1);
+      ASSERT_TRUE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 1 is a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(2);
+      ASSERT_TRUE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 2 is not a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(4);
+      ASSERT_FALSE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 3 is not a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(8);
+      ASSERT_FALSE(set_active_channels_result.is_ok());
+    }
+  }
 };
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferProperties) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestProperties(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmo) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestGetVmo(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmoMultipleTimes) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestGetVmoMultipleTimes(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBuffersStartStop) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestCreationAndStartStop(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBuffersClientCloseChannel) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         id, GetDefaultRingBufferFormat(), std::move(endpoints->server));
@@ -1114,19 +1193,19 @@ TEST_F(AmlG12CompositeRingBufferTest, RingBuffersClientCloseChannel) {
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferStartStartedRingBuffer) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestStartStartedRingBuffer(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferStopStoppedRingBuffer) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestStopStoppedRingBuffer(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetDelay) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestGetDelay(id);
   }
 }

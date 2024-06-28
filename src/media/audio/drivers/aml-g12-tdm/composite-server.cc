@@ -8,6 +8,7 @@
 #include <zircon/errors.h>
 
 #include <algorithm>
+#include <bitset>
 #include <numeric>
 #include <string>
 
@@ -79,7 +80,7 @@ AudioCompositeServer::AudioCompositeServer(
         supported_dai_formats_[i].bits_per_sample()[0]);
   }
 
-  ZX_ASSERT(StartSocPower() == ZX_OK);
+  ZX_ASSERT(StartSocPower(/*wait_for_completion*/ true) == ZX_OK);
 
   // Output engines.
   ZX_ASSERT(ConfigEngine(0, 0, false, std::move(mmios[0].value()), aml_version) == ZX_OK);
@@ -145,6 +146,7 @@ zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, b
 
   supported_ring_buffer_formats_[index] = std::move(pcm_formats);
 
+  engines_[index].ring_buffer_index = index;
   engines_[index].dai_index = dai_index;
   engines_[index].config.is_input = input;
 
@@ -400,9 +402,11 @@ void AudioCompositeServer::CreateRingBuffer(CreateRingBufferRequest& request,
     // epitaph to convey that the previous ring buffer resource is not there anymore.
     engine.ring_buffer->Unbind(ZX_ERR_NO_RESOURCES);
   }
-  current_ring_buffer_formats_[ring_buffer_index].emplace(request.format());
-  engine.ring_buffer = RingBufferServer::CreateRingBufferServer(dispatcher(), *this, engine,
-                                                                std::move(request.ring_buffer()));
+  // Engine is on by default.
+  engines_on_.set(ring_buffer_index, true);
+  engine.ring_buffer_format = request.format();
+  engine.ring_buffer = RingBufferServer::CreateRingBufferServer(
+      dispatcher(), *this, ring_buffer_index, std::move(request.ring_buffer()));
   completer.Reply(zx::ok());
 }
 
@@ -491,7 +495,7 @@ void AudioCompositeServer::SetDaiFormat(SetDaiFormatRequest& request,
   completer.Reply(zx::ok());
 }
 
-zx_status_t AudioCompositeServer::StartSocPower() {
+zx_status_t AudioCompositeServer::StartSocPower(bool wait_for_completion) {
   // Only if needed (not done previously) so voting on relevant clock ids is not repeated.
   // Each driver instance (audio or any other) may vote independently.
   if (soc_power_started_) {
@@ -519,8 +523,9 @@ zx_status_t AudioCompositeServer::StartSocPower() {
             zx_status_get_string(pll_result->error_value()));
     return pll_result->error_value();
   }
-  constexpr uint32_t kMsecsToStabilizePll = 10;
-  zx::nanosleep(zx::deadline_after(zx::msec(kMsecsToStabilizePll)));
+  if (wait_for_completion) {
+    zx::nanosleep(zx::deadline_after(kTimeToStabilizePll));
+  }
   for (auto& gpio_sclk_client : gpio_sclk_clients_) {
     constexpr uint32_t kSclkAltFunction = 1;
     fidl::WireResult result = gpio_sclk_client->SetAltFunction(kSclkAltFunction);
@@ -531,6 +536,7 @@ zx_status_t AudioCompositeServer::StartSocPower() {
   }
   TRACE_ASYNC_END("aml-g12-composite", "suspend", trace_async_id_);
   soc_power_started_ = true;
+  last_started_time_ = zx::clock::get_monotonic();
   return ZX_OK;
 }
 
@@ -583,21 +589,24 @@ zx_status_t AudioCompositeServer::StopSocPower() {
   trace_async_id_ = TRACE_NONCE();
   TRACE_ASYNC_BEGIN("aml-g12-composite", "suspend", trace_async_id_);
   soc_power_started_ = false;
+  last_stopped_time_ = zx::clock::get_monotonic();
   return ZX_OK;
 }
 
 // static
 std::unique_ptr<RingBufferServer> RingBufferServer::CreateRingBufferServer(
-    async_dispatcher_t* dispatcher, AudioCompositeServer& owner, Engine& engine,
+    async_dispatcher_t* dispatcher, AudioCompositeServer& owner, size_t engine_index,
     fidl::ServerEnd<fuchsia_hardware_audio::RingBuffer> ring_buffer) {
-  return std::make_unique<RingBufferServer>(dispatcher, owner, engine, std::move(ring_buffer));
+  return std::make_unique<RingBufferServer>(dispatcher, owner, engine_index,
+                                            std::move(ring_buffer));
 }
 
 RingBufferServer::RingBufferServer(async_dispatcher_t* dispatcher, AudioCompositeServer& owner,
-                                   Engine& engine,
+                                   size_t engine_index,
                                    fidl::ServerEnd<fuchsia_hardware_audio::RingBuffer> ring_buffer)
 
-    : engine_(engine),
+    : engine_(owner.engines_[engine_index]),
+      engine_index_(engine_index),
       dispatcher_(dispatcher),
       owner_(owner),
       binding_(fidl::ServerBinding<fuchsia_hardware_audio::RingBuffer>(
@@ -637,8 +646,9 @@ void RingBufferServer::ResetRingBuffer() {
 void RingBufferServer::GetProperties(
     fidl::Server<fuchsia_hardware_audio::RingBuffer>::GetPropertiesCompleter::Sync& completer) {
   fuchsia_hardware_audio::RingBufferProperties properties;
-  properties.needs_cache_flush_or_invalidate(true).driver_transfer_bytes(
-      engine_.device->fifo_depth());
+  properties.needs_cache_flush_or_invalidate(true)
+      .driver_transfer_bytes(engine_.device->fifo_depth())
+      .turn_on_delay(std::make_optional(owner_.kTimeToStabilizePll.get()));
   completer.Reply(std::move(properties));
 }
 
@@ -821,7 +831,40 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
 void RingBufferServer::SetActiveChannels(
     fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
     SetActiveChannelsCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  // Check if bitmask activating channels go beyond the current number of channels.
+  if (request.active_channels_bitmask() &
+      ~((1 << engine_.ring_buffer_format.pcm_format()->number_of_channels()) - 1)) {
+    FDF_LOG(ERROR, "Bitmask: 0x%lX activating channels beyond the current number of channels: %u",
+            request.active_channels_bitmask(),
+            engine_.ring_buffer_format.pcm_format()->number_of_channels());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  // Any active channel requires a particular engine to be on.
+  owner_.engines_on_.set(engine_index_, request.active_channels_bitmask());
+
+  // Any engine that is on requires SoC power.
+  if (owner_.engines_on_.any()) {
+    // Per the audio drivers API at //sdk/fidl/fuchsia.hardware.audio/ring_buffer.fidl
+    // SetActiveChannels does not delay the reply waiting for the hardware to actually turn on,
+    // we reply with a time indicating when the hardware configuration was completed.
+    zx_status_t status = owner_.StartSocPower(/*wait_for_completion*/ false);
+    if (status != ZX_OK) {
+      completer.Reply(zx::error(status));
+      return;
+    }
+    completer.Reply(zx::ok(owner_.last_started_time_.get()));
+    return;
+  } else {
+    zx_status_t status = owner_.StopSocPower();
+    if (status != ZX_OK) {
+      completer.Reply(zx::error(status));
+      return;
+    }
+    completer.Reply(zx::ok(owner_.last_stopped_time_.get()));
+    return;
+  }
 }
 
 void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
