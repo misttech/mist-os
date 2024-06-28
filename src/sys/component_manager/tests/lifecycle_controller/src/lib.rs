@@ -3,10 +3,14 @@
 // found in the LICENSE file.
 
 use fuchsia_component::client::connect_to_protocol;
-use futures::{FutureExt, StreamExt};
+use fuchsia_component_test::{ChildOptions, RealmBuilder};
+use fuchsia_runtime::{HandleInfo, HandleType};
+use fuchsia_zircon::{AsHandleRef, Event};
+use futures::channel::mpsc;
+use futures::{FutureExt, SinkExt, StreamExt};
 use {
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
 };
 
 #[fuchsia::test]
@@ -135,4 +139,92 @@ async fn dynamic_child() {
     let error =
         realm_query.get_instance("./servers:dynamic_echo_server").await.unwrap().unwrap_err();
     assert_eq!(error, fsys::GetInstanceError::InstanceNotFound);
+}
+
+#[fuchsia::test]
+async fn dynamic_child_with_arguments() {
+    let builder = RealmBuilder::new().await.unwrap();
+    let (sender, mut receiver) = mpsc::channel(1);
+    let _child =
+        builder
+            .add_local_child(
+                "numbered_handles_child",
+                move |mut handles| {
+                    let mut sender = sender.clone();
+                    async move {
+                        sender
+                            .send(handles.take_numbered_handle(
+                                HandleInfo::new(HandleType::User0, 0).as_raw(),
+                            ))
+                            .await
+                            .expect("failed to send handle");
+                        Ok(())
+                    }
+                    .boxed()
+                },
+                ChildOptions::new().eager(),
+            )
+            .await
+            .unwrap();
+    let (url, _local_component_task) = builder.initialize().await.unwrap();
+
+    let lifecycle_controller = connect_to_protocol::<fsys::LifecycleControllerMarker>().unwrap();
+
+    lifecycle_controller
+        .create_instance(
+            ".",
+            &fdecl::CollectionRef { name: "servers".to_string() },
+            &fdecl::Child {
+                name: Some("dynamic_child_with_arguments".to_string()),
+                url: Some(url),
+                startup: Some(fdecl::StartupMode::Lazy),
+                ..Default::default()
+            },
+            fcomp::CreateChildArgs::default(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+    lifecycle_controller
+        .resolve_instance("./servers:dynamic_child_with_arguments")
+        .await
+        .unwrap()
+        .unwrap();
+
+    let handle = Event::create();
+    let koid = handle.basic_info().unwrap().koid;
+
+    let (_binder, server) = fidl::endpoints::create_proxy().unwrap();
+    lifecycle_controller
+        .start_instance_with_args(
+            "./servers:dynamic_child_with_arguments/numbered_handles_child",
+            server,
+            fcomp::StartChildArgs {
+                numbered_handles: Some(vec![fprocess::HandleInfo {
+                    handle: handle.into(),
+                    id: HandleInfo::new(HandleType::User0, 0).as_raw(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("failed to send start_instance_with_args")
+        .expect("failed to start instance");
+
+    let option_handle = receiver.next().await.expect("failed to receive");
+    let handle = option_handle.expect("local component did not receive handle");
+    assert_eq!(koid, handle.basic_info().unwrap().koid, "child received unexpected handle");
+
+    lifecycle_controller
+        .destroy_instance(
+            ".",
+            &fdecl::ChildRef {
+                name: "dynamic_child_with_arguments".to_string(),
+                collection: Some("servers".to_string()),
+            },
+        )
+        .await
+        .unwrap()
+        .unwrap();
 }

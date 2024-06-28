@@ -2,6 +2,7 @@
     include: [
         "//src/sys/test_runners/rust/default.shard.cml",
         "inspect/offer.shard.cml",
+        "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
@@ -16,6 +17,7 @@
     collections: [
         {
             name: "servers",
+            environment: "#realm_builder_env",
             durability: "transient",
         },
     ],

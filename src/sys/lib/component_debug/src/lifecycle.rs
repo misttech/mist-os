@@ -176,6 +176,40 @@ pub async fn start_instance(
     Ok(stop_future)
 }
 
+/// Uses the `fuchsia.sys2.LifecycleController` protocol to start a component instance
+/// with the given `moniker`.
+///
+/// Returns a future that can be waited on to know when the component instance has stopped.
+pub async fn start_instance_with_args(
+    lifecycle_controller: &fsys::LifecycleControllerProxy,
+    moniker: &Moniker,
+    arguments: fcomponent::StartChildArgs,
+) -> Result<StopFuture, StartError> {
+    let (client, server) = fidl::endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
+    lifecycle_controller
+        .start_instance_with_args(&moniker.to_string(), server, arguments)
+        .await
+        .map_err(|e| ActionError::Fidl(e))?
+        .map_err(|e| match e {
+            fsys::StartError::PackageNotFound => StartError::PackageNotFound,
+            fsys::StartError::ManifestNotFound => StartError::ManifestNotFound,
+            fsys::StartError::Internal => ActionError::Internal.into(),
+            fsys::StartError::BadMoniker => ActionError::BadMoniker.into(),
+            fsys::StartError::InstanceNotFound => ActionError::InstanceNotFound.into(),
+            _ => ActionError::UnknownError.into(),
+        })?;
+    let stop_future = async move {
+        let mut event_stream = client.take_event_stream();
+        match event_stream.next().await {
+            Some(Err(e)) => return Err(e),
+            None => return Ok(()),
+            _ => unreachable!("The binder protocol does not have an event"),
+        }
+    }
+    .boxed();
+    Ok(stop_future)
+}
+
 /// Uses the `fuchsia.sys2.LifecycleController` protocol to stop a component instance
 /// with the given `moniker`.
 pub async fn stop_instance(
@@ -321,7 +355,11 @@ mod test {
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
-                fsys::LifecycleControllerRequest::StartInstance { moniker, responder, .. } => {
+                fsys::LifecycleControllerRequest::StartInstanceWithArgs {
+                    moniker,
+                    responder,
+                    ..
+                } => {
                     assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
                     responder.send(Ok(())).unwrap();
                 }
@@ -409,7 +447,7 @@ mod test {
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
-                fsys::LifecycleControllerRequest::StartInstance { responder, .. } => {
+                fsys::LifecycleControllerRequest::StartInstanceWithArgs { responder, .. } => {
                     responder.send(Err(error)).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
@@ -515,7 +553,9 @@ mod test {
     async fn test_start() {
         let moniker = Moniker::parse_str("core/foo").unwrap();
         let lc = lifecycle_start("core/foo");
-        let _ = start_instance(&lc, &moniker).await.unwrap();
+        let _ = start_instance_with_args(&lc, &moniker, fcomponent::StartChildArgs::default())
+            .await
+            .unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -543,7 +583,7 @@ mod test {
     async fn test_instance_not_found() {
         let moniker = Moniker::parse_str("core/foo").unwrap();
         let lc = lifecycle_start_fail(fsys::StartError::InstanceNotFound);
-        match start_instance(&lc, &moniker).await {
+        match start_instance_with_args(&lc, &moniker, fcomponent::StartChildArgs::default()).await {
             Ok(_) => panic!("start shouldn't succeed"),
             Err(StartError::ActionError(ActionError::InstanceNotFound)) => {}
             Err(e) => panic!("start failed unexpectedly: {}", e),

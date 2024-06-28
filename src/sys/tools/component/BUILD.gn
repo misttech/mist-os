@@ -25,6 +25,7 @@ rustc_library("component") {
     "//src/sys/lib/socket-to-stdio",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:futures",
   ]
 
   # The component tool is only used for debugging.

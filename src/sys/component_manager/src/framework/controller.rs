@@ -6,12 +6,8 @@ use crate::model::actions::StopAction;
 use crate::model::component::{IncomingCapabilities, StartReason, WeakComponentInstance};
 use fidl::endpoints::{ProtocolMarker, RequestStream};
 use futures::prelude::*;
-use sandbox::Capability;
 use tracing::{error, warn};
-use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub async fn run_controller(
     weak_component_instance: WeakComponentInstance,
@@ -29,7 +25,7 @@ pub async fn serve_controller(
     let mut tasks = fasync::TaskGroup::new();
     while let Some(request) = stream.try_next().await? {
         match request {
-            fcomponent::ControllerRequest::Start { mut args, execution_controller, responder } => {
+            fcomponent::ControllerRequest::Start { args, execution_controller, responder } => {
                 let component = weak_component_instance.upgrade();
                 let Ok(component) = component else {
                     responder.send(Err(fcomponent::Error::InstanceNotFound))?;
@@ -49,39 +45,11 @@ pub async fn serve_controller(
                     control_handle,
                     stop_payload: None,
                 };
-
-                let incoming = {
-                    let numbered_handles = args.numbered_handles.take().unwrap_or_default();
-
-                    let Ok(namespace): Result<namespace::Namespace, _> =
-                        args.namespace_entries.take().unwrap_or_default().try_into()
-                    else {
-                        responder.send(Err(fcomponent::Error::InvalidArguments))?;
+                let incoming: IncomingCapabilities = match args.try_into() {
+                    Ok(incoming) => incoming,
+                    Err(e) => {
+                        responder.send(Err(e))?;
                         continue;
-                    };
-
-                    let dict = if let Some(dict_client_end) = args.dictionary {
-                        let fidl_capability = fsandbox::Capability::Dictionary(dict_client_end);
-                        let Ok(any) = Capability::try_from(fidl_capability) else {
-                            responder.send(Err(fcomponent::Error::InvalidArguments))?;
-                            continue;
-                        };
-                        let dict = match any {
-                            Capability::Dictionary(d) => d,
-                            _ => {
-                                responder.send(Err(fcomponent::Error::InvalidArguments))?;
-                                continue;
-                            }
-                        };
-                        Some(dict)
-                    } else {
-                        None
-                    };
-
-                    IncomingCapabilities {
-                        numbered_handles,
-                        additional_namespace_entries: namespace.into(),
-                        dict,
                     }
                 };
 

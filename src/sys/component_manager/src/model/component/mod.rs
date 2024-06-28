@@ -209,6 +209,35 @@ impl Default for IncomingCapabilities {
     }
 }
 
+impl TryFrom<fcomponent::StartChildArgs> for IncomingCapabilities {
+    type Error = fcomponent::Error;
+
+    fn try_from(mut args: fcomponent::StartChildArgs) -> Result<Self, Self::Error> {
+        let numbered_handles = args.numbered_handles.take().unwrap_or_default();
+
+        let namespace: namespace::Namespace = args
+            .namespace_entries
+            .take()
+            .unwrap_or_default()
+            .try_into()
+            .map_err(|_| fcomponent::Error::InvalidArguments)?;
+
+        let dict = if let Some(dict_client_end) = args.dictionary {
+            let fidl_capability = fsandbox::Capability::Dictionary(dict_client_end);
+            let any = Capability::try_from(fidl_capability)
+                .map_err(|_| fcomponent::Error::InvalidArguments)?;
+            let Capability::Dictionary(dict) = any else {
+                return Err(fcomponent::Error::InvalidArguments);
+            };
+            Some(dict)
+        } else {
+            None
+        };
+
+        Ok(Self { numbered_handles, additional_namespace_entries: namespace.into(), dict })
+    }
+}
+
 /// Models a component instance, possibly with links to children.
 pub struct ComponentInstance {
     /// The registry for resolving component URLs within the component instance.

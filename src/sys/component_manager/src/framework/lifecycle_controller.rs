@@ -54,18 +54,33 @@ impl LifecycleControllerCapabilityProvider {
         moniker: String,
         binder: ServerEnd<fcomponent::BinderMarker>,
     ) -> Result<(), fsys::StartError> {
+        Self::start_instance_with_args(
+            model,
+            scope_moniker,
+            moniker,
+            binder,
+            fcomponent::StartChildArgs::default(),
+        )
+        .await
+    }
+
+    async fn start_instance_with_args(
+        model: &Model,
+        scope_moniker: &Moniker,
+        moniker: String,
+        binder: ServerEnd<fcomponent::BinderMarker>,
+        args: fcomponent::StartChildArgs,
+    ) -> Result<(), fsys::StartError> {
         let moniker =
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::StartError::BadMoniker)?;
         let instance =
             model.root().find(&moniker).await.ok_or(fsys::StartError::InstanceNotFound)?;
-        instance
-            .start(&StartReason::Debug, None, IncomingCapabilities::default())
-            .await
-            .map(|_| ())
-            .map_err(|error| {
-                warn!(%moniker, %error, "failed to start instance");
-                error
-            })?;
+        let incoming: IncomingCapabilities =
+            args.try_into().map_err(|_| fsys::StartError::InvalidArguments)?;
+        instance.start(&StartReason::Debug, None, incoming).await.map(|_| ()).map_err(|error| {
+            warn!(%moniker, %error, "failed to start instance");
+            error
+        })?;
         instance.scope_to_runtime(binder.into_channel()).await;
         Ok(())
     }
@@ -165,7 +180,12 @@ impl LifecycleControllerCapabilityProvider {
         scope_moniker: Moniker,
         mut stream: fsys::LifecycleControllerRequestStream,
     ) {
-        while let Ok(Some(operation)) = stream.try_next().await {
+        loop {
+            let operation = match stream.try_next().await {
+                Ok(Some(operation)) => operation,
+                Ok(None) => return,
+                Err(_e) => continue,
+            };
             let Some(model) = self.model.upgrade() else {
                 return;
             };
@@ -186,6 +206,24 @@ impl LifecycleControllerCapabilityProvider {
                     let res = Self::start_instance(&model, &scope_moniker, moniker, binder).await;
                     responder.send(res).unwrap_or_else(
                         |error| warn!(%error, "LifecycleController.StartInstance failed to send"),
+                    );
+                }
+                fsys::LifecycleControllerRequest::StartInstanceWithArgs {
+                    moniker,
+                    binder,
+                    args,
+                    responder,
+                } => {
+                    let res = Self::start_instance_with_args(
+                        &model,
+                        &scope_moniker,
+                        moniker,
+                        binder,
+                        args,
+                    )
+                    .await;
+                    responder.send(res).unwrap_or_else(
+                        |error| warn!(%error, "LifecycleController.StartInstanceWithArgs failed to send"),
                     );
                 }
                 fsys::LifecycleControllerRequest::StopInstance { moniker, responder } => {

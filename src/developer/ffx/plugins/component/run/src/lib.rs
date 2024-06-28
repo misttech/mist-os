@@ -18,6 +18,7 @@ use ffx_log_args::LogCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
 use fidl_fuchsia_developer_remotecontrol as rc;
+use futures::FutureExt;
 use log_command::log_formatter::LogEntry;
 use std::io::Write;
 
@@ -28,7 +29,11 @@ async fn cmd_impl(
     mut writer: MachineWriter<LogEntry>,
     connector: FfxConnector,
 ) -> Result<(), anyhow::Error> {
-    let lifecycle_controller = connect_to_lifecycle_controller(&rcs_proxy).await?;
+    let rcs_proxy_clone = rcs_proxy.clone();
+    let lifecycle_controller_factory = move || {
+        let rcs_proxy_clone = rcs_proxy_clone.clone();
+        async move { connect_to_lifecycle_controller(&rcs_proxy_clone).await }.boxed()
+    };
     let realm_query = connect_to_realm_query(&rcs_proxy).await?;
 
     let config_overrides = resolve_raw_config_overrides(
@@ -47,7 +52,7 @@ async fn cmd_impl(
         args.recreate,
         args.connect_stdio,
         config_overrides,
-        lifecycle_controller,
+        lifecycle_controller_factory,
         &mut writer,
     )
     .await

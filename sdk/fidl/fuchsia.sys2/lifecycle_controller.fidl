@@ -41,6 +41,9 @@ type StartError = flexible enum {
     // The component failed a policy check.
     @available(added=19)
     POLICY_ERROR = 6;
+    // The input was invalid.
+    @available(added=HEAD)
+    INVALID_ARGUMENTS = 7;
 };
 
 // Errors that can occur from stopping a component instance
@@ -125,6 +128,13 @@ closed protocol LifecycleController {
     strict StartInstance(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         binder server_end:fuchsia.component.Binder;
+    }) -> () error StartError;
+
+    @available(added=22)
+    strict StartInstanceWithArgs(resource struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        binder server_end:fuchsia.component.Binder;
+        args fuchsia.component.StartChildArgs;
     }) -> () error StartError;
 
     /// Stops the instance identified by the given moniker. Relative

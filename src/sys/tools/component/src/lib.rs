@@ -10,6 +10,7 @@ use component_debug::cli::*;
 use component_debug::config::resolve_raw_config_overrides;
 use component_debug::copy::copy_cmd;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
+use futures::FutureExt;
 use socket_to_stdio::Stdout;
 use {fidl_fuchsia_dash as fdash, fidl_fuchsia_sys2 as fsys};
 
@@ -100,7 +101,14 @@ pub async fn exec() -> Result<()> {
                 args.recreate,
                 args.connect_stdio,
                 config_overrides,
-                lifecycle_controller,
+                || {
+                    async {
+                        connect_to_protocol_at_path::<fsys::LifecycleControllerMarker>(
+                            "/svc/fuchsia.sys2.LifecycleController.root",
+                        )
+                    }
+                    .boxed()
+                },
                 writer,
             )
             .await
