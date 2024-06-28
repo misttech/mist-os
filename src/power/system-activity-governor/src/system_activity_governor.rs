@@ -192,9 +192,10 @@ impl ExecutionStateManager {
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
             listener.on_suspend();
 
-            // LINT.IfChange
             let response = if let Some(suspender) = inner.suspender.as_ref() {
-                fuchsia_trace::duration!(c"power", c"suspend");
+                // LINT.IfChange
+                fuchsia_trace::duration!(c"power", c"system-activity-governor:suspend");
+                // LINT.ThenChange(//src/performance/lib/trace_processing/metrics/suspend.py)
                 Some(
                     suspender
                         .suspend(&fhsuspend::SuspenderSuspendRequest {
@@ -206,6 +207,7 @@ impl ExecutionStateManager {
             } else {
                 None
             };
+            // LINT.IfChange
             tracing::info!(?response, "Resuming");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
             self._inspect_node.borrow_mut().add_entry(|node| {

@@ -8,7 +8,9 @@ from typing import Iterator, Sequence
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
 _EVENT_CATEGORY = "power"
-_EVENT_NAME = "suspend"
+# LINT.IfChange
+_EVENT_NAME = "system-activity-governor:suspend"
+# LINT.ThenChange(//src/power/system-activity-governor/src/system_activity_governor.rs)
 
 
 class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
