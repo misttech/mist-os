@@ -75,6 +75,7 @@
                 // TODO(https://fxbug.dev/323847465)
                 "BpfMapTest.MMapRingBufTest",
                 "BpfMapTest.WriteRingBufTest",
+                "BpfMapTest.IdenticalPagesRingBufTest",
             ],
         },
     ],

@@ -448,4 +448,23 @@ TEST_F(BpfMapTest, WriteRingBufTest) {
   ASSERT_EQ(BPF_RINGBUF_DISCARD_BIT, record_length & BPF_RINGBUF_DISCARD_BIT);
 }
 
+TEST_F(BpfMapTest, IdenticalPagesRingBufTest) {
+  // Map the last 2 pages, and check that they are the same after some operations on the buffer.
+  auto pages = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, 2 * getpagesize(), PROT_READ, MAP_SHARED, ringbuf_fd(), 2 * getpagesize()));
+
+  uint8_t* page1 = static_cast<uint8_t*>(pages.mapping());
+  uint8_t* page2 = page1 + getpagesize();
+
+  // Check that the pages are equal after creating the buffer.
+  ASSERT_EQ(memcmp(page1, page2, getpagesize()), 0);
+
+  for (size_t i = 0; i < 256; ++i) {
+    WriteToRingBuffer(static_cast<uint8_t>(i));
+  }
+
+  // Check that they are still equals after some operations.
+  ASSERT_EQ(memcmp(page1, page2, getpagesize()), 0);
+}
+
 }  // namespace
