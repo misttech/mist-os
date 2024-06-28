@@ -3335,7 +3335,8 @@ template("basic_executable") {
 #   build API file.
 #
 # - For executable instances built with host toolchains, metadata is used to add an
-#   entry to the `tool_paths.json` build API file.
+#   entry to the `tool_paths.json` build API file unless `emit_tool_path`
+#   is set to `false`.
 #
 # - Metadata is used to add an distribution manifest entry describing how to
 #   copy the stripped executable binary to 'bin/$output_name'. NOTE: This
@@ -3401,6 +3402,9 @@ template("executable") {
       } else {
         output_extension = ""
       }
+    }
+    if (!defined(emit_tool_path)) {
+      emit_tool_path = true
     }
 
     output_file = "$output_dir/$output_name"
@@ -3509,7 +3513,9 @@ template("executable") {
             test_component_manifest_program_barrier = []
           }
         }
-      } else {
+
+        not_needed([ "emit_tool_path" ])
+      } else if (emit_tool_path) {
         tool_paths = [
           {
             cpu = current_cpu

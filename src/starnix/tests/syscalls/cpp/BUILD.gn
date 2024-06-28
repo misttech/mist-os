@@ -275,6 +275,8 @@ test("syslog_non_root") {
 
 if (is_linux) {
   executable("extended_pstate_initial_state_child") {
+    emit_tool_path = false
+
     # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
     exclude_toolchain_tags = [ "instrumented" ]
     sources = [ "extended_pstate_initial_state_child.cc" ]
@@ -304,6 +306,7 @@ if (is_linux) {
 
   executable("ptrace_test_exec_child") {
     testonly = true
+    emit_tool_path = false
     sources = [ "ptrace_test_exec_child.cc" ]
 
     # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
@@ -323,6 +326,7 @@ if (is_linux) {
 
   executable("syscall_test_exec_child") {
     testonly = true
+    emit_tool_path = false
     sources = [ "syscall_test_exec_child.cc" ]
 
     # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
