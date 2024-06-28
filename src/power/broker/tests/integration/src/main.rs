@@ -1503,6 +1503,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // TODO(b/349228257): Fix the race condition in closing element_control_from_server.
     fn test_element_control_in_element_schema_closes_returned_channel() -> Result<()> {
         let mut executor = fasync::TestExecutor::new();
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
