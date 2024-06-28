@@ -93,15 +93,6 @@ if (is_fuchsia) {
     # Device side of zxdb & fidlcat:
     "//src/developer/debug/debug_agent",
   ]
-  core_realm_testing_aib_pkgs = [
-    # SL4F for infra testing
-    "//src/testing/sl4f:for_transition",
-    "//src/sys/bin/start_sl4f:for_transition",
-  ]
-  core_realm_testing_aib_shards = [
-    # SL4F for infra testing
-    "//src/testing/sl4f:sl4f_core_shard",
-  ]
 
   _core_realm_deps =
       core_realm_aib_shards + [
@@ -118,7 +109,7 @@ if (is_fuchsia) {
   }
 
   core_realm_definition("core-eng") {
-    deps = _core_realm_deps + core_realm_testing_aib_shards + [
+    deps = _core_realm_deps + [
              # required for SL4F
              "//src/recovery/system:system_recovery_core_shard",
              "//src/settings/service:setui_service_core_shard",
@@ -148,9 +139,7 @@ if (is_fuchsia) {
                       ]
 
   recovery_eng_packages =
-      recovery_packages + core_realm_eng_aib_pkgs +
-      core_realm_testing_aib_pkgs +
-      [
+      recovery_packages + core_realm_eng_aib_pkgs + [
         "//src/cobalt/bin/app:cobalt",
         "//src/cobalt/bin/app:cobalt_registry",
         "//src/cobalt/bin/app:config",
@@ -213,6 +202,9 @@ if (is_fuchsia) {
           legacy_privacy_support = true
         }
       }
+      development_support = {
+        include_sl4f = true
+      }
       forensics = {
         feedback = {
           remote_device_id_provider = true
@@ -238,15 +230,16 @@ if (is_fuchsia) {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
-      if (authorized_ssh_keys_path != false) {
-        development_support = {
-          authorized_ssh_keys_path =
-              rebase_path(authorized_ssh_keys_path, root_build_dir)
-        }
-      }
       connectivity = {
         wlan = {
           legacy_privacy_support = true
+        }
+      }
+      development_support = {
+        include_sl4f = true
+        if (authorized_ssh_keys_path != false) {
+          authorized_ssh_keys_path =
+              rebase_path(authorized_ssh_keys_path, root_build_dir)
         }
       }
       forward_variables_from(_storage_config, "*")
@@ -358,8 +351,9 @@ if (is_fuchsia) {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
-      if (authorized_ssh_keys_path != false) {
-        development_support = {
+      development_support = {
+        include_sl4f = true
+        if (authorized_ssh_keys_path != false) {
           authorized_ssh_keys_path =
               rebase_path(authorized_ssh_keys_path, root_build_dir)
         }
