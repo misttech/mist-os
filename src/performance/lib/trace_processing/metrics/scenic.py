@@ -6,36 +6,16 @@
 
 import logging
 import statistics
-from typing import Any, Iterator, Sequence, Tuple
+from typing import Iterator, Sequence, Tuple
 
 from trace_processing import trace_metrics, trace_model, trace_utils
 
 
 _LOGGER: logging.Logger = logging.getLogger("ScenicMetricsProcessor")
-_AGGREGATE_METRICS_ONLY: str = "aggregateMetricsOnly"
 _EVENT_CATEGORY: str = "gfx"
 _SCENIC_START_EVENT_NAME: str = "ApplyScheduledSessionUpdates"
 _SCENIC_RENDER_EVENT_NAME: str = "RenderFrame"
 _DISPLAY_VSYNC_READY_EVENT_NAME: str = "Display::Fence::OnReady"
-
-
-# DEPRECATED: Use ScenicMetricsProcessor instead.
-# TODO(b/320778225): Remove once downstream callers are migrated.
-def metrics_processor(
-    model: trace_model.Model, extra_args: dict[str, Any]
-) -> Sequence[trace_metrics.TestCaseResult]:
-    """Computes how long Scenic takes for operations for the given trace.
-
-    Args:
-        model: The trace model to process.
-        extra_args: Additional arguments to the processor.
-
-    Returns:
-        A list of computed metrics.
-    """
-    return ScenicMetricsProcessor(
-        aggregates_only=extra_args.get(_AGGREGATE_METRICS_ONLY, False) is True
-    ).process_metrics(model)
 
 
 class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
