@@ -19,7 +19,7 @@ from build_dir import get_build_directory
 
 
 class ExecutableCommand(ABC):
-    """Abstract base class for wrappers that can asynchronously execute."""
+    """Abstract base class for wrappers that can execute commands."""
 
     @abstractmethod
     async def start(self, *args: str) -> AsyncCommand:
@@ -28,10 +28,6 @@ class ExecutableCommand(ABC):
         Returns:
             AsyncCommand: Wrapper for the started command.
         """
-
-
-class SynchronousCommand(ABC):
-    """Abstract base class for wrappers that can execute synchronously."""
 
     @abstractmethod
     def sync(
@@ -51,7 +47,7 @@ class SynchronousCommand(ABC):
         """
 
 
-class FxCmd(ExecutableCommand, SynchronousCommand):
+class FxCmd(ExecutableCommand):
     """Wrapper for executing `fx` commands through Python.
 
     Usage (async):
@@ -148,6 +144,29 @@ class QueueFinished:
 
 
 @dataclass
+class CommandFailed(Exception):
+    """Exception for when a command fails to execute."""
+
+    # The return code of the command
+    return_code: int
+
+
+@dataclass
+class CommandTransformFailed(CommandFailed):
+    """Exception for when a transformation operation failed."""
+
+    # The exception raised by the transformer.
+    inner: Exception
+
+
+class CommandTimeout(CommandFailed):
+    """Exception for when a command fails due to a timeout."""
+
+    def __init__(self, return_code: int):
+        super().__init__(return_code=return_code)
+
+
+@dataclass
 class RunningCommand(typing.Generic[EventType, ReturnType]):
     """Container for the output of a running command."""
 
@@ -156,7 +175,7 @@ class RunningCommand(typing.Generic[EventType, ReturnType]):
 
     # Task computing the result of the command execution.
     # This must be awaited.
-    result: asyncio.Task[ReturnType]
+    result: asyncio.Task[ReturnType | CommandFailed]
 
     # Queue of events during the execution of the command.
     events: asyncio.Queue[EventType | QueueFinished]
@@ -185,16 +204,35 @@ class CommandTransformer(typing.Generic[EventType, ReturnType], ABC):
         cmd = await self._inner.start(*self._args)
         events = asyncio.Queue[EventType | QueueFinished]()
 
-        async def task() -> ReturnType:
+        async def task() -> ReturnType | CommandFailed:
+            event_exception: Exception | None = None
+
             def do_event_add(event: EventType) -> None:
                 events.put_nowait(event)
 
             def event_callback(event: CommandEvent) -> None:
-                self._handle_event(event, do_event_add)
+                nonlocal event_exception
+                try:
+                    print("handling event")
+                    self._handle_event(event, do_event_add)
+                except Exception as e:
+                    event_exception = e
 
             final = await cmd.run_to_completion(callback=event_callback)
             events.put_nowait(QueueFinished())
-            return self._to_output(final)
+            if final.was_timeout:
+                return CommandTimeout(final.return_code)
+            if final.return_code != 0:
+                return CommandFailed(final.return_code)
+            if event_exception is not None:
+                return CommandTransformFailed(
+                    final.return_code, event_exception
+                )
+
+            try:
+                return self._to_output(final)
+            except Exception as e:
+                return CommandTransformFailed(final.return_code, e)
 
         t = asyncio.create_task(task())
         return RunningCommand(cmd, t, events)
@@ -207,6 +245,10 @@ class CommandTransformer(typing.Generic[EventType, ReturnType], ABC):
         Args:
             event_callback (typing.Callable[[EventType], None] | None, optional):
             Optional receiver for bespoke command events.
+
+        Raises:
+            CommandError: If the command's return code is not 0
+            CommandTimeout: If the command reached a specified timeout and was cancelled.
 
         Returns:
             ReturnType: The return value for the wrapped command.
@@ -223,8 +265,13 @@ class CommandTransformer(typing.Generic[EventType, ReturnType], ABC):
                     if event_callback is not None:
                         event_callback(event)
 
-            res = await asyncio.gather(running_command.result, drain_events())
-            return res[0]
+            results = await asyncio.gather(
+                running_command.result, drain_events()
+            )
+            result = results[0]
+            if isinstance(result, CommandFailed):
+                raise result
+            return result
 
         return asyncio.run(task())
 

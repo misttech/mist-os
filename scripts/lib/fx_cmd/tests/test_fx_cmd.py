@@ -118,6 +118,7 @@ class TestCommandTransformers(unittest.TestCase):
         ),
     )
     def test_counting_transformer(self) -> None:
+        """A basic transformer works correctly"""
         with tempfile.TemporaryDirectory() as td:
             path = pathlib.Path(td)
             f1 = path / "foo.txt"
@@ -133,3 +134,69 @@ class TestCommandTransformers(unittest.TestCase):
             self.assertEqual(result, 2)
 
             self.assertSetEqual(set(lines), {"bar.txt", "foo.txt"})
+
+            # Test that we get an error reading a directory that doesn't exist.
+            self.assertRaises(
+                fx_cmd.CommandFailed,
+                lambda: self.OutputCountTransformer(
+                    "ignored",
+                    inner=fx_cmd.FxCmd(build_directory=path / "does-not-exist"),
+                ).sync(),
+            )
+
+    class FailingOutputTransformer(fx_cmd.CommandTransformer[None, int]):
+        def _to_output(self, output: CommandOutput) -> int:
+            raise RuntimeError("failed to convert")
+
+    class FailingEventTransformer(fx_cmd.CommandTransformer[str, int]):
+        def _handle_event(
+            self,
+            event: CommandEvent,
+            callback: typing.Callable[[str], None],
+        ) -> None:
+            raise RuntimeError("failed to handle event")
+
+        def _to_output(self, output: CommandOutput) -> int:
+            return 0
+
+    @mock.patch(
+        "asyncio.subprocess.create_subprocess_exec",
+        mock.Mock(
+            side_effect=lambda *_args, **kwargs: real_subprocess_exec(
+                "echo", "hello world\n", **kwargs
+            ),
+        ),
+    )
+    def test_transformer_errors(self) -> None:
+        """Exceptions in the transformer are caught"""
+        self.assertRaises(
+            fx_cmd.CommandTransformFailed,
+            lambda: self.FailingOutputTransformer(
+                "ignored", inner=fx_cmd.FxCmd(build_directory="/fuchsia")
+            ).sync(),
+        )
+
+        self.assertRaises(
+            fx_cmd.CommandTransformFailed,
+            lambda: self.FailingEventTransformer(
+                "ignored", inner=fx_cmd.FxCmd(build_directory="/fuchsia")
+            ).sync(),
+        )
+
+    @mock.patch(
+        "asyncio.subprocess.create_subprocess_exec",
+        mock.Mock(
+            side_effect=lambda *_args, **kwargs: real_subprocess_exec(
+                "sleep", "10", **kwargs
+            ),
+        ),
+    )
+    def test_transformer_timeout(self) -> None:
+        """Timeouts are caught in the transformer"""
+        self.assertRaises(
+            fx_cmd.CommandTimeout,
+            lambda: self.OutputCountTransformer(
+                "ignored",
+                inner=fx_cmd.FxCmd(build_directory="/fuchsia", timeout=0.1),
+            ).sync(),
+        )

@@ -4,4 +4,4 @@
 
 from .lib import *
 
-__all__ = ["FxCmd", "CommandTransformer", "QueueFinished"]
+__all__ = ["FxCmd", "CommandTransformer", "QueueFinished", "ExecutableCommand"]
