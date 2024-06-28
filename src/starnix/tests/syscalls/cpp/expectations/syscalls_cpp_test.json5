@@ -76,6 +76,7 @@
                 "BpfMapTest.MMapRingBufTest",
                 "BpfMapTest.WriteRingBufTest",
                 "BpfMapTest.IdenticalPagesRingBufTest",
+                "BpfMapTest.NotificationsRingBufTest",
             ],
         },
     ],

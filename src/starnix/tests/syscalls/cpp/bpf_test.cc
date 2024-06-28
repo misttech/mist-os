@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <sys/epoll.h>
 #include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
@@ -11,6 +12,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <climits>
 #include <vector>
 
@@ -227,7 +229,7 @@ class BpfMapTest : public testing::Test {
     SAFE_SYSCALL(write(sk0.get(), "", 1));
   }
 
-  void WriteToRingBuffer(char v) {
+  void WriteToRingBuffer(char v, uint32_t submit_flag = 0) {
     // A bpf program that write a record in the ringbuffer.
     bpf_insn program[] = {
         // r1 <- ringbuf_fd_
@@ -242,12 +244,12 @@ class BpfMapTest : public testing::Test {
         BPF_JNE_IMM(0, 0, 1),
         // exit
         BPF_RETURN(),
-        // *r0 = 42
+        // *r0 = `v`
         BPF_STORE(0, v),
         // r1 <- r0,
         BPF_MOV_REG(1, 0),
-        // r2 <- 0,
-        BPF_MOV_REG(2, 0),
+        // r2 <- `submit_flag`,
+        BPF_MOV_IMM(2, submit_flag),
         // Call bpf_ringbuf_submit
         BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_submit),
         // r0 <- 0,
@@ -276,7 +278,7 @@ class BpfMapTest : public testing::Test {
         // r1 <- r0,
         BPF_MOV_REG(1, 0),
         // r2 <- 0,
-        BPF_MOV_REG(2, 0),
+        BPF_MOV_IMM(2, 0),
         // Call bpf_ringbuf_discard
         BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_discard),
         // r0 <- 0,
@@ -419,16 +421,18 @@ TEST_F(BpfMapTest, WriteRingBufTest) {
       nullptr, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, ringbuf_fd(), 0));
   auto pagero = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
       nullptr, 3 * getpagesize(), PROT_READ, MAP_SHARED, ringbuf_fd(), getpagesize()));
-  unsigned long* consumer_pos = static_cast<unsigned long*>(pagewr.mapping());
-  unsigned long* producer_pos = static_cast<unsigned long*>(pagero.mapping());
+  std::atomic<unsigned long>* consumer_pos =
+      static_cast<std::atomic<unsigned long>*>(pagewr.mapping());
+  std::atomic<unsigned long>* producer_pos =
+      static_cast<std::atomic<unsigned long>*>(pagero.mapping());
   uint8_t* data = static_cast<uint8_t*>(pagero.mapping()) + getpagesize();
-  ASSERT_EQ(0u, *consumer_pos);
-  ASSERT_EQ(0u, *producer_pos);
+  ASSERT_EQ(0u, consumer_pos->load(std::memory_order_acquire));
+  ASSERT_EQ(0u, producer_pos->load(std::memory_order_acquire));
 
   WriteToRingBuffer(42);
 
-  ASSERT_EQ(0u, *consumer_pos);
-  ASSERT_EQ(16u, *producer_pos);
+  ASSERT_EQ(0u, consumer_pos->load(std::memory_order_acquire));
+  ASSERT_EQ(16u, producer_pos->load(std::memory_order_acquire));
 
   uint32_t record_length = *reinterpret_cast<uint32_t*>(data);
   ASSERT_EQ(0u, record_length & BPF_RINGBUF_BUSY_BIT);
@@ -440,8 +444,8 @@ TEST_F(BpfMapTest, WriteRingBufTest) {
 
   DiscardWriteToRingBuffer();
 
-  ASSERT_EQ(0u, *consumer_pos);
-  ASSERT_EQ(32u, *producer_pos);
+  ASSERT_EQ(0u, consumer_pos->load(std::memory_order_acquire));
+  ASSERT_EQ(32u, producer_pos->load(std::memory_order_acquire));
 
   record_length = *reinterpret_cast<uint32_t*>(data + 16);
   ASSERT_EQ(0u, record_length & BPF_RINGBUF_BUSY_BIT);
@@ -465,6 +469,61 @@ TEST_F(BpfMapTest, IdenticalPagesRingBufTest) {
 
   // Check that they are still equals after some operations.
   ASSERT_EQ(memcmp(page1, page2, getpagesize()), 0);
+}
+
+TEST_F(BpfMapTest, NotificationsRingBufTest) {
+  auto pagewr = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, ringbuf_fd(), 0));
+  auto pagero = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, 3 * getpagesize(), PROT_READ, MAP_SHARED, ringbuf_fd(), getpagesize()));
+  std::atomic<unsigned long>* consumer_pos =
+      static_cast<std::atomic<unsigned long>*>(pagewr.mapping());
+  std::atomic<unsigned long>* producer_pos =
+      static_cast<std::atomic<unsigned long>*>(pagero.mapping());
+
+  fbl::unique_fd epollfd(SAFE_SYSCALL(epoll_create(1)));
+
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLET;
+
+  SAFE_SYSCALL(epoll_ctl(epollfd.get(), EPOLL_CTL_ADD, ringbuf_fd(), &ev));
+
+  // First wait should return no result.
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // After a normal write, epoll should return an event.
+  WriteToRingBuffer(42);
+  ASSERT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // But only once, as this is edge triggered.
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // A new write will not trigger an event, as the reader is late.
+  WriteToRingBuffer(42);
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // Unless the event is forced through flags
+  WriteToRingBuffer(42, BPF_RB_FORCE_WAKEUP);
+  ASSERT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // Let's catch up.
+  consumer_pos->store(producer_pos->load(std::memory_order_acquire), std::memory_order_release);
+
+  // Execute a write, preventing an event to run.
+  WriteToRingBuffer(42, BPF_RB_NO_WAKEUP);
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // A normal write will now not send an event because the client has not caught
+  // up.
+  WriteToRingBuffer(42);
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // Let's catch up again.
+  consumer_pos->store(producer_pos->load(std::memory_order_acquire), std::memory_order_release);
+
+  // A normal write will now send an event.
+  WriteToRingBuffer(42);
+  EXPECT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
 }
 
 }  // namespace
