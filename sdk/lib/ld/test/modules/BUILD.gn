@@ -718,6 +718,9 @@ test_executable("tls-exec-only") {
     "../..",
     "//src/lib/elfldltl",
   ]
+
+  # workaround for b/349448459 to remote-link successfully
+  configs = [ "//build/config:remote_link_scandeps_workaround" ]
 }
 
 test_executable("tls-shlib-only") {
@@ -873,6 +876,9 @@ test_executable("relro") {
 test_executable("fixed-load-address") {
   sources = [ "fixed-load-address.cc" ]
   deps = [ "//src/lib/elfldltl" ]
+
+  # workaround for b/349448459 to remote-link successfully
+  configs = [ "//build/config:remote_link_scandeps_workaround" ]
 }
 
 test_executable("second-session") {
