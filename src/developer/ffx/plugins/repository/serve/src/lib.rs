@@ -39,7 +39,7 @@ use timeout::timeout;
 use tuf::metadata::RawSignedMetadata;
 
 const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
-const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 15;
+const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 120;
 const MAX_CONSECUTIVE_CONNECT_ATTEMPTS: u8 = 10;
 const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
 const REPO_FOREGROUND_FEATURE_FLAG: &str = "repository.foreground.enabled";
