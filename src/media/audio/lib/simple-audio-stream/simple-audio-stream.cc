@@ -22,7 +22,7 @@ namespace audio {
 SimpleAudioStream::SimpleAudioStream(zx_device_t* parent, bool is_input)
     : SimpleAudioStreamBase(parent),
       SimpleAudioStreamProtocol(is_input),
-      loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+      loop_(&kAsyncLoopConfigNeverAttachToThread) {
   simple_audio_ = inspect_.GetRoot().CreateChild("simple_audio_stream");
   state_ = simple_audio_.CreateString("state", "created");
   start_time_ = simple_audio_.CreateInt("start_time", 0);
