@@ -8,6 +8,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fit/defer.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
@@ -33,6 +34,8 @@ int main(int argc, const char** argv) {
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   component::OutgoingDirectory outgoing(loop.dispatcher());
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithDispatcher(loop.dispatcher()).BuildAndInitialize();
 
   {
     fdio_flat_namespace_t* ns;
