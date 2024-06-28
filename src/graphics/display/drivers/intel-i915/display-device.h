@@ -27,18 +27,7 @@
 namespace i915 {
 
 class Controller;
-class DisplayDevice;
-namespace FidlBacklight = fuchsia_hardware_backlight;
-
-// Thread safe weak-ref to the DisplayDevice, because the backlight device
-// lifecycle is managed by devmgr but the DisplayDevice lifecycle is managed
-// by the display controller class.
-typedef struct display_ref {
-  mtx_t mtx;
-  DisplayDevice* display_device __TA_GUARDED(mtx);
-} display_ref_t;
-
-class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
+class DisplayDevice {
  public:
   enum class Type {
     kEdp,
@@ -55,7 +44,7 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   DisplayDevice& operator=(const DisplayDevice&) = delete;
   DisplayDevice& operator=(DisplayDevice&&) = delete;
 
-  ~DisplayDevice() override;
+  virtual ~DisplayDevice();
 
   void ApplyConfiguration(const display_config_t* banjo_display_config,
                           display::ConfigStamp config_stamp);
@@ -109,27 +98,13 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   virtual zx::result<> SetBacklightState(bool power, double brightness) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-  virtual zx::result<FidlBacklight::wire::State> GetBacklightState() {
+  virtual zx::result<fuchsia_hardware_backlight::wire::State> GetBacklightState() {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   virtual bool CheckPixelRate(int64_t pixel_rate_hz) = 0;
 
   raw_display_info_t CreateRawDisplayInfo();
-
-  // FIDL calls
-  void GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) override;
-  void SetStateNormalized(SetStateNormalizedRequestView request,
-                          SetStateNormalizedCompleter::Sync& completer) override;
-  void GetStateAbsolute(GetStateAbsoluteCompleter::Sync& completer) override;
-  void SetStateAbsolute(SetStateAbsoluteRequestView request,
-                        SetStateAbsoluteCompleter::Sync& completer) override;
-  void GetMaxAbsoluteBrightness(GetMaxAbsoluteBrightnessCompleter::Sync& completer) override;
-  void SetNormalizedBrightnessScale(
-      SetNormalizedBrightnessScaleRequestView request,
-      SetNormalizedBrightnessScaleCompleter::Sync& completer) override;
-  void GetNormalizedBrightnessScale(
-      GetNormalizedBrightnessScaleCompleter::Sync& completer) override;
 
  protected:
   // Attempts to initialize the ddi.
@@ -180,9 +155,6 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   display::DisplayTiming info_ = {};
 
   Type type_;
-
-  zx_device_t* backlight_device_ = nullptr;
-  display_ref_t* display_ref_ = nullptr;
 };
 
 }  // namespace i915

@@ -44,25 +44,6 @@ constexpr fuchsia_images2_pixel_format_enum_value_t kBanjoSupportedPixelFormatsA
 constexpr cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> kBanjoSupportedPixelFormats(
     kBanjoSupportedPixelFormatsArray);
 
-void backlight_message(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
-  DisplayDevice* ptr;
-  {
-    fbl::AutoLock lock(&static_cast<display_ref_t*>(ctx)->mtx);
-    ptr = static_cast<display_ref_t*>(ctx)->display_device;
-  }
-  fidl::WireDispatch<fuchsia_hardware_backlight::Device>(
-      ptr, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
-      ddk::FromDeviceFIDLTransaction(txn));
-}
-
-void backlight_release(void* ctx) { delete static_cast<display_ref_t*>(ctx); }
-
-constexpr zx_protocol_device_t kBacklightDeviceOps = {
-    .version = DEVICE_OPS_VERSION,
-    .release = &backlight_release,
-    .message = &backlight_message,
-};
-
 }  // namespace
 
 DisplayDevice::DisplayDevice(Controller* controller, display::DisplayId id, DdiId ddi_id,
@@ -83,11 +64,6 @@ DisplayDevice::~DisplayDevice() {
   }
   if (ddi_reference_) {
     ddi_reference_.reset();
-  }
-  if (display_ref_) {
-    fbl::AutoLock lock(&display_ref_->mtx);
-    display_ref_->display_device = nullptr;
-    device_async_remove(backlight_device_);
   }
 }
 
@@ -126,33 +102,6 @@ bool DisplayDevice::InitWithDdiPllConfig(const DdiPllConfig& pll_config) {
 
 void DisplayDevice::InitBacklight() {
   if (HasBacklight() && InitBacklightHw()) {
-    fbl::AllocChecker ac;
-    auto display_ref = fbl::make_unique_checked<display_ref_t>(&ac);
-    zx_status_t status = ZX_ERR_NO_MEMORY;
-    if (ac.check()) {
-      mtx_init(&display_ref->mtx, mtx_plain);
-      {
-        fbl::AutoLock lock(&display_ref->mtx);
-        display_ref->display_device = this;
-      }
-
-      device_add_args_t args = {
-          .version = DEVICE_ADD_ARGS_VERSION,
-          .name = "backlight",
-          .ctx = display_ref.get(),
-          .ops = &kBacklightDeviceOps,
-          .proto_id = ZX_PROTOCOL_BACKLIGHT,
-      };
-
-      status = device_add(controller_->zxdev(), &args, &backlight_device_);
-      if (status == ZX_OK) {
-        display_ref_ = display_ref.release();
-      }
-    }
-    if (display_ref_ == nullptr) {
-      zxlogf(WARNING, "Failed to add backlight (%d)", status);
-    }
-
     std::ignore = SetBacklightState(true, 1.0);
   }
 }
@@ -283,68 +232,6 @@ raw_display_info_t DisplayDevice::CreateRawDisplayInfo() {
   // TODO(b/317914671): After the display coordinator provides display metadata
   // to the drivers, each display's type should potentially be adjusted from
   // HDMI to DVI, based on EDID information.
-}
-
-void DisplayDevice::GetStateNormalized(GetStateNormalizedCompleter::Sync& completer) {
-  zx::result<FidlBacklight::wire::State> backlight_state = zx::error(ZX_ERR_BAD_STATE);
-
-  if (display_ref_ != nullptr) {
-    fbl::AutoLock lock(&display_ref_->mtx);
-    if (display_ref_->display_device != nullptr) {
-      backlight_state = display_ref_->display_device->GetBacklightState();
-    }
-  }
-
-  if (backlight_state.is_ok()) {
-    completer.ReplySuccess(backlight_state.value());
-  } else {
-    completer.ReplyError(backlight_state.status_value());
-  }
-}
-
-void DisplayDevice::SetStateNormalized(SetStateNormalizedRequestView request,
-                                       SetStateNormalizedCompleter::Sync& completer) {
-  zx::result<> status = zx::error(ZX_ERR_BAD_STATE);
-
-  if (display_ref_ != nullptr) {
-    fbl::AutoLock lock(&display_ref_->mtx);
-    if (display_ref_->display_device != nullptr) {
-      status = display_ref_->display_device->SetBacklightState(request->state.backlight_on,
-                                                               request->state.brightness);
-    }
-  }
-
-  if (status.is_error()) {
-    completer.ReplyError(status.status_value());
-    return;
-  }
-  completer.ReplySuccess();
-}
-
-void DisplayDevice::GetStateAbsolute(GetStateAbsoluteCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void DisplayDevice::SetStateAbsolute(SetStateAbsoluteRequestView request,
-                                     SetStateAbsoluteCompleter::Sync& completer) {
-  FidlBacklight::wire::DeviceSetStateAbsoluteResult result;
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void DisplayDevice::GetMaxAbsoluteBrightness(GetMaxAbsoluteBrightnessCompleter::Sync& completer) {
-  FidlBacklight::wire::DeviceGetMaxAbsoluteBrightnessResult result;
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void DisplayDevice::SetNormalizedBrightnessScale(
-    SetNormalizedBrightnessScaleRequestView request,
-    SetNormalizedBrightnessScaleCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void DisplayDevice::GetNormalizedBrightnessScale(
-    GetNormalizedBrightnessScaleCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace i915
