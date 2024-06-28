@@ -1037,7 +1037,7 @@ impl Right {
 /// [doc-runners]: /docs/concepts/components/v2/capabilities/runner.md
 /// [doc-event]: /docs/concepts/components/v2/capabilities/event.md
 /// [doc-service]: /docs/concepts/components/v2/capabilities/service.md
-/// [doc-directory-rights]: /docs/concepts/components/v2/capabilities/directory#directory-capability-rights
+/// [doc-directory-rights]: /docs/concepts/components/v2/capabilities/directory.md#directory-capability-rights
 ///
 /// ## Top-level keys {#document}
 #[derive(ReferenceDoc, Deserialize, Debug, Default, PartialEq, Serialize)]
@@ -1293,7 +1293,6 @@ pub struct Document {
     /// # Additional fields
     ///
     /// This supports the following additional fields:
-    /// [fidl-environment-decl]: /reference/fidl/fuchsia.component.decl#Environment
     /// [glossary.namespace]: /docs/glossary/README.md#namespace
     #[reference_doc(recurse)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2848,6 +2847,8 @@ pub struct Use {
     ///     requested capability is derived.
     /// - `#<child-name>`: A [reference](#references) to a child component
     ///     instance.
+    ///
+    /// [fidl-environment-decl]: /reference/fidl/fuchsia.component.decl#Environment
     #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<UseFromRef>,
 
@@ -2903,7 +2904,7 @@ pub struct Use {
     /// This property is disallowed for runner capabilities, which are always `required`.
     ///
     /// For more information, see the
-    /// [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
+    /// [availability](/docs/concepts/components/v2/capabilities/availability.md) documentation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 
@@ -3093,7 +3094,7 @@ pub struct Expose {
     ///     only to avoid validation errors during transitional periods of multi-step code changes.
     ///
     /// For more information, see the
-    /// [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
+    /// [availability](/docs/concepts/components/v2/capabilities/availability.md) documentation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 
@@ -3230,7 +3231,7 @@ pub struct Offer {
     pub from: OneOrMany<OfferFromRef>,
 
     /// Capability target(s). One of:
-    /// - `#<target-name>` or [`#name1`, ...]: A [reference](#references) to a child or collection,
+    /// - `#<target-name>` or \[`#name1`, ...\]: A [reference](#references) to a child or collection,
     ///   or an array of references.
     /// - `all`: Short-hand for an `offer` clause containing all child [references](#references).
     pub to: OneOrMany<OfferToRef>,
@@ -3288,7 +3289,7 @@ pub struct Offer {
     ///     only to avoid validation errors during transitional periods of multi-step code changes.
     ///
     /// For more information, see the
-    /// [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
+    /// [availability](/docs/concepts/components/v2/capabilities/availability.md) documentation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 
