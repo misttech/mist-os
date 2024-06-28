@@ -355,6 +355,8 @@ impl BrokerSvc {
                                             .shutdown_with_epitaph(Status::from_raw(
                                                 ZX_ERR_ALREADY_EXISTS,
                                             ));
+                                        // Close request stream, responders, and control_handles.
+                                        std::mem::drop(element_control_stream_from_server);
                                         element_control.into_stream()?
                                     }
                                 };
