@@ -284,7 +284,9 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
 }  // namespace
 
 int main(int argv, char** argc) {
-  fuchsia_logging::SetTags({"console-launcher"});
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithDispatcher(loop.dispatcher()).BuildAndInitializeWithTags({"console-launcher"});
 
   if (zx_status_t status = StdoutToDebuglog::Init(); status != ZX_OK) {
     FX_PLOGS(ERROR, status)
@@ -305,7 +307,6 @@ int main(int argv, char** argc) {
   }
   console_launcher::Arguments args = get_args.value();
 
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
   fbl::RefPtr root = fbl::MakeRefCounted<fs::PseudoDir>();
 
@@ -369,8 +370,9 @@ int main(int argv, char** argc) {
                   if (fragment_len < 0) {
                     const void* path_ptr = path.data();
                     const void* component_ptr = component.data();
-                    FX_LOGS(FATAL) << "expected overlapping memory:" << " path@" << path_ptr << "="
-                                   << path << " component@" << component_ptr << "=" << component;
+                    FX_LOGS(FATAL) << "expected overlapping memory:"
+                                   << " path@" << path_ptr << "=" << path << " component@"
+                                   << component_ptr << "=" << component;
                   }
                   return std::string_view{path.data(), static_cast<size_t>(fragment_len)};
                 }();
