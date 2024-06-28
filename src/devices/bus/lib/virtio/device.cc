@@ -25,9 +25,7 @@ namespace virtio {
 namespace fpci = fuchsia_hardware_pci;
 
 Device::Device(zx::bti bti, std::unique_ptr<Backend> backend)
-    : bti_(std::move(bti)), backend_(std::move(backend)) {
-  device_ops_.version = DEVICE_OPS_VERSION;
-}
+    : bti_(std::move(bti)), backend_(std::move(backend)) {}
 
 Device::~Device() { zxlogf(TRACE, "%s: exit", __func__); }
 
