@@ -6,8 +6,10 @@
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <fidl/fuchsia.logger/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/async/default.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
@@ -58,7 +60,8 @@ class LogState {
 
   fidl::WireSharedClient<fuchsia_logger::LogSink> log_sink_;
   void (*on_severity_changed_)(fuchsia_logging::LogSeverity severity);
-  async::Loop loop_;
+  // TODO(b/b/299996898): Remove this once everyone has been migrated.
+  async::Loop deprecated_loop_;
   std::atomic<fuchsia_logging::LogSeverity> min_severity_;
   const fuchsia_logging::LogSeverity default_severity_;
   mutable cpp17::variant<zx::socket, std::ofstream> logsink_socket_ = zx::socket();
@@ -227,15 +230,20 @@ void LogState::HandleInterest(fuchsia_diagnostics::wire::Interest interest) {
 }
 
 void LogState::Connect() {
+  auto default_dispatcher = async_get_default_dispatcher();
   if (interest_listener_config_ != fuchsia_logging::Disabled) {
-    if (!interest_listener_dispatcher_) {
-      loop_.StartThread("log-interest-listener-thread");
+    if (!interest_listener_dispatcher_ && !default_dispatcher) {
+      deprecated_loop_.StartThread("log-interest-listener-thread");
     }
   }
   // Regardless of whether or not we need to do anything async, FIDL async bindings
   // require a valid dispatcher or they panic.
   if (!interest_listener_dispatcher_) {
-    interest_listener_dispatcher_ = loop_.dispatcher();
+    if (default_dispatcher) {
+      interest_listener_dispatcher_ = default_dispatcher;
+    } else {
+      interest_listener_dispatcher_ = deprecated_loop_.dispatcher();
+    }
   }
   fidl::ClientEnd<fuchsia_logger::LogSink> client_end;
   if (!provided_log_sink_.has_value()) {
@@ -317,7 +325,7 @@ void LogState::Set(const fuchsia_logging::LogSettings& settings,
 
 LogState::LogState(const fuchsia_logging::LogSettings& settings,
                    const std::initializer_list<std::string>& tags)
-    : loop_(&kAsyncLoopConfigNeverAttachToThread),
+    : deprecated_loop_(&kAsyncLoopConfigNeverAttachToThread),
       min_severity_(settings.min_log_level),
       default_severity_(settings.min_log_level) {
   interest_listener_dispatcher_ =
