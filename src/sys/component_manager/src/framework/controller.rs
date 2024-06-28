@@ -22,7 +22,6 @@ pub async fn serve_controller(
     weak_component_instance: WeakComponentInstance,
     mut stream: fcomponent::ControllerRequestStream,
 ) -> Result<(), fidl::Error> {
-    let mut tasks = fasync::TaskGroup::new();
     while let Some(request) = stream.try_next().await? {
         match request {
             fcomponent::ControllerRequest::Start { args, execution_controller, responder } => {
@@ -81,14 +80,8 @@ pub async fn serve_controller(
                         .lock_resolved_state()
                         .await
                         .map_err(|_| fcomponent::Error::InstanceCannotResolve)?;
-                    let mut exposed_dict = resolved.make_exposed_dict().await;
-                    tasks.spawn(async move {
-                        if let Err(err) =
-                            exposed_dict.serve_dict(dictionary.into_stream().unwrap()).await
-                        {
-                            warn!(%err, "failed to serve dict");
-                        }
-                    });
+                    let exposed_dict = resolved.get_exposed_dict().await;
+                    exposed_dict.serve(dictionary.into_stream().unwrap());
                     Ok(())
                 }
                 .await;

@@ -2,21 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fidl::registry::try_from_handle_in_registry;
 use crate::{Capability, ConversionError, RemotableCapability, RemoteError};
-use fidl::{AsHandleRef, HandleRef};
+use fidl::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
-
-/// Given a reference to a handle, returns a copy of a capability from the registry that was added
-/// with the handle's koid.
-///
-/// Returns [RemoteError::Unregistered] if the capability is not in the registry.
-fn try_from_handle_in_registry<'a>(handle_ref: HandleRef<'_>) -> Result<Capability, RemoteError> {
-    let koid = handle_ref.get_koid().unwrap();
-    let capability = crate::fidl::registry::get(koid).ok_or(RemoteError::Unregistered)?;
-    Ok(capability)
-}
 
 impl From<Capability> for fsandbox::Capability {
     fn from(capability: Capability) -> Self {
@@ -48,14 +39,7 @@ impl TryFrom<fsandbox::Capability> for Capability {
             fsandbox::Capability::Data(data_capability) => {
                 Ok(crate::Data::try_from(data_capability)?.into())
             }
-            fsandbox::Capability::Dictionary(client_end) => {
-                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
-                match &any {
-                    Capability::Dictionary(_) => (),
-                    _ => panic!("BUG: registry has a non-Dict capability under a Dict koid"),
-                };
-                Ok(any)
-            }
+            fsandbox::Capability::Dictionary(dict) => Ok(crate::Dict::try_from(dict)?.into()),
             fsandbox::Capability::Connector(connector) => {
                 let any = try_from_handle_in_registry(connector.token.as_handle_ref())?;
                 match &any {

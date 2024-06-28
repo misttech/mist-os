@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints;
+use fidl::{endpoints, HandleBased, Rights};
 use fidl_fidl_examples_routing_echo::{EchoMarker, EchoRequest, EchoRequestStream};
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
@@ -22,8 +22,10 @@ async fn main() {
     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
 
     // Create a dictionary
-    let dict = factory.create_dictionary().await.unwrap();
-    let dict = dict.into_proxy().unwrap();
+    let dict_ref = factory.create_dictionary().await.unwrap();
+    let (dict, server) = endpoints::create_proxy().unwrap();
+    let dict_token = dict_ref.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
+    factory.open_dictionary(dict_ref, server).unwrap();
 
     // Add 3 Echo servers to the dictionary
     let mut receiver_tasks = fasync::TaskGroup::new();
@@ -50,7 +52,7 @@ async fn main() {
     fs.take_and_serve_directory_handle().unwrap();
     fs.for_each_concurrent(None, move |request: IncomingRequest| {
         // [START outer_clone]
-        let dict = Clone::clone(&dict);
+        let dict_token = dict_token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
         // [END outer_clone]
         async move {
             match request {
@@ -59,8 +61,12 @@ async fn main() {
                         match request {
                             fsandbox::RouterRequest::Route { payload: _, responder } => {
                                 // [START inner_clone]
-                                let client_end = dict.clone().await.unwrap();
-                                let capability = fsandbox::Capability::Dictionary(client_end);
+                                let dict_ref = fsandbox::DictionaryRef {
+                                    token: dict_token
+                                        .duplicate_handle(Rights::SAME_RIGHTS)
+                                        .unwrap(),
+                                };
+                                let capability = fsandbox::Capability::Dictionary(dict_ref);
                                 // [END inner_clone]
                                 let _ = responder.send(Ok(capability));
                             }

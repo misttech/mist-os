@@ -36,11 +36,16 @@ type DirEntry = resource struct {
 };
 
 @available(added=HEAD)
+type DictionaryRef = resource struct {
+    token Token;
+};
+
+@available(added=HEAD)
 type Capability = flexible resource union {
     1: unit @generated_name("Unit") struct {};
     2: handle zx.Handle;
     3: data Data;
-    4: dictionary client_end:Dictionary;
+    4: dictionary DictionaryRef;
     5: connector Connector;
     6: directory client_end:fuchsia.io.Directory;
     7: router client_end:Router;
@@ -131,14 +136,6 @@ open protocol Dictionary {
         capability Capability;
     }) error DictionaryError;
 
-    /// Creates a new connection to the same underlying dictionary.
-    ///
-    /// Use `Copy` to a new dictionary with clones of all the exiting entries.
-    @available(added=HEAD)
-    flexible Clone() -> (resource struct {
-        dictionary client_end:Dictionary;
-    });
-
     /// Create a new dictionary that contains a clone of all the entries in
     /// this dictionary.
     ///
@@ -150,7 +147,7 @@ open protocol Dictionary {
     ///   dictionary could not be cloned.
     @available(added=HEAD)
     flexible Copy() -> (resource struct {
-        dictionary client_end:Dictionary;
+        dictionary DictionaryRef;
     }) error DictionaryError;
 
     /// Enumerates the items in this dictionary.
@@ -286,6 +283,13 @@ open protocol Factory {
 
     /// Creates a new empty [`Dictionary`].
     flexible CreateDictionary() -> (resource struct {
-        dictionary client_end:Dictionary;
+        dictionary DictionaryRef;
+    });
+
+    /// Binds a fuchsia.component.sandbox/Dictionary channel to a `dictionary`
+    /// token.
+    flexible OpenDictionary(resource struct {
+        dictionary DictionaryRef;
+        server_end server_end:Dictionary;
     });
 };

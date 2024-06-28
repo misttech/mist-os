@@ -4,45 +4,49 @@
 
 use crate::Capability;
 use derivative::Derivative;
+use fidl_fuchsia_component_sandbox as fsandbox;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
-use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
+
+#[cfg(target_os = "fuchsia")]
+use fuchsia_async as fasync;
 
 pub type Key = cm_types::Name;
 
 /// A capability that represents a dictionary of capabilities.
+#[derive(Debug, Clone)]
+pub struct Dict {
+    inner: Arc<Mutex<DictInner>>,
+}
+
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Dict {
-    entries: Arc<Mutex<BTreeMap<Key, Capability>>>,
+pub(crate) struct DictInner {
+    /// The contents of the [Dict].
+    pub(crate) entries: BTreeMap<Key, Capability>,
 
     /// When an external request tries to access a non-existent entry,
     /// this closure will be invoked with the name of the entry.
     #[derivative(Debug = "ignore")]
+    // Currently this is only used on target, but it's compatible with host.
+    #[allow(dead_code)]
     pub(crate) not_found: Arc<dyn Fn(&str) -> () + 'static + Send + Sync>,
 
-    /// Tasks that serve dictionary iterators.
+    /// Tasks that serve the Dictionary protocol.
+    #[cfg(target_os = "fuchsia")]
     #[derivative(Debug = "ignore")]
-    #[allow(dead_code)]
-    pub(crate) iterator_tasks: fasync::TaskGroup,
+    pub(crate) tasks: fasync::TaskGroup,
 }
 
 impl Default for Dict {
     fn default() -> Self {
         Self {
-            entries: Arc::new(Mutex::new(BTreeMap::new())),
-            not_found: Arc::new(|_key: &str| {}),
-            iterator_tasks: fasync::TaskGroup::new(),
-        }
-    }
-}
-
-impl Clone for Dict {
-    fn clone(&self) -> Self {
-        Self {
-            entries: self.entries.clone(),
-            not_found: self.not_found.clone(),
-            iterator_tasks: fasync::TaskGroup::new(),
+            inner: Arc::new(Mutex::new(DictInner {
+                entries: BTreeMap::new(),
+                not_found: Arc::new(|_key: &str| {}),
+                #[cfg(target_os = "fuchsia")]
+                tasks: fasync::TaskGroup::new(),
+            })),
         }
     }
 }
@@ -57,14 +61,17 @@ impl Dict {
     /// the name of the entry will be sent using `not_found`.
     pub fn new_with_not_found(not_found: impl Fn(&str) -> () + 'static + Send + Sync) -> Self {
         Self {
-            entries: Arc::new(Mutex::new(BTreeMap::new())),
-            not_found: Arc::new(not_found),
-            iterator_tasks: fasync::TaskGroup::new(),
+            inner: Arc::new(Mutex::new(DictInner {
+                entries: BTreeMap::new(),
+                not_found: Arc::new(not_found),
+                #[cfg(target_os = "fuchsia")]
+                tasks: fasync::TaskGroup::new(),
+            })),
         }
     }
 
-    pub(crate) fn lock_entries(&self) -> MutexGuard<'_, BTreeMap<Key, Capability>> {
-        self.entries.lock().unwrap()
+    pub(crate) fn lock(&self) -> MutexGuard<'_, DictInner> {
+        self.inner.lock().unwrap()
     }
 
     /// Inserts an entry, mapping `key` to `capability`. If an entry already
@@ -75,8 +82,8 @@ impl Dict {
         key: Key,
         capability: Capability,
     ) -> Result<(), fsandbox::DictionaryError> {
-        let mut entries = self.lock_entries();
-        match entries.insert(key, capability) {
+        let mut this = self.lock();
+        match this.entries.insert(key, capability) {
             Some(_) => Err(fsandbox::DictionaryError::AlreadyExists),
             None => Ok(()),
         }
@@ -87,13 +94,13 @@ impl Dict {
     ///
     /// If the value could not be cloned, returns an error.
     pub fn get(&self, key: &Key) -> Result<Option<Capability>, ()> {
-        self.lock_entries().get(key).map(|c| c.try_clone()).transpose().map_err(|_| ())
+        self.lock().entries.get(key).map(|c| c.try_clone()).transpose().map_err(|_| ())
     }
 
     /// Removes `key` from the entries, returning the capability at `key` if the
     /// key was already in the entries.
     pub fn remove(&self, key: &Key) -> Option<Capability> {
-        self.lock_entries().remove(key)
+        self.lock().entries.remove(key)
     }
 
     /// Returns an iterator over a clone of the entries, sorted by key.
@@ -101,8 +108,9 @@ impl Dict {
     /// If a capability is not cloneable, an error returned for the value.
     pub fn enumerate(&self) -> impl Iterator<Item = (Key, Result<Capability, ()>)> {
         let entries = {
-            let entries = self.lock_entries();
-            let entries: Vec<_> = entries
+            let this = self.lock();
+            let entries: Vec<_> = this
+                .entries
                 .iter()
                 .map(|(k, v)| {
                     let k = k.clone();
@@ -117,15 +125,15 @@ impl Dict {
 
     /// Returns an iterator over the keys, in sorted order.
     pub fn keys(&self) -> impl Iterator<Item = Key> {
-        let keys: Vec<_> = self.lock_entries().keys().cloned().collect();
+        let keys: Vec<_> = self.lock().entries.keys().cloned().collect();
         keys.into_iter()
     }
 
     /// Removes all entries from the Dict and returns them as an iterator.
     pub fn drain(&self) -> impl Iterator<Item = (Key, Capability)> {
         let entries = {
-            let mut entries = self.lock_entries();
-            std::mem::replace(&mut *entries, BTreeMap::new())
+            let mut this = self.lock();
+            std::mem::replace(&mut this.entries, BTreeMap::new())
         };
         entries.into_iter()
     }
@@ -139,8 +147,9 @@ impl Dict {
     pub fn shallow_copy(&self) -> Result<Self, ()> {
         let copy = Self::new();
         let copied_entries = {
-            let entries = self.lock_entries();
-            let res: Result<BTreeMap<_, _>, _> = entries
+            let this = self.lock();
+            let res: Result<BTreeMap<_, _>, _> = this
+                .entries
                 .iter()
                 .map(|(k, v)| {
                     let k = k.clone();
@@ -151,8 +160,8 @@ impl Dict {
             res?
         };
         {
-            let mut entries = copy.lock_entries();
-            let _ = std::mem::replace(&mut *entries, copied_entries);
+            let mut copy = copy.lock();
+            let _ = std::mem::replace(&mut copy.entries, copied_entries);
         }
         Ok(copy)
     }

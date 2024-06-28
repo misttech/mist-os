@@ -8,10 +8,10 @@ use ::routing::capability_source::InternalCapability;
 use async_trait::async_trait;
 use cm_types::Name;
 use cm_util::TaskGroup;
-use fidl::endpoints::{self, ClientEnd, DiscoverableProtocolMarker, ServerEnd};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use fuchsia_zircon::{self as zx};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use router_error::Explain;
@@ -80,8 +80,15 @@ impl FactoryCapabilityProvider {
                 responder.send(sender)?;
             }
             fsandbox::FactoryRequest::CreateDictionary { responder } => {
-                let client_end = self.create_dictionary();
-                responder.send(client_end)?;
+                let token = self.create_dictionary();
+                responder.send(token)?;
+            }
+            fsandbox::FactoryRequest::OpenDictionary {
+                dictionary,
+                server_end,
+                control_handle: _,
+            } => {
+                self.open_dictionary(dictionary, server_end);
             }
             fsandbox::FactoryRequest::_UnknownMethod { ordinal, .. } => {
                 warn!(%ordinal, "fuchsia.component.sandbox/Factory received unknown method");
@@ -101,12 +108,19 @@ impl FactoryCapabilityProvider {
         fsandbox::Connector::from(sender)
     }
 
-    fn create_dictionary(&self) -> ClientEnd<fsandbox::DictionaryMarker> {
-        let (client_end, server_end) = endpoints::create_endpoints();
-        let dict = Dict::new();
-        let client_end_koid = server_end.basic_info().unwrap().related_koid;
-        dict.serve_and_register(server_end.into_stream().unwrap(), client_end_koid);
-        client_end
+    fn create_dictionary(&self) -> fsandbox::DictionaryRef {
+        fsandbox::DictionaryRef::from(Dict::new())
+    }
+
+    fn open_dictionary(
+        &self,
+        dictionary: fsandbox::DictionaryRef,
+        server_end: ServerEnd<fsandbox::DictionaryMarker>,
+    ) {
+        let Ok(dict) = Dict::try_from(dictionary) else {
+            return;
+        };
+        dict.serve(server_end.into_stream().unwrap());
     }
 }
 
@@ -142,8 +156,10 @@ mod tests {
     use crate::model::component::ComponentInstance;
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;
+    use fidl::endpoints;
+    use fidl_fuchsia_component_sandbox as fsandbox;
+    use fuchsia_zircon::{self as zx, AsHandleRef};
     use std::sync::{Arc, Weak};
-    use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon as zx};
 
     async fn new_root() -> Arc<ComponentInstance> {
         ComponentInstance::new_root(
@@ -183,12 +199,13 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn create_dictionary() {
+    async fn create_and_open_dictionary() {
         let root = new_root().await;
         let (factory_proxy, _host) = factory(&root).await;
 
-        let dict = factory_proxy.create_dictionary().await.unwrap();
-        let dict = dict.into_proxy().unwrap();
+        let dict_ref = factory_proxy.create_dictionary().await.unwrap();
+        let (dict, server) = endpoints::create_proxy().unwrap();
+        factory_proxy.open_dictionary(dict_ref, server).unwrap();
 
         // The dictionary is empty.
         let (iterator, server_end) = endpoints::create_proxy().unwrap();

@@ -324,6 +324,9 @@ pub struct ResolvedInstanceState {
     /// [StartChildArgs].
     namespace_dir: Once<Arc<pfs::Simple>>,
 
+    /// Holds a [Dict] mapping the component's exposed capabilities. Created on demand.
+    exposed_dict: Once<Dict>,
+
     /// Hosts a directory mapping the component's exposed capabilities, generated from `exposed_dict`.
     /// Created on demand.
     exposed_dir: Once<DirEntry>,
@@ -427,6 +430,7 @@ impl ResolvedInstanceState {
             next_dynamic_instance_id: 1,
             environments,
             namespace_dir: Once::default(),
+            exposed_dict: Once::default(),
             exposed_dir: Once::default(),
             dynamic_capabilities: vec![],
             dynamic_offers: vec![],
@@ -594,19 +598,21 @@ impl ResolvedInstanceState {
             .clone())
     }
 
-    /// Returns a [`Dict`] with contents similar to `component_output_dict`, but adds
-    /// capabilities backed by legacy routing, and hosts [`Open`]s instead of
-    /// [`Router`]s. This [`Dict`] is used to generate the `exposed_dir`. This function creates a new [`Dict`],
-    /// so allocation cost is paid only when called.
-    pub async fn make_exposed_dict(&self) -> Dict {
-        let component = self.weak_component.upgrade().unwrap();
-        let dict = Router::dict_routers_to_open(
-            &WeakInstanceToken::new_component(self.weak_component.clone()),
-            &component.execution_scope,
-            &self.sandbox.component_output_dict,
-        );
-        Self::extend_exposed_dict_with_legacy(&component, self.decl(), &dict);
-        dict
+    /// Returns a [`Dict`] with contents similar to `component_output_dict`, but adds capabilities
+    /// backed by legacy routing, and hosts [`Open`]s instead of [`Router`]s. This [`Dict`] is used
+    /// to generate the `exposed_dir`.
+    pub async fn get_exposed_dict(&self) -> &Dict {
+        let create_exposed_dict = async {
+            let component = self.weak_component.upgrade().unwrap();
+            let dict = Router::dict_routers_to_open(
+                &WeakInstanceToken::new_component(self.weak_component.clone()),
+                &component.execution_scope,
+                &self.sandbox.component_output_dict,
+            );
+            Self::extend_exposed_dict_with_legacy(&component, self.decl(), &dict);
+            dict
+        };
+        self.exposed_dict.get_or_init(create_exposed_dict).await
     }
 
     fn extend_exposed_dict_with_legacy(
@@ -632,7 +638,7 @@ impl ResolvedInstanceState {
 
     pub async fn get_exposed_dir(&self) -> &DirEntry {
         let create_exposed_dir = async {
-            let exposed_dict = self.make_exposed_dict().await;
+            let exposed_dict = self.get_exposed_dict().await.clone();
             DirEntry::new(
                 exposed_dict
                     .try_into_directory_entry()

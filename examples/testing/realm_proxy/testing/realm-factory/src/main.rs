@@ -31,12 +31,14 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
             match request {
                 RealmFactoryRequest::CreateRealm { options, responder } => {
                     let realm = create_realm(options).await?;
+                    let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>()?;
 
                     // Get a dict containing the capabilities exposed by the realm.
                     let (expose_dict, server_end) = endpoints::create_proxy().unwrap();
                     realm.root.controller().get_exposed_dictionary(server_end).await?.unwrap();
-                    let dictionary = expose_dict.copy().await?.unwrap();
-                    let dictionary = dictionary.into_proxy().unwrap();
+                    let dict_ref = expose_dict.copy().await?.unwrap();
+                    let (dictionary, server) = endpoints::create_proxy().unwrap();
+                    factory.open_dictionary(dict_ref, server).unwrap();
 
                     // Mix in additional capabilities to the dict.
                     //
@@ -55,7 +57,6 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
 
                     let (echo_receiver_client, echo_receiver_stream) =
                         endpoints::create_request_stream::<fsandbox::ReceiverMarker>()?;
-                    let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>()?;
                     let echo_connector_client =
                         factory.create_connector(echo_receiver_client).await?;
                     dictionary

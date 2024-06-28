@@ -45,11 +45,11 @@ use {
     cm_types::RelativePath,
     errors::{ActionError, ModelError, ResolveActionError, StartActionError},
     fasync::TestExecutor,
-    fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
+    fidl::endpoints::{ProtocolMarker, ServerEnd},
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
+    fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::{
         channel::{mpsc, oneshot},
@@ -1092,8 +1092,6 @@ async fn create_child_with_dict() {
     // TODO(https://fxbug.dev/319542502): Insert the external Router type, once it exists
     dict.insert("hippo".parse().unwrap(), sender.into()).expect("dict entry already exists");
 
-    let dictionary_client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
-
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child_with_args(
         &Moniker::root(),
@@ -1106,10 +1104,7 @@ async fn create_child_with_dict() {
             on_terminate: None,
             config_overrides: None,
         },
-        fcomponent::CreateChildArgs {
-            dictionary: Some(dictionary_client_end),
-            ..Default::default()
-        },
+        fcomponent::CreateChildArgs { dictionary: Some(dict.into()), ..Default::default() },
     )
     .await;
 

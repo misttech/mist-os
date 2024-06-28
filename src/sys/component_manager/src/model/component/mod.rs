@@ -222,11 +222,11 @@ impl TryFrom<fcomponent::StartChildArgs> for IncomingCapabilities {
             .try_into()
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
 
-        let dict = if let Some(dict_client_end) = args.dictionary {
-            let fidl_capability = fsandbox::Capability::Dictionary(dict_client_end);
-            let any = Capability::try_from(fidl_capability)
+        let dict = if let Some(dict_ref) = args.dictionary {
+            let fidl_capability = fsandbox::Capability::Dictionary(dict_ref);
+            let cap = Capability::try_from(fidl_capability)
                 .map_err(|_| fcomponent::Error::InvalidArguments)?;
-            let Capability::Dictionary(dict) = any else {
+            let Capability::Dictionary(dict) = cap else {
                 return Err(fcomponent::Error::InvalidArguments);
             };
             Some(dict)
@@ -510,8 +510,8 @@ impl ComponentInstance {
             .map_err(|_| AddDynamicChildError::InvalidDictionary)?;
 
         // Merge `ChildArgs.dictionary` entries into the child sandbox.
-        if let Some(dictionary_client_end) = child_args.dictionary {
-            let fidl_capability = fsandbox::Capability::Dictionary(dictionary_client_end);
+        if let Some(dictionary_ref) = child_args.dictionary {
+            let fidl_capability = fsandbox::Capability::Dictionary(dictionary_ref);
             let any: Capability =
                 fidl_capability.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
             let dict = match any {

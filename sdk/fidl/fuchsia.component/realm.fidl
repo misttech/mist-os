@@ -184,7 +184,7 @@ type CreateChildArgs = resource table {
 
     /// A dictionary that contains extra capabilities for the component instance.
     @available(added=HEAD)
-    5: dictionary client_end:fuchsia.component.sandbox.Dictionary;
+    5: dictionary fuchsia.component.sandbox.DictionaryRef;
 };
 
 /// A protocol to iterate over the list of children in a realm.
