@@ -65,6 +65,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertIsNone(c.depfile)
         self.assertIsNone(c.sysroot)
         self.assertEqual(c.libdirs, [])
+        self.assertEqual(c.libs, [])
         self.assertIsNone(c.profile_list)
         self.assertIsNone(c.profile_generate)
         self.assertIsNone(c.profile_instr_generate)
@@ -399,6 +400,24 @@ class CxxActionTests(unittest.TestCase):
             )
         )
         self.assertEqual(c.libdirs, [Path("../foo/foo"), Path("bar/bar")])
+
+    def test_libs(self) -> None:
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    "-lmath",
+                    "-lscience",
+                    source,
+                    "-o",
+                    output,
+                    "-liberty",
+                ]
+            )
+        )
+        self.assertEqual(c.libs, ["math", "science", "iberty"])
 
     def test_unwindlib_equals_arg(self) -> None:
         source = Path("hello.o")

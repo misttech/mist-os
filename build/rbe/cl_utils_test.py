@@ -277,6 +277,46 @@ class RemoveHashCommentsTests(unittest.TestCase):
         )
 
 
+class RemoveCCommentsTests(unittest.TestCase):
+    def test_empty_string(self) -> None:
+        self.assertEqual(cl_utils.remove_c_comments(""), "")
+
+    def test_whitepace_only(self) -> None:
+        self.assertEqual(cl_utils.remove_c_comments(" "), " ")
+        self.assertEqual(cl_utils.remove_c_comments("\t"), "\t")
+        self.assertEqual(cl_utils.remove_c_comments("\n"), "\n")
+        self.assertEqual(cl_utils.remove_c_comments("  \n"), "  \n")
+        self.assertEqual(cl_utils.remove_c_comments("\t\n"), "\t\n")
+
+    def test_strings(self) -> None:
+        self.assertEqual(cl_utils.remove_c_comments('"qwer"\n'), '"qwer"\n')
+        self.assertEqual(
+            cl_utils.remove_c_comments('"/* not a comment*/"\n'),
+            '"/* not a comment*/"\n',
+        )
+        self.assertEqual(
+            cl_utils.remove_c_comments('"// not a comment"\n'),
+            '"// not a comment"\n',
+        )
+
+    def test_eol_comment(self) -> None:
+        self.assertEqual(cl_utils.remove_c_comments("//ab\n"), " \n")
+        self.assertEqual(cl_utils.remove_c_comments("a//b\n"), "a \n")
+        self.assertEqual(
+            cl_utils.remove_c_comments("c d\ne // f\ngh\n"), "c d\ne  \ngh\n"
+        )
+
+    def test_block_comment(self) -> None:
+        self.assertEqual(cl_utils.remove_c_comments("a/**/b"), "a b")
+        self.assertEqual(cl_utils.remove_c_comments("a/****/b"), "a b")
+        self.assertEqual(
+            cl_utils.remove_c_comments("a/*nothing to see here*/b"), "a b"
+        )
+        self.assertEqual(
+            cl_utils.remove_c_comments("a/*\nzz\n*/b"), "a b"
+        )  # multiline
+
+
 class StringSetArgparseActionTests(unittest.TestCase):
     def _parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(

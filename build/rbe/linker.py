@@ -62,7 +62,6 @@ class TokenType(enum.Enum):
     CLOSE_PAREN = 4
     SPACE = 5
     NEWLINE = 6
-    COMMENT = 7
 
 
 _KEYWORDS_RE = re.compile(
@@ -70,7 +69,6 @@ _KEYWORDS_RE = re.compile(
 )
 _SPACE_RE = re.compile(r"[ \t]+")
 _NEWLINE_RE = re.compile(r"\r?\n")
-_COMMENT_RE = re.compile(r"/\*[^*]*\*/", re.MULTILINE)
 _ARG_RE = re.compile(r"[^, \t\r\n()]+")
 
 
@@ -90,11 +88,11 @@ class Token(object):
     type: TokenType
 
 
-def _lex_linker_script(text: str) -> Iterable[Token]:
+def _lex_linker_script(unfiltered_text: str) -> Iterable[Token]:
     """Lex the full text of a linker script.
 
     Args:
-      text: full contents of linker script
+      unfiltered_text: contents of linker script
 
     Yields:
       linker script Tokens
@@ -102,6 +100,9 @@ def _lex_linker_script(text: str) -> Iterable[Token]:
     Raises:
       LexError if there are unhandled input cases, lexical errors.
     """
+    # Remove C-style comments first
+    text = cl_utils.remove_c_comments(unfiltered_text)
+
     while text:  # is not empty
         next_char = text[0]
 
@@ -125,13 +126,6 @@ def _lex_linker_script(text: str) -> Iterable[Token]:
             keyword_name = keyword_match.group(0)
             yield Token(text=keyword_name, type=TokenType.KEYWORD)
             text = text[len(keyword_name) :]
-            continue
-
-        comment_match = _COMMENT_RE.match(text)
-        if comment_match:
-            comment_name = comment_match.group(0)
-            yield Token(text=comment_name, type=TokenType.COMMENT)
-            text = text[len(comment_name) :]
             continue
 
         space_match = _SPACE_RE.match(text)
@@ -236,7 +230,7 @@ def _parse_linker_script_directives(
 
         if tok.type != TokenType.KEYWORD:
             raise ParseError(
-                f"Expected a linker script keyword, but got: {tok.text}"
+                f'Expected a linker script keyword, but got: "{tok.text}" ({tok.type})'
             )
         yield _parse_directive(tok.text, toks)
 
@@ -456,6 +450,8 @@ class LinkerInvocation(object):
 
         Yields:
           paths to linker input files.
+          Some of the yielded paths may not be normalized.
+          It is up to the caller to adjust/resolve these if needed.
         """
         for lib in self.l_libs:
             vmsg(f"Expanding: {lib}")
