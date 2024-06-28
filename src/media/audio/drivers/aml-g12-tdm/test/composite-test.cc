@@ -7,9 +7,6 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
-#include <fidl/fuchsia.power.broker/cpp/fidl.h>
-#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/platform-defs.h>
@@ -139,41 +136,15 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
+  void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   void MapMmio() { EXPECT_EQ(ZX_OK, mapped_mmio_.Map(mmio_)); }
-
-  void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {
-    // fuchsia_hardware_power uses FIDL uint8 for power levels matching fuchsia_power_broker's.
-    constexpr uint8_t kPowerLevelOff =
-        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOff);
-    constexpr uint8_t kPowerLevelOn =
-        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOn);
-    constexpr char kPowerElementName[] = "audio-hw";
-    fuchsia_hardware_power::LevelTuple wake_handling_on = {{
-        .child_level = kPowerLevelOn,
-        .parent_level = static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kActive),
-    }};
-    fuchsia_hardware_power::PowerDependency opportunistic_on_execution_state = {{
-        .child = kPowerElementName,
-        .parent = fuchsia_hardware_power::ParentElement::WithSag(
-            fuchsia_hardware_power::SagElement::kExecutionState),
-        .level_deps = {{std::move(wake_handling_on)}},
-        .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
-    }};
-    fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
-    fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelOn, .name = "on"}};
-    fuchsia_hardware_power::PowerElement element = {
-        {.name = kPowerElementName, .levels = {{std::move(off), std::move(on)}}}};
-    fuchsia_hardware_power::PowerElementConfiguration wake_config = {
-        {.element = std::move(element),
-         .dependencies = {{std::move(opportunistic_on_execution_state)}}}};
-
-    completer.Reply(zx::ok(
-        std::vector<fuchsia_hardware_power::PowerElementConfiguration>{{std::move(wake_config)}}));
-  }
 
   zx::vmo mmio_;
   fzl::VmoMapper mapped_mmio_;
@@ -271,194 +242,9 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
 };
 
-// Power Specific.
-class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
- public:
-  FakeSystemActivityGovernor(zx::event wake_handling) : wake_handling_(std::move(wake_handling)) {}
-
-  fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
-    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   fidl::kIgnoreBindingClosure);
-  }
-
-  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
-    fuchsia_power_system::PowerElements elements;
-    zx::event duplicate;
-    wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
-
-    fuchsia_power_system::ExecutionState wake_handling = {
-        {.opportunistic_dependency_token = std::move(duplicate)}};
-
-    elements = {{.execution_state = std::move(wake_handling)}};
-
-    completer.Reply({{std::move(elements)}});
-  }
-
-  void RegisterListener(RegisterListenerRequest& request,
-                        RegisterListenerCompleter::Sync& completer) override {}
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  zx::event wake_handling_;
-  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
-};
-
-class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
- public:
-  void WatchStatus(fuchsia_power_broker::LeaseControlWatchStatusRequest& request,
-                   WatchStatusCompleter::Sync& completer) override {
-    completer.Reply(lease_status_);
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  fuchsia_power_broker::LeaseStatus lease_status_ = fuchsia_power_broker::LeaseStatus::kSatisfied;
-};
-
-class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
- public:
-  void Lease(fuchsia_power_broker::LessorLeaseRequest& request,
-             LeaseCompleter::Sync& completer) override {
-    auto lease_control = fidl::CreateEndpoints<fuchsia_power_broker::LeaseControl>();
-    lease_control_binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   std::move(lease_control->server), &lease_control_,
-                                   [](fidl::UnbindInfo info) mutable {});
-
-    completer.Reply(fit::success(std::move(lease_control->client)));
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  FakeLeaseControl lease_control_;
-  std::optional<fidl::ServerBinding<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
-};
-
-class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
- public:
-  void Watch(WatchCompleter::Sync& completer) override {
-    ZX_ASSERT(!completer_);
-    completer_.emplace(completer.ToAsync());
-    sync_completion_signal(&ready_);
-  }
-
-  void set_required_level(fuchsia_power_broker::PowerLevel level) {
-    ASSERT_EQ(ZX_OK, sync_completion_wait(&ready_, zx::duration::infinite().get()));
-    sync_completion_reset(&ready_);
-    ZX_ASSERT(completer_);
-    completer_->Reply(fit::success(level));
-    completer_.reset();
-    required_level_ = level;
-  }
-
-  bool watch_received() { return sync_completion_signaled(&ready_); }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  fuchsia_power_broker::PowerLevel required_level_ = AudioCompositeServer::kAudioHardwareOn;
-  std::optional<WatchCompleter::Async> completer_;
-  sync_completion_t ready_;
-};
-
-class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
- public:
-  void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& request,
-              UpdateCompleter::Sync& completer) override {
-    current_level_ = request.current_level();
-    completer.Reply(fit::success());
-  }
-
-  fuchsia_power_broker::PowerLevel current_level() { return current_level_; }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  fuchsia_power_broker::PowerLevel current_level_ = AudioCompositeServer::kAudioHardwareOn;
-};
-
-class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
- public:
-  fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
-    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   fidl::kIgnoreBindingClosure);
-  }
-
-  void AddElement(fuchsia_power_broker::ElementSchema& request,
-                  AddElementCompleter::Sync& completer) override {
-    auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
-    element_control_server_ = std::move(element_control->server);
-    if (request.lessor_channel()) {
-      auto lessor_impl = std::make_unique<FakeLessor>();
-      wake_lessor_ = lessor_impl.get();
-      fidl::BindServer<fuchsia_power_broker::Lessor>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*request.lessor_channel()),
-          std::move(lessor_impl),
-          [](FakeLessor* impl, fidl::UnbindInfo info,
-             fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
-    }
-    if (request.level_control_channels()) {
-      auto required_level_impl = std::make_unique<FakeRequiredLevel>();
-      required_level_ = required_level_impl.get();
-      fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-          std::move(request.level_control_channels()->required()), std::move(required_level_impl),
-          [](FakeRequiredLevel* impl, fidl::UnbindInfo info,
-             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_end) mutable {});
-      auto current_level_impl = std::make_unique<FakeCurrentLevel>();
-      current_level_ = current_level_impl.get();
-      fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-          std::move(request.level_control_channels()->current()), std::move(current_level_impl),
-          [](FakeCurrentLevel* impl, fidl::UnbindInfo info,
-             fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> server_end) mutable {});
-    }
-
-    fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control->client)},
-    };
-
-    completer.Reply(fit::success(std::move(result)));
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  uint8_t current_level() {
-    ZX_ASSERT(current_level_);
-    return current_level_->current_level();
-  }
-  FakeRequiredLevel* required_level() {
-    ZX_ASSERT(required_level_);
-    return required_level_;
-  }
-
- private:
-  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
-  FakeLessor* wake_lessor_ = nullptr;
-  FakeRequiredLevel* required_level_ = nullptr;
-  FakeCurrentLevel* current_level_ = nullptr;
-  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
-};
-
 struct IncomingNamespace {
-  IncomingNamespace() {
-    zx::event::create(0, &execution_state);
-    zx::event execution_state_duplicate;
-    execution_state.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_state_duplicate);
-    system_activity_governor.emplace(std::move(execution_state_duplicate));
-  }
   fdf_testing::TestNode node_{std::string("root")};
   fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
-  zx::event execution_state;
-  std::optional<FakeSystemActivityGovernor> system_activity_governor;
-  FakePowerBroker power_broker;
 };
 
 class AmlG12CompositeTest : public testing::Test {
@@ -468,12 +254,11 @@ class AmlG12CompositeTest : public testing::Test {
         driver_dispatcher_(runtime_.StartBackgroundDispatcher()),
         incoming_(env_dispatcher(), std::in_place) {}
 
-  void SetUp() override { Init(/*power_framework_enabled=*/false); }
+  void SetUp() override { Init(); }
 
-  void Init(bool power_framework_enabled) {
+  void Init() {
     fuchsia_driver_framework::DriverStartArgs driver_start_args;
-    incoming_.SyncCall([power_framework_enabled, &driver_start_args,
-                        this](IncomingNamespace* incoming) {
+    incoming_.SyncCall([&driver_start_args, this](IncomingNamespace* incoming) {
       auto start_args_result = incoming->node_.CreateStartArgsAndServe();
       ASSERT_TRUE(start_args_result.is_ok());
 
@@ -511,23 +296,6 @@ class AmlG12CompositeTest : public testing::Test {
           incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
               sclk_tdm_c_server_.GetInstanceHandler(), "gpio-tdm-c-sclk");
       ASSERT_TRUE(add_sclk_tdm_c_result.is_ok());
-
-      // Power specific.
-      // TODO(b/339038497): This driver is built with Bazel and structured configuration is not
-      // yet supported when building a driver with Bazel. Once available add a config parameter
-      // check and test with power awareness enabled and disabled.
-      if (power_framework_enabled) {
-        auto result_sag = incoming->env_.incoming_directory()
-                              .component()
-                              .AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
-                                  incoming->system_activity_governor->CreateHandler());
-        EXPECT_EQ(ZX_OK, result_sag.status_value());
-        auto result_broker = incoming->env_.incoming_directory()
-                                 .component()
-                                 .AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
-                                     incoming->power_broker.CreateHandler());
-        EXPECT_EQ(ZX_OK, result_broker.status_value());
-      }
 
       driver_start_args = std::move(start_args_result->start_args);
     });
@@ -1361,67 +1129,6 @@ TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetDelay) {
   for (auto& id : kAllValidIds) {
     TestGetDelay(id);
   }
-}
-
-class AmlG12CompositeTestPower : public AmlG12CompositeTest {
- protected:
-  void SetUp() override { Init(/*power_framework_enabled=*/true); }
-};
-
-TEST_F(AmlG12CompositeTestPower, DriverIsAlive) {
-  fidl::Result result = client_->GetProperties();
-  ASSERT_TRUE(result.is_ok());
-  ASSERT_EQ(fuchsia_hardware_audio::kClockDomainMonotonic,
-            result->properties().clock_domain().value());
-}
-
-TEST_F(AmlG12CompositeTestPower, PowerSuspendResume) {
-  EXPECT_TRUE(IsTdmASclkSet());
-  EXPECT_TRUE(IsTdmBSclkSet());
-  EXPECT_TRUE(IsTdmCSclkSet());
-  EXPECT_TRUE(IsFakeClockGateEnabled());
-  EXPECT_TRUE(IsFakeClockPllEnabled());
-
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.required_level()->set_required_level(
-        AudioCompositeServer::kAudioHardwareOff);
-  });
-  fuchsia_power_broker::PowerLevel level = {};
-  do {
-    level = incoming_.SyncCall(
-        [](IncomingNamespace* incoming) { return incoming->power_broker.current_level(); });
-  } while (level != AudioCompositeServer::kAudioHardwareOff);
-
-  EXPECT_FALSE(IsTdmASclkSet());
-  EXPECT_FALSE(IsTdmBSclkSet());
-  EXPECT_FALSE(IsTdmCSclkSet());
-  EXPECT_FALSE(IsFakeClockGateEnabled());
-  EXPECT_FALSE(IsFakeClockPllEnabled());
-
-  bool watch_received = false;
-  do {
-    watch_received = incoming_.SyncCall([](IncomingNamespace* incoming) {
-      return incoming->power_broker.required_level()->watch_received();
-    });
-  } while (!watch_received);
-
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.required_level()->set_required_level(
-        AudioCompositeServer::kAudioHardwareOn);
-  });
-  {
-    fuchsia_power_broker::PowerLevel level = {};
-    do {
-      level = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->power_broker.current_level(); });
-    } while (level != AudioCompositeServer::kAudioHardwareOn);
-  }
-
-  EXPECT_TRUE(IsTdmASclkSet());
-  EXPECT_TRUE(IsTdmBSclkSet());
-  EXPECT_TRUE(IsTdmCSclkSet());
-  EXPECT_TRUE(IsFakeClockGateEnabled());
-  EXPECT_TRUE(IsFakeClockPllEnabled());
 }
 
 }  // namespace audio::aml_g12

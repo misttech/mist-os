@@ -20,13 +20,6 @@ namespace audio::aml_g12 {
 
 constexpr char kDriverName[] = "aml-g12-audio-composite";
 
-struct PowerConfiguration {
-  fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_client;
-  fidl::ClientEnd<fuchsia_power_broker::Lessor> lessor_client;
-  fidl::ClientEnd<fuchsia_power_broker::CurrentLevel> current_level_client;
-  fidl::ClientEnd<fuchsia_power_broker::RequiredLevel> required_level_client;
-};
-
 class Driver : public fdf::DriverBase {
  public:
   Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
@@ -43,8 +36,6 @@ class Driver : public fdf::DriverBase {
     bindings_.AddBinding(dispatcher(), std::move(server), server_.get(),
                          fidl::kIgnoreBindingClosure);
   }
-  zx::result<PowerConfiguration> GetPowerConfiguration(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
 
   std::unique_ptr<AudioCompositeServer> server_;
   fidl::ServerBindingGroup<fuchsia_hardware_audio::Composite> bindings_;

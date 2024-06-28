@@ -52,7 +52,6 @@ fuchsia_cc_driver(
     output_name = "aml-g12-composite",
     deps = [
         "//sdk/lib/driver/compat/cpp",
-        "//sdk/lib/driver/power/cpp",
         "//src/devices/lib/amlogic",
         "//zircon/system/ulib/ddk-platform-defs",
         "@fuchsia_sdk//fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
@@ -64,8 +63,6 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/memory_barriers",
         "@fuchsia_sdk//pkg/trace",
         "@internal_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-        "@internal_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
-        "@internal_sdk//fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     ],
 )
 
@@ -110,7 +107,6 @@ fuchsia_cc_test(
     ],
     deps = [
         "//sdk/lib/driver/compat/cpp",
-        "//sdk/lib/driver/power/cpp",
         "//src/devices/lib/amlogic",
         "//zircon/system/ulib/ddk-platform-defs",
         "//zircon/system/ulib/fzl",
@@ -133,8 +129,6 @@ fuchsia_cc_test(
         "@fuchsia_sdk//pkg/trace",
         "@fuchsia_sdk//pkg/zx",
         "@internal_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-        "@internal_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
-        "@internal_sdk//fidl/fuchsia.power.system:fuchsia.power.system_cpp",
         "@internal_sdk//src/devices/testing/fake-bti_fake-bti",
     ],
 )

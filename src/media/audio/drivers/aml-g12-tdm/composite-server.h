@@ -7,8 +7,6 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.clock/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
-#include <fidl/fuchsia.power.broker/cpp/fidl.h>
-#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/trace/event.h>
@@ -92,22 +90,12 @@ class AudioCompositeServer
     : public fidl::Server<fuchsia_hardware_audio::Composite>,
       public fidl::Server<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
  public:
-  // Cast is needed because PowerLevel and BinaryPowerLevel are distinct types.
-  static const fuchsia_power_broker::PowerLevel kAudioHardwareOn =
-      static_cast<fuchsia_power_broker::PowerLevel>(fuchsia_power_broker::BinaryPowerLevel::kOn);
-  static const fuchsia_power_broker::PowerLevel kAudioHardwareOff =
-      static_cast<fuchsia_power_broker::PowerLevel>(fuchsia_power_broker::BinaryPowerLevel::kOff);
-
   AudioCompositeServer(
       std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios, zx::bti bti,
       async_dispatcher_t* dispatcher, metadata::AmlVersion aml_version,
       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
-      std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients,
-      fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control,
-      fidl::SyncClient<fuchsia_power_broker::Lessor> lessor,
-      fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level,
-      fidl::Client<fuchsia_power_broker::RequiredLevel> required_level);
+      std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients);
 
   async_dispatcher_t* dispatcher() { return dispatcher_; }
   zx::bti& bti() { return bti_; }
@@ -167,7 +155,6 @@ class AudioCompositeServer
                            metadata::AmlVersion aml_version);
   zx_status_t StartSocPower();
   zx_status_t StopSocPower();
-  void WatchRequiredLevel();
 
   async_dispatcher_t* dispatcher_;
   zx::bti bti_;
@@ -191,17 +178,6 @@ class AudioCompositeServer
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_;
   std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients_;
   bool soc_power_started_ = false;
-  // Need to keep the ElementControl channel end (returned from adding the power element audio-hw)
-  // so the power element stays in the topology.
-  fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_;
-  // This Lessor client allows us to request a lease on the audio-hw power element.
-  fidl::SyncClient<fuchsia_power_broker::Lessor> lessor_;
-  // We need to keep the LeaseControl channel end to keep the lease on audio-hw.
-  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_;
-  // FIDL client used to monitor the power level to be set as required by the Power Broker.
-  fidl::Client<fuchsia_power_broker::RequiredLevel> required_level_;
-  // FIDL client used to update the Power Broker about the level set in the hardware.
-  fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level_;
   trace_async_id_t trace_async_id_;
 };
 
