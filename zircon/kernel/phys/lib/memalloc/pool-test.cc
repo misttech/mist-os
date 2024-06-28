@@ -56,7 +56,7 @@ void TestPoolInit(Pool& pool, cpp20::span<Range> input, std::optional<uint64_t> 
 
 void TestPoolContents(const Pool& pool, cpp20::span<const Range> expected) {
   EXPECT_EQ(expected.size(), pool.size());
-  std::vector<const Range> actual(pool.begin(), pool.end());
+  std::vector<Range> actual(pool.begin(), pool.end());
   ASSERT_NO_FATAL_FAILURE(CompareRanges(expected, {actual}));
 }
 

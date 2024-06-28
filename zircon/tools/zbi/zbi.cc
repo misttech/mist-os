@@ -419,7 +419,7 @@ class Checksummer final {
     crc_ = crc32(crc_, static_cast<const uint8_t*>(buffer.iov_base), buffer.iov_len);
   }
 
-  void Write(const std::list<const iovec>& list) {
+  void Write(const std::list<iovec>& list) {
     for (const auto& buffer : list) {
       Write(buffer);
     }
@@ -787,7 +787,7 @@ uint32_t Compressor::Finish(OutputStream* out) {
 }
 
 struct Decompressor {
-  using Function = std::unique_ptr<std::byte[]>(const std::list<const iovec>& payload,
+  using Function = std::unique_ptr<std::byte[]>(const std::list<iovec>& payload,
                                                 uint32_t decompressed_length);
 
   Function* decompress;
@@ -801,7 +801,7 @@ constexpr Decompressor kDecompressors[] = {
     {DecompressZstd, 0xFD2FB528},
 };
 
-std::unique_ptr<std::byte[]> Decompress(const std::list<const iovec>& payload,
+std::unique_ptr<std::byte[]> Decompress(const std::list<iovec>& payload,
                                         uint32_t decompressed_length) {
   if (payload.empty() || payload.front().iov_len < sizeof(uint32_t)) {
     fprintf(stderr, "compressed payload too small for header\n");
@@ -820,7 +820,7 @@ std::unique_ptr<std::byte[]> Decompress(const std::list<const iovec>& payload,
   exit(1);
 }
 
-std::unique_ptr<std::byte[]> DecompressLz4f(const std::list<const iovec>& payload,
+std::unique_ptr<std::byte[]> DecompressLz4f(const std::list<iovec>& payload,
                                             uint32_t decompressed_length) {
   auto buffer = std::make_unique<std::byte[]>(decompressed_length);
 
@@ -860,7 +860,7 @@ std::unique_ptr<std::byte[]> DecompressLz4f(const std::list<const iovec>& payloa
   return buffer;
 }
 
-std::unique_ptr<std::byte[]> DecompressZstd(const std::list<const iovec>& payload,
+std::unique_ptr<std::byte[]> DecompressZstd(const std::list<iovec>& payload,
                                             uint32_t decompressed_length) {
   auto buffer = std::make_unique<std::byte[]>(decompressed_length);
 
@@ -1919,7 +1919,7 @@ Extracted items use the file names shown below:\n\
 
  private:
   zbi_header_t header_;
-  std::list<const iovec> payload_;
+  std::list<iovec> payload_;
   // The payload_ items might point into these buffers.  They're just
   // stored here to own the buffers until the payload is exhausted.
   std::forward_list<std::unique_ptr<std::byte[]>> buffers_;
