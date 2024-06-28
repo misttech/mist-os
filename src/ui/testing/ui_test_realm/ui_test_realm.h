@@ -86,6 +86,9 @@ class UITestRealm {
 
     // Idle threshold milliseconds for the activity service.
     int idle_threshold_ms = 5000;
+
+    // Whether the power framework is treated as available.
+    bool suspend_enabled = false;
   };
 
   explicit UITestRealm(Config config);

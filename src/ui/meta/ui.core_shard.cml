@@ -42,5 +42,10 @@
             to: "#ui",
             source_availability: "unknown",
         },
+        {
+            from: "parent",
+            to: "#ui",
+            config: [ "fuchsia.power.SuspendEnabled" ],
+        },
     ],
 }

@@ -51,6 +51,13 @@ pub(crate) trait RealmBuilderExt {
         destination: &(dyn TestRealmComponent + Sync),
         directory_contents: DirectoryContents,
     );
+
+    /// Routes `D` from self to the given `destination` component.
+    async fn route_config_capability_from_self(
+        &self,
+        capability: String,
+        destination: &(dyn TestRealmComponent + Sync),
+    );
 }
 
 #[async_trait::async_trait]
@@ -122,6 +129,23 @@ impl RealmBuilderExt for RealmBuilder {
             directory_name,
             vec![destination.ref_()],
             directory_contents,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// Routes `D` from self to the given `destination` component.
+    async fn route_config_capability_from_self(
+        &self,
+        capability_name: String,
+        destination: &(dyn TestRealmComponent + Sync),
+    ) {
+        RealmBuilder::add_route(
+            &self,
+            Route::new()
+                .capability(Capability::configuration(capability_name))
+                .from(Ref::self_())
+                .to(destination.ref_()),
         )
         .await
         .unwrap();

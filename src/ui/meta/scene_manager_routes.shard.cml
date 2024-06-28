@@ -48,6 +48,11 @@
             subdir: "scene_manager",
         },
         {
+            from: "parent",
+            to: "#scene_manager",
+            config: [ "fuchsia.power.SuspendEnabled" ],
+        },
+        {
             directory: "dev-input-report",
             from: "parent",
             to: [ "#scene_manager" ],
