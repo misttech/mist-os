@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/lcd.h"
 
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -22,7 +23,6 @@
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -151,7 +151,7 @@ zx::result<uint32_t> GetMipiDsiDisplayId(
 
 // static
 zx::result<std::unique_ptr<Lcd>> Lcd::Create(
-    display::Namespace& incoming, uint32_t panel_type, const PanelConfig* panel_config,
+    fdf::Namespace& incoming, uint32_t panel_type, const PanelConfig* panel_config,
     designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
   ZX_DEBUG_ASSERT(designware_dsi_host_controller != nullptr);

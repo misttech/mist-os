@@ -35,8 +35,6 @@
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/driver-runtime-backed-dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter-dfv2.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace-dfv2.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -48,16 +46,6 @@ void DisplayDeviceDriver::Stop() {}
 
 zx::result<DisplayDeviceDriver::DriverFrameworkMigrationUtils>
 DisplayDeviceDriver::CreateDriverFrameworkMigrationUtils() {
-  zx::result<std::unique_ptr<display::Namespace>> create_namespace_result =
-      display::NamespaceDfv2::Create(incoming().get());
-  if (create_namespace_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create incoming Namespace: %s",
-            create_namespace_result.status_string());
-    return create_namespace_result.take_error();
-  }
-  std::unique_ptr<display::Namespace> incoming_namespace =
-      std::move(create_namespace_result).value();
-
   zx::result<std::unique_ptr<display::MetadataGetter>> create_metadata_getter_result =
       display::MetadataGetterDfv2::Create(incoming());
   if (create_metadata_getter_result.is_error()) {
@@ -79,7 +67,6 @@ DisplayDeviceDriver::CreateDriverFrameworkMigrationUtils() {
       std::move(create_dispatcher_factory_result).value();
 
   return zx::ok(DriverFrameworkMigrationUtils{
-      .incoming = std::move(incoming_namespace),
       .metadata_getter = std::move(metadata_getter),
       .dispatcher_factory = std::move(dispatcher_factory),
   });
@@ -96,10 +83,9 @@ zx::result<> DisplayDeviceDriver::Start() {
   driver_framework_migration_utils_ =
       std::move(create_driver_framework_migration_utils_result).value();
 
-  zx::result<std::unique_ptr<DisplayEngine>> create_display_engine_result =
-      DisplayEngine::Create(driver_framework_migration_utils_.incoming.get(),
-                            driver_framework_migration_utils_.metadata_getter.get(),
-                            driver_framework_migration_utils_.dispatcher_factory.get());
+  zx::result<std::unique_ptr<DisplayEngine>> create_display_engine_result = DisplayEngine::Create(
+      incoming().get(), driver_framework_migration_utils_.metadata_getter.get(),
+      driver_framework_migration_utils_.dispatcher_factory.get());
   if (create_display_engine_result.is_error()) {
     FDF_LOG(ERROR, "Failed to create DisplayEngine: %s",
             create_display_engine_result.status_string());

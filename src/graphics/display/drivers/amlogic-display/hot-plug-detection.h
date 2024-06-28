@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/fit/function.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -22,7 +23,6 @@
 
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -48,7 +48,7 @@ class HotPlugDetection {
   // state is HPD not detected. The target call must outlive the newly created
   // HotPlugDetection instance. The target may be called on an arbitrary thread.
   static zx::result<std::unique_ptr<HotPlugDetection>> Create(
-      display::Namespace& incoming, display::DispatcherFactory& dispatcher_factory,
+      fdf::Namespace& incoming, display::DispatcherFactory& dispatcher_factory,
       OnStateChangeHandler on_state_change);
 
   // Production code should prefer the Create() factory method.

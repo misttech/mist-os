@@ -19,7 +19,6 @@
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -43,7 +42,6 @@ class DisplayDeviceDriver : public fdf::DriverBase {
 
  private:
   struct DriverFrameworkMigrationUtils {
-    std::unique_ptr<display::Namespace> incoming;
     std::unique_ptr<display::MetadataGetter> metadata_getter;
     std::unique_ptr<display::DispatcherFactory> dispatcher_factory;
   };

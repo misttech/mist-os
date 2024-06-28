@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
@@ -26,7 +27,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -72,9 +72,9 @@ Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node)
   node_.RecordInt("vout_type", static_cast<int>(type()));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(display::Namespace& incoming,
-                                                      uint32_t panel_type, uint32_t width,
-                                                      uint32_t height, inspect::Node node) {
+zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming, uint32_t panel_type,
+                                                      uint32_t width, uint32_t height,
+                                                      inspect::Node node) {
   zxlogf(INFO, "Fixed panel type is %d", panel_type);
   const PanelConfig* panel_config = GetPanelConfig(panel_type);
   if (panel_config == nullptr) {
@@ -142,7 +142,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
   return zx::ok(std::move(vout));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(display::Namespace& incoming,
+zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(fdf::Namespace& incoming,
                                                        inspect::Node node) {
   zx::result<std::unique_ptr<HdmiHost>> hdmi_host_result = HdmiHost::Create(incoming);
   if (hdmi_host_result.is_error()) {

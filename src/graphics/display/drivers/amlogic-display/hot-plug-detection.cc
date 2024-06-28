@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -22,13 +23,12 @@
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
-    display::Namespace& incoming, display::DispatcherFactory& dispatcher_factory,
+    fdf::Namespace& incoming, display::DispatcherFactory& dispatcher_factory,
     HotPlugDetection::OnStateChangeHandler on_state_change) {
   static const char kHpdGpioFragmentName[] = "gpio-hdmi-hotplug-detect";
   zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> pin_gpio_result =

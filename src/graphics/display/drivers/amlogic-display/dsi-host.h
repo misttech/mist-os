@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DSI_HOST_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>
@@ -18,7 +19,6 @@
 #include "src/graphics/display/drivers/amlogic-display/mipi-phy.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -33,8 +33,7 @@ class DsiHost {
   // `panel_config` must be non-null and must outlive the `DsiHost` instance.
   //
   // Returns a non-null pointer to the DsiHost instance on success.
-  static zx::result<std::unique_ptr<DsiHost>> Create(display::Namespace& incoming,
-                                                     uint32_t panel_type,
+  static zx::result<std::unique_ptr<DsiHost>> Create(fdf::Namespace& incoming, uint32_t panel_type,
                                                      const PanelConfig* panel_config);
 
   // Production code should prefer using the `Create()` factory method.

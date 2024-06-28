@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
@@ -22,7 +23,6 @@
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -35,13 +35,13 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
  public:
   // Returns a non-null pointer to the Vout instance outputting DSI signal on
   // success.
-  static zx::result<std::unique_ptr<Vout>> CreateDsiVout(display::Namespace& incoming,
+  static zx::result<std::unique_ptr<Vout>> CreateDsiVout(fdf::Namespace& incoming,
                                                          uint32_t panel_type, uint32_t width,
                                                          uint32_t height, inspect::Node node);
 
   // Returns a non-null pointer to the Vout instance outputting HDMI signal on
   // success.
-  static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(display::Namespace& incoming,
+  static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(fdf::Namespace& incoming,
                                                           inspect::Node node);
 
   // Sets only the display size, feature bits and panel settings for testing.

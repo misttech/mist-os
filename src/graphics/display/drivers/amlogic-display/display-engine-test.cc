@@ -30,7 +30,6 @@
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/driver-runtime-backed-dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter-dfv2.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace-dfv2.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -366,8 +365,7 @@ class FakeSysmemTest : public testing::Test {
     zx::result<fdf::Namespace> namespace_result = fdf::Namespace::Create(entries);
     ASSERT_OK(namespace_result.status_value());
 
-    driver_framework_incoming_directory_ =
-        std::make_shared<fdf::Namespace>(std::move(namespace_result).value());
+    incoming_ = std::make_shared<fdf::Namespace>(std::move(namespace_result).value());
 
     zx::result<> test_environment_init_result = test_environment_.SyncCall(
         &fdf_testing::TestEnvironment::Initialize, std::move(directory_server));
@@ -381,13 +379,8 @@ class FakeSysmemTest : public testing::Test {
 
     InitializeTestEnvironment();
 
-    zx::result<std::unique_ptr<display::Namespace>> create_incoming_result =
-        display::NamespaceDfv2::Create(driver_framework_incoming_directory_.get());
-    ASSERT_OK(create_incoming_result.status_value());
-    incoming_ = std::move(create_incoming_result).value();
-
     zx::result<std::unique_ptr<display::MetadataGetter>> create_metadata_getter_result =
-        display::MetadataGetterDfv2::Create(driver_framework_incoming_directory_);
+        display::MetadataGetterDfv2::Create(incoming_);
     ASSERT_OK(create_metadata_getter_result.status_value());
     metadata_getter_ = std::move(create_metadata_getter_result).value();
 
@@ -451,12 +444,11 @@ class FakeSysmemTest : public testing::Test {
   async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
       env_dispatcher_->async_dispatcher(), std::in_place};
 
-  // Must outlive `incoming_` and `metadata_getter_`.
-  std::shared_ptr<fdf::Namespace> driver_framework_incoming_directory_;
+  // Must outlive `metadata_getter_`.
+  std::shared_ptr<fdf::Namespace> incoming_;
 
   async::Loop loop_;
 
-  std::unique_ptr<display::Namespace> incoming_;
   std::unique_ptr<display::MetadataGetter> metadata_getter_;
   std::unique_ptr<display::DispatcherFactory> dispatcher_factory_;
 

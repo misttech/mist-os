@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/compiler.h>
@@ -34,7 +35,6 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -46,7 +46,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   // `metadata_getter` must be non-null and outlive `DisplayEngine`.
   // `dispatcher_factory` must be non-null and outlive `DisplayEngine`.
   static zx::result<std::unique_ptr<DisplayEngine>> Create(
-      display::Namespace* incoming, display::MetadataGetter* metadata_getter,
+      fdf::Namespace* incoming, display::MetadataGetter* metadata_getter,
       display::DispatcherFactory* dispatcher_factory);
 
   // Creates an uninitialized `DisplayEngine` instance.
@@ -56,7 +56,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   // `dispatcher_factory` must be non-null and outlive `DisplayEngine`.
   //
   // Production code should use `DisplayEngine::Create()` instead.
-  explicit DisplayEngine(display::Namespace* incoming, display::MetadataGetter* metadata_getter,
+  explicit DisplayEngine(fdf::Namespace* incoming, display::MetadataGetter* metadata_getter,
                          display::DispatcherFactory* dispatcher_factory);
 
   DisplayEngine(const DisplayEngine&) = delete;
@@ -225,7 +225,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   // currently applied to the display.
   bool IsNewDisplayTiming(const display::DisplayTiming& timing) __TA_REQUIRES(display_mutex_);
 
-  display::Namespace& incoming_;
+  fdf::Namespace& incoming_;
   display::MetadataGetter& metadata_getter_;
   display::DispatcherFactory& dispatcher_factory_;
 

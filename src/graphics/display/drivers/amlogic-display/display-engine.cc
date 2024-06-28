@@ -51,7 +51,6 @@
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace amlogic_display {
@@ -1303,7 +1302,7 @@ zx_status_t DisplayEngine::Initialize() {
   return ZX_OK;
 }
 
-DisplayEngine::DisplayEngine(display::Namespace* incoming, display::MetadataGetter* metadata_getter,
+DisplayEngine::DisplayEngine(fdf::Namespace* incoming, display::MetadataGetter* metadata_getter,
                              display::DispatcherFactory* dispatcher_factory)
     : incoming_(*incoming),
       metadata_getter_(*metadata_getter),
@@ -1316,7 +1315,7 @@ DisplayEngine::~DisplayEngine() {}
 
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
-    display::Namespace* incoming, display::MetadataGetter* metadata_getter,
+    fdf::Namespace* incoming, display::MetadataGetter* metadata_getter,
     display::DispatcherFactory* dispatcher_factory) {
   fbl::AllocChecker alloc_checker;
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(

@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -25,7 +26,6 @@
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -182,7 +182,7 @@ HdmiHost::HdmiHost(std::unique_ptr<HdmiTransmitter> hdmi_transmitter, fdf::MmioB
 }
 
 // static
-zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(display::Namespace& incoming) {
+zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(fdf::Namespace& incoming) {
   static constexpr char kPdevFragmentName[] = "pdev";
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
       incoming.Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
