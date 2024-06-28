@@ -568,6 +568,95 @@ where
 {
 }
 
+/// A marker trait for all dual stack conversions in [`TcpContext`].
+pub trait DualStackConverter<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>:
+    OwnedOrRefsBidirectionalConverter<
+        I::ConnectionAndAddr<D, BT>,
+        EitherStack<
+            (
+                Connection<I, I, D, BT>,
+                ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+            ),
+            (
+                Connection<I, I::OtherVersion, D, BT>,
+                ConnAddr<ConnIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+            ),
+        >,
+    > + OwnedOrRefsBidirectionalConverter<
+        I::ListenerIpAddr,
+        DualStackListenerIpAddr<I::Addr, NonZeroU16>,
+    > + OwnedOrRefsBidirectionalConverter<
+        ListenerAddr<I::ListenerIpAddr, D>,
+        ListenerAddr<DualStackListenerIpAddr<I::Addr, NonZeroU16>, D>,
+    > + OwnedOrRefsBidirectionalConverter<
+        I::OriginalDstAddr,
+        EitherStack<I::Addr, <I::OtherVersion as Ip>::Addr>,
+    >
+{
+}
+
+impl<I, D, BT, O> DualStackConverter<I, D, BT> for O
+where
+    I: DualStackIpExt,
+    D: WeakDeviceIdentifier,
+    BT: TcpBindingsTypes,
+    O: OwnedOrRefsBidirectionalConverter<
+            I::ConnectionAndAddr<D, BT>,
+            EitherStack<
+                (
+                    Connection<I, I, D, BT>,
+                    ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+                ),
+                (
+                    Connection<I, I::OtherVersion, D, BT>,
+                    ConnAddr<ConnIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+                ),
+            >,
+        > + OwnedOrRefsBidirectionalConverter<
+            I::ListenerIpAddr,
+            DualStackListenerIpAddr<I::Addr, NonZeroU16>,
+        > + OwnedOrRefsBidirectionalConverter<
+            ListenerAddr<I::ListenerIpAddr, D>,
+            ListenerAddr<DualStackListenerIpAddr<I::Addr, NonZeroU16>, D>,
+        > + OwnedOrRefsBidirectionalConverter<
+            I::OriginalDstAddr,
+            EitherStack<I::Addr, <I::OtherVersion as Ip>::Addr>,
+        >,
+{
+}
+
+/// A marker trait for all single stack conversions in [`TcpContext`].
+pub trait SingleStackConverter<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>:
+    OwnedOrRefsBidirectionalConverter<
+        I::ConnectionAndAddr<D, BT>,
+        (Connection<I, I, D, BT>, ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, D>),
+    > + OwnedOrRefsBidirectionalConverter<I::ListenerIpAddr, ListenerIpAddr<I::Addr, NonZeroU16>>
+    + OwnedOrRefsBidirectionalConverter<
+        ListenerAddr<I::ListenerIpAddr, D>,
+        ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
+    > + OwnedOrRefsBidirectionalConverter<I::OriginalDstAddr, I::Addr>
+{
+}
+
+impl<I, D, BT, O> SingleStackConverter<I, D, BT> for O
+where
+    I: DualStackIpExt,
+    D: WeakDeviceIdentifier,
+    BT: TcpBindingsTypes,
+    O: OwnedOrRefsBidirectionalConverter<
+            I::ConnectionAndAddr<D, BT>,
+            (
+                Connection<I, I, D, BT>,
+                ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+            ),
+        > + OwnedOrRefsBidirectionalConverter<I::ListenerIpAddr, ListenerIpAddr<I::Addr, NonZeroU16>>
+        + OwnedOrRefsBidirectionalConverter<
+            ListenerAddr<I::ListenerIpAddr, D>,
+            ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
+        > + OwnedOrRefsBidirectionalConverter<I::OriginalDstAddr, I::Addr>,
+{
+}
+
 /// Core context for TCP.
 pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     TcpDemuxContext<I, Self::WeakDeviceId, BC> + IpSocketHandler<I, BC>
@@ -589,17 +678,7 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     /// A collection of type assertions that must be true in the single stack
     /// version, associated types and concrete types must unify and we can
     /// inspect types by converting them into the concrete types.
-    type SingleStackConverter: OwnedOrRefsBidirectionalConverter<
-            I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
-            (
-                Connection<I, I, Self::WeakDeviceId, BC>,
-                ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, Self::WeakDeviceId>,
-            ),
-        > + OwnedOrRefsBidirectionalConverter<I::ListenerIpAddr, ListenerIpAddr<I::Addr, NonZeroU16>>
-        + OwnedOrRefsBidirectionalConverter<
-            ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
-            ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
-        > + OwnedOrRefsBidirectionalConverter<I::OriginalDstAddr, I::Addr>;
+    type SingleStackConverter: SingleStackConverter<I, Self::WeakDeviceId, BC>;
 
     /// The core context that will give access to both versions of the IP layer.
     type DualStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
@@ -620,34 +699,7 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     /// A collection of type assertions that must be true in the dual stack
     /// version, associated types and concrete types must unify and we can
     /// inspect types by converting them into the concrete types.
-    type DualStackConverter: OwnedOrRefsBidirectionalConverter<
-            I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
-            EitherStack<
-                (
-                    Connection<I, I, Self::WeakDeviceId, BC>,
-                    ConnAddr<
-                        ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        Self::WeakDeviceId,
-                    >,
-                ),
-                (
-                    Connection<I, I::OtherVersion, Self::WeakDeviceId, BC>,
-                    ConnAddr<
-                        ConnIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        Self::WeakDeviceId,
-                    >,
-                ),
-            >,
-        > + OwnedOrRefsBidirectionalConverter<
-            I::ListenerIpAddr,
-            DualStackListenerIpAddr<I::Addr, NonZeroU16>,
-        > + OwnedOrRefsBidirectionalConverter<
-            ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
-            ListenerAddr<DualStackListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
-        > + OwnedOrRefsBidirectionalConverter<
-            I::OriginalDstAddr,
-            EitherStack<I::Addr, <I::OtherVersion as Ip>::Addr>,
-        >;
+    type DualStackConverter: DualStackConverter<I, Self::WeakDeviceId, BC>;
 
     /// Calls the function with mutable access to the set with all TCP sockets.
     fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
@@ -5235,50 +5287,15 @@ mod tests {
     use crate::internal::state::{TimeWait, MSL};
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
-        type SingleStackConverter: OwnedOrRefsBidirectionalConverter<
-            Self::ConnectionAndAddr<FakeWeakDeviceId<FakeDeviceId>, TcpBindingsCtx<FakeDeviceId>>,
-            (
-                Connection<
-                    Self,
-                    Self,
-                    FakeWeakDeviceId<FakeDeviceId>,
-                    TcpBindingsCtx<FakeDeviceId>,
-                >,
-                ConnAddr<
-                    ConnIpAddr<<Self as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                    FakeWeakDeviceId<FakeDeviceId>,
-                >,
-            ),
+        type SingleStackConverter: SingleStackConverter<
+            Self,
+            FakeWeakDeviceId<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
         >;
-
-        type DualStackConverter: OwnedOrRefsBidirectionalConverter<
-            Self::ConnectionAndAddr<FakeWeakDeviceId<FakeDeviceId>, TcpBindingsCtx<FakeDeviceId>>,
-            EitherStack<
-                (
-                    Connection<
-                        Self,
-                        Self,
-                        FakeWeakDeviceId<FakeDeviceId>,
-                        TcpBindingsCtx<FakeDeviceId>,
-                    >,
-                    ConnAddr<
-                        ConnIpAddr<<Self as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        FakeWeakDeviceId<FakeDeviceId>,
-                    >,
-                ),
-                (
-                    Connection<
-                        Self,
-                        Self::OtherVersion,
-                        FakeWeakDeviceId<FakeDeviceId>,
-                        TcpBindingsCtx<FakeDeviceId>,
-                    >,
-                    ConnAddr<
-                        ConnIpAddr<<Self::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        FakeWeakDeviceId<FakeDeviceId>,
-                    >,
-                ),
-            >,
+        type DualStackConverter: DualStackConverter<
+            Self,
+            FakeWeakDeviceId<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
         >;
         fn recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr;
 
