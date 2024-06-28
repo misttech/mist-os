@@ -4,7 +4,6 @@
 
 #include <assert.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
 #include <lib/stdcompat/bit.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
@@ -12,6 +11,8 @@
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio {
 

@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "include/lib/virtio/driver_utils.h"
-
-#include <lib/ddk/debug.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/virtio/backends/pci.h>
+#include <lib/virtio/driver_utils.h>
 #include <lib/zx/result.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +14,7 @@
 
 #include <memory>
 
-#include "include/lib/virtio/backends/pci.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio {
 

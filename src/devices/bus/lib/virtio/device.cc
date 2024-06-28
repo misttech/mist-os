@@ -4,7 +4,6 @@
 
 #include <assert.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
 #include <lib/virtio/backends/pci.h>
 #include <lib/virtio/device.h>
 #include <limits.h>
@@ -19,6 +18,8 @@
 #include <utility>
 
 #include <pretty/hexdump.h>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio {
 

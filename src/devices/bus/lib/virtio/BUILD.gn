@@ -61,10 +61,10 @@ library_headers("virtio-headers") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
-  visibility = [ ":virtio" ]
+  visibility = [ ":virtio-common" ]
 }
 
-source_set("virtio") {
+source_set("virtio-common") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "backends/pci.cc",
@@ -76,7 +76,7 @@ source_set("virtio") {
   ]
   public_deps = [
     ":virtio-headers",
-    "//src/devices/lib/driver",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
   ]
   deps = [
     "//sdk/lib/stdcompat",
@@ -86,4 +86,19 @@ source_set("virtio") {
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
+}
+
+group("virtio") {
+  public_deps = [
+    ":virtio-common",
+    "//src/devices/lib/driver",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
+  ]
+}
+
+group("virtio-dfv2") {
+  public_deps = [
+    ":virtio-common",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
+  ]
 }

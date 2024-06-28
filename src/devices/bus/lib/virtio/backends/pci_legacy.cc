@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
+#include <lib/virtio/backends/pci.h>
 #include <zircon/syscalls/types.h>
 
 #include <fbl/auto_lock.h>
 #include <virtio/virtio.h>
 
-#include "../include/lib/virtio/backends/pci.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio {
 
