@@ -40,6 +40,10 @@ impl Uuid {
         self.0.as_bytes()
     }
 
+    pub const fn to_le_bytes(&self) -> [u8; Self::BLUETOOTH_UUID_LENGTH_BYTES] {
+        self.0.to_bytes_le()
+    }
+
     pub const fn new16(value: u16) -> Uuid {
         Uuid::new32(value as u32)
     }
