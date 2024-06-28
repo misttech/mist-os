@@ -1013,7 +1013,7 @@ impl Right {
 ///
 /// ### Paths {#paths}
 ///
-/// Paths are sequences of [names]{#names} delimited by the `/` character. A path
+/// Paths are sequences of [names](#names) delimited by the `/` character. A path
 /// must not exceed 4095 characters in length. Throughout the document,
 ///
 /// - Relative paths cannot start with the `/` character.
