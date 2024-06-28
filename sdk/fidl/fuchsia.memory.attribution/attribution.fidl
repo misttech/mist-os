@@ -77,8 +77,30 @@ type NewPrincipal = resource table {
     /// The identifier of this principal.
     1: identifier Identifier;
 
+    /// Description of the identity of the principal.
+    ///
+    /// Description holds a human-friendly (or a reference to a human-friendly)
+    /// identity descriptor of the principal. This will be used by clients to
+    /// identify this principal to users at display time.
+    2: description flexible resource union {
+        /// Token identifying the component instance run by this principal.
+        ///
+        /// This is the token defined in the component_instance field of
+        /// fuchsia.component.runner.ComponentStartInfo.
+        1: component zx.Handle:EVENT;
+
+        /// A subpart of a component, which isn't a fully-blown Component within
+        /// Component Framework but still represents a coherent unit of
+        /// computation. This can be, for instance, a Linux process under Starnix.
+        ///
+        /// This name needs to be unique within the component this principal is
+        /// part of.
+        2: part string:MAX;
+    };
+
     /// The type of the principal.
-    2: type flexible enum : uint32 {
+    // TODO(b/347257225): `type` is not compatible with measure_tape.
+    3: principal_type flexible enum : uint32 {
         /// An independent unit of computation that can be described as
         /// running, such as a component or an application.
         ///
@@ -95,7 +117,7 @@ type NewPrincipal = resource table {
 
     /// If this principal provides attribution information, a channel to its
     /// provider.
-    3: detailed_attribution client_end:<Provider>;
+    4: detailed_attribution client_end:<Provider>;
 };
 
 /// The complete set of Resources used by a Principal.
@@ -104,7 +126,7 @@ type NewPrincipal = resource table {
 /// Principal by this connection should be replaced. If, on another connection, another
 /// Provider attributed resources to this principal, these attributions should be kept.
 type UpdatedPrincipal = resource table {
-    /// The name of this principal.
+    /// The identifier of this principal.
     1: identifier Identifier;
 
     /// The resources owned by this principal.
@@ -112,7 +134,9 @@ type UpdatedPrincipal = resource table {
     /// If the size of the Resource vector is too big to fit in a FIDL message, `buffer` should
     /// contain a serialized vector of Resources.
     2: resources flexible resource union {
-        1: data vector<Resource>:MAX;
+        1: data struct {
+            resources vector<Resource>:MAX;
+        };
 
         /// buffer is read-only.
         2: buffer zx.Handle:VMO;
@@ -127,23 +151,7 @@ type Resource = flexible union {
     1: kernel_object zx.Koid;
 };
 
-/// [`Identifier`] identifies a principal.
-type Identifier = flexible resource union {
-    /// Represents the principal sending the claim. This is useful for a runner
-    /// to claim a resource that is also shared with one of its children.
-    1: self struct {};
-
-    /// Token identifying the component instance run by this principal.
-    ///
-    /// This is the token defined in the component_instance field of
-    /// fuchsia.component.runner.ComponentStartInfo.
-    2: component zx.Handle:EVENT;
-
-    /// A subpart of a component, which isn't a fully-blown Component within
-    /// Component Framework but still represents a coherent unit of
-    /// computation. This can be, for instance, a Linux process under Starnix.
-    ///
-    /// This name needs to be unique within the component this principal is
-    /// part of.
-    3: part string:MAX;
-};
+/// Unique identifier within the scope of an attribution provider, used to
+/// identify a specific principal (Component, part of a Component, etc.)
+/// in attribution updates.
+alias Identifier = uint64;

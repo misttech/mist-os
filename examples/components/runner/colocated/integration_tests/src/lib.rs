@@ -4,6 +4,7 @@
 
 #![cfg(test)]
 
+use attribution_testing::PrincipalIdentifier;
 use fidl_fuchsia_process::HandleInfo;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route,
@@ -130,6 +131,7 @@ async fn test_attribute_memory() {
 
     // Starting from the ELF runner, ask about the resource usage.
     let mut mem = attribution_testing::attribute_memory(
+        PrincipalIdentifier(0),
         "elf_runner.cm".to_owned(),
         capabilities.attribution_provider,
         capabilities.introspector,

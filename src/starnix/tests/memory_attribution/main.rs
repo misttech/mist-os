@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
+use attribution_testing::PrincipalIdentifier;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
 use futures::StreamExt;
@@ -54,6 +55,7 @@ async fn mmap_anonymous() {
     let introspector =
         realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::IntrospectorMarker>().unwrap();
     let mut attribution = attribution_testing::attribute_memory(
+        PrincipalIdentifier(1),
         "starnix_runner".to_string(),
         attribution_provider,
         introspector,

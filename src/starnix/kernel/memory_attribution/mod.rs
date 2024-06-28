@@ -4,12 +4,13 @@
 
 pub mod sync;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::iter;
 use std::sync::{mpsc, Arc, Weak};
 
 use attribution::{AttributionServer, AttributionServerHandle};
 use fidl::AsHandleRef;
+use fuchsia_zircon::HandleBased;
 use starnix_sync::Mutex;
 use starnix_uapi::pid_t;
 use {fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx};
@@ -33,9 +34,6 @@ pub struct MemoryAttributionManager {
 struct InitialState {
     /// The initial set of processes running in this kernel.
     processes: HashSet<pid_t>,
-
-    /// A mapping from PID to process identifiers.
-    process_names: HashMap<pid_t, String>,
 }
 
 impl MemoryAttributionManager {
@@ -49,13 +47,11 @@ impl MemoryAttributionManager {
             let Some(kernel) = weak_kernel.upgrade() else { return vec![] };
             let pids = kernel.pids.read();
             let mut processes: HashSet<pid_t> = HashSet::new();
-            let mut process_names: HashMap<pid_t, String> = HashMap::new();
             for thread_group in pids.get_thread_groups() {
                 if let Some(leader) = pids.get_task(thread_group.leader).upgrade() {
                     let name = get_thread_group_identifier(&thread_group);
-                    events.append(&mut attribution_info_for_thread_group(name.clone(), &leader));
+                    events.append(&mut attribution_info_for_thread_group(name, &leader));
                     processes.insert(thread_group.leader);
-                    process_names.insert(thread_group.leader, name);
                 }
             }
             drop(pids);
@@ -63,7 +59,7 @@ impl MemoryAttributionManager {
             // Spawn the pid table monitoring thread once.
             if let Some(publisher_rx) = publisher_rx.lock().take() {
                 let (initial_state_tx, initial_state_rx) = mpsc::sync_channel(1);
-                initial_state_tx.send(InitialState { processes, process_names }).unwrap();
+                initial_state_tx.send(InitialState { processes }).unwrap();
                 let weak_kernel = weak_kernel.clone();
                 let notifier = sync::spawn_thread(&kernel, move |waiter| {
                     Self::run(weak_kernel, publisher_rx, initial_state_rx, waiter);
@@ -104,7 +100,7 @@ impl MemoryAttributionManager {
     ) {
         let publisher = publisher.recv().unwrap();
         let initial_state = initial_state.recv().unwrap();
-        let InitialState { mut processes, mut process_names } = initial_state;
+        let InitialState { mut processes } = initial_state;
 
         loop {
             waiter.wait(MAXIMUM_RESCAN_INTERVAL);
@@ -120,9 +116,8 @@ impl MemoryAttributionManager {
                     if let Some(leader) = kernel.pids.read().get_task(thread_group.leader).upgrade()
                     {
                         let name = get_thread_group_identifier(&thread_group);
-                        let mut update = attribution_info_for_thread_group(name.clone(), &leader);
+                        let mut update = attribution_info_for_thread_group(name, &leader);
                         processes.insert(pid);
-                        process_names.insert(pid, name);
                         updates.append(&mut update);
                     }
                 }
@@ -130,11 +125,8 @@ impl MemoryAttributionManager {
 
             // Find removed processes.
             let new_processes: HashSet<pid_t> = thread_groups.iter().map(|tg| tg.leader).collect();
-            for thread_group in processes.difference(&new_processes) {
-                let name = process_names.remove(thread_group).unwrap();
-                updates.push(fattribution::AttributionUpdate::Remove(
-                    fattribution::Identifier::Part(name),
-                ));
+            for pid in processes.difference(&new_processes) {
+                updates.push(fattribution::AttributionUpdate::Remove(*pid as u64));
             }
             processes = new_processes;
 
@@ -149,8 +141,12 @@ impl MemoryAttributionManager {
 }
 
 fn get_thread_group_identifier(thread_group: &ThreadGroup) -> String {
-    // The system task has an invalid Zircon process handle.
-    let name = thread_group.process.get_name().unwrap_or_else(|_| c"[system task]".to_owned());
+    let name = match thread_group.process.is_invalid_handle() {
+        // The system task has an invalid Zircon process handle.
+        true => c"[system task]".to_owned(),
+        false => thread_group.process.get_name().unwrap_or_else(|_| c"".to_owned()),
+    };
+    // Names not encoded in UTF-8 will stripped of invalid UTF-8 characters.
     let name = name.to_string_lossy();
     let id = thread_group.leader;
     let name = format!("PID {id}: {name}");
@@ -161,16 +157,17 @@ fn attribution_info_for_thread_group(
     name: String,
     leader: &Task,
 ) -> Vec<fattribution::AttributionUpdate> {
-    let new = new_principal(name.clone());
-    let updated = updated_principal(leader, name);
+    let new = new_principal(leader.get_pid(), name.clone());
+    let updated = updated_principal(leader);
     iter::once(new).chain(updated.into_iter()).collect()
 }
 
 /// Builds a `NewPrincipal` event.
-fn new_principal(name: String) -> fattribution::AttributionUpdate {
+fn new_principal(pid: i32, name: String) -> fattribution::AttributionUpdate {
     let new = fattribution::AttributionUpdate::Add(fattribution::NewPrincipal {
-        identifier: Some(fattribution::Identifier::Part(name)),
-        type_: Some(fattribution::Type::Runnable),
+        identifier: Some(pid as u64),
+        description: Some(fattribution::Description::Part(name)),
+        principal_type: Some(fattribution::PrincipalType::Runnable),
         detailed_attribution: None,
         ..Default::default()
     });
@@ -178,14 +175,14 @@ fn new_principal(name: String) -> fattribution::AttributionUpdate {
 }
 
 /// Builds an `UpdatedPrincipal` event. If the task has an invalid root VMAR, returns `None`.
-fn updated_principal(leader: &Task, name: String) -> Option<fattribution::AttributionUpdate> {
+fn updated_principal(leader: &Task) -> Option<fattribution::AttributionUpdate> {
     let mm = leader.mm();
     let Some(vmar_koid) = mm.root_vmar.get_koid().ok() else { return None };
     let update = fattribution::AttributionUpdate::Update(fattribution::UpdatedPrincipal {
-        identifier: Some(fattribution::Identifier::Part(name)),
-        resources: Some(fattribution::Resources::Data(vec![fattribution::Resource::KernelObject(
-            vmar_koid.raw_koid(),
-        )])),
+        identifier: Some(leader.get_pid() as u64),
+        resources: Some(fattribution::Resources::Data(fattribution::Data {
+            resources: vec![fattribution::Resource::KernelObject(vmar_koid.raw_koid())],
+        })),
         ..Default::default()
     });
     Some(update)
