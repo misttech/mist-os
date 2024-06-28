@@ -15,6 +15,7 @@ pub mod ap;
 pub mod auth;
 mod block_ack;
 pub mod client;
+pub mod completers;
 mod ddk_converter;
 pub mod device;
 pub mod disconnect;
@@ -301,13 +302,14 @@ const MINSTREL_UPDATE_INTERVAL: std::time::Duration = std::time::Duration::from_
 const MINSTREL_UPDATE_INTERVAL_HW_SIM: std::time::Duration = std::time::Duration::from_millis(83);
 
 pub async fn mlme_main_loop<T: MlmeImpl>(
-    init_sender: oneshot::Sender<Result<(), zx::Status>>,
+    init_sender: oneshot::Sender<()>,
     config: T::Config,
     mut device: T::Device,
     buffer_provider: BufferProvider,
     mlme_request_stream: mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
 ) -> Result<(), Error> {
+    info!("Starting MLME main loop...");
     let (minstrel_timer, minstrel_time_stream) = common::timer::create_timer();
     let minstrel = device.mac_sublayer_support().await.ok().filter(should_enable_minstrel).map(
         |mac_sublayer_support| {
@@ -331,8 +333,8 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     let mlme_impl =
         T::new(config, device, buffer_provider, timer).await.expect("Failed to create MLME.");
 
-    // Signal init is complete.
-    init_sender.send(Ok(())).map_err(|_| format_err!("Failed to signal init complete."))?;
+    info!("MLME initialization complete!");
+    init_sender.send(()).map_err(|_| format_err!("Failed to signal init complete."))?;
 
     main_loop_impl(
         mlme_impl,
@@ -644,7 +646,7 @@ mod tests {
         let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (device_sink, device_stream) = mpsc::unbounded();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
-        let (init_sender, mut init_receiver) = oneshot::channel::<Result<(), zx::Status>>();
+        let (init_sender, mut init_receiver) = oneshot::channel();
         let mut main_loop = Box::pin(mlme_main_loop::<FakeMlme>(
             init_sender,
             (),
@@ -654,10 +656,7 @@ mod tests {
             device_stream,
         ));
         assert_variant!(TestExecutor::poll_until_stalled(&mut main_loop).await, Poll::Pending);
-        assert_eq!(
-            TestExecutor::poll_until_stalled(&mut init_receiver).await,
-            Poll::Ready(Ok(Ok(())))
-        );
+        assert_eq!(TestExecutor::poll_until_stalled(&mut init_receiver).await, Poll::Ready(Ok(())));
 
         // Create a `WlanSoftmacIfcBridge` proxy and stream in order to send a `StopBridgedDriver`
         // message and extract its responder.

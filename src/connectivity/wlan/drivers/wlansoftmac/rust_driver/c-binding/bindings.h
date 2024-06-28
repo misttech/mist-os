@@ -103,43 +103,37 @@ typedef struct {
  * Start and run a bridged wlansoftmac driver hosting an MLME server and an SME server.
  *
  * The driver is "bridged" in the sense that it requires a bridge to a Fuchsia driver to
- * communicate with other Fuchsia drivers over the FDF transport. When initialization of the
- * bridged driver completes, `run_init_completer` will be called.
+ * communicate with other Fuchsia drivers over the FDF transport. After the bridged
+ * driver starts successfully, `run_start_completer` will be called with `start_completer`.
+ * If the bridged driver does not start successfully, this function will return a
+ * non-`ZX_OK` status.
+ *
+ * This function returns `ZX_OK` only if shutdown completes successfully. A successful
+ * shutdown only occurs if the bridged driver receives a
+ * `fuchsia.wlan.softmac/WlanSoftmacIfcBridge.StopBridgedDriver` message and the subsequent
+ * teardown of the hosted server succeeds.
+ *
+ * In all other scenarios, e.g., failure during startup, while running, or during shutdown,
+ * this function will return a non-`ZX_OK` value.
  *
  * # Safety
  *
- * There are two layers of safety documentation for this function. The first layer is for this
- * function itself, and the second is for the `run_init_completer` function.
- *
- * ## For this function itself
- *
  * This function is unsafe for the following reasons:
  *
- *   - This function cannot guarantee `run_init_completer` is thread-safe, i.e., that it's safe to
- *     to call at any time from any thread.
- *   - This function cannot guarantee `init_completer` points to a valid object when
- *     `run_init_completer` is called.
+ *   - This function cannot guarantee `run_start_completer` is thread-safe.
+ *   - This function cannot guarantee `start_completer` points to a valid object when
+ *     `run_start_completer` is called.
  *   - This function cannot guarantee `wlan_softmac_bridge_client_handle` is a valid handle.
  *
  * By calling this function, the caller promises the following:
  *
- *   - The `run_init_completer` function is thread-safe.
- *   - The `init_completer` pointer will point to a valid object at least until
- *     `run_init_completer` is called.
+ *   - The `run_start_completer` function is thread-safe.
+ *   - The `start_completer` pointer will point to a valid object at least until
+ *     `run_start_completer` is called.
  *   - The `wlan_softmac_bridge_client_handle` is a valid handle.
- *
- * ## For `run_init_completer`
- *
- * The `run_init_completer` function is unsafe because it cannot guarantee the `init_completer`
- * argument will be the same `init_completer` passed to `start_and_run_bridged_wlansoftmac`, and
- * cannot guarantee it will be called exactly once.
- *
- * The caller of `run_init_completer` must promise to pass the same `init_completer` from
- * `start_and_run_bridged_wlansoftmac` to `run_init_completer` and call `run_init_completer`
- * exactly once.
  */
 extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
-    void *init_completer, void (*run_init_completer)(void *init_completer, zx_status_t status),
+    void *start_completer, void (*run_start_completer)(void *start_completer, zx_status_t status),
     ethernet_rx_t ethernet_rx, wlan_tx_t wlan_tx, wlansoftmac_buffer_provider_ops_t buffer_provider,
     zx_handle_t wlan_softmac_bridge_client_handle);
 

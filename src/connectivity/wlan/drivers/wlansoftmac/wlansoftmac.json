@@ -1,5 +1,5 @@
 {
-    "short_description": "WLAN SoftMAC driver",
+    "short_description": "WLAN SoftMAC platform driver",
     "manufacturer": "",
     "families": [
         "generic"

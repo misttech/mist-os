@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
         "trace/client.shard.cml",
     ],
     program: {
         runner: "driver",
-        compat: "driver/wlansoftmac.so",
+        binary: "driver/wlansoftmac.so",
         bind: "meta/bind/wlansoftmac.bindbc",
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],

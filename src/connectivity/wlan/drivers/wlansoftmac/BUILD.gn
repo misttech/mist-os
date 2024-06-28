@@ -11,7 +11,7 @@ config("wlansoftmac_config") {
   include_dirs = [ "." ]
 }
 
-driver_bind_rules("wlansoftmac_bind") {
+driver_bind_rules("wlansoftmac-bind") {
   rules = "wlansoftmac.bind"
   bind_output = "wlansoftmac.bindbc"
   tests = "bind_tests.json"
@@ -22,34 +22,32 @@ source_set("source_set") {
   sources = [
     "buffer_allocator.cc",
     "buffer_allocator.h",
-    "driver.cc",
-    "softmac_binding.cc",
-    "softmac_binding.h",
     "softmac_bridge.cc",
     "softmac_bridge.h",
+    "softmac_driver.cc",
+    "softmac_driver.h",
     "softmac_ifc_bridge.cc",
     "softmac_ifc_bridge.h",
   ]
 
   public_deps = [
-    ":wlansoftmac_bind",
+    ":wlansoftmac-bind",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fidl_driver",
-    "//src/connectivity/wlan/drivers/lib/fidl-bridge/cpp",
-    "//src/connectivity/wlan/drivers/lib/log/cpp",
+    "//src/connectivity/wlan/drivers/lib/fidl-bridge/cpp:dfv2",
+    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
     "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:wlansoftmac-c",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/dev-operation",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync:sync-cpp",
+    "//zircon/system/ulib/trace-engine",
   ]
 }
 
@@ -65,7 +63,7 @@ fuchsia_driver("wlansoftmac_driver-driver") {
 fuchsia_driver_component("wlansoftmac_driver") {
   component_name = "wlansoftmac"
   deps = [ ":wlansoftmac_driver-driver" ]
-  info = "wlansoftmac_driver-info.json"
+  info = "wlansoftmac.json"
   manifest = "meta/wlansoftmac.cml"
 }
 
@@ -74,24 +72,76 @@ fuchsia_driver_package("wlansoftmac") {
   driver_components = [ ":wlansoftmac_driver" ]
 }
 
-test("wlansoftmac_tests") {
-  sources = [ "tests/buffer_allocator_test.cc" ]
+test("buffer-allocator-tests") {
+  sources = [
+    "buffer_allocator.cc",
+    "buffer_allocator.h",
+    "tests/buffer_allocator_tests.cc",
+  ]
+
+  deps = [
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
+    "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:wlansoftmac-c",
+    "//src/connectivity/wlan/lib/common/cpp:common",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+fuchsia_unittest_package("wlansoftmac-buffer-allocator-tests") {
+  deps = [ ":buffer-allocator-tests" ]
+}
+
+test("good-driver-tests") {
+  sources = [
+    "tests/custom_environment.h",
+    "tests/fake_wlansoftmac_server.h",
+    "tests/good_driver_tests.cc",
+  ]
 
   deps = [
     ":source_set",
-    "//src/connectivity/wlan/drivers/lib/log/cpp/test:log_overrides",
+    "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/lib/fxl/test:gtest_main",
   ]
 }
 
-fuchsia_unittest_package("wlansoftmac-tests") {
-  deps = [ ":wlansoftmac_tests" ]
+fuchsia_unittest_package("wlansoftmac-good-driver-tests") {
+  deps = [ ":good-driver-tests" ]
+}
+
+test("bad-driver-tests") {
+  sources = [
+    "tests/bad_driver_tests.cc",
+    "tests/custom_environment.h",
+    "tests/fake_wlansoftmac_server.h",
+  ]
+
+  deps = [
+    ":source_set",
+    "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_unittest_package("wlansoftmac-bad-driver-tests") {
+  deps = [ ":bad-driver-tests" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":wlansoftmac-tests",
-    ":wlansoftmac_bind_test",
+    ":wlansoftmac-bad-driver-tests",
+    ":wlansoftmac-bind_test",
+    ":wlansoftmac-buffer-allocator-tests",
+    ":wlansoftmac-good-driver-tests",
   ]
 }
