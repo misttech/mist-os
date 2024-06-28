@@ -227,6 +227,66 @@ class BpfMapTest : public testing::Test {
     SAFE_SYSCALL(write(sk0.get(), "", 1));
   }
 
+  void WriteToRingBuffer(char v) {
+    // A bpf program that write a record in the ringbuffer.
+    bpf_insn program[] = {
+        // r1 <- ringbuf_fd_
+        BPF_LOAD_MAP(1, ringbuf_fd()),
+        // r2 <- 1
+        BPF_MOV_IMM(2, 1),
+        // r3 <- 0
+        BPF_MOV_IMM(3, 0),
+        // Call bpf_ringbuf_reserve
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_reserve),
+        // r0 != 0 -> JMP 1
+        BPF_JNE_IMM(0, 0, 1),
+        // exit
+        BPF_RETURN(),
+        // *r0 = 42
+        BPF_STORE(0, v),
+        // r1 <- r0,
+        BPF_MOV_REG(1, 0),
+        // r2 <- 0,
+        BPF_MOV_REG(2, 0),
+        // Call bpf_ringbuf_submit
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_submit),
+        // r0 <- 0,
+        BPF_MOV_IMM(0, 0),
+        // exit
+        BPF_RETURN(),
+    };
+    Run(program, sizeof(program) / sizeof(program[0]));
+  }
+
+  void DiscardWriteToRingBuffer() {
+    // A bpf program that cancel a write the ringbuffer.
+    bpf_insn program[] = {
+        // r1 <- ringbuf_fd_
+        BPF_LOAD_MAP(1, ringbuf_fd()),
+        // r2 <- 1
+        BPF_MOV_IMM(2, 1),
+        // r3 <- 0
+        BPF_MOV_IMM(3, 0),
+        // Call bpf_ringbuf_reserve
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_reserve),
+        // r0 != 0 -> JMP 1
+        BPF_JNE_IMM(0, 0, 1),
+        // exit
+        BPF_RETURN(),
+        // r1 <- r0,
+        BPF_MOV_REG(1, 0),
+        // r2 <- 0,
+        BPF_MOV_REG(2, 0),
+        // Call bpf_ringbuf_discard
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_discard),
+        // r0 <- 0,
+        BPF_MOV_IMM(0, 0),
+        // exit
+        BPF_RETURN(),
+    };
+    Run(program, sizeof(program) / sizeof(program[0]));
+  }
+
   int array_fd() const { return array_fd_; }
   int map_fd() const { return map_fd_; }
   int ringbuf_fd() const { return ringbuf_fd_; }
@@ -352,6 +412,40 @@ TEST_F(BpfMapTest, MMapRingBufTest) {
                                           ringbuf_fd(), 0)
                 .error_value(),
             EINVAL);
+}
+
+TEST_F(BpfMapTest, WriteRingBufTest) {
+  auto pagewr = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, ringbuf_fd(), 0));
+  auto pagero = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, 3 * getpagesize(), PROT_READ, MAP_SHARED, ringbuf_fd(), getpagesize()));
+  unsigned long* consumer_pos = static_cast<unsigned long*>(pagewr.mapping());
+  unsigned long* producer_pos = static_cast<unsigned long*>(pagero.mapping());
+  uint8_t* data = static_cast<uint8_t*>(pagero.mapping()) + getpagesize();
+  ASSERT_EQ(0u, *consumer_pos);
+  ASSERT_EQ(0u, *producer_pos);
+
+  WriteToRingBuffer(42);
+
+  ASSERT_EQ(0u, *consumer_pos);
+  ASSERT_EQ(16u, *producer_pos);
+
+  uint32_t record_length = *reinterpret_cast<uint32_t*>(data);
+  ASSERT_EQ(0u, record_length & BPF_RINGBUF_BUSY_BIT);
+  ASSERT_EQ(0u, record_length & BPF_RINGBUF_DISCARD_BIT);
+  ASSERT_EQ(1u, record_length);
+
+  uint8_t record_value = *(data + 8);
+  ASSERT_EQ(42u, record_value);
+
+  DiscardWriteToRingBuffer();
+
+  ASSERT_EQ(0u, *consumer_pos);
+  ASSERT_EQ(32u, *producer_pos);
+
+  record_length = *reinterpret_cast<uint32_t*>(data + 16);
+  ASSERT_EQ(0u, record_length & BPF_RINGBUF_BUSY_BIT);
+  ASSERT_EQ(BPF_RINGBUF_DISCARD_BIT, record_length & BPF_RINGBUF_DISCARD_BIT);
 }
 
 }  // namespace

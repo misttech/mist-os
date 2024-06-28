@@ -47,6 +47,13 @@
     retval;                                                                           \
   })
 
+#define ASSERT_RESULT_SUCCESS_AND_RETURN(S)          \
+  ({                                                 \
+    auto retval = (S);                               \
+    ASSERT_TRUE(retval.is_ok()) << #S << " failed."; \
+    std::move(retval.value());                       \
+  })
+
 namespace test_helper {
 
 // Helper class to handle test that needs to fork and do assertion on the child
