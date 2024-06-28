@@ -7,7 +7,7 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
-load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 # Command for running ffx assembly size-check product.
 _SIZE_CHECKER_RUNNER_SH = """

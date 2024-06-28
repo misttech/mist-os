@@ -33,6 +33,63 @@ LOCAL_ONLY_ACTION_KWARGS = {
     },
 }
 
+def select_single_file(files, basename, error_footer = ""):
+    """Finds a single file with a given basename. Multiple matches will fail.
+
+    Args:
+      files: A list of files.
+      basename: The basename of the desired file.
+      error_footer: Optionally adds a non-generic error message footer.
+
+    Returns:
+      The single file matching the basename.
+      It's guaranteed that exactly one file matches that basename.
+    """
+    matching_files = [file for file in files if file.basename == basename]
+
+    if not matching_files:
+        NO_MATCHING_FILE = "\n\nCould not find {} in {}.\n{}".format(
+            basename,
+            files,
+            error_footer,
+        ).rstrip() + "\n\n"
+        fail(NO_MATCHING_FILE)
+
+    if len(matching_files) > 1:
+        AMBIGUOUS_FILE_MATCH = "\n\nToo many matches of {} in {}. (Multiple matches are not allowed).\n{}".format(
+            basename,
+            files,
+            error_footer,
+        ).rstrip() + "\n\n"
+        fail(AMBIGUOUS_FILE_MATCH)
+
+    return matching_files[0]
+
+def select_multiple_files(files, basename, error_footer = ""):
+    """Finds all files that match the given basename. Zero matches will fail.
+
+    Args:
+      files: A list of files.
+      basename: The basename of the desired files.
+      error_footer: Optionally adds a non-generic error message footer.
+
+    Returns:
+      A list of files matching the basename.
+      It's guaranteed that this list is non-empty.
+    """
+    matching_files = [file for file in files if file.basename == basename]
+
+    if not matching_files:
+        # Assign error string to variable for a cleaner stack trace.
+        NO_MATCHING_FILES = "\n\nCould not find any {} in {}.\n{}".format(
+            basename,
+            files,
+            error_footer,
+        ).rstrip() + "\n\n"
+        fail(NO_MATCHING_FILES)
+
+    return matching_files
+
 def extract_labels(json_dict):
     """Walk json_dict and return a map of all the labels found.
 

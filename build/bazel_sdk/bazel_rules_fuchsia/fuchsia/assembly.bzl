@@ -40,6 +40,10 @@ load(
     _fuchsia_elf_sizes = "fuchsia_elf_sizes",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_legacy_bundle.bzl",
+    _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_package_directory.bzl",
     _fuchsia_package_directory = "fuchsia_package_directory",
 )
@@ -60,14 +64,12 @@ load(
 )
 load(
     "//fuchsia/private/assembly:fuchsia_platform_artifacts.bzl",
-    _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
     _fuchsia_platform_artifacts = "fuchsia_platform_artifacts",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product.bzl",
     _PACKAGE_MODE = "PACKAGE_MODE",
     _fuchsia_product = "fuchsia_product",
-    _fuchsia_product_assembly = "fuchsia_product_assembly",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product_bundle.bzl",
@@ -114,14 +116,6 @@ load(
     _fuchsia_virtual_device = "fuchsia_virtual_device",
 )
 load(
-    "//fuchsia/private/assembly:providers.bzl",
-    _FuchsiaLegacyBundleInfo = "FuchsiaLegacyBundleInfo",
-    _FuchsiaPlatformArtifactsInfo = "FuchsiaPlatformArtifactsInfo",
-    _FuchsiaProductAssemblyInfo = "FuchsiaProductAssemblyInfo",
-    _FuchsiaProductImageInfo = "FuchsiaProductImageInfo",
-    _FuchsiaScrutinyConfigInfo = "FuchsiaScrutinyConfigInfo",
-)
-load(
     "//fuchsia/private/workflows:fuchsia_task_flash.bzl",
     _fuchsia_task_flash = "fuchsia_task_flash",
 )
@@ -143,7 +137,6 @@ fuchsia_board_input_bundle = _fuchsia_board_input_bundle
 fuchsia_prebuilt_board_input_bundle = _fuchsia_prebuilt_board_input_bundle
 fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
 fuchsia_product = _fuchsia_product
-fuchsia_product_assembly = _fuchsia_product_assembly
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
 fuchsia_prebuilt_partitions_configuration = _fuchsia_prebuilt_partitions_configuration
 fuchsia_product_bundle = _fuchsia_product_bundle

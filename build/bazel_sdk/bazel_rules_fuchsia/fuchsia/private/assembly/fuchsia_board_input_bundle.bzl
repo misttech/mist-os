@@ -4,15 +4,11 @@
 
 """Rules for defining assembly board input bundle."""
 
-load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-load(
-    ":providers.bzl",
-    "FuchsiaBoardInputBundleInfo",
-)
-load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load(":providers.bzl", "FuchsiaBoardInputBundleInfo")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_single_file")
 
 def _fuchsia_board_input_bundle_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
@@ -114,9 +110,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     return [
         DefaultInfo(
-            files = depset(
-                direct = deps,
-            ),
+            files = depset(deps),
         ),
         FuchsiaBoardInputBundleInfo(
             config = board_input_bundle_dir,
@@ -173,55 +167,31 @@ fuchsia_board_input_bundle = rule(
 )
 
 def _fuchsia_prebuilt_board_input_bundle_impl(ctx):
+    board_input_bundle = ctx.file.config or select_single_file(
+        ctx.files.files,
+        "board_input_bundle.json",
+        "Use the 'config' attribute to manually specify the board input bundle manifest.",
+    )
     return [
-        DefaultInfo(
-            files = depset(
-                direct = [ctx.file.config],
-            ),
-        ),
+        DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaBoardInputBundleInfo(
-            config = ctx.file.config,
+            config = board_input_bundle,
             files = ctx.files.files,
         ),
     ]
 
-def fuchsia_prebuilt_board_input_bundle(name, config, files = []):
-    """Define a Board Input Bundle based on pre-existed BIB directory.
-
-    Args:
-        name: Name for fuchsia_prebuilt_board_input_bundle target.
-        config: Path to Board Input Bundle config file.
-        files: Supporting files needed for this target
-    """
-    filegroup = "{}_files".format(name)
-
-    # If the files are not provided, we will glob the directory based on the
-    # config file.
-    if not files:
-        native.filegroup(
-            name = filegroup,
-            srcs = native.glob(["{}/**/*".format(paths.dirname(config))]),
-        )
-        files = [":{}".format(filegroup)]
-
-    _fuchsia_prebuilt_board_input_bundle(
-        name = name,
-        config = config,
-        files = files,
-    )
-
-_fuchsia_prebuilt_board_input_bundle = rule(
-    doc = """Generates a Board Input Bundle based on pre-existed BIB directory.""",
+fuchsia_prebuilt_board_input_bundle = rule(
+    doc = """Defines a Board Input Bundle based on preexisting BIB files.""",
     implementation = _fuchsia_prebuilt_board_input_bundle_impl,
     attrs = {
         "config": attr.label(
-            doc = "Path to Board Input Bundle config file.",
+            doc = """For manually specifying the Board Input Bundle config file.
+                This file must be present within `files` as well.""",
             allow_single_file = True,
-            mandatory = True,
         ),
-        "files": attr.label_list(
-            doc = "All files belong to Board Input Bundles",
-            default = [],
+        "files": attr.label(
+            doc = "All files belonging to the Board Input Bundles",
+            mandatory = True,
         ),
     },
 )

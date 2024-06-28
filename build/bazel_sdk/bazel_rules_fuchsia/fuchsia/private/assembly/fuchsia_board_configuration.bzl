@@ -7,11 +7,16 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load(
     ":providers.bzl",
-    "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
     "FuchsiaBoardInputBundleInfo",
 )
-load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS", "extract_labels", "replace_labels_with_files")
+load(
+    ":utils.bzl",
+    "LOCAL_ONLY_ACTION_KWARGS",
+    "extract_labels",
+    "replace_labels_with_files",
+    "select_single_file",
+)
 
 def _copy_bash(ctx, src, dst):
     cmd = """\
@@ -37,8 +42,10 @@ rm -rf \"$2\" && cp -fR \"$1/\" \"$2\"
     )
 
 def _fuchsia_board_configuration_impl(ctx):
+    # TODO(https://fxbug.dev/349939865): Change the file name to
+    # `board_configuration.json` and nest under `ctx.label.name`.
     board_config_file = ctx.actions.declare_file(ctx.label.name + "_board_config.json")
-    deps = [board_config_file]
+    board_files = [board_config_file]
 
     filesystems = json.decode(ctx.attr.filesystems)
     replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
@@ -47,7 +54,7 @@ def _fuchsia_board_configuration_impl(ctx):
         src = label.files.to_list()[0]
         dest = ctx.actions.declare_file(src.path)
         ctx.actions.symlink(output = dest, target_file = src)
-        deps.append(dest)
+        board_files.append(dest)
 
     board_config = {}
     board_config["name"] = ctx.attr.board_name
@@ -60,7 +67,7 @@ def _fuchsia_board_configuration_impl(ctx):
         board_config["input_bundles"] = [board_dir_name + "/" + i for i in ctx.attr.input_bundles]
         board_dir = ctx.actions.declare_directory(board_dir_name)
         _copy_bash(ctx, ctx.file.board_bundles_dir, board_dir)
-        deps.append(board_dir)
+        board_files.append(board_dir)
 
     # Files from board_input_bundles have paths that are relative to root,
     # prefix "../"s to make them relative to the output board config.
@@ -72,10 +79,10 @@ def _fuchsia_board_configuration_impl(ctx):
         board_config["input_bundles"] = board_config.get("input_bundles", []) + [
             board_config_relative_to_root + path,
         ]
-        deps.extend(bib[FuchsiaBoardInputBundleInfo].files)
+        board_files.extend(bib[FuchsiaBoardInputBundleInfo].files)
 
     if ctx.attr.devicetree:
-        deps.append(ctx.file.devicetree)
+        board_files.append(ctx.file.devicetree)
         if ctx.attr.board_bundles_dir:
             # Relativize the file path to the board file instead of the
             # workspace root
@@ -89,12 +96,11 @@ def _fuchsia_board_configuration_impl(ctx):
 
     return [
         DefaultInfo(
-            files = depset(
-                direct = deps,
-            ),
+            files = depset(board_files),
         ),
         FuchsiaBoardConfigInfo(
-            board_config = board_config_file,
+            config = board_config_file,
+            files = board_files,
         ),
     ]
 
@@ -162,26 +168,37 @@ def fuchsia_board_configuration(
     )
 
 def _fuchsia_prebuilt_board_configuration_impl(ctx):
+    board_configuration = (
+        # TODO(https://fxbug.dev/349939865): Remove this ugly hack once the
+        # board configuration manifest's name is fixed.
+        ([file for file in ctx.files.files if file.path.endswith("_board_config.json")] + [None])[0]
+    ) or select_single_file(ctx.files.files, "board_configuration.json")
     return [
-        FuchsiaBoardConfigDirectoryInfo(
-            config_directory = ctx.files.board_config_directory,
+        FuchsiaBoardConfigInfo(
+            files = ctx.files.files,
+            config = board_configuration,
         ),
     ]
 
 _fuchsia_prebuilt_board_configuration = rule(
     doc = """A prebuilt board configuration file and its main hardware support bundle.""",
     implementation = _fuchsia_prebuilt_board_configuration_impl,
-    provides = [FuchsiaBoardConfigDirectoryInfo],
+    provides = [FuchsiaBoardConfigInfo],
     attrs = {
-        "board_config_directory": attr.label(
-            doc = "Path to the directory containing the prebuilt board configuration.",
+        "files": attr.label(
+            doc = "A filegroup containing all of the files consisting of the prebuilt board configuration.",
             mandatory = True,
         ),
     },
 )
 
 def fuchsia_prebuilt_board_configuration(
-        name,
-        directory):
+        *,
+        directory = None,
+        **kwargs):
     """A board configuration that has been prebuilt and exists in a specific folder."""
-    _fuchsia_prebuilt_board_configuration(name = name, board_config_directory = directory)
+
+    # TODO(chandarren): Migrate users to use `files` instead.
+    if directory:
+        kwargs["files"] = directory
+    _fuchsia_prebuilt_board_configuration(**kwargs)

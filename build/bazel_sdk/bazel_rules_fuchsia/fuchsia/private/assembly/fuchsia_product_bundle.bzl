@@ -12,7 +12,7 @@ load(
 )
 load(
     ":providers.bzl",
-    "FuchsiaAssemblyConfigInfo",
+    "FuchsiaPartitionsConfigInfo",
     "FuchsiaProductBundleInfo",
     "FuchsiaProductImageInfo",
     "FuchsiaRepositoryKeysInfo",
@@ -20,7 +20,7 @@ load(
     "FuchsiaSizeCheckerInfo",
     "FuchsiaVirtualDeviceInfo",
 )
-load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 DELIVERY_BLOB_TYPE = struct(
     UNCOMPRESSED = "0",
@@ -590,7 +590,7 @@ def _extract_structured_config(ctx, ffx_tool, ffx_scrutiny_inputs, pb_out_dir, i
 
 def _build_fuchsia_product_bundle_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
-    partitions_configuration = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config
+    partitions_configuration = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo]
     system_a_out = ctx.attr.main[FuchsiaProductImageInfo].images_out
     ffx_tool = fuchsia_toolchain.ffx
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
@@ -629,7 +629,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
     env = {
         "FFX": ffx_tool.path,
         "OUTDIR": pb_out_dir.path,
-        "PARTITIONS_PATH": partitions_configuration.path,
+        "PARTITIONS_PATH": partitions_configuration.config.path,
         "SYSTEM_A_MANIFEST": system_a_out.path + "/images.json",
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
@@ -637,7 +637,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
     }
 
     # Gather all the inputs.
-    inputs = ctx.files.partitions_config + ctx.files.main + get_ffx_product_bundle_inputs(fuchsia_toolchain)
+    inputs = partitions_configuration.files + ctx.files.main + get_ffx_product_bundle_inputs(fuchsia_toolchain)
 
     # Add virtual devices.
     for virtual_device in ctx.attr.virtual_devices:
@@ -687,7 +687,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         progress_message = "Creating product bundle for %s" % ctx.label.name,
         **LOCAL_ONLY_ACTION_KWARGS
     )
-    deps = [pb_out_dir, size_report] + ctx.files.partitions_config + ctx.files.main
+    deps = [pb_out_dir, size_report] + partitions_configuration.files + ctx.files.main
 
     # Scrutiny Validation
     ffx_scrutiny_inputs = get_ffx_scrutiny_inputs(fuchsia_toolchain)
@@ -752,6 +752,7 @@ _build_fuchsia_product_bundle = rule(
         ),
         "partitions_config": attr.label(
             doc = "Partitions config to use.",
+            providers = [FuchsiaPartitionsConfigInfo],
             mandatory = True,
         ),
         "main": attr.label(

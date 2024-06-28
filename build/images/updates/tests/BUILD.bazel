@@ -7,7 +7,7 @@ load(
     "BUILD_TYPES",
     "fuchsia_board_configuration",
     "fuchsia_legacy_bundle",
-    "fuchsia_product_assembly",
+    "fuchsia_product",
     "fuchsia_product_configuration",
 )
 
@@ -49,8 +49,8 @@ fuchsia_product_configuration(
     },
 )
 
-fuchsia_product_assembly(
-    name = "fake_product_assembly",
+fuchsia_product(
+    name = "fake_product",
     testonly = True,
     board_config = ":board_config",
     legacy_bundle = ":legacy_gn_aib",
