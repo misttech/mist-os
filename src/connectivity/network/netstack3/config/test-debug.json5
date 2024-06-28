@@ -4,6 +4,9 @@
 {
     // Netstack3 structured configuration values for use in tests that embed the
     // debug instrumented netstack.
-    num_threads: 4,
+
+    // TODO(https://fxbug.dev/316616750): Update this default once
+    // multithreading is stabilized.
+    num_threads: 1,
     debug_logs: true,
 }

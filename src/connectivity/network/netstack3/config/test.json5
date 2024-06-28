@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 {
     // Netstack3 structured configuration values for use in tests.
-    num_threads: 4,
+
+    // TODO(https://fxbug.dev/316616750): Update this default once
+    // multithreading is stabilized.
+    num_threads: 1,
     debug_logs: false,
 }
