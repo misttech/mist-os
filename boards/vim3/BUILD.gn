@@ -16,7 +16,6 @@ board_configuration("vim3") {
     "fuchsia::fan",
     "fuchsia::mali_gpu",
     "fuchsia::pmm_checker",
-    "fuchsia::real_time_clock",
     "fuchsia::usb_peripheral_support",
     "fuchsia::wlan_fullmac",
   ]
