@@ -80,6 +80,11 @@ fuchsia_unittest_package("simple-display-test") {
 #     Type: list of GN labels
 #     Default: []
 #
+#   sources (optional)
+#     Additional C++ sources of the driver library.
+#     Type: list of C++ sources.
+#     Default: []
+#
 template("simple_fuchsia_driver") {
   driver_name = target_name
   driver_bind_rules("simple-${driver_name}-bind") {
@@ -95,9 +100,16 @@ template("simple_fuchsia_driver") {
   }
 
   fuchsia_driver("simple.${driver_name}-driver") {
-    forward_variables_from(invoker, [ "deps" ])
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "sources",
+                           ])
     if (!defined(deps)) {
       deps = []
+    }
+    if (!defined(sources)) {
+      sources = []
     }
 
     output_name = "simple.${driver_name}"
@@ -105,7 +117,7 @@ template("simple_fuchsia_driver") {
       "//build/config:all_source",
       "//build/config/fuchsia:enable_zircon_asserts",
     ]
-    sources = [ "simple-${driver_name}.cc" ]
+    sources += [ "simple-${driver_name}.cc" ]
 
     deps += [
       ":shared",
@@ -129,6 +141,8 @@ template("simple_fuchsia_driver") {
 }
 
 simple_fuchsia_driver("bochs") {
+  sources = [ "bochs-vbe-registers.h" ]
+  deps = [ "//zircon/system/ulib/hwreg" ]
 }
 
 simple_fuchsia_driver("intel") {
