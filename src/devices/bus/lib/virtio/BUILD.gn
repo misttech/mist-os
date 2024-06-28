@@ -52,6 +52,7 @@ library_headers("virtio-headers") {
     "lib/virtio/backends/pci.h",
   ]
   public_deps = [
+    "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/lib/ddk",
