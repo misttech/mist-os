@@ -348,6 +348,13 @@ class DEPCMD : public hwreg::RegisterBase<DEPCMD, uint32_t> {
   static constexpr uint32_t DEPSTARTCFG = 9;  // Start New Configuration
 };
 
+class GSNPSID : public hwreg::RegisterBase<GSNPSID, uint32_t> {
+ public:
+  DEF_FIELD(31, 16, core_id);
+  DEF_FIELD(15, 0, release_number);
+  static auto Get() { return hwreg::RegisterAddr<GSNPSID>(0xc120); }
+};
+
 class USB31_VER_NUMBER : public hwreg::RegisterBase<USB31_VER_NUMBER, uint32_t> {
  public:
   DEF_FIELD(31, 0, IPVERSION);

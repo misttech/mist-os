@@ -33,12 +33,11 @@ zx_status_t Dwc3::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t Dwc3::AcquirePDevResources() {
-  zx::result pdev_result = ddk::PDevFidl::Create(parent());
-  if (pdev_result.is_error()) {
-    zxlogf(ERROR, "could not get pdev %s", pdev_result.status_string());
-    return pdev_result.error_value();
+  pdev_ = ddk::PDevFidl::FromFragment(parent());
+  if (!pdev_.is_valid()) {
+    zxlogf(ERROR, "Could not get platform device protocol");
+    return ZX_ERR_NOT_SUPPORTED;
   }
-  pdev_ = std::move(pdev_result.value());
 
   if (zx_status_t status = pdev_.MapMmio(0, &mmio_); status != ZX_OK) {
     zxlogf(ERROR, "MapMmio failed: %s", zx_status_get_string(status));
@@ -150,17 +149,6 @@ zx_status_t Dwc3::Init() {
     return status;
   }
 
-  StartPeripheralMode();
-
-  // Start the interrupt thread.
-  auto irq_thunk = +[](void* arg) -> int { return static_cast<Dwc3*>(arg)->IrqThread(); };
-  if (int rc = thrd_create_with_name(&irq_thread_, irq_thunk, static_cast<void*>(this),
-                                     "dwc3-interrupt-thread");
-      rc != thrd_success) {
-    return ZX_ERR_INTERNAL;
-  }
-  irq_thread_started_.store(true);
-
   // Things went well.  Cancel our cleanup routine.
   cleanup.cancel();
   return ZX_OK;
@@ -221,6 +209,11 @@ void Dwc3::ReleaseResources() {
 
 zx_status_t Dwc3::CheckHwVersion() {
   auto* mmio = get_mmio();
+  const uint32_t core_id = GSNPSID::Get().ReadFrom(mmio).core_id();
+  if (core_id == 0x5533) {
+    return ZX_OK;
+  }
+
   const uint32_t ip_version = USB31_VER_NUMBER::Get().ReadFrom(mmio).IPVERSION();
 
   auto is_ascii_digit = [](char val) -> bool { return (val >= '0') && (val <= '9'); };
@@ -390,8 +383,6 @@ void Dwc3::HandleConnectionDoneEvent() {
         zxlogf(ERROR, "unsupported speed %u", speed);
         break;
     }
-
-    new_speed = USB_SPEED_UNDEFINED;
   }
 
   if (ep0_max_packet) {
@@ -539,6 +530,18 @@ zx_status_t Dwc3::UsbDciSetInterface(const usb_dci_interface_protocol_t* interfa
   }
 
   dci_intf_ = ddk::UsbDciInterfaceProtocolClient(interface);
+
+  StartPeripheralMode();
+
+  // Start the interrupt thread.
+  auto irq_thunk = +[](void* arg) -> int { return static_cast<Dwc3*>(arg)->IrqThread(); };
+  if (int rc = thrd_create_with_name(&irq_thread_, irq_thunk, static_cast<void*>(this),
+                                     "dwc3-interrupt-thread");
+      rc != thrd_success) {
+    return ZX_ERR_INTERNAL;
+  }
+  irq_thread_started_.store(true);
+
   return ZX_OK;
 }
 
@@ -568,6 +571,7 @@ zx_status_t Dwc3::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
   uep->ep.interval = ep_desc->b_interval;
   // TODO(voydanoff) USB3 support
   uep->ep.enabled = true;
+  EpSetConfig(uep->ep, true);
 
   // TODO(johngro): What protects this configured_ state from a locking/threading perspective?
   if (configured_) {
