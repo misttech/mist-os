@@ -398,17 +398,6 @@ void UITestRealm::ConfigureSceneOwner() {
                                 ConfigValue::Uint64(config_.display_rotation));
   realm_builder_.SetConfigValue(kSceneManagerName, "idle_threshold_ms",
                                 ConfigValue::Uint64(config_.idle_threshold_ms));
-
-  std::vector<component_testing::ConfigCapability> configurations;
-  configurations.push_back({
-      .name = "fuchsia.power.SuspendEnabled",
-      .value = ConfigValue::Bool(config_.suspend_enabled),
-  });
-  realm_builder_.AddConfiguration(std::move(configurations));
-  realm_builder_.AddRoute(
-      Route{.capabilities = {component_testing::Config{"fuchsia.power.SuspendEnabled"}},
-            .source = component_testing::SelfRef{},
-            .targets = {ChildRef{kSceneManagerName}}});
 }
 
 void UITestRealm::Build() {

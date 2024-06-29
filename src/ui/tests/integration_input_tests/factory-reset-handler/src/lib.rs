@@ -137,21 +137,6 @@ async fn assemble_realm(
     )
     .await;
 
-    b.add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-        name: "fuchsia.power.SuspendEnabled"
-            .to_string()
-            .parse()
-            .expect("failed to parse string slice"),
-        value: false.into(),
-    }))
-    .await
-    .expect("failed to add config capability");
-    b.route_config_capability_from_self(
-        String::from("fuchsia.power.SuspendEnabled"),
-        &scene_manager,
-    )
-    .await;
-
     // Create the test realm.
     b.build().await.expect("Failed to create realm")
 }

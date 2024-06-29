@@ -125,10 +125,5 @@ fuchsia_structured_config_values("config_for_test") {
     display_rotation = 270
     display_pixel_density = "4.1668"
     viewing_distance = "near"
-
-    # Config capabilities must be given a default value to build if structured
-    # configuration is also used. This should be overwritten by the config
-    # capability value routed to the component.
-    suspend_enabled = false
   }
 }

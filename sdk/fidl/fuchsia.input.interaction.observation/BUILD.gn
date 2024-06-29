@@ -8,6 +8,4 @@ fidl("fuchsia.input.interaction.observation") {
   sdk_category = "internal"
   sources = [ "aggregator.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
-
-  enable_hlcpp = true
 }

@@ -187,12 +187,7 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
                     BuildType::Eng => 5000,
                     BuildType::UserDebug | BuildType::User => 100,
                 }
-            })?
-            // Config capabilities must be given a default value to build if
-            // structured configuration is also used. This should be
-            // overwritten by the config capability value routed to the
-            // component.
-            .field("suspend_enabled", false)?;
+            })?;
 
         let config_dir = builder
             .add_domain_config(PackageSetDestination::Blob(PackageDestination::SensorConfig))

@@ -5,7 +5,6 @@
 #include <fuchsia/accessibility/semantics/cpp/fidl.h>
 #include <fuchsia/element/cpp/fidl.h>
 #include <fuchsia/input/interaction/cpp/fidl.h>
-#include <fuchsia/input/interaction/observation/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/display/singleton/cpp/fidl.h>
 #include <fuchsia/ui/focus/cpp/fidl.h>
@@ -53,7 +52,6 @@ int run_test_ui_stack(int argc, const char** argv) {
   config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
   config.display_rotation = test_ui_stack_config.display_rotation();
   config.device_pixel_ratio = std::stof(test_ui_stack_config.device_pixel_ratio());
-  config.suspend_enabled = test_ui_stack_config.suspend_enabled();
 
   // Build test realm.
   ui_testing::UITestRealm realm(config);
@@ -69,8 +67,6 @@ int run_test_ui_stack(int argc, const char** argv) {
                                                          realm_exposed_services.get());
   AddPublicService<fuchsia::input::interaction::Notifier>(context.get(),
                                                           realm_exposed_services.get());
-  AddPublicService<fuchsia::input::interaction::observation::Aggregator>(
-      context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia::ui::composition::Allocator>(context.get(),
                                                         realm_exposed_services.get());
   AddPublicService<fuchsia::ui::composition::Flatland>(context.get(), realm_exposed_services.get());

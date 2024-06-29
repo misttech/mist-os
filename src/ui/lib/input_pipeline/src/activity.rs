@@ -108,36 +108,18 @@ impl ActivityManager {
                     })));
                 }
                 Ok(AggregatorRequest::HandoffWake { responder }) => {
-                    if !self.suspend_enabled {
+                    if self.suspend_enabled {
+                        if let Err(e) = responder.send(Ok(())) {
+                            tracing::warn!("Error sending a response to HandoffWake: {:?}", e);
+                        }
+                    } else {
                         if let Err(e) = responder.send(Err(HandoffWakeError::PowerNotAvailable)) {
                             tracing::warn!(
                                 "Error sending an error response to HandoffWake: {:?}",
                                 e
                             );
                         }
-                        continue;
                     }
-
-                    let state_publisher = self.interaction_hanging_get.borrow().new_publisher();
-                    if let Some(t) = self.idle_transition_task.take() {
-                        // If the task returns a completed output, we can assume the
-                        // state has transitioned to Idle.
-                        if let Some(()) = t.cancel() {
-                            state_publisher.set(State::Active);
-                        }
-                    }
-
-                    if let Err(e) = responder.send(Ok(())) {
-                        tracing::warn!("Error sending a response to HandoffWake: {:?}", e);
-                    }
-
-                    let event_time = fuchsia_async::Time::now().into_zx();
-                    *self.last_event_time.borrow_mut() = event_time;
-                    let timeout = self.idle_threshold_ms + event_time;
-                    self.idle_transition_task.set(Some(Task::local(async move {
-                        Timer::new(timeout).await;
-                        state_publisher.set(State::Idle);
-                    })));
                 }
                 Err(e) => {
                     tracing::warn!(
