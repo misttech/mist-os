@@ -119,11 +119,11 @@ closed protocol Sampler {
     ///  - [FXT Format]
     ///  - [`zx_vmar_map_iob()`]
     ///
-    /// [FXT Large Blob with Metadata]: docs/reference/tracing/trace-format.md#large-blob-record
+    /// [FXT Large Blob with Metadata]: /docs/reference/tracing/trace-format.md#large-blob-record
     /// [`zx_sampler_attach()`]: sampler_attach.md
     /// [`zx_sampler_start()`]: sampler_start.md
     /// [`zx_sampler_stop()`]: sampler_stop.md
-    /// [FXT Format]: docs/reference/tracing/trace-format.md
+    /// [FXT Format]: /docs/reference/tracing/trace-format.md
     /// [`zx_vmar_map_iob()`]: vmar_map_iob.md
     @next
     strict Create(resource struct {
@@ -174,10 +174,8 @@ closed protocol Sampler {
     /// ## See also
     ///
     ///  - [`zx_sampler_create()`]
-    ///  - [`zx_sampler_destroy()`]
     ///
     /// [`zx_sampler_create()`]: sampler_create.md
-    /// [`zx_sampler_destroy()`]: sampler_destroy.md
     @next
     strict Attach(resource struct {
         iobuffer Handle;

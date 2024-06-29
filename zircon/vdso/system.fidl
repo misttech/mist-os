@@ -161,7 +161,7 @@ closed protocol System {
     /// equivalent two-argument constructor signatures.
     ///
     /// The string constant may be of any length.  It is in read-only memory provided
-    /// by the [vDSO](../../concepts/kernel/vdso.md).  Thus it is always accessible at
+    /// by the [vDSO](/docs/concepts/kernel/vdso.md).  Thus it is always accessible at
     /// the same address for the life of the process and its contents never change.
     ///
     /// The first four characters identify the version scheme. An example of the string
@@ -1062,12 +1062,10 @@ closed protocol System {
     ///  - [`zx_handle_close()`]
     ///  - [`zx_system_set_performance_info()`]
     ///  - [`zx_port_create()`]
-    ///  - [`zx_port_write()`]
     ///
     /// [`zx_handle_close()`]: handle_close.md
     /// [`zx_system_set_performance_info()`]: system_set_performance_info.md
     /// [`zx_port_create()`]: port_create.md
-    /// [`zx_port_read()`]: port_read.md
     @next
     strict CreateProcessorPowerLevelTransitionHandler(resource struct {
         resource Handle:RESOURCE;

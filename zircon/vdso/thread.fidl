@@ -209,7 +209,7 @@ closed protocol Thread {
     /// is part of is no longer alive.
     ///
     /// `ZX_ERR_INVALID_ARGS` *thread_entry* is not a userspace address, is not a
-    /// [canonical address], or is not `0`.
+    /// canonical address, or is not `0`.
     ///
     /// ## See also
     ///
