@@ -158,7 +158,13 @@ impl Injection {
 
     #[tracing::instrument]
     async fn target_factory_inner(&self) -> Result<TargetProxy> {
-        let target_spec = self.target_spec.clone();
+        // See if we need to do local resolution. (Do it here not in
+        // open_target_with_fut because o_t_w_f is not async)
+        let target_spec = ffx_target::maybe_locally_resolve_target_spec(
+            self.target_spec.clone(),
+            &self.env_context,
+        )
+        .await?;
         let daemon_proxy = self.daemon_factory().await?;
         let (target_proxy, target_proxy_fut) = open_target_with_fut(
             target_spec,
@@ -233,6 +239,9 @@ impl Injector for Injection {
     #[tracing::instrument]
     async fn remote_factory(&self) -> Result<RemoteControlProxy> {
         let timeout_error = self.daemon_timeout_error();
+        // XXX Note: if we are doing local discovery, that will eat into this time.
+        //     and if local discovery is _longer_ than the proxy timeout, we'll get
+        //     a confusing error.
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         let target_info = std::sync::Mutex::new(None);
         let proxy = timeout(proxy_timeout, async {

@@ -156,7 +156,7 @@ impl Display for ManualTarget {
     }
 }
 
-async fn parse_manual_targets<F>(finder: &F) -> Vec<ManualTarget>
+pub async fn parse_manual_targets<F>(finder: &F) -> Vec<ManualTarget>
 where
     F: ManualTargets,
 {

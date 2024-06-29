@@ -101,8 +101,8 @@ fn is_fastboot_match(info: &InterfaceInfo) -> bool {
 
     let errs: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
 
+    let serial = extract_debug_serial_number(info);
     if !errs.is_empty() {
-        let serial = extract_serial_number(info);
         tracing::debug!(
             "Interface with serial {} is not valid fastboot match. Encountered errors: \n\t{}",
             serial,
@@ -112,9 +112,11 @@ fn is_fastboot_match(info: &InterfaceInfo) -> bool {
     } else {
         if let Err(e) = valid_dev_product(info) {
             tracing::debug!(
-                "Interface is a valid Fastboot match, but may not be a Fuchsia Product: {}",
+                "Interface {serial} is a valid Fastboot match, but may not be a Fuchsia Product: {}",
                 e
             );
+        } else {
+            tracing::debug!("Found valid device: {serial}");
         }
         true
     }
@@ -138,7 +140,11 @@ where
 
 pub fn find_serial_numbers() -> Vec<String> {
     let mut serials = Vec::new();
-    let cb = |info: &InterfaceInfo| serials.push(extract_serial_number(info));
+    let cb = |info: &InterfaceInfo| {
+        if let Ok(Some(s)) = extract_serial_number(info) {
+            serials.push(s);
+        }
+    };
     enumerate_interfaces(cb);
     serials
 }
@@ -160,21 +166,49 @@ where
     Interface::open(&mut open_cb).map_err(Into::into)
 }
 
-fn extract_serial_number(info: &InterfaceInfo) -> String {
+fn extract_serial_number(info: &InterfaceInfo) -> Result<Option<String>> {
     let null_pos = match info.serial_number.iter().position(|&c| c == 0) {
         Some(p) => p,
         None => {
-            return "".to_string();
+            bail!("Invalid serial number");
         }
     };
-    (*String::from_utf8_lossy(&info.serial_number[..null_pos])).to_string()
+    let serial = (*String::from_utf8_lossy(&info.serial_number[..null_pos])).to_string();
+    if serial.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(serial))
+    }
+}
+
+fn extract_debug_serial_number(info: &InterfaceInfo) -> String {
+    let null_pos = match info.serial_number.iter().position(|&c| c == 0) {
+        Some(p) => p,
+        None => {
+            return "<invalid>".to_string();
+        }
+    };
+    let serial = (*String::from_utf8_lossy(&info.serial_number[..null_pos])).to_string();
+    if serial.is_empty() {
+        "<empty>".to_string()
+    } else {
+        serial
+    }
+}
+
+fn info_matches_serial(info: &InterfaceInfo, serial: &str) -> bool {
+    if let Ok(Some(s)) = extract_serial_number(info) {
+        s == serial
+    } else {
+        false
+    }
 }
 
 #[tracing::instrument]
 pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
     tracing::debug!("Opening USB fastboot interface with serial number: {}", serial);
     let mut interface =
-        open_interface(|info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial })
+        open_interface(|info: &InterfaceInfo| -> bool { info_matches_serial(info, serial) })
             .with_context(|| format!("opening interface with serial number: {}", serial))?;
     match send(Command::GetVar(ClientVariable::Version), &mut interface).await {
         Ok(Reply::Okay(version)) =>
@@ -241,14 +275,7 @@ pub struct UnversionedFastbootUsbTester;
 
 impl FastbootUsbTester for UnversionedFastbootUsbTester {
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
-        let mut open_cb = |info: &InterfaceInfo| -> bool {
-            if extract_serial_number(info) == *serial {
-                is_fastboot_match(info)
-            } else {
-                // Do not open.
-                false
-            }
-        };
+        let mut open_cb = |info: &InterfaceInfo| -> bool { info_matches_serial(info, serial) };
         Interface::check(&mut open_cb)
     }
 }
@@ -339,7 +366,7 @@ where
         // Enumerate interfaces
         let new_serials = finder.find_serial_numbers();
         let new_serials = BTreeSet::from_iter(new_serials);
-        tracing::trace!("found serials: {:#?}", new_serials);
+        tracing::debug!("found serials: {:#?}", new_serials);
         // Update Cache
         for serial in &new_serials {
             // Just because the serial is found doesnt mean that the target is ready
@@ -350,9 +377,9 @@ where
                 continue;
             }
 
-            tracing::trace!("Inserting new serial: {}", serial);
+            tracing::debug!("Inserting new serial: {}", serial);
             if serials.insert(serial.clone()) {
-                tracing::trace!("Sending discovered event for serial: {}", serial);
+                tracing::debug!("Sending discovered event for serial: {}", serial);
                 let _ = events_out.send(FastbootEvent::Discovered(serial.clone())).await;
                 tracing::trace!("Sent discovered event for serial: {}", serial);
             }
@@ -363,7 +390,7 @@ where
         tracing::trace!("missing serials: {:#?}", missing_serials);
         for serial in missing_serials {
             serials.remove(&serial);
-            tracing::trace!("Sening lost event for serial: {}", serial);
+            tracing::trace!("Sending lost event for serial: {}", serial);
             let _ = events_out.send(FastbootEvent::Lost(serial.clone())).await;
             tracing::trace!("Sent lost event for serial: {}", serial);
         }

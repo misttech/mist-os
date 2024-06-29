@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
+use ffx_config::EnvironmentContext;
 use ffx_wait_args::WaitCommand;
 use fho::{daemon_protocol, Error, FfxContext, FfxMain, FfxTool, Result, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
@@ -27,6 +28,7 @@ pub struct WaitTool {
     cmd: WaitCommand,
     #[with(daemon_protocol())]
     target_collection_proxy: TargetCollectionProxy,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(WaitTool);
@@ -35,7 +37,7 @@ fho::embedded_plugin!(WaitTool);
 impl FfxMain for WaitTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> Result<()> {
-        match wait_for_device(self.target_collection_proxy, self.cmd).await {
+        match wait_for_device(self.target_collection_proxy, self.cmd, &self.context).await {
             Ok(()) => {
                 writer.machine(&CommandStatus::Ok {})?;
                 Ok(())
@@ -52,7 +54,11 @@ impl FfxMain for WaitTool {
     }
 }
 
-async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitCommand) -> Result<()> {
+async fn wait_for_device(
+    target_collection: TargetCollectionProxy,
+    cmd: WaitCommand,
+    context: &EnvironmentContext,
+) -> Result<()> {
     let ffx: ffx_command::Ffx = argh::from_env();
     let default_target = ffx.target().await.bug()?;
     let behavior = if cmd.down {
@@ -62,7 +68,8 @@ async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitComm
     };
     let duration =
         if cmd.timeout > 0 { Some(Duration::from_secs(cmd.timeout as u64)) } else { None };
-    ffx_target::wait_for_device(duration, default_target, &target_collection, behavior).await
+    ffx_target::wait_for_device(duration, context, default_target, &target_collection, behavior)
+        .await
 }
 
 #[cfg(test)]
@@ -165,10 +172,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn peer_closed_to_target_collection_causes_top_level_error() {
-        let _env = ffx_config::test_init().await.expect("test env");
+        let env = ffx_config::test_init().await.expect("test env");
         let tool = WaitTool {
             target_collection_proxy: setup_fake_target_collection_server_auto_close(),
             cmd: WaitCommand { timeout: 1000, down: false },
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -209,10 +217,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn able_to_connect_to_device() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let tool = WaitTool {
             target_collection_proxy: setup_fake_target_collection_server([true, true], true),
             cmd: WaitCommand { timeout: 5, down: false },
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -228,10 +237,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn able_to_connect_to_device_with_zero_timeout() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let tool = WaitTool {
             target_collection_proxy: setup_fake_target_collection_server([true, true], true),
             cmd: WaitCommand { timeout: 0, down: false },
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -247,10 +257,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn unable_to_connect_to_device() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let tool = WaitTool {
             target_collection_proxy: setup_fake_target_collection_server([true, true], false),
             cmd: WaitCommand { timeout: 2, down: false },
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -266,10 +277,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn peer_closed_causes_down_error() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let tool = WaitTool {
             target_collection_proxy: setup_fake_target_collection_server_auto_close(),
             cmd: WaitCommand { timeout: 2, down: true },
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -285,10 +297,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn wait_for_down() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let tool = WaitTool {
             target_collection_proxy: setup_fake_target_collection_server([true, true], false),
             cmd: WaitCommand { timeout: 10, down: true },
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -304,10 +317,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn wait_for_down_when_never_up() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let tool = WaitTool {
             target_collection_proxy: setup_fake_target_collection_server([false, false], false),
             cmd: WaitCommand { timeout: 2, down: true },
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -323,7 +337,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn wait_for_down_when_after_up() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let tool = WaitTool {
             target_collection_proxy: setup_fake_target_collection_server([true, false], true),
             // We actually _have_ to wait for a few seconds, because
@@ -332,6 +346,7 @@ mod tests {
             // Any shorter a time and we're just going to hit the
             // timeout.
             cmd: WaitCommand { timeout: 10, down: true },
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =
@@ -347,10 +362,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn wait_for_down_when_able_to_connect_to_device() {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let tool = WaitTool {
             target_collection_proxy: setup_fake_target_collection_server([true, true], true),
             cmd: WaitCommand { timeout: 3, down: true },
+            context: env.context.clone(),
         };
         let test_buffers = TestBuffers::default();
         let writer =

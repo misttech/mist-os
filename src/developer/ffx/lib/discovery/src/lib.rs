@@ -215,7 +215,7 @@ where
         let fastboot_sender = sender.clone();
         Some(fastboot_watcher(move |res: Result<FastbootEvent>| {
             // Translate the result to a TargetEvent
-            tracing::trace!("discovery watcher got fastboot event: {:#?}", res);
+            tracing::debug!("discovery watcher got fastboot event: {:#?}", res);
             let event = match res {
                 Ok(r) => {
                     let event: TargetEvent = r.into();
