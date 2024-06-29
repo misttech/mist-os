@@ -1107,10 +1107,25 @@ pub async fn add_manual_target(
     } else {
         ffx_bail!("ffx lost connection to the daemon before receiving a response.");
     };
+
+    // Change TargetAddrInfo to TargetAddr so ip can be extracted.
+    // This is similar logic found in get_ssh_address().
+    const DEFAULT_SSH_PORT: u16 = 22;
+    let taddr = TargetAddr::from(&addr);
+    let taddr_str = match taddr.ip() {
+        IpAddr::V4(_) => format!("{}", taddr),
+        IpAddr::V6(_) => format!("[{}]", taddr),
+    };
+
+    // Pass formatted ip and port to target connection error, so it is more user friendly
     res.map_err(|e| {
         let err = e.connection_error.unwrap();
         let logs = e.connection_error_logs.map(|v| v.join("\n"));
-        let target = Some(format!("{addr:?}"));
+        let target = Some(format!(
+            "{}:{}",
+            taddr_str,
+            if taddr.port() == 0 { DEFAULT_SSH_PORT } else { taddr.port() }
+        ));
         FfxError::TargetConnectionError { err, target, logs }.into()
     })
 }
