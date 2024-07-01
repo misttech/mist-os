@@ -1503,6 +1503,7 @@ impl FileObject {
 
         self.ops().readdir(&mut locked, self, current_task, sink)?;
         self.update_atime();
+        self.notify(InotifyMask::ACCESS);
         Ok(())
     }
 

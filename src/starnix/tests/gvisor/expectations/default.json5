@@ -369,7 +369,6 @@
                 // inotify_test
                 "Inotify.UtimesGeneratesAttribEvent",
                 "Inotify.UnmatchedEventsAreDiscarded",
-                "Inotify.ControlEvents",
                 "Inotify.KernfsBasic",
                 "Inotify.ExcludeUnlinkInodeEvents",
                 "Inotify.ExcludeUnlinkDirectory",
