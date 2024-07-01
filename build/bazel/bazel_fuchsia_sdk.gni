@@ -16,9 +16,8 @@ declare_args() {
   # Set to true to populate the @fuchsia_sdk external repository with prebuilt
   # binaries for all API levels, or a subset of them. Possible values are:
   #
-  #   false: The default, which is to only build for the current PLATFORM
-  #       API level, unless `override_target_api_level` is set.
-  #       See //build/config/fuchsia/override_target_api_level.gni.
+  #   false: The default, which is to only build targets for which the IDK
+  #       contains artifacts built at "PLATFORM".
   #
   #   true: To build for all API levels listed in
   #       platform_version.build_time_supported_api_levels, which defaults to
