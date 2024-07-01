@@ -421,16 +421,22 @@ class StatisticsTest(TempDirTestCase):
             "example_suite: ExampleTest \(got 2\)\n"
             "example_suite: ExampleTest \(got 3\)$"
         )
-        with self.assertRaisesRegex(AssertionError, error):
-            ComparePerf([dir1_path, dir2_path], expected_sample_size=99)
+        # TODO(https://fxbug.dev/343997506): Re-enable this
+        # assertRaisesRegex() check when "--expected_sample_size" is
+        # changed back to producing an error.
+        #   with self.assertRaisesRegex(AssertionError, error):
+        ComparePerf([dir1_path, dir2_path], expected_sample_size=99)
         # We should get a similar error if we pass only one directory.
         error = (
             "^The following metrics had an unexpected sample size"
             " \(expected 99\):\n"
             "example_suite: ExampleTest \(got 2\)$"
         )
-        with self.assertRaisesRegex(AssertionError, error):
-            ComparePerf([dir1_path], expected_sample_size=99)
+        # TODO(https://fxbug.dev/343997506): Re-enable this
+        # assertRaisesRegex() check when "--expected_sample_size" is
+        # changed back to producing an error.
+        #   with self.assertRaisesRegex(AssertionError, error):
+        ComparePerf([dir1_path], expected_sample_size=99)
         # There should be no check for the sample sizes if the
         # "--expected_sample_size" argument is not given.
         stdout = io.StringIO()
