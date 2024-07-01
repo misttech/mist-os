@@ -300,6 +300,6 @@ mod tests {
         let inspect_proxy =
             fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
                 .expect("Failed to open directory");
-        populate_data_map(&[inspect_proxy.into()]).await
+        populate_data_map(&[InspectHandle::directory(inspect_proxy)]).await
     }
 }

@@ -59,7 +59,7 @@ impl InspectRepository {
     fn add_inspect_artifacts(
         self: &Arc<Self>,
         identity: Arc<ComponentIdentity>,
-        proxy_handle: impl Into<InspectHandle>,
+        proxy_handle: InspectHandle,
     ) {
         // Hold the lock while we insert and update pipelines.
         let mut guard = self.inner.write();
@@ -111,7 +111,7 @@ impl InspectRepository {
     pub(crate) fn add_inspect_handle(
         self: &Arc<Self>,
         component: Arc<ComponentIdentity>,
-        handle: impl Into<InspectHandle>,
+        handle: InspectHandle,
     ) {
         debug!(identity = %component, "Added inspect handle.");
         // Update the central repository to reference the new diagnostics source.
@@ -175,7 +175,7 @@ impl InspectRepositoryInner {
     fn insert_inspect_artifact_container(
         &mut self,
         identity: Arc<ComponentIdentity>,
-        proxy_handle: impl Into<InspectHandle>,
+        proxy_handle: InspectHandle,
     ) -> Option<oneshot::Receiver<Koid>> {
         let mut diag_repo_entry_opt = self.diagnostics_containers.get_mut(&identity);
         match diag_repo_entry_opt {
@@ -269,14 +269,12 @@ mod tests {
         let (proxy, _stream) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
             .expect("create directory proxy");
         let proxy_clone = proxy.clone();
-        inspect_repo.add_inspect_handle(
-            Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
-        );
+        inspect_repo
+            .add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
 
         inspect_repo.add_inspect_handle(
             Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy_clone, Some("test")),
+            InspectHandle::tree(proxy_clone, Some("test")),
         );
 
         let guard = inspect_repo.inner.read();
@@ -291,10 +289,8 @@ mod tests {
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
             .expect("create directory proxy");
-        data_repo.add_inspect_handle(
-            Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
-        );
+        data_repo
+            .add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
         assert!(data_repo.inner.read().get(&identity).is_some());
         drop(server_end);
         while data_repo.inner.read().get(&identity).is_some() {
@@ -312,10 +308,8 @@ mod tests {
         let identity = Arc::new(ComponentIdentity::new(moniker.clone(), TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
             .expect("create directory proxy");
-        data_repo.add_inspect_handle(
-            Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
-        );
+        data_repo
+            .add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
         assert!(data_repo.inner.read().get(&identity).is_some());
         assert!(pipeline.static_selectors_matchers().unwrap().contains_key(&moniker));
 
@@ -337,19 +331,15 @@ mod tests {
 
         let (proxy, _server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
             .expect("create directory proxy");
-        data_repo.add_inspect_handle(
-            Arc::clone(&identity),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
-        );
+        data_repo
+            .add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
 
         let moniker2 = ExtendedMoniker::parse_str("./a/b/foo2").unwrap();
         let identity2 = Arc::new(ComponentIdentity::new(moniker2, TEST_URL));
         let (proxy, _server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
             .expect("create directory proxy");
-        data_repo.add_inspect_handle(
-            Arc::clone(&identity2),
-            InspectHandle::from_named_tree_proxy(proxy, Some("test")),
-        );
+        data_repo
+            .add_inspect_handle(Arc::clone(&identity2), InspectHandle::tree(proxy, Some("test")));
 
         assert_eq!(2, data_repo.inner.read().fetch_inspect_data(&None, None).len());
 

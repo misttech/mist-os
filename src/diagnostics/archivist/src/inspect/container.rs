@@ -55,24 +55,16 @@ impl InspectHandle {
         }
     }
 
-    pub fn from_named_tree_proxy<T: Into<FlyStr>>(proxy: TreeProxy, name: Option<T>) -> Self {
+    pub fn tree<T: Into<FlyStr>>(proxy: TreeProxy, name: Option<T>) -> Self {
         InspectHandle::Tree { proxy, name: name.map(|n| n.into()) }
+    }
+
+    pub fn directory(proxy: fio::DirectoryProxy) -> Self {
+        InspectHandle::Directory { proxy }
     }
 
     pub fn is_tree(&self) -> bool {
         matches!(self, Self::Tree { .. })
-    }
-}
-
-impl From<fio::DirectoryProxy> for InspectHandle {
-    fn from(proxy: fio::DirectoryProxy) -> Self {
-        InspectHandle::Directory { proxy }
-    }
-}
-
-impl From<TreeProxy> for InspectHandle {
-    fn from(proxy: TreeProxy) -> Self {
-        InspectHandle::Tree { proxy, name: None }
     }
 }
 
@@ -88,7 +80,7 @@ impl InspectArtifactsContainer {
     ///
     /// Returns itself and a `Receiver` that resolves into the koid of the input `proxy`
     /// when that proxy closes.
-    pub fn new(proxy: impl Into<InspectHandle>) -> (Self, oneshot::Receiver<zx::Koid>) {
+    pub fn new(proxy: InspectHandle) -> (Self, oneshot::Receiver<zx::Koid>) {
         let mut this = Self { inspect_handles: HashMap::new(), on_closed_tasks: vec![] };
         // safe to unwrap as diagnostics_proxy is guaranteed to be empty
         let rx = this.push_handle(proxy).unwrap();
@@ -105,11 +97,7 @@ impl InspectArtifactsContainer {
     ///
     /// Returns `None` if the handle is a DirectoryProxy and there is already one tracked,
     /// as only single handles are supported in the DirectoryProxy case.
-    pub fn push_handle(
-        &mut self,
-        new_handle: impl Into<InspectHandle>,
-    ) -> Option<oneshot::Receiver<zx::Koid>> {
-        let handle = new_handle.into();
+    pub fn push_handle(&mut self, handle: InspectHandle) -> Option<oneshot::Receiver<zx::Koid>> {
         if !self.inspect_handles.is_empty() && matches!(handle, InspectHandle::Directory { .. }) {
             return None;
         }
@@ -143,7 +131,7 @@ impl InspectArtifactsContainer {
                 fuchsia_fs::directory::clone_no_describe(dir, None).ok().map(|directory| {
                     UnpopulatedInspectDataContainer {
                         identity: Arc::clone(identity),
-                        inspect_handles: vec![directory.into()],
+                        inspect_handles: vec![InspectHandle::directory(directory)],
                         inspect_matcher: matcher,
                     }
                 })
@@ -510,7 +498,7 @@ mod test {
 
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            inspect_handles: vec![directory.into()],
+            inspect_handles: vec![InspectHandle::directory(directory)],
             inspect_matcher: None,
         };
         let mut stream = container.populate(
@@ -533,7 +521,7 @@ mod test {
                 .unwrap();
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            inspect_handles: vec![directory.into()],
+            inspect_handles: vec![InspectHandle::directory(directory)],
             inspect_matcher: None,
         };
         let mut stream = container.populate(
@@ -548,8 +536,9 @@ mod test {
     fn only_one_directory_proxy_is_populated() {
         let _executor = fuchsia_async::LocalExecutor::new();
         let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let (mut container, _rx) = InspectArtifactsContainer::new(directory);
+        let (mut container, _rx) =
+            InspectArtifactsContainer::new(InspectHandle::directory(directory));
         let (directory2, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        assert!(container.push_handle(directory2).is_none());
+        assert!(container.push_handle(InspectHandle::directory(directory2)).is_none());
     }
 }
