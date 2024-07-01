@@ -82,11 +82,11 @@ pub mod socket {
         SocketIpAddr, StrictlyZonedAddr,
     };
     pub use base::{
-        AddrEntry, AddrVec, Bound, BoundSocketMap, DualStackIpExt, EitherStack, FoundSockets,
-        IncompatibleError, InsertError, Inserter, Listener, ListenerAddrInfo, MaybeDualStack,
-        NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, Shutdown, ShutdownType,
-        SocketAddrType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError, SocketIpAddrExt,
-        SocketIpExt, SocketMapAddrSpec, SocketMapAddrStateSpec,
+        AddrEntry, AddrVec, Bound, BoundSocketMap, DualStackIpExt, DualStackTuple, EitherStack,
+        FoundSockets, IncompatibleError, InsertError, Inserter, Listener, ListenerAddrInfo,
+        MaybeDualStack, NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, Shutdown,
+        ShutdownType, SocketAddrType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError,
+        SocketIpAddrExt, SocketIpExt, SocketMapAddrSpec, SocketMapAddrStateSpec,
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, SocketStateEntry, SocketZonedAddrExt, UpdateSharingError,
     };
