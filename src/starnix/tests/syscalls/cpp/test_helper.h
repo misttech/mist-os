@@ -36,7 +36,7 @@
 #define SAFE_SYSCALL_SKIP_ON_EPERM(X)                                                 \
   ({                                                                                  \
     auto retval = (X);                                                                \
-    if (retval < 0 && errno == EPERM) {                                               \
+    if (retval < 0) {                                                                 \
       if (errno == EPERM) {                                                           \
         GTEST_SKIP() << "Permission denied for " << #X << ", skipping tests.";        \
       } else {                                                                        \
