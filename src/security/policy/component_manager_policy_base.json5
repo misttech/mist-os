@@ -9,6 +9,9 @@
                 "/bootstrap/power_manager",
                 "/bootstrap/shutdown_shim",
             ],
+            create_raw_processes: [
+                "/bootstrap/starnix_lite",
+            ],
         },
         capability_policy: [
             {
@@ -201,6 +204,7 @@
                     "/bootstrap",
                     "/bootstrap/fshost/blobfs",
                     "/bootstrap/pkg-cache",
+                    "/bootstrap/starnix_lite",
                 ],
             },
             {

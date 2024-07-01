@@ -9,7 +9,7 @@ import("//build/testing/boot_tests/kernel_zbi_test.gni")
 resource("linux-bin") {
   allow_binary_output_dir = true
   sources = [ "nolibc-test.linux" ]
-  outputs = [ "test/nolibc-test.linux" ]
+  outputs = [ "data/tests/nolibc" ]
 }
 
 kernel_zbi_test("nolibc") {

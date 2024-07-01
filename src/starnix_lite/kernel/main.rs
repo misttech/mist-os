@@ -12,29 +12,12 @@
 // unconditional dependency for rustdoc generation.
 use tracing_mutex as _;
 
-use crate::bootfs::BootfsSvc;
-use crate::builtin::svc_controller::SvcController;
-use crate::builtin::time::create_utc_clock;
-use anyhow::{Context, Error};
-use builtins::vmex_resource::VmexResource;
-use fuchsia_component::server::*;
-use fuchsia_runtime::swap_utc_clock_handle;
-use futures::prelude::*;
-use mistos_logger::klog;
+use anyhow::Error;
 use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
 use starnix_kernel_config::Config;
 use starnix_kernel_runner::{create_container_from_config, Container, ContainerServiceConfig};
-use starnix_logging::{log_info, log_warn};
-use {fuchsia_async as fasync, fuchsia_runtime as fruntime, fuchsia_zircon as zx};
-
-mod bootfs;
-mod builtin;
-
-extern "C" {
-    fn dl_set_loader_service(
-        handle: fuchsia_zircon::sys::zx_handle_t,
-    ) -> fuchsia_zircon::sys::zx_handle_t;
-}
+use starnix_logging::log_info;
+use {fuchsia_runtime as fruntime, fuchsia_zircon as zx};
 
 /// Overrides the `zxio_maybe_faultable_copy` weak symbol found in zxio.
 #[no_mangle]
@@ -65,21 +48,13 @@ async fn build_container(
     Ok(container)
 }
 
-fn main() -> Result<(), Error> {
-    klog::KernelLogger::init();
-
+#[fuchsia::main(
+    logging_tags = ["starnix_lite"],
+    logging_blocking,
+    logging_panic_prefix="\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n",
+)]
+async fn main() -> Result<(), Error> {
     log_info!("Starnix Lite is starting up...");
-
-    // Close any loader service passed to so that the service session can be
-    // freed, as we won't make use of a loader service such as by calling dlopen.
-    // If userboot invoked this directly, this service was the only reason userboot
-    // continued to run and closing it will let userboot terminate.
-    let ldsvc = unsafe {
-        fuchsia_zircon::Handle::from_raw(dl_set_loader_service(
-            fuchsia_zircon::sys::ZX_HANDLE_INVALID,
-        ))
-    };
-    drop(ldsvc);
 
     // Make sure that if this process panics in normal mode that the whole kernel's job is killed.
     if let Err(err) = fruntime::job_default()
@@ -88,23 +63,31 @@ fn main() -> Result<(), Error> {
         panic!("Starnix Lite failed to set itself as critical: {}", err);
     }
 
-    let config = Config {
-        features: Default::default(),
-        init: vec![],
-        kernel_cmdline: Default::default(),
-        mounts: vec!["/:remotefs".to_owned()],
-        rlimits: Default::default(),
-        name: "starnix_lite".to_owned(),
-        startup_file_path: Default::default(),
-        remote_block_devices: Default::default(),
-    };
+    // We call this early during Starnix boot to make sure the usercopy utilities
+    // are ready for use before any restricted-mode/Linux processes are created.
+    init_usercopy();
 
-    let mut executor = fasync::LocalExecutor::new();
-    executor.run_singlethreaded(async_main(config)).context("async main")?;
+    let config = Config::take_from_startup_handle();
 
+    let container = async_lock::OnceCell::<Container>::new();
+
+    let mut config_service: Option<ContainerServiceConfig> = None;
+
+    let container = container
+        .get_or_try_init(|| build_container(config, &mut config_service))
+        .await
+        .expect("failed to start container");
+
+    if let Some(config) = config_service {
+        container
+            .run(config)
+            .await
+            .expect("failed to run the expected services from the container");
+    }
     Ok(())
 }
 
+/*
 async fn async_main(config: Config) -> Result<(), Error> {
     let system_resource_handle =
         fruntime::take_startup_handle(fruntime::HandleType::SystemResource.into())
@@ -196,3 +179,4 @@ async fn async_main(config: Config) -> Result<(), Error> {
     }
     Ok(())
 }
+*/

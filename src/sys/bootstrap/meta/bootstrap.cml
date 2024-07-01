@@ -20,6 +20,10 @@
             name: "shutdown_shim",
             url: "fuchsia-boot:///shutdown-shim#meta/shutdown-shim.cm",
         },
+        {
+            name: "starnix_lite",
+            url: "fuchsia-boot:///starnix_lite#meta/starnix_kernel.cm",
+        },
     ],
     offer: [
         {
@@ -105,6 +109,7 @@
             to: [
                 "#critical-services",
                 "#shutdown_shim",
+                "#starnix_lite",
             ],
         },
         {
@@ -115,13 +120,13 @@
             from: "parent",
             to: [ "#critical-services" ],
         },
-        {
-            directory: "dev-class",
-            from: "#devfs-with-pkg",
-            as: "input",
-            to: "#critical-services",
-            subdir: "input",
-        },
+        //{
+        //    directory: "dev-class",
+        //    from: "#devfs-with-pkg",
+        //    as: "input",
+        //    to: "#critical-services",
+        //    subdir: "input",
+        //},
 
         // -- Archivist offers below here --
 
@@ -164,6 +169,13 @@
             from: "parent",
             to: "#archivist",
             availability: "optional",
+        },
+
+        // Startnix Lite
+        {
+            protocol: [ "fuchsia.kernel.VmexResource" ],
+            from: "parent",
+            to: "#starnix_lite",
         },
     ],
     expose: [

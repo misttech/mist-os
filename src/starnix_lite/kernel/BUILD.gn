@@ -3,6 +3,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/assembled_system.gni")
+import("//build/assembly/board_configuration.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_macro.gni")
 import("//build/rust/rustc_test.gni")
@@ -51,28 +54,12 @@ rustc_binary("starnix_kernel_bin") {
     ":starnix_core",
     ":starnix_kernel_config",
     ":starnix_kernel_runner",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
-    "//src/lib/fdio/rust:fdio",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/fuchsia-sync",
-    "//src/lib/mistos-logger",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/kernel:starnix_logging",
-    "//src/storage/lib/vfs/rust:vfs",
-    "//src/sys/component_manager/lib/builtins",
-    "//src/sys/lib/fuchsia-bootfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-mutex",
   ]
 
@@ -146,6 +133,8 @@ rustc_library("starnix_core") {
     "fs/functionfs.rs",
     "fs/layeredfs.rs",
     "fs/mod.rs",
+    "fs/nmfs/fs.rs",
+    "fs/nmfs/mod.rs",
     "fs/overlayfs.rs",
     "fs/proc/fs.rs",
     "fs/proc/mod.rs",
@@ -170,6 +159,7 @@ rustc_library("starnix_core") {
     "lib.rs",
     "loader.rs",
     "memory_attribution/mod.rs",
+    "memory_attribution/sync.rs",
     "mm/futex_table.rs",
     "mm/memory_manager.rs",
     "mm/mod.rs",
@@ -684,8 +674,8 @@ resource("vdso-data") {
 
 # The starnix kernel manifest, used by all containers.
 fuchsia_component_manifest("starnix_kernel_manifest") {
-  manifest = "meta/starnix_lite_kernel.cml"
-  component_name = "starnix_lite_kernel"
+  manifest = "meta/starnix_kernel.cml"
+  component_name = "starnix_kernel"
 }
 
 # The starnix kernel configuration library, used by the Rust binary to parse configuration.
@@ -703,7 +693,61 @@ fuchsia_structured_config_values("kernel_config") {
   values_source = "//src/starnix/kernel/meta/config.json5"
 }
 
+# Packages
+
+fuchsia_package("starnix_lite_package") {
+  package_name = "starnix_lite"
+  deps = [
+    ":kernel_config",
+    ":starnix_kernel",
+    ":starnix_kernel_manifest",
+    "//examples/nolibc:linux-bin",
+    "//src/starnix/containers:default_init",
+    "//src/starnix/examples/hello_starnix:bin",
+  ]
+}
+
 # ZBIs
+
+if (current_toolchain == default_toolchain) {
+  board_configuration("board_config") {
+    name = "virt"
+  }
+
+  product_assembly_configuration("product_config") {
+    platform = {
+      build_type = "eng"
+      feature_set_level = "embeddable"
+      storage = {
+        filesystems = {
+          image_name = "starnix_lite"
+          image_mode = "no_image"
+          volume = {
+            fvm = {
+              data = {
+              }
+              blob = {
+              }
+            }
+          }
+        }
+      }
+    }
+    product = {
+    }
+  }
+
+  # `assembled_system` builds a zbi for consumption by the test.
+  assembled_system("starnix_lite_zbi") {
+    testonly = true
+    product_assembly_config_label = ":product_config"
+    board_config_label = ":board_config"
+    use_bringup_platform_bundles_only = true
+    bootfs_labels = []
+    bootfs_package_labels = [ "//src/starnix_lite/kernel:starnix_lite_package" ]
+    base_packages = []
+  }
+}
 
 kernel_cmdline("starnix-zbi-cmdline") {
   args = [

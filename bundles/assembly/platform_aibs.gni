@@ -6,6 +6,85 @@ import("//build/icu/config.gni")  # icu_git_info
 
 platform_aibs_dir = get_label_info("//bundles/assembly", "target_out_dir")
 
+# LINT.IfChange
+
+baremetal_user_platform_aib_names = [
+  # The kernel itself
+  "zircon",
+
+  # The embeddable feature-set-level
+  "embeddable",
+
+  # The bootstrap feature-set-level
+
+  # Developer
+  "kernel_debug_broker_user",
+
+  # Diagnostics
+  "console",
+
+  # Driver Framework
+  "driver_framework",
+
+  # Power
+
+  # Graphics
+  "virtcon_disable",
+
+  # Kernel args
+  "kernel_args_user",
+  "kernel_contiguous_physical_pages",
+
+  # RCS live usb support
+  #"live_usb",
+
+  # Static resource files.
+  "resources",
+
+  # Emulator Support
+  "emulator_support",
+  #"paravirtualization_support",
+
+  # Storage
+  #"paver_legacy",
+
+  # SWD (Software Delivery)
+  #"no_update_checker",
+
+  # Temporary AIB holds wlanphy driver
+  #"wlanphy_driver",
+]
+
+baremetal_userdebug_platform_aib_names = [
+  # The embeddable feature-set-level
+  "embeddable_userdebug",
+
+  "clock_development_tools",
+
+  # Kernel args
+  "kernel_args_eng",
+  "kernel_args_userdebug",
+
+  # Developer
+  "kernel_debug_broker_userdebug",
+  "ptysvc",
+]
+
+baremetal_eng_platform_aib_names = [
+  # The embeddable feature-set-level
+  "embeddable_eng",
+
+  # Kernel args
+  "kernel_oom_reboot_timeout_low",
+  "kernel_oom_behavior_jobkill",
+  "kernel_pmm_checker_enabled",
+  "kernel_pmm_checker_enabled_auto",
+  "kernel_serial_legacy",
+
+  # Power Framework
+  #"power_framework_testing_sag",
+]
+
 # These are the user-buildtype-safe platform AIBs that are used by bootstrap
 # feature-set-level assemblies.  This is a subset of the overall platform AIBs
 # so that these systems (e.g. bringup) don't need to build the entire platform.
@@ -397,6 +476,20 @@ if (_experimental_user_aibs != []) {
       "We found experimental AIBs that are allowed in user builds. This is not allowed.")
   print(_experimental_user_aibs)
   assert(false, "experimental AIBs cannot be used in user builds")
+}
+
+baremetal_platform_aib_labels = []
+baremetal_platform_aib_files = []
+foreach(
+    name,
+    baremetal_user_platform_aib_names + baremetal_userdebug_platform_aib_names +
+        baremetal_eng_platform_aib_names) {
+  label = "//bundles/assembly:${name}"
+  _target_out_dir = get_label_info(label, "target_out_dir")
+
+  baremetal_platform_aib_labels += [ label ]
+  baremetal_platform_aib_files +=
+      [ "${_target_out_dir}/${name}/assembly_config.json" ]
 }
 
 bringup_platform_aib_labels = []
