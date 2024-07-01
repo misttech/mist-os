@@ -153,6 +153,10 @@ int Sherlock::Start() {
     zxlogf(ERROR, "PwmInit() failed");
   }
 
+  if (ButtonsInit() != ZX_OK) {
+    zxlogf(ERROR, "ButtonsInit() failed");
+  }
+
   // ClkInit() must be called after other subsystems that bind to clock have had a chance to add
   // their init steps.
   if (ClkInit() != ZX_OK) {
@@ -212,10 +216,6 @@ int Sherlock::Start() {
 
   if (NnaInit() != ZX_OK) {
     zxlogf(ERROR, "NnaInit() failed");
-  }
-
-  if (ButtonsInit() != ZX_OK) {
-    zxlogf(ERROR, "ButtonsInit() failed");
   }
 
   if (OtRadioInit() != ZX_OK) {

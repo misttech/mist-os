@@ -536,19 +536,6 @@ zx_status_t ButtonsDevice::Init() {
   // Setup.
   for (uint32_t i = 0; i < gpios_.size(); ++i) {
     auto& gpio = gpios_[i];
-    {
-      fidl::WireResult result = gpio.client->SetAltFunction(0);  // 0 means function GPIO.
-      if (!result.ok()) {
-        FDF_LOG(ERROR, "Failed to send SetAltFunction request to gpio %u: %s", i,
-                result.status_string());
-        return result.status();
-      }
-      if (result->is_error()) {
-        FDF_LOG(ERROR, "Failed to set alt function for gpio %u: %s", i,
-                zx_status_get_string(result->error_value()));
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-    }
 
     if (gpio.config.type == BUTTONS_GPIO_TYPE_MATRIX_OUTPUT) {
       fidl::WireResult result = gpio.client->ConfigOut(gpio.config.matrix.output_value);

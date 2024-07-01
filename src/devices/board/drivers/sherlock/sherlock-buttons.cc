@@ -23,6 +23,7 @@
 #include <soc/aml-t931/t931-hw.h>
 
 #include "lib/fidl_driver/cpp/wire_messaging_declarations.h"
+#include "sherlock-gpios.h"
 #include "src/devices/board/drivers/sherlock/sherlock.h"
 
 namespace sherlock {
@@ -49,6 +50,22 @@ static const buttons_gpio_config_t gpios[] = {
 };
 
 zx_status_t Sherlock::ButtonsInit() {
+  gpio_init_steps_.push_back(
+      GpioConfigIn(GPIO_VOLUME_UP, fuchsia_hardware_gpio::GpioFlags::kPullUp));
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOLUME_UP, 0));
+
+  gpio_init_steps_.push_back(
+      GpioConfigIn(GPIO_VOLUME_DOWN, fuchsia_hardware_gpio::GpioFlags::kPullUp));
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOLUME_DOWN, 0));
+
+  gpio_init_steps_.push_back(
+      GpioConfigIn(GPIO_VOLUME_BOTH, fuchsia_hardware_gpio::GpioFlags::kNoPull));
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOLUME_BOTH, 0));
+
+  gpio_init_steps_.push_back(
+      GpioConfigIn(GPIO_MIC_PRIVACY, fuchsia_hardware_gpio::GpioFlags::kNoPull));
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_MIC_PRIVACY, 0));
+
   fidl::Arena<> fidl_arena;
   fdf::Arena buttons_arena('BTTN');
 
@@ -65,6 +82,13 @@ zx_status_t Sherlock::ButtonsInit() {
            {{.type = DEVICE_METADATA_BUTTONS_GPIOS,
              .data = std::vector(reinterpret_cast<const uint8_t*>(&gpios),
                                  reinterpret_cast<const uint8_t*>(&gpios) + sizeof(gpios))}}}}};
+
+  const std::vector<fuchsia_driver_framework::BindRule> kGpioInitRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kGpioInitProps = {
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
 
   const std::vector<fuchsia_driver_framework::BindRule> kVolUpRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
@@ -111,6 +135,10 @@ zx_status_t Sherlock::ButtonsInit() {
   };
 
   std::vector<fuchsia_driver_framework::ParentSpec> parents = {
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = std::move(kGpioInitRules),
+          .properties = std::move(kGpioInitProps),
+      }},
       fuchsia_driver_framework::ParentSpec{{
           .bind_rules = std::move(kVolUpRules),
           .properties = std::move(kVolUpProps),

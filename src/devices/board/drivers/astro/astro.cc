@@ -70,6 +70,10 @@ int Astro::Thread() {
     zxlogf(ERROR, "PwmInit failed: %d", status);
   }
 
+  if ((status = ButtonsInit()) != ZX_OK) {
+    zxlogf(ERROR, "ButtonsInit failed: %d", status);
+  }
+
   // ClkInit() must be called after other subsystems that bind to clock have had a chance to add
   // their init steps.
   if ((status = ClkInit()) != ZX_OK) {
@@ -95,10 +99,6 @@ int Astro::Thread() {
 
   if ((status = PowerInit()) != ZX_OK) {
     zxlogf(ERROR, "PowerInit failed: %d", status);
-  }
-
-  if ((status = ButtonsInit()) != ZX_OK) {
-    zxlogf(ERROR, "ButtonsInit failed: %d", status);
   }
 
   if ((status = MaliInit()) != ZX_OK) {

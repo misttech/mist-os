@@ -85,6 +85,10 @@ int Nelson::Thread() {
     zxlogf(ERROR, "PwmInit failed: %d", status);
   }
 
+  if ((status = ButtonsInit()) != ZX_OK) {
+    zxlogf(ERROR, "ButtonsInit failed: %d", status);
+  }
+
   // ClkInit() must be called after other subsystems that bind to clock have had a chance to add
   // their init steps.
   if ((status = ClkInit()) != ZX_OK) {
@@ -107,10 +111,6 @@ int Nelson::Thread() {
 
   if ((status = RegistersInit()) != ZX_OK) {
     zxlogf(ERROR, "RegistersInit failed: %d", status);
-  }
-
-  if ((status = ButtonsInit()) != ZX_OK) {
-    zxlogf(ERROR, "ButtonsInit failed: %d", status);
   }
 
   if ((status = CpuInit()) != ZX_OK) {
