@@ -35,7 +35,7 @@ sdk_source_set("cpp") {
     "macros.h",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources += [
       "logging_backend_fuchsia.cc",
       "logging_backend_fuchsia_globals.h",

@@ -58,10 +58,17 @@ executable("dash") {
     "src/trap.c",
     "src/var.c",
   ]
-  configs += [
-    ":config",
-    "//build/config/fuchsia:static_cpp_standard_library",
-  ]
+  if (is_mistos) {
+    configs += [
+      ":config",
+      "//build/config/mistos:static_cpp_standard_library",
+    ]
+  } else {
+    configs += [
+      ":config",
+      "//build/config/fuchsia:static_cpp_standard_library",
+    ]
+  }
   deps = [
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
     "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp",

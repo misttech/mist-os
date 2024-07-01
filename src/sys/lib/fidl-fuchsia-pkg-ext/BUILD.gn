@@ -40,7 +40,7 @@ rustc_library("fidl-fuchsia-pkg-ext") {
     "//third_party/rust_crates:typed-builder",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     deps += [
       "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
       "//src/lib/zircon/rust:fuchsia-zircon-status",
