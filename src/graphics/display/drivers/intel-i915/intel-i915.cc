@@ -2201,37 +2201,6 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
   txn.Reply(ZX_OK, txn.requested_state());
 }
 
-void Controller::DdkResume(ddk::ResumeTxn txn) {
-  fbl::AutoLock lock(&display_lock_);
-  BringUpDisplayEngine(true);
-
-  pch_engine_->RestoreNonClockParameters();
-
-  if (!is_tgl(device_id_)) {
-    // TODO(https://fxbug.dev/42060601): Intel's documentation states that this field
-    // should only be written once, at system boot. Either delete this, or
-    // document an experiment confirming that this write works as intended.
-    //
-    // Kaby Lake: IHD-OS-KBL-Vol 2c-1.17 Part 1 page 444
-    // Skylake: IHD-OS-SKL-Vol 2c-05.16 Part 1 page 440
-    registers::DdiRegs(DdiId::DDI_A)
-        .BufferControl()
-        .ReadFrom(mmio_space())
-        .set_ddi_e_disabled_kaby_lake(ddi_e_disabled_)
-        .WriteTo(mmio_space());
-  }
-
-  for (auto& disp : display_devices_) {
-    if (!disp->Resume()) {
-      zxlogf(ERROR, "Failed to resume display");
-    }
-  }
-
-  interrupts_.Resume();
-
-  txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
-}
-
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
   zx_status_t status =

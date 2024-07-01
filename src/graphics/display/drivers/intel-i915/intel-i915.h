@@ -52,8 +52,7 @@ typedef struct buffer_allocation {
 } buffer_allocation_t;
 
 class Controller;
-using DeviceType =
-    ddk::Device<Controller, ddk::Initializable, ddk::Unbindable, ddk::Suspendable, ddk::Resumable>;
+using DeviceType = ddk::Device<Controller, ddk::Initializable, ddk::Unbindable, ddk::Suspendable>;
 
 class Controller : public DeviceType,
                    public ddk::DisplayControllerImplProtocol<Controller, ddk::base_protocol>,
@@ -74,7 +73,6 @@ class Controller : public DeviceType,
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
   void DdkSuspend(ddk::SuspendTxn txn);
-  void DdkResume(ddk::ResumeTxn txn);
 
   // display controller protocol ops
   void DisplayControllerImplSetDisplayControllerInterface(
