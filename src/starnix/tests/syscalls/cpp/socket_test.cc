@@ -99,7 +99,7 @@ void* reader(void* arg) {
     size_t to_read = read_info->length - read_info->bytes_read;
     fflush(stdout);
     ssize_t bytes_read = read(read_info->fd, read_info->mem + read_info->bytes_read, to_read);
-    EXPECT_LT(-1, bytes_read);
+    EXPECT_LT(-1, bytes_read) << strerror(errno);
     if (bytes_read < 0) {
       return nullptr;
     }
@@ -118,7 +118,7 @@ TEST(UnixSocket, BigWrite) {
   }
 
   int fds[2];
-  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds)) << strerror(errno);
 
   read_info_spec read_info;
   read_info.mem = new unsigned char[write_size];
@@ -134,11 +134,11 @@ TEST(UnixSocket, BigWrite) {
   while (write_count < write_size) {
     size_t to_send = write_size - write_count;
     ssize_t bytes_read = write(fds[0], send_mem + write_count, to_send);
-    ASSERT_LT(-1, bytes_read);
+    ASSERT_LT(-1, bytes_read) << strerror(errno);
     write_count += bytes_read;
   }
 
-  ASSERT_EQ(0, pthread_join(read_thread, nullptr));
+  ASSERT_EQ(0, pthread_join(read_thread, nullptr)) << strerror(errno);
 
   close(fds[0]);
   close(fds[1]);
