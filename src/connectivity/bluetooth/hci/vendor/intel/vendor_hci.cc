@@ -4,6 +4,7 @@
 
 #include "vendor_hci.h"
 
+#include <endian.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/object.h>
 #include <lib/zx/time.h>
