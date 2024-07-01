@@ -76,7 +76,7 @@ class BlockDevice : public Device,
   void txn_complete(block_txn_t* txn, zx_status_t status);
 
   // The main virtio ring.
-  Ring vring_ = {this};
+  Ring vring_{this};
 
   // Lock to be used around Ring::AllocDescChain and FreeDesc.
   // TODO: Move this into Ring class once it's certain that other users of the class are okay with

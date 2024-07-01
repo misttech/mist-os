@@ -316,7 +316,7 @@ class TestVirtioDevice : public virtio::Device, public DeviceType {
   void DdkRelease() { delete this; }
 
  private:
-  virtio::Ring ring_ = {this};
+  virtio::Ring ring_{this};
 };
 
 class TestVirtioSharedMemoryDevice : public virtio::Device,
