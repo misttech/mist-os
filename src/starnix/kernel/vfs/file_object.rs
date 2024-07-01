@@ -1539,7 +1539,9 @@ impl FileObject {
         if !self.can_write() {
             return error!(EINVAL);
         }
-        self.node().ftruncate(locked, current_task, length)
+        self.node().ftruncate(locked, current_task, length)?;
+        self.notify(InotifyMask::MODIFY);
+        Ok(())
     }
 
     pub fn fallocate<L>(

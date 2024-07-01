@@ -367,7 +367,6 @@
                 "GetrusageTest.IgnoreZombie",
 
                 // inotify_test
-                "Inotify.TruncateGeneratesModifyEvent",
                 "Inotify.UtimesGeneratesAttribEvent",
                 "Inotify.UnmatchedEventsAreDiscarded",
                 "Inotify.ControlEvents",
